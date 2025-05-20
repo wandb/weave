@@ -3,9 +3,18 @@ type ExtraKeysAllowed = {
   [key: string]: any;
 };
 
+export const ComputedCallStatuses = {
+  success: 'success' as const,
+  error: 'error' as const,
+  running: 'running' as const,
+  descendant_error: 'descendant_error' as const,
+} as const;
+export type ComputedCallStatusType = keyof typeof ComputedCallStatuses;
+
 type WeaveSummarySchema = {
   costs?: {[key: string]: LLMCostSchema};
   latency_ms?: number; // latency in milliseconds
+  status?: ComputedCallStatusType;
 } & ExtraKeysAllowed;
 
 export type LLMUsageSchema = {
@@ -359,6 +368,17 @@ export type CompletionsCreateReq = {
 export type CompletionsCreateRes = {
   response: any;
   weave_call_id?: string;
+};
+
+export type ProjectStatsReq = {
+  project_id: string;
+};
+
+export type ProjectStatsRes = {
+  trace_storage_size_bytes: number;
+  objects_storage_size_bytes: number;
+  tables_storage_size_bytes: number;
+  files_storage_size_bytes: number;
 };
 
 export enum ContentType {

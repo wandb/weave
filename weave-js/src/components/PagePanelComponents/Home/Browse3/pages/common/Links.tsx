@@ -228,9 +228,6 @@ export const OpVersionLink: React.FC<{
   color?: string;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  // const text = props.hideName
-  //   ? props.version
-  //   : props.opName + ': ' + truncateID(props.version);
   const text = opVersionText(props.opName, props.versionIndex);
   const to = peekingRouter.opVersionUIUrl(
     props.entityName,
@@ -296,6 +293,7 @@ export const CallLink: React.FC<{
   focusedCallId?: string;
   tracetree?: boolean;
   icon?: React.ReactNode;
+  noName?: boolean;
   color?: string;
   isEval?: boolean;
 }> = props => {
@@ -351,16 +349,18 @@ export const CallLink: React.FC<{
             minWidth: 0,
           }}>
           {props.icon}
-          <span
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              flexGrow: 1,
-              flexShrink: 1,
-            }}>
-            {opName}
-          </span>
+          {!props.noName && (
+            <span
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flexGrow: 1,
+                flexShrink: 1,
+              }}>
+              {opName}
+            </span>
+          )}
           <span style={{flexShrink: 0}}>
             <Id id={props.callId} type="Call" />
           </span>

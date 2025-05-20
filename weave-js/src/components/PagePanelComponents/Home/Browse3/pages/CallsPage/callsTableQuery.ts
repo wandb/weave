@@ -294,6 +294,7 @@ export const convertHighLevelFilterToLowLevelFilter = (
     parentIds: effectiveFilter.parentId
       ? [effectiveFilter.parentId]
       : undefined,
+    runIds: effectiveFilter.runIds,
   };
 };
 

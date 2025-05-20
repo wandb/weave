@@ -14,7 +14,7 @@ describe('Client API', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env = { ...originalEnv };
+    process.env = {...originalEnv};
 
     // Mock getWandbConfigs
     (getWandbConfigs as jest.Mock).mockReturnValue({
@@ -120,7 +120,9 @@ describe('Client API', () => {
     test('throws error if connection verification fails', async () => {
       (TraceServerApi as jest.Mock).mockImplementation(() => ({
         health: {
-          readRootHealthGet: jest.fn().mockRejectedValue(new Error('Connection failed')),
+          readRootHealthGet: jest
+            .fn()
+            .mockRejectedValue(new Error('Connection failed')),
         },
       }));
 

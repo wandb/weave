@@ -16,12 +16,13 @@ import React, {
   FC,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import {TEAL_600} from '../../../../../../common/css/color.styles';
+import {useDeepMemo} from '../../../../../../common/state/hooks';
 import {monthRoundedTime} from '../../../../../../common/util/time';
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {makeRefCall} from '../../../../../../util/refs';
@@ -51,9 +52,12 @@ import {
 } from '../CallPage/cost';
 import {isEvaluateOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
-import {STATUS_TO_FILTER, StatusChip} from '../common/StatusChip';
+import {StatusChip} from '../common/StatusChip';
 import {buildDynamicColumns} from '../common/tabularListViews/columnBuilder';
-import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
+import {
+  ComputedCallStatuses,
+  TraceCallSchema,
+} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
   traceCallLatencyMs,
@@ -61,9 +65,11 @@ import {
   traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
+import {FlattenedCallData} from './CallsTable';
 import {
   insertPath,
   isDynamicCallColumn,
+  Path,
   pathToString,
   stringToPath,
 } from './callsTableColumnsUtil';
@@ -73,6 +79,7 @@ import {OpVersionIndexText} from './OpVersionIndexText';
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = [
   'summary.usage',
   'summary.weave',
+  'summary.status_counts',
   'feedback',
 ];
 
@@ -80,7 +87,8 @@ export const useCallsTableColumns = (
   entity: string,
   project: string,
   effectiveFilter: WFHighLevelCallFilter,
-  tableData: TraceCallSchema[],
+  currentViewId: string,
+  tableData: FlattenedCallData[],
   expandedRefCols: Set<string>,
   onCollapse: (col: string) => void,
   onExpand: (col: string) => void,
@@ -128,10 +136,12 @@ export const useCallsTableColumns = (
     [columnsWithRefs]
   );
 
+  // If either of these values has changed we'll reset the dynamic columns.
+  const resetDep = {effectiveFilter, currentViewId};
   const allDynamicColumnNames = useAllDynamicColumnNames(
     tableData,
     shouldIgnoreColumn,
-    effectiveFilter
+    resetDep
   );
 
   // Determine what sort of view we are looking at based on the filter
@@ -386,7 +396,7 @@ function buildCallsTableColumns(
       },
       renderCell: cellParams => {
         const valueStatus = traceCallStatusCode(cellParams.row);
-        const valueFilter = STATUS_TO_FILTER[valueStatus];
+        const valueFilter = ComputedCallStatuses[valueStatus];
         return (
           <CellFilterWrapper
             onUpdateFilter={onUpdateFilter}
@@ -686,7 +696,7 @@ function buildCallsTableColumns(
         return (
           <div className="flex h-full w-full items-center justify-center">
             <StatusChip
-              value="ERROR"
+              value={ComputedCallStatuses.error}
               tooltipOverride="There was an error fetching the cost for this call."
             />
           </div>
@@ -709,7 +719,7 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: true,
     valueGetter: (unused: any, row: any) => {
-      if (traceCallStatusCode(row) === 'UNSET') {
+      if (traceCallStatusCode(row) === ComputedCallStatuses.running) {
         // Call is still in progress, latency will be 0.
         // Displaying nothing seems preferable to being misleading.
         return null;
@@ -717,7 +727,9 @@ function buildCallsTableColumns(
       return traceCallLatencyS(row);
     },
     renderCell: cellParams => {
-      if (traceCallStatusCode(cellParams.row) === 'UNSET') {
+      if (
+        traceCallStatusCode(cellParams.row) === ComputedCallStatuses.running
+      ) {
         // Call is still in progress, latency will be 0.
         // Displaying nothing seems preferable to being misleading.
         return null;
@@ -757,7 +769,7 @@ function buildCallsTableColumns(
           return (
             <div className="flex h-full w-full items-center justify-center">
               <StatusChip
-                value="ERROR"
+                value={ComputedCallStatuses.error}
                 tooltipOverride="There was an error fetching the storage size for this call."
               />
             </div>
@@ -789,24 +801,14 @@ function buildCallsTableColumns(
         return <span>{runId}</span>;
       }
       const [entityName, projectName, runName] = parts;
-      // The filtering here is kind of hacky.
-      // We would need the project internal id to construct an equals filter,
-      // or we need to pass the restriction in as part of the "filter" argument
-      // instead of the "query" argument. A slight improvement that wouldn't go
-      // that far would be if we had an "ends with" operator.
       return (
-        <CellFilterWrapper
+        <CellValueRun
+          entity={entityName}
+          project={projectName}
+          run={runName}
           onUpdateFilter={onUpdateFilter}
-          field="wb_run_id"
           rowId={cellParams.id.toString()}
-          operation="(string): contains"
-          value={':' + runName}>
-          <CellValueRun
-            entity={entityName}
-            project={projectName}
-            run={runName}
-          />
-        </CellFilterWrapper>
+        />
       );
     },
   });
@@ -845,39 +847,36 @@ const useAllDynamicColumnNames = (
   shouldIgnoreColumn: (col: string) => boolean,
   resetDep: any
 ) => {
-  const [allDynamicColumnNames, setAllDynamicColumnNames] = useState<string[]>(
-    []
-  );
+  const prevColumnsRef = useRef<string[]>([]);
+  const memoedDep = useDeepMemo(resetDep);
+  const prevResetDepRef = useRef<any>(memoedDep);
 
-  useEffect(() => {
-    setAllDynamicColumnNames(last => {
-      let nextAsPaths = last
-        .filter(c => !shouldIgnoreColumn(c))
-        .map(stringToPath);
-      tableData.forEach(row => {
-        Object.keys(row).forEach(key => {
-          const keyAsPath = stringToPath(key);
-          if (isDynamicCallColumn(keyAsPath)) {
-            nextAsPaths = insertPath(nextAsPaths, stringToPath(key));
-          }
-        });
-      });
+  // If resetDep changed, clear the previous columns
+  if (prevResetDepRef.current !== memoedDep) {
+    prevColumnsRef.current = [];
+    prevResetDepRef.current = memoedDep;
+  }
 
-      return nextAsPaths.map(pathToString);
+  // Start with any previous columns
+  let currentColumnPaths: Path[] = prevColumnsRef.current
+    .filter(c => !shouldIgnoreColumn(c))
+    .map(stringToPath);
+
+  // Add new columns from the current table data
+  tableData.forEach(row => {
+    Object.keys(row).forEach(key => {
+      const keyAsPath = stringToPath(key);
+      if (isDynamicCallColumn(keyAsPath)) {
+        currentColumnPaths = insertPath(currentColumnPaths, keyAsPath);
+      }
     });
-  }, [shouldIgnoreColumn, tableData]);
+  });
 
-  useEffect(() => {
-    // Here, we reset the dynamic column names when the filter changes.
-    // Both branches of the if statement are the same. I just wanted to
-    // ensure that the `resetDep` is included in the dependency array.
-    // Perhaps there is a better way to do this?
-    if (resetDep) {
-      setAllDynamicColumnNames([]);
-    } else {
-      setAllDynamicColumnNames([]);
-    }
-  }, [resetDep]);
+  // Convert paths back to strings
+  const allDynamicColumnNames = currentColumnPaths.map(pathToString);
+
+  // Store the current columns for the next render
+  prevColumnsRef.current = allDynamicColumnNames;
 
   return allDynamicColumnNames;
 };

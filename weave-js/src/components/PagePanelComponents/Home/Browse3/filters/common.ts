@@ -37,7 +37,6 @@ export const UNFILTERABLE_FIELDS = [
   'tokens',
   'cost',
   'wb_user_id', // Option+Click works
-  'wb_run_id', // Option+Click works
   'total_storage_size_bytes',
 ];
 
@@ -51,6 +50,7 @@ export const FIELD_LABELS: Record<string, string> = {
   'summary.weave.status': 'Status',
   'summary.weave.trace_name': 'Name',
   started_at: 'Called',
+  wb_run_id: 'Run',
   wb_user_id: 'User',
   'feedback.[*].trigger_ref': 'Monitored',
 };
@@ -79,6 +79,7 @@ export const FIELD_TYPE: Record<string, string> = {
   id: 'id',
   'summary.weave.status': 'status',
   'summary.weave.trace_name': 'string',
+  wb_run_id: 'run',
   wb_user_id: 'user',
   started_at: 'datetime',
   'feedback.[*].trigger_ref': 'monitor',
@@ -290,6 +291,15 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       {
         value: '(string): in',
         label: 'in',
+        group: 'string',
+      },
+    ];
+  }
+  if ('run' === fieldType) {
+    return [
+      {
+        value: '(string): equals',
+        label: 'equals',
         group: 'string',
       },
     ];

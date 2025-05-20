@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -24,6 +25,8 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace_server.interface.builtin_object_classes import leaderboard
+
+logger = logging.getLogger(__name__)
 
 _global_postprocess_inputs: PostprocessInputsFunc | None = None
 _global_postprocess_output: PostprocessOutputFunc | None = None
@@ -157,7 +160,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
                 ref.name,
                 ref.digest,
             )
-        print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
+        logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
     return ref
 
 
@@ -262,6 +265,10 @@ def finish() -> None:
 
     """
     weave_init.finish()
+
+    # Flush any remaining calls
+    if wc := weave_client_context.get_weave_client():
+        wc.finish()
 
 
 # As of this writing, most important symbols are

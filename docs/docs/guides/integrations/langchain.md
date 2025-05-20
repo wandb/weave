@@ -248,7 +248,7 @@ examples = [
 
 @weave.op()
 def fruit_name_score(target: dict, output: dict) -> dict:
-    return {"correct": target["fruit"] == model_output["fruit"]}
+    return {"correct": target["fruit"] == output["fruit"]}
 
 
 evaluation = weave.Evaluation(
