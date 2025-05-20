@@ -516,7 +516,7 @@ const RE_WEAVE_OBJECT_REF_PATHNAME = new RegExp(
     '/',
     '(object|op)', // Weave kind
     '/',
-    '([a-zA-Z0-9-_/. ]{1,128})', // Artifact name
+    '([^\\#?%:]{1,128})', // Artifact name
     ':',
     '([*]|[a-zA-Z0-9]+)', // Artifact version, allowing '*' for any version
     '/?', // Ref extra portion is optional
@@ -1268,8 +1268,16 @@ export const useExpandedNode = (
     if (node.nodeType !== 'output') {
       return;
     }
+    // The this variable from the stack is used to determine the file table op to use when
+    // calling tabelType.normalizeTableLike(node).
+    const singleRunWorkspaceVar = stack.find(
+      stackVar => stackVar.name === 'singleRunWorkspace'
+    );
+    const stackForExpansion = singleRunWorkspaceVar
+      ? [singleRunWorkspaceVar]
+      : [];
     // TODO: This is a race if we have multiple loading in parallel!
-    expandAll(context.client!, dereffedNode, [])
+    expandAll(context.client!, dereffedNode, stackForExpansion)
       .then(newNode => {
         if (isMounted) {
           setResult({node, value: newNode});
@@ -1279,7 +1287,7 @@ export const useExpandedNode = (
     return () => {
       isMounted = false;
     };
-  }, [context, node, dereffedNode]);
+  }, [context, node, dereffedNode, stack]);
   const finalResult = useMemo(() => {
     if (error != null) {
       // rethrow in render thread

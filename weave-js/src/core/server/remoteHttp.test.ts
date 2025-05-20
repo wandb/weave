@@ -1,5 +1,3 @@
-/* tslint:disable */
-
 import _ from 'lodash';
 import {vi} from 'vitest';
 

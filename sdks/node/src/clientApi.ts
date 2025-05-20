@@ -13,7 +13,8 @@ export let globalClient: WeaveClient | null = null;
 
 /**
  * Log in to Weights & Biases (W&B) using the provided API key.
- * This function saves the credentials to your netrc file for future use.
+ * This function attempts to save the credentials to your netrc file for future use,
+ * but will continue even if it cannot write to the file system.
  *
  * @param {string} apiKey - Your W&B API key.
  * @param {string} [host] - (Optional) The host name (usually only needed if you're using a custom W&B server).
@@ -25,7 +26,9 @@ export async function login(apiKey: string, host?: string) {
     host = defaultHost;
   }
   if (!apiKey) {
-    throw new Error('API key is required for login. Please provide a valid API key.');
+    throw new Error(
+      'API key is required for login. Please provide a valid API key.'
+    );
   }
   const {traceBaseUrl} = getUrls(host);
 
@@ -47,13 +50,23 @@ export async function login(apiKey: string, host?: string) {
     );
   }
 
-  const netrc = new Netrc();
-  // Only save to netrc if host and a non-empty apiKey are provided
-  if (host && apiKey.trim()) {
-    netrc.setEntry({machine: host, login: 'user', password: apiKey});
-    netrc.save();
-    console.log(`Successfully logged in. Credentials saved for ${host}`);
+  // Try to save to netrc, but continue even if it fails
+  try {
+    const netrc = new Netrc();
+    if (host && apiKey.trim()) {
+      netrc.setEntry({machine: host, login: 'user', password: apiKey});
+      netrc.save();
+      console.log(`Successfully logged in. Credentials saved for ${host}`);
+    }
+  } catch (error) {
+    // Log warning but don't fail - the API key can still be used from environment
+    console.warn(
+      'Could not save credentials to netrc file. You may need to set WANDB_API_KEY environment variable for future sessions.'
+    );
   }
+
+  // Set the API key in the environment for the current session
+  process.env.WANDB_API_KEY = apiKey;
 }
 
 /**

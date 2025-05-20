@@ -50,4 +50,4 @@ We allow urls without a prefix in the following cases:
 1. `window.open("https://docs.wandb.com")` - If we detect a literal that starts with http or `/site` we let it through
 2. `window.location.href = file.directUrl` - If we detect `directUrl`, `ref`, or `uploadUrl` we allow them as these are going directly to cloud storage
 
-If you know what you're doing and need to make an exception, simple disable this rule with `// eslint-disable-line wandb/no-unprefixed-urls`
+If you know what you're doing and need to make an exception, simple disable this rule with `// eslint-disable-next-line wandb/no-unprefixed-urls`

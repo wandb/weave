@@ -37,18 +37,14 @@ export type EvaluationComparisonSummary = {
 };
 
 export type EvaluationComparisonResults = {
-  // Inputs are the intersection of all inputs used in the evaluations.
-  // Note, we are able to "merge" the same input digest even if it is
-  // used in different evaluations.
-  inputs: {
-    [rowDigest: string]: DatasetRow;
-  };
-
   // ResultRows are the actual results of running the evaluation against
   // the inputs.
   resultRows: {
     // Each rowDigest is a unique identifier for the input data.
     [rowDigest: string]: {
+      // Optional cache of the raw data row.  This is most frequently populated
+      // if one of the evaluations is an imperative evaluation.
+      rawDataRow?: any;
       // Each RowDigest is further broken down by the evaluations that
       // used the input.
       evaluations: {
@@ -86,14 +82,6 @@ export type EvaluationCall = {
   color: string;
   summaryMetrics: MetricResultMap;
   traceId: string;
-};
-
-/**
- * The DatasetRow is the primary object that defines the input data.
- */
-type DatasetRow = {
-  digest: string;
-  val: any;
 };
 
 /**

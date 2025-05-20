@@ -6,11 +6,12 @@
  * re-fetching the same data multiple times in a single page view.
  */
 
+import {isEmpty} from 'lodash';
 import LRUCache from 'lru-cache';
 
 import {Node} from '../../../../../../core';
 import {
-  CallKey,
+  CacheableCallKey,
   CallSchema,
   ObjectVersionKey,
   ObjectVersionSchema,
@@ -41,9 +42,13 @@ const makeSpecificCache = <K, V>(
   };
 };
 
-export const callCache = makeSpecificCache<CallKey, CallSchema>(key => {
-  return `call:${key.entity}/${key.project}/${key.callId}`;
-});
+export const callCache = makeSpecificCache<CacheableCallKey, CallSchema>(
+  key => {
+    const {entity, project, callId, ...rest} = key;
+    const meta = isEmpty(rest) ? '' : `?meta=${JSON.stringify(rest)}`;
+    return `call:${entity}/${project}/${callId}${meta}`;
+  }
+);
 
 export const opVersionCache = makeSpecificCache<OpVersionKey, OpVersionSchema>(
   key => {

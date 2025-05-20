@@ -5,6 +5,7 @@ import builtins
 import inspect
 import io
 import json
+import logging
 import os
 import re
 import sys
@@ -25,7 +26,10 @@ from weave.trace.refs import ObjectRef
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization import serializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
+from weave.trace.term import logger
 from weave.trace_server.trace_server_interface_util import str_digest
+
+logger = logging.getLogger(__name__)
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
@@ -244,11 +248,13 @@ def reconstruct_signature(fn: Callable) -> str:
 
 
 def get_source_or_fallback(fn: Callable, *, warnings: list[str]) -> str:
-    if is_op(fn):
-        fn = as_op(fn)
-        fn = fn.resolve_fn
+    if fn_is_op := is_op(fn):
+        op = as_op(fn)
+        fn = op.resolve_fn
 
-    if not settings.should_capture_code():
+    if not settings.should_capture_code() or (
+        fn_is_op and not op._code_capture_enabled
+    ):
         # This digest is kept for op versioning purposes
         digest = str_digest(inspect.getsource(fn))
         return textwrap.dedent(
@@ -311,7 +317,7 @@ def get_code_deps_safe(
     try:
         return _get_code_deps(fn, artifact, {}, depth)
     except Exception as e:
-        print(f"Error getting code deps for {fn}: {e}")
+        logger.info(f"Error getting code deps for {fn}: {e}")
         return {
             "import_code": [],
             "code": [CODE_DEP_ERROR_SENTINEL],
@@ -510,6 +516,9 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
             message += "\n  " + warning
 
     op_function_code = get_source_or_fallback(obj, warnings=warnings)
+    if not obj._code_capture_enabled:
+        import_code = []
+        code = []
 
     if settings.should_redact_pii():
         from weave.trace.pii_redaction import redact_pii_string
@@ -558,7 +567,7 @@ def load_instance(
     try:
         mod = __import__(import_name, fromlist=[module_dir])
     except Exception as e:
-        print("Op loading exception. This might be fine!", e)
+        logger.info(f"Op loading exception. This might be fine! {e}")
         import traceback
 
         traceback.print_exc()
@@ -577,7 +586,7 @@ def load_instance(
     # so we resort to looking at the source ast.
     last_op_function = find_last_weave_op_function(inspect.getsource(mod))
     if last_op_function is None:
-        print(
+        logger.info(
             f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=}"
         )
         return None

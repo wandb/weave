@@ -1,7 +1,11 @@
 import copy
 import io
 import json
+import os
+import re
 from typing import TYPE_CHECKING, Any, Callable, Optional
+
+import boto3
 
 import weave
 from weave.trace.op import _add_accumulator, _IteratorWrapper
@@ -51,8 +55,54 @@ def bedrock_on_finish_invoke(
         call.summary.update(summary_update)
 
 
+def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
+    """Extract the model name from an inference profile ARN.
+
+    Args:
+        profile_arn: The inference profile ARN in format:
+            - Simple inference profiles: 'arn:aws:bedrock:region:account-id:inference-profile/model-id'
+            - Application inference profiles: 'arn:aws:bedrock:region:account-id:application-inference-profile/profileId'
+              In the case of application inference profiles, a list of inference profiles is returned,
+              and the model from the first profile is used.
+
+    Returns:
+        The extracted model name (e.g. "amazon.nova-lite-v1:0")
+    """
+    try:
+        aws_region_name = os.environ.get("AWS_REGION_NAME")
+        profile_id = profile_arn.split("/")[-1]
+        bedrock_client = boto3.client("bedrock", region_name=aws_region_name)
+
+        response = bedrock_client.get_inference_profile(
+            inferenceProfileIdentifier=profile_id
+        )
+
+        # Get the first model ARN from the models array
+        model_arn = response["models"][0]["modelArn"]
+
+        # Extract the model ID from the inference profile ARN
+        model_id = model_arn.split("/")[-1]
+
+        return model_id  # noqa: TRY300
+    except Exception as e:
+        # Fallback to simple inference profile if the application inference profile format fails
+        model_part = profile_arn.split("/")[-1]
+        model_name = re.sub(r"^[a-z]{2}\.", "", model_part)
+        return model_name
+
+
 def postprocess_inputs_converse(inputs: dict[str, Any]) -> dict[str, Any]:
-    return inputs.get("kwargs", {})
+    """Post-process the inputs for the converse API call.
+
+    This function extracts the model name from the inference profile ARN if any
+    and updates the modelId in the kwargs to match model-cost list.
+    """
+    kwargs = inputs.get("kwargs", {})
+    if "modelId" in kwargs and "arn" in kwargs["modelId"]:
+        kwargs["modelId"] = extract_model_name_from_inference_profile_arn(
+            kwargs["modelId"]
+        )
+    return kwargs
 
 
 def postprocess_inputs_apply_guardrail(inputs: dict[str, Any]) -> dict[str, Any]:

@@ -2,9 +2,7 @@ import _ from 'lodash';
 
 import type {EditingNode, EditingOp} from './types';
 
-// TODO: is this unique enough for now?
 export const cyrb53 = (str: string, seed = 0) => {
-  /* tslint:disable:no-bitwise */
   let h1 = 0xdeadbeef ^ seed;
   let h2 = 0x41c6ce57 ^ seed;
   for (let i = 0, ch; i < str.length; i++) {
@@ -19,7 +17,6 @@ export const cyrb53 = (str: string, seed = 0) => {
     Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
     Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return 4294967296 * (2097151 & h2) + (h1 >>> 0);
-  /* tslint:enable:no-bitwise */
 };
 
 export function hash(str: string): string {

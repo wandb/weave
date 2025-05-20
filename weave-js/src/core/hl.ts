@@ -279,7 +279,8 @@ export function expandGeneratedWeaveOp(
     node.fromOp.inputs,
     (innerNode: Node) =>
       refineEditingNode(context, innerNode, macroStack) as any,
-    context
+    context,
+    macroStack
   );
 }
 

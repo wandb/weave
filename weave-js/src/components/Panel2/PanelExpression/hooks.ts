@@ -382,6 +382,7 @@ export function usePanelExpressionState(props: PanelExpressionProps) {
 
   const curPanelName =
     handler != null ? getStackIdAndName(handler).displayName : '';
+  const curPanelId = handler != null ? getStackIdAndName(handler).id : '';
 
   const [editingExp, setEditingExp] = useSynchronizedState(refinedExpression);
 
@@ -693,6 +694,7 @@ export function usePanelExpressionState(props: PanelExpressionProps) {
     configOpen,
     configurableNodeSettings,
     curPanelName,
+    curPanelId,
     deleteTailPanelOps,
     discardEditingConfig,
     editingConfigIsModified,

@@ -1488,7 +1488,6 @@ export async function getColumnDomainRanges(
               );
               return opMap({
                 arr: siblingRows,
-                /* tslint:disable-next-line */
                 mapFn: constFunction({row: siblingRows.type}, ({row}) =>
                   ts.groupBy.includes(colId)
                     ? opPick({

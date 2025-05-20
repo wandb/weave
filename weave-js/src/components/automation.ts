@@ -87,10 +87,8 @@ export const useWeaveAutomation = (automationId: string | null) => {
           if (serverCommand.command === 'run_js') {
             try {
               // TODO check this out
-              // tslint:disable
               // eslint-disable-next-line no-eval
               eval(serverCommand.js);
-              // tslint:enable
             } catch (e: any) {
               console.log('Weave automation. Error:', e);
               await sendStatusError(automationId, e.stack.toString());

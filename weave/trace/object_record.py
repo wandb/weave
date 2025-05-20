@@ -3,11 +3,13 @@ from __future__ import annotations
 import dataclasses
 import types
 from inspect import getmro, isclass
-from typing import Any, Callable, Union
-
-import pydantic
+from typing import Any, Callable
 
 from weave.trace.op import is_op
+from weave.trace_server.client_server_common.pydantic_util import (
+    PydanticBaseModelGeneral,
+    pydantic_asdict_one_level,
+)
 
 
 class ObjectRecord:
@@ -38,21 +40,24 @@ class ObjectRecord:
     def map_values(self, fn: Callable) -> ObjectRecord:
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
+    def unwrap(self) -> dict[str, Any]:
+        # Nasty import to avoid circular import
+        from weave.trace.vals import unwrap
 
-PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
-
-
-def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
-    if isinstance(obj, pydantic.BaseModel):
-        return obj.model_fields
-    elif isinstance(obj, pydantic.v1.BaseModel):
-        return obj.__fields__
-    else:
-        raise TypeError(f"{obj} is not a pydantic model")
-
-
-def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
-    return {k: getattr(obj, k) for k in pydantic_model_fields(obj)}
+        unwrapped_one_level = {
+            k: v
+            for k, v in self.__dict__.items()
+            if k
+            not in [
+                "_class_name",
+                "_bases",
+                "map_values",
+                "unwrap",
+                "__repr__",
+                "__eq__",
+            ]
+        }
+        return unwrap(unwrapped_one_level)
 
 
 def class_all_bases_names(cls: type) -> list[str]:

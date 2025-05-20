@@ -61,3 +61,22 @@ export function formatRelativeTime(unixTimestamp: number): string {
     return inFuture ? 'in a moment' : 'just now';
   }
 }
+
+export function convertBytes(result: any) {
+  if (typeof result !== 'number') {
+    return '';
+  }
+  if (result > 1e9) {
+    return `${(result / 1e9).toFixed(1)}GB`;
+  } else if (result > 1e6) {
+    return `${(result / 1e6).toFixed(1)}MB`;
+  } else if (result > 1000) {
+    return `${(result / 1000).toFixed(1)}kB`;
+  }
+  return `${result}B`;
+}
+
+export function getJsonPayloadSize(json: any): number {
+  const jsonString = JSON.stringify(json);
+  return new Blob([jsonString]).size;
+}

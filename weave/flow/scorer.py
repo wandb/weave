@@ -98,7 +98,9 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
         return {"mean": np.mean(data).item()}
     elif isinstance(val, dict):
         result = {}
-        all_keys = set().union(*[x.keys() for x in data if isinstance(x, dict)])
+        all_keys = list(
+            dict.fromkeys([k for d in data if isinstance(d, dict) for k in d.keys()])
+        )
         for k in all_keys:
             if (
                 summary := auto_summarize(

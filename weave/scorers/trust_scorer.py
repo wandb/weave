@@ -358,9 +358,11 @@ class WeaveTrustScorerV1(weave.Scorer):
     @weave.op
     def score(
         self,
+        *,
         query: str,
         context: Union[str, list[str]],
         output: str,  # Pass the output of a LLM to this parameter for example
+        **kwargs: Any,
     ) -> WeaveScorerResult:
         """
         Score the query, context and output against 5 different scorers.

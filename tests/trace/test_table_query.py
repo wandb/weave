@@ -1,6 +1,11 @@
 import random
 from collections.abc import Iterator
 
+import pytest
+
+from tests.trace.util import (
+    client_is_sqlite,
+)
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
@@ -265,40 +270,40 @@ def test_table_query_multiple_sort_criteria(client: WeaveClient):
 def test_table_query_stats(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 
-    stats_res = client.server.table_query_stats(
-        tsi.TableQueryStatsReq(
+    stats_res = client.server.table_query_stats_batch(
+        tsi.TableQueryStatsBatchReq(
             project_id=client._project_id(),
-            digest=digest,
+            digests=[digest],
         )
     )
 
-    assert stats_res.count == len(data)
+    assert stats_res.tables[0].count == len(data)
 
 
 def test_table_query_stats_empty(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 0, 0)
 
-    stats_res = client.server.table_query_stats(
-        tsi.TableQueryStatsReq(
+    stats_res = client.server.table_query_stats_batch(
+        tsi.TableQueryStatsBatchReq(
             project_id=client._project_id(),
-            digest=digest,
+            digests=[digest],
         )
     )
 
-    assert stats_res.count == len(data)
+    assert stats_res.tables[0].count == len(data)
 
 
 def test_table_query_stats_missing(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 
-    stats_res = client.server.table_query_stats(
-        tsi.TableQueryStatsReq(
+    stats_res = client.server.table_query_stats_batch(
+        tsi.TableQueryStatsBatchReq(
             project_id=client._project_id(),
-            digest="missing",
+            digests=["missing"],
         )
     )
 
-    assert stats_res.count == 0
+    assert len(stats_res.tables) == 0
 
 
 def generate_duplication_simple_table_data(
@@ -333,13 +338,13 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
             digest=res1["digest"],
         )
     )
-    stats_res = client.server.table_query_stats(
-        tsi.TableQueryStatsReq(
+    stats_res = client.server.table_query_stats_batch(
+        tsi.TableQueryStatsBatchReq(
             project_id=client._project_id(),
-            digest=res1["digest"],
+            digests=[res1["digest"]],
         )
     )
-    assert len(res.rows) == stats_res.count == 10
+    assert len(res.rows) == stats_res.tables[0].count == 10
     assert [r.original_index for r in res.rows] == list(range(10))
 
     # Test filtered query for res1
@@ -360,13 +365,13 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
             digest=res2["digest"],
         )
     )
-    stats_res = client.server.table_query_stats(
-        tsi.TableQueryStatsReq(
+    stats_res = client.server.table_query_stats_batch(
+        tsi.TableQueryStatsBatchReq(
             project_id=client._project_id(),
-            digest=res2["digest"],
+            digests=[res2["digest"]],
         )
     )
-    assert len(res.rows) == stats_res.count == 20
+    assert len(res.rows) == stats_res.tables[0].count == 20
     assert [r.original_index for r in res.rows] == list(range(20))
 
     # Test filtered query for res2
@@ -387,13 +392,13 @@ def test_table_query_with_duplicate_row_digests(client: WeaveClient):
             digest=res3["digest"],
         )
     )
-    stats_res = client.server.table_query_stats(
-        tsi.TableQueryStatsReq(
+    stats_res = client.server.table_query_stats_batch(
+        tsi.TableQueryStatsBatchReq(
             project_id=client._project_id(),
-            digest=res3["digest"],
+            digests=[res3["digest"]],
         )
     )
-    assert len(res.rows) == stats_res.count == 30
+    assert len(res.rows) == stats_res.tables[0].count == 30
     assert [r.original_index for r in res.rows] == list(range(30))
 
     # Test filtered query for res3
@@ -446,3 +451,21 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
     # this is the same table, so we should get the same number of rows
     assert len(res.rows) == 10
     assert [r.original_index for r in res.rows] == list(range(10))
+
+
+def test_table_query_stats_with_storage_size(client: WeaveClient):
+    if client_is_sqlite(client):
+        pytest.skip("SQLite does not support storage size")
+
+    digest, row_digests, data = generate_table_data(client, 10, 10)
+
+    stats_res = client.server.table_query_stats_batch(
+        tsi.TableQueryStatsBatchReq(
+            project_id=client._project_id(),
+            digests=[digest],
+            include_storage_size=True,
+        )
+    )
+
+    assert stats_res.tables[0].count == len(data)
+    assert stats_res.tables[0].storage_size_bytes > 0

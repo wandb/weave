@@ -280,11 +280,23 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         # I am not sure the best way to cache the iterator here. TODO
         return self._next_trace_server.table_query_stream(req)
 
+    # This is a legacy endpoint, it should be removed once the client is mostly updated
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query_stats(req)
         return self._with_cache_pydantic(
             self._next_trace_server.table_query_stats, req, tsi.TableQueryStatsRes
+        )
+
+    def table_query_stats_batch(
+        self, req: tsi.TableQueryStatsBatchReq
+    ) -> tsi.TableQueryStatsBatchRes:
+        if any(not digest_is_cacheable(digest) for digest in req.digests or []):
+            return self._next_trace_server.table_query_stats_batch(req)
+        return self._with_cache_pydantic(
+            self._next_trace_server.table_query_stats_batch,
+            req,
+            tsi.TableQueryStatsBatchRes,
         )
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
@@ -344,6 +356,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             lambda content: tsi.FileContentReadRes(content=content),
         )
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        return self._with_cache_pydantic(
+            self._next_trace_server.files_stats,
+            req,
+            tsi.FilesStatsRes,
+        )
+
     # Remaining Un-cacheable Methods:
 
     # Call API
@@ -370,6 +389,10 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         return self._next_trace_server.call_update(req)
+
+    # OTEL API
+    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        return self._next_trace_server.otel_export(req)
 
     # Op API
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
@@ -432,3 +455,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
         return self._next_trace_server.completions_create(req)
+
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        return self._next_trace_server.project_stats(req)

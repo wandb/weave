@@ -12,7 +12,7 @@ import {ErrorBoundary} from '../../../../../../ErrorBoundary';
 import {CellValue} from '../../../../Browse2/CellValue';
 import {
   CellFilterWrapper,
-  OnAddFilter,
+  OnUpdateFilter,
 } from '../../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../../filters/common';
 import {flattenObjectPreservingWeaveTypes} from '../../../flattenObject';
@@ -112,7 +112,7 @@ export function prepareFlattenedDataForTable<T>(
       cleaned[newKey] = flattened[key];
     });
 
-    return cleaned as T & {[key: string]: string};
+    return {...r, ...cleaned} as T & {[key: string]: string};
   });
 }
 /**
@@ -206,7 +206,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
   onCollapse?: (col: string) => void,
   onExpand?: (col: string) => void,
   columnIsSortable?: (col: string) => boolean,
-  onAddFilter?: OnAddFilter
+  onUpdateFilter?: OnUpdateFilter
 ) => {
   const cols: Array<GridColDef<T>> = [];
 
@@ -287,7 +287,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         if (val === undefined) {
           return (
             <CellFilterWrapper
-              onAddFilter={onAddFilter}
+              onUpdateFilter={onUpdateFilter}
               field={key}
               rowId={cellParams.id.toString()}
               operation={'(any): isEmpty'}
@@ -299,7 +299,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         return (
           <ErrorBoundary>
             <CellFilterWrapper
-              onAddFilter={onAddFilter}
+              onUpdateFilter={onUpdateFilter}
               field={key}
               rowId={cellParams.id.toString()}
               operation={null}

@@ -9,7 +9,7 @@ describe('availablePanels', () => {
         list({type: 'image-file'}),
         undefined
       ).stackIds.map(sid => sid.id)
-    ).toEqual(['row.image-file', 'table', 'plot']);
+    ).toEqual(['row.image-file', 'table', 'plot', 'panel-stepper']);
   });
   it('type number[]', () => {
     expect(
@@ -24,6 +24,7 @@ describe('availablePanels', () => {
       'row.Color',
       'table',
       'plot',
+      'panel-stepper',
     ]);
   });
 });

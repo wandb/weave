@@ -9,7 +9,7 @@ import {
   useApolloClient,
   useMutation,
 } from '@apollo/client';
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 
 const SECRETS_QUERY = gql`
   query secrets($entityName: String!) {
@@ -58,7 +58,7 @@ export const useSecrets = ({
   entityName,
 }: {
   entityName: string;
-}): SecretResponse => {
+}): SecretResponse & {refetch: () => void} => {
   const [response, setResponse] = useState<SecretResponse>({
     loading: true,
     entityId: '',
@@ -67,12 +67,15 @@ export const useSecrets = ({
 
   const apolloClient = useApolloClient();
 
-  useEffect(() => {
-    let mounted = true;
-    apolloClient
-      .query({query: SECRETS_QUERY as any, variables: {entityName}})
-      .then(result => {
-        if (!mounted) {
+  const fetchSecrets = useCallback(
+    async (isMounted?: () => boolean) => {
+      try {
+        const result = await apolloClient.query({
+          query: SECRETS_QUERY as any,
+          variables: {entityName},
+          fetchPolicy: 'no-cache',
+        });
+        if (isMounted && !isMounted()) {
           return;
         }
         const secretPayloads = result.data.entity?.secrets ?? [];
@@ -90,13 +93,24 @@ export const useSecrets = ({
           entityId: result.data.entity?.id ?? '',
           secrets,
         });
-      });
+      } catch (error) {
+        if (!isMounted || isMounted()) {
+          setResponse(prev => ({...prev, loading: false}));
+        }
+      }
+    },
+    [apolloClient, entityName]
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    fetchSecrets(() => mounted);
     return () => {
       mounted = false;
     };
-  }, [apolloClient, entityName]);
+  }, [fetchSecrets]);
 
-  return response;
+  return {...response, refetch: () => fetchSecrets()};
 };
 
 interface InsertSecretResponse {

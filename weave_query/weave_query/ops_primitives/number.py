@@ -4,9 +4,10 @@ import typing
 
 import numpy as np
 
+from weave_query import box
+from weave_query import timestamp as weave_timestamp
 from weave_query import weave_types as types
 from weave_query.api import op, weave_class
-from weave_query import timestamp as weave_timestamp
 
 binary_number_op_input_type = {
     "lhs": types.Number(),
@@ -374,6 +375,16 @@ def stddev(numbers):
     if len(non_null_numbers) == 0:
         return None
     return np.std(non_null_numbers).tolist()
+
+
+@op(
+    name="number-isInteger",
+    input_type={"value": types.optional(types.Number())},
+    output_type=types.Boolean(),
+)
+def is_integer(value):
+    unboxed_value = box.unbox(value)
+    return unboxed_value is not None and unboxed_value == int(unboxed_value)
 
 
 @op(

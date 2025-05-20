@@ -58,6 +58,7 @@ from weave.trace.op import (
     should_skip_tracing_for_op,
 )
 from weave.trace.op import op as op_deco
+from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
     CallRef,
     ObjectRef,
@@ -124,10 +125,14 @@ from weave.trace_server.trace_server_interface import (
     RefsReadBatchReq,
     SortBy,
     StartedCallSchemaForInsert,
+    TableAppendSpec,
+    TableAppendSpecPayload,
     TableCreateReq,
     TableCreateRes,
     TableSchemaForInsert,
+    TableUpdateReq,
     TraceServerInterface,
+    TraceStatus,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
@@ -180,8 +185,6 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("page_size must be greater than 0")
         if limit is not None and limit <= 0:
             raise ValueError("limit must be greater than 0")
-        if offset is not None and offset < 0:
-            raise ValueError("offset must be greater than or equal to 0")
 
     @lru_cache
     def _fetch_page(self, index: int) -> list[T]:
@@ -324,12 +327,18 @@ def _make_calls_iterator(
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+        # Add the global offset to the page offset
+        # This ensures the offset is applied only once
+        effective_offset = offset
+        if offset_override is not None:
+            effective_offset += offset_override
+
         return list(
             server.calls_query_stream(
                 CallsQueryReq(
                     project_id=project_id,
                     filter=filter,
-                    offset=offset,
+                    offset=effective_offset,
                     limit=limit,
                     include_costs=include_costs,
                     include_feedback=include_feedback,
@@ -351,17 +360,20 @@ def _make_calls_iterator(
         )
         if limit_override is not None:
             offset = offset_override or 0
-            return min(limit_override, response.count - offset)
+            return min(limit_override, max(0, response.count - offset))
         if offset_override is not None:
             return response.count - offset_override
         return response.count
+
+    if offset_override is not None and offset_override < 0:
+        raise ValueError("offset must be greater than or equal to 0")
 
     return PaginatedIterator(
         fetch_func,
         transform_func=transform_func,
         size_func=size_func,
         limit=limit_override,
-        offset=offset_override,
+        offset=None,  # Set offset to None since we handle it in fetch_func
         page_size=page_size,
     )
 
@@ -416,37 +428,6 @@ def get_obj_name(val: Any) -> str:
     return name
 
 
-def get_ref(obj: Any) -> ObjectRef | None:
-    return getattr(obj, "ref", None)
-
-
-def remove_ref(obj: Any) -> None:
-    if get_ref(obj) is not None:
-        if "ref" in obj.__dict__:  # for methods
-            obj.__dict__["ref"] = None
-        else:
-            obj.ref = None
-
-
-def set_ref(obj: Any, ref: Ref | None) -> None:
-    """Try to set the ref on "any" object.
-
-    We use increasingly complex methods to try to set the ref
-    to support different kinds of objects. This will still
-    fail for python primitives, but those can't be traced anyway.
-    """
-    try:
-        obj.ref = ref
-    except:
-        try:
-            setattr(obj, "ref", ref)
-        except:
-            try:
-                obj.__dict__["ref"] = ref
-            except:
-                raise ValueError(f"Failed to set ref on object of type {type(obj)}")
-
-
 def _get_direct_ref(obj: Any) -> Ref | None:
     if isinstance(obj, WeaveTable):
         # TODO: this path is odd. We want to use table_ref when serializing
@@ -454,7 +435,7 @@ def _get_direct_ref(obj: Any) -> Ref | None:
         # the "container ref", ie a ref to the root object that the WeaveTable
         # is within, with extra pointing to the table.
         return obj.table_ref
-    return getattr(obj, "ref", None)
+    return get_ref(obj)
 
 
 def map_to_refs(obj: Any) -> Any:
@@ -475,7 +456,9 @@ def map_to_refs(obj: Any) -> Any:
         return obj.ref
     elif isinstance(obj, WeaveTable):
         return obj.ref
-    elif isinstance(obj, list):
+    elif isinstance_namedtuple(obj):
+        return {k: map_to_refs(v) for k, v in obj._asdict().items()}
+    elif isinstance(obj, (list, tuple)):
         return [map_to_refs(v) for v in obj]
     elif isinstance(obj, dict):
         return {k: map_to_refs(v) for k, v in obj.items()}
@@ -782,6 +765,10 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
     return result
 
 
+RESERVED_SUMMARY_USAGE_KEY = "usage"
+RESERVED_SUMMARY_STATUS_COUNTS_KEY = "status_counts"
+
+
 class WeaveKeyDict(dict):
     """A dict representing the 'weave' subdictionary of a call's attributes.
 
@@ -986,27 +973,40 @@ class WeaveClient:
         page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
         """
-        Get a list of calls.
+        Retrieve a list of traced calls (operations) for this project.
+
+        This method provides a powerful and flexible interface for querying trace data.
+        It supports pagination, filtering, sorting, field projection, and scoring metadata,
+        and can be used to power custom trace UIs or analysis tools.
+
+        Performance Tip: Specify `columns` and use `filter` or `query` to reduce result size.
 
         Args:
-            filter: A filter to apply to the calls.
-            limit: The maximum number of calls to return.
-            offset: The number of calls to skip.
-            sort_by: A list of fields to sort the calls by.
-            query: A mongo-like query to filter the calls.
-            include_costs: If true, cost info is included at summary.weave
-            include_feedback: If true, feedback info is included at summary.weave.feedback
-            columns: A list of columns to include in the response. If None,
-               all columns are included. Specifying fewer columns may be more performant.
-               Some columns are always included: id, project_id, trace_id, op_name, started_at
-            scored_by: Accepts a list or single item. Each item is a name or ref uri of a scorer
-                to filter by. Multiple scorers are ANDed together. If passing in just the name,
-                then scores for all versions of the scorer are returned. If passing in the full ref
-                URI, then scores for a specific version of the scorer are returned.
-            page_size: Tune performance by changing the number of calls fetched at a time.
+            `filter`: High-level filter for narrowing results by fields like `op_name`, `parent_ids`, etc.
+            `limit`: Maximum number of calls to return.
+            `offset`: Number of calls to skip before returning results (used for pagination).
+            `sort_by`: List of fields to sort the results by (e.g., `started_at desc`).
+            `query`: A mongo-like expression for advanced filtering. Not all Mongo operators are supported.
+            `include_costs`: If True, includes token/cost info in `summary.weave`.
+            `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
+            `columns`: List of fields to return per call. Reducing this can significantly improve performance.
+                    (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
+            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are ANDed.
+            `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
-            An iterator of calls.
+            `CallsIter`: An iterator over `Call` objects. Supports slicing, iteration, and `.to_pandas()`.
+
+        Example:
+            ```python
+            calls = client.get_calls(
+                filter=CallsFilter(op_names=["my_op"]),
+                columns=["inputs", "output", "summary"],
+                limit=100,
+            )
+            for call in calls:
+                print(call.inputs, call.output)
+            ```
         """
         if filter is None:
             filter = CallsFilter()
@@ -1276,15 +1276,17 @@ class WeaveClient:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
             isinstance(original_output, dict)
-            and "usage" in original_output
+            and RESERVED_SUMMARY_USAGE_KEY in original_output
             and "model" in original_output
         ):
-            summary["usage"] = {}
-            summary["usage"][original_output["model"]] = {
+            summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+            summary[RESERVED_SUMMARY_USAGE_KEY][original_output["model"]] = {
                 "requests": 1,
-                **original_output["usage"],
+                **original_output[RESERVED_SUMMARY_USAGE_KEY],
             }
-        elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
+        elif hasattr(original_output, RESERVED_SUMMARY_USAGE_KEY) and hasattr(
+            original_output, "model"
+        ):
             # Handle the cases where we are emitting an object instead of a pre-serialized dict
             # In fact, this is going to become the more common case
             model = original_output.model
@@ -1292,21 +1294,19 @@ class WeaveClient:
             if isinstance(usage, pydantic.BaseModel):
                 usage = usage.model_dump(exclude_unset=True)
             if isinstance(usage, dict) and isinstance(model, str):
-                summary["usage"] = {}
-                summary["usage"][model] = {"requests": 1, **usage}
+                summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+                summary[RESERVED_SUMMARY_USAGE_KEY][model] = {"requests": 1, **usage}
 
-        # JR Oct 24 - This descendants stats code has been commented out since
-        # it entered the code base. A screenshot of the non-ideal UI that the
-        # comment refers to is available in the description of that PR:
-        # https://github.com/wandb/weave/pull/1414
-        # These should probably be added under the "weave" key in the summary.
-        # ---
-        # Descendent error tracking disabled til we fix UI
-        # Add this call's summary after logging the call, so that only
-        # descendents are included in what we log
-        # summary.setdefault("descendants", {}).setdefault(
-        #     call.op_name, {"successes": 0, "errors": 0}
-        # )["successes"] += 1
+        # Create client-side rollup of status_counts_by_op
+        status_counts_dict = summary.setdefault(
+            RESERVED_SUMMARY_STATUS_COUNTS_KEY,
+            {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0},
+        )
+        if exception:
+            status_counts_dict[TraceStatus.ERROR] += 1
+        else:
+            status_counts_dict[TraceStatus.SUCCESS] += 1
+
         call.summary = summary
 
         # Exception Handling
@@ -1929,10 +1929,13 @@ class WeaveClient:
         return self._save_object_basic(op, name)
 
     @trace_sentry.global_trace_sentry.watch()
-    def _save_table(self, table: Table) -> TableRef:
+    def _save_table(self, table: Table | WeaveTable) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
         This is the sister function to _save_object_basic but for Tables.
         """
+        # Skip saving the table if it is already persisted.
+        if isinstance(table, WeaveTable) and table.table_ref is not None:
+            return table.table_ref
 
         def send_table_create() -> TableCreateRes:
             rows = to_json(table.rows, self._project_id(), self)
@@ -1962,6 +1965,23 @@ class WeaveClient:
             table.table_ref = table_ref
 
         return table_ref
+
+    def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
+        payloads = [TableAppendSpecPayload(row=row) for row in rows]
+        table_update_req = TableUpdateReq(
+            project_id=self._project_id(),
+            base_digest=table_digest,
+            updates=[TableAppendSpec(append=payload) for payload in payloads],
+        )
+        res = self.server.table_update(table_update_req)
+        return WeaveTable(
+            table_ref=TableRef(
+                entity=self.entity,
+                project=self.project,
+                _digest=res.digest,
+            ),
+            server=self.server,
+        )
 
     ################ Internal Helpers ################
 

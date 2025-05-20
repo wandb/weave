@@ -1,12 +1,11 @@
-import {cloneDeep} from 'lodash';
 import {SetStateAction, useCallback, useState} from 'react';
 
+import {normalizeChatTraceCall} from '../ChatView/hooks';
 import {
-  anthropicContentBlocksToChoices,
-  hasStringProp,
-  isAnthropicCompletionFormat,
-} from '../ChatView/hooks';
-import {LLM_MAX_TOKENS_KEYS, LLMMaxTokensKey} from './llmMaxTokens';
+  DEFAULT_LLM_MODEL,
+  LLM_MAX_TOKENS_KEYS,
+  LLMMaxTokensKey,
+} from './llmMaxTokens';
 import {
   OptionalTraceCallSchema,
   PlaygroundResponseFormats,
@@ -22,7 +21,13 @@ export const DEFAULT_SYSTEM_MESSAGE = {
   content: DEFAULT_SYSTEM_MESSAGE_CONTENT,
 };
 
-const DEFAULT_MODEL = 'gpt-4o-mini-2024-07-18' as LLMMaxTokensKey;
+export const DEFAULT_SAVED_MODEL = {
+  llmModelId: null,
+  versionIndex: null,
+  isLatest: false,
+  objectId: null,
+  savedModelParams: null,
+};
 
 const DEFAULT_PLAYGROUND_STATE = {
   traceCall: {
@@ -42,8 +47,9 @@ const DEFAULT_PLAYGROUND_STATE = {
   presencePenalty: 0,
   nTimes: 1,
   maxTokensLimit: 16384,
-  model: DEFAULT_MODEL,
+  model: DEFAULT_LLM_MODEL,
   selectedChoiceIndex: 0,
+  savedModel: DEFAULT_SAVED_MODEL,
 };
 
 type NumericPlaygroundStateKey =
@@ -118,8 +124,7 @@ export const usePlaygroundState = () => {
       // pulled from litellm
       setPlaygroundStates(prevState => {
         const newState = {...prevState[0]};
-
-        newState.traceCall = parseTraceCall(traceCall);
+        newState.traceCall = normalizeChatTraceCall(traceCall);
 
         if (!inputs) {
           return [newState];
@@ -155,7 +160,7 @@ export const usePlaygroundState = () => {
             ) as LLMMaxTokensKey;
           }
           if (newState.model === undefined) {
-            newState.model = DEFAULT_MODEL;
+            newState.model = DEFAULT_LLM_MODEL;
           }
         }
         return [newState];
@@ -184,7 +189,9 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     key: Math.random() * 1000,
 
     messages: state.traceCall?.inputs?.messages,
-    model: state.model,
+    model: state.savedModel.llmModelId
+      ? state.savedModel.llmModelId
+      : state.model,
     temperature: state.temperature,
     max_tokens: state.maxTokens,
     stop: state.stopSequences.length > 0 ? state.stopSequences : undefined,
@@ -201,7 +208,7 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     tools: tools.length > 0 ? tools : undefined,
   };
 
-  if (state.model.includes('o3')) {
+  if (state.model.includes('o3') || state.model.includes('o4')) {
     const {max_tokens, ...rest} = inputs;
     return {
       ...rest,
@@ -210,39 +217,4 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
   }
 
   return inputs;
-};
-
-// This is a helper function to parse the trace call output for anthropic
-// so that the playground can display the choices
-export const parseTraceCall = (traceCall: OptionalTraceCallSchema) => {
-  const parsedTraceCall = cloneDeep(traceCall);
-
-  // Handles anthropic outputs
-  // Anthropic has content and stop_reason as top-level fields
-  if (
-    parsedTraceCall.output !== null &&
-    isAnthropicCompletionFormat(parsedTraceCall.output)
-  ) {
-    const {content, stop_reason, ...outputs} = parsedTraceCall.output as any;
-    parsedTraceCall.output = {
-      ...outputs,
-      choices: anthropicContentBlocksToChoices(content, stop_reason),
-    };
-  }
-  // Handles anthropic inputs
-  // Anthropic has system message as a top-level request field
-  if (hasStringProp(parsedTraceCall.inputs, 'system')) {
-    const {messages, system, ...inputs} = parsedTraceCall.inputs as any;
-    parsedTraceCall.inputs = {
-      ...inputs,
-      messages: [
-        {
-          role: 'system',
-          content: system,
-        },
-        ...messages,
-      ],
-    };
-  }
-  return parsedTraceCall;
 };

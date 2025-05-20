@@ -145,8 +145,20 @@ export const useImageControls = (
       {} as ClassSetControls
     );
 
+    let defaultMaskSets: ClassSetControls = {};
+    if (_.isEmpty(classSetsFromLabels)) {
+      const maskLayers = usableType.maskLayers ?? {};
+      defaultMaskSets = _.fromPairs(
+        _.keys(maskLayers).map(maskId => [
+          `mask-${maskId}`,
+          {classes: defaultClassSet},
+        ])
+      );
+    }
+
     return {
       [defaultClassSetID]: {classes: defaultClassSet},
+      ...defaultMaskSets,
       ...classSetsFromLabels,
     } as ClassSetControls;
   }, [usableType, maskClassLabels]);

@@ -14,7 +14,6 @@ import {ErrorPanel} from '../../../../../ErrorPanel';
 import {Loading} from '../../../../../Loading';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {Timestamp} from '../../../../../Timestamp';
-import {useWeaveflowRouteContext} from '../../context';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {basicField} from '../common/DataTable';
 import {Empty} from '../common/Empty';
@@ -24,6 +23,7 @@ import {
   EMPTY_PROPS_DATASETS,
   EMPTY_PROPS_LEADERBOARDS,
   EMPTY_PROPS_MODEL,
+  EMPTY_PROPS_OBJECT_VERSIONS,
   EMPTY_PROPS_OBJECTS,
   EMPTY_PROPS_PROGRAMMATIC_SCORERS,
   EMPTY_PROPS_PROMPTS,
@@ -398,19 +398,20 @@ export const FilterableObjectVersionsTable: React.FC<{
   selectedVersions?: string[];
   setSelectedVersions?: (selected: string[]) => void;
 }> = props => {
+  const {setSelectedVersions} = props;
   const {useRootObjectVersions} = useWFHooks();
-  const {baseRouter} = useWeaveflowRouteContext();
 
   const effectiveFilter = useMemo(() => {
     return {...props.initialFilter, ...props.frozenFilter};
   }, [props.initialFilter, props.frozenFilter]);
 
+  const isOneObject = effectiveFilter.objectName != null;
   const effectivelyLatestOnly = !effectiveFilter.objectName;
 
-  const filteredObjectVersions = useRootObjectVersions(
-    props.entity,
-    props.project,
-    {
+  const filteredObjectVersions = useRootObjectVersions({
+    entity: props.entity,
+    project: props.project,
+    filter: {
       baseObjectClasses: effectiveFilter.baseObjectClass
         ? [effectiveFilter.baseObjectClass]
         : undefined,
@@ -419,9 +420,17 @@ export const FilterableObjectVersionsTable: React.FC<{
         : undefined,
       latestOnly: effectivelyLatestOnly,
     },
-    undefined,
-    effectivelyLatestOnly // metadata only when getting latest
-  );
+    metadataOnly: effectivelyLatestOnly,
+  });
+
+  // When the table reloads, clear any selected versions.
+  // This is because we may be reloading because of a deletion, and
+  // we don't want the deleted version to remain in the selected state if it is there.
+  useEffect(() => {
+    if (filteredObjectVersions.loading && setSelectedVersions) {
+      setSelectedVersions([]);
+    }
+  }, [filteredObjectVersions.loading, setSelectedVersions]);
 
   if (filteredObjectVersions.loading) {
     return <Loading centered />;
@@ -434,7 +443,9 @@ export const FilterableObjectVersionsTable: React.FC<{
   const objectVersions = filteredObjectVersions.result ?? [];
   const isEmpty = objectVersions.length === 0;
   if (isEmpty) {
-    let propsEmpty = EMPTY_PROPS_OBJECTS;
+    let propsEmpty = isOneObject
+      ? EMPTY_PROPS_OBJECT_VERSIONS
+      : EMPTY_PROPS_OBJECTS;
     const base = props.initialFilter?.baseObjectClass;
     if ('Prompt' === base) {
       propsEmpty = EMPTY_PROPS_PROMPTS;
@@ -455,14 +466,7 @@ export const FilterableObjectVersionsTable: React.FC<{
   }
 
   return (
-    <FilterLayoutTemplate
-      showFilterIndicator={Object.keys(effectiveFilter ?? {}).length > 0}
-      showPopoutButton={Object.keys(props.frozenFilter ?? {}).length > 0}
-      filterPopoutTargetUrl={baseRouter.objectVersionsUIUrl(
-        props.entity,
-        props.project,
-        effectiveFilter
-      )}>
+    <FilterLayoutTemplate>
       <ObjectVersionsTable
         objectVersions={objectVersions}
         objectTitle={props.objectTitle}
@@ -486,15 +490,15 @@ const PeerVersionsLink: React.FC<{obj: ObjectVersionSchema}> = props => {
   // the meantime we will just fetch the first 100 versions and display 99+ if
   // there are at least 100. Someone can come back and add `count` to the 3
   // query APIs which will make this faster.
-  const objectVersionsNode = useRootObjectVersions(
-    obj.entity,
-    obj.project,
-    {
+  const objectVersionsNode = useRootObjectVersions({
+    entity: obj.entity,
+    project: obj.project,
+    filter: {
       objectIds: [obj.objectId],
     },
-    100,
-    true // metadataOnly
-  );
+    limit: 100,
+    metadataOnly: true,
+  });
   if (objectVersionsNode.loading) {
     return <LoadingDots />;
   }

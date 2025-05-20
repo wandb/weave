@@ -3,6 +3,7 @@ import {UserLink} from '@wandb/weave/components/UserLink';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {useMemo} from 'react';
 
+import {useObjectStorageSizeCalculation} from '../../../../../../common/hooks/useStorageSizeCalculation';
 import {maybePluralizeWord} from '../../../../../../core/util/string';
 import {Icon, IconName} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
@@ -34,6 +35,7 @@ import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
+import {StorageSizeSection} from '../common/StorageSizeSection';
 import {EvaluationLeaderboardTab} from '../LeaderboardTab';
 import {TabUsePrompt} from '../OpsPage/Tabs/TabUsePrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from '../wfReactInterface/constants';
@@ -47,12 +49,14 @@ import {
   CallSchema,
   KnownBaseObjectClassType,
   ObjectVersionSchema,
+  WeaveObjectVersionKey,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {DeleteObjectButtonWithModal} from './ObjectDeleteButtons';
 import {TabPrompt} from './Tabs/TabPrompt';
 import {TabUseAnnotationSpec} from './Tabs/TabUseAnnotationSpec';
 import {TabUseModel} from './Tabs/TabUseModel';
 import {TabUseObject} from './Tabs/TabUseObject';
+import {TabUseSavedView} from './Tabs/TabUseSavedView';
 
 type ObjectIconProps = {
   baseObjectClass: KnownBaseObjectClassType;
@@ -70,6 +74,7 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   SavedView: 'view-glasses',
   Provider: 'model',
   ProviderModel: 'model',
+  LLMStructuredCompletionModel: 'model',
 };
 const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
@@ -100,14 +105,16 @@ export const ObjectVersionPage: React.FC<{
 
   const objectVersion = useObjectVersion({
     // Blindly assume this is weave object?
-    scheme: 'weave',
-    entity: props.entity,
-    project: props.project,
-    weaveKind: 'object',
-    objectId: props.objectName,
-    versionHash: props.version,
-    path: props.filePath,
-    refExtra: props.refExtra,
+    key: {
+      scheme: 'weave' as WeaveObjectVersionKey['scheme'],
+      weaveKind: 'object' as WeaveObjectVersionKey['weaveKind'],
+      entity: props.entity,
+      project: props.project,
+      objectId: props.objectName,
+      versionHash: props.version,
+      path: props.filePath,
+      refExtra: props.refExtra,
+    },
   });
   if (isObjDeleteError(objectVersion.error)) {
     const deletedAtMessage = objectVersion.error?.message ?? 'Object deleted';
@@ -132,15 +139,15 @@ const ObjectVersionPageInner: React.FC<{
   const objectName = objectVersion.objectId;
   const objectVersionIndex = objectVersion.versionIndex;
   const {refExtra, createdAtMs} = objectVersion;
-  const objectVersions = useRootObjectVersions(
-    entityName,
-    projectName,
-    {
+  const objectVersions = useRootObjectVersions({
+    entity: entityName,
+    project: projectName,
+    filter: {
       objectIds: [objectName],
     },
-    undefined,
-    true
-  );
+    metadataOnly: true,
+    includeStorageSize: true,
+  });
   const objectVersionCount = (objectVersions.result ?? []).length;
   const baseObjectClass = useMemo(() => {
     const s = objectVersion.baseObjectClass;
@@ -155,38 +162,30 @@ const ObjectVersionPageInner: React.FC<{
   const minimalColumns = useMemo(() => {
     return ['id', 'op_name', 'project_id'];
   }, []);
-  const producingCalls = useCalls(
-    entityName,
-    projectName,
-    {
+  const producingCalls = useCalls({
+    entity: entityName,
+    project: projectName,
+    filter: {
       outputObjectVersionRefs: [refUri],
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    minimalColumns
-  );
+    columns: minimalColumns,
+  });
 
-  const consumingCalls = useCalls(
-    entityName,
-    projectName,
-    {
+  const consumingCalls = useCalls({
+    entity: entityName,
+    project: projectName,
+    filter: {
       inputObjectVersionRefs: [refUri],
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    minimalColumns
-  );
+    columns: minimalColumns,
+  });
 
   const showCallsTab =
     !(producingCalls.loading || consumingCalls.loading) &&
     (producingCalls.result?.length ?? 0) +
       (consumingCalls.result?.length ?? 0) >
       0;
-  const data = useRefsData([refUri]);
+  const data = useRefsData({refUris: [refUri]});
   const viewerData = useMemo(() => {
     if (data.loading) {
       return {};
@@ -214,6 +213,13 @@ const ObjectVersionPageInner: React.FC<{
   const isScorer = baseObjectClass === 'Scorer' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
+
+  const {
+    currentVersionSizeBytes,
+    allVersionsSizeBytes,
+    shouldShowAllVersions,
+    isLoading,
+  } = useObjectStorageSizeCalculation(objectVersions, objectVersionIndex);
 
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
@@ -291,6 +297,12 @@ const ObjectVersionPageInner: React.FC<{
                 <UserLink userId={objectVersion.userId} includeName />
               </div>
             )}
+            <StorageSizeSection
+              isLoading={isLoading}
+              shouldShowAllVersions={shouldShowAllVersions}
+              currentVersionBytes={currentVersionSizeBytes}
+              allVersionsSizeBytes={allVersionsSizeBytes}
+            />
             {isScorer && (
               <div className="block">
                 <p className="text-moon-500">Scores</p>
@@ -429,7 +441,9 @@ const ObjectVersionPageInner: React.FC<{
           content: (
             <ScrollableTabContent>
               <Tailwind>
-                {baseObjectClass === 'Prompt' ? (
+                {baseObjectClass === 'SavedView' ? (
+                  <TabUseSavedView name={objectName} uri={refUri} />
+                ) : baseObjectClass === 'Prompt' ? (
                   <TabUsePrompt
                     name={objectName}
                     uri={refUri}
@@ -672,7 +686,9 @@ const OpVersionCallsLink: React.FC<{
   partialFilter?: WFHighLevelCallFilter;
 }> = ({val, partialFilter}) => {
   const {useOpVersion} = useWFHooks();
-  const opVersion = useOpVersion(refUriToOpVersionKey(val.opVersionRef));
+  const opVersion = useOpVersion({
+    key: refUriToOpVersionKey(val.opVersionRef),
+  });
   if (opVersion.loading) {
     return null;
   } else if (opVersion.result == null) {

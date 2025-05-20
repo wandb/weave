@@ -11,7 +11,9 @@ import {Button} from 'semantic-ui-react';
 import {useWeaveContext} from '../../context';
 import {focusEditor, WeaveExpression} from '../../panel/WeaveExpression';
 import * as S from './ControlFilter.styles';
+import {makeEventRecorder} from './panellib/libanalytics';
 
+const recordEvent = makeEventRecorder('Table');
 interface ControlFilterProps {
   filterFunction: NodeOrVoidNode;
   setFilterFunction(newNode: NodeOrVoidNode): void;
@@ -29,19 +31,6 @@ export const ControlFilter: React.FC<ControlFilterProps> = React.memo(
       weave.nodeIsExecutable(filterFunction) &&
       (filterFunction.nodeType === 'void' ||
         isAssignableTo(filterFunction.type, maybe('boolean')));
-    const updateFilterFunction = useCallback(() => {
-      if (weave.nodeIsExecutable(filterFunction) && isValid) {
-        propsSetFilterFunction(filterFunction);
-      } else {
-        setFilterFunction(propsFilterFunction);
-      }
-    }, [
-      propsFilterFunction,
-      propsSetFilterFunction,
-      filterFunction,
-      isValid,
-      weave,
-    ]);
 
     const isClean = useMemo(() => {
       return (
@@ -50,6 +39,22 @@ export const ControlFilter: React.FC<ControlFilterProps> = React.memo(
         propsFilterFunction === filterFunction
       );
     }, [propsFilterFunction, filterFunction]);
+
+    const updateFilterFunction = useCallback(() => {
+      isClean ? recordEvent('CLOSE_FILTER') : recordEvent('APPLY_FILTER');
+      if (weave.nodeIsExecutable(filterFunction) && isValid) {
+        propsSetFilterFunction(filterFunction);
+      } else {
+        setFilterFunction(propsFilterFunction);
+      }
+    }, [
+      isClean,
+      propsFilterFunction,
+      propsSetFilterFunction,
+      filterFunction,
+      isValid,
+      weave,
+    ]);
 
     const removable = useMemo(() => {
       return propsFilterFunction.nodeType !== 'void';
@@ -76,6 +81,9 @@ export const ControlFilter: React.FC<ControlFilterProps> = React.memo(
             <Button
               data-test="filter-apply"
               disabled={!isValid}
+              data-dd-action-name={`${
+                isClean ? 'Close' : 'Apply'
+              } table filter`}
               onClick={updateFilterFunction}
               size="mini"
               primary={!isClean || undefined}>
@@ -84,6 +92,7 @@ export const ControlFilter: React.FC<ControlFilterProps> = React.memo(
             {!isClean && (
               <Button
                 onClick={() => {
+                  recordEvent('FILTER_DISCARD_CHANGES');
                   propsSetFilterFunction(propsFilterFunction);
                 }}
                 size="mini">
@@ -95,7 +104,9 @@ export const ControlFilter: React.FC<ControlFilterProps> = React.memo(
             {removable && (
               <Button
                 data-test="filter-remove"
+                data-dd-action-name="remove table filter"
                 onClick={() => {
+                  recordEvent('REMOVE_FILTER');
                   propsSetFilterFunction(voidNode());
                 }}
                 size="mini"

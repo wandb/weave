@@ -11,7 +11,7 @@ import {Loading} from '../../../../Loading';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 
 // Simple language detection based on file extension or content
-// TODO: Unify this utility method with Browse2OpDefCode.tsx
+// TODO: Unify this utility method with OpDefCode.tsx
 export const detectLanguage = (uri: string, code: string) => {
   if (uri.endsWith('.py')) {
     return 'python';

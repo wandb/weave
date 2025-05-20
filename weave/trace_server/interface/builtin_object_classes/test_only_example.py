@@ -1,10 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
 
 class TestOnlyNestedBaseModel(BaseModel):
     a: int
+    aliased_property: int = Field(alias="aliased_property_alias")
 
 
 class TestOnlyNestedBaseObject(base_object_def.BaseObject):

@@ -131,12 +131,13 @@ class FilesystemAsync:
         path: str,
         mode: typing.Union[typing.Literal["w"], typing.Literal["wb"]] = "wb",
     ) -> typing.Any:
-        path = self.path(path)
-        await aiofiles_os.makedirs(os.path.dirname(path), exist_ok=True)
-        tmp_name = f"{path}.tmp-{util.rand_string_n(16)}"
-        async with aiofiles.open(tmp_name, mode) as f:
-            yield f
-        with tracer.trace("rename"):
+        with tracer.trace("filesystem.async.open_write"):
+            path = self.path(path)
+            await aiofiles_os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp_name = f"{path}.tmp-{util.rand_string_n(16)}"
+            async with aiofiles.open(tmp_name, mode) as f:
+                yield f
+        with tracer.trace("filesystem.async.rename"):
             await aiofiles_os.rename(tmp_name, path)
 
     @typing.overload

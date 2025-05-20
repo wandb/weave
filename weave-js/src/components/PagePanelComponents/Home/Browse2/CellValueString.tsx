@@ -36,6 +36,7 @@ const isJSON = (value: string): boolean => {
 
 type CellValueStringProps = {
   value: string;
+  style?: React.CSSProperties;
 };
 
 const Collapsed = styled.div`
@@ -83,7 +84,7 @@ const Spacer = styled.div`
 `;
 Spacer.displayName = 'S.Spacer';
 
-const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
+const CellValueStringWithPopup = ({value, style}: CellValueStringProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -102,6 +103,7 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
     toast('Copied to clipboard');
   }, [value]);
 
+  const [wrapLines, setWrapLines] = useState(false);
   let content: ReactNode = <TooltipText isJSON={json}>{trimmed}</TooltipText>;
   if (format === 'Code') {
     let language;
@@ -119,6 +121,7 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
         readOnly
         handleMouseWheel
         alwaysConsumeMouseWheel={false}
+        wrapLines={wrapLines}
       />
     );
   } else if (format === 'Markdown') {
@@ -140,7 +143,7 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
   return (
     <>
       <StyledTooltip enterDelay={500} title={title}>
-        <Collapsed ref={ref} onClick={onClick}>
+        <Collapsed ref={ref} onClick={onClick} style={style}>
           {trimmed}
         </Collapsed>
       </StyledTooltip>
@@ -197,6 +200,31 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
                   }}
                 />
                 <Spacer />
+                {format === 'Code' && (
+                  <>
+                    <Button
+                      size="small"
+                      variant="ghost"
+                      active={!wrapLines}
+                      icon="pan-tool-1"
+                      tooltip="Don't wrap code"
+                      onClick={() => {
+                        setWrapLines(false);
+                      }}
+                    />
+                    <Button
+                      className="mr-4"
+                      size="small"
+                      variant="ghost"
+                      active={wrapLines}
+                      icon="wrap"
+                      tooltip="Wrap code"
+                      onClick={() => {
+                        setWrapLines(true);
+                      }}
+                    />
+                  </>
+                )}
                 <Button
                   size="small"
                   variant="ghost"
@@ -227,10 +255,10 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
   );
 };
 
-export const CellValueString = ({value}: CellValueStringProps) => {
+export const CellValueString = ({value, style}: CellValueStringProps) => {
   const trimmed = value.trim();
   if (isUrl(trimmed)) {
     return <TargetBlank href={trimmed}>{trimmed}</TargetBlank>;
   }
-  return <CellValueStringWithPopup value={value} />;
+  return <CellValueStringWithPopup value={value} style={style} />;
 };

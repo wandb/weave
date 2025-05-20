@@ -1,8 +1,6 @@
 // include the pca.js types, in case we're importing the source
 // from outside of the cg project
 
-// tslint doesn't like <reference>
-/* tslint:disable-next-line */
 /// <reference path="./projection.d.ts" />
 
 import * as _ from 'lodash';
@@ -1880,7 +1878,6 @@ export const opListUMAP = makeConfigurableStandardOp({
   },
 });
 
-// tslint:disable-next-line: ban-types
 const withDisabledConsoleLog = <FT extends Function>(fn: FT) => {
   const log = console.log;
   console.log = () => {};

@@ -1,4 +1,3 @@
-// tslint:disable-next-line
 /// <reference path="./ops/primitives/projection.d.ts" />
 
 import './ops';

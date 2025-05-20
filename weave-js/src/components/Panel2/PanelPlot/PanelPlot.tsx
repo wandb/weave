@@ -35,8 +35,12 @@ import {PLOT_DIMS_UI, PlotConfig, SeriesConfig} from './versions';
 
 const PanelPlotConfig: React.FC<PanelPlotProps> = props => {
   const {input} = props;
+  const {stack} = usePanelContext();
 
-  const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
+  const inputNode = useMemo(
+    () => TableType.normalizeTableLike(input, stack),
+    [input, stack]
+  );
   const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
   const newProps = useMemo(() => {
     return {
@@ -619,8 +623,11 @@ const useLoader = () => {
 
 const PanelPlot2: React.FC<PanelPlotProps> = props => {
   const {input} = props;
-
-  const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
+  const {stack} = usePanelContext();
+  const inputNode = useMemo(
+    () => TableType.normalizeTableLike(input, stack),
+    [input, stack]
+  );
   const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
   const newProps = useMemo(() => {
     return {
@@ -656,7 +663,7 @@ export const Spec: Panel2.PanelSpec = {
     // TODO: PanelPlot default relies on stack for its config, but we pass
     // it in empty!
     const tableNormInput = await weave.refineNode(
-      TableType.normalizeTableLike(inputNode),
+      TableType.normalizeTableLike(inputNode, stack),
       stack
     );
     return PlotState.panelPlotDefaultConfig(tableNormInput, undefined, stack);

@@ -7,12 +7,14 @@ import {BabylonPointCloud, SceneBox} from './render_babylon';
 
 export const getEmptyFilter = () => ({
   hiddenBoundingBoxLabels: [],
+  shownBoundingBoxLabels: [],
   hideAllBoxes: false,
   score: {},
 });
 
 export interface Filter {
   hiddenBoundingBoxLabels: string[];
+  shownBoundingBoxLabels: string[];
   hideAllBoxes: boolean;
   score: BoundingBoxSliderControl;
 }
@@ -21,6 +23,43 @@ export const DEFAULT_SCORE_GROUP_NAME = 'score';
 export const BOXES = 'boxes';
 const ALL_LABEL = 'all';
 export const GROUP_NAME_3D_BOUNDING_BOXES = 'Labels';
+
+function categorizeBoxVisibility(
+  classIdControl: NonNullable<
+    AllBoundingBoxControls['toggles']
+  >[string][string],
+  classIdToLabel: ClassIdToLabelMap
+) {
+  return Object.keys(classIdControl).reduce<{
+    hiddenBoundingBoxLabels: string[];
+    shownBoundingBoxLabels: string[];
+  }>(
+    ({hiddenBoundingBoxLabels, shownBoundingBoxLabels}, strClassId) => {
+      if (strClassId === ALL_LABEL) {
+        // all label handled separately
+        return {hiddenBoundingBoxLabels, shownBoundingBoxLabels};
+      }
+      const classId = parseInt(strClassId, 10);
+      const label = classIdToLabel.get(classId);
+      const toggle = classIdControl[classId];
+      // If the toggle is not disabled, then it's not a toggle we want to hide the box for.
+      if (!label || !toggle) {
+        return {hiddenBoundingBoxLabels, shownBoundingBoxLabels};
+      }
+      if (toggle.disabled) {
+        hiddenBoundingBoxLabels.push(label);
+      } else {
+        shownBoundingBoxLabels.push(label);
+      }
+
+      return {hiddenBoundingBoxLabels, shownBoundingBoxLabels};
+    },
+    {
+      hiddenBoundingBoxLabels: [] as string[],
+      shownBoundingBoxLabels: [] as string[],
+    }
+  );
+}
 
 export const getFilterFromBBoxConfig = (
   boundingBoxConfig: AllBoundingBoxControls | undefined,
@@ -33,28 +72,13 @@ export const getFilterFromBBoxConfig = (
   const classIdControl =
     boundingBoxConfig?.toggles?.[BOXES]?.[GROUP_NAME_3D_BOUNDING_BOXES] ?? {};
 
-  const hiddenBoundingBoxLabels = Object.keys(classIdControl).reduce<string[]>(
-    (resultSoFar, strClassId) => {
-      if (strClassId === ALL_LABEL) {
-        // all label handled separately
-        return resultSoFar;
-      }
-      const classId = parseInt(strClassId, 10);
-      const label = classIdToLabel.get(classId);
-      const toggle = classIdControl[classId];
-      if (!label || !toggle || toggle.disabled) {
-        return resultSoFar;
-      }
-
-      resultSoFar.push(label);
-      return resultSoFar;
-    },
-    []
-  );
+  const {hiddenBoundingBoxLabels, shownBoundingBoxLabels} =
+    categorizeBoxVisibility(classIdControl, classIdToLabel);
   // AllBoundingBoxControls.styles controls how lines appear (solid, dashed/etc),
   // but that is currently not supported for 3d
   return {
     hiddenBoundingBoxLabels,
+    shownBoundingBoxLabels,
     hideAllBoxes: classIdControl[ALL_LABEL]?.disabled ?? false,
     score: boundingBoxConfig.sliders
       ? boundingBoxConfig.sliders[DEFAULT_SCORE_GROUP_NAME]
@@ -70,7 +94,9 @@ export type ClassIdToLabelMap = Map<number, string>;
 // transformation was tricky/more error prone than this way.
 // TODO: merge this and isBoundingBoxHidden.
 const isBoundingBoxVisible = (box: SceneBox, filter: Filter) => {
-  if (filter.hideAllBoxes) {
+  const isBoxManuallyShown =
+    box.label != null && filter.shownBoundingBoxLabels.includes(box.label);
+  if (filter.hideAllBoxes && !isBoxManuallyShown) {
     return false;
   }
 

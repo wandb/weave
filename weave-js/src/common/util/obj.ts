@@ -44,7 +44,6 @@ export function shallowEqual<TValue extends object>(
   return true;
 }
 
-// tslint:disable-next-line
 type DeArray<T> = T extends Array<infer E> ? E : never;
 type Pivot<T extends any[][]> = Array<{[key in keyof T]: DeArray<T[key]>}>;
 export function zip<T extends any[][]>(...args: T): Pivot<T> {

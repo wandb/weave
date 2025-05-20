@@ -19,6 +19,7 @@ import {ReactComponent as ImportBokeh} from '../../assets/icons/icon-bokeh.svg';
 import {ReactComponent as ImportBookDictionary} from '../../assets/icons/icon-book-dictionary.svg';
 import {ReactComponent as ImportBoolean} from '../../assets/icons/icon-boolean.svg';
 import {ReactComponent as ImportBoxPlot} from '../../assets/icons/icon-box-plot.svg';
+import {ReactComponent as ImportBranchCommit} from '../../assets/icons/icon-branch-commit.svg';
 import {ReactComponent as ImportBug} from '../../assets/icons/icon-bug.svg';
 import {ReactComponent as ImportBuzzBot10} from '../../assets/icons/icon-buzz-bot10.svg';
 import {ReactComponent as ImportCategoryMultimodal} from '../../assets/icons/icon-category-multimodal.svg';
@@ -266,6 +267,7 @@ import {ReactComponent as ImportWarningAlt} from '../../assets/icons/icon-warnin
 import {ReactComponent as ImportWeave} from '../../assets/icons/icon-weave.svg';
 import {ReactComponent as ImportWeaveGroupBoard} from '../../assets/icons/icon-weave-group-board.svg';
 import {ReactComponent as ImportWebhook} from '../../assets/icons/icon-webhook.svg';
+import {ReactComponent as ImportWrap} from '../../assets/icons/icon-wrap.svg';
 import {ReactComponent as ImportXAxiAlt} from '../../assets/icons/icon-x-axi-alt.svg';
 import {ReactComponent as ImportXAxis} from '../../assets/icons/icon-x-axis.svg';
 import {ReactComponent as ImportYoutubeSocial} from '../../assets/icons/icon-youtube-social.svg';
@@ -340,6 +342,9 @@ export const IconBoolean = (props: SVGIconProps) => (
 );
 export const IconBoxPlot = (props: SVGIconProps) => (
   <ImportBoxPlot {...updateIconProps(props)} />
+);
+export const IconBranchCommit = (props: SVGIconProps) => (
+  <ImportBranchCommit {...updateIconProps(props)} />
 );
 export const IconBug = (props: SVGIconProps) => (
   <ImportBug {...updateIconProps(props)} />
@@ -1082,6 +1087,9 @@ export const IconWeaveGroupBoard = (props: SVGIconProps) => (
 export const IconWebhook = (props: SVGIconProps) => (
   <ImportWebhook {...updateIconProps(props)} />
 );
+export const IconWrap = (props: SVGIconProps) => (
+  <ImportWrap {...updateIconProps(props)} />
+);
 export const IconXAxiAlt = (props: SVGIconProps) => (
   <ImportXAxiAlt {...updateIconProps(props)} />
 );
@@ -1115,6 +1123,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'book-dictionary': IconBookDictionary,
   boolean: IconBoolean,
   'box-plot': IconBoxPlot,
+  'branch-commit': IconBranchCommit,
   bug: IconBug,
   'buzz-bot10': IconBuzzBot10,
   'category-multimodal': IconCategoryMultimodal,
@@ -1362,6 +1371,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   weave: IconWeave,
   'weave-group-board': IconWeaveGroupBoard,
   webhook: IconWebhook,
+  wrap: IconWrap,
   'x-axi-alt': IconXAxiAlt,
   'x-axis': IconXAxis,
   'youtube-social': IconYoutubeSocial,

@@ -76,10 +76,7 @@ export const OverflowMenu: FC<{
         project={selectedCalls[0]?.project ?? ''}
         open={addToDatasetModalOpen}
         onClose={() => setAddToDatasetModalOpen(false)}
-        selectedCalls={selectedCalls.map(call => ({
-          digest: call.callId,
-          val: call.traceCall!,
-        }))}
+        selectedCallIds={selectedCalls.map(call => call.callId)}
       />
       <PopupDropdown
         sections={menuOptions}
@@ -197,7 +194,11 @@ export const ConfirmDeleteModal: FC<{
     Object.keys(projectGroups).forEach(projectKey => {
       const [entity, project] = projectKey.split('/');
       deletePromises.push(
-        callsDelete(entity, project, projectGroups[projectKey])
+        callsDelete({
+          entity,
+          project,
+          callIDs: projectGroups[projectKey],
+        })
       );
     });
     Promise.all(deletePromises)

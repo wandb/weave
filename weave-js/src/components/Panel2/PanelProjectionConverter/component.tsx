@@ -4,6 +4,7 @@ import React, {useCallback, useMemo} from 'react';
 import {useNodeWithServerType} from '../../../react';
 import * as ConfigPanel from '../ConfigPanel';
 import * as Panel2 from '../panel';
+import {usePanelContext} from '../PanelContext';
 import {makeEventRecorder} from '../panellib/libanalytics';
 import * as TableType from '../PanelTable/tableType';
 import * as PTypes from './types';
@@ -67,9 +68,10 @@ const PanelProjectionConverterTableConfig: React.FC<
   >
 > = props => {
   const {input} = props;
+  const {stack} = usePanelContext();
   const normalizedInput = useMemo(() => {
-    return TableType.normalizeTableLike(input);
-  }, [input]);
+    return TableType.normalizeTableLike(input, stack);
+  }, [input, stack]);
   const typedNormalizedInput = useNodeWithServerType(normalizedInput);
 
   if (typedNormalizedInput.loading) {

@@ -15,8 +15,7 @@ from wandb.sdk.internal.internal_api import Api as InternalApi
 from wandb.sdk.internal.sender import _manifest_json_from_proto
 from wandb.sdk.lib import runid
 
-from weave_query import errors
-from weave_query import engine_trace, wandb_client_api
+from weave_query import engine_trace, errors, wandb_client_api
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +219,8 @@ class InMemoryLazyLiteRun:
 
         with tracer.trace("ArtifactSaver.save"):
             res = saver.save(
+                entity=self._entity_name,
+                project=self._project_name,
                 type=artifact_type_name,
                 name=artifact_name,
                 client_id=artifact._client_id,

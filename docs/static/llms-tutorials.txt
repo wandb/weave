@@ -1,0 +1,1421 @@
+<!--- Docs: Tutorials -->
+<!--- Tutorial Eval -->
+
+# Tutorial Eval
+
+# Tutorial: Build an Evaluation pipeline
+
+To iterate on an application, we need a way to evaluate if it's improving. To do so, a common practice is to test it against the same set of examples when there is a change. Weave has a first-class way to track evaluations with `Model` & `Evaluation` classes. We have built the APIs to make minimal assumptions to allow for the flexibility to support a wide array of use-cases.
+
+
+
+## 1. Build a `Model`
+
+
+  
+
+`Model`s store and version information about your system, such as prompts, temperatures, and more.
+Weave automatically captures when they are used and updates the version when there are changes.
+
+`Model`s are declared by subclassing `Model` and implementing a `predict` function definition, which takes one example and returns the response.
+
+> 🚨 **Important**: **Known Issue**: If you are using Google Colab, remove `async` from the following examples.
+
+
+    ```python
+    import json
+    import openai
+    import weave
+    class ExtractFruitsModel(weave.Model):
+        model_name: str
+        prompt_template: str
+        @weave.op()
+        async def predict(self, sentence: str) -> dict:
+            client = openai.AsyncClient()
+
+            response = await client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "user", "content": self.prompt_template.format(sentence=sentence)}
+                ],
+            )
+            result = response.choices[0].message.content
+            if result is None:
+                raise ValueError("No response from model")
+            parsed = json.loads(result)
+            return parsed
+    ```
+
+    You can instantiate `Model` objects as normal like this:
+
+    ```python
+    import asyncio
+    import weave
+
+    weave.init('intro-example')
+
+    model = ExtractFruitsModel(model_name='gpt-3.5-turbo-1106',
+                            prompt_template='Extract fields ("fruit": , "color": , "flavor": ) from the following text, as json: {sentence}')
+    sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
+    print(asyncio.run(model.predict(sentence)))
+    # if you're in a Jupyter Notebook, run:
+    # await model.predict(sentence)
+    ```
+
+> 💡 **Note**: Checkout the [Models](/guides/core-types/models) guide to learn more.
+
+  
+  
+
+    `weave.Model` is not supported in TypeScript yet.  Instead, you can just wrap your model-like function with `weave.op`
+
+    ```typescript
+    // highlight-next-line
+    const model = weave.op(async function myModel({datasetRow}) {
+      const prompt = `Extract fields ("fruit": , "color": , "flavor") from the following text, as json: ${datasetRow.sentence}`;
+      const response = await openaiClient.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{role: 'user', content: prompt}],
+        response_format: {type: 'json_object'},
+      });
+      const result = response?.choices?.[0]?.message?.content;
+      if (result == null) {
+        throw new Error('No response from model');
+      }
+      return JSON.parse(result);
+    });
+    ```
+
+  
+
+
+## 2. Collect some examples
+
+
+  
+
+    ```python
+    sentences = [
+        "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
+        "Pounits are a bright green color and are more savory than sweet.",
+        "Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them."
+    ]
+    labels = [
+        {'fruit': 'neoskizzles', 'color': 'purple', 'flavor': 'candy'},
+        {'fruit': 'pounits', 'color': 'bright green', 'flavor': 'savory'},
+        {'fruit': 'glowls', 'color': 'pale orange', 'flavor': 'sour and bitter'}
+    ]
+    examples = [
+        {'id': '0', 'sentence': sentences[0], 'target': labels[0]},
+        {'id': '1', 'sentence': sentences[1], 'target': labels[1]},
+        {'id': '2', 'sentence': sentences[2], 'target': labels[2]}
+    ]
+    ```
+
+  
+  
+  
+    ```typescript
+    const sentences = [
+      'There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.',
+      'Pounits are a bright green color and are more savory than sweet.',
+      'Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them.',
+    ];
+    const labels = [
+      {fruit: 'neoskizzles', color: 'purple', flavor: 'candy'},
+      {fruit: 'pounits', color: 'bright green', flavor: 'savory'},
+      {fruit: 'glowls', color: 'pale orange', flavor: 'sour and bitter'},
+    ];
+    const examples = [
+      {id: '0', sentence: sentences[0], target: labels[0]},
+      {id: '1', sentence: sentences[1], target: labels[1]},
+      {id: '2', sentence: sentences[2], target: labels[2]},
+    ];
+    const dataset = new weave.Dataset({
+      id: 'Fruit Dataset',
+      rows: examples,
+    });
+    ```
+  
+
+
+## 3. Evaluate a `Model`
+
+
+  
+
+`Evaluation`s assess a `Model`s performance on a set of examples using a list of specified scoring functions or `weave.scorer.Scorer` classes.
+
+Here, we'll use a default scoring class `MultiTaskBinaryClassificationF1` and we'll also define our own `fruit_name_score` scoring function.
+
+Here `sentence` is passed to the model's predict function, and `target` is used in the scoring function, these are inferred based on the argument names of the `predict` and scoring functions. The `fruit` key needs to be outputted by the model's predict function and must also be existing as a column in the dataset (or outputted by the `preprocess_model_input` function if defined).
+
+    ```python
+    import weave
+    from weave.scorers import MultiTaskBinaryClassificationF1
+
+    weave.init('intro-example')
+
+    @weave.op()
+    def fruit_name_score(target: dict, output: dict) -> dict:
+        return {'correct': target['fruit'] == output['fruit']}
+    evaluation = weave.Evaluation(
+        dataset=examples,
+        scorers=[
+            MultiTaskBinaryClassificationF1(class_names=["fruit", "color", "flavor"]),
+            fruit_name_score
+        ],
+    )
+    print(asyncio.run(evaluation.evaluate(model)))
+    # if you're in a Jupyter Notebook, run:
+    # await evaluation.evaluate(model)
+    ```
+
+  
+  
+`Evaluation`s assess a model's performance on a set of examples using a list of specified scoring functions.
+
+For this example, we'll define a few simple scoring functions.
+
+Here, `sentence` is passed to the model and `...` is used in the scoring function. These are defined...
+
+    ```typescript
+        
+    const client = await weave.init('intro-example');
+    const openaiClient = weave.wrapOpenAI(new OpenAI());
+
+    const fruitNameScorer = weave.op(
+      ({modelOutput, datasetRow}) => datasetRow.target.fruit == modelOutput.fruit,
+      {name: 'fruitNameScore'}
+    );
+
+    const evaluation = new weave.Evaluation({
+      dataset: ds,
+      scorers: [fruitNameScorer],
+    });
+
+    const results = await evaluation.evaluate(model);
+    console.log(JSON.stringify(results, null, 2));
+    ```
+
+  
+
+
+In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class) for more information.
+
+## 4. Pulling it all together
+
+
+  
+  
+    ```python
+    import json
+    import asyncio
+    import weave
+    from weave.scorers import MultiTaskBinaryClassificationF1
+    import openai
+
+    # We create a model class with one predict function.
+    # All inputs, predictions and parameters are automatically captured for easy inspection.
+    class ExtractFruitsModel(weave.Model):
+        model_name: str
+        prompt_template: str
+        @weave.op()
+        async def predict(self, sentence: str) -> dict:
+            client = openai.AsyncClient()
+
+            response = await client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "user", "content": self.prompt_template.format(sentence=sentence)}
+                ],
+                response_format={ "type": "json_object" }
+            )
+            result = response.choices[0].message.content
+            if result is None:
+                raise ValueError("No response from model")
+            parsed = json.loads(result)
+            return parsed
+
+    # We call init to begin capturing data in the project, intro-example.
+    weave.init('intro-example')
+
+    # We create our model with our system prompt.
+    model = ExtractFruitsModel(name='gpt4',
+                            model_name='gpt-4-0125-preview',
+                            prompt_template='Extract fields ("fruit": , "color": , "flavor") from the following text, as json: {sentence}')
+    sentences = ["There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
+    "Pounits are a bright green color and are more savory than sweet.",
+    "Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them."]
+    labels = [
+        {'fruit': 'neoskizzles', 'color': 'purple', 'flavor': 'candy'},
+        {'fruit': 'pounits', 'color': 'bright green', 'flavor': 'savory'},
+        {'fruit': 'glowls', 'color': 'pale orange', 'flavor': 'sour and bitter'}
+    ]
+    examples = [
+        {'id': '0', 'sentence': sentences[0], 'target': labels[0]},
+        {'id': '1', 'sentence': sentences[1], 'target': labels[1]},
+        {'id': '2', 'sentence': sentences[2], 'target': labels[2]}
+    ]
+    # If you have already published the Dataset, you can run:
+    # dataset = weave.ref('example_labels').get()
+
+    # We define a scoring function to compare our model predictions with a ground truth label.
+    @weave.op()
+    def fruit_name_score(target: dict, output: dict) -> dict:
+        return {'correct': target['fruit'] == output['fruit']}
+
+    # Finally, we run an evaluation of this model.
+    # This will generate a prediction for each input example, and then score it with each scoring function.
+    evaluation = weave.Evaluation(
+        name='fruit_eval',
+        dataset=examples, scorers=[MultiTaskBinaryClassificationF1(class_names=["fruit", "color", "flavor"]), fruit_name_score],
+    )
+    print(asyncio.run(evaluation.evaluate(model)))
+    # if you're in a Jupyter Notebook, run:
+    # await evaluation.evaluate(model)
+    ```
+
+  
+  
+
+    ```typescript
+        import 'source-map-support/register';
+    
+    const sentences = [
+      'There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.',
+      'Pounits are a bright green color and are more savory than sweet.',
+      'Finally, there are fruits called glowls, which have a very sour and bitter taste which is acidic and caustic, and a pale orange tinge to them.',
+      'There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.',
+    ];
+    const labels = [
+      {fruit: 'neoskizzles', color: 'purple', flavor: 'candy'},
+      {fruit: 'pounits', color: 'bright green', flavor: 'savory'},
+      {fruit: 'glowls', color: 'pale orange', flavor: 'sour and bitter'},
+    ];
+    const examples = [
+      {id: '0', sentence: sentences[0], target: labels[0]},
+      {id: '1', sentence: sentences[1], target: labels[1]},
+      {id: '2', sentence: sentences[2], target: labels[2]},
+    ];
+    const dataset = new weave.Dataset({
+      id: 'Fruit Dataset',
+      rows: examples,
+    });
+
+    const openaiClient = weave.wrapOpenAI(new OpenAI());
+
+    const model = weave.op(async function myModel({datasetRow}) {
+      const prompt = `Extract fields ("fruit": , "color": , "flavor") from the following text, as json: ${datasetRow.sentence}`;
+      const response = await openaiClient.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{role: 'user', content: prompt}],
+        response_format: {type: 'json_object'},
+      });
+      const result = response?.choices?.[0]?.message?.content;
+      if (result == null) {
+        throw new Error('No response from model');
+      }
+      return JSON.parse(result);
+    });
+
+    const fruitNameScorer = weave.op(
+      ({modelOutput, datasetRow}) => datasetRow.target.fruit == modelOutput.fruit,
+      {name: 'fruitNameScore'}
+    );
+
+    async function main() {
+      await weave.init('examples');
+      const evaluation = new weave.Evaluation({
+        dataset,
+        scorers: [fruitNameScorer],
+      });
+
+      const results = await evaluation.evaluate({model});
+      console.log(JSON.stringify(results, null, 2));
+    }
+
+    main();
+
+    ```
+
+  
+
+
+## What's next?
+
+- Follow the [Model-Based Evaluation of RAG applications](/tutorial-rag) to evaluate a RAG app using an LLM judge.
+
+[Source](https://weave-docs.wandb.ai/tutorial-eval)
+
+<!--- Docs: Tutorials -->
+<!--- Tutorial Rag -->
+
+# Tutorial Rag
+
+# Tutorial: Model-Based Evaluation of RAG applications
+
+Retrieval Augmented Generation (RAG) is a common way of building Generative AI applications that have access to custom knowledge bases.
+
+In this example, we'll show an example that has a retrieval step to get documents. By tracking this, you can debug your app and see what documents were pulled into the LLM context.
+We'll also show how to evaluate it using an LLM judge.
+
+
+
+Check out the [RAG++ course](https://www.wandb.courses/courses/rag-in-production?utm_source=wandb_docs&utm_medium=code&utm_campaign=weave_docs) for a more advanced dive into practical RAG techniques for engineers, where you'll learn production-ready solutions from Weights & Biases, Cohere and Weaviate to optimize performance, cut costs, and enhance the accuracy and relevance of your applications.
+
+## 1. Build a knowledge base
+
+First, we compute the embeddings for our articles. You would typically do this once with your articles and put the embeddings & metadata in a database, but here we're doing it every time we run our script for simplicity.
+
+
+  
+    ```python
+    from openai import OpenAI
+    import weave
+    from weave import Model
+    import numpy as np
+    import json
+    import asyncio
+
+    articles = [
+        "Novo Nordisk and Eli Lilly rival soars 32 percent after promising weight loss drug results Shares of Denmarks Zealand Pharma shot 32 percent higher in morning trade, after results showed success in its liver disease treatment survodutide, which is also on trial as a drug to treat obesity. The trial “tells us that the 6mg dose is safe, which is the top dose used in the ongoing [Phase 3] obesity trial too,” one analyst said in a note. The results come amid feverish investor interest in drugs that can be used for weight loss.",
+        "Berkshire shares jump after big profit gain as Buffetts conglomerate nears $1 trillion valuation Berkshire Hathaway shares rose on Monday after Warren Buffetts conglomerate posted strong earnings for the fourth quarter over the weekend. Berkshires Class A and B shares jumped more than 1.5%, each. Class A shares are higher by more than 17% this year, while Class B has gained more than 18%. Berkshire was last valued at $930.1 billion, up from $905.5 billion where it closed on Friday, according to FactSet. Berkshire on Saturday posted fourth-quarter operating earnings of $8.481 billion, about 28 percent higher than the $6.625 billion from the year-ago period, driven by big gains in its insurance business. Operating earnings refers to profits from businesses across insurance, railroads and utilities. Meanwhile, Berkshires cash levels also swelled to record levels. The conglomerate held $167.6 billion in cash in the fourth quarter, surpassing the $157.2 billion record the conglomerate held in the prior quarter.",
+        "Highmark Health says its combining tech from Google and Epic to give doctors easier access to information Highmark Health announced it is integrating technology from Google Cloud and the health-care software company Epic Systems. The integration aims to make it easier for both payers and providers to access key information they need, even if its stored across multiple points and formats, the company said. Highmark is the parent company of a health plan with 7 million members, a provider network of 14 hospitals and other entities",
+        "Rivian and Lucid shares plunge after weak EV earnings reports Shares of electric vehicle makers Rivian and Lucid fell Thursday after the companies reported stagnant production in their fourth-quarter earnings after the bell Wednesday. Rivian shares sank about 25 percent, and Lucids stock dropped around 17 percent. Rivian forecast it will make 57,000 vehicles in 2024, slightly less than the 57,232 vehicles it produced in 2023. Lucid said it expects to make 9,000 vehicles in 2024, more than the 8,428 vehicles it made in 2023.",
+        "Mauritius blocks Norwegian cruise ship over fears of a potential cholera outbreak Local authorities on Sunday denied permission for the Norwegian Dawn ship, which has 2,184 passengers and 1,026 crew on board, to access the Mauritius capital of Port Louis, citing “potential health risks.” The Mauritius Ports Authority said Sunday that samples were taken from at least 15 passengers on board the cruise ship. A spokesperson for the U.S.-headquartered Norwegian Cruise Line Holdings said Sunday that 'a small number of guests experienced mild symptoms of a stomach-related illness' during Norwegian Dawns South Africa voyage.",
+        "Intuitive Machines lands on the moon in historic first for a U.S. company Intuitive Machines Nova-C cargo lander, named Odysseus after the mythological Greek hero, is the first U.S. spacecraft to soft land on the lunar surface since 1972. Intuitive Machines is the first company to pull off a moon landing — government agencies have carried out all previously successful missions. The company's stock surged in extended trading Thursday, after falling 11 percent in regular trading.",
+        "Lunar landing photos: Intuitive Machines Odysseus sends back first images from the moon Intuitive Machines cargo moon lander Odysseus returned its first images from the surface. Company executives believe the lander caught its landing gear sideways on the moon's surface while touching down and tipped over. Despite resting on its side, the company's historic IM-1 mission is still operating on the moon.",
+    ]
+
+    def docs_to_embeddings(docs: list) -> list:
+        openai = OpenAI()
+        document_embeddings = []
+        for doc in docs:
+            response = (
+                openai.embeddings.create(input=doc, model="text-embedding-3-small")
+                .data[0]
+                .embedding
+            )
+            document_embeddings.append(response)
+        return document_embeddings
+
+    article_embeddings = docs_to_embeddings(articles) # Note: you would typically do this once with your articles and put the embeddings & metadata in a database
+    ```
+
+  
+  
+    ```typescript
+    require('dotenv').config();
+        
+    interface Article {
+        text: string;
+        embedding?: number[];
+    }
+
+    const articles: Article[] = [
+        { 
+            text: `Novo Nordisk and Eli Lilly rival soars 32 percent...` // truncated for brevity
+        },
+        // ... other articles
+    ];
+
+    function cosineSimilarity(a: number[], b: number[]): number {
+        const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+        const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+        const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+        return dotProduct / (magnitudeA * magnitudeB);
+    }
+
+    const docsToEmbeddings = weave.op(async function(docs: Article[]): Promise {
+        const openai = new OpenAI();
+        const enrichedDocs = await Promise.all(docs.map(async (doc) => {
+            const response = await openai.embeddings.create({
+                input: doc.text,
+                model: "text-embedding-3-small"
+            });
+            return {
+                ...doc,
+                embedding: response.data[0].embedding
+            };
+        }));
+        return enrichedDocs;
+    });
+    ```
+  
+
+
+## 2. Create a RAG app
+
+Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.op()` decorator and we create our `Model` class. We call `weave.init('rag-qa')` to begin tracking all the inputs and outputs of our functions for later inspection.
+
+
+  
+    ```python
+    from openai import OpenAI
+    import weave
+    from weave import Model
+    import numpy as np
+    import asyncio
+    @weave.op()
+    def get_most_relevant_document(query):
+        openai = OpenAI()
+        query_embedding = (
+            openai.embeddings.create(input=query, model="text-embedding-3-small")
+            .data[0]
+            .embedding
+        )
+        similarities = [
+            np.dot(query_embedding, doc_emb)
+            / (np.linalg.norm(query_embedding) * np.linalg.norm(doc_emb))
+            for doc_emb in article_embeddings
+        ]
+        # Get the index of the most similar document
+        most_relevant_doc_index = np.argmax(similarities)
+        return articles[most_relevant_doc_index]
+    class RAGModel(Model):
+        system_message: str
+        model_name: str = "gpt-3.5-turbo-1106"
+        @weave.op()
+        def predict(self, question: str) -> dict: # note: `question` will be used later to select data from our evaluation rows
+            from openai import OpenAI
+            context = get_most_relevant_document(question)
+            client = OpenAI()
+            query = f"""Use the following information to answer the subsequent question. If the answer cannot be found, write "I don't know."
+            Context:
+            \"\"\"
+            {context}
+            \"\"\"
+            Question: {question}"""
+            response = client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": self.system_message},
+                    {"role": "user", "content": query},
+                ],
+                temperature=0.0,
+                response_format={"type": "text"},
+            )
+            answer = response.choices[0].message.content
+            return {'answer': answer, 'context': context}
+    weave.init('rag-qa')
+    model = RAGModel(
+        system_message="You are an expert in finance and answer questions related to finance, financial services, and financial markets. When responding based on provided information, be sure to cite the source."
+    )
+    model.predict("What significant result was reported about Zealand Pharma's obesity trial?")
+    ```
+
+  
+  
+    ```typescript
+    class RAGModel {
+        private openai: OpenAI;
+        private systemMessage: string;
+        private modelName: string;
+        private articleEmbeddings: Article[];
+
+        constructor(config: {
+            systemMessage: string;
+            modelName?: string;
+            articleEmbeddings: Article[];
+        }) {
+            this.openai = weave.wrapOpenAI(new OpenAI());
+            this.systemMessage = config.systemMessage;
+            this.modelName = config.modelName || "gpt-3.5-turbo-1106";
+            this.articleEmbeddings = config.articleEmbeddings;
+            this.predict = weave.op(this, this.predict);
+        }
+
+        async predict(question: string): Promise<{
+            answer: string;
+            context: string;
+        }> {
+            const context = await this.getMostRelevantDocument(question);
+            
+            const response = await this.openai.chat.completions.create({
+                model: this.modelName,
+                messages: [
+                    { role: "system", content: this.systemMessage },
+                    { role: "user", content: `Use the following information...` }
+                ],
+                temperature: 0
+            });
+
+            return {
+                answer: response.choices[0].message.content || "",
+                context
+            };
+        }
+    }
+    ```
+  
+
+
+## 3. Evaluating with an LLM Judge
+
+When there aren't simple ways to evaluate your application, one approach is to use an LLM to evaluate aspects of it. Here is an example of using an LLM judge to try to measure the context precision by prompting it to verify if the context was useful in arriving at the given answer. This prompt was augmented from the popular [RAGAS framework](https://docs.ragas.io/).
+
+### Defining a scoring function
+
+As we did in the [Build an Evaluation pipeline tutorial](/tutorial-eval), we'll define a set of example rows to test our app against and a scoring function. Our scoring function will take one row and evaluate it. The input arguments should match with the corresponding keys in our row, so `question` here will be taken from the row dictionary. `output` is the output of the model. The input to the model will be taken from the example based on its input argument, so `question` here too. We're using `async` functions so they run fast in parallel. If you need a quick introduction to async, you can find one [here](https://docs.python.org/3/library/asyncio.html).
+
+
+  
+    ```python
+    from openai import OpenAI
+    import weave
+    import asyncio
+    @weave.op()
+    async def context_precision_score(question, output):
+        context_precision_prompt = """Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output.
+        Output in only valid JSON format.
+
+        question: {question}
+        context: {context}
+        answer: {answer}
+        verdict: """
+        client = OpenAI()
+
+        prompt = context_precision_prompt.format(
+            question=question,
+            context=output['context'],
+            answer=output['answer'],
+        )
+
+        response = client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={ "type": "json_object" }
+        )
+        response_message = response.choices[0].message
+        response = json.loads(response_message.content)
+        return {
+            "verdict": int(response["verdict"]) == 1,
+        }
+
+    questions = [
+        {"question": "What significant result was reported about Zealand Pharma's obesity trial?"},
+        {"question": "How much did Berkshire Hathaway's cash levels increase in the fourth quarter?"},
+        {"question": "What is the goal of Highmark Health's integration of Google Cloud and Epic Systems technology?"},
+        {"question": "What were Rivian and Lucid's vehicle production forecasts for 2024?"},
+        {"question": "Why was the Norwegian Dawn cruise ship denied access to Mauritius?"},
+        {"question": "Which company achieved the first U.S. moon landing since 1972?"},
+        {"question": "What issue did Intuitive Machines' lunar lander encounter upon landing on the moon?"}
+    ]
+    evaluation = weave.Evaluation(dataset=questions, scorers=[context_precision_score])
+    asyncio.run(evaluation.evaluate(model)) # note: you'll need to define a model to evaluate
+    ```
+
+  
+  
+    ```typescript
+    const contextPrecisionScore = weave.op(async function(args: {
+        datasetRow: QuestionRow;
+        modelOutput: { answer: string; context: string; }
+    }): Promise {
+        const openai = new OpenAI();
+        
+        const prompt = `Given question, answer and context verify if the context was useful...`;
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4-turbo-preview",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        const result = JSON.parse(response.choices[0].message.content || "{}");
+        return {
+            verdict: parseInt(result.verdict) === 1
+        };
+    });
+
+    const evaluation = new weave.Evaluation({
+        dataset: createQuestionDataset(),
+        scorers: [contextPrecisionScore]
+    });
+
+    await evaluation.evaluate({
+        model: weave.op((args: { datasetRow: QuestionRow }) => 
+            model.predict(args.datasetRow.question)
+        )
+    });
+    ```
+  
+
+
+### Optional: Defining a `Scorer` class
+
+In some applications we want to create custom evaluation classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score. In order to do that Weave defines a list of ready-to-use `Scorer` classes and also makes it easy to create a custom `Scorer` - in the following we'll see how to create a custom `class CorrectnessLLMJudge(Scorer)`.
+
+On a high-level the steps to create custom Scorer are quite simple:
+
+1. Define a custom class that inherits from `weave.flow.scorer.Scorer`
+2. Overwrite the `score` function and add a `@weave.op()` if you want to track each call of the function
+   - this function has to define an `output` argument where the prediction of the model will be passed to. We define it as type `Optional[dict]` in case the mode might return "None".
+   - the rest of the arguments can either be a general `Any` or `dict` or can select specific columns from the dataset that is used to evaluate the model using the `weave.Evaluate` class - they have to have the exact same names as the column names or keys of a single row after being passed to `preprocess_model_input` if that is used.
+3. _Optional:_ Overwrite the `summarize` function to customize the calculation of the aggregate score. By default Weave uses the `weave.flow.scorer.auto_summarize` function if you don't define a custom function.
+   - this function has to have a `@weave.op()` decorator.
+
+
+  
+    ```python
+    from weave import Scorer
+    from weave import WeaveList
+
+    class CorrectnessLLMJudge(Scorer):
+        prompt: str
+        model_name: str
+        device: str
+
+        @weave.op()
+        async def score(self, output: Optional[dict], query: str, answer: str) -> Any:
+            """Score the correctness of the predictions by comparing the pred, query, target.
+            Args:
+                - output: the dict that will be provided by the model that is evaluated
+                - query: the question asked - as defined in the dataset
+                - answer: the target answer - as defined in the dataset
+            Returns:
+                - single dict {metric name: single evaluation value}"""
+
+            # get_model is defined as general model getter based on provided params (OpenAI,HF...)
+            eval_model = get_model(
+                model_name = self.model_name,
+                prompt = self.prompt
+                device = self.device,
+            )
+            # async evaluation to speed up evaluation - this doesn't have to be async
+            grade = await eval_model.async_predict(
+                {
+                    "query": query,
+                    "answer": answer,
+                    "result": output.get("result"),
+                }
+            )
+            # output parsing - could be done more reobustly with pydantic
+            evaluation = "incorrect" not in grade["text"].strip().lower()
+
+            # the column name displayed in Weave
+            return {"correct": evaluation}
+
+        @weave.op()
+        def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+            """Aggregate all the scores that are calculated for each row by the scoring function.
+            Args:
+                - score_rows: a WeaveList object, nested dict of metrics and scores
+            Returns:
+                - nested dict with the same structure as the input"""
+
+            # if nothing is provided the weave.flow.scorer.auto_summarize function is used
+            # return auto_summarize(score_rows)
+
+            valid_data = [x.get("correct") for x in score_rows if x.get("correct") is not None]
+            count_true = list(valid_data).count(True)
+            int_data = [int(x) for x in valid_data]
+
+            sample_mean = np.mean(int_data) if int_data else 0
+            sample_variance = np.var(int_data) if int_data else 0
+            sample_error = np.sqrt(sample_variance / len(int_data)) if int_data else 0
+
+            # the extra "correct" layer is not necessary but adds structure in the UI
+            return {
+                "correct": {
+                    "true_count": count_true,
+                    "true_fraction": sample_mean,
+                    "stderr": sample_error,
+                }
+            }
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+To use this as a scorer, you would initialize it and pass it to `scorers` argument in your `Evaluation like this:
+
+
+  
+    ```python
+    evaluation = weave.Evaluation(dataset=questions, scorers=[CorrectnessLLMJudge()])
+    ```
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+## 4. Pulling it all together
+
+To get the same result for your RAG apps:
+
+- Wrap LLM calls & retrieval step functions with `weave.op()`
+- (optional) Create a `Model` subclass with `predict` function and app details
+- Collect examples to evaluate
+- Create scoring functions that score one example
+- Use `Evaluation` class to run evaluations on your examples
+
+**NOTE:** Sometimes the async execution of Evaluations will trigger a rate limit on the models of OpenAI, Anthropic, etc. To prevent that you can set an environment variable to limit the amount of parallel workers e.g. `WEAVE_PARALLELISM=3`.
+
+Here, we show the code in it's entirety.
+
+
+  
+    ```python
+    from openai import OpenAI
+    import weave
+    from weave import Model
+    import numpy as np
+    import json
+    import asyncio
+
+    # Examples we've gathered that we want to use for evaluations
+    articles = [
+        "Novo Nordisk and Eli Lilly rival soars 32 percent after promising weight loss drug results Shares of Denmarks Zealand Pharma shot 32 percent higher in morning trade, after results showed success in its liver disease treatment survodutide, which is also on trial as a drug to treat obesity. The trial “tells us that the 6mg dose is safe, which is the top dose used in the ongoing [Phase 3] obesity trial too,” one analyst said in a note. The results come amid feverish investor interest in drugs that can be used for weight loss.",
+        "Berkshire shares jump after big profit gain as Buffetts conglomerate nears $1 trillion valuation Berkshire Hathaway shares rose on Monday after Warren Buffetts conglomerate posted strong earnings for the fourth quarter over the weekend. Berkshires Class A and B shares jumped more than 1.5%, each. Class A shares are higher by more than 17% this year, while Class B has gained more than 18%. Berkshire was last valued at $930.1 billion, up from $905.5 billion where it closed on Friday, according to FactSet. Berkshire on Saturday posted fourth-quarter operating earnings of $8.481 billion, about 28 percent higher than the $6.625 billion from the year-ago period, driven by big gains in its insurance business. Operating earnings refers to profits from businesses across insurance, railroads and utilities. Meanwhile, Berkshires cash levels also swelled to record levels. The conglomerate held $167.6 billion in cash in the fourth quarter, surpassing the $157.2 billion record the conglomerate held in the prior quarter.",
+        "Highmark Health says its combining tech from Google and Epic to give doctors easier access to information Highmark Health announced it is integrating technology from Google Cloud and the health-care software company Epic Systems. The integration aims to make it easier for both payers and providers to access key information they need, even if it's stored across multiple points and formats, the company said. Highmark is the parent company of a health plan with 7 million members, a provider network of 14 hospitals and other entities",
+        "Rivian and Lucid shares plunge after weak EV earnings reports Shares of electric vehicle makers Rivian and Lucid fell Thursday after the companies reported stagnant production in their fourth-quarter earnings after the bell Wednesday. Rivian shares sank about 25 percent, and Lucids stock dropped around 17 percent. Rivian forecast it will make 57,000 vehicles in 2024, slightly less than the 57,232 vehicles it produced in 2023. Lucid said it expects to make 9,000 vehicles in 2024, more than the 8,428 vehicles it made in 2023.",
+        "Mauritius blocks Norwegian cruise ship over fears of a potential cholera outbreak Local authorities on Sunday denied permission for the Norwegian Dawn ship, which has 2,184 passengers and 1,026 crew on board, to access the Mauritius capital of Port Louis, citing “potential health risks.” The Mauritius Ports Authority said Sunday that samples were taken from at least 15 passengers on board the cruise ship. A spokesperson for the U.S.-headquartered Norwegian Cruise Line Holdings said Sunday that 'a small number of guests experienced mild symptoms of a stomach-related illness' during Norwegian Dawns South Africa voyage.",
+        "Intuitive Machines lands on the moon in historic first for a U.S. company Intuitive Machines Nova-C cargo lander, named Odysseus after the mythological Greek hero, is the first U.S. spacecraft to soft land on the lunar surface since 1972. Intuitive Machines is the first company to pull off a moon landing — government agencies have carried out all previously successful missions. The company's stock surged in extended trading Thursday, after falling 11 percent in regular trading.",
+        "Lunar landing photos: Intuitive Machines Odysseus sends back first images from the moon Intuitive Machines cargo moon lander Odysseus returned its first images from the surface. Company executives believe the lander caught its landing gear sideways on the surface of the moon while touching down and tipped over. Despite resting on its side, the company's historic IM-1 mission is still operating on the moon.",
+    ]
+
+    def docs_to_embeddings(docs: list) -> list:
+        openai = OpenAI()
+        document_embeddings = []
+        for doc in docs:
+            response = (
+                openai.embeddings.create(input=doc, model="text-embedding-3-small")
+                .data[0]
+                .embedding
+            )
+            document_embeddings.append(response)
+        return document_embeddings
+
+    article_embeddings = docs_to_embeddings(articles) # Note: you would typically do this once with your articles and put the embeddings & metadata in a database
+
+    # We've added a decorator to our retrieval step
+    @weave.op()
+    def get_most_relevant_document(query):
+        openai = OpenAI()
+        query_embedding = (
+            openai.embeddings.create(input=query, model="text-embedding-3-small")
+            .data[0]
+            .embedding
+        )
+        similarities = [
+            np.dot(query_embedding, doc_emb)
+            / (np.linalg.norm(query_embedding) * np.linalg.norm(doc_emb))
+            for doc_emb in article_embeddings
+        ]
+        # Get the index of the most similar document
+        most_relevant_doc_index = np.argmax(similarities)
+        return articles[most_relevant_doc_index]
+
+    # We create a Model subclass with some details about our app, along with a predict function that produces a response
+    class RAGModel(Model):
+        system_message: str
+        model_name: str = "gpt-3.5-turbo-1106"
+        @weave.op()
+        def predict(self, question: str) -> dict: # note: `question` will be used later to select data from our evaluation rows
+            from openai import OpenAI
+            context = get_most_relevant_document(question)
+            client = OpenAI()
+            query = f"""Use the following information to answer the subsequent question. If the answer cannot be found, write "I don't know."
+            Context:
+            \"\"\"
+            {context}
+            \"\"\"
+            Question: {question}"""
+            response = client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": self.system_message},
+                    {"role": "user", "content": query},
+                ],
+                temperature=0.0,
+                response_format={"type": "text"},
+            )
+            answer = response.choices[0].message.content
+            return {'answer': answer, 'context': context}
+    weave.init('rag-qa')
+    model = RAGModel(
+        system_message="You are an expert in finance and answer questions related to finance, financial services, and financial markets. When responding based on provided information, be sure to cite the source."
+    )
+
+    # Here is our scoring function uses our question and output to product a score
+    @weave.op()
+    async def context_precision_score(question, output):
+        context_precision_prompt = """Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output.
+        Output in only valid JSON format.
+
+        question: {question}
+        context: {context}
+        answer: {answer}
+        verdict: """
+        client = OpenAI()
+
+        prompt = context_precision_prompt.format(
+            question=question,
+            context=output['context'],
+            answer=output['answer'],
+        )
+
+        response = client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={ "type": "json_object" }
+        )
+        response_message = response.choices[0].message
+        response = json.loads(response_message.content)
+        return {
+            "verdict": int(response["verdict"]) == 1,
+        }
+
+    questions = [
+        {"question": "What significant result was reported about Zealand Pharma's obesity trial?"},
+        {"question": "How much did Berkshire Hathaway's cash levels increase in the fourth quarter?"},
+        {"question": "What is the goal of Highmark Health's integration of Google Cloud and Epic Systems technology?"},
+        {"question": "What were Rivian and Lucid's vehicle production forecasts for 2024?"},
+        {"question": "Why was the Norwegian Dawn cruise ship denied access to Mauritius?"},
+        {"question": "Which company achieved the first U.S. moon landing since 1972?"},
+        {"question": "What issue did Intuitive Machines' lunar lander encounter upon landing on the moon?"}
+    ]
+
+    # We define an Evaluation object and pass our example questions along with scoring functions
+    evaluation = weave.Evaluation(dataset=questions, scorers=[context_precision_score])
+    asyncio.run(evaluation.evaluate(model))
+    ```
+
+  
+  
+    ```typescript
+    require('dotenv').config();
+        
+    interface Article {
+        text: string;
+        embedding?: number[];
+    }
+
+    const articles: Article[] = [
+        { 
+            text: `Novo Nordisk and Eli Lilly rival soars 32 percent after promising weight loss drug results Shares of Denmarks Zealand Pharma shot 32 percent higher in morning trade, after results showed success in its liver disease treatment survodutide, which is also on trial as a drug to treat obesity. The trial tells us that the 6mg dose is safe, which is the top dose used in the ongoing [Phase 3] obesity trial too, one analyst said in a note. The results come amid feverish investor interest in drugs that can be used for weight loss.`
+        },
+        { 
+            text: `Berkshire shares jump after big profit gain as Buffetts conglomerate nears $1 trillion valuation Berkshire Hathaway shares rose on Monday after Warren Buffetts conglomerate posted strong earnings for the fourth quarter over the weekend. Berkshires Class A and B shares jumped more than 1.5%, each. Class A shares are higher by more than 17% this year, while Class B has gained more than 18%. Berkshire was last valued at $930.1 billion, up from $905.5 billion where it closed on Friday, according to FactSet. Berkshire on Saturday posted fourth-quarter operating earnings of $8.481 billion, about 28 percent higher than the $6.625 billion from the year-ago period, driven by big gains in its insurance business. Operating earnings refers to profits from businesses across insurance, railroads and utilities. Meanwhile, Berkshires cash levels also swelled to record levels. The conglomerate held $167.6 billion in cash in the fourth quarter, surpassing the $157.2 billion record the conglomerate held in the prior quarter.`
+        },
+        { 
+            text: `Highmark Health says its combining tech from Google and Epic to give doctors easier access to information Highmark Health announced it is integrating technology from Google Cloud and the health-care software company Epic Systems. The integration aims to make it easier for both payers and providers to access key information they need, even if its stored across multiple points and formats, the company said. Highmark is the parent company of a health plan with 7 million members, a provider network of 14 hospitals and other entities`
+        }
+    ];
+
+    function cosineSimilarity(a: number[], b: number[]): number {
+        const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+        const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+        const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+        return dotProduct / (magnitudeA * magnitudeB);
+    }
+
+    const docsToEmbeddings = weave.op(async function(docs: Article[]): Promise {
+        const openai = new OpenAI();
+        const enrichedDocs = await Promise.all(docs.map(async (doc) => {
+            const response = await openai.embeddings.create({
+                input: doc.text,
+                model: "text-embedding-3-small"
+            });
+            return {
+                ...doc,
+                embedding: response.data[0].embedding
+            };
+        }));
+        return enrichedDocs;
+    });
+
+    class RAGModel {
+        private openai: OpenAI;
+        private systemMessage: string;
+        private modelName: string;
+        private articleEmbeddings: Article[];
+
+        constructor(config: {
+            systemMessage: string;
+            modelName?: string;
+            articleEmbeddings: Article[];
+        }) {
+            this.openai = weave.wrapOpenAI(new OpenAI());
+            this.systemMessage = config.systemMessage;
+            this.modelName = config.modelName || "gpt-3.5-turbo-1106";
+            this.articleEmbeddings = config.articleEmbeddings;
+            this.predict = weave.op(this, this.predict);
+        }
+
+        private async getMostRelevantDocument(query: string): Promise {
+            const queryEmbedding = await this.openai.embeddings.create({
+                input: query,
+                model: "text-embedding-3-small"
+            });
+
+            const similarities = this.articleEmbeddings.map(doc => {
+                if (!doc.embedding) return 0;
+                return cosineSimilarity(queryEmbedding.data[0].embedding, doc.embedding);
+            });
+
+            const mostRelevantIndex = similarities.indexOf(Math.max(...similarities));
+            return this.articleEmbeddings[mostRelevantIndex].text;
+        }
+
+        async predict(question: string): Promise<{
+            answer: string;
+            context: string;
+        }> {
+            const context = await this.getMostRelevantDocument(question);
+            
+            const response = await this.openai.chat.completions.create({
+                model: this.modelName,
+                messages: [
+                    { role: "system", content: this.systemMessage },
+                    { 
+                        role: "user", 
+                        content: `Use the following information to answer the subsequent question. If the answer cannot be found, write "I don't know."
+                        Context:
+                        """
+                        ${context}
+                        """
+                        Question: ${question}`
+                    }
+                ],
+                temperature: 0
+            });
+
+            return {
+                answer: response.choices[0].message.content || "",
+                context
+            };
+        }
+    }
+
+    interface ScorerResult {
+        verdict: boolean;
+    }
+
+    interface QuestionRow {
+        question: string;
+    }
+
+    function createQuestionDataset(): weave.Dataset {
+        return new weave.Dataset({
+            id: 'rag-questions',
+            rows: [
+                { question: "What significant result was reported about Zealand Pharma's obesity trial?" },
+                { question: "How much did Berkshire Hathaway's cash levels increase in the fourth quarter?" },
+                { question: "What is the goal of Highmark Health's integration of Google Cloud and Epic Systems technology?" }
+            ]
+        });
+    }
+
+    const contextPrecisionScore = weave.op(async function(args: {
+        datasetRow: QuestionRow;
+        modelOutput: { answer: string; context: string; }
+    }): Promise {
+        const openai = new OpenAI();
+        
+        const prompt = `Given question, answer and context verify if the context was useful in arriving at the given answer. Give verdict as "1" if useful and "0" if not with json output.
+        Output in only valid JSON format.
+
+        question: ${args.datasetRow.question}
+        context: ${args.modelOutput.context}
+        answer: ${args.modelOutput.answer}
+        verdict: `;
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4-turbo-preview",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" }
+        });
+
+        const result = JSON.parse(response.choices[0].message.content || "{}");
+        return {
+            verdict: parseInt(result.verdict) === 1
+        };
+    });
+
+    async function main() {
+        await weave.init('rag-qa-ts');
+        
+        const articleEmbeddings = await docsToEmbeddings(articles);
+        
+        const model = new RAGModel({
+            systemMessage: "You are an expert in finance and answer questions related to finance, financial services, and financial markets. When responding based on provided information, be sure to cite the source.",
+            articleEmbeddings
+        });
+
+        const evaluation = new weave.Evaluation({
+            dataset: createQuestionDataset(),
+            scorers: [contextPrecisionScore]
+        });
+
+        const results = await evaluation.evaluate({
+            model: weave.op((args: { datasetRow: QuestionRow }) => 
+                model.predict(args.datasetRow.question)
+            )
+        });
+        
+        console.log('Evaluation results:', results);
+    }
+
+    if (require.main === module) {
+        main().catch(console.error);
+    }
+    ```
+  
+
+
+## Conclusion
+
+We've learned how to build observability into different steps of our applications, like the retrieval step in this example.
+We've also learned how to build more complex scoring functions, like an LLM judge, for doing automatic evaluation of application responses.
+
+[Source](https://weave-docs.wandb.ai/tutorial-rag)
+
+<!--- Docs: Tutorials -->
+<!--- Tutorial Weave Models -->
+
+# Tutorial Weave Models
+
+# Tutorial: App versioning
+
+Tracking the [inputs, outputs, metadata](/quickstart) as well as [data flowing through your app](/tutorial-tracing_2) is critical to understanding the performance of your system. However **versioning your app over time** is also critical to understand how modifications to your code or application parameters change your outputs. Weave's `Model` class is how these changes can be tracked in Weave.
+
+In this tutorial you'll learn:
+
+- How to use Weave `Model` to track and version your application and its parameters.
+- How to export, modify and re-use a Weave `Model` already logged.
+
+## Using `weave.Model`
+
+> 🚨 **Important**: The `weave.Model` class is currently only supported in Python.
+
+
+Using Weave `Model`s means that parameters such as model vendor ids, prompts, temperature, and more are stored and versioned when they change.
+
+To create a `Model` in Weave, you need the following:
+
+- a class that inherits from `weave.Model`
+- type definitions on all class fields
+- a typed `invoke` function with the `@weave.op()` decorator
+
+When you change the class fields or the code that defines your model, **these changes will be logged and the version will be updated**. This ensures that you can compare the generations across different versions of your app.
+
+In the example below, the **model name, temperature and system prompt will be tracked and versioned**:
+
+
+  
+    ```python
+    import json
+    from openai import OpenAI
+
+    import weave
+
+    @weave.op()
+    def extract_dinos(wmodel: weave.Model, sentence: str) -> dict:
+        response = wmodel.client.chat.completions.create(
+            model=wmodel.model_name,
+            temperature=wmodel.temperature,
+            messages=[
+                {
+                    "role": "system",
+                    "content": wmodel.system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": sentence
+                }
+                ],
+                response_format={ "type": "json_object" }
+            )
+        return response.choices[0].message.content
+
+    # Sub-class with a weave.Model
+    class ExtractDinos(weave.Model):
+        client: OpenAI = None
+        model_name: str
+        temperature: float
+        system_prompt: str
+
+        # Ensure your function is called `invoke` or `predict`
+        @weave.op()
+        def invoke(self, sentence: str) -> dict:
+            dino_data  = extract_dinos(self, sentence)
+            return json.loads(dino_data)
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+Now you can instantiate and call the model with `invoke`:
+
+
+  
+    ```python
+    weave.init('jurassic-park')
+    client = OpenAI()
+
+    system_prompt = """Extract any dinosaur `name`, their `common_name`, \
+    names and whether its `diet` is a herbivore or carnivore, in JSON format."""
+    dinos = ExtractDinos(
+        client=client,
+        model_name='gpt-4o',
+        temperature=0.4,
+        system_prompt=system_prompt
+    )
+
+    sentence = """I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), \
+    both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant \
+    Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below."""
+    result = dinos.invoke(sentence)
+    print(result)
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+Now after calling `.invoke` you can see the trace in Weave **now tracks the model parameters as well as the code** for the model functions that have been decorated with `weave.op()`. You can see the model is also versioned, "v21" in this case, and if you click on the model **you can see all of the calls** that have used that version of the model
+
+
+
+**A note on using `weave.Model`:**
+
+- You can use `predict` instead of `invoke` for the name of the function in your Weave `Model` if you prefer.
+- If you want other class methods to be tracked by weave they need to be wrapped in `weave.op()`
+- Parameters starting with an underscore are ignored by weave and won't be logged
+
+## Exporting and re-using a logged `weave.Model`
+
+Because Weave stores and versions Models that have been invoked, it is possible to export and re-use these models.
+
+**Get the Model ref**
+In the Weave UI you can get the Model ref for a particular version
+
+**Using the Model**
+Once you have the URI of the Model object, you can export and re-use it. Note that the exported model is already initialised and ready to use:
+
+
+  
+    ```python
+    # the exported weave model is already initialised and ready to be called
+    new_dinos = weave.ref("weave:///morgan/jurassic-park/object/ExtractDinos:ey4udBU2MU23heQFJenkVxLBX4bmDsFk7vsGcOWPjY4").get()
+
+    # set the client to the openai client again
+    new_dinos.client = client
+
+    new_sentence = """I also saw an Ankylosaurus grazing on giant ferns"""
+    new_result = new_dinos.invoke(new_sentence)
+    print(new_result)
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+Here you can now see the name Model version (v21) was used with the new input:
+
+
+
+## What's next?
+
+- Follow the [Build an Evaluation pipeline tutorial](/tutorial-eval) to start iteratively improving your applications.
+
+[Source](https://weave-docs.wandb.ai/tutorial-weave_models)
+
+<!--- Docs: Tutorials -->
+<!--- Tutorial Tracing 2 -->
+
+# Tutorial Tracing 2
+
+# Tutorial: Track Application Logic
+
+In the [Track LLM inputs & outputs](/quickstart) tutorial, the basics of tracking the inputs and outputs of your LLMs was covered.
+
+In this tutorial you will learn how to:
+
+- **Track data** as it flows through your application
+- **Track metadata** at call time
+
+## Tracking nested function calls
+
+LLM-powered applications can contain multiple LLMs calls and additional data processing and validation logic that is important to monitor. Even deep nested call structures common in many apps, Weave will keep track of the parent-child relationships in nested functions as long as `weave.op()` is added to every function you'd like to track.
+
+Building on our [basic tracing example](/quickstart), we will now add additional logic to count the returned items from our LLM and wrap them all in a higher level function. We'll then add `weave.op()` to trace every function, its call order and its parent-child relationship:
+
+
+  
+
+    ```python
+    import weave
+    import json
+    from openai import OpenAI
+
+    client = OpenAI()
+    @weave.op()
+    def extract_dinos(sentence: str) -> dict:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """Extract any dinosaur `name`, their `common_name`, \
+    names and whether its `diet` is a herbivore or carnivore, in JSON format."""
+                },
+                {
+                    "role": "user",
+                    "content": sentence
+                }
+                ],
+                response_format={ "type": "json_object" }
+            )
+        return response.choices[0].message.content
+    @weave.op()
+    def count_dinos(dino_data: dict) -> int:
+        # count the number of items in the returned list
+        k = list(dino_data.keys())[0]
+        return len(dino_data[k])
+    @weave.op()
+    def dino_tracker(sentence: str) -> dict:
+        # extract dinosaurs using a LLM
+        dino_data = extract_dinos(sentence)
+
+        # count the number of dinosaurs returned
+        dino_data = json.loads(dino_data)
+        n_dinos = count_dinos(dino_data)
+        return {"n_dinosaurs": n_dinos, "dinosaurs": dino_data}
+    weave.init('jurassic-park')
+
+    sentence = """I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), \
+    both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant \
+    Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below."""
+
+    result = dino_tracker(sentence)
+    print(result)
+    ```
+    **Nested functions**
+
+    When you run the above code you will see the the inputs and outputs from the two nested functions (`extract_dinos` and `count_dinos`), as well as the automatically-logged OpenAI trace.
+
+    
+
+  
+  
+
+    ```typescript
+        
+    const openai = weave.wrapOpenAI(new OpenAI());
+
+    const extractDinos = weave.op(async (sentence: string) => {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Extract any dinosaur `name`, their `common_name`, names and whether its `diet` is a herbivore or carnivore, in JSON format.',
+          },
+          {role: 'user', content: sentence},
+        ],
+        response_format: {type: 'json_object'},
+      });
+      return response.choices[0].message.content;
+    });
+
+    const countDinos = weave.op(async (dinoData: string) => {
+      const parsed = JSON.parse(dinoData);
+      return Object.keys(parsed).length;
+    });
+
+    const dinoTracker = weave.op(async (sentence: string) => {
+      const dinoData = await extractDinos(sentence);
+      const nDinos = await countDinos(dinoData);
+      return {nDinos, dinoData};
+    });
+
+    async function main() {
+      await weave.init('jurassic-park');
+
+      const sentence = `I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike),
+            both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant
+            Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below.`;
+
+      const result = await dinoTracker(sentence);
+      console.log(result);
+    }
+
+    main();
+
+    ```
+
+    **Nested functions**
+
+    When you run the above code you will see the the inputs and outputs from the two nested functions (`extractDinos` and `countDinos`), as well as the automatically-logged OpenAI trace.
+
+    
+    
+
+  
+
+
+## Tracking metadata
+
+Tracking metadata can be done easily by using the `weave.attributes` context manager and passing it a dictionary of the metadata to track at call time.
+
+Continuing our example from above:
+
+
+  
+    ```python
+    import weave
+
+    weave.init('jurassic-park')
+
+    sentence = """I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), \
+    both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant \
+    Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below."""
+
+    # track metadata alongside our previously defined function
+    with weave.attributes({'user_id': 'lukas', 'env': 'production'}):
+        result = dino_tracker(sentence)
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+> 💡 **Note**: It's recommended to use metadata tracking to track metadata at run time, e.g. user ids or whether or not the call is part of the development process or is in production etc.
+
+To track system settings, such as a System Prompt, we recommend using [weave Models](guides/core-types/models)
+
+## What's next?
+
+- Follow the [App Versioning tutorial](/tutorial-weave_models) to capture, version and organize ad-hoc prompt, model, and application changes.
+
+[Source](https://weave-docs.wandb.ai/tutorial-tracing_2)

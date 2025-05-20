@@ -209,6 +209,17 @@ export const buildPanelRunsWithStepper = (
       });
     }
 
+    const tableSelection = {
+      show: tableKeys.length > 0,
+      keys: tableKeys,
+      currentSelection: tableHistoryKey,
+      callback: (key: string) => {
+        safeUpdateConfig({tableHistoryKey: key});
+      },
+    };
+
+    const newConfig = {...props.config, tableSelection};
+
     return (
       <>
         {defaultNode != null && !isVoidNode(defaultNode) && (
@@ -227,7 +238,7 @@ export const buildPanelRunsWithStepper = (
               loading={props.loading}
               panelSpec={spec}
               configMode={false}
-              config={props.config}
+              config={newConfig}
               context={props.context}
               updateConfig={props.updateConfig}
               updateContext={props.updateContext}

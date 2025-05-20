@@ -1,14 +1,23 @@
 from __future__ import annotations
 
-from weave.trace import autopatch, init_message, trace_sentry, weave_client
+import logging
+
+from weave.trace import (
+    autopatch,
+    init_message,
+    trace_sentry,
+    wandb_termlog_patch,
+    weave_client,
+)
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
-from weave.trace_server import sqlite_trace_server
 from weave.trace_server.trace_server_interface import TraceServerInterface
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class InitializedClient:
@@ -96,7 +105,10 @@ def init_weave(
     if wandb_context is None:
         import wandb
 
-        print("Please login to Weights & Biases (https://wandb.ai/) to continue:")
+        logger.info(
+            "Please login to Weights & Biases (https://wandb.ai/) to continue..."
+        )
+        wandb_termlog_patch.ensure_patched()
         wandb.login(anonymous="never", force=True)  # type: ignore
         wandb_api.init()
         wandb_context = wandb_api.get_wandb_api_context()
@@ -199,6 +211,8 @@ def init_weave_get_server(
 
 
 def init_local() -> InitializedClient:
+    from weave.trace_server import sqlite_trace_server
+
     server = sqlite_trace_server.SqliteTraceServer("weave.db")
     server.setup_tables()
     client = weave_client.WeaveClient("none", "none", server)

@@ -69,30 +69,18 @@ export const DragDropContext = createContext<DragDropState>({
   mouseEventOnShiftRelease: null,
   elementOnShiftRelease: null,
 
-  // tslint:disable-next-line:no-empty
   setMouseDownEvent: () => {},
-  // tslint:disable-next-line:no-empty
   setDragData: () => {},
-  // tslint:disable-next-line:no-empty
   setDropRef: () => {},
-  // tslint:disable-next-line:no-empty
   setDragRef: () => {},
-  // tslint:disable-next-line:no-empty
   setDragStarted: () => {},
-  // tslint:disable-next-line:no-empty
   setDragging: () => {},
 
-  // tslint:disable-next-line:no-empty
   setShiftKey: () => {},
-  // tslint:disable-next-line:no-empty
   setDropRefOnShift: () => {},
-  // tslint:disable-next-line:no-empty
   setDropRefOnShiftRelease: () => {},
-  // tslint:disable-next-line:no-empty
   setMouseEventOnShift: () => {},
-  // tslint:disable-next-line:no-empty
   setMouseEventOnShiftRelease: () => {},
-  // tslint:disable-next-line:no-empty
   setElementOnShiftRelease: () => {},
 });
 DragDropContext.displayName = 'DragDropContext';

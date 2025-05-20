@@ -19,6 +19,8 @@ def test_get_aws_credentials():
             "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
             "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
             "WF_FILE_STORAGE_AWS_SESSION_TOKEN": "test-token",
+            "WF_FILE_STORAGE_AWS_REGION": "us-east-1",
+            "WF_FILE_STORAGE_AWS_KMS_KEY": "test-kms-key",
         },
     ):
         creds = get_aws_credentials()
@@ -26,6 +28,8 @@ def test_get_aws_credentials():
             "access_key_id": "test-key",
             "secret_access_key": "test-secret",
             "session_token": "test-token",
+            "region": "us-east-1",
+            "kms_key": "test-kms-key",
         }
 
     # Test with required credentials only (no session token)
@@ -40,10 +44,19 @@ def test_get_aws_credentials():
         assert creds == {
             "access_key_id": "test-key",
             "secret_access_key": "test-secret",
+            "session_token": None,
+            "region": None,
+            "kms_key": None,
         }
 
     # Test with missing required credentials
-    with mock.patch.dict(os.environ, {}, clear=True):
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "key-id",
+        },
+        clear=True,
+    ):
         with pytest.raises(ValueError, match="AWS credentials not set"):
             get_aws_credentials()
 
@@ -65,43 +78,31 @@ def test_get_azure_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": "test-credential",
-        },
-    ):
-        with pytest.raises(ValueError, match="Incorrect padding"):
-            creds = get_azure_credentials()
-    with mock.patch.dict(
-        os.environ,
-        {
-            "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": base64.b64encode(
-                b"test-credential"
-            ).decode(),
+            "WF_FILE_STORAGE_AZURE_ACCESS_KEY": "test-credential",
         },
     ):
         creds = get_azure_credentials()
         assert creds == {
-            "credential": "test-credential",
+            "access_key": "test-credential",
             "account_url": None,
         }
 
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": base64.b64encode(
-                b"test-credential"
-            ).decode(),
+            "WF_FILE_STORAGE_AZURE_ACCESS_KEY": "test-credential",
             "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": "some_account_url",
         },
     ):
         creds = get_azure_credentials()
         assert creds == {
-            "credential": "test-credential",
+            "access_key": "test-credential",
             "account_url": "some_account_url",
         }
 
     # Test with missing credentials
     with mock.patch.dict(os.environ, {}, clear=True):
-        with pytest.raises(ValueError, match="Azure credentials not set"):
+        with pytest.raises(ValueError, match="Azure access key not set"):
             get_azure_credentials()
 
 
@@ -129,11 +130,6 @@ def test_get_gcp_credentials():
         with mock.patch("google.oauth2.service_account.Credentials") as mock_creds:
             get_gcp_credentials()
             mock_creds.from_service_account_info.assert_called_once()
-
-    # Test with missing credentials
-    with mock.patch.dict(os.environ, {}, clear=True):
-        with pytest.raises(ValueError, match="No GCP credentials found"):
-            get_gcp_credentials()
 
     # Test with invalid JSON
     with mock.patch.dict(

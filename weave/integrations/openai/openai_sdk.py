@@ -655,6 +655,12 @@ def get_openai_patcher(
     async_responses_create_settings = base.model_copy(
         update={"name": base.name or "openai.responses.create"}
     )
+    responses_parse_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.parse"}
+    )
+    async_responses_parse_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.parse"}
+    )
 
     _openai_patcher = MultiPatcher(
         [
@@ -713,6 +719,16 @@ def get_openai_patcher(
                 create_wrapper_responses_async(
                     settings=async_responses_create_settings
                 ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "Responses.parse",
+                create_wrapper_responses_sync(settings=responses_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "AsyncResponses.parse",
+                create_wrapper_responses_async(settings=async_responses_parse_settings),
             ),
         ]
     )

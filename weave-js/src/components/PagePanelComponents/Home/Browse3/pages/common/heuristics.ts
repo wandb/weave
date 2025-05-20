@@ -1,8 +1,10 @@
 const PREDICT_AND_SCORE_OP_NAME_PRE_PYDANTIC = 'Evaluation-predict_and_score';
 export const PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC =
   'Evaluation.predict_and_score';
+export const PREDICT_AND_SCORE_OP_NAME_JS = 'Evaluation.predictAndScore';
 const EVALUATE_OP_NAME_PRE_PYDANTIC = 'Evaluation-evaluate';
 export const EVALUATE_OP_NAME_POST_PYDANTIC = 'Evaluation.evaluate';
+export const PREDICT_OP_NAME = 'Model.predict';
 
 export const isPredictAndScoreOp = (opName: string) =>
   opName === PREDICT_AND_SCORE_OP_NAME_PRE_PYDANTIC ||

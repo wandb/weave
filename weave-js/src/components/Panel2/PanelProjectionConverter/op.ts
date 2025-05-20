@@ -34,11 +34,11 @@ export const outputType: Panel2.PanelSpec['outputType'] = inType => {
 };
 
 export const equivalentTransform: Panel2.PanelSpec['equivalentTransform'] =
-  async (inputNode, config, refineType) => {
+  async (inputNode, config, refineType, client, stack) => {
     let castedNode: Node = inputNode as any;
     if (TableType.isTableTypeLike(inputNode.type)) {
       castedNode = await refineType(castedNode);
-      castedNode = TableType.normalizeTableLike(castedNode);
+      castedNode = TableType.normalizeTableLike(castedNode, stack);
       castedNode = await refineType(castedNode);
     }
     // In cases where the resolved type is not assignable to our expected return

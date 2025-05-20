@@ -24,6 +24,7 @@ import {
   WANDB_ARTIFACT_REF_PREFIX,
   WEAVE_REF_PREFIX,
 } from '../pages/wfReactInterface/constants';
+import {Query} from '../pages/wfReactInterface/traceServerClientInterface/query';
 import {TraceCallSchema} from '../pages/wfReactInterface/traceServerClientTypes';
 
 export type FilterId = number | string | undefined;
@@ -32,13 +33,11 @@ export type FilterId = number | string | undefined;
 // For most of these it would be great if we could enable filtering in the future.
 export const UNFILTERABLE_FIELDS = [
   'feedback',
-  'summary.weave.status',
   'summary.weave.latency_ms',
-  'summary.weave.trace_name',
   'tokens',
   'cost',
   'wb_user_id', // Option+Click works
-  'wb_run_id', // Option+Click works
+  'total_storage_size_bytes',
 ];
 
 export type ColumnInfo = {
@@ -48,7 +47,10 @@ export type ColumnInfo = {
 
 export const FIELD_LABELS: Record<string, string> = {
   id: 'Call ID',
+  'summary.weave.status': 'Status',
+  'summary.weave.trace_name': 'Name',
   started_at: 'Called',
+  wb_run_id: 'Run',
   wb_user_id: 'User',
 };
 
@@ -75,6 +77,8 @@ export const getFieldLabel = (field: string): string => {
 export const FIELD_TYPE: Record<string, string> = {
   id: 'id',
   'summary.weave.status': 'status',
+  'summary.weave.trace_name': 'string',
+  wb_run_id: 'run',
   wb_user_id: 'user',
   started_at: 'datetime',
 };
@@ -90,7 +94,7 @@ export type SelectOperatorOption = {
   group: OperatorGroup;
 };
 
-const allOperators: SelectOperatorOption[] = [
+const stringOperators: SelectOperatorOption[] = [
   {
     value: '(string): contains',
     label: 'contains',
@@ -106,6 +110,18 @@ const allOperators: SelectOperatorOption[] = [
     label: 'in',
     group: 'string',
   },
+  {
+    value: '(string): notEquals',
+    label: 'does not equal',
+    group: 'string',
+  },
+  {
+    value: '(string): notContains',
+    label: 'does not contain',
+    group: 'string',
+  },
+];
+const numberOperators: SelectOperatorOption[] = [
   {
     value: '(number): =',
     label: '=',
@@ -136,11 +152,15 @@ const allOperators: SelectOperatorOption[] = [
     label: '≥',
     group: 'number',
   },
+];
+const booleanOperators: SelectOperatorOption[] = [
   {
     value: '(bool): is',
     label: 'is',
     group: 'boolean',
   },
+];
+const dateOperators: SelectOperatorOption[] = [
   {
     value: '(date): after',
     label: 'after',
@@ -151,6 +171,8 @@ const allOperators: SelectOperatorOption[] = [
     label: 'before',
     group: 'date',
   },
+];
+const anyOperators: SelectOperatorOption[] = [
   {
     value: '(any): isEmpty',
     label: 'is empty',
@@ -161,6 +183,13 @@ const allOperators: SelectOperatorOption[] = [
     label: 'is not empty',
     group: 'any',
   },
+];
+const allOperators: SelectOperatorOption[] = [
+  ...stringOperators,
+  ...numberOperators,
+  ...booleanOperators,
+  ...dateOperators,
+  ...anyOperators,
 ];
 
 // Display labels
@@ -242,33 +271,34 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
         label: 'in',
         group: 'string',
       },
+      {
+        value: '(string): notEquals',
+        label: 'does not equal',
+        group: 'string',
+      },
     ];
   }
+  if ('string' === fieldType) {
+    return stringOperators;
+  }
   if ('datetime' === fieldType) {
-    return [
-      {
-        value: '(date): after',
-        label: 'after',
-        group: 'date',
-      },
-      {
-        value: '(date): before',
-        label: 'before',
-        group: 'date',
-      },
-    ];
+    return dateOperators;
   }
   if ('status' === fieldType) {
     return [
       {
-        value: 'is',
-        label: 'is',
-        group: 'boolean',
+        value: '(string): in',
+        label: 'in',
+        group: 'string',
       },
+    ];
+  }
+  if ('run' === fieldType) {
+    return [
       {
-        value: 'is not',
-        label: 'is not',
-        group: 'boolean',
+        value: '(string): equals',
+        label: 'equals',
+        group: 'string',
       },
     ];
   }
@@ -296,6 +326,7 @@ export const getDefaultOperatorForValue = (value: any) => {
 
 export const FIELD_DESCRIPTIONS: Record<string, string> = {
   started_at: 'The time the op was invoked',
+  'summary.weave.trace_name': 'The name of the call',
   'attributes.weave.client_version': 'The version of the Weave library used',
   'attributes.weave.source': 'Which Weave client was used',
   'attributes.weave.os_name': 'Operating system name',
@@ -387,4 +418,52 @@ export const upsertFilter = (
 export type OperatorGroupedOption = {
   label: string;
   options: SelectOperatorOption[];
+};
+
+export const makeRawDateFilter = (
+  days: number,
+  field: string = 'started_at'
+): Query => {
+  const d = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  return {
+    $expr: {
+      $gt: [{$getField: field}, {$literal: d.getTime() / 1000}],
+    },
+  };
+};
+
+/**
+ * Creates a date filter for a specified number of days in the past
+ * @param days Number of days in the past to filter from
+ * @param id Optional filter ID (defaults to 0)
+ * @param field Optional field name (defaults to 'started_at')
+ * @param operator Optional operator (defaults to '(date): after')
+ * @returns GridFilterItem configured with the specified parameters
+ */
+export const makeDateFilter = (
+  days: number,
+  id: number | string = 0,
+  field: string = 'started_at',
+  operator: string = '(date): after'
+): GridFilterItem => {
+  const pastDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return {
+    id,
+    field,
+    operator,
+    value: pastDate.toISOString(),
+  };
+};
+
+export const makeMonthFilter = (): GridFilterItem => {
+  // Get last month
+  const curMonth = new Date().getMonth();
+  // Number of days in the previous month
+  const prevMonthDays = new Date(
+    new Date().getFullYear(),
+    curMonth,
+    0
+  ).getDate();
+  return makeDateFilter(prevMonthDays);
 };

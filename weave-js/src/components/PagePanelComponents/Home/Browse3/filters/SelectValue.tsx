@@ -5,6 +5,7 @@
 import React from 'react';
 
 import {parseRef} from '../../../../../react';
+import {RunOption, SelectRun} from '../../../../SelectRun';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../smallRef/SmallRef';
 import {
@@ -19,6 +20,7 @@ import {IdList} from './IdList';
 import {SelectDatetimeDropdown} from './SelectDatetimeDropdown';
 import {TextValue} from './TextValue';
 import {ValueInputBoolean} from './ValueInputBoolean';
+import {ValueInputStatus} from './ValueInputStatus';
 
 type SelectValueProps = {
   entity: string;
@@ -55,8 +57,28 @@ export const SelectValue = ({
   if (fieldType === 'id' && operator.endsWith('in')) {
     return <IdList ids={getStringList(value)} type="Call" />;
   }
+  if (fieldType === 'status') {
+    return <ValueInputStatus value={value} onSetValue={onSetValue} />;
+  }
   if (fieldType === 'user') {
     return <UserLink userId={value} includeName={true} hasPopover={false} />;
+  }
+  if (fieldType === 'run') {
+    return (
+      <SelectRun
+        entityName={entity}
+        projectName={project}
+        runName={
+          typeof value === 'string' && value.includes(':')
+            ? value.split(':')[1]
+            : value
+        }
+        onSelectRun={(run: RunOption) => {
+          const value = `${run.projectInternalId}:${run.value}`;
+          onSetValue(value);
+        }}
+      />
+    );
   }
   if (fieldType === 'datetime') {
     // For date range, only show active state for the last filter

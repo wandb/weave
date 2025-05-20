@@ -37,6 +37,14 @@ interface DatasetEditContextType {
   >;
   /** Get rows without any mui datagrid or weave metadata */
   getRowsNoMeta: () => Array<Record<string, any>>;
+  /** Update cell value and track edit state */
+  updateCellValue: (
+    row: DatasetRow,
+    field: string,
+    newValue: any,
+    serverValue: any,
+    preserveFieldOrder?: (row: DatasetRow) => DatasetRow
+  ) => void;
 }
 
 export const DatasetEditContext = createContext<
@@ -114,6 +122,86 @@ export const DatasetEditProvider: React.FC<DatasetEditProviderProps> = ({
     [setEditedRows]
   );
 
+  const updateCellValue = useCallback(
+    (
+      row: DatasetRow,
+      field: string,
+      newValue: any,
+      serverValue: any,
+      preserveFieldOrder?: (row: DatasetRow) => DatasetRow
+    ) => {
+      const existingRow = {...row};
+      const updatedRow = {...existingRow};
+      updatedRow[field] = newValue;
+
+      const finalRow = preserveFieldOrder
+        ? preserveFieldOrder(updatedRow)
+        : updatedRow;
+
+      // Compare arrays by value instead of by reference
+      const isValueChanged =
+        Array.isArray(newValue) && Array.isArray(serverValue)
+          ? JSON.stringify(newValue) !== JSON.stringify(serverValue)
+          : newValue !== serverValue;
+
+      if (existingRow.___weave?.isNew) {
+        // For newly added rows
+        setAddedRows(prev => {
+          const newMap = new Map(prev);
+          if (existingRow.___weave?.id) {
+            newMap.set(existingRow.___weave.id, finalRow);
+          }
+          return newMap;
+        });
+      } else {
+        // For existing rows
+        if (!finalRow.___weave) {
+          // If ___weave object is missing completely, recreate it with required properties
+          const rowId = existingRow.___weave?.id || `generated-${Date.now()}`;
+          finalRow.___weave = {
+            id: rowId,
+            index: existingRow.___weave?.index,
+            editedFields: new Set<string>(),
+          };
+        } else if (!finalRow.___weave.editedFields) {
+          finalRow.___weave.editedFields = new Set<string>();
+        }
+
+        // Ensure editedFields exists before using it
+        if (!finalRow.___weave.editedFields) {
+          finalRow.___weave.editedFields = new Set<string>();
+        }
+
+        if (isValueChanged) {
+          finalRow.___weave.editedFields.add(field);
+        } else {
+          finalRow.___weave.editedFields.delete(field);
+        }
+
+        // Only process if we have a valid row index
+        const rowIndex = existingRow.___weave?.index;
+        if (rowIndex !== undefined) {
+          setEditedRows(prev => {
+            const newMap = new Map(prev);
+
+            // We can now safely access editedFields since we ensured it exists above
+            // Use non-null assertion operator to tell TypeScript we guarantee editedFields exists
+            if (finalRow.___weave.editedFields!.size === 0) {
+              newMap.delete(rowIndex);
+            } else {
+              newMap.set(rowIndex, finalRow);
+            }
+
+            return newMap;
+          });
+
+          setFieldEdited(rowIndex, field, isValueChanged);
+        }
+      }
+    },
+    [setAddedRows, setEditedRows, setFieldEdited]
+  );
+
   const reset = useCallback(() => {
     setEditedRows(new Map());
     setDeletedRows([]);
@@ -188,6 +276,7 @@ export const DatasetEditProvider: React.FC<DatasetEditProviderProps> = ({
         resetEditState: reset,
         convertEditsToTableUpdateSpec,
         getRowsNoMeta,
+        updateCellValue,
       }}>
       {children}
     </DatasetEditContext.Provider>

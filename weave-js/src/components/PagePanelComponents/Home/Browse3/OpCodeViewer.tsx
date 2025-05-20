@@ -3,9 +3,9 @@ import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {Button} from '../../../Button';
-import {Browse2OpDefCode} from '../Browse2/Browse2OpDefCode';
 import {useWeaveflowCurrentRouteContext} from './context';
 import {OpCodeViewerDiff} from './OpCodeViewerDiff';
+import {OpDefCode} from './OpDefCode';
 import {opVersionKeyToRefUri} from './pages/wfReactInterface/utilities';
 import {OpVersionSchema} from './pages/wfReactInterface/wfDataModelHooksInterface';
 import {SelectOpVersion} from './SelectOpVersion';
@@ -155,7 +155,7 @@ export const OpCodeViewer = ({
     <OpCodeViewerContainer>
       {diffBar}
       {diffState.left == null || diffState.right == null ? (
-        <Browse2OpDefCode uri={currentVersionURI} />
+        <OpDefCode uri={currentVersionURI} />
       ) : (
         <>
           <SelectVersionBar>

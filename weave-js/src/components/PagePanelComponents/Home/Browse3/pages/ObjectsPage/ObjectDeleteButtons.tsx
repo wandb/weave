@@ -1,5 +1,8 @@
 import {Button} from '@wandb/weave/components/Button';
-import {maybePluralizeWord} from '@wandb/weave/core/util/string';
+import {
+  maybePluralize,
+  maybePluralizeWord,
+} from '@wandb/weave/core/util/string';
 import React, {useContext, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -56,12 +59,12 @@ export const DeleteObjectButtonWithModal: React.FC<{
         onClose={() => setDeleteModalOpen(false)}
         deleteTitleStr={deleteStr}
         onDelete={() =>
-          objectVersionsDelete(
-            objVersionSchema.entity,
-            objVersionSchema.project,
-            objVersionSchema.objectId,
-            [objVersionSchema.versionHash]
-          )
+          objectVersionsDelete({
+            entity: objVersionSchema.entity,
+            project: objVersionSchema.project,
+            objectId: objVersionSchema.objectId,
+            digests: [objVersionSchema.versionHash],
+          })
         }
         onSuccess={onSuccess}
       />
@@ -100,8 +103,69 @@ export const DeleteObjectVersionsButtonWithModal: React.FC<{
         deleteTitleStr={deleteTitleStr}
         deleteBodyStrs={objectVersions}
         onDelete={() =>
-          objectVersionsDelete(entity, project, objectName, objectDigests)
+          objectVersionsDelete({
+            entity,
+            project,
+            objectId: objectName,
+            digests: objectDigests,
+          })
         }
+        onSuccess={onSuccess}
+      />
+    </>
+  );
+};
+
+// Dialog confirming the deletion of all versions of one or more objects.
+export const DeleteObjectsButtonWithModal: React.FC<{
+  entity: string;
+  project: string;
+  objectIds: string[];
+  disabled?: boolean;
+  onSuccess: () => void;
+}> = ({entity, project, objectIds, disabled, onSuccess}) => {
+  const {useObjectDeleteFunc} = useWFHooks();
+  const {objectDeleteAllVersions} = useObjectDeleteFunc();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const numObjects = objectIds.length;
+  const deleteTitleStr = maybePluralize(numObjects, 'object', 's');
+  const deleteBodyStrs = objectIds.map(
+    objectId => `${objectId} - all versions`
+  );
+
+  const onDelete = () => {
+    return Promise.all(
+      objectIds.map(objectId =>
+        objectDeleteAllVersions({
+          key: {
+            entity,
+            project,
+            objectId,
+            weaveKind: 'object',
+            scheme: 'weave',
+            versionHash: '',
+            path: '',
+          },
+        })
+      )
+    );
+  };
+
+  return (
+    <>
+      <Button
+        icon="delete"
+        variant="ghost"
+        onClick={() => setDeleteModalOpen(true)}
+        disabled={disabled}
+      />
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        deleteTitleStr={deleteTitleStr}
+        deleteBodyStrs={deleteBodyStrs}
+        onDelete={onDelete}
         onSuccess={onSuccess}
       />
     </>

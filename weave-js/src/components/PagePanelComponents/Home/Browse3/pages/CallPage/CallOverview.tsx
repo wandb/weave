@@ -7,6 +7,8 @@ import {Reactions} from '../../feedback/Reactions';
 import {EditableCallName} from '../common/EditableCallName';
 import {CopyableId} from '../common/Id';
 import {StatusChip} from '../common/StatusChip';
+import {ComputedCallStatuses} from '../wfReactInterface/traceServerClientTypes';
+import {traceCallStatusCode} from '../wfReactInterface/tsDataModelHooks';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {ExceptionAlert} from './Exceptions';
 import {OverflowMenu} from './OverflowMenu';
@@ -42,15 +44,18 @@ OverflowBin.displayName = 'S.OverflowBin';
 export const CallOverview: React.FC<{
   call: CallSchema;
 }> = ({call}) => {
-  const statusCode = call.rawSpan.status_code;
   const refCall = makeRefCall(call.entity, call.project, call.callId);
   const editableCallDisplayNameRef = React.useRef<EditableField>(null);
   const [isEditing, setIsEditing] = React.useState(false);
 
+  const status = call.traceCall
+    ? traceCallStatusCode(call.traceCall)
+    : ComputedCallStatuses.running;
+
   return (
     <>
       <Overview>
-        <StatusChip value={statusCode} iconOnly />
+        <StatusChip value={status} iconOnly />
         <CallName $isEditing={isEditing}>
           <EditableCallName call={call} onEditingChange={setIsEditing} />
         </CallName>

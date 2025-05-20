@@ -11,9 +11,11 @@ class AWSCredentials(TypedDict):
     """AWS authentication credentials for S3 access.
     The session_token is optional and only required for temporary credentials."""
 
-    access_key_id: str
-    secret_access_key: str
+    access_key_id: NotRequired[Optional[str]]
+    secret_access_key: NotRequired[Optional[str]]
     session_token: NotRequired[Optional[str]]
+    kms_key: NotRequired[Optional[str]]
+    region: NotRequired[Optional[str]]
 
 
 class AzureConnectionCredentials(TypedDict):
@@ -25,7 +27,7 @@ class AzureConnectionCredentials(TypedDict):
 class AzureAccountCredentials(TypedDict):
     """Azure authentication using account-based credentials."""
 
-    credential: str
+    access_key: str
     account_url: NotRequired[Optional[str]]
 
 
@@ -47,19 +49,21 @@ def get_aws_credentials() -> AWSCredentials:
     access_key_id = environment.wf_storage_bucket_aws_access_key_id()
     secret_access_key = environment.wf_storage_bucket_aws_secret_access_key()
     session_token = environment.wf_storage_bucket_aws_session_token()
-    if access_key_id is None or secret_access_key is None:
+    if access_key_id is not None and secret_access_key is None:
         raise ValueError("AWS credentials not set")
+    kms_key = environment.wf_storage_bucket_aws_kms_key()
+    region = environment.wf_storage_bucket_aws_region()
 
-    creds = AWSCredentials(
+    return AWSCredentials(
         access_key_id=access_key_id,
         secret_access_key=secret_access_key,
+        session_token=session_token,
+        kms_key=kms_key,
+        region=region,
     )
-    if session_token is not None:
-        creds["session_token"] = session_token
-    return creds
 
 
-def get_gcp_credentials() -> GCPCredentials:
+def get_gcp_credentials() -> Optional[GCPCredentials]:
     """Retrieves GCP service account credentials from environment variables.
 
     Required env vars:
@@ -77,9 +81,7 @@ def get_gcp_credentials() -> GCPCredentials:
 
     creds_json_b64 = environment.wf_storage_bucket_gcp_credentials_json_b64()
     if not creds_json_b64:
-        raise ValueError(
-            "No GCP credentials found. Set WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64 environment variable."
-        )
+        return None
 
     try:
         creds_dict = json.loads(base64.b64decode(creds_json_b64).decode("utf-8"))
@@ -96,7 +98,7 @@ def get_azure_credentials() -> (
 
     Required env vars (one of):
         - WF_FILE_STORAGE_AZURE_CONNECTION_STRING
-        - WF_FILE_STORAGE_AZURE_CREDENTIAL_B64 (base64 encoded)
+        - WF_FILE_STORAGE_AZURE_ACCESS_KEY
 
     Returns:
         Either AzureConnectionCredentials or AzureAccountCredentials based on available env vars
@@ -107,9 +109,8 @@ def get_azure_credentials() -> (
     connection_string = environment.wf_storage_bucket_azure_connection_string()
     if connection_string is not None:
         return AzureConnectionCredentials(connection_string=connection_string)
-    b64_credential = environment.wf_storage_bucket_azure_credential()
-    if b64_credential is None:
-        raise ValueError("Azure credentials not set")
-    credential = base64.b64decode(b64_credential).decode("utf-8")
+    access_key = environment.wf_storage_bucket_azure_access_key()
+    if access_key is None:
+        raise ValueError("Azure access key not set")
     account_url = environment.wf_storage_bucket_azure_account_url()
-    return AzureAccountCredentials(credential=credential, account_url=account_url)
+    return AzureAccountCredentials(access_key=access_key, account_url=account_url)

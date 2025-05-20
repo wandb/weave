@@ -34,7 +34,6 @@ export function deepMapValuesAndArrays(obj: any, mapFn: (o: any) => any): any {
   return mapFn(obj);
 }
 
-// tslint:disable-next-line
 type DeArray<T> = T extends Array<infer E> ? E : never;
 type Pivot<T extends any[][]> = Array<{[key in keyof T]: DeArray<T[key]>}>;
 export function zip<T extends any[][]>(...args: T): Pivot<T> {

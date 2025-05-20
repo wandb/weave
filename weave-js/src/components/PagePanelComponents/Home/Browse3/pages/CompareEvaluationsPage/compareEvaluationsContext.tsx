@@ -1,6 +1,6 @@
 import {Box} from '@material-ui/core';
 import {useDeepMemo} from '@wandb/weave/hookUtils';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {WeaveLoader} from '../../../../../../common/components/WeaveLoader';
 import {LinearProgress} from '../../../../../LinearProgress';
@@ -8,7 +8,7 @@ import {useEvaluationComparisonState} from './ecpState';
 import {EvaluationComparisonState} from './ecpState';
 import {ComparisonDimensionsType} from './ecpState';
 
-const CompareEvaluationsContext = React.createContext<{
+export type CompareEvaluationContext = {
   state: EvaluationComparisonState;
   setComparisonDimensions: React.Dispatch<
     React.SetStateAction<ComparisonDimensionsType | null>
@@ -18,7 +18,13 @@ const CompareEvaluationsContext = React.createContext<{
   addEvaluationCall: (newCallId: string) => void;
   removeEvaluationCall: (callId: string) => void;
   setEvaluationCallOrder: (newCallIdOrder: string[]) => void;
-} | null>(null);
+
+  getCachedRowData: (digest: string) => any;
+  setCachedRowData: (digest: string, data: any) => void;
+};
+
+const CompareEvaluationsContext =
+  React.createContext<CompareEvaluationContext | null>(null);
 
 export const useCompareEvaluationsState = () => {
   const ctx = React.useContext(CompareEvaluationsContext);
@@ -72,10 +78,24 @@ export const CompareEvaluationsProvider: React.FC<{
     selectedMetrics ?? undefined
   );
 
+  // Here we use a ref instead of a state to avoid re-rendering the component when the cache is updated
+  const resultRowCache = useRef<Record<string, any>>({});
+
   const value = useMemo(() => {
     if (initialState.loading || initialState.result == null) {
       return null;
     }
+    const setCachedRowData = (digest: string, data: any) => {
+      resultRowCache.current[digest] = data;
+    };
+    const getCachedRowData = (digest: string) => {
+      return (
+        resultRowCache.current[digest] ??
+        initialState.result?.loadableComparisonResults?.result?.resultRows?.[
+          digest
+        ]?.rawDataRow
+      );
+    };
     return {
       state: initialState.result,
       setComparisonDimensions,
@@ -97,16 +117,17 @@ export const CompareEvaluationsProvider: React.FC<{
         setEvaluationCallIds(newCallIdOrder);
         onEvaluationCallIdsUpdate(newCallIdOrder);
       },
+      getCachedRowData,
+      setCachedRowData,
     };
   }, [
     initialState.loading,
     initialState.result,
-    setEvaluationCallIds,
-    evaluationCallIds,
-    onEvaluationCallIdsUpdate,
     setComparisonDimensions,
     setSelectedInputDigest,
     setSelectedMetrics,
+    evaluationCallIds,
+    onEvaluationCallIdsUpdate,
   ]);
 
   if (!value) {

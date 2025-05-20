@@ -5,7 +5,6 @@ import {
   GridPagination,
   GridPaginationModel,
   GridRenderCellParams,
-  GridRenderEditCellParams,
   GridRowModel,
   GridSortModel,
   useGridApiRef,
@@ -36,9 +35,8 @@ import {SortBy} from '../pages/wfReactInterface/traceServerClientTypes';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {
   CELL_COLORS,
-  CellEditingRenderer,
-  CellViewingRenderer,
   ControlCell,
+  DatasetCellRenderer,
   DELETED_CELL_STYLES,
 } from './CellRenderers';
 import {useDatasetEditContext} from './DatasetEditorContext';
@@ -154,12 +152,24 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     };
   }, [parsedRef]);
 
-  const numRowsQuery = useTableQueryStats(
-    lookupKey?.entity ?? '',
-    lookupKey?.project ?? '',
-    lookupKey?.digest ?? '',
-    {skip: lookupKey == null}
+  const tableQueryParams = useMemo(
+    () => ({
+      entity: lookupKey?.entity ?? '',
+      project: lookupKey?.project ?? '',
+      digests: lookupKey?.digest ? [lookupKey?.digest] : [],
+      skip: lookupKey == null,
+    }),
+    [lookupKey]
   );
+
+  const numRowsQuery = useTableQueryStats(tableQueryParams);
+
+  const totalRows = useMemo(() => {
+    if (numRowsQuery.result == null) {
+      return 0;
+    }
+    return numRowsQuery.result.tables?.[0]?.count ?? 0;
+  }, [numRowsQuery.result]);
 
   const numAddedRows = useMemo(
     () => Array.from(addedRows.values()).length,
@@ -182,16 +192,15 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     return {numRowsToFetch: rowsToFetch, offset: offsetVal};
   }, [paginationModel, numAddedRows]);
 
-  const fetchQuery = useTableRowsQuery(
-    lookupKey?.entity ?? '',
-    lookupKey?.project ?? '',
-    lookupKey?.digest ?? '',
-    undefined,
-    numRowsToFetch,
+  const fetchQuery = useTableRowsQuery({
+    entity: lookupKey?.entity ?? '',
+    project: lookupKey?.project ?? '',
+    digest: lookupKey?.digest ?? '',
+    limit: numRowsToFetch,
     offset,
     sortBy,
-    {skip: lookupKey == null}
-  );
+    skip: lookupKey == null,
+  });
 
   const [loadedRows, setLoadedRows] = useState<Array<{[key: string]: any}>>([]);
   const [fetchQueryLoaded, setFetchQueryLoaded] = useState(false);
@@ -419,7 +428,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
       width: columnWidths[field as string] ?? undefined,
       flex: columnWidths[field as string] ? undefined : 1,
       minWidth: 100,
-      editable: isEditing,
+      editable: false,
       sortable: true,
       filterable: false,
       renderCell: (params: GridRenderCellParams) => {
@@ -438,7 +447,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         const rowIndex = params.row.___weave?.index;
 
         return (
-          <CellViewingRenderer
+          <DatasetCellRenderer
             {...params}
             isEdited={
               rowIndex != null && !params.row.___weave?.isNew
@@ -452,19 +461,6 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               field as string
             )}
             disableNewRowHighlight={disableNewRowHighlight}
-          />
-        );
-      },
-      renderEditCell: (params: GridRenderEditCellParams) => {
-        const rowIndex = params.row.___weave?.index;
-        const serverValue =
-          rowIndex != null && !params.row.___weave?.isNew
-            ? get(loadedRows[rowIndex - offset]?.val ?? {}, params.field)
-            : '';
-        return (
-          <CellEditingRenderer
-            {...params}
-            serverValue={serverValue}
             preserveFieldOrder={preserveFieldOrder}
           />
         );
@@ -532,6 +528,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   return (
     <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
       <StyledDataGrid
+        data-testid="dataset-table"
         apiRef={apiRef}
         initialState={{
           pinnedColumns: {
@@ -552,14 +549,11 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         sortingMode="server"
         sortModel={sortModel}
         onSortModelChange={onSortModelChange}
-        editMode="cell"
         pagination
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
-        rowCount={
-          (numRowsQuery.result?.count ?? 0) + (isEditing ? numAddedRows : 0)
-        }
+        rowCount={totalRows + (isEditing ? numAddedRows : 0)}
         disableMultipleColumnsSorting
         loading={!fetchQueryLoaded}
         disableRowSelectionOnClick

@@ -7,14 +7,11 @@ import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
-import {toast} from 'react-toastify';
 
 import {Loading} from '../../../../../Loading';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
-import {createNewDataset} from '../../datasets/datasetOperations';
-import {DatasetPublishToast} from '../../datasets/DatasetPublishToast';
-import {useWFHooks} from '../../pages/wfReactInterface/context';
+import {useDatasetSaving} from '../../datasets/useDatasetSaving';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {DeleteObjectVersionsButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
 import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
@@ -35,14 +32,14 @@ export const DatasetsPage: React.FC<{
   const history = useHistory();
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const router = useWeaveflowCurrentRouteContext();
-  const {useObjCreate, useTableCreate} = useWFHooks();
-
-  // Get the create hooks
-  const tableCreate = useTableCreate();
-  const objCreate = useObjCreate();
 
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
-  const [isCreatingDataset, setIsCreatingDataset] = useState(false);
+
+  const {isCreatingDataset, handleSaveDataset} = useDatasetSaving({
+    entity,
+    project,
+    onSaveComplete: () => setIsCreateDrawerOpen(false),
+  });
 
   const baseFilter = useMemo(() => {
     return {
@@ -76,73 +73,6 @@ export const DatasetsPage: React.FC<{
 
   const handleCloseDrawer = () => {
     setIsCreateDrawerOpen(false);
-  };
-
-  const handleSaveDataset = async (dataset: any) => {
-    // Log the dataset being saved for debugging purposes
-    console.log('Saving dataset:', dataset);
-
-    // Check if this is a publish action
-    const isPublish = dataset.publishNow === true;
-
-    setIsCreatingDataset(true);
-    try {
-      // Parse the rows from string back to array if they are provided as a string
-      const rows =
-        typeof dataset.rows === 'string'
-          ? JSON.parse(dataset.rows)
-          : dataset.rows;
-
-      // Create the dataset using the actual API function
-      const result = await createNewDataset({
-        projectId: `${entity}/${project}`,
-        entity,
-        project,
-        datasetName: dataset.name,
-        rows,
-        tableCreate,
-        objCreate,
-        router,
-      });
-
-      // If this is a publish action, we could add additional logic here
-      // This would require backend support for publishing datasets
-      if (isPublish) {
-        console.log('Publishing dataset:', dataset.name);
-        // Here you would call an API to mark the dataset as published
-        // For now, we'll just log and show different toast messaging
-      }
-
-      // Show success message with link to the new dataset
-      toast(
-        <DatasetPublishToast
-          message={
-            isPublish
-              ? 'Dataset published successfully!'
-              : 'Dataset created successfully!'
-          }
-          url={result.url}
-        />,
-        {
-          position: 'top-right',
-          autoClose: 5000,
-          hideProgressBar: true,
-          closeOnClick: true,
-          pauseOnHover: true,
-        }
-      );
-    } catch (error: any) {
-      console.error('Failed to create dataset:', error);
-      toast.error(
-        `Failed to ${isPublish ? 'publish' : 'create'} dataset: ${
-          error.message
-        }`
-      );
-    } finally {
-      setIsCreatingDataset(false);
-      // Close the drawer
-      handleCloseDrawer();
-    }
   };
 
   if (loadingUserInfo) {

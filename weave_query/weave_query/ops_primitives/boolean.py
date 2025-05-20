@@ -1,8 +1,8 @@
 import typing
 
+from weave_query import dispatch
 from weave_query import weave_types as types
 from weave_query.api import op, weave_class
-from weave_query import dispatch
 from weave_query.ops_primitives.dict import dict_
 
 
@@ -79,3 +79,24 @@ def case(cases: list[Case]) -> dispatch.RuntimeOutputNode:
     sep_cases = {"%s" % i: cases[i]["when"] for i in range(len(cases))}
     sep_results = {"%s" % i: cases[i]["then"] for i in range(len(cases))}
     return cond(dict_(**sep_cases), dict_(**sep_results))
+
+
+list_of_booleans_input_type = {"values": types.List(types.optional(types.Boolean()))}
+
+
+@op(
+    name="boolean-all",
+    input_type=list_of_booleans_input_type,
+    output_type=types.Boolean(),
+)
+def boolean_all(values: list[typing.Optional[bool]]) -> bool:
+    return all(value for value in values if value is not None)
+
+
+@op(
+    name="boolean-any",
+    input_type=list_of_booleans_input_type,
+    output_type=types.Boolean(),
+)
+def boolean_any(values: list[typing.Optional[bool]]) -> bool:
+    return any(value for value in values if value is not None)

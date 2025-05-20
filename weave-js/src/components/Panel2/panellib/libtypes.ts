@@ -65,6 +65,11 @@ export function _getTypeHandlerStacks<
       }
     }
 
+    // Prevent converting to stepper
+    if (ps.id === 'panel-stepper' && parentConverterId) {
+      return false;
+    }
+
     return (
       isAssignableTo(currentType, ps.inputType) &&
       ps.shouldSuggest?.(currentType) !== false

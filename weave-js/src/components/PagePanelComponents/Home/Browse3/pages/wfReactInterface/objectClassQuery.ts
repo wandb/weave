@@ -114,11 +114,19 @@ const getBaseObjectInstances = async <C extends BuiltinObjectClassRegistryKeys>(
 
   const objects = await objectPromise;
 
-  // We would expect that this  filtering does not filter anything
+  // We would expect that this filtering does not filter anything
   // out because the backend enforces the base object class, but this
   // is here as a sanity check.
-  return objects.objs
+  const filteredObjects = objects.objs
     .map(obj => ({obj, parsed: knownObjectClass.safeParse(obj.val)}))
+    .map(({obj, parsed}) => {
+      if (!parsed.success) {
+        console.warn(
+          `Failed to parse object: ${JSON.stringify(parsed.error.errors)}`
+        );
+      }
+      return {obj, parsed};
+    })
     .filter(({parsed}) => parsed.success)
     .filter(({obj}) => obj.base_object_class === baseObjectClassName)
     .map(
@@ -128,6 +136,7 @@ const getBaseObjectInstances = async <C extends BuiltinObjectClassRegistryKeys>(
           C
         >)
     );
+  return filteredObjects;
 };
 
 export const useCreateBuiltinObjectInstance = <

@@ -62,7 +62,6 @@ const Markdown: React.FC<MarkdownEditorProps> = ({
   useLayoutEffect(() => {
     if (ref.current) {
       const code = ref.current.querySelectorAll('code');
-      // tslint:disable-next-line:prefer-for-of
       for (let i = 0; i < code.length; i++) {
         Prism.highlightElement(code[i]);
       }
@@ -89,7 +88,6 @@ const Markdown: React.FC<MarkdownEditorProps> = ({
     const imgs = ref.current.querySelectorAll('img');
     // We have to use classic for loop here because IE doesn't support NodeList.forEach()
     // See https://developer.mozilla.org/en-US/docs/Web/API/NodeList#Example
-    // tslint:disable-next-line:prefer-for-of
     for (let i = 0; i < imgs.length; i++) {
       const img = imgs[i];
       img.addEventListener('load', updateHeight);

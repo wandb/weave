@@ -6,20 +6,11 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {
-  Autocomplete,
-  Box,
-  Chip,
-  FormControl,
-  ListItem,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import {Autocomplete, FormControl, ListItem, Tooltip} from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
   GridFilterModel,
-  GridLogicOperator,
   GridPaginationModel,
   GridPinnedColumnFields,
   GridRowSelectionModel,
@@ -29,6 +20,7 @@ import {
 import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {
   Icon,
   IconNotVisible,
@@ -36,6 +28,7 @@ import {
   IconSortAscending,
   IconSortDescending,
 } from '@wandb/weave/components/Icon';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {
   FC,
   useCallback,
@@ -48,7 +41,8 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
-import {A, TargetBlank} from '../../../../../../common/util/links';
+import {RemovableTag} from '../../../../../Tag';
+import {RemoveAction} from '../../../../../Tag/RemoveAction';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
@@ -60,7 +54,7 @@ import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
-import {OnAddFilter} from '../../filters/CellFilterWrapper';
+import {OnUpdateFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
@@ -69,18 +63,9 @@ import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
-import {Empty} from '../common/Empty';
-import {
-  EMPTY_PROPS_EVALUATIONS,
-  EMPTY_PROPS_TRACES,
-} from '../common/EmptyContent';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
-import {
-  truncateID,
-  useControllableState,
-  useURLSearchParamsDict,
-} from '../util';
+import {useControllableState, useURLSearchParamsDict} from '../util';
 import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
@@ -110,7 +95,8 @@ import {
   useOutputObjectVersionOptions,
   WFHighLevelCallFilter,
 } from './callsTableFilter';
-import {useCallsForQuery} from './callsTableQuery';
+import {CallsTableNoRowsOverlay} from './CallsTableNoRowsOverlay';
+import {DEFAULT_FILTER_CALLS, useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 
@@ -119,7 +105,9 @@ const MAX_SELECT = 100;
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
   'summary.weave.feedback',
+  'summary.status_counts',
   'wb_run_id',
+  'attributes.otel_span',
 ];
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
@@ -131,14 +119,35 @@ export const DEFAULT_PIN_CALLS: GridPinnedColumnFields = {
 export const DEFAULT_SORT_CALLS: GridSortModel = [
   {field: 'started_at', sort: 'desc'},
 ];
-export const DEFAULT_FILTER_CALLS: GridFilterModel = {
-  items: [],
-  logicOperator: GridLogicOperator.And,
+
+export const filterHasCalledAfterDateFilter = (filter: GridFilterModel) => {
+  return filter.items.some(
+    item => item.field === 'started_at' && item.operator === '(date): after'
+  );
 };
 
-const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
+export const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
   page: 0,
+};
+
+const CustomLoadingOverlay: React.FC = () => {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        display: 'flex',
+        justifyContent: 'center',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+        zIndex: 1,
+      }}>
+      <WaveLoader size="huge" />
+    </div>
+  );
 };
 
 export const CallsTable: FC<{
@@ -170,6 +179,8 @@ export const CallsTable: FC<{
 
   // Can include glob for prefix match, e.g. "inputs.*"
   allowedColumnPatterns?: string[];
+
+  currentViewId?: string;
 }> = ({
   entity,
   project,
@@ -189,6 +200,7 @@ export const CallsTable: FC<{
   paginationModel,
   setPaginationModel,
   allowedColumnPatterns,
+  currentViewId,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isMetricsChecked, setMetricsChecked] = useState(false);
@@ -222,6 +234,13 @@ export const CallsTable: FC<{
 
   // 2. Filter (Unstructured Filter)
   const filterModelResolved = filterModel ?? DEFAULT_FILTER_CALLS;
+
+  const clearFilters = useCallback(() => {
+    setFilter({});
+    if (setFilterModel) {
+      setFilterModel({items: []});
+    }
+  }, [setFilter, setFilterModel]);
 
   // 3. Sort
   const sortModelResolved = sortModel ?? DEFAULT_SORT_CALLS;
@@ -263,6 +282,9 @@ export const CallsTable: FC<{
     [expandedRefCols]
   );
 
+  const shouldIncludeTotalStorageSize = effectiveFilter.traceRootsOnly;
+  const currentViewIdResolved = currentViewId ?? '';
+
   // Fetch the calls
   const calls = useCallsForQuery(
     entity,
@@ -271,7 +293,13 @@ export const CallsTable: FC<{
     filterModelResolved,
     paginationModelResolved,
     sortModelResolved,
-    expandedRefCols
+    expandedRefCols,
+    undefined,
+    {
+      // The total storage size only makes sense for traces,
+      // and not for calls.
+      includeTotalStorageSize: shouldIncludeTotalStorageSize,
+    }
   );
 
   // Here, we only update our local state once the calls have loaded.
@@ -287,11 +315,18 @@ export const CallsTable: FC<{
   const [callsResult, setCallsResult] = useState(calls.result);
   const [callsTotal, setCallsTotal] = useState(calls.total);
   const callsEffectiveFilter = useRef(effectiveFilter);
+  const prevViewIdRef = useRef(currentViewIdResolved);
+  // A structural change is one where we don't want the set of columns to persist.
+  // This can be because of a view change or effective filter (e.g. selected Op) change.
+  const hasStructuralChange =
+    callsEffectiveFilter.current !== effectiveFilter ||
+    prevViewIdRef.current !== currentViewIdResolved;
   useEffect(() => {
-    if (callsEffectiveFilter.current !== effectiveFilter) {
+    if (hasStructuralChange) {
       setCallsResult([]);
       setCallsTotal(0);
       callsEffectiveFilter.current = effectiveFilter;
+      prevViewIdRef.current = currentViewIdResolved;
       // Refetch the calls IFF the filter has changed, this is a
       // noop if the calls query is already loading, but if the filter
       // has no effective impact (frozen vs. not frozen) we need to
@@ -301,13 +336,15 @@ export const CallsTable: FC<{
       setCallsResult(calls.result);
       setCallsTotal(calls.total);
       callsEffectiveFilter.current = effectiveFilter;
+      prevViewIdRef.current = currentViewIdResolved;
     }
-  }, [calls, effectiveFilter]);
+  }, [calls, effectiveFilter, currentViewIdResolved, hasStructuralChange]);
 
   // Construct Flattened Table Data
   const tableData: FlattenedCallData[] = useMemo(
-    () => prepareFlattenedCallDataForTable(callsResult),
-    [callsResult]
+    () =>
+      prepareFlattenedCallDataForTable(hasStructuralChange ? [] : callsResult),
+    [callsResult, hasStructuralChange]
   );
 
   // This is a specific helper that is used when the user attempts to option-click
@@ -361,7 +398,7 @@ export const CallsTable: FC<{
     [callsResult, columnIsRefExpanded, expandedRefCols]
   );
 
-  const onAddFilter: OnAddFilter | undefined =
+  const onUpdateFilter: OnUpdateFilter | undefined =
     filterModel && setFilterModel
       ? (field: string, operator: string | null, value: any, rowId: string) => {
           // This condition is used to filter by the parent ref itself, not the child cell.
@@ -375,6 +412,54 @@ export const CallsTable: FC<{
             field = expandedRef.field;
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
+
+          // All values added to the filter model should be strings, we
+          // only allow text-field input in the filter bar (even for numeric)
+          // They are converted during the backend mongo-style filter creation
+          let strVal: string;
+          if (typeof value !== 'string') {
+            strVal = JSON.stringify(value);
+          } else {
+            strVal = value;
+          }
+
+          // Check if there is an exact match for field, operator, and value in filterModel.items
+          // If an exact match exists, remove it instead of adding a duplicate.
+          const existingFullMatchIndex = filterModel.items.findIndex(
+            item =>
+              item.field === field &&
+              item.operator === op &&
+              item.value === strVal
+          );
+          if (existingFullMatchIndex !== -1) {
+            const newItems = [...filterModel.items];
+            newItems.splice(existingFullMatchIndex, 1);
+            setFilterModel({
+              ...filterModel,
+              items: newItems,
+            });
+            return;
+          }
+
+          // Check if there is a match for field and operator in filterModel.items
+          // If a match exists, update the value instead of adding a new filter
+          const existingFieldOpMatchIndex = filterModel.items.findIndex(
+            item => item.field === field && item.operator === op
+          );
+          if (existingFieldOpMatchIndex !== -1) {
+            const newItems = [...filterModel.items];
+            newItems[existingFieldOpMatchIndex] = {
+              ...newItems[existingFieldOpMatchIndex],
+              value: strVal,
+            };
+            setFilterModel({
+              ...filterModel,
+              items: newItems,
+            });
+            return;
+          }
+
+          // There is no match, add a new filter.
           const newModel = {
             ...filterModel,
             items: [
@@ -383,7 +468,7 @@ export const CallsTable: FC<{
                 id: filterModel.items.length,
                 field,
                 operator: op,
-                value,
+                value: strVal,
               },
             ],
           };
@@ -396,14 +481,20 @@ export const CallsTable: FC<{
     entity,
     project,
     effectiveFilter,
+    currentViewIdResolved,
     tableData,
     expandedRefCols,
     onCollapse,
     onExpand,
     columnIsRefExpanded,
     allowedColumnPatterns,
-    onAddFilter,
-    calls.costsLoading
+    onUpdateFilter,
+    calls.costsLoading,
+    !!calls.costsError,
+    shouldIncludeTotalStorageSize,
+    shouldIncludeTotalStorageSize ? calls.storageSizeResults : null,
+    shouldIncludeTotalStorageSize && calls.storageSizeLoading,
+    !!calls.storageSizeError
   );
 
   // This contains columns which are suitable for selection and raw data
@@ -515,14 +606,6 @@ export const CallsTable: FC<{
       setRowIds(rowIds);
     }
   }, [rowIds, isPeeking, setRowIds]);
-
-  // CPR (Tim) - (GeneralRefactoring): Co-locate this closer to the effective filter stuff
-  const clearFilters = useCallback(() => {
-    setFilter({});
-    if (setFilterModel) {
-      setFilterModel({items: []});
-    }
-  }, [setFilter, setFilterModel]);
 
   // CPR (Tim) - (GeneralRefactoring): Remove this, and add a slot for empty content that can be calculated
   // in the parent component
@@ -645,6 +728,19 @@ export const CallsTable: FC<{
     return cols;
   }, [columns.cols, selectedCalls, tableData]);
 
+  // MUI data grid is unhappy if you pass it a sort model
+  // that references columns that aren't in the grid - it triggers an
+  // infinite loop.
+  const sortModelFiltered = useMemo(() => {
+    // Get all valid column fields from muiColumns
+    const validColumnFields = new Set(muiColumns.map(col => col.field));
+
+    // Filter out any sort items that reference columns not in muiColumns
+    return sortModelResolved.filter(sortItem =>
+      validColumnFields.has(sortItem.field)
+    );
+  }, [muiColumns, sortModelResolved]);
+
   // Register Compare Evaluations Button
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
@@ -668,23 +764,6 @@ export const CallsTable: FC<{
 
   const [deleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
   const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
-
-  // Replace the state and effect with a single memo
-  const selectedCallObjects = useMemo(() => {
-    if (!callsResult) {
-      return [];
-    }
-    return callsResult
-      .filter(
-        call =>
-          call?.traceCall?.id != null &&
-          selectedCalls.includes(call.traceCall.id)
-      )
-      .map(call => ({
-        digest: call.traceCall!.id,
-        val: call.traceCall!,
-      }));
-  }, [callsResult, selectedCalls]);
 
   // Called in reaction to Hide column menu
   const onColumnVisibilityModelChange = setColumnVisibilityModel
@@ -742,6 +821,41 @@ export const CallsTable: FC<{
     },
     [callsLoading, setPaginationModel]
   );
+
+  const noRowsOverlay = useCallback(() => {
+    if (calls.primaryError) {
+      return (
+        <ErrorPanel
+          title="Oh no! Unable to load traces..."
+          error={calls.primaryError}
+        />
+      );
+    }
+    return (
+      <CallsTableNoRowsOverlay
+        entity={entity}
+        project={project}
+        callsLoading={callsLoading}
+        callsResult={callsResult}
+        isEvaluateTable={isEvaluateTable}
+        effectiveFilter={effectiveFilter}
+        filterModelResolved={filterModelResolved}
+        clearFilters={clearFilters}
+        setFilterModel={setFilterModel}
+      />
+    );
+  }, [
+    calls.primaryError,
+    callsLoading,
+    callsResult,
+    clearFilters,
+    effectiveFilter,
+    filterModelResolved,
+    isEvaluateTable,
+    setFilterModel,
+    entity,
+    project,
+  ]);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -811,6 +925,7 @@ export const CallsTable: FC<{
               </div>
               {isEvaluateTable ? (
                 <CompareEvaluationsTableButton
+                  tooltipText="Compare metrics and examples for selected evaluations"
                   onClick={() => {
                     history.push(
                       router.compareEvaluationsUri(
@@ -839,13 +954,15 @@ export const CallsTable: FC<{
                       onClick={() => setAddToDatasetModalOpen(true)}
                       disabled={selectedCalls.length === 0}
                     />
-                    <AddToDatasetDrawer
-                      entity={entity}
-                      project={project}
-                      open={addToDatasetModalOpen}
-                      onClose={() => setAddToDatasetModalOpen(false)}
-                      selectedCalls={selectedCallObjects}
-                    />
+                    {addToDatasetModalOpen && (
+                      <AddToDatasetDrawer
+                        entity={entity}
+                        project={project}
+                        open={true}
+                        onClose={() => setAddToDatasetModalOpen(false)}
+                        selectedCallIds={selectedCalls}
+                      />
+                    )}
                   </div>
                   <div className="flex-none">
                     <BulkDeleteButton
@@ -869,40 +986,60 @@ export const CallsTable: FC<{
           )}
           <div className="ml-auto flex items-center gap-8">
             {selectedInputObjectVersion && (
-              <Chip
+              <RemovableTag
+                color="moon"
                 label={`Input: ${objectVersionNiceString(
                   selectedInputObjectVersion
                 )}`}
-                onDelete={() => {
-                  setFilter({
-                    ...filter,
-                    inputObjectVersionRefs: undefined,
-                  });
-                }}
+                removeAction={
+                  <RemoveAction
+                    onClick={(e: React.SyntheticEvent) => {
+                      e.stopPropagation();
+                      setFilter({
+                        ...filter,
+                        inputObjectVersionRefs: undefined,
+                      });
+                    }}
+                  />
+                }
               />
             )}
             {selectedOutputObjectVersion && (
-              <Chip
+              <RemovableTag
+                color="moon"
                 label={`Output: ${objectVersionNiceString(
                   selectedOutputObjectVersion
                 )}`}
-                onDelete={() => {
-                  setFilter({
-                    ...filter,
-                    outputObjectVersionRefs: undefined,
-                  });
-                }}
+                removeAction={
+                  <RemoveAction
+                    onClick={(e: React.SyntheticEvent) => {
+                      e.stopPropagation();
+                      setFilter({
+                        ...filter,
+                        outputObjectVersionRefs: undefined,
+                      });
+                    }}
+                  />
+                }
               />
             )}
             {selectedParentId && (
-              <Chip
+              <RemovableTag
+                maxChars={48}
+                truncatedPart="middle"
+                color="moon"
                 label={`Parent: ${selectedParentId}`}
-                onDelete={() => {
-                  setFilter({
-                    ...filter,
-                    parentId: undefined,
-                  });
-                }}
+                removeAction={
+                  <RemoveAction
+                    onClick={(e: React.SyntheticEvent) => {
+                      e.stopPropagation();
+                      setFilter({
+                        ...filter,
+                        parentId: undefined,
+                      });
+                    }}
+                  />
+                }
               />
             )}
             <div className="flex items-center gap-6">
@@ -974,12 +1111,12 @@ export const CallsTable: FC<{
         columnVisibilityModel={columnVisibilityModel}
         // SORT SECTION START
         sortingMode="server"
-        sortModel={sortModel}
+        sortModel={sortModelFiltered}
         onSortModelChange={onSortModelChange}
         // SORT SECTION END
         // PAGINATION SECTION START
         pagination
-        rowCount={callsTotal}
+        rowCount={calls.primaryError ? 0 : callsTotal}
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={onPaginationModelChange}
@@ -1013,56 +1150,7 @@ export const CallsTable: FC<{
           },
         }}
         slots={{
-          noRowsOverlay: () => {
-            if (callsLoading) {
-              return <></>;
-            }
-            const isEmpty = callsResult.length === 0;
-            if (isEmpty) {
-              // CPR (Tim) - (GeneralRefactoring): Move "isEvaluateTable" out and instead make this empty state a prop
-              if (isEvaluateTable) {
-                return <Empty {...EMPTY_PROPS_EVALUATIONS} />;
-              } else if (
-                effectiveFilter.traceRootsOnly &&
-                filterModelResolved.items.length === 0
-              ) {
-                return <Empty {...EMPTY_PROPS_TRACES} />;
-              }
-            }
-            return (
-              <Box
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                <Typography color="textSecondary">
-                  No calls found.{' '}
-                  {clearFilters != null ? (
-                    <>
-                      Try{' '}
-                      <A
-                        onClick={() => {
-                          clearFilters();
-                        }}>
-                        clearing the filters
-                      </A>{' '}
-                      or l
-                    </>
-                  ) : (
-                    'L'
-                  )}
-                  earn more about how to log calls by visiting{' '}
-                  <TargetBlank href="https://wandb.me/weave">
-                    the docs
-                  </TargetBlank>
-                  .
-                </Typography>
-              </Box>
-            );
-          },
+          noRowsOverlay,
           columnMenu: CallsCustomColumnMenu,
           pagination: () => <PaginationButtons hideControls={hideControls} />,
           columnMenuSortDescendingIcon: IconSortDescending,
@@ -1072,7 +1160,9 @@ export const CallsTable: FC<{
             <IconPinToRight style={{transform: 'scaleX(-1)'}} />
           ),
           columnMenuPinRightIcon: IconPinToRight,
+          loadingOverlay: CustomLoadingOverlay,
         }}
+        className="tw-style"
       />
     </FilterLayoutTemplate>
   );
@@ -1190,23 +1280,23 @@ const useParentIdOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {
   const {useCall} = useWFHooks();
-  const parentCall = useCall(
-    effectiveFilter.parentId
-      ? {
-          entity,
-          project,
-          callId: effectiveFilter.parentId,
-        }
-      : null
-  );
+  const callKey = effectiveFilter.parentId
+    ? {
+        entity,
+        project,
+        callId: effectiveFilter.parentId,
+      }
+    : null;
+  const parentCall = useCall({key: callKey});
   return useMemo(() => {
     if (parentCall.loading || parentCall.result == null) {
       return {};
     }
+    const call = parentCall.result;
+    const truncatedId = call.callId.slice(-4);
+    const label = `${call.displayName} (${truncatedId})`;
     return {
-      [parentCall.result.callId]: `${parentCall.result.spanName} (${truncateID(
-        parentCall.result.callId
-      )})`,
+      [call.callId]: label,
     };
   }, [parentCall.loading, parentCall.result]);
 };

@@ -1,6 +1,10 @@
+import logging
+
 from weave.integrations.patcher import Patcher
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.weave_client import Call
+
+logger = logging.getLogger(__name__)
 
 TRANSFORM_EMBEDDINGS = False
 ALLOWED_ROOT_EVENT_TYPES = ("query",)
@@ -16,7 +20,7 @@ except ImportError:
 except Exception:
     # This occurs if llama_index is installed but there is an error in the import or some other error occured in the interaction between packages.
     import_failed = True
-    print(
+    logger.info(
         "Failed to autopatch llama_index. If you are tracing Llama calls, please upgrade llama_index to be version>=0.10.35"
     )
 
