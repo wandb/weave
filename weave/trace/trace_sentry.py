@@ -32,6 +32,15 @@ SENTRY_DEFAULT_DSN = "https://99697cf8ca5158250d3dd6cb23cca9b0@o151352.ingest.us
 SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
 
+# Function to check if Sentry SDK has already been initialized by the user
+def _is_sentry_configured() -> bool:
+    """Check if the Sentry SDK has already been configured with a client."""
+    # Check if the current hub has a client
+    if hasattr(sentry_sdk, "Hub") and hasattr(sentry_sdk.Hub, "current"):
+        return sentry_sdk.Hub.current.client is not None
+    return False
+
+
 def _safe_noop(func: Callable) -> Callable:
     """Decorator to ensure that Sentry methods do nothing if disabled and don't raise."""
 
@@ -58,7 +67,8 @@ class Sentry:
 
         self.dsn = SENTRY_DEFAULT_DSN
 
-        self.hub: sentry_sdk.hub.Hub | None = None
+        self.hub: sentry_sdk.Hub | None = None
+        self._using_global_hub = False
 
         self._disabled = False
 
@@ -84,19 +94,27 @@ class Sentry:
     def setup(self) -> None:
         """Setup Sentry SDK.
 
-        We use lower-level APIs (i.e., not sentry_sdk.init) here
-        to avoid the possibility of interfering with the user's
-        own Sentry SDK setup.
+        If the user has already configured Sentry SDK, we'll use their hub configuration.
+        Otherwise, we'll create our own hub with weave's default settings.
+        This ensures we don't interfere with the user's Sentry configuration.
         """
         from weave import version
 
-        client = sentry_sdk.Client(
-            dsn=self.dsn,
-            default_integrations=False,
-            environment=self.environment,
-            release=version.VERSION,
-        )
-        self.hub = sentry_sdk.Hub(client)
+        # Check if Sentry has already been configured
+        if _is_sentry_configured():
+            # Use the existing global hub
+            self.hub = sentry_sdk.Hub.current
+            self._using_global_hub = True
+        else:
+            # Create a new client and hub with weave's settings
+            client = sentry_sdk.Client(
+                dsn=self.dsn,
+                default_integrations=False,
+                environment=self.environment,
+                release=version.VERSION,
+            )
+            self.hub = sentry_sdk.Hub(client)
+            self._using_global_hub = False
 
     @_safe_noop
     def exception(
@@ -149,7 +167,14 @@ class Sentry:
     @_safe_noop
     def end_session(self) -> None:
         """End the current session."""
-        assert self.hub is not None
+        if self.hub is None:
+            return
+
+        # If we're using the global hub (user's Sentry configuration),
+        # we don't want to close their session since that should be managed by them
+        if self._using_global_hub:
+            return
+
         # get the current client and scope
         client, scope = self.hub._stack[-1]
         session = scope._session
@@ -191,7 +216,9 @@ class Sentry:
                     if tag == "user":
                         scope.user = val
 
-        self.start_session()
+        # Only start a session if we're not using the global hub
+        if not self._using_global_hub:
+            self.start_session()
 
     # Not in the original WandB Sentry module
     def watch(self) -> Callable:
@@ -245,6 +272,22 @@ def _is_local_dev_install(module: Any) -> bool:
         return False
 
 
+# Lazy initialization: Create the global Sentry instance but don't set it up yet
 global_trace_sentry = Sentry()
-global_trace_sentry.setup()
-global_trace_sentry.configure_scope()
+
+
+# This function should be called by weave.init to ensure proper initialization order
+def initialize_sentry() -> None:
+    """Initialize the Weave Sentry integration.
+
+    This function should be called from weave.init rather than automatically
+    when this module is imported. This ensures that if the user has already
+    initialized Sentry, we'll properly respect that configuration.
+    """
+    global_trace_sentry.setup()
+    global_trace_sentry.configure_scope()
+
+
+# For backward compatibility, initialize if not already using a user-configured hub
+if not _is_sentry_configured():
+    initialize_sentry()
