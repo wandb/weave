@@ -402,7 +402,7 @@ def _call_sync_func(
             return res, call
 
     __weave = setup_dunder_weave_dict(__weave)
-    __weave["attributes"]["python"]["type"] = "function"
+    __weave["attributes"]["weave"]["python"]["type"] = "function"
 
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
@@ -544,7 +544,7 @@ async def _call_async_func(
             return res, call
 
     __weave = setup_dunder_weave_dict(__weave)
-    __weave["attributes"]["python"]["type"] = "async_function"
+    __weave["attributes"]["weave"]["python"]["type"] = "async_function"
 
     # Proceed with tracing
     try:
@@ -672,7 +672,7 @@ def _call_sync_gen(
             return gen, call
 
     __weave = setup_dunder_weave_dict(__weave)
-    __weave["attributes"]["python"]["type"] = "generator"
+    __weave["attributes"]["weave"]["python"]["type"] = "generator"
 
     # Proceed with tracing
     try:
@@ -881,7 +881,7 @@ async def _call_async_gen(
             return gen, call
 
     __weave = setup_dunder_weave_dict(__weave)
-    __weave["attributes"]["python"]["type"] = "async_generator"
+    __weave["attributes"]["weave"]["python"]["type"] = "async_generator"
 
     # Proceed with tracing
     try:
