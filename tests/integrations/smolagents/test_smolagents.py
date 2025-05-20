@@ -7,16 +7,23 @@ from weave.integrations.integration_utilities import op_name_from_ref
 
 
 def mask_api_key_and_skip(request):
-    from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
-    # Mask api_key in query params
+    if "raw.githubusercontent.com/BerriAI/litellm/main" in request.uri:
+        return None
+
     url = urlparse(request.uri)
     query = parse_qs(url.query)
     if "api_key" in query:
         query["api_key"] = ["DUMMY_API_KEY"]
         new_query = urlencode(query, doseq=True)
         new_url = url._replace(query=new_query)
-        request = request._replace(uri=urlunparse(new_url))
+        request = type(request)(
+            method=request.method,
+            uri=urlunparse(new_url),
+            body=request.body,
+            headers=request.headers,
+        )
     return request
 
 
@@ -24,8 +31,7 @@ def mask_api_key_and_skip(request):
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
-    match_on=["method", "scheme", "host", "port", "path"],
-    before_record_request=mask_api_key_and_skip,
+    match_on=["method", "scheme", "host", "port", "path", "query"],
 )
 def test_hf_api_model(client):
     from smolagents import HfApiModel
@@ -107,14 +113,14 @@ def test_tool_calling_agent_search(client):
         "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
     )
     os.environ["SERPAPI_API_KEY"] = os.environ.get("SERPAPI_API_KEY", "DUMMY_API_KEY")
-    model = OpenAIServerModel(model_id="gpt-4.1-mini")
+    model = OpenAIServerModel(model_id="gpt-4.1")
     agent = ToolCallingAgent(tools=[GoogleSearchTool()], model=model)
     answer = agent.run(
         "Use the provided tool to answer this question. Get the following page - 'https://weave-docs.wandb.ai/'?"
     )
 
     calls = client.calls()
-    assert len(calls) == 19
+    assert len(calls) == 20
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -137,7 +143,7 @@ def test_tool_calling_agent_weather(client):
         "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
     )
 
-    model = OpenAIServerModel(model_id="gpt-4.1-mini")
+    model = OpenAIServerModel(model_id="gpt-4.1")
 
     @tool
     def get_weather(location: str, celsius: Optional[bool] = False) -> str:
@@ -154,7 +160,7 @@ def test_tool_calling_agent_weather(client):
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
     calls = client.calls()
-    assert len(calls) == 10
+    assert len(calls) == 12
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -177,14 +183,14 @@ def test_code_agent_search(client):
     )
     os.environ["SERPAPI_API_KEY"] = os.environ.get("SERPAPI_API_KEY", "DUMMY_API_KEY")
 
-    model = OpenAIServerModel(model_id="gpt-4.1-mini")
+    model = OpenAIServerModel(model_id="gpt-4.1")
     agent = CodeAgent(tools=[GoogleSearchTool()], model=model)
     answer = agent.run(
         "Use the provided tool to answer this question. Get the following page - 'https://weave-docs.wandb.ai/'?"
     )
 
     calls = client.calls()
-    assert len(calls) == 20
+    assert len(calls) == 10
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -208,7 +214,7 @@ def test_code_agent_weather(client):
     )
     os.environ["SERPAPI_API_KEY"] = os.environ.get("SERPAPI_API_KEY", "DUMMY_API_KEY")
 
-    model = OpenAIServerModel(model_id="gpt-4.1-mini")
+    model = OpenAIServerModel(model_id="gpt-4.1")
 
     @tool
     def get_weather(location: str, celsius: Optional[bool] = False) -> str:
@@ -227,7 +233,7 @@ def test_code_agent_weather(client):
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
     calls = client.calls()
-    assert len(calls) == 9
+    assert len(calls) == 7
 
     call = calls[0]
     assert call.started_at < call.ended_at
