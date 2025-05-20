@@ -6,12 +6,11 @@ from weave.integrations.patcher import Patcher
 from weave.trace.context import weave_client_context
 from weave.trace.weave_client import Call, WeaveClient
 
-import_failed = False
+_import_failed = False
 
 try:
     from llama_index.core.instrumentation.event_handlers.base import BaseEventHandler
 
-    # Import specific event types referenced
     from llama_index.core.instrumentation.events.agent import (
         AgentToolCallEvent,
     )
@@ -27,11 +26,10 @@ try:
         SpanDropEvent,
     )
     from llama_index.core.instrumentation.span_handlers.base import BaseSpanHandler
-    # Other event types will be identified by their class_name()
 except ImportError:
-    import_failed = True
+    _import_failed = True
 except Exception:
-    import_failed = True
+    _import_failed = True
     print(
         "Failed to autopatch llama_index. If you are tracing Llama calls, please upgrade llama_index to be version>=0.10.35"
     )
@@ -447,8 +445,8 @@ class LLamaIndexPatcher(Patcher):
 
     def attempt_patch(self) -> bool:
         """Attempts to patch LlamaIndex instrumentation and set up Weave handlers."""
-        global _global_root_call, import_failed
-        if import_failed:
+        global _global_root_call, _import_failed
+        if _import_failed:
             return False
 
         try:
