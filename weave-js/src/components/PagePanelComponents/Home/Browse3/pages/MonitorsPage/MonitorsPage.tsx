@@ -4,6 +4,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {IconPencilEdit} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
+import {ALL_TRACES_OR_CALLS_REF_KEY} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 import {EMPTY_PROPS_MONITORS} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/EmptyContent';
 import {CreateMonitorDrawer} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/CreateMonitorDrawer';
 import {FilterableObjectVersionsTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectVersionsTable';
@@ -15,7 +16,6 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
 import React, {useMemo, useState} from 'react';
-import {ALL_TRACES_OR_CALLS_REF_KEY} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 
 export const MonitorsPage = ({
   entity,

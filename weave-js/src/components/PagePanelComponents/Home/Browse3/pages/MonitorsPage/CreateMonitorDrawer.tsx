@@ -13,6 +13,7 @@ import {
   useOpVersionOptions,
   WFHighLevelCallFilter,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
+import {ALL_TRACES_OR_CALLS_REF_KEY} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 import {
   getFilterByRaw,
   useFilterSortby,
@@ -35,7 +36,6 @@ import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
 import {toast} from 'react-toastify';
-import {ALL_TRACES_OR_CALLS_REF_KEY} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 

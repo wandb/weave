@@ -6,8 +6,7 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {Chip, Tooltip} from '@mui/material';
-import {Autocomplete, Chip, FormControl, ListItem, Tooltip} from '@mui/material';
+import {Tooltip} from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,

@@ -72,6 +72,7 @@ export const SelectValue = ({
         value={value}
         onChange={onSetValue}
       />
+    );
   }
   if (fieldType === 'run') {
     return (
