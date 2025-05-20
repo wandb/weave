@@ -4,7 +4,7 @@ import base64
 import binascii
 import mimetypes
 from pathlib import Path
-from weave.content_types.file import File
+from weave.content_types.File import File
 from weave.content_types.content import Content
 from weave.content_types.mime_types import guess_mime_type
 
@@ -76,3 +76,5 @@ class WeaveObject:
             mime_type=parsed_content_type['mime_type'],
             preferred_extension=parsed_content_type['extension']
         )
+
+
