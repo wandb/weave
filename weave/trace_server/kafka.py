@@ -15,6 +15,7 @@ class KafkaProducer(ConfluentKafkaProducer):
         conf = {
             "bootstrap.servers": _make_broker_host(),
             "client.id": socket.gethostname(),
+            "message.timeout.ms": 500,
         }
         return cls(conf)
 

@@ -243,11 +243,11 @@ export const SmallObjectVersionsRef = ({
 }: SmallWeaveRefProps) => {
   const {useRootObjectVersions} = useWFHooks();
   const {peekingRouter} = useWeaveflowRouteContext();
-  const objectVersions = useRootObjectVersions(
-    objRef.entityName,
-    objRef.projectName,
-    {objectIds: [objRef.artifactName]}
-  );
+  const objectVersions = useRootObjectVersions({
+    entity: objRef.entityName,
+    project: objRef.projectName,
+    filter: {objectIds: [objRef.artifactName]},
+  });
 
   const error =
     objectVersions?.error ??

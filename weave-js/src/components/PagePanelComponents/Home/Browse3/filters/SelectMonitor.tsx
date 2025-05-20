@@ -48,15 +48,13 @@ export const SelectMonitor = ({
   const [loading, setLoading] = useState(true);
   const {useRootObjectVersions} = useWFHooks();
 
-  const monitorsResult = useRootObjectVersions(
+  const monitorsResult = useRootObjectVersions({
     entity,
     project,
-    OBJECT_VERSIONS_FILTER,
-    undefined,
-    false,
-    undefined,
-    OBJECT_VERSIONS_SORT_BY
-  );
+    filter: OBJECT_VERSIONS_FILTER,
+    metadataOnly: false,
+    sortBy: OBJECT_VERSIONS_SORT_BY,
+  });
 
   const placeholder = useMemo(() => {
     if (loading) {
