@@ -261,6 +261,7 @@ export const ExampleCompareSectionTable: React.FC<
   const decreaseRowHeight = useCallback(() => {
     setRowHeight(v => clip(v / 2, 35, 35 * 2 ** 4));
   }, []);
+  const onlyOneModel = props.state.evaluationCallIdsOrdered.length === 1;
   const header = (
     <HorizontalBox
       sx={{
@@ -285,11 +286,13 @@ export const ExampleCompareSectionTable: React.FC<
             <Icon name="collapse" />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Pivot on Model">
-          <IconButton onClick={() => setModelsAsRows(v => !v)}>
-            <Icon name="table" />
-          </IconButton>
-        </Tooltip>
+        {!onlyOneModel && (
+          <Tooltip title="Pivot on Model">
+            <IconButton onClick={() => setModelsAsRows(v => !v)}>
+              <Icon name="table" />
+            </IconButton>
+          </Tooltip>
+        )}
       </HorizontalBox>
       <HorizontalBox
         sx={{
@@ -306,7 +309,6 @@ export const ExampleCompareSectionTable: React.FC<
       </HorizontalBox>
     </HorizontalBox>
   );
-  const onlyOneModel = props.state.evaluationCallIdsOrdered.length === 1;
   const inner =
     modelsAsRows || onlyOneModel ? (
       <ExampleCompareSectionTableModelsAsRows
@@ -851,54 +853,59 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       ...Object.entries(compositeMetrics).flatMap(
         ([metricGroupKey, metricGroupDef]) => {
           return Object.entries(metricGroupDef.metrics).map(
-            ([keyPath, metricDef]) => ({
-              field: `scores.${keyPath}`,
-              headerName: Object.values(
-                metricDef.scorerRefs
-              )[0].metric.metricSubPath.join('.'),
-              ...SCORE_COLUMN_SETTINGS,
-              ...DISABLED_ROW_SPANNING,
-              disableColumnMenu: false,
-              disableReorder: true,
-              valueGetter: (value: any, row: RowData) => {
-                if (row._pivot === 'modelsAsColumns') {
-                  // This does not make sense for models as columns
-                  return null;
-                }
-                const dimension = Object.values(metricDef.scorerRefs)[0].metric;
-                return lookupMetricValueDirect(
-                  row.scores,
-                  row.evaluationCallId,
-                  dimension,
-                  compositeMetrics
-                );
-              },
-              renderCell: (params: GridRenderCellParams<RowData>) => {
-                if (params.row._pivot === 'modelsAsColumns') {
-                  // This does not make sense for models as columns
-                  return null;
-                }
-                const dimension = Object.values(metricDef.scorerRefs)[0].metric;
-                const summaryValue = lookupMetricValueDirect(
-                  params.row.scores,
-                  params.row.evaluationCallId,
-                  dimension,
-                  compositeMetrics
-                );
-                const baselineValue = lookupMetricValueDirect(
-                  params.row.scores,
-                  props.state.evaluationCallIdsOrdered[0],
-                  dimension,
-                  compositeMetrics
-                );
+            ([keyPath, metricDef]) => {
+              const metricSubpath = Object.values(metricDef.scorerRefs)[0]
+                .metric.metricSubPath;
+              return {
+                field: `scores.${keyPath}`,
+                headerName:
+                  metricSubpath.length > 0 ? metricSubpath.join('.') : keyPath,
+                ...SCORE_COLUMN_SETTINGS,
+                ...DISABLED_ROW_SPANNING,
+                disableColumnMenu: false,
+                disableReorder: true,
+                valueGetter: (value: any, row: RowData) => {
+                  if (row._pivot === 'modelsAsColumns') {
+                    // This does not make sense for models as columns
+                    return null;
+                  }
+                  const dimension = Object.values(metricDef.scorerRefs)[0]
+                    .metric;
+                  return lookupMetricValueDirect(
+                    row.scores,
+                    row.evaluationCallId,
+                    dimension,
+                    compositeMetrics
+                  );
+                },
+                renderCell: (params: GridRenderCellParams<RowData>) => {
+                  if (params.row._pivot === 'modelsAsColumns') {
+                    // This does not make sense for models as columns
+                    return null;
+                  }
+                  const dimension = Object.values(metricDef.scorerRefs)[0]
+                    .metric;
+                  const summaryValue = lookupMetricValueDirect(
+                    params.row.scores,
+                    params.row.evaluationCallId,
+                    dimension,
+                    compositeMetrics
+                  );
+                  const baselineValue = lookupMetricValueDirect(
+                    params.row.scores,
+                    props.state.evaluationCallIdsOrdered[0],
+                    dimension,
+                    compositeMetrics
+                  );
 
-                return evalAggScorerMetricCompGeneric(
-                  dimension,
-                  summaryValue,
-                  baselineValue
-                );
-              },
-            })
+                  return evalAggScorerMetricCompGeneric(
+                    dimension,
+                    summaryValue,
+                    baselineValue
+                  );
+                },
+              };
+            }
           );
         }
       ),
@@ -921,6 +928,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     outputWidths,
   ]);
 
+  console.log(compositeMetrics);
+
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
       {
@@ -933,17 +942,32 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       {
         groupId: 'scores',
         headerName: 'Scores',
-        children: Object.entries(compositeMetrics).map(
+        children: Object.entries(compositeMetrics).flatMap(
           ([metricGroupKey, metricGroupDef]) => {
-            return {
-              groupId: `scores.${metricGroupKey}`,
-              headerName: metricGroupKey,
-              children: Object.entries(metricGroupDef.metrics).map(
-                ([keyPath, metricDef]) => ({
-                  field: `scores.${keyPath}`,
-                })
-              ),
-            };
+            const firstChildKeyPath = Object.entries(
+              metricGroupDef.metrics
+            )[0][0];
+            const childrenLength = Object.entries(
+              metricGroupDef.metrics
+            ).length;
+            const children: GridColumnNode[] = Object.entries(
+              metricGroupDef.metrics
+            ).map(([keyPath, metricDef]) => ({
+              field: `scores.${keyPath}`,
+            }));
+            if (
+              metricGroupKey === DERIVED_SCORER_REF_PLACEHOLDER ||
+              (childrenLength === 1 && firstChildKeyPath === metricGroupKey)
+            ) {
+              return children;
+            }
+            return [
+              {
+                groupId: `scores.${metricGroupKey}`,
+                headerName: metricGroupKey,
+                children,
+              },
+            ];
           }
         ),
       },
@@ -1167,6 +1191,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     outputWidths,
   ]);
 
+  console.log(compositeMetrics);
+
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
       {
@@ -1199,15 +1225,19 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         headerName: 'Scores',
         children: Object.entries(compositeMetrics).flatMap(
           ([metricGroupKey, metricGroupDef]) => {
+            const firstChildKeyPath = Object.entries(
+              metricGroupDef.metrics
+            )[0][0];
             const children: GridColumnNode[] = Object.entries(
               metricGroupDef.metrics
             ).map(([keyPath, metricDef]) => {
+              const metricSubpath = Object.values(metricDef.scorerRefs)[0]
+                .metric.metricSubPath;
               return {
-                groupId: `scores.${keyPath}`,
+                groupId: `scores.${metricGroupKey}.${keyPath}`,
                 [CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY]: true,
-                headerName: Object.values(
-                  metricDef.scorerRefs
-                )[0].metric.metricSubPath.join('.'),
+                headerName:
+                  metricSubpath.length > 0 ? metricSubpath.join('.') : keyPath,
                 children: props.state.evaluationCallIdsOrdered.map(
                   evaluationCallId => {
                     return {
@@ -1218,7 +1248,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
               };
             });
 
-            if (metricGroupKey === DERIVED_SCORER_REF_PLACEHOLDER) {
+            if (
+              metricGroupKey === DERIVED_SCORER_REF_PLACEHOLDER ||
+              (children.length === 1 && firstChildKeyPath === metricGroupKey)
+            ) {
               return children;
             }
 
