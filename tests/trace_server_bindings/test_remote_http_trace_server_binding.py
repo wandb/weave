@@ -368,7 +368,7 @@ def test_requeue_after_max_retries(server, caplog):
 
     # Mock is_accepting_new_work to return True so we can test requeuing
     server.call_processor.is_accepting_new_work = MagicMock(return_value=True)
-    
+
     # Mock enqueue to verify it gets called, and _send_batch_to_server to throw an exception
     server.call_processor.enqueue = MagicMock()
     server._send_batch_to_server = MagicMock(

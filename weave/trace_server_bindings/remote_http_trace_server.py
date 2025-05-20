@@ -191,7 +191,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                         elif isinstance(item, EndBatchItem):
                             ids.append(f"{item.req.end.id}-end")
                     logger.debug(f"Requeueing batch with {ids=}")
-                
+
                 # Only requeue if the processor is still accepting work
                 if self.call_processor and self.call_processor.is_accepting_new_work():
                     self.call_processor.enqueue(batch)
