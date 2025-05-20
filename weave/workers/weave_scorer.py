@@ -104,6 +104,24 @@ def get_active_monitors(project_id: str) -> list[ActiveMonitor]:
     return monitors
 
 
+def _make_active_monitor(project_id: str, obj: tsi.ObjSchema) -> ActiveMonitor:
+    return ActiveMonitor(
+        monitor=Monitor(
+            name=obj.val["name"],
+            description=obj.val["description"],
+            sampling_rate=obj.val["sampling_rate"],
+            scorers=resolve_scorer_refs(obj.val["scorers"], project_id),
+            op_names=obj.val["op_names"],
+            query=obj.val["query"],
+            active=obj.val["active"],
+        ),
+        internal_ref=InternalObjectRef(
+            project_id=project_id, name=obj.val["name"], version=obj.digest
+        ),
+        wb_user_id=obj.wb_user_id,
+    )
+
+
 def fetch_active_monitors(project_id: str) -> list[ActiveMonitor]:
     """Returns active monitors for a given project."""
     obj_query = tsi.ObjQueryReq(
@@ -120,21 +138,7 @@ def fetch_active_monitors(project_id: str) -> list[ActiveMonitor]:
     monitor_objects = server.objs_query(obj_query)
 
     active_monitors = [
-        ActiveMonitor(
-            monitor=Monitor(
-                name=obj.val["name"],
-                description=obj.val["description"],
-                sampling_rate=obj.val["sampling_rate"],
-                scorers=resolve_scorer_refs(obj.val["scorers"], project_id),
-                op_names=obj.val["op_names"],
-                query=obj.val["query"],
-                active=obj.val["active"],
-            ),
-            internal_ref=InternalObjectRef(
-                project_id=project_id, name=obj.val["name"], version=obj.digest
-            ),
-            wb_user_id=obj.wb_user_id,
-        )
+        _make_active_monitor(project_id, obj)
         for obj in monitor_objects.objs
         if obj.val["active"]
     ]
@@ -366,6 +370,7 @@ async def process_project_ended_calls(
 ) -> None:
     if len(ended_calls) == 0:
         logger.warning("No ended calls to process, this should not happen")
+        return
 
     project_id = ended_calls[0].project_id
 
@@ -379,7 +384,7 @@ async def process_project_ended_calls(
         wb_user_id = active_monitor["wb_user_id"]
 
         # Here we potentially query the same calls multiple times.
-        # The reasons is that each monitor has its own call filter, and so we need to query the DB for each monitor.
+        # The reasons is that each monitor has its own call filter, so we need to query the DB for each monitor.
         # We could merge the call filters and do a single query, but then
         # we would need to figure out which call match what monitor filter.
         # Currently we have no way to apply filters outside the DB
@@ -394,9 +399,9 @@ async def process_project_ended_calls(
             for call in calls:
                 for scorer in monitor.scorers:
                     logger.info("Applying scorer %s to call %s", scorer.name, call.id)
-                await apply_scorer(
-                    monitor_internal_ref, scorer, call, project_id, wb_user_id
-                )
+                    await apply_scorer(
+                        monitor_internal_ref, scorer, call, project_id, wb_user_id
+                    )
 
 
 async def run_consumer() -> None:
