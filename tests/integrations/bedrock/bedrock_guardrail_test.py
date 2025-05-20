@@ -127,7 +127,7 @@ def test_client_parameters(mock_bedrock_client):
     scorer._bedrock_runtime = mock_bedrock_client
     mock_bedrock_client.apply_guardrail.return_value = MOCK_APPLY_GUARDRAIL_RESPONSE
 
-    scorer.score("Test content")
+    scorer.score(output="Test content")
     call_args = mock_bedrock_client.apply_guardrail.call_args[1]
     assert call_args["guardrailIdentifier"] == "custom-guardrail-id"
 
@@ -141,7 +141,7 @@ def test_client_parameters(mock_bedrock_client):
     scorer._bedrock_runtime = mock_bedrock_client
     mock_bedrock_client.apply_guardrail.return_value = MOCK_APPLY_GUARDRAIL_RESPONSE
 
-    scorer.score("Test content")
+    scorer.score(output="Test content")
     call_args = mock_bedrock_client.apply_guardrail.call_args[1]
     assert call_args["guardrailVersion"] == "2"
 
@@ -155,7 +155,7 @@ def test_client_parameters(mock_bedrock_client):
     scorer._bedrock_runtime = mock_bedrock_client
     mock_bedrock_client.apply_guardrail.return_value = MOCK_APPLY_GUARDRAIL_RESPONSE
 
-    scorer.score("Test content")
+    scorer.score(output="Test content")
     call_args = mock_bedrock_client.apply_guardrail.call_args[1]
     assert call_args["source"] == "INPUT"
 
@@ -165,7 +165,7 @@ def test_error_handling(scorer, mock_bedrock_client):
     # Mock raises an exception
     mock_bedrock_client.apply_guardrail.side_effect = Exception("Test error")
 
-    result = scorer.score("Test content")
+    result = scorer.score(output="Test content")
 
     # Verify the result is properly formatted for error case
     assert result.passed is False
@@ -188,7 +188,7 @@ def test_uninitialized_client():
     scorer._bedrock_runtime = None
 
     with pytest.raises(ValueError) as excinfo:
-        scorer.score("Test content")
+        scorer.score(output="Test content")
 
     assert "Bedrock runtime client is not initialized" in str(excinfo.value)
 
