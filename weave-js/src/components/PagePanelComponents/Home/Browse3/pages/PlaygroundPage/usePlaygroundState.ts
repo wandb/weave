@@ -88,10 +88,26 @@ const NUMERIC_SETTINGS_MAPPING: Record<
   },
 };
 
-export const usePlaygroundState = () => {
-  const [playgroundStates, setPlaygroundStates] = useState<PlaygroundState[]>([
-    DEFAULT_PLAYGROUND_STATE,
-  ]);
+const getDefaultModelState = (model: string): PlaygroundState => {
+  return {
+    ...DEFAULT_PLAYGROUND_STATE,
+    model,
+  };
+};
+
+const getDefaultModelsState = (
+  defaultModelIds: string[]
+): PlaygroundState[] => {
+  if (defaultModelIds.length === 0) {
+    return [DEFAULT_PLAYGROUND_STATE];
+  }
+  return defaultModelIds.map(modelId => getDefaultModelState(modelId));
+};
+
+export const usePlaygroundState = (defaultModelIds: string[]) => {
+  const [playgroundStates, setPlaygroundStates] = useState<PlaygroundState[]>(
+    getDefaultModelsState(defaultModelIds)
+  );
 
   const setPlaygroundStateField = useCallback(
     (

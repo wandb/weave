@@ -13,6 +13,7 @@ import {
   SAVED_MODEL_OPTION_VALUE,
 } from './LLMDropdownOptions';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
+import {useHistory} from 'react-router-dom';
 interface LLMDropdownProps {
   value: LLMMaxTokensKey | string;
   onChange: (
@@ -45,6 +46,12 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
   const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+
+  // TOOD: Avoid direct url manipulation
+  const history = useHistory();
+  const handleViewCatalog = (path: string) => {
+    history.push(`/catalog/${path}`);
+  };
 
   const handleCloseDrawer = () => {
     setIsAddProviderDrawerOpen(false);
@@ -166,6 +173,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
               project={project}
               isAdmin={isTeamAdmin}
               onConfigureProvider={handleConfigureProvider}
+              onViewCatalog={handleViewCatalog}
             />
           ),
         }}

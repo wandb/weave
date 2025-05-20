@@ -24,6 +24,7 @@ export type PlaygroundPageProps = {
   entity: string;
   project: string;
   callId: string;
+  modelIds: string[];
 };
 
 type PlaygroundPageInnerProps = PlaygroundPageProps &
@@ -40,7 +41,7 @@ export const PlaygroundPage = (props: PlaygroundPageProps) => {
     playgroundStates,
     setPlaygroundStateField,
     setPlaygroundStateFromTraceCall,
-  } = usePlaygroundState();
+  } = usePlaygroundState(props.modelIds);
 
   return (
     <SimplePageLayoutWithHeader

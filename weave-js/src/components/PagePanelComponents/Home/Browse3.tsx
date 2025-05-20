@@ -64,6 +64,7 @@ import {
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
+import {getParamArray, queryGetDict} from './Browse3/urlQueryUtil';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
@@ -990,11 +991,15 @@ const ComparePageBinding = () => {
 
 const PlaygroundPageBinding = () => {
   const params = useParamsDecoded<Browse3TabItemParams>();
+  const history = useHistory();
+  const query = queryGetDict(history);
+  const modelIds = getParamArray(query, 'model');
   return (
     <PlaygroundPage
       entity={params.entity}
       project={params.project}
       callId={params.itemName}
+      modelIds={modelIds}
     />
   );
 };

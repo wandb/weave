@@ -1,0 +1,67 @@
+{
+  "models": [
+    {
+      "id": "deepseek-ai/DeepSeek-R1",
+      "provider": "deepseek-ai",
+      "modality": "Text",
+      "url_huggingface": "https://huggingface.co/deepseek-ai/DeepSeek-R1",
+      "notes_internal": "Name recognition"
+    },
+    {
+      "id": "meta-llama/Llama-3.3-70B-Instruct",
+      "provider": "meta-llama",
+      "modality": "Text",
+      "url_huggingface": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
+      "notes_internal": "Most served models across providers. Llama 4 Scout SOTA at this size. Best text only available"
+    },
+    {
+      "id": "mistralai/Mistral-Small-3.1",
+      "provider": "mistralai",
+      "modality": "Text",
+      "url_huggingface": "https://huggingface.co/mistralai/Mistral-Small-3.1",
+      "notes_internal": "General purpose"
+    },
+    {
+      "id": "meta-llama/Llama-4-Scout",
+      "provider": "meta-llama",
+      "modality": "Text",
+      "url_huggingface": "https://huggingface.co/meta-llama/Llama-4-Scout",
+      "notes_internal": "SOTA at this size. Best text only available"
+    },
+    {
+      "id": "Phi 4 Mini",
+      "provider": "Phi",
+      "modality": "Text",
+      "url_huggingface": "https://huggingface.co/Phi/Phi-4-Mini",
+      "notes_internal": "General purpose"
+    },
+    {
+      "id": "Llama 4 Maverick",
+      "provider": "meta-llama",
+      "modality": "Text",
+      "url_huggingface": "https://huggingface.co/meta-llama/Llama-4-Maverick",
+      "notes_internal": "General purpose"
+    },
+    {
+      "id": "Qwen QwQ 32B",
+      "provider": "Qwen",
+      "modality": "Text",
+      "url_huggingface": "https://huggingface.co/Qwen/Qwen2.5-VL-32B",
+      "notes_internal": "General purpose"
+    },
+    {
+      "id": "Granite 3.3 8B",
+      "provider": "Qwen",
+      "modality": "Text",
+      "url_huggingface": "https://huggingface.co/Qwen/Qwen2.5-VL-7B",
+      "notes_internal": "General purpose"
+    },
+    {
+      "id": "BGE M3",
+      "provider": "BGE",
+      "modality": "Text",
+      "url_huggingface": "https://huggingface.co/Qwen/Qwen2.5-VL-7B",
+      "notes_internal": "General purpose"
+    }
+  ]
+}

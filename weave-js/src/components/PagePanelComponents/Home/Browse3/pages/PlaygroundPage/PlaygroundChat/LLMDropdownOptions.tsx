@@ -63,17 +63,21 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   project: string;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
+  onViewCatalog?: (provider: string) => void;
 }
 
 const SubMenu = ({
+  value,
   llms,
   onChange,
   position,
   onSelect,
   isAdmin,
   onConfigureProvider,
+  onViewCatalog,
   providers,
 }: {
+  value: string;
   llms: Array<LLMOption>;
   onChange: (
     value: LLMMaxTokensKey,
@@ -84,6 +88,7 @@ const SubMenu = ({
   onSelect: () => void;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
+  onViewCatalog?: (provider: string) => void;
   providers?: ProviderOption[];
 }) => {
   return ReactDOM.createPortal(
@@ -118,6 +123,9 @@ const SubMenu = ({
             onSelect();
           }}
           sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
             width: '100%',
             wordBreak: 'break-all',
             wordWrap: 'break-word',
@@ -127,14 +135,53 @@ const SubMenu = ({
             borderRadius: '4px',
             '&:hover': {
               backgroundColor: hexToRGB(OBLIVION, 0.04),
+              '& .info-button': {
+                opacity: 1,
+              },
             },
           }}>
-          {llm.label}
-          {llm.subLabel && (
-            <div className="text-sm text-moon-500">{llm.subLabel}</div>
-          )}
+          <Box sx={{flex: 1}}>
+            {llm.label}
+            {llm.subLabel && (
+              <div className="text-sm text-moon-500">{llm.subLabel}</div>
+            )}
+          </Box>
+          <Box sx={{opacity: 0}} className="info-button">
+            <Button
+              icon="info"
+              variant="ghost"
+              size="small"
+              tooltip="View model details"
+              onClick={e => {
+                e.stopPropagation();
+                onViewCatalog?.(llm.value);
+              }}
+            />
+          </Box>
         </Box>
       ))}
+      {onViewCatalog && (
+        <Box
+          onClick={e => {
+            e.stopPropagation();
+            onViewCatalog?.(value);
+          }}
+          sx={{
+            width: '100%',
+            wordBreak: 'break-all',
+            wordWrap: 'break-word',
+            whiteSpace: 'normal',
+            p: '6px',
+            cursor: 'pointer',
+            borderRadius: '4px',
+            fontWeight: 600,
+            '&:hover': {
+              backgroundColor: hexToRGB(OBLIVION, 0.04),
+            },
+          }}>
+          View in Model Catalog
+        </Box>
+      )}
       {providers?.map(provider => {
         const tooltipContent =
           provider.value !== 'custom-provider' && !isAdmin
@@ -203,6 +250,7 @@ const SubMenuOption = ({
   project,
   isAdmin,
   onConfigureProvider,
+  onViewCatalog,
   ...props
 }: CustomOptionProps) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -267,6 +315,7 @@ const SubMenuOption = ({
       </Box>
       {isHovered && hasOptions && (
         <SubMenu
+          value={props.data.value}
           providers={props.data.providers}
           llms={llms}
           onChange={onChange}
@@ -280,6 +329,7 @@ const SubMenuOption = ({
           }}
           isAdmin={isAdmin}
           onConfigureProvider={onConfigureProvider}
+          onViewCatalog={onViewCatalog}
         />
       )}
     </Box>
@@ -293,6 +343,7 @@ export const CustomOption = ({
   project,
   isAdmin,
   onConfigureProvider,
+  onViewCatalog,
   data,
   ...props
 }: CustomOptionProps) => {
@@ -399,7 +450,8 @@ export const CustomOption = ({
       entity={entity}
       project={project}
       isAdmin={isAdmin}
-      onConfigureProvider={onConfigureProvider}>
+      onConfigureProvider={onConfigureProvider}
+      onViewCatalog={onViewCatalog}>
       {children}
     </SubMenuOption>
   );
