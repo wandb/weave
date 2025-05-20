@@ -27,10 +27,8 @@ import {
 import {
   buildCompositeMetricsMap,
   DERIVED_SCORER_REF_PLACEHOLDER,
-  groupNameForMetric,
 } from '../../compositeMetricsUtil';
 import {EvaluationComparisonState} from '../../ecpState';
-import {flattenedDimensionPath} from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
@@ -850,35 +848,59 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
           );
         },
       })),
-      ...Object.entries(props.state.summary.scoreMetrics).map(
-        ([metricId, metric]) => ({
-          field: `scores.${metricId}`,
-          headerName: flattenedDimensionPath(metric),
-          ...SCORE_COLUMN_SETTINGS,
-          ...DISABLED_ROW_SPANNING,
-          disableColumnMenu: false,
-          disableReorder: true,
-          valueGetter: (value: any, row: RowData) => {
-            if (row._pivot === 'modelsAsColumns') {
-              // This does not make sense for models as columns
-              return null;
-            }
-            return row.scores[metricId]?.[row.evaluationCallId];
-          },
-          renderCell: (params: GridRenderCellParams<RowData>) => {
-            if (params.row._pivot === 'modelsAsColumns') {
-              // This does not make sense for models as columns
-              return null;
-            }
-            return evalAggScorerMetricCompGeneric(
-              props.state.summary.scoreMetrics[metricId],
-              params.row.scores[metricId][params.row.evaluationCallId],
-              params.row.scores[metricId][
-                props.state.evaluationCallIdsOrdered[0]
-              ]
-            );
-          },
-        })
+      ...Object.entries(compositeMetrics).flatMap(
+        ([metricGroupKey, metricGroupDef]) => {
+          return Object.entries(metricGroupDef.metrics).map(
+            ([keyPath, metricDef]) => ({
+              field: `scores.${keyPath}`,
+              headerName: Object.values(
+                metricDef.scorerRefs
+              )[0].metric.metricSubPath.join('.'),
+              ...SCORE_COLUMN_SETTINGS,
+              ...DISABLED_ROW_SPANNING,
+              disableColumnMenu: false,
+              disableReorder: true,
+              valueGetter: (value: any, row: RowData) => {
+                if (row._pivot === 'modelsAsColumns') {
+                  // This does not make sense for models as columns
+                  return null;
+                }
+                const dimension = Object.values(metricDef.scorerRefs)[0].metric;
+                return lookupMetricValueDirect(
+                  row.scores,
+                  row.evaluationCallId,
+                  dimension,
+                  compositeMetrics
+                );
+              },
+              renderCell: (params: GridRenderCellParams<RowData>) => {
+                if (params.row._pivot === 'modelsAsColumns') {
+                  // This does not make sense for models as columns
+                  return null;
+                }
+                const dimension = Object.values(metricDef.scorerRefs)[0].metric;
+                const summaryValue = lookupMetricValueDirect(
+                  params.row.scores,
+                  params.row.evaluationCallId,
+                  dimension,
+                  compositeMetrics
+                );
+                const baselineValue = lookupMetricValueDirect(
+                  params.row.scores,
+                  props.state.evaluationCallIdsOrdered[0],
+                  dimension,
+                  compositeMetrics
+                );
+
+                return evalAggScorerMetricCompGeneric(
+                  dimension,
+                  summaryValue,
+                  baselineValue
+                );
+              },
+            })
+          );
+        }
       ),
     ];
     return res;
@@ -895,6 +917,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     isExpanded,
     toggleExpansion,
     outputColumnKeys,
+    compositeMetrics,
     outputWidths,
   ]);
 
@@ -910,10 +933,18 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       {
         groupId: 'scores',
         headerName: 'Scores',
-        children: Object.keys(props.state.summary.scoreMetrics).map(
-          finalKey => ({
-            field: `scores.${finalKey}`,
-          })
+        children: Object.entries(compositeMetrics).map(
+          ([metricGroupKey, metricGroupDef]) => {
+            return {
+              groupId: `scores.${metricGroupKey}`,
+              headerName: metricGroupKey,
+              children: Object.entries(metricGroupDef.metrics).map(
+                ([keyPath, metricDef]) => ({
+                  field: `scores.${keyPath}`,
+                })
+              ),
+            };
+          }
         ),
       },
       {
@@ -924,11 +955,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         })),
       },
     ];
-  }, [
-    inputSubFields.inputSubFields,
-    props.state.summary.scoreMetrics,
-    outputColumnKeys,
-  ]);
+  }, [inputSubFields.inputSubFields, compositeMetrics, outputColumnKeys]);
 
   const onlyExpandedRows = useOnlyExpandedRows(rows, isExpanded);
 
@@ -1199,10 +1226,11 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
               {
                 groupId: `scores.${metricGroupKey}`,
                 headerName: metricGroupKey,
-                [CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY]: true,
                 children,
               },
             ];
+            (res as any)[CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY] =
+              true;
 
             return res;
           }
