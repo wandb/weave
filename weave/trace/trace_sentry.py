@@ -266,13 +266,12 @@ class Sentry:
         # Also configure the Weave hub if it exists
         if self.weave_hub is not None:
             with self.weave_hub.configure_scope() as weave_scope:
-                if tags is not None:
-                    for tag in tags:
-                        val = tags.get(tag, None)
-                        if val not in (None, ""):
-                            weave_scope.set_tag(tag, val)
-                        if tag == "user":
-                            weave_scope.user = val
+                tags = tags or {}
+                for tag, val in tags.items():
+                    if val not in (None, ""):
+                        weave_scope.set_tag(tag, val)
+                    if tag == "user":
+                        weave_scope.user = val
 
         # Only start a session if we're not using the global hub
         if not self._using_global_hub:
