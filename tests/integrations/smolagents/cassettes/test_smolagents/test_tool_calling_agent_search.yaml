@@ -93,19 +93,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNNj9owFLznV1jvTIBk+Si5lR66cFhV7B6qllXkOC+JW8f22s5ShPjv
-        VQIkgaVSc4gsj2feeN7zwSMEeAoRAVZQx0ot/OWPZciqzdPSLMSa7p825kU9f/n6sNEv1XcY1AyV
-        /ELmLqwhU6UW6LiSJ5gZpA5r1WA+mc/Dh1kYNkCpUhQ1LdfOnwwDv+SS++E4nPrjiR9MzvRCcYYW
-        IvLTI4SQQ/OvjcoU/0BExoPLTonW0hwhag8RAkaJegeotdw6Kh0MOpAp6VDW3mUlRA9wSomYUSG6
-        wqfv0Ft3aVEh4pV8XH9S69V0OXte6dnjGwu/2eLzvlfvJL3XjaGskqxNqYe3+9FNMUJA0rLh7jCJ
-        LVLDihs2IUBNXpUoXe0cDlt4q9DstxBtwXKHUeGcttFotEP6jn6qmB3uqEyTIeWjLRzhSu7o3Vu/
-        9oIymFWWio8JUimVo/VFmghfz8ix7ZZQuTYqsTdUyLjktogNUtuE0O+FdzHSWIDqqt2gjSq1i536
-        jU3RYDwOTrLQDWUHh9Mz6JSjok8LZ4M7inGKjvJmItohZJQVmHbcbhhplXLVA7ze7T/auad9SoDL
-        /H/kO4Ax1A7TWBtMObu+cnfMYP1o/3WszbkxDBbNO2cYO46m7kiKGa3E6SWB3VuHZZxxmaPRhjfP
-        CTIdzxfJfJHgJMjAO3p/AQAA//8DAAZfTSJdBAAA
+        H4sIAAAAAAAAAwAAAP//jFPLjtswDLz7KwSe4yTOA258DFA0e2nRB9pim4UhS3Ssriy5Ep1sEOTf
+        CzsPO9ktUB8MgaMhh0PqEDAGSkLCQBScRFnpcPm4XMWc6s/br58+Fjvx48MkW4wLWq3w5QEGDcNm
+        v1HQhTUUtqw0krLmBAuHnLDJGsWzOJ7M5pOoBUorUTe0TUXhbBiFpTIqnIwn83A8C6PZmV5YJdBD
+        wn4FjDF2aP+NUCPxBRI2HlwiJXrPNwjJ9RJj4KxuIsC9V564IRh0oLCG0DTaTa11DyBrdSq41l3h
+        03fonTu3uNbp9wf5zq/Ez7kV8bfl++mXR/e8imLZq3dKva9aQXltxNWlHn6NJ3fFGAPDy5a7wyz1
+        yJ0o7tiMAXebukRDjXI4rOFPjW6/hmQNXhEmBVHlk9Foh3yLobTCD3fcyGzI1WgNgzXkShO6dI/c
+        rSFpfDnCTY1j8Nb5qeeew7z2XL+2lRtjiTfdtb4+nZHjdYTabipnM39HhVwZ5YvUIfetM/0BBRch
+        rQSob3YAKmfLilKyz9gWjcbj6JQWuk3t4Ol5nYAscd2nTS+0m4ypROKqXZPrZgouCpQdt9tQXktl
+        e0DQ6/61nLdynxxQZvM/6TtACKwIZVo5lErcttxdc9i85H9du/rcCgaPbqsEpqTQNRORmPNan54X
+        +L0nLNNcmQ26yqn2jUFepfEiixcZzqIcgmPwFwAA//8DAMIbRepyBAAA
     headers:
       CF-RAY:
-      - 9429e1616c777f4c-MAA
+      - 9429f7512c75a907-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -113,14 +113,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 20 May 2025 06:47:03 GMT
+      - Tue, 20 May 2025 07:02:02 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=Khs9daXX7O_r2wW1OQvWwr2aaOWpgvC2DMube0wnwOY-1747723623-1.0.1.1-2xk52jQTQCDq1fO5dTUvV1kCgtHHUqGdUJcoo9eMgRcqKDZyuvGHJ90K7Ja4iJcPaMq5SoU0myu1oelcBKoPAGi7bx7mZ.YY32aOWj2JOzs;
-        path=/; expires=Tue, 20-May-25 07:17:03 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=DfPfBMYNwyRrsTyQLwTxhwAPo2uhMFB0h2LpP4xLq7I-1747724522-1.0.1.1-TdTVeKw2nY_7muyg1ayU98k2dlfgJrd7y_ZRQ64vbZdO1n4HyuQrqlZTabcTTg0O10dHcEi8MmX_h5HApNtqhuKoPERmC2ASQNgAGIKN9t8;
+        path=/; expires=Tue, 20-May-25 07:32:02 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=cf7xr7VMosRaocHr4o2fmn4lzYDTZQFCg7v0HXc0Jmc-1747723623684-0.0.1.1-604800000;
+      - _cfuvid=lPPzXFceerboyabSprZTHA5wT70fJoN02c3mud0rHJs-1747724522676-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Transfer-Encoding:
       - chunked
@@ -135,13 +135,13 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '732'
+      - '1211'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
       x-envoy-upstream-service-time:
-      - '739'
+      - '1216'
       x-ratelimit-limit-requests:
       - '30000'
       x-ratelimit-limit-tokens:
@@ -155,7 +155,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_351a4ebc4f4f1eabeb920bef880b43f9
+      - req_8e635bd5dee227cf7a18040c0e1061b8
     status:
       code: 200
       message: OK
@@ -209,14 +209,15 @@ interactions:
       did with the exact same parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
       task:\nUse the provided tool to answer this question. Get the following page
       - ''https://weave-docs.wandb.ai/''?"}]},{"role":"assistant","content":[{"type":"text","text":"Called
-      Tool: ''web_search'' with arguments: {''query'': ''site:https://weave-docs.wandb.ai/''}\nCalling
-      tools:\n[{''id'': ''call_InHJ8oJI5B6SIp6Hqc2PshAy'', ''type'': ''function'',
-      ''function'': {''name'': ''web_search'', ''arguments'': {''query'': ''site:https://weave-docs.wandb.ai/''}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
-      id: call_InHJ8oJI5B6SIp6Hqc2PshAy\nError:\nError executing tool ''web_search''
-      with arguments {\"query\": \"site:https://weave-docs.wandb.ai/\"}: AttributeError:
-      ''Request'' object has no attribute ''_replace''\nPlease try again or use another
-      tool\nNow let''s retry: take care not to repeat previous errors! If you have
-      retried several times, try a completely different approach.\n"}]}],"model":"gpt-4.1-mini","stop":["Observation:","Calling
+      Tool: ''web_search'' with arguments: {''query'': ''site:https://weave-docs.wandb.ai/'',
+      ''filter_year'': None}\nCalling tools:\n[{''id'': ''call_VId8sHcX5oc7TBE3RZrkH17d'',
+      ''type'': ''function'', ''function'': {''name'': ''web_search'', ''arguments'':
+      {''query'': ''site:https://weave-docs.wandb.ai/'', ''filter_year'': None}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
+      id: call_VId8sHcX5oc7TBE3RZrkH17d\nError:\nError executing tool ''web_search''
+      with arguments {\"query\": \"site:https://weave-docs.wandb.ai/\", \"filter_year\":
+      null}: AttributeError: ''Request'' object has no attribute ''_replace''\nPlease
+      try again or use another tool\nNow let''s retry: take care not to repeat previous
+      errors! If you have retried several times, try a completely different approach.\n"}]}],"model":"gpt-4.1-mini","stop":["Observation:","Calling
       tools:"],"tool_choice":"required","tools":[{"type":"function","function":{"name":"web_search","description":"Performs
       a google web search for your query then returns a string of the top search results.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"The
       search query to perform."},"filter_year":{"type":"integer","description":"Optionally
@@ -231,12 +232,12 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '5483'
+      - '5548'
       content-type:
       - application/json
       cookie:
-      - __cf_bm=Khs9daXX7O_r2wW1OQvWwr2aaOWpgvC2DMube0wnwOY-1747723623-1.0.1.1-2xk52jQTQCDq1fO5dTUvV1kCgtHHUqGdUJcoo9eMgRcqKDZyuvGHJ90K7Ja4iJcPaMq5SoU0myu1oelcBKoPAGi7bx7mZ.YY32aOWj2JOzs;
-        _cfuvid=cf7xr7VMosRaocHr4o2fmn4lzYDTZQFCg7v0HXc0Jmc-1747723623684-0.0.1.1-604800000
+      - __cf_bm=DfPfBMYNwyRrsTyQLwTxhwAPo2uhMFB0h2LpP4xLq7I-1747724522-1.0.1.1-TdTVeKw2nY_7muyg1ayU98k2dlfgJrd7y_ZRQ64vbZdO1n4HyuQrqlZTabcTTg0O10dHcEi8MmX_h5HApNtqhuKoPERmC2ASQNgAGIKN9t8;
+        _cfuvid=lPPzXFceerboyabSprZTHA5wT70fJoN02c3mud0rHJs-1747724522676-0.0.1.1-604800000
       host:
       - api.openai.com
       user-agent:
@@ -264,19 +265,19 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNNc5swEL3zKzR7No6hpNQc3UMOTdrxoW0mdYYRYgHZQiKSiOt4/N8z
-        gA3YcWfKgdHs03v79kN7hxDgKUQEWEEtKyvhLp4Wfvbz3se3oNysH5Zf795ekrt5vvl+/9vCpGGo
-        ZI3MnlhTpspKoOVKdjDTSC02ql4YhKH/6bN/2wKlSlE0tLyybjD13JJL7voz/9adBa4XHOmF4gwN
-        ROSPQwgh+/bfGJUp/oWIzCanSInG0Bwh6i8RAlqJJgLUGG4slZ3pI8iUtCgb77IWYgRYpUTMqBBD
-        4u7bj85Dt6gQ8XK2zJE+PvzahQs+Xxfbx+LpR62/jfJ10ruqNZTVkvVdGuF9PLpIRghIWrbcLSax
-        QapZccEmBKjO6xKlbZzDfgUvNerdCqIVFNZWJrq52SJ9RTdVzEy3VKbJlPKbFRzgTOngXDs/j3qk
-        MasNFR+bR6VUljY1tN17PiKHflBC5ZVWibmgQsYlN0WskZq2/vEYnJOR1gLUZ5OGSquysrFVG2yT
-        et78SycLwz4OsB8cQassFSOa7/uTK4pxipbydhn6/WOUFZgO3GEPaZ1yNQKcUfUf7VzT7jrAZf4/
-        8gPAGFYW07jSmHJ2XvJwTWPzXv91re9zaxgM6lfOMLYcdTORFDNai+PLNztjsYwzLnPUlebtS4Ks
-        isN5Es4TDLwMnIPzDgAA//8DAPMfCnRYBAAA
+        H4sIAAAAAAAAAwAAAP//jFNdb5swFH3nV1j3OSSBkkXhbdGqZe0qVdqeslTImAu4M7Znm2ZVlP9e
+        AQmQtJPGA7Lu8Tn33A8fPEKAZxATYCV1rNLCX2/Xm9Vind8491hs9vcrrB8i93O/re9/3MGkYaj0
+        GZk7s6ZMVVqg40p2MDNIHTaqwTJaLsNoEd60QKUyFA2t0M6PpoFfccn9cB4u/HnkB9GJXirO0EJM
+        fnmEEHJo/41RmeFfiMl8co5UaC0tEOL+EiFglGgiQK3l1lHpYDKATEmHsvEuayFGgFNKJIwKMSTu
+        vsPoPHSLCpHw6JtNeXr3Zb+R/Hb7+fE7XX99uH0e5eukX3VrKK8l67s0wvt4fJWMEJC0arl7TBOL
+        1LDyik0IUFPUFUrXOIfDDv7UaF53EO+gdE7beDbbI31BP1PMTvdUZumU8tkOjnChdPQ+Oj+NemQw
+        ry0V75tHpVSONjW03Xs6Icd+UEIV2qjUXlEh55LbMjFIbVv/eAze2UhrAeqLSYM2qtIuceo3tkmD
+        MPjUycKwjwMcRifQKUfFmBad1ulSMcnQUd4uQ79/jLISs4E77CGtM65GgDeq/r2dj7S7DnBZ/I/8
+        ADCG2mGWaIMZZ5clD9cMNu/1X9f6PreGwaJ54QwTx9E0E8kwp7XoHhHYV+uwSnIuCzTa8PYlQa6T
+        5SpdrlKMghy8o/cGAAD//wMAa5ChJ1gEAAA=
     headers:
       CF-RAY:
-      - 9429e16f2d527f4c-MAA
+      - 9429f75c2801a907-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -284,7 +285,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 20 May 2025 06:47:05 GMT
+      - Tue, 20 May 2025 07:02:04 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -300,13 +301,13 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '742'
+      - '1141'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
       x-envoy-upstream-service-time:
-      - '746'
+      - '1145'
       x-ratelimit-limit-requests:
       - '30000'
       x-ratelimit-limit-tokens:
@@ -314,13 +315,13 @@ interactions:
       x-ratelimit-remaining-requests:
       - '29999'
       x-ratelimit-remaining-tokens:
-      - '149998933'
+      - '149998917'
       x-ratelimit-reset-requests:
       - 2ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_138dec8fae9033d76eedcd6d57fb2074
+      - req_a2fbf91ce1a1d19abae9344a40e84584
     status:
       code: 200
       message: OK
@@ -374,18 +375,19 @@ interactions:
       did with the exact same parameters.\n\nNow Begin!"}]},{"role":"user","content":[{"type":"text","text":"New
       task:\nUse the provided tool to answer this question. Get the following page
       - ''https://weave-docs.wandb.ai/''?"}]},{"role":"assistant","content":[{"type":"text","text":"Called
-      Tool: ''web_search'' with arguments: {''query'': ''site:https://weave-docs.wandb.ai/''}\nCalling
-      tools:\n[{''id'': ''call_InHJ8oJI5B6SIp6Hqc2PshAy'', ''type'': ''function'',
-      ''function'': {''name'': ''web_search'', ''arguments'': {''query'': ''site:https://weave-docs.wandb.ai/''}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
-      id: call_InHJ8oJI5B6SIp6Hqc2PshAy\nError:\nError executing tool ''web_search''
-      with arguments {\"query\": \"site:https://weave-docs.wandb.ai/\"}: AttributeError:
-      ''Request'' object has no attribute ''_replace''\nPlease try again or use another
-      tool\nNow let''s retry: take care not to repeat previous errors! If you have
-      retried several times, try a completely different approach.\n"}]},{"role":"assistant","content":[{"type":"text","text":"Called
+      Tool: ''web_search'' with arguments: {''query'': ''site:https://weave-docs.wandb.ai/'',
+      ''filter_year'': None}\nCalling tools:\n[{''id'': ''call_VId8sHcX5oc7TBE3RZrkH17d'',
+      ''type'': ''function'', ''function'': {''name'': ''web_search'', ''arguments'':
+      {''query'': ''site:https://weave-docs.wandb.ai/'', ''filter_year'': None}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
+      id: call_VId8sHcX5oc7TBE3RZrkH17d\nError:\nError executing tool ''web_search''
+      with arguments {\"query\": \"site:https://weave-docs.wandb.ai/\", \"filter_year\":
+      null}: AttributeError: ''Request'' object has no attribute ''_replace''\nPlease
+      try again or use another tool\nNow let''s retry: take care not to repeat previous
+      errors! If you have retried several times, try a completely different approach.\n"}]},{"role":"assistant","content":[{"type":"text","text":"Called
       Tool: ''web_search'' with arguments: {''query'': ''https://weave-docs.wandb.ai/''}\nCalling
-      tools:\n[{''id'': ''call_Q0QgeaXMVy7Bi9jhwXhZOurK'', ''type'': ''function'',
+      tools:\n[{''id'': ''call_i4IsbibJDwHniEZAPLaBGMEj'', ''type'': ''function'',
       ''function'': {''name'': ''web_search'', ''arguments'': {''query'': ''https://weave-docs.wandb.ai/''}}}]"}]},{"role":"user","content":[{"type":"text","text":"Call
-      id: call_Q0QgeaXMVy7Bi9jhwXhZOurK\nError:\nError executing tool ''web_search''
+      id: call_i4IsbibJDwHniEZAPLaBGMEj\nError:\nError executing tool ''web_search''
       with arguments {\"query\": \"https://weave-docs.wandb.ai/\"}: AttributeError:
       ''Request'' object has no attribute ''_replace''\nPlease try again or use another
       tool\nNow let''s retry: take care not to repeat previous errors! If you have
@@ -404,12 +406,12 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '6225'
+      - '6290'
       content-type:
       - application/json
       cookie:
-      - __cf_bm=Khs9daXX7O_r2wW1OQvWwr2aaOWpgvC2DMube0wnwOY-1747723623-1.0.1.1-2xk52jQTQCDq1fO5dTUvV1kCgtHHUqGdUJcoo9eMgRcqKDZyuvGHJ90K7Ja4iJcPaMq5SoU0myu1oelcBKoPAGi7bx7mZ.YY32aOWj2JOzs;
-        _cfuvid=cf7xr7VMosRaocHr4o2fmn4lzYDTZQFCg7v0HXc0Jmc-1747723623684-0.0.1.1-604800000
+      - __cf_bm=DfPfBMYNwyRrsTyQLwTxhwAPo2uhMFB0h2LpP4xLq7I-1747724522-1.0.1.1-TdTVeKw2nY_7muyg1ayU98k2dlfgJrd7y_ZRQ64vbZdO1n4HyuQrqlZTabcTTg0O10dHcEi8MmX_h5HApNtqhuKoPERmC2ASQNgAGIKN9t8;
+        _cfuvid=lPPzXFceerboyabSprZTHA5wT70fJoN02c3mud0rHJs-1747724522676-0.0.1.1-604800000
       host:
       - api.openai.com
       user-agent:
@@ -437,21 +439,21 @@ interactions:
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//dFTLbtswELz7Kxa85GI7lmLHsI9pmxf6Qg9FkzoQVuRKYkORCknZcQz/
-        eyHJkZSXDgKxszM73CW5GwAwKdgSGM/Q87xQo7PbszD9nRbXs6834en9zdMvdbV5CHxwnm8f2LBi
-        mPgfcf/MGnOTF4q8NLqBuSX0VKkG8+l8Hp6chqc1kBtBqqKlhR9Nx8Eol1qOwkk4G02mo2B6oGdG
-        cnJsCX8HAAC7+l8Z1YIe2RImw+dITs5hSmzZJgEwa1QVYeicdB61Z8MO5EZ70pV3XSrVA7wxKuKo
-        VFe4+Xa9ddctVCpKvjydXFx+uv1RFvHF58Xlt6fv15T9Oe/Va6S3RW0oKTVvu9TD2/jyVTEApjFv
-        uFKjilC7DdlXfACGNi1z0r7yznYr1uSt2HLFrgBzKDXGisAbENIS92oLlryVtCbwGcGhK5BYk9eB
-        AlOCo8z7wi2PjzeEaxoJw914g1rEY5THR1A6qdMm25q1FCSgaqIDUdalPPFMS44KlMylx2qLbgw/
-        FaEjQM7Jua5Ya2wtERA2FENszcaRhcRYkDoxNq81xiu2Zy86sB+8t77rTddSUjpUb8eOWpuDtWru
-        dwdk3x4xZdLCmti9olYDkS6LLKGrJ9c/QINnI7UFVr44o6ywJi985M091UWDk0XYyLLuJnXwbH4A
-        vfGoerTpdDF8RzES5FHWx7i9ORx5RqLHDWZhuxMshTQdNhn0GvDW0XvyTROkTnsqH8p3AOdUeBJR
-        YUlI/nLXXZql6rH5KK1tdW2YObJrySnykmw1FEEJlqp5AZjbOk95lEidki2srJ8BlhTRfBHPFzFN
-        g4QN9oP/AAAA//8DAHlYKZYVBQAA
+        H4sIAAAAAAAAAwAAAP//dFRNa+MwEL3nVwy69JKkSepsNrm1sLCFUpZdCqVNMWNpbKuVJSHJSUPI
+        f19kp7H75YOR9ObNPD2NtB8AMCnYChgvMfDKqtHVw9Xvy3v9Yuyv6ubZXMz/vVxOq7/KL43P2DAy
+        TPZMPLyxxtxUVlGQRrcwd4SBYtbpIlksZsl8ljRAZQSpSCtsGCXj6aiSWo5mk9l8NElG0+RIL43k
+        5NkKHgcAAPvmH4VqQa9sBZPh20pF3mNBbHUKAmDOqLjC0HvpA+rAhh3IjQ6ko3ZdK9UDgjEq5ahU
+        V7j99r1x5xYqlVby+vanrx/ubZ3fJe4if725vLq9S3r12tQ72wjKa81PLvXw0/rqQzEAprFquVKj
+        SlH7LbkPfACGrqgr0iFqZ/s1a+PWbLVm14AV1BozRRAMCOmIB7WDnAIvwThAzsl7CCXB0RwPJm/m
+        FguCszIE61fn51vCDY2E4X68RS2yMcrzMxB1kzfaB+SccR6sow3pIHUBW8rAEzpeko/F2vLgKDhJ
+        G1Rj+KMIPYF1ZiMF9WXEeG+Jy3wH2xIDSJ0bV2G0CnamBk0kIHemghDhqHYIqAVcw1YqBW0DxA0a
+        J6Qu1G68Zgf2zrzD4KvxU68xHOW1R/W5Y1BrExo1Tcs8HZHDqTuVKawzmf9AjWcpfZk6Qt8cer/3
+        Bm9CGgmsftfezDpT2ZAG80JN0WkySdq0rLuEHfxjeQSDCaj6tMXF8IuMqaCAsrkBp0vHkZcketzp
+        fHbaCdZCmg6bDHoGfFb0VfrWBKmLXpZv03cA52QDidQ6EpK/33UX5ii+U9+FnaxuBDNPbiM5pUGS
+        i4ciKMdatY8H8zsfqEpzqQty1snmBWG5TRfLbLHMKJnmbHAY/AcAAP//AwCQi/tnUAUAAA==
     headers:
       CF-RAY:
-      - 9429e177d8b07f4c-MAA
+      - 9429f7665c12a907-MAA
       Connection:
       - keep-alive
       Content-Encoding:
@@ -459,7 +461,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Tue, 20 May 2025 06:47:08 GMT
+      - Tue, 20 May 2025 07:02:06 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -475,13 +477,13 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '1560'
+      - '1320'
       openai-version:
       - '2020-10-01'
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
       x-envoy-upstream-service-time:
-      - '1565'
+      - '1324'
       x-ratelimit-limit-requests:
       - '30000'
       x-ratelimit-limit-tokens:
@@ -489,13 +491,13 @@ interactions:
       x-ratelimit-remaining-requests:
       - '29999'
       x-ratelimit-remaining-tokens:
-      - '149998776'
+      - '149998760'
       x-ratelimit-reset-requests:
       - 2ms
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_ec3c1e3d2fef28b0961d57b5f1345482
+      - req_35bed7576ccd25dd42f244a960ccf1d2
     status:
       code: 200
       message: OK
