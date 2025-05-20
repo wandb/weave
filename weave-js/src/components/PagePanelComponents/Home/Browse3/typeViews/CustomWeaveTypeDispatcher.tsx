@@ -50,6 +50,9 @@ const customWeaveTypeRegistry: {
   'weave.type_handlers.Audio.audio.Audio': {
     component: AudioPlayer,
   },
+  'weave.trace.type_wrappers.audio.Audio': {
+    component: AudioPlayer,
+  },
   'datetime.datetime': {
     component: DateTimeView,
   },
