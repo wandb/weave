@@ -1,0 +1,6 @@
+{
+  "label": "A set of tools and utilities to help with your workflow and deployment process for AI applications. These are currently in early alpha stages and subject to change.",
+  "customProps": {
+    "optional": true
+  }
+}

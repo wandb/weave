@@ -129,3 +129,46 @@ make update_playground_models
 ```
 
 This regenerates the model list section automatically.
+
+
+### LLM context doc generation
+
+To make Weave documentation usable by AI tools like Cursor, GPT, or Claude, we generate special machine-readable files that summarize the full documentation set.
+
+- Script: `docs/scripts/generate_llmstxt.py`
+
+This script produces two types of files:
+
+* `llms-full.txt`: A single Markdown file with all documentation content.
+* `llms-full.json`: A structured JSON file for use in RAG pipelines or embeddings.
+* Optionally: Per-category `.txt` files (e.g., `llms-integrations.txt`, `llms-api.txt`). These are useful for asking targeted questions, as `llms-full.txt` is too large for most context windows.
+
+#### Usage
+
+Run the script from the project root:
+
+```bash
+python docs/scripts/generate_llmstxt.py
+```
+
+This will generate:
+
+* `static/llms-full.txt`
+* `static/llms-full.json`
+
+To also generate per-category `.txt` files (recommended for LLM tools like Cursor with context limits):
+
+```bash
+python docs/scripts/generate_llmstxt.py --categories
+```
+
+These files can be used by developers and agents to quickly access documentation content without navigating the full site.
+
+> **Important:** These files are not used by the docs site directly but may be used in downstream applications or LLM pipelines.
+
+#### Regeneration checklist
+
+Run this script if:
+
+- You’ve added or edited any docs that should be used by an LLM.
+- You want to verify how your content will be surfaced in tools like Cursor or GPT.

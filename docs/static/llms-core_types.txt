@@ -1,0 +1,982 @@
+<!--- Docs: Core Types -->
+<!--- Models -->
+
+# Models
+
+# Models
+
+A `Model` is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.
+
+
+  
+    To create a model in Weave, you need the following:
+
+    - a class that inherits from `weave.Model`
+    - type definitions on all parameters
+    - a typed `predict` function with `@weave.op()` decorator
+
+    ```python
+    from weave import Model
+    import weave
+
+    class YourModel(Model):
+        attribute1: str
+        attribute2: int
+
+        @weave.op()
+        def predict(self, input_data: str) -> dict:
+            # Model logic goes here
+            prediction = self.attribute1 + ' ' + input_data
+            return {'pred': prediction}
+    ```
+
+    You can call the model as usual with:
+
+    ```python
+    import weave
+    weave.init('intro-example')
+
+    model = YourModel(attribute1='hello', attribute2=5)
+    model.predict('world')
+    ```
+
+    This will track the model settings along with the inputs and outputs anytime you call `predict`.
+
+    ## Automatic versioning of models
+
+    When you change the parameters or the code that defines your model, these changes will be logged and the version will be updated.
+    This ensures that you can compare the predictions across different versions of your model. Use this to iterate on prompts or to try the latest LLM and compare predictions across different settings.
+
+    For example, here we create a new model:
+
+    ```python
+    import weave
+    weave.init('intro-example')
+
+    model = YourModel(attribute1='howdy', attribute2=10)
+    model.predict('world')
+    ```
+
+    After calling this, you will see that you now have two versions of this Model in the UI, each with different tracked calls.
+
+    ## Serve models
+
+    To serve a model, you can easily spin up a FastAPI server by calling:
+
+    ```bash
+    weave serve 
+    ```
+
+    For additional instructions, see [serve](/guides/tools/serve).
+
+    ## Track production calls
+
+    To separate production calls, you can add an additional attribute to the predictions for easy filtering in the UI or API.
+
+    ```python
+    with weave.attributes({'env': 'production'}):
+        model.predict('world')
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+
+[Source](https://weave-docs.wandb.ai/guides/core-types/models)
+
+<!--- Docs: Core Types -->
+<!--- Media -->
+
+# Media
+
+# Logging media
+
+Weave supports logging and displaying video, images, and audio.
+
+## Video
+
+Weave automatically logs videos using [`moviepy`](https://zulko.github.io/moviepy/). This allows you to pass video inputs and outputs to traced functions, and Weave will automatically handle uploading and storing video data.
+
+> 💡 **Note**: Video support is currently only available in Python.
+
+For usage information, see [Video Support](../tracking/video).
+
+## Images
+
+Logging type: `PIL.Image.Image`. 
+
+> 🚨 **Important**: Base64-encoded image strings (e.g., `data:image/jpeg;base64,...`) are technically supported but discouraged. They can cause performance issues and should only be used if absolutely necessary (e.g., for integration with specific APIs).
+
+The following example shows how to log an image generated via the OpenAI DALL-E API:
+
+
+  
+  
+    ```python
+    import weave
+    from openai import OpenAI
+    import requests
+    from PIL import Image
+
+    weave.init('image-example')
+    client = OpenAI()
+
+    @weave.op
+    def generate_image(prompt: str) -> Image:
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+        )
+        image_url = response.data[0].url
+        image_response = requests.get(image_url, stream=True)
+        image = Image.open(image_response.raw)
+
+        # return a PIL.Image.Image object to be logged as an image
+        return image
+
+    generate_image("a cat with a pumpkin hat")
+    ```
+
+  
+  
+
+    ```typescript
+        
+    async function main() {
+        const client = await weave.init('image-example');
+        const openai = new OpenAI();
+
+        const generateImage = weave.op(async (prompt: string) => {
+            const response = await openai.images.generate({
+                model: 'dall-e-3',
+                prompt: prompt,
+                size: '1024x1024',
+                quality: 'standard',
+                n: 1,
+            });
+            const imageUrl = response.data[0].url;
+            const imgResponse = await fetch(imageUrl);
+            const data = Buffer.from(await imgResponse.arrayBuffer());
+
+            return weave.weaveImage({data});
+        });
+
+        generateImage('a cat with a pumpkin hat');
+    }
+
+    main();
+    ```
+
+  
+
+
+This image is logged to Weave and automatically displayed in the UI. 
+
+
+
+## Audio
+
+Logging type: `wave.Wave_read`. 
+
+The following example shows how to log an audio file using OpenAI's speech generation API.
+
+
+  
+  
+    ```python
+    import weave
+    from openai import OpenAI
+    import wave
+
+    weave.init("audio-example")
+    client = OpenAI()
+
+
+    @weave.op
+    def make_audio_file_streaming(text: str) -> wave.Wave_read:
+        with client.audio.speech.with_streaming_response.create(
+            model="tts-1",
+            voice="alloy",
+            input=text,
+            response_format="wav",
+        ) as res:
+            res.stream_to_file("output.wav")
+
+        # return a wave.Wave_read object to be logged as audio
+        return wave.open("output.wav")
+
+    make_audio_file_streaming("Hello, how are you?")
+    ```
+
+  
+  
+
+    ```typescript
+        
+    async function main() {
+        await weave.init('audio-example');
+        const openai = new OpenAI();
+
+        const makeAudioFileStreaming = weave.op(async function audio(text: string) {
+            const response = await openai.audio.speech.create({
+                model: 'tts-1',
+                voice: 'alloy',
+                input: text,
+                response_format: 'wav',
+            });
+
+            const chunks: Uint8Array[] = [];
+            for await (const chunk of response.body) {
+                chunks.push(chunk);
+            }
+            return weave.weaveAudio({data: Buffer.concat(chunks)});
+        });
+
+        await makeAudioFileStreaming('Hello, how are you?');
+    }
+
+    main();
+    ```
+
+  
+
+
+This audio is logged to Weave and automatically displayed in the UI, along with an audio player. In the audio player, you can view and download the raw audio waveform.
+
+
+
+> 🌟 **Tip**: Try our cookbook for [Audio Logging](/reference/gen_notebooks/audio_with_weave) or Open in Colab. The cookbook also includes an advanced example of a Real Time Audio API based assistant integrated with Weave.
+
+[Source](https://weave-docs.wandb.ai/guides/core-types/media)
+
+<!--- Docs: Core Types -->
+<!--- Env Vars -->
+
+# Env Vars
+
+# Environment variables
+
+Weave provides a set of environment variables to configure and optimize its behavior. You can set these variables in your shell or within scripts to control specific functionality.
+
+```bash
+# Example of setting environment variables in the shell
+export WEAVE_PARALLELISM=10  # Controls the number of parallel workers
+export WEAVE_PRINT_CALL_LINK=false  # Disables call link output
+```
+
+```python
+# Example of setting environment variables in Python
+import os
+
+os.environ["WEAVE_PARALLELISM"] = "10"
+os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
+```
+
+## Available Environment Variables
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `WANDB_API_KEY` | `string` | `None` | If set, automatically log into W&B Weave without being prompted for your API key. To generate an API key, log in to your W&B account and go to [https://wandb.ai/authorize](https://wandb.ai/authorize). |
+| `WEAVE_DISABLED` | `bool` | `false` | When set to `true`, disables all Weave tracing. Weave ops will behave like regular functions. |
+| `WEAVE_PRINT_CALL_LINK` | `bool` | `true` | Controls whether to print a link to the Weave UI when calling a Weave op. |
+| `WEAVE_CAPTURE_CODE` | `bool` | `true` | Controls whether to save code for ops so they can be reloaded for later use. |
+| `WEAVE_DEBUG_HTTP` | `bool` | `false` | When set to `true`, turns on HTTP request and response logging for debugging. |
+| `WEAVE_PARALLELISM` | `int` | `20` | In evaluations, controls the number of examples to evaluate in parallel. Set to `1` to run examples sequentially. |
+| `WEAVE_TRACE_LANGCHAIN` | `bool` | `true` | Controls global tracing for LangChain. Set to `false` to explicitly disable LangChain tracing. |
+| `WEAVE_USE_SERVER_CACHE` | `bool` | `false` | Enables server response caching. When enabled, responses from the server are cached to disk to improve performance for repeated queries. |
+| `WEAVE_SERVER_CACHE_SIZE_LIMIT` | `int` | `1000000000` | Sets the maximum size limit for the server cache in bytes. When the cache reaches this size, older entries are automatically removed to make space for new ones. Important: the underlying implementation uses SQLite which has a Write Ahead Log (WAL) that will grow to 4MB regardless of this setting. This WAL will be removed when the program exits. |
+| `WEAVE_SERVER_CACHE_DIR` | `str` | `None` | Specifies the directory where cache files should be stored. If not set, a temporary directory is used. |
+| `WEAVE_MAX_CALLS_QUEUE_SIZE` | `int` | `100000` | Sets the maximum size of the calls queue.  Defaults to 100_000.  Setting a value of 0 means the queue can grow unbounded. |
+| `WEAVE_RETRY_MAX_ATTEMPTS` | `int` | `3` | Sets the maximum number of retry attempts for failed requests. |
+| `WEAVE_RETRY_MAX_INTERVAL` | `float` | `300.0` | Sets the maximum interval between retry attempts in seconds. |
+| `WANDB_BASE_URL` | `string` | `None` | Sets the Weave host URL. Equivalent to entering the host URL when prompted by `wandb.login()`. You can specify `WANDB_BASE_URL` and `WANDB_API_KEY` before using `weave.init()` to automatically log into and authenticate to Weave. |
+
+> 💡 **Note**: All boolean environment variables accept the following values (case-insensitive):
+- `true`, `1`, `yes`, `on` for True
+- `false`, `0`, `no`, `off` for False
+
+[Source](https://weave-docs.wandb.ai/guides/core-types/env-vars)
+
+<!--- Docs: Core Types -->
+<!--- Datasets -->
+
+# Datasets
+
+# Datasets
+
+Weave `Dataset`s help you to organize, collect, track, and version examples for LLM application evaluation for easy comparison. You can create and interact with `Dataset`s programmatically and via the UI. 
+
+This page describes:
+
+- Basic `Dataset` operations in Python and TypeScript and how to get started  
+- How to create a `Dataset` in Python and TypeScript from objects such as Weave [calls](../tracking/tracing.mdx)
+- Available operations on a `Dataset` in the UI
+
+## `Dataset` quickstart
+
+The following code samples demonstrate how to perform fundamental `Dataset` operations using Python and TypeScript. Using the SDKs, you can:
+
+- Create a `Dataset`
+- Publish the `Dataset`
+- Retrieve the `Dataset`
+- Access a specific example in the `Dataset`
+
+Select a tab to see Python and TypeScript-specific code. 
+
+
+  
+    ```python
+    import weave
+    from weave import Dataset
+    # Initialize Weave
+    weave.init('intro-example')
+
+    # Create a dataset
+    dataset = Dataset(
+        name='grammar',
+        rows=[
+            {'id': '0', 'sentence': "He no likes ice cream.", 'correction': "He doesn't like ice cream."},
+            {'id': '1', 'sentence': "She goed to the store.", 'correction': "She went to the store."},
+            {'id': '2', 'sentence': "They plays video games all day.", 'correction': "They play video games all day."}
+        ]
+    )
+
+    # Publish the dataset
+    weave.publish(dataset)
+
+    # Retrieve the dataset
+    dataset_ref = weave.ref('grammar').get()
+
+    # Access a specific example
+    example_label = dataset_ref.rows[2]['sentence']
+    ```
+
+  
+  
+    ```typescript
+    
+    // Initialize Weave
+    await weave.init('intro-example');
+
+    // Create a dataset
+    const dataset = new weave.Dataset({
+        name: 'grammar',
+        rows: [
+            {id: '0', sentence: "He no likes ice cream.", correction: "He doesn't like ice cream."},
+            {id: '1', sentence: "She goed to the store.", correction: "She went to the store."},
+            {id: '2', sentence: "They plays video games all day.", correction: "They play video games all day."}
+        ]
+    });
+
+    // Publish the dataset
+    await dataset.save();
+
+    // Access a specific example
+    const exampleLabel = datasetRef.getRow(2).sentence;
+    ```
+
+  
+
+
+## Create a `Dataset` from other objects
+
+
+  
+  In Python, `Dataset`s can also be constructed from common Weave objects like [calls](../tracking/tracing.mdx), and Python objects like `pandas.DataFrame`s. This feature is useful if you want to create an example `Dataset` from specific examples.
+
+  ### Weave call
+
+  To create a `Dataset` from one or more Weave calls, retrieve the call object(s), and add them to a list in the `from_calls` method.
+
+  ```python
+  @weave.op
+  def model(task: str) -> str:
+      return f"Now working on {task}"
+
+  res1, call1 = model.call(task="fetch")
+  res2, call2 = model.call(task="parse")
+
+  dataset = Dataset.from_calls([call1, call2])
+  # Now you can use the dataset to evaluate the model, etc.
+  ```
+
+  ### Pandas DataFrame
+
+  To create a `Dataset` from a Pandas `DataFrame` object, use the `from_pandas` method. 
+
+  To convert the `Dataset` back, use `to_pandas`.
+
+  ```python
+  import pandas as pd
+
+  df = pd.DataFrame([
+      {'id': '0', 'sentence': "He no likes ice cream.", 'correction': "He doesn't like ice cream."},
+      {'id': '1', 'sentence': "She goed to the store.", 'correction': "She went to the store."},
+      {'id': '2', 'sentence': "They plays video games all day.", 'correction': "They play video games all day."}
+  ])
+  dataset = Dataset.from_pandas(df)
+  df2 = dataset.to_pandas()
+
+  assert df.equals(df2)
+  ```
+
+  
+  
+   This feature is not currently available in TypeScript.  Stay tuned!
+  
+
+
+## Create, edit, and delete a `Dataset` in the UI
+
+You can create, edit, and delete `Dataset`s in the UI.
+
+### Create a new `Dataset`
+
+1. Navigate to the Weave project you want to edit.
+
+2. In the sidebar, select **Traces**.
+
+3. Select one or more calls that you want to create a new `Dataset` for.
+
+4. In the upper right-hand menu, click the **Add selected rows to a dataset** icon (located next to the trashcan icon).
+
+5. From the **Choose a dataset** dropdown, select **Create new**. The **Dataset name** field appears.
+
+6. In the **Dataset name** field, enter a name for your dataset. Options to **Configure dataset fields**  appear.
+
+    :::important
+    Dataset names must start with a letter or number and can only contain letters, numbers, hyphens, and underscores.
+    :::
+
+7. (Optional) In **Configure dataset fields**, select the fields from your calls to include in the dataset.  
+    - You can customize the column names for each selected field.
+    - You can select a subset of fields to include in the new `Dataset`, or deselect all fields.
+
+8. Once you've configured the dataset fields, click **Next**. A preview of your new `Dataset` appears. 
+
+9. (Optional) Click any of the editable fields in your **Dataset** to edit the entry.
+
+10. Click **Create dataset**. Your new dataset is created.
+
+11. In the confirmation popup, click **View the dataset** to view the new `Dataset`. Alternatively, go to the **Datasets** tab.
+
+### Edit a `Dataset` 
+
+1. Navigate to the Weave project containing the `Dataset` you want to edit.
+
+2. From the sidebar, select **Datasets**. Your available `Dataset`s display.
+
+   
+
+3. In the **Object** column, click the name and version of the `Dataset` you want to edit. A pop-out modal showing `Dataset` information like name, version, author, and `Dataset` rows displays.
+
+   
+
+4. In the upper right-hand corner of the modal, click the **Edit dataset** button (the pencil icon). An **+ Add row** button displays at the bottom of the modal.
+
+    
+
+5. Click **+ Add row**. A green row displays at the top of your existing `Dataset` rows, indicating that you can add a new row to the `Dataset`. 
+
+    
+
+6. To add data to a new row, click the desired column within that row. The default **id** column in a `Dataset` row cannot be edited, as Weave assigns it automatically upon creation. An editing modal appears with **Text**, **Code**, and **Diff** options for formatting.
+
+    
+
+7. Repeat step 6 for each column that you want to add data to in the new row. 
+
+    
+
+8. Repeat step 5 for each row that you want to add to the `Dataset`.
+
+9. Once you're done editing, publish your `Dataset` by clicking **Publish** in the upper right-hand corner of the modal. Alternatively, if you don't want to publish your changes, click **Cancel**. 
+
+    
+
+   Once published, the new version of the `Dataset` with updated rows is available in the UI. 
+
+     
+     
+   
+### Delete a `Dataset`
+
+1. Navigate to the Weave project containing the `Dataset` you want to edit.
+
+2. From the sidebar, select **Datasets**. Your available `Dataset`s display.
+
+3. In the **Object** column, click the name and version of the `Dataset` you want to delete. A pop-out modal showing `Dataset` information like name, version, author, and `Dataset` rows displays.
+
+4. In the upper right-hand corner of the modal, click the trashcan icon. 
+
+   A pop-up modal prompting you to confirm `Dataset` deletion displays. 
+
+   
+
+5. In the pop-up modal, click the red **Delete** button to delete the `Dataset`. Alternatively, click **Cancel** if you don't want to delete the `Dataset`. 
+
+   Now, the `Dataset` is deleted, and no longer visible in the **Datasets** tab in your Weave dashboard.
+
+### Add a new example to a `Dataset`
+
+1. Navigate to the Weave project you want to edit.
+
+2. In the sidebar, select **Traces**.
+
+3. Select one or more calls with `Datasets` for which you want to create new examples.
+
+4. In the upper right-hand menu, click the **Add selected rows to a dataset** icon (located next to the trashcan icon). Optionally, toggle **Show latest versions** to off to display all versions of all available datasets.
+
+5. From the **Choose a dataset** dropdown, select the `Dataset` you want to add examples to. Options to **Configure field mapping** will display.
+
+6. (Optional) In **Configure field mapping**, you can adjust the mapping of fields from your calls to the corresponding dataset columns.
+
+7. Once you've configured field mappings, click **Next**. A preview of your new `Dataset` appears.
+
+8. In the empty row (green), add your new example value(s). Note that the **id** field is not editable and is created automatically by Weave.
+
+9. Click **Add to dataset**. Alternatively, to return to the **Configure field mapping** screen, click **Back**.
+
+10. In the confirmation popup, click **View the dataset** to see the changes. Alternatively, navigate to the **Datasets** tab to view the updates to your `Dataset`.
+
+[Source](https://weave-docs.wandb.ai/guides/core-types/datasets)
+
+<!--- Docs: Core Types -->
+<!--- Prompts -->
+
+# Prompts
+
+# Prompts
+
+> 🚨 **Important**: This feature is only accessible through the Python SDK. All code examples on this page are provided in Python.
+
+Creating, evaluating, and refining prompts is a core activity for AI engineers.
+Small changes to a prompt can have big impacts on your application's behavior.
+Weave lets you create prompts, save and retrieve them, and evolve them over time.
+
+Weave is unopinionated about how a Prompt is constructed. If your needs are simple you can use our built-in `weave.StringPrompt` or `weave.MessagesPrompt` classes. If your needs are more complex you can subclass those or our base class `weave.Prompt` and override the
+`format` method.
+
+When you publish one of these objects with `weave.publish`, it will appear in your Weave project on the "Prompts" page.
+
+## StringPrompt
+
+```python
+import weave
+weave.init('intro-example')
+system_prompt = weave.StringPrompt("You are a pirate")
+weave.publish(system_prompt, name="pirate_prompt")
+
+from openai import OpenAI
+client = OpenAI()
+
+response = client.chat.completions.create(
+  model="gpt-4o",
+  messages=[
+    {
+      "role": "system",
+      "content": system_prompt.format()
+    },
+    {
+      "role": "user",
+      "content": "Explain general relativity in one paragraph."
+    }
+  ],
+)
+```
+
+Perhaps this prompt does not yield the desired effect, so we modify the prompt to be more
+clearly instructive.
+
+```python
+import weave
+weave.init('intro-example')
+system_prompt = weave.StringPrompt("Talk like a pirate. I need to know I'm listening to a pirate.")
+weave.publish(system_prompt, name="pirate_prompt")
+
+from openai import OpenAI
+client = OpenAI()
+
+response = client.chat.completions.create(
+  model="gpt-4o",
+  messages=[
+    {
+      "role": "system",
+      "content": system_prompt.format()
+    },
+    {
+      "role": "user",
+      "content": "Explain general relativity in one paragraph."
+    }
+  ],
+)
+```
+
+When viewing this prompt object, I can see that it has two versions.
+
+
+
+I can also select them for comparison to see exactly what changed.
+
+
+
+## MessagesPrompt
+
+The `MessagesPrompt` can be used to replace an array of Message objects.
+
+```python
+import weave
+weave.init('intro-example')
+prompt = weave.MessagesPrompt([
+    {
+        "role": "system",
+        "content": "You are a stegosaurus, but don't be too obvious about it."
+    },
+    {
+        "role": "user",
+        "content": "What's good to eat around here?"
+    }
+])
+weave.publish(prompt, name="dino_prompt")
+
+from openai import OpenAI
+client = OpenAI()
+
+response = client.chat.completions.create(
+  model="gpt-4o",
+  messages=prompt.format(),
+)
+```
+
+## Parameterizing prompts
+
+As the `format` method's name suggests, you can pass arguments to
+fill in template placeholders in the content string.
+
+```python
+import weave
+weave.init('intro-example')
+prompt = weave.StringPrompt("Solve the equation {equation}")
+weave.publish(prompt, name="calculator_prompt")
+
+from openai import OpenAI
+client = OpenAI()
+
+response = client.chat.completions.create(
+  model="gpt-4o",
+  messages=[
+    {
+      "role": "user",
+      "content": prompt.format(equation="1 + 1 = ?")
+    }
+  ],
+)
+```
+
+This also works with `MessagesPrompt`.
+
+```python
+import weave
+weave.init('intro-example')
+prompt = weave.MessagesPrompt([
+{
+    "role": "system",
+    "content": "You will be provided with a description of a scene and your task is to provide a single word that best describes an associated emotion."
+},
+{
+    "role": "user",
+    "content": "{scene}"
+}
+])
+weave.publish(prompt, name="emotion_prompt")
+
+from openai import OpenAI
+client = OpenAI()
+
+response = client.chat.completions.create(
+  model="gpt-4o",
+  messages=prompt.format(scene="A dog is lying on a dock next to a fisherman."),
+)
+```
+
+[Source](https://weave-docs.wandb.ai/guides/core-types/prompts)
+
+<!--- Docs: Core Types -->
+<!--- Evaluations -->
+
+# Evaluations
+
+# Evaluation Overview
+
+Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using scoring functions.
+
+
+
+```python
+import weave
+from weave import Evaluation
+import asyncio
+
+# Collect your examples
+examples = [
+    {"question": "What is the capital of France?", "expected": "Paris"},
+    {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+    {"question": "What is the square root of 64?", "expected": "8"},
+]
+
+# Define any custom scoring function
+@weave.op()
+def match_score1(expected: str, output: dict) -> dict:
+    # Here is where you'd define the logic to score the model output
+    return {'match': expected == output['generated_text']}
+
+@weave.op()
+def function_to_evaluate(question: str):
+    # here's where you would add your LLM call and return the output
+    return  {'generated_text': 'Paris'}
+
+# Score your examples using scoring functions
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1]
+)
+
+# Start tracking the evaluation
+weave.init('intro-example')
+# Run the evaluation
+asyncio.run(evaluation.evaluate(function_to_evaluate))
+```
+
+:::info Looking for a less opinionated approach?
+
+If you prefer a more flexible evaluation framework, check out Weave's [`EvaluationLogger`](../evaluation/evaluation_logger.md). The imperative approach offers more flexibility for complex workflows, while the standard evaluation framework provides more structure and guidance.
+:::
+
+## Create an Evaluation
+
+To systematically improve your application, it's helpful to test your changes against a consistent dataset of potential inputs so that you catch regressions and can inspect your apps behaviour under different conditions. Using the `Evaluation` class, you can be sure you're comparing apples-to-apples by keeping track of all of the details that you're experimenting and evaluating with.
+
+Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
+
+### Define an evaluation dataset
+
+First, define a [Dataset](/guides/core-types/datasets) or list of dictionaries with a collection of examples to be evaluated. These examples are often failure cases that you want to test for, these are similar to unit tests in Test-Driven Development (TDD).
+
+### Defining scoring functions
+
+Then, create a list of scoring functions. These are used to score each example. Each function should have a `output` and optionally, other inputs from your examples, and return a dictionary with the scores.
+
+Scoring functions need to have a `output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
+
+This will take `expected` from the dictionary for scoring.
+
+```python
+import weave
+
+# Collect your examples
+examples = [
+    {"question": "What is the capital of France?", "expected": "Paris"},
+    {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+    {"question": "What is the square root of 64?", "expected": "8"},
+]
+
+# Define any custom scoring function
+@weave.op()
+def match_score1(expected: str, output: dict) -> dict:
+    # Here is where you'd define the logic to score the model output
+    return {'match': expected == output['generated_text']}
+```
+
+### Optional: Define a custom `Scorer` class
+
+In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score.
+
+See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class) for more information.
+
+### Define a Model to evaluate
+
+To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have parameters that you want to experiment with and capture in weave.
+
+```python
+from weave import Model, Evaluation
+import asyncio
+
+class MyModel(Model):
+    prompt: str
+
+    @weave.op()
+    def predict(self, question: str):
+        # here's where you would add your LLM call and return the output
+        return {'generated_text': 'Hello, ' + self.prompt}
+
+model = MyModel(prompt='World')
+
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1]
+)
+weave.init('intro-example') # begin tracking results with weave
+asyncio.run(evaluation.evaluate(model))
+```
+
+This will run `predict` on each example and score the output with each scoring functions.
+
+#### Custom Naming
+
+You can change the name of the Evaluation itself by passing a `name` parameter to the `Evaluation` class.
+
+```python
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1], name="My Evaluation"
+)
+```
+
+You can also change the name of individual evaluations by setting the `display_name` key of the `__weave` dictionary.
+
+> 💡 **Note**: Using the `__weave` dictionary sets the call display name which is distinct from the Evaluation object name. In the
+UI, you will see the display name if set, otherwise the Evaluation object name will be used.
+
+
+```python
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1]
+)
+evaluation.evaluate(model, __weave={"display_name": "My Evaluation Run"})
+```
+
+### Define a function to evaluate
+
+Alternatively, you can also evaluate a function that is wrapped in a `@weave.op()`.
+
+```python
+@weave.op()
+def function_to_evaluate(question: str):
+    # here's where you would add your LLM call and return the output
+    return  {'generated_text': 'some response'}
+
+asyncio.run(evaluation.evaluate(function_to_evaluate))
+```
+
+### Pulling it all together
+
+```python
+from weave import Evaluation, Model
+import weave
+import asyncio
+weave.init('intro-example')
+examples = [
+    {"question": "What is the capital of France?", "expected": "Paris"},
+    {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+    {"question": "What is the square root of 64?", "expected": "8"},
+]
+
+@weave.op()
+def match_score1(expected: str, output: dict) -> dict:
+    return {'match': expected == output['generated_text']}
+
+@weave.op()
+def match_score2(expected: dict, output: dict) -> dict:
+    return {'match': expected == output['generated_text']}
+
+class MyModel(Model):
+    prompt: str
+
+    @weave.op()
+    def predict(self, question: str):
+        # here's where you would add your LLM call and return the output
+        return {'generated_text': 'Hello, ' + question + self.prompt}
+
+model = MyModel(prompt='World')
+evaluation = Evaluation(dataset=examples, scorers=[match_score1, match_score2])
+
+asyncio.run(evaluation.evaluate(model))
+
+@weave.op()
+def function_to_evaluate(question: str):
+    # here's where you would add your LLM call and return the output
+    return  {'generated_text': 'some response' + question}
+
+asyncio.run(evaluation.evaluate(function_to_evaluate))
+```
+
+## Advanced evaluation usage
+
+### Using `preprocess_model_input` to format dataset rows before evaluating
+
+> 🚨 **Important**: The `preprocess_model_input` function is only applied to inputs before passing them to the model's prediction function.  
+Scorer functions always receive the original dataset example, without any preprocessing applied.
+
+The `preprocess_model_input` parameter allows you to transform your dataset examples before they are passed to your evaluation function. This is useful when you need to:
+
+- Rename fields to match your model's expected input
+- Transform data into the correct format
+- Add or remove fields
+- Load additional data for each example
+
+Here's a simple example that shows how to use `preprocess_model_input` to rename fields:
+
+```python
+import weave
+from weave import Evaluation
+import asyncio
+
+# Our dataset has "input_text" but our model expects "question"
+examples = [
+    {"input_text": "What is the capital of France?", "expected": "Paris"},
+    {"input_text": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+    {"input_text": "What is the square root of 64?", "expected": "8"},
+]
+
+@weave.op()
+def preprocess_example(example):
+    # Rename input_text to question
+    return {
+        "question": example["input_text"]
+    }
+
+@weave.op()
+def match_score(expected: str, output: dict) -> dict:
+    return {'match': expected == output['generated_text']}
+
+@weave.op()
+def function_to_evaluate(question: str):
+    return {'generated_text': f'Answer to: {question}'}
+
+# Create evaluation with preprocessing
+evaluation = Evaluation(
+    dataset=examples,
+    scorers=[match_score],
+    preprocess_model_input=preprocess_example
+)
+
+# Run the evaluation
+weave.init('preprocessing-example')
+asyncio.run(evaluation.evaluate(function_to_evaluate))
+```
+
+In this example, our dataset contains examples with an `input_text` field, but our evaluation function expects a `question` parameter. The `preprocess_example` function transforms each example by renaming the field, allowing the evaluation to work correctly.
+
+The preprocessing function:
+
+1. Receives the raw example from your dataset
+2. Returns a dictionary with the fields your model expects
+3. Is applied to each example before it's passed to your evaluation function
+
+This is particularly useful when working with external datasets that may have different field names or structures than what your model expects.
+
+### Using HuggingFace Datasets with evaluations
+
+We are continuously improving our integrations with third-party services and libraries.
+
+While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations.
+
+See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.
+
+## Saved views 
+
+You can save your Evals table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).
+
+[Source](https://weave-docs.wandb.ai/guides/core-types/evaluations)
