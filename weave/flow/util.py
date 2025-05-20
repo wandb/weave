@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 U = TypeVar("U")
+ItemReturnType = tuple[int, T, U]
 
 _shown_warnings = set()
 
@@ -26,11 +27,12 @@ async def async_foreach(
     sequence: Iterable[T],
     func: Callable[[T], Awaitable[U]],
     max_concurrent_tasks: int,
-) -> AsyncIterator[tuple[T, U]]:
+) -> AsyncIterator[ItemReturnType]:
     """Process items from a sequence concurrently with a maximum number of parallel tasks.
 
     This function loads items from the input sequence lazily to support large or infinite
-    sequences. Items are processed and yielded in the same order as the input sequence.
+    sequences. Items are processed in the same order as the input sequence, but potentially
+    yielded out of order (if certain tasks complete faster than others).
 
     Args:
         sequence: An iterable of items to process. Items are loaded lazily.
@@ -38,7 +40,8 @@ async def async_foreach(
         max_concurrent_tasks: Maximum number of items to process concurrently.
 
     Yields:
-        Tuples of (original_item, processed_result) in the same order as the input sequence.
+        Tuples of (index, original_item, processed_result) where index is the index of the item
+        in the input sequence.
 
     Example:
         ```python
@@ -46,7 +49,7 @@ async def async_foreach(
             await asyncio.sleep(1)  # Simulate async work
             return str(x * 2)
 
-        async for item, result in async_foreach(range(10), process, max_concurrent_tasks=3):
+        async for index, item, result in async_foreach(range(10), process, max_concurrent_tasks=3):
             print(f"Processed {item} -> {result}")
         ```
 
@@ -56,25 +59,28 @@ async def async_foreach(
         - All pending tasks are properly cleaned up on error or cancellation
         - Results are yielded in the same order as the input sequence
     """
-    semaphore = asyncio.Semaphore(max_concurrent_tasks)
-    active_tasks: list[asyncio.Task] = []
+    semaphore: asyncio.Semaphore = asyncio.Semaphore(max_concurrent_tasks)
+    active_tasks: list[asyncio.Task[ItemReturnType]] = []
 
-    async def process_item(item: T) -> tuple[T, U]:
+    async def process_item(index: int, item: T) -> ItemReturnType:
         """Process a single item using the provided function with semaphore control."""
         async with semaphore:
             result = await func(item)
-            return item, result
+            return index, item, result
+
+    iterator = iter(sequence)
+    iterator_index = 0
 
     def maybe_queue_next_task() -> None:
         """Attempt to queue the next task from the iterator if available."""
+        nonlocal iterator_index
         try:
             item = next(iterator)
-            task = asyncio.create_task(process_item(item))
+            task = asyncio.create_task(process_item(iterator_index, item))
             active_tasks.append(task)
+            iterator_index += 1
         except StopIteration:
             pass
-
-    iterator = iter(sequence)
 
     try:
         # Prime the initial set of tasks
@@ -84,13 +90,16 @@ async def async_foreach(
         while active_tasks:
             # Always wait for the first task in the list to complete
             # This ensures we yield results in order
-            task = active_tasks.pop(0)  # Remove completed task from front of list
             try:
-                item, result = await task
-                yield item, result
-
-                # Add a new task if there are more items
-                maybe_queue_next_task()
+                (done, pending) = await asyncio.wait(
+                    active_tasks, return_when=asyncio.FIRST_COMPLETED
+                )
+                active_tasks = list(pending)
+                for task in done:
+                    (index, item, result) = task.result()
+                    yield index, item, result
+                    # Add a new task if there are more items
+                    maybe_queue_next_task()
             except Exception:
                 # Clean up remaining tasks before re-raising
                 for t in active_tasks:
