@@ -26,6 +26,7 @@ import {CallLink} from '../../../common/Links';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
+  CompositeScoreMetrics,
   CompositeSummaryMetricGroupForKeyPath,
   DERIVED_SCORER_REF_PLACEHOLDER,
   resolvePeerDimension,
@@ -399,35 +400,12 @@ export const ExampleCompareSectionDetail: React.FC<{
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
     const currEvalCallId = orderedCallIds[evalIndex];
     const dimension = lookupDimension(scorerIndex, metricIndex);
-    const resolvedScoreId = resolvePeerDimension(
-      compositeScoreMetrics,
+    return lookupMetricValueDirect(
+      targetTrial.scores,
       currEvalCallId,
-      dimension
+      dimension,
+      compositeScoreMetrics
     );
-    // If we get a valid resolution through the normal path, use that
-    if (resolvedScoreId != null) {
-      const metricId = metricDefinitionId(resolvedScoreId);
-      if (
-        targetTrial.scores &&
-        metricId in targetTrial.scores &&
-        currEvalCallId in targetTrial.scores[metricId]
-      ) {
-        return targetTrial.scores[metricId][currEvalCallId];
-      }
-    }
-
-    // Fallback: try direct lookup using the original dimension's metric ID
-    // This is needed for imperative evaluations that don't get properly resolved
-    const originalMetricId = metricDefinitionId(dimension);
-    if (
-      targetTrial.scores &&
-      originalMetricId in targetTrial.scores &&
-      currEvalCallId in targetTrial.scores[originalMetricId]
-    ) {
-      return targetTrial.scores[originalMetricId][currEvalCallId];
-    }
-
-    return undefined;
   };
 
   const lookupAggScorerMetricValue = (
@@ -1131,4 +1109,41 @@ export const evalAggScorerMetricCompGeneric = (
       />
     </HorizontalBox>
   );
+};
+
+export const lookupMetricValueDirect = (
+  targetTrialScores: PivotedRow['scores'],
+  currEvalCallId: string,
+  dimension: MetricDefinition,
+  compositeScoreMetrics: CompositeScoreMetrics
+): MetricValueType | undefined => {
+  const resolvedScoreId = resolvePeerDimension(
+    compositeScoreMetrics,
+    currEvalCallId,
+    dimension
+  );
+  // If we get a valid resolution through the normal path, use that
+  if (resolvedScoreId != null) {
+    const metricId = metricDefinitionId(resolvedScoreId);
+    if (
+      targetTrialScores &&
+      metricId in targetTrialScores &&
+      currEvalCallId in targetTrialScores[metricId]
+    ) {
+      return targetTrialScores[metricId][currEvalCallId];
+    }
+  }
+
+  // Fallback: try direct lookup using the original dimension's metric ID
+  // This is needed for imperative evaluations that don't get properly resolved
+  const originalMetricId = metricDefinitionId(dimension);
+  if (
+    targetTrialScores &&
+    originalMetricId in targetTrialScores &&
+    currEvalCallId in targetTrialScores[originalMetricId]
+  ) {
+    return targetTrialScores[originalMetricId][currEvalCallId];
+  }
+
+  return undefined;
 };
