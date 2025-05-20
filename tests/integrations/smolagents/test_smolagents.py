@@ -6,27 +6,6 @@ import pytest
 from weave.integrations.integration_utilities import op_name_from_ref
 
 
-def mask_api_key_and_skip(request):
-    from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
-
-    if "raw.githubusercontent.com/BerriAI/litellm/main" in request.uri:
-        return None
-
-    url = urlparse(request.uri)
-    query = parse_qs(url.query)
-    if "api_key" in query:
-        query["api_key"] = ["DUMMY_API_KEY"]
-        new_query = urlencode(query, doseq=True)
-        new_url = url._replace(query=new_query)
-        request = type(request)(
-            method=request.method,
-            uri=urlunparse(new_url),
-            body=request.body,
-            headers=request.headers,
-        )
-    return request
-
-
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -69,7 +48,6 @@ def test_hf_api_model(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
-    before_record_request=mask_api_key_and_skip,
 )
 def test_openai_server_model(client):
     from smolagents import OpenAIServerModel
@@ -103,7 +81,6 @@ def test_openai_server_model(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
-    before_record_request=mask_api_key_and_skip,
 )
 def test_tool_calling_agent_search(client):
     from smolagents import GoogleSearchTool, OpenAIServerModel, ToolCallingAgent
@@ -133,7 +110,6 @@ def test_tool_calling_agent_search(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
-    before_record_request=mask_api_key_and_skip,
 )
 def test_tool_calling_agent_weather(client):
     from smolagents import OpenAIServerModel, ToolCallingAgent, tool
@@ -172,7 +148,6 @@ def test_tool_calling_agent_weather(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
-    before_record_request=mask_api_key_and_skip,
 )
 def test_code_agent_search(client):
     from smolagents import CodeAgent, GoogleSearchTool, OpenAIServerModel
@@ -203,7 +178,6 @@ def test_code_agent_search(client):
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "huggingface.co"],
     match_on=["method", "scheme", "host", "port", "path"],
-    before_record_request=mask_api_key_and_skip,
 )
 def test_code_agent_weather(client):
     from smolagents import CodeAgent, OpenAIServerModel, tool
