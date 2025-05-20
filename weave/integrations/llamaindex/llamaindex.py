@@ -61,6 +61,16 @@ def get_embedding_shape(embedding: List[Any]) -> Tuple[int, ...]:
     return tuple(shape)
 
 
+def process_llamaindex_event_start(event: BaseEvent) -> Dict[str, Any]:
+    is_event = event.class_name()
+
+    if is_event == "EmbeddingStartEvent":
+        return event.model_dump()
+
+def process_llamaindex_event_end(event: BaseEvent) -> Dict[str, Any]:
+    return {}
+
+
 def process_llamaindex_payload(
     payload: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
@@ -118,44 +128,6 @@ def process_llamaindex_payload(
     return res
 
 
-_EVENT_TYPE_TO_OP_NAME_SUFFIX_MAP: Dict[str, str] = {
-    "Query": "query",
-    "Embedding": "embedding",
-    "SparseEmbedding": "sparse_embedding",  # Added for clarity
-    "LLMPredict": "llm_predict",
-    "LLMStructuredPredict": "llm_structured_predict",
-    "LLMCompletion": "llm_completion",
-    "LLMChat": "llm_chat",
-    "Retrieval": "retrieval",
-    "Synthesize": "synthesis",
-    "GetResponse": "get_response",
-    "ReRank": "rerank",
-    "AgentChatWithStep": "agent_chat_with_step",
-    "AgentRunStep": "agent_run_step",
-    "AgentToolCall": "agent_tool_call",
-    "StreamChatDeltaReceived": "stream_chat_delta",
-    "LLMChatInProgress": "llm_chat_in_progress",
-    "StreamChatError": "stream_chat_error",
-    "SpanDrop": "span_drop",
-}
-
-# Mapping of LlamaIndex EndEvent class names to their primary result field(s)
-# Value can be a string (single field) or a list of strings (multiple fields)
-EVENT_PRIMARY_RESULT_FIELD_MAP: Dict[str, Union[str, List[str]]] = {
-    "QueryEndEvent": "response",
-    "SynthesizeEndEvent": "response",
-    "RetrievalEndEvent": "nodes",
-    "EmbeddingEndEvent": ["chunks", "embeddings"],
-    "SparseEmbeddingEndEvent": ["chunks", "embeddings"],
-    "LLMChatEndEvent": "response",
-    "LLMPredictEndEvent": "output",
-    "ReRankEndEvent": "nodes",
-    "GetResponseEndEvent": "response",
-    "AgentChatWithStepEndEvent": "response",
-    "AgentRunStepEndEvent": "step_output",
-}
-
-
 def get_op_name_from_event(event: BaseEvent) -> str:
     """Generates a Weave operation name from a LlamaIndex event."""
     class_name = event.class_name()
@@ -165,14 +137,29 @@ def get_op_name_from_event(event: BaseEvent) -> str:
             core_name = core_name[: -len(suffix)]
             break
 
-    op_suffix = _EVENT_TYPE_TO_OP_NAME_SUFFIX_MAP.get(core_name)
-    if op_suffix:
-        return f"llama_index.{op_suffix}"
+    if core_name:
+        return f"llama_index.event.{core_name}"
 
     snake_case_name = "".join(
         ["_" + i.lower() if i.isupper() else i for i in core_name]
     ).lstrip("_")
     return f"llama_index.unmapped.{snake_case_name}"
+
+
+def _remove_common_items(d1, d2):
+    result = {}
+    for key, value in d2.items():
+        if key not in d1:
+            result[key] = value
+        else:
+            if isinstance(value, dict) and isinstance(d1[key], dict):
+                # Recursively remove common nested dict items
+                nested_diff = _remove_common_items(d1[key], value)
+                if nested_diff:  # only include if there's something left
+                    result[key] = nested_diff
+            elif d1[key] != value:
+                result[key] = value
+    return result
 
 
 class WeaveSpanHandler(BaseSpanHandler[Any]):
@@ -311,90 +298,31 @@ class WeaveEventHandler(BaseEventHandler):
         except Exception:
             raw_event_payload = {"detail": f"Failed to dump event: {str(event)}"}
 
-        processed_inputs = process_llamaindex_payload(raw_event_payload)
-
         event_class_name = event.class_name()
         is_start_event = event_class_name.endswith("StartEvent")
         is_end_event = event_class_name.endswith("EndEvent")
 
         try:
             if is_start_event:
-                call = gc.create_call(op_name, processed_inputs, parent_call_for_event)
+                call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
                 _weave_calls_map[event_pairing_key] = call
             elif is_end_event:
                 if event_pairing_key in _weave_calls_map:
+                    # If the event pairing key is in the weave calls map, finish the call
                     call_to_finish = _weave_calls_map.pop(event_pairing_key)
 
-                    # Determine specific output payload for EndEvents
-                    output_payload_for_finish = (
-                        processed_inputs  # Default to full payload
-                    )
-                    primary_result_keys = EVENT_PRIMARY_RESULT_FIELD_MAP.get(
-                        event_class_name
-                    )
+                    # TODO: ensure it doesn't take a lot of time.
+                    event_start_payload = call_to_finish.inputs
+                    modified_event_end_payload = _remove_common_items(event_start_payload, raw_event_payload)
 
-                    if primary_result_keys:
-                        isolated_result: Dict[str, Any] = {}
-                        keys_to_extract = (
-                            [primary_result_keys]
-                            if isinstance(primary_result_keys, str)
-                            else primary_result_keys
-                        )
-
-                        for key in keys_to_extract:
-                            if key in raw_event_payload:
-                                isolated_result[key] = raw_event_payload[key]
-
-                        if isolated_result:  # Only process if we found primary keys
-                            output_payload_for_finish = process_llamaindex_payload(
-                                isolated_result
-                            )
-
-                    gc.finish_call(call_to_finish, output_payload_for_finish)
+                    gc.finish_call(call_to_finish, modified_event_end_payload)
                 else:
                     # Fallback for unmatched EndEvent: log as an instantaneous event
                     # print(f"Weave(EventHandler): Unmatched EndEvent for {event_pairing_key}, logging as new.")
                     call = gc.create_call(
-                        op_name, processed_inputs, parent_call_for_event
+                        op_name, raw_event_payload, parent_call_for_event
                     )
-                    gc.finish_call(call, processed_inputs)  # Output is same as input
-
-            # Handle atomic/informational events that don't have a Start/End pair
-            elif isinstance(
-                event,
-                (
-                    AgentToolCallEvent,
-                    StreamChatDeltaReceivedEvent,
-                    LLMChatInProgressEvent,
-                    StreamChatErrorEvent,
-                    SpanDropEvent,
-                ),
-            ):
-                exception_to_log = None
-                if (
-                    isinstance(event, StreamChatErrorEvent)
-                    and hasattr(event, "exception")
-                    and event.exception
-                ):
-                    exception_to_log = event.exception  # type: ignore
-                elif (
-                    isinstance(event, SpanDropEvent)
-                    and hasattr(event, "err_str")
-                    and event.err_str
-                ):
-                    exception_to_log = Exception(str(event.err_str))  # type: ignore
-
-                call = gc.create_call(op_name, processed_inputs, parent_call_for_event)
-                if exception_to_log:
-                    gc.finish_call(call, None, exception=exception_to_log)
-                else:
-                    # For these events, the input payload itself can serve as the output summary
-                    gc.finish_call(call, processed_inputs)
-            else:
-                # Generic/unclassified events are logged as instantaneous
-                # print(f"Weave(EventHandler): Generic event {op_name}, logging as instantaneous.")
-                call = gc.create_call(op_name, processed_inputs, parent_call_for_event)
-                gc.finish_call(call, processed_inputs)
+                    gc.finish_call(call, raw_event_payload)  # Output is same as input
 
         except Exception as e:
             print(
