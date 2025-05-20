@@ -24,6 +24,7 @@ export type WFHighLevelCallFilter = {
   inputObjectVersionRefs?: string[];
   outputObjectVersionRefs?: string[];
   parentId?: string | null;
+  runIds?: string[];
   // This really doesn't belong here. We are using it to indicate that the
   // filter is frozen and should not be updated by the user. However, this
   // control should really be managed outside of the filter itself.

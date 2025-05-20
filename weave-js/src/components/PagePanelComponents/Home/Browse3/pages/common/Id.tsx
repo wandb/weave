@@ -10,7 +10,7 @@ import copyToClipboard from 'copy-to-clipboard';
 import React, {useCallback, useState} from 'react';
 import styled from 'styled-components';
 
-const IdPanel = styled.div<{clickable?: boolean}>`
+export const IdPanel = styled.div<{clickable?: boolean}>`
   padding: 0 4px;
   background-color: ${MOON_150};
   border-radius: 4px;

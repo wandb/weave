@@ -7,7 +7,15 @@ import {Alert} from '@mui/material';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
@@ -29,7 +37,8 @@ import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {HorizontalBox, VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
-import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
+import {ExampleCompareSectionDetail} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
@@ -250,9 +259,14 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
 }> = ({state, height}) => {
+  const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
+    'detail'
+  );
+
   return (
     <VerticalBox
       sx={{
+        height: '100%',
         width: '100%',
         overflow: 'hidden',
       }}>
@@ -264,23 +278,114 @@ const ResultExplorer: React.FC<{
           width: '100%',
           alignItems: 'center',
           justifyContent: 'flex-start',
+          paddingTop: 15,
         }}>
         <Box
           sx={{
-            fontSize: '1.5em',
+            fontSize: '16px',
             fontWeight: 'bold',
           }}>
           Output Comparison
         </Box>
       </HorizontalBox>
-      <Box
-        sx={{
-          height,
-          overflow: 'auto',
-        }}>
-        <ExampleCompareSection state={state} />
-      </Box>
+      <AdaptiveHeightParent maxHeight={height}>
+        <Box
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            height: '100%',
+            borderTop: '1px solid #e0e0e0',
+          }}>
+          <Box
+            style={{
+              flex: 1,
+              width: '50%',
+              display: viewMode !== 'detail' ? 'block' : 'none',
+            }}>
+            <ExampleCompareSectionTable
+              state={state}
+              shouldHighlightSelectedRow={viewMode === 'split'}
+              onShowSplitView={() => setViewMode('split')}
+            />
+          </Box>
+
+          <Box
+            style={{
+              flex: 1,
+              width: '50%',
+              borderLeft: '1px solid #e0e0e0',
+              display: viewMode !== 'table' ? 'block' : 'none',
+            }}>
+            <ExampleCompareSectionDetail
+              state={state}
+              onClose={() => setViewMode('table')}
+              onExpandToggle={() =>
+                setViewMode(viewMode === 'detail' ? 'split' : 'detail')
+              }
+              isExpanded={viewMode === 'detail'}
+            />
+          </Box>
+        </Box>
+      </AdaptiveHeightParent>
     </VerticalBox>
+  );
+};
+
+/**
+ * This component should behave as follows:
+ * 1. It accepts a maxHeight prop which is the maximum height of the component.
+ * 2. It accepts children to display inside the component.
+ * 3. The children component's parent element should be no taller than the maxHeight, BUT
+ *    IMPORTANTLY: should be contrainted to the visible bounding region.
+ *
+ * In other words: the parent's height is:
+ *    * > 0
+ *    * <= maxHeight
+ *    * <= the visible height of the parent's parent element (bounded by the window or the next visible parent with a height constraint and overflow: hidden)
+ */
+const AdaptiveHeightParent: React.FC<{
+  maxHeight: number;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+  className?: string;
+}> = ({maxHeight, children, style, className}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(maxHeight);
+
+  useEffect(() => {
+    const updateHeight = () => {
+      if (!containerRef.current) return;
+
+      // Get the container's bounding rect
+      const containerRect = containerRef.current.getBoundingClientRect();
+
+      // Find the visible height (distance from top of element to bottom of viewport)
+      const visibleHeight = Math.min(
+        window.innerHeight - containerRect.top,
+        containerRef.current.parentElement?.getBoundingClientRect().height ||
+          Infinity
+      );
+
+      // Set the height to the minimum of maxHeight and visibleHeight
+      const newHeight = Math.max(0, Math.min(maxHeight, visibleHeight));
+      setHeight(newHeight);
+    };
+
+    const interval = setInterval(updateHeight, 100);
+
+    return () => clearInterval(interval);
+  }, [maxHeight]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        height: maxHeight,
+        overflow: 'hidden',
+      }}
+      className={className}>
+      <div style={{height, ...style}}>{children}</div>
+    </div>
   );
 };
 

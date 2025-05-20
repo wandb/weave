@@ -10,15 +10,13 @@ const createFreshMockClient = () => ({
     parentCall: null,
     newStack: [],
   })),
-  createCall: jest.fn(
-    (_, __, ___, ____, _____, ______, _______, displayName: string) => {
-      // We still need a way to capture this if tests rely on it.
-      // Maybe pass a shared object or use a different mechanism?
-      // For now, let's remove the direct capture here.
-      // capturedDisplayName = displayName;
-      return Promise.resolve();
-    }
-  ),
+  createCall: jest.fn((...args: any[]) => {
+    // We still need a way to capture this if tests rely on it.
+    // Maybe pass a shared object or use a different mechanism?
+    // For now, let's remove the direct capture here.
+    // capturedDisplayName = displayName;
+    return Promise.resolve();
+  }),
   runWithCallStack: jest.fn(async (stack: any, fn: () => any) => fn()),
   finishCall: jest.fn(() => Promise.resolve()),
   finishCallWithException: jest.fn(() => Promise.resolve()),
@@ -193,13 +191,17 @@ describe('op wrappers', () => {
     expect(getGlobalClientSpy).toHaveBeenCalledTimes(1);
 
     // Assertions on the specific mock instance returned for this test
-    expect(mockClientInstance.finishCallWithException).toHaveBeenCalledWith(
+    expect(mockClientInstance.finishCallWithException).toHaveBeenCalled();
+    const args = mockClientInstance.finishCallWithException.mock.lastCall;
+    // The first arg is internal, so we shift it off and not check it
+    args?.shift();
+    expect(args).toEqual([
       error,
       expect.objectContaining({callId: 'mockCallId'}), // currentCall
       null, // parentCall
       expect.any(Date), // endTime
-      expect.any(Promise) // startCallPromise
-    );
+      expect.any(Promise), // startCallPromise
+    ]);
     expect(mockClientInstance.finishCall).not.toHaveBeenCalled();
   });
 });
