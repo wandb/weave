@@ -387,3 +387,542 @@ async def test_agentchat_run_stream_with_tool(
     assert summary["weave"]["status"] == "success"
     assert summary["weave"]["trace_name"] == expected_trace_name
     assert summary["weave"]["latency_ms"] > 0
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+@pytest.mark.asyncio
+async def test_agentchat_group_chat(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    from autogen_agentchat.agents import AssistantAgent
+    from autogen_agentchat.conditions import TextMessageTermination
+    from autogen_agentchat.teams import RoundRobinGroupChat
+    from autogen_ext.models.openai import OpenAIChatCompletionClient
+
+    model = "gpt-4.1-nano-2025-04-14"
+    model_client = OpenAIChatCompletionClient(
+        model=model,
+        parallel_tool_calls=False,
+    )
+
+    # Create a tool for incrementing a number.
+    def increment_number(number: int) -> int:
+        """Increment a number by 1."""
+        return number + 1
+
+    # Create a tool agent that uses the increment_number function.
+    looped_assistant = AssistantAgent(
+        "looped_assistant",
+        model_client=model_client,
+        tools=[increment_number],  # Register the tool.
+        system_message="You are a helpful AI assistant, use the tool to increment the number.",
+    )
+
+    # Termination condition that stops the task if the agent responds with a text message.
+    termination_condition = TextMessageTermination("looped_assistant")
+
+    # Create a team with the looped assistant agent and the termination condition.
+    team = RoundRobinGroupChat(
+        [looped_assistant],
+        termination_condition=termination_condition,
+    )
+
+    # Run the team with a task and print the messages to the console.
+    async for _ in team.run_stream(task="Increment the number 1 to 3."):
+        _
+    await model_client.close()
+    calls = list(client.calls())
+    call = calls[0]
+    assert call.exception is None and call.ended_at is not None
+
+    assert len(calls) == 60
+    flattened = flatten_calls(calls)
+    assert len(flattened) == 203
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+    exp = [
+        ("autogen_agentchat.RoundRobinGroupChat.run_stream", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.send_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.ChatAgentContainer.on_message", 1),
+        ("autogen_agentchat.ChatAgentContainer.on_message", 1),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 2),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 3),
+        ("openai.chat.completions.create", 4),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 3),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 4),
+        ("autogen_core.FunctionTool.run", 3),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 3),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 4),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 3),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 4),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.ChatAgentContainer.on_message", 1),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 2),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 3),
+        ("openai.chat.completions.create", 4),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 3),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 4),
+        ("autogen_core.FunctionTool.run", 3),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 3),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 4),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 3),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 4),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.ChatAgentContainer.on_message", 1),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 2),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 3),
+        ("openai.chat.completions.create", 4),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 3),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 4),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 1),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_core.SingleThreadedAgentRuntime.send_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.on_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.on_message", 0),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 1),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 2),
+        ("openai.chat.completions.create", 3),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_core.FunctionTool.run", 2),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 0),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 1),
+        ("openai.chat.completions.create", 2),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_core.FunctionTool.run", 1),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 0),
+        ("openai.chat.completions.create", 1),
+        ("openai.chat.completions.create", 0),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_core.FunctionTool.run", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.on_message", 0),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 1),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 2),
+        ("openai.chat.completions.create", 3),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_core.FunctionTool.run", 2),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 0),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 1),
+        ("openai.chat.completions.create", 2),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_core.FunctionTool.run", 1),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 0),
+        ("openai.chat.completions.create", 1),
+        ("openai.chat.completions.create", 0),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_core.FunctionTool.run", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.on_message", 0),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 1),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 2),
+        ("openai.chat.completions.create", 3),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 0),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 1),
+        ("openai.chat.completions.create", 2),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 0),
+        ("openai.chat.completions.create", 1),
+        ("openai.chat.completions.create", 0),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_agentchat.RoundRobinGroupChatManager.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+    ]
+    expected_trace_name = exp[0][0]
+    assert got == exp
+    summary = call.summary
+    assert "usage" in summary
+    assert model in summary["usage"]
+    assert summary["usage"][model]["requests"] == 3
+    assert summary["usage"][model]["prompt_tokens"] > 0
+    assert summary["usage"][model]["completion_tokens"] > 0
+    assert summary["usage"][model]["total_tokens"] > 0
+
+    assert "status_counts" in summary
+    assert summary["status_counts"]["success"] == 60
+    assert summary["status_counts"]["error"] == 0
+    assert "weave" in summary
+    assert summary["weave"]["status"] == "success"
+    assert summary["weave"]["trace_name"] == expected_trace_name
+    assert summary["weave"]["latency_ms"] > 0
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+@pytest.mark.asyncio
+async def test_agent_with_memory(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    from autogen_agentchat.agents import AssistantAgent
+    from autogen_core.memory import ListMemory, MemoryContent, MemoryMimeType
+    from autogen_ext.models.openai import OpenAIChatCompletionClient
+
+    model_name = "gpt-4.1-nano-2025-04-14"
+
+    @weave.op
+    async def _run_agent():
+        user_memory = ListMemory()
+
+        # Add user preferences to memory
+        await user_memory.add(
+            MemoryContent(
+                content="The weather should be in metric units",
+                mime_type=MemoryMimeType.TEXT,
+            )
+        )
+
+        await user_memory.add(
+            MemoryContent(
+                content="Meal recipe must be vegan", mime_type=MemoryMimeType.TEXT
+            )
+        )
+
+        async def get_weather(city: str, units: str = "imperial") -> str:
+            if units == "imperial":
+                return f"The weather in {city} is 73 °F and Sunny."
+            elif units == "metric":
+                return f"The weather in {city} is 23 °C and Sunny."
+            else:
+                return f"Sorry, I don't know the weather in {city}."
+
+        model_client = OpenAIChatCompletionClient(
+            model=model_name,
+        )
+        assistant_agent = AssistantAgent(
+            name="assistant_agent",
+            model_client=model_client,
+            tools=[get_weather],
+            memory=[user_memory],
+        )
+
+        async for _ in assistant_agent.run_stream(
+            task="What is the weather in New York?"
+        ):
+            pass
+
+        await model_client.close()
+
+    await _run_agent()
+    calls = list(client.calls())
+    call = calls[0]
+    assert call.exception is None and call.ended_at is not None
+    assert len(calls) == 10
+    flattened = flatten_calls(calls)
+    assert len(flattened) == 31
+
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+    exp = [
+        ("run_agent", 0),
+        ("autogen_core.ListMemory.add", 1),
+        ("autogen_core.ListMemory.add", 1),
+        ("autogen_agentchat.AssistantAgent.run_stream", 1),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 2),
+        ("autogen_core.ListMemory.update_context", 3),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 3),
+        ("openai.chat.completions.create", 4),
+        ("autogen_core.FunctionTool.run", 3),
+        ("autogen_core.FunctionTool.run", 3),
+        ("autogen_core.ListMemory.add", 0),
+        ("autogen_core.ListMemory.add", 0),
+        ("autogen_agentchat.AssistantAgent.run_stream", 0),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 1),
+        ("autogen_core.ListMemory.update_context", 2),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 2),
+        ("openai.chat.completions.create", 3),
+        ("autogen_core.FunctionTool.run", 2),
+        ("autogen_core.FunctionTool.run", 2),
+        ("autogen_agentchat.AssistantAgent.on_messages_stream", 0),
+        ("autogen_core.ListMemory.update_context", 1),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 1),
+        ("openai.chat.completions.create", 2),
+        ("autogen_core.FunctionTool.run", 1),
+        ("autogen_core.FunctionTool.run", 1),
+        ("autogen_core.ListMemory.update_context", 0),
+        ("autogen_ext.OpenAIChatCompletionClient.create", 0),
+        ("openai.chat.completions.create", 1),
+        ("openai.chat.completions.create", 0),
+        ("autogen_core.FunctionTool.run", 0),
+        ("autogen_core.FunctionTool.run", 0),
+    ]
+
+    expected_trace_name = exp[0][0]
+    assert got == exp
+    summary = call.summary
+    assert "usage" in summary
+    assert model_name in summary["usage"]
+    assert summary["usage"][model_name]["requests"] == 1
+    assert summary["usage"][model_name]["prompt_tokens"] > 0
+    assert summary["usage"][model_name]["completion_tokens"] > 0
+    assert summary["usage"][model_name]["total_tokens"] > 0
+
+    assert "status_counts" in summary
+    assert summary["status_counts"]["success"] == 10
+    assert summary["status_counts"]["error"] == 0
+    assert "weave" in summary
+    assert summary["weave"]["status"] == "success"
+    assert summary["weave"]["trace_name"] == expected_trace_name
+    assert summary["weave"]["latency_ms"] > 0
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+@pytest.mark.asyncio
+async def test_workflows_singlethreaded_runtime(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    from dataclasses import dataclass
+    from typing import Callable
+
+    from autogen_core import (
+        AgentId,
+        DefaultTopicId,
+        MessageContext,
+        RoutedAgent,
+        SingleThreadedAgentRuntime,
+        default_subscription,
+        message_handler,
+    )
+
+    @dataclass
+    class Message:
+        content: int
+
+    @default_subscription
+    class Modifier(RoutedAgent):
+        def __init__(self, modify_val: Callable[[int], int]) -> None:
+            super().__init__("A modifier agent.")
+            self._modify_val = modify_val
+
+        @message_handler
+        async def handle_message(self, message: Message, ctx: MessageContext) -> None:
+            val = self._modify_val(message.content)
+            await self.publish_message(Message(content=val), DefaultTopicId())  # type: ignore
+
+    @default_subscription
+    class Checker(RoutedAgent):
+        def __init__(self, run_until: Callable[[int], bool]) -> None:
+            super().__init__("A checker agent.")
+            self._run_until = run_until
+
+        @message_handler
+        async def handle_message(self, message: Message, ctx: MessageContext) -> None:
+            if not self._run_until(message.content):
+                await self.publish_message(
+                    Message(content=message.content), DefaultTopicId()
+                )
+            else:
+                pass
+
+    # NOTE: this is a special case where you need to use the weave decorator
+    # if you want the messages in the pubsub to be captured under a single trace
+    @weave.op
+    async def run_workflow() -> None:
+        # Create a local embedded runtime.
+        runtime = SingleThreadedAgentRuntime()
+
+        await Modifier.register(
+            runtime,
+            "modifier",
+            lambda: Modifier(modify_val=lambda x: x - 1),
+        )
+
+        await Checker.register(
+            runtime,
+            "checker",
+            lambda: Checker(run_until=lambda x: x <= 1),
+        )
+
+        # Start the runtime and send a direct message to the checker.
+        runtime.start()
+        await runtime.send_message(Message(3), AgentId("checker", "default"))
+        await runtime.stop_when_idle()
+
+    await run_workflow()
+
+    calls = list(client.calls())
+    call = calls[0]
+    assert call.exception is None and call.ended_at is not None
+    assert len(calls) == 15
+    flattened = flatten_calls(calls)
+    assert len(flattened) == 41
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+    exp = [
+        ("run_workflow", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.send_message", 1),
+        ("autogen_test.Checker.on_message", 1),
+        ("autogen_test.Checker.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_test.Modifier.on_message", 1),
+        ("autogen_test.Modifier.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_test.Checker.on_message", 1),
+        ("autogen_test.Checker.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_test.Modifier.on_message", 1),
+        ("autogen_test.Modifier.publish_message", 2),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 3),
+        ("autogen_test.Checker.on_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.send_message", 0),
+        ("autogen_test.Checker.on_message", 0),
+        ("autogen_test.Checker.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_test.Checker.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_test.Modifier.on_message", 0),
+        ("autogen_test.Modifier.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_test.Modifier.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_test.Checker.on_message", 0),
+        ("autogen_test.Checker.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_test.Checker.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_test.Modifier.on_message", 0),
+        ("autogen_test.Modifier.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 2),
+        ("autogen_test.Modifier.publish_message", 0),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
+        ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
+        ("autogen_test.Checker.on_message", 0),
+    ]
+    expected_trace_name = exp[0][0]
+    assert got == exp
+    summary = call.summary
+    assert "status_counts" in summary
+    assert summary["status_counts"]["success"] == 15
+    assert summary["status_counts"]["error"] == 0
+
+    assert "weave" in summary
+    assert summary["weave"]["status"] == "success"
+    assert summary["weave"]["trace_name"] == expected_trace_name
+    assert summary["weave"]["latency_ms"] > 0
