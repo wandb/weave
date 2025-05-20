@@ -75,7 +75,7 @@ class MonitorsCache:
     _capacity = 100
 
     @classmethod
-    def get(cls, project_id: str) -> list[ActiveMonitor] | None:
+    def get(cls, project_id: str) -> Optional[list[ActiveMonitor]]:
         if (cached_value := cls._cache.get(project_id)) is not None:
             if cached_value[0] > datetime.now() - timedelta(seconds=cls._ttl_seconds):
                 cls._cache.move_to_end(project_id)
@@ -285,7 +285,7 @@ async def apply_scorer(
     scorer: Scorer,
     call: Call,
     project_id: str,
-    wb_user_id: str | None,
+    wb_user_id: Optional[str],
 ) -> None:
     """Actually apply the scorer to the call."""
     score_call_id, result = _do_score_call(scorer, call, project_id)
@@ -350,7 +350,7 @@ def handle_kafka_errors(msg: Message) -> bool:
     return True
 
 
-async def cleanup_tasks(tasks: set[asyncio.Task]) -> set[asyncio.Task]:
+async def cleanup_and_wait(tasks: set[asyncio.Task]) -> set[asyncio.Task]:
     """Clean up completed tasks and wait for pending ones."""
     done_tasks = {t for t in tasks if not t.done()}
 
@@ -449,7 +449,7 @@ async def run_consumer() -> None:
                     )
                     tasks.add(task)
 
-                tasks = await cleanup_tasks(tasks)
+                tasks = await cleanup_and_wait(tasks)
             except Exception as e:
                 logger.exception("Error processing messages: %s", e, exc_info=e)
 

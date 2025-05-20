@@ -15,6 +15,7 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
 import React, {useMemo, useState} from 'react';
+import {ALL_TRACES_OR_CALLS_REF_KEY} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 
 export const MonitorsPage = ({
   entity,
@@ -99,7 +100,11 @@ export const MonitorsPage = ({
                 const opRefs: string[] = params.value;
                 return opRefs.length > 0 ? (
                   <div className="flex items-center gap-2">
-                    <SmallRef objRef={parseRef(opRefs[0]) as WeaveObjectRef} />
+                    {opRefs[0] !== ALL_TRACES_OR_CALLS_REF_KEY ? (
+                      <SmallRef
+                        objRef={parseRef(opRefs[0]) as WeaveObjectRef}
+                      />
+                    ) : null}
                     {opRefs.length > 1 ? (
                       <span>{`+${opRefs.length - 1}`}</span>
                     ) : null}

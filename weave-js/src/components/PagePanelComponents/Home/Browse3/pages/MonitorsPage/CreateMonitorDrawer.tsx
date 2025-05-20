@@ -35,7 +35,7 @@ import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
 import {toast} from 'react-toastify';
-import {v4 as uuidv4} from 'uuid';
+import {ALL_TRACES_OR_CALLS_REF_KEY} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
@@ -117,6 +117,7 @@ export const CreateMonitorDrawer = ({
     entity,
     project,
     filter,
+    '',
     tableData,
     new Set(),
     () => {},
@@ -164,16 +165,13 @@ export const CreateMonitorDrawer = ({
         scorerDigest = parseRef(refUri).artifactVersion;
       } else {
         // If refUri is undefined the scorer needs to be create.
-        const scorerClassName = scorerName;
-        scorerName = `${scorerName}-${uuidv4().split('-')[0]}`;
-
         const scorerObj = {
           _type: scorerName,
           name: scorerName,
           description: `${scorerName} created from the UI.`,
           ref: null,
           column_map: null,
-          _class_name: scorerClassName,
+          _class_name: scorerName,
           _bases: ['Scorer', 'Object', 'BaseModel'],
         };
 
@@ -212,6 +210,12 @@ export const CreateMonitorDrawer = ({
 
       const mongoQuery = getFilterByRaw(filterModel);
 
+      const opNames =
+        selectedOpVersionOption.length === 1 &&
+        selectedOpVersionOption[0] === ALL_TRACES_OR_CALLS_REF_KEY
+          ? null
+          : selectedOpVersionOption;
+
       const monitorObj = {
         _type: 'Monitor',
         name: monitorName,
@@ -219,7 +223,7 @@ export const CreateMonitorDrawer = ({
         ref: null,
         _class_name: 'Monitor',
         _bases: ['Object', 'BaseModel'],
-        op_names: selectedOpVersionOption,
+        op_names: opNames,
         query: mongoQuery ? {$expr: mongoQuery} : null,
         sampling_rate: samplingRate / 100,
         scorers: scorerRefs.map(scorerRef =>

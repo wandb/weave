@@ -210,6 +210,8 @@ const MonitorPageInner = ({
                         {filterItems.map(item => (
                           <FilterTagItem
                             key={item.id}
+                            entity={entity}
+                            project={project}
                             item={item}
                             disableRemove
                           />
