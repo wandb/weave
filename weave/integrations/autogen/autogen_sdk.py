@@ -228,10 +228,10 @@ def _create_wrapper_async_generator(
                     yield value
             except Exception as e:
                 logger.exception(
-                    f"{e}\nError in autogen asyncgen wrapper for {fn.__name__}",
+                    f"{e}\nError in autogen async gen wrapper for {fn.__name__}",
                     stacklevel=2,
                 )
-                # Fall back to original function if our instrumentation fails
+                # Fall back to the original function if our instrumentation fails
                 async for value in fn(*args, **kwargs):
                     yield value
 
@@ -269,8 +269,45 @@ def _create_wrapper_async(
                     f"{e}\nError in autogen async wrapper for {fn.__name__}",
                     stacklevel=2,
                 )
-                # Fall back to original function if our instrumentation fails
+                # Fall back to the original function if our instrumentation fails
                 return await fn(*args, **kwargs)
+
+        return _symbol_wrapper
+
+    return wrapper
+
+
+def _create_wrapper_sync(
+    settings: OpSettings,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Creates a wrapper for regular synchronous functions.
+
+    This wrapper is for non-async, non-generator methods that return a single value.
+
+    Args:
+        settings: Operation settings for the wrapper.
+
+    Returns:
+        A function that wraps sync functions with weave tracing.
+    """
+
+    def wrapper(fn: Callable[..., Any]) -> Callable[..., Any]:
+        op_kwargs = settings.model_dump()
+
+        @wraps(fn)
+        def _symbol_wrapper(*args: Any, **kwargs: Any) -> Any:
+            try:
+                op = _setup_op_wrapper(
+                    fn, args, kwargs, op_kwargs, should_accumulate=False
+                )
+                return op(*args, **kwargs)
+            except Exception as e:
+                logger.exception(
+                    f"{e}\nError in autogen sync wrapper for {fn.__name__}",
+                    stacklevel=2,
+                )
+                # Fall back to the original function if our instrumentation fails
+                return fn(*args, **kwargs)
 
         return _symbol_wrapper
 
@@ -283,8 +320,7 @@ def _create_symbol_wrapper(
     """Creates a wrapper factory for autogen methods.
 
     This is the main entry point for creating wrappers. It automatically
-    determines if a method is a streaming method (async generator) or a
-    regular async method and creates the appropriate wrapper.
+    determines if a method is a streaming method (async generator), a regular async method, or a sync method and creates the appropriate wrapper.
 
     Args:
         settings: Operation settings for the wrapper.
@@ -297,8 +333,10 @@ def _create_symbol_wrapper(
     def wrapper(fn: Callable[..., Any]) -> Callable[..., Any]:
         if _should_use_accumulator(fn):
             return _create_wrapper_async_generator(settings)(fn)
-        else:
+        elif inspect.iscoroutinefunction(fn):
             return _create_wrapper_async(settings)(fn)
+        else:
+            return _create_wrapper_sync(settings)(fn)
 
     return wrapper
 
@@ -436,42 +474,37 @@ def _preload_autogen_extensions() -> None:
     """Preloads autogen extension modules.
 
     This function ensures that autogen-ext modules are properly imported
-    before patching, to ensure that all subclasses are properly discovered.
+    before patching to ensure that all subclasses are properly discovered.
     This is important because patching relies on the Python class hierarchy.
-
-    Args:
-        None
-
-    Returns:
-        None
     """
     try:
         import importlib.util
+        import pkgutil
 
         if importlib.util.find_spec("autogen_ext") is None:
-            logger.warning(
-                "autogen-ext package not found, skipping extension preloading"
-            )
+            logger.info("autogen-ext package not found, skipping extension preloading")
             return
 
-        # Define extensions to preload - these are modules that might contain
-        # subclasses of classes we're patching
-        ext_modules = [
-            "autogen_ext.memory.chromadb",  # Contains ChromaDBVectorMemory
-        ]
+        import autogen_ext
 
-        # Import each module
-        for module_name in ext_modules:
+        for finder, name, ispkg in pkgutil.walk_packages(
+            autogen_ext.__path__, autogen_ext.__name__ + "."
+        ):
             try:
-                importlib.import_module(module_name)
-            except ImportError:
+                importlib.import_module(name)
+            except (ImportError, ModuleNotFoundError) as e:
+                # Only log at debug level, and don't include stack trace
+                logger.debug(f"Optional extension module not loaded: {name} ({e})")
+            except Exception as e:
+                # Unexpected errors should still be logged as warnings
                 logger.exception(
-                    f"Extension module not available: {module_name}", stacklevel=2
+                    f"Unexpected error loading extension module {name}: {e}",
+                    stacklevel=2,
                 )
 
     except Exception as e:
         # Don't fail if preloading fails
-        logger.exception(f"Error preloading autogen extensions: {e}", stacklevel=2)
+        logger.warning(f"Error preloading autogen extensions: {e}", stacklevel=2)
 
 
 def get_patcher(
@@ -507,7 +540,7 @@ def get_patcher(
 
         base_settings = settings.op_settings
         op_patch_settings = base_settings.model_copy(
-            update={"name": base_settings.name or "autogen_agentchat.agent"}
+            update={"name": base_settings.name or "autogen.component"}
         )
 
         patchers: list[SymbolPatcher | None] = []
@@ -536,7 +569,7 @@ def get_patcher(
         valid_patchers: Sequence[Patcher] = [p for p in patchers if p is not None]
         _autogen_patcher = MultiPatcher(valid_patchers)
     except Exception:
-        logger.exception("Failed to create autogen_agentchat patcher", stacklevel=2)
+        logger.exception("Failed to create autogen patcher", stacklevel=2)
         return NoOpPatcher()
     else:
         return _autogen_patcher

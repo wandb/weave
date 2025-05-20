@@ -51,6 +51,8 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
     base_chat_agent_config = BasePatchClassConfig(
         class_name="BaseChatAgent",
         method_names=["run", "run_stream", "on_messages", "on_messages_stream"],
+        should_patch_base_class=True,
+        should_patch_subclasses=True,
     )
 
     base_chat_agent_module_config = BasePatchModuleConfig(
@@ -117,7 +119,10 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
 
     # Chat Completion Client Class
     chat_completion_client_config = BasePatchClassConfig(
-        class_name="ChatCompletionClient", method_names=["create", "create_stream"]
+        class_name="ChatCompletionClient",
+        method_names=["create", "create_stream", "_check_cache"],
+        should_patch_base_class=True,
+        should_patch_subclasses=True,
     )
 
     chat_completion_client_module_config = BasePatchModuleConfig(
@@ -153,6 +158,17 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         classes=[code_executor_config],
     )
 
+    cache_store_config = BasePatchClassConfig(
+        class_name="CacheStore",
+        method_names=["get", "set"],
+        should_patch_base_class=False,
+        should_patch_subclasses=True,
+    )
+    cache_store_module_config = BasePatchModuleConfig(
+        module_path="autogen_core._cache_store",
+        classes=[cache_store_config],
+    )
+
     return [
         ## Autogen Agent Chat Modules
         base_chat_agent_module_config,
@@ -165,6 +181,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         chat_completion_client_module_config,
         memory_module_config,
         code_executor_module_config,
+        cache_store_module_config,
     ]
 
 

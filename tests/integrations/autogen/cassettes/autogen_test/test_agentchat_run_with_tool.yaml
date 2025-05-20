@@ -1,0 +1,213 @@
+interactions:
+- request:
+    body: '{"messages":[{"content":"You are a helpful assistant.","role":"system"},{"role":"user","name":"user","content":"What
+      is the weather in New York?"}],"model":"gpt-4.1-nano-2025-04-14","stream":false,"tools":[{"type":"function","function":{"name":"get_weather","description":"","parameters":{"type":"object","properties":{"city":{"description":"city","title":"City","type":"string"}},"required":["city"],"additionalProperties":false},"strict":false}}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '449'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.78.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.78.1
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.11
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFNdi9swEHz3rxD7HB/5cM7Bb+2FNC3laGkp5JrDyPLaUU+WhCT3GkL+
+        e7Gc2E4uhfrBiJ2d3dlZ6RAQAjyHhADbUccqLcL3T+/UZ7raa/FhtXyMYq3Nj29fHu41rtefYNQw
+        VPYLmTuz7piqtEDHlWxhZpA6bKpO4iiOp9N4FnugUjmKhlZqF0Z3k1BSqcLpeDoPx1E4iU70neIM
+        LSTkZ0AIIQf/b4TKHP9AQsajc6RCa2mJkHRJhIBRookAtZZbR6WDUQ8yJR3KRrushRgATimRMipE
+        37j9DoNz7xYVIi2/rp+y74vNMluN+Wb5IKJxea/Ex0G/tvRee0FFLVnn0gDv4slVM0JA0spzS3Tp
+        K1K3Q3NFJwSoKesKpWukw2ELjLv9FpItPOIr2SjzsoUjXJCOwa3z88APg0VtqXhrFJVSOdro9U49
+        n5BjtxShSm1UZq+oUHDJ7S41SK2fdWh5cBbiJUB9sVXQRlXapU69oG86X7RFob95PTiZn0CnHBV9
+        PJ6NblRLc3SU+6V394xRtsO8Z/b3jdY5VwMgGEz+Vsyt2u30XJb/U74HGEPtME+1wZyzy4H7NIPN
+        u/xXWuexFwwWzW/OMHUcTbONHAtai/axgN1bh1VacFmi0Yb7FwOFThdFHs3iySKbQXAM/gIAAP//
+        AwBRwEoaQAQAAA==
+    headers:
+      CF-RAY:
+      - 9429cbc25c3c7ffe-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 20 May 2025 06:32:17 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=Raubc1aqTjQwDtDSJYKMpEdZP8.vV8LXxMmsG8BTj6c-1747722737-1.0.1.1-tpjsDLZM1SU87t_232X2KmyGgfuYQ4c1F.ro9Rig1_izyG9HPud0IKcq5DQs0JYT0nfRFwjHPPUSpS0Dz78sDUBY8MR4HGV5dqWmD5X576U;
+        path=/; expires=Tue, 20-May-25 07:02:17 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=c.k.5GN50SN9GbssC.QRq0bCMJJRxm5K4Q4tFcitpro-1747722737690-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '346'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '350'
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999982'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_7a4784c2ba3fee21733b42dffd3d7f5c
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"content":"You are a helpful assistant.","role":"system"},{"role":"user","name":"user","content":"What
+      is the weather in New York?"},{"role":"assistant","tool_calls":[{"id":"call_gQHZbT8YDbF0iYDCl40g6olI","function":{"arguments":"{\"city\":\"New
+      York\"}","name":"get_weather"},"type":"function"}]},{"content":"The weather
+      in New York is 73 degrees and Sunny.","role":"tool","tool_call_id":"call_gQHZbT8YDbF0iYDCl40g6olI"}],"model":"gpt-4.1-nano-2025-04-14","stream":false}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '486'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=Raubc1aqTjQwDtDSJYKMpEdZP8.vV8LXxMmsG8BTj6c-1747722737-1.0.1.1-tpjsDLZM1SU87t_232X2KmyGgfuYQ4c1F.ro9Rig1_izyG9HPud0IKcq5DQs0JYT0nfRFwjHPPUSpS0Dz78sDUBY8MR4HGV5dqWmD5X576U;
+        _cfuvid=c.k.5GN50SN9GbssC.QRq0bCMJJRxm5K4Q4tFcitpro-1747722737690-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.78.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.78.1
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.11
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFKxbtswEN31FQfOlmFZamV4a4d2SOulBeq2CASaPEl0KJIgT0mMwP9e
+        UHIsJU2BLhzu3Xt87+6eEgCmJNsCEy0n0Tmdfvz1wX7Nj483u/rzvr7/InZuf9zb8senG96zRWTY
+        wxEFPbOWwnZOIylrRlh45IRRNSuLslyvy3wzAJ2VqCOtcZQWyyw13Nh0vVq/S1dFmhUXemuVwMC2
+        8DsBAHga3mjUSHxkW1gtnisdhsAbZNtrEwDzVscK4yGoQNwQW0ygsIbQDN6/twgPyKlFD8rADh/g
+        p/V3oAKI3ns0pE9Q5iCx8YgBuJHwrTfmtJwLeqz7wGMq02s9A7gxlnicyhDl9oKcr+a1bZy3h/CK
+        ymplVGgrjzxYE40Gso4N6DkBuB2G1L/IzZy3naOK7B0O373PRjk27WYCs/wCkiWup3pZLN5QqyQS
+        VzrMhswEFy3KiTlthPdS2RmQzDL/beYt7TG3Ms3/yE+AEOgIZeU8SiVeBp7aPMbL/VfbdcaDYRbQ
+        3yuBFSn0cQ8Sa97r8ZxYOAXCrqqVadA7r8abql21qWWRl9nmkLPknPwBAAD//wMAtVnP02IDAAA=
+    headers:
+      CF-RAY:
+      - 9429cbc80bbf7ffe-MAA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 20 May 2025 06:32:18 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '306'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '312'
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999968'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_1fe4f51adaf9f9538b9f41e654b1d22c
+    status:
+      code: 200
+      message: OK
+version: 1
