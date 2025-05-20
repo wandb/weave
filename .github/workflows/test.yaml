@@ -284,6 +284,8 @@ jobs:
             "vertexai",
             "pandas-test",
             "mcp",
+            "smolagents",
+            "autogen_tests"
           ]
       fail-fast: false
     services:
