@@ -41,7 +41,7 @@ export const operationConverter = (
         substr: {$literal: item.value},
       },
     };
-  } else if (item.operator === '(string): by') {
+  } else if (item.operator === '(monitored): by') {
     return {
       $contains: {
         input: {$getField: item.field},

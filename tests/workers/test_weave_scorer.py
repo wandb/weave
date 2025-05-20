@@ -53,7 +53,10 @@ def mock_monitor_object_res():
                     "name": "test-monitor-1",
                     "description": "Test Monitor 1",
                     "sampling_rate": 1.0,
-                    "scorers": ["scorer1", "scorer2"],
+                    "scorers": [
+                        "weave-trace-internal:///test-project/object/scorer1:v0",
+                        "weave-trace-internal:///test-project/object/scorer2:v0",
+                    ],
                     "op_names": ["op1", "op2"],
                     "query": None,
                     "active": True,
@@ -73,7 +76,9 @@ def mock_monitor_object_res():
                     "name": "test-monitor-2",
                     "description": "Test Monitor 2",
                     "sampling_rate": 0.5,
-                    "scorers": ["scorer3"],
+                    "scorers": [
+                        "weave-trace-internal:///test-project/object/scorer3:v0",
+                    ],
                     "op_names": ["op3", "op4"],
                     "query": None,
                     "active": False,

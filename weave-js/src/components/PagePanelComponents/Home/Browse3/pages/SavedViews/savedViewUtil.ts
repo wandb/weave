@@ -253,7 +253,7 @@ const filterToClause = (item: Filter): Record<string, any> => {
     };
   } else if (
     item.operator === '(string): in' ||
-    item.operator === '(string): by'
+    item.operator === '(monitored): by'
   ) {
     const values =
       typeof item.value === 'string'

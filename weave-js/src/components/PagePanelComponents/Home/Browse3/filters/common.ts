@@ -316,7 +316,7 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
   if ('monitor' === fieldType) {
     return [
       {
-        value: '(string): by',
+        value: '(monitored): by',
         label: 'by',
         group: 'string',
       },
