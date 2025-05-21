@@ -16,6 +16,7 @@ import {ReactComponent as ImportBellNotifications} from '../../assets/icons/icon
 import {ReactComponent as ImportBenchmarkSquare} from '../../assets/icons/icon-benchmark-square.svg';
 import {ReactComponent as ImportBlogReport} from '../../assets/icons/icon-blog-report.svg';
 import {ReactComponent as ImportBokeh} from '../../assets/icons/icon-bokeh.svg';
+import {ReactComponent as ImportBold} from '../../assets/icons/icon-bold.svg';
 import {ReactComponent as ImportBookDictionary} from '../../assets/icons/icon-book-dictionary.svg';
 import {ReactComponent as ImportBoolean} from '../../assets/icons/icon-boolean.svg';
 import {ReactComponent as ImportBoxPlot} from '../../assets/icons/icon-box-plot.svg';
@@ -90,6 +91,9 @@ import {ReactComponent as ImportGhostAgent} from '../../assets/icons/icon-ghost-
 import {ReactComponent as ImportGit} from '../../assets/icons/icon-git.svg';
 import {ReactComponent as ImportGithub} from '../../assets/icons/icon-github.svg';
 import {ReactComponent as ImportGroup} from '../../assets/icons/icon-group.svg';
+import {ReactComponent as ImportH1} from '../../assets/icons/icon-h1.svg';
+import {ReactComponent as ImportH2} from '../../assets/icons/icon-h2.svg';
+import {ReactComponent as ImportH3} from '../../assets/icons/icon-h3.svg';
 import {ReactComponent as ImportHeadset} from '../../assets/icons/icon-headset.svg';
 import {ReactComponent as ImportHeart} from '../../assets/icons/icon-heart.svg';
 import {ReactComponent as ImportHeartFilled} from '../../assets/icons/icon-heart-filled.svg';
@@ -102,6 +106,7 @@ import {ReactComponent as ImportIgnoreOutliers} from '../../assets/icons/icon-ig
 import {ReactComponent as ImportImpersonateMaskAlt} from '../../assets/icons/icon-impersonate-mask-alt.svg';
 import {ReactComponent as ImportImportInsert} from '../../assets/icons/icon-import-insert.svg';
 import {ReactComponent as ImportInfo} from '../../assets/icons/icon-info.svg';
+import {ReactComponent as ImportItalic} from '../../assets/icons/icon-italic.svg';
 import {ReactComponent as ImportJobAutomation} from '../../assets/icons/icon-job-automation.svg';
 import {ReactComponent as ImportJobCalculator} from '../../assets/icons/icon-job-calculator.svg';
 import {ReactComponent as ImportJobProgramCode} from '../../assets/icons/icon-job-program-code.svg';
@@ -148,6 +153,7 @@ import {ReactComponent as ImportNewSectionAbove} from '../../assets/icons/icon-n
 import {ReactComponent as ImportNewSectionBelow} from '../../assets/icons/icon-new-section-below.svg';
 import {ReactComponent as ImportNotVisible} from '../../assets/icons/icon-not-visible.svg';
 import {ReactComponent as ImportNumber} from '../../assets/icons/icon-number.svg';
+import {ReactComponent as ImportNumberedList} from '../../assets/icons/icon-numbered-list.svg';
 import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-new-tab.svg';
 import {ReactComponent as ImportOpenaiLogo} from '../../assets/icons/icon-openai-logo.svg';
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
@@ -221,6 +227,7 @@ import {ReactComponent as ImportStar} from '../../assets/icons/icon-star.svg';
 import {ReactComponent as ImportStarFilled} from '../../assets/icons/icon-star-filled.svg';
 import {ReactComponent as ImportStop} from '../../assets/icons/icon-stop.svg';
 import {ReactComponent as ImportStopped} from '../../assets/icons/icon-stopped.svg';
+import {ReactComponent as ImportStrikethrough} from '../../assets/icons/icon-strikethrough.svg';
 import {ReactComponent as ImportSun} from '../../assets/icons/icon-sun.svg';
 import {ReactComponent as ImportSwap} from '../../assets/icons/icon-swap.svg';
 import {ReactComponent as ImportSweepBayes} from '../../assets/icons/icon-sweep-bayes.svg';
@@ -333,6 +340,9 @@ export const IconBlogReport = (props: SVGIconProps) => (
 );
 export const IconBokeh = (props: SVGIconProps) => (
   <ImportBokeh {...updateIconProps(props)} />
+);
+export const IconBold = (props: SVGIconProps) => (
+  <ImportBold {...updateIconProps(props)} />
 );
 export const IconBookDictionary = (props: SVGIconProps) => (
   <ImportBookDictionary {...updateIconProps(props)} />
@@ -556,6 +566,15 @@ export const IconGithub = (props: SVGIconProps) => (
 export const IconGroup = (props: SVGIconProps) => (
   <ImportGroup {...updateIconProps(props)} />
 );
+export const IconH1 = (props: SVGIconProps) => (
+  <ImportH1 {...updateIconProps(props)} />
+);
+export const IconH2 = (props: SVGIconProps) => (
+  <ImportH2 {...updateIconProps(props)} />
+);
+export const IconH3 = (props: SVGIconProps) => (
+  <ImportH3 {...updateIconProps(props)} />
+);
 export const IconHeadset = (props: SVGIconProps) => (
   <ImportHeadset {...updateIconProps(props)} />
 );
@@ -591,6 +610,9 @@ export const IconImportInsert = (props: SVGIconProps) => (
 );
 export const IconInfo = (props: SVGIconProps) => (
   <ImportInfo {...updateIconProps(props)} />
+);
+export const IconItalic = (props: SVGIconProps) => (
+  <ImportItalic {...updateIconProps(props)} />
 );
 export const IconJobAutomation = (props: SVGIconProps) => (
   <ImportJobAutomation {...updateIconProps(props)} />
@@ -729,6 +751,9 @@ export const IconNotVisible = (props: SVGIconProps) => (
 );
 export const IconNumber = (props: SVGIconProps) => (
   <ImportNumber {...updateIconProps(props)} />
+);
+export const IconNumberedList = (props: SVGIconProps) => (
+  <ImportNumberedList {...updateIconProps(props)} />
 );
 export const IconOpenNewTab = (props: SVGIconProps) => (
   <ImportOpenNewTab {...updateIconProps(props)} />
@@ -949,6 +974,9 @@ export const IconStop = (props: SVGIconProps) => (
 export const IconStopped = (props: SVGIconProps) => (
   <ImportStopped {...updateIconProps(props)} />
 );
+export const IconStrikethrough = (props: SVGIconProps) => (
+  <ImportStrikethrough {...updateIconProps(props)} />
+);
 export const IconSun = (props: SVGIconProps) => (
   <ImportSun {...updateIconProps(props)} />
 );
@@ -1120,6 +1148,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'benchmark-square': IconBenchmarkSquare,
   'blog-report': IconBlogReport,
   bokeh: IconBokeh,
+  bold: IconBold,
   'book-dictionary': IconBookDictionary,
   boolean: IconBoolean,
   'box-plot': IconBoxPlot,
@@ -1194,6 +1223,9 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   git: IconGit,
   github: IconGithub,
   group: IconGroup,
+  h1: IconH1,
+  h2: IconH2,
+  h3: IconH3,
   headset: IconHeadset,
   heart: IconHeart,
   'heart-filled': IconHeartFilled,
@@ -1206,6 +1238,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'impersonate-mask-alt': IconImpersonateMaskAlt,
   'import-insert': IconImportInsert,
   info: IconInfo,
+  italic: IconItalic,
   'job-automation': IconJobAutomation,
   'job-calculator': IconJobCalculator,
   'job-program-code': IconJobProgramCode,
@@ -1252,6 +1285,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'new-section-below': IconNewSectionBelow,
   'not-visible': IconNotVisible,
   number: IconNumber,
+  'numbered-list': IconNumberedList,
   'open-new-tab': IconOpenNewTab,
   'openai-logo': IconOpenaiLogo,
   'orchestration-launch': IconOrchestrationLaunch,
@@ -1325,6 +1359,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'star-filled': IconStarFilled,
   stop: IconStop,
   stopped: IconStopped,
+  strikethrough: IconStrikethrough,
   sun: IconSun,
   swap: IconSwap,
   'sweep-bayes': IconSweepBayes,
