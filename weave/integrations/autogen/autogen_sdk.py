@@ -360,8 +360,15 @@ def _get_symbol_patcher(
     """
     try:
         module = importlib.import_module(module_path)
-    except ImportError:
-        logger.exception(f"Could not import module {module_path}", stacklevel=2)
+    except ModuleNotFoundError as e:
+        logger.warning(
+            f"Module {module_path} not found, skipping patching for {class_name}: {e}"
+        )
+        return None
+    except ImportError as e:
+        logger.warning(
+            f"Could not import module {module_path}, skipping patching for {class_name}: {e}"
+        )
         return None
 
     if not hasattr(module, class_name):
@@ -410,6 +417,18 @@ def _get_class_and_subclass_patchers(
 
     try:
         module = importlib.import_module(module_path)
+    except ModuleNotFoundError as e:
+        logger.warning(
+            f"Module {module_path} not found, skipping patching for {class_name}: {e}"
+        )
+        return patchers  # Return empty list, skip patching for this module
+    except ImportError as e:
+        logger.warning(
+            f"Could not import module {module_path}, skipping patching for {class_name}: {e}"
+        )
+        return patchers
+
+    try:
         base_class = getattr(module, class_name)
 
         classes_to_patch: list[type] = []
@@ -462,10 +481,15 @@ def _get_class_and_subclass_patchers(
                 if patcher is not None:
                     patchers.append(patcher)
 
-    except (ImportError, AttributeError):
+    except AttributeError as e:
+        logger.warning(f"Class {class_name} not found in {module_path}, skipping: {e}")
+        return patchers
+    except Exception as e:
         logger.exception(
-            f"Error creating patchers for {module_path}.{class_name}", stacklevel=2
+            f"Unexpected error creating patchers for {module_path}.{class_name}: {e}",
+            stacklevel=2,
         )
+        return patchers
 
     return patchers
 
