@@ -148,21 +148,6 @@ export const ScorecardSection: React.FC<{
         paddingRight: STANDARD_PADDING,
         overflow: 'auto',
       }}>
-      <HorizontalBox
-        sx={{
-          width: '100%',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          marginBottom: '8px',
-        }}>
-        <Box
-          sx={{
-            fontSize: '1.5em',
-            fontWeight: 'bold',
-          }}>
-          Scorecard
-        </Box>
-      </HorizontalBox>
       <div
         style={{
           display: 'grid',
