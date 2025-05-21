@@ -90,6 +90,9 @@ import {ReactComponent as ImportGhostAgent} from '../../assets/icons/icon-ghost-
 import {ReactComponent as ImportGit} from '../../assets/icons/icon-git.svg';
 import {ReactComponent as ImportGithub} from '../../assets/icons/icon-github.svg';
 import {ReactComponent as ImportGroup} from '../../assets/icons/icon-group.svg';
+import {ReactComponent as ImportH1} from '../../assets/icons/icon-h1.svg';
+import {ReactComponent as ImportH2} from '../../assets/icons/icon-h2.svg';
+import {ReactComponent as ImportH3} from '../../assets/icons/icon-h3.svg';
 import {ReactComponent as ImportHeadset} from '../../assets/icons/icon-headset.svg';
 import {ReactComponent as ImportHeart} from '../../assets/icons/icon-heart.svg';
 import {ReactComponent as ImportHeartFilled} from '../../assets/icons/icon-heart-filled.svg';
@@ -148,6 +151,7 @@ import {ReactComponent as ImportNewSectionAbove} from '../../assets/icons/icon-n
 import {ReactComponent as ImportNewSectionBelow} from '../../assets/icons/icon-new-section-below.svg';
 import {ReactComponent as ImportNotVisible} from '../../assets/icons/icon-not-visible.svg';
 import {ReactComponent as ImportNumber} from '../../assets/icons/icon-number.svg';
+import {ReactComponent as ImportNumberedList} from '../../assets/icons/icon-numbered-list.svg';
 import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-new-tab.svg';
 import {ReactComponent as ImportOpenaiLogo} from '../../assets/icons/icon-openai-logo.svg';
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
@@ -556,6 +560,15 @@ export const IconGithub = (props: SVGIconProps) => (
 export const IconGroup = (props: SVGIconProps) => (
   <ImportGroup {...updateIconProps(props)} />
 );
+export const IconH1 = (props: SVGIconProps) => (
+  <ImportH1 {...updateIconProps(props)} />
+);
+export const IconH2 = (props: SVGIconProps) => (
+  <ImportH2 {...updateIconProps(props)} />
+);
+export const IconH3 = (props: SVGIconProps) => (
+  <ImportH3 {...updateIconProps(props)} />
+);
 export const IconHeadset = (props: SVGIconProps) => (
   <ImportHeadset {...updateIconProps(props)} />
 );
@@ -729,6 +742,9 @@ export const IconNotVisible = (props: SVGIconProps) => (
 );
 export const IconNumber = (props: SVGIconProps) => (
   <ImportNumber {...updateIconProps(props)} />
+);
+export const IconNumberedList = (props: SVGIconProps) => (
+  <ImportNumberedList {...updateIconProps(props)} />
 );
 export const IconOpenNewTab = (props: SVGIconProps) => (
   <ImportOpenNewTab {...updateIconProps(props)} />
@@ -1194,6 +1210,9 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   git: IconGit,
   github: IconGithub,
   group: IconGroup,
+  h1: IconH1,
+  h2: IconH2,
+  h3: IconH3,
   headset: IconHeadset,
   heart: IconHeart,
   'heart-filled': IconHeartFilled,
@@ -1252,6 +1271,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'new-section-below': IconNewSectionBelow,
   'not-visible': IconNotVisible,
   number: IconNumber,
+  'numbered-list': IconNumberedList,
   'open-new-tab': IconOpenNewTab,
   'openai-logo': IconOpenaiLogo,
   'orchestration-launch': IconOrchestrationLaunch,
