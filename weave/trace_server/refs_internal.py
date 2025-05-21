@@ -92,6 +92,9 @@ class InternalTableRef:
     def uri(self) -> str:
         return f"{WEAVE_INTERNAL_SCHEME}:///{self.project_id}/table/{self.digest}"
 
+    def content_id(self) -> str:
+        return self.digest
+
 
 @dataclasses.dataclass(frozen=True)
 class InternalObjectRef:
@@ -113,6 +116,12 @@ class InternalObjectRef:
         if self.extra:
             u += "/" + "/".join(extra_value_quoter(e) for e in self.extra)
         return u
+
+    def content_id(self) -> str:
+        content_id = self.version
+        if self.extra:
+            content_id += "/" + "/".join(extra_value_quoter(e) for e in self.extra)
+        return content_id
 
 
 @dataclasses.dataclass(frozen=True)

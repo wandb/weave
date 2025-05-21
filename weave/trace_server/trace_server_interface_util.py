@@ -22,6 +22,43 @@ def str_digest(json_val: str) -> str:
     return bytes_digest(json_val.encode())
 
 
+def any_digest(item: Any) -> str:
+    return str_digest(json.dumps(item))
+
+
+def _replace_refs_with_content_ids(item: Any) -> Any:
+    """
+    This is a critical function as it allows us to convert any primtive payload
+    into a location-agnostic payload. Specifically: any occurance of a "ref" in an
+    object contains the ownership path and the digest itself. for example:
+
+    weave-internal:///project_id/object_id/digest/extra
+
+    `weave-internal:///project_id/object_id` is simply the location of the object (NOT the content id),
+
+    but
+
+    `digest/extra` is the digest of the object and the extra path (if it exists) - this is unique based on the content of the object
+
+    This function replaces all occurance of refs with the digest/extra string.
+    """
+
+    def _visit_fn(parsed: refs_internal.InternalRef, val: str) -> str:
+        if isinstance(
+            parsed, (refs_internal.InternalObjectRef, refs_internal.InternalTableRef)
+        ):
+            return parsed.content_id()
+        return val
+
+    return _visit_refs(item, _visit_fn)
+
+
+def _ref_aware_any_digest(item: Any) -> str:
+    """This function returns the weave digest for any item, replacing all refs with their content digests."""
+    ref_replaced_item = _replace_refs_with_content_ids(item)
+    return any_digest(ref_replaced_item)
+
+
 def _order_dict(dictionary: dict) -> dict:
     return {
         k: _order_dict(v) if isinstance(v, dict) else v
@@ -34,21 +71,21 @@ valid_internal_schemes = [
     refs_internal.WEAVE_INTERNAL_SCHEME,
 ]
 
+
 def _maybe_parse_ref(val: Any) -> Optional[refs_internal.InternalRef]:
-    if any(
-        val.startswith(scheme + ":///") for scheme in valid_internal_schemes
-    ):
+    if any(val.startswith(scheme + ":///") for scheme in valid_internal_schemes):
         try:
             parsed = refs_internal.parse_internal_uri(val)
             if parsed.uri() == val:
                 return parsed
         except Exception:
             pass
-    return False
+    return None
+
 
 def _visit_refs(
     vals: Any,
-    visit_fn: Callable[[str], Any],
+    visit_fn: Callable[[refs_internal.InternalRef, str], Any],
 ) -> Any:
     def _visit(val: Any) -> Any:
         if isinstance(val, dict):
@@ -57,17 +94,20 @@ def _visit_refs(
             return [_visit(v) for v in val]
         elif isinstance(val, str):
             if parsed := _maybe_parse_ref(val):
-                return visit_fn(parsed)
+                return visit_fn(parsed, val)
         return val
+
     return _visit(vals)
+
 
 def extract_refs_from_values(
     vals: Any,
 ) -> list[str]:
-    refs = []
+    refs: list[str] = []
 
-    def visit_fn(parsed: refs_internal.InternalRef) -> Any:
-        refs.append(parsed)
+    def visit_fn(parsed: refs_internal.InternalRef, val: str) -> Any:
+        refs.append(val)
+        return val
 
     _visit_refs(vals, visit_fn)
 
@@ -84,24 +124,6 @@ def assert_null_wb_user_id(obj: Any) -> None:
         raise ValueError("wb_user_id must be None")
 
 
-def calculate_unbounded_inputs_hash(inputs: dict[str, Any], bounded_input_key: str = "self") -> str:
-    """
-    This function calculates a hash of the unbounded inputs. This is useful as
-    it can be used to local calls which have identical inputs (other than the `self`
-    argument).
-
-    Critically, this also converts all refs to their location-agnostic representation.
-
-    PROBLEM: this doesn't work for cases where you want to exclude one of the inputs from the hash. (eg. model from p_a_s)
-    """
-
-    def _visit_fn(parsed: refs_internal.InternalRef) -> Any:
-        agnostic_ref = parsed.digest
-        if hasattr(parsed, "extra"):
-            agnostic_ref += "/".join(parsed.extra)
-        return agnostic_ref
-    
-    inputs_without_bounded_input = {k: v for k, v in inputs.items() if k != bounded_input_key}
-
-    bounded_inputs = _visit_refs(inputs_without_bounded_input, _visit_fn)
-    return str_digest(json.dumps(bounded_inputs))
+def calculate_input_digests(inputs: dict[str, Any]) -> dict[str, str]:
+    """This calculates the digest for each input"""
+    return {k: _ref_aware_any_digest(v) for k, v in inputs.items()}

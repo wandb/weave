@@ -137,7 +137,7 @@ from weave.trace_server.trace_server_common import (
 from weave.trace_server.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
-    calculate_unbounded_inputs_hash,
+    calculate_input_digests,
     extract_refs_from_values,
     str_digest,
 )
@@ -2435,11 +2435,11 @@ def _start_call_for_insert_to_ch_insertable_start_call(
     # wrong trace id (one that does not match the parent_id)!
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
-    unbounded_inputs_hash = calculate_unbounded_inputs_hash(start_call.inputs)
+    input_digests = calculate_input_digests(start_call.inputs)
     attributes = start_call.attributes.copy()
     weave_attrs = attributes.setdefault("weave", {})
-    weave_attrs["unbounded_inputs_hash"] = unbounded_inputs_hash
-    
+    weave_attrs["input_digests"] = input_digests
+
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -2584,4 +2584,3 @@ def set_root_span_dd_tags(tags: dict[str, Union[str, float, int]]) -> None:
         logger.debug("No root span")
     else:
         root_span.set_tags(tags)
-
