@@ -186,8 +186,8 @@ const CompareEvaluationsPageInner: React.FC<{
   height: number;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  const showExampleFilter =
-    Object.keys(state.summary.evaluationCalls).length === 2;
+  const showExampleFilter = false;
+  // Object.keys(state.summary.evaluationCalls).length === 2;
   const showExamples =
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
@@ -209,6 +209,11 @@ const CompareEvaluationsPageInner: React.FC<{
             <ComparisonDefinitionSection state={state} />
           </>
         }
+        headerContainerSx={{
+          // Nice scrolling behavior
+          pr: 0,
+          pl: 0,
+        }}
         tabs={[
           {
             value: 'report',
@@ -216,9 +221,11 @@ const CompareEvaluationsPageInner: React.FC<{
             content: (
               <VerticalBox
                 sx={{
+                  height: '100%',
+                  overflow: 'auto',
                   paddingTop: STANDARD_PADDING,
                   alignItems: 'flex-start',
-                  gridGap: STANDARD_PADDING * 2,
+                  gridGap: STANDARD_PADDING,
                 }}>
                 <SummaryPlots
                   state={state}
@@ -234,6 +241,8 @@ const CompareEvaluationsPageInner: React.FC<{
             content: (
               <VerticalBox
                 sx={{
+                  height: '100%',
+                  overflow: 'auto',
                   paddingTop: STANDARD_PADDING,
                   alignItems: 'flex-start',
                   gridGap: STANDARD_PADDING * 2,

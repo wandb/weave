@@ -1189,8 +1189,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     outputWidths,
   ]);
 
-  console.log(compositeMetrics);
-
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
       {

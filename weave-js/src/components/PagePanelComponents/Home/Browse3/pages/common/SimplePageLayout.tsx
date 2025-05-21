@@ -325,6 +325,7 @@ const SimpleTabView: FC<{
 
 export const BetterTabView: FC<{
   headerContent: ReactNode;
+  headerContainerSx?: SxProps<Theme>;
   tabs: Array<{
     value: string;
     label: string;
@@ -357,16 +358,25 @@ export const BetterTabView: FC<{
             pt: 1,
             px: 2,
             alignContent: 'center',
+            ...(props.headerContainerSx ?? {}),
           }}>
           {props.headerContent}
         </Box>
       )}
       {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
         <Tabs.Root
-          style={{padding: '12px 16px 0 16px', borderBottom: `1px solid ${MOON_200}`}}
+          style={{
+            padding: '12px 16px 0 16px',
+            borderBottom: `1px solid ${MOON_200}`,
+          }}
           value={props.tabValue}
           onValueChange={props.handleTabChange}>
-          <Tabs.List style={{overflowX: 'scroll', scrollbarWidth: 'none', borderBottom: `0px solid white`}}>
+          <Tabs.List
+            style={{
+              overflowX: 'scroll',
+              scrollbarWidth: 'none',
+              borderBottom: `0px solid white`,
+            }}>
             {props.tabs.map(tab => (
               <Tabs.Trigger
                 key={tab.label}

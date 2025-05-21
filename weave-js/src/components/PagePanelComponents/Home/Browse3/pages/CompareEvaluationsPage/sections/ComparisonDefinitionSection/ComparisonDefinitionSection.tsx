@@ -66,7 +66,7 @@ export const ComparisonDefinitionSection: React.FC<{
 
   return (
     <Tailwind>
-      <div className="flex w-full items-center gap-4 overflow-x-auto px-16">
+      <div className="flex w-full items-end gap-4 overflow-x-auto pl-16">
         <HorizontalBox>
           <DraggableSection
             useDragHandle
