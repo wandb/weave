@@ -38,7 +38,7 @@ const getIconName = (mimetype: string): IconName => {
   return IconNames.Document;
 };
 
-// Save a Blob as a file in the user's downloads folder in a
+// Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
 const saveBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -53,27 +53,30 @@ const saveBlob = (blob: Blob, filename: string) => {
   });
 };
 
-type FileTypePayload = CustomWeaveTypePayload<
-  'weave.type_handlers.File.file.File',
-  {file: string; 'metadata.json': string}
+type ContentTypePayload = CustomWeaveTypePayload<
+  'weave.type_wrappers.Content.content.Content',
+  {content: string; 'metadata.json': string}
 >;
 
-type FileViewProps = {
+type ContentViewProps = {
   entity: string;
   project: string;
   mode?: string;
-  data: FileTypePayload;
+  data: ContentTypePayload;
 };
 
-type FileMetadata = {
-  original_path: string;
+type ContentMetadata = {
+  original_path?: string;
   mimetype: string;
   size: number;
+  filename: string;
 };
 
-export const FileView = ({entity, project, data}: FileViewProps) => {
+export const ContentView = ({entity, project, data}: ContentViewProps) => {
   const {useFileContent} = useWFHooks();
+  console.log(data)
 
+  console.log(data.files)
   const metadata = useFileContent({
     entity,
     project,
@@ -99,82 +102,81 @@ export const FileView = ({entity, project, data}: FileViewProps) => {
     return <span>Error parsing metadata</span>;
   }
 
-  const file = data.files['file'];
+  const content = data.files['content'];
   return (
-    <FileViewMetadataLoaded
+    <ContentViewMetadataLoaded
       entity={entity}
       project={project}
       metadata={metadataJson}
-      file={file}
+      content={content}
     />
   );
 };
 
-type FileViewMetadataLoadedProps = {
+type ContentViewMetadataLoadedProps = {
   entity: string;
   project: string;
-  metadata: FileMetadata;
-  file: string;
+  metadata: ContentMetadata;
+  content: string;
 };
 
-const FileViewMetadataLoaded = ({
+const ContentViewMetadataLoaded = ({
   entity,
   project,
   metadata,
-  file,
-}: FileViewMetadataLoadedProps) => {
-  const [fileResult, setFileResult] = useState<Blob | null>(null);
+  content,
+}: ContentViewMetadataLoadedProps) => {
+  const [contentResult, setContentResult] = useState<Blob | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
   const {useFileContent} = useWFHooks();
-  const {original_path, size, mimetype} = metadata;
+  const {filename, size, mimetype} = metadata;
 
   const iconStart = <Icon name={getIconName(mimetype)} />;
-  const filename = original_path.split('/').pop() || original_path;
   const onDownloadCallback = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsDownloading(true);
   }, []);
-  const fileContent = useFileContent({
+  const contentContent = useFileContent({
     entity,
     project,
-    digest: file,
+    digest: content,
     skip: !isDownloading,
   });
 
-  // Store the last non-null file content result in state
+  // Store the last non-null content content result in state
   // We do this because passing skip: true to useFileContent will
-  // result in fileContent.result getting returned as null even
+  // result in contentContent.result getting returned as null even
   // if it was previously downloaded successfully.
   useEffect(() => {
-    if (fileContent.result) {
-      const blob = new Blob([fileContent.result], {
+    if (contentContent.result) {
+      const blob = new Blob([contentContent.result], {
         type: mimetype,
       });
 
-      setFileResult(blob);
+      setContentResult(blob);
       setIsDownloading(false);
     }
-  }, [fileContent.result, mimetype]);
+  }, [contentContent.result, mimetype]);
 
   const doSave = useCallback(() => {
-    if (!fileResult) {
-      console.error('No file result');
+    if (!contentResult) {
+      console.error('No content result');
       return;
     }
-    saveBlob(fileResult, filename);
-  }, [fileResult, filename]);
+    saveBlob(contentResult, filename);
+  }, [contentResult, filename]);
 
   useEffect(() => {
-    // If we have finished downloading the file and the
+    // If we have finished downloading the content and the
     // user action wasn't opening a preview, save it.
-    if (fileResult && !isDownloading && !showPreview) {
+    if (contentResult && !isDownloading && !showPreview) {
       doSave();
     }
     // Don't want a showPreview dependency because we don't want to save on preview close
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileResult, isDownloading, doSave]);
+  }, [contentResult, isDownloading, doSave]);
 
   const onClickDownload = isDownloading ? undefined : onDownloadCallback;
 
@@ -188,7 +190,7 @@ const FileViewMetadataLoaded = ({
   if (mimetype === 'application/pdf') {
     const onTextClick = () => {
       setShowPreview(true);
-      if (!fileResult) {
+      if (!contentResult) {
         setIsDownloading(true);
       }
     };
@@ -203,11 +205,11 @@ const FileViewMetadataLoaded = ({
           onClick={onTextClick}
           text={filename}
         />
-        {showPreview && fileResult && (
+        {showPreview && contentResult && (
           <PDFView
             open={true}
             onClose={onClose}
-            blob={fileResult}
+            blob={contentResult}
             onDownload={doSave}
           />
         )}
@@ -239,7 +241,7 @@ const FileViewMetadataLoaded = ({
     <TailwindContents>
       <div className="grid grid-cols-[auto_auto] items-center gap-x-2 gap-y-1">
         <div className="text-right font-bold">Name</div>
-        <div>{original_path}</div>
+        <div>{filename}</div>
         <div className="text-right font-bold">MIME type</div>
         <div>{mimetype}</div>
         <div className="text-right font-bold">Size</div>

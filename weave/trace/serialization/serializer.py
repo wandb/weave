@@ -100,6 +100,8 @@ class Serializer:
             # "Op" in the database.
             if ser_id.endswith(".Op"):
                 return "Op"
+            # elif ser_id.endswith(".Content"):
+            #     return "weave.Content"
         return ser_id
 
 
