@@ -492,7 +492,15 @@ class CallDict(TypedDict):
 
 @dataclasses.dataclass
 class Call:
-    """A Call represents a single operation that was executed as part of a trace."""
+    """A Call represents a single operation executed as part of a trace.
+
+    ``attributes`` are frozen once the call is created. Use
+    :func:`weave.attributes` or ``create_call(..., attributes=...)`` to
+    populate metadata beforehand. The ``summary`` dictionary may be
+    modified while the call is running; its contents are deep-merged
+    with computed summary values when :meth:`WeaveClient.finish_call`
+    is invoked.
+    """
 
     _op_name: str | Future[str]
     trace_id: str
@@ -784,7 +792,11 @@ class WeaveKeyDict(dict):
 class AttributesDict(dict):
     """A dict representing the attributes of a call.
 
-    The `weave` key is reserved for internal use and cannot be set directly.
+    The ``weave`` key is reserved for internal use and cannot be set directly.
+    Attributes become immutable once the call is created. Any attempt to modify
+    the dictionary after call start will raise :class:`TypeError`. Use the
+    :func:`weave.attributes` context manager or the ``attributes`` parameter of
+    :meth:`WeaveClient.create_call` to supply metadata before the call begins.
     """
 
     def __init__(self, **kwargs: Any) -> None:
@@ -1267,6 +1279,12 @@ class WeaveClient:
         *,
         op: Op | None = None,
     ) -> None:
+        """Finalize a call and persist its results.
+
+        Any values present in ``call.summary`` are deep-merged with computed
+        summary statistics (e.g. usage and status counts) before being written
+        to the database.
+        """
         if (
             is_tracing_setting_disabled()
             or (op is not None and should_skip_tracing_for_op(op))
