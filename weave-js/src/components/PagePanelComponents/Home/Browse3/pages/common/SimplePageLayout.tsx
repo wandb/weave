@@ -217,8 +217,11 @@ export const SimplePageLayoutWithHeader: FC<{
       setAndNotifyTab(tabs[0].label);
     }
   }, [tabs, idxSelected, userSelectedTab, setAndNotifyTab]);
-  const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
-
+  const tabValueString = props.tabs[tabValue].label;
+  const tabsWithValues = useMemo(
+    () => props.tabs.map(t => ({...t, value: t.label})),
+    [props.tabs]
+  );
   return (
     <Box
       sx={{
@@ -285,10 +288,8 @@ export const SimplePageLayoutWithHeader: FC<{
               main={
                 <SimpleTabView
                   headerContent={props.headerContent}
-                  tabContent={tabContent}
-                  tabs={props.tabs}
-                  tabId={tabId}
-                  tabValue={tabValue}
+                  tabs={tabsWithValues}
+                  tabValue={tabValueString}
                   hideTabsIfSingle={props.hideTabsIfSingle}
                   handleTabChange={handleTabChange}
                 />
@@ -301,29 +302,7 @@ export const SimplePageLayoutWithHeader: FC<{
   );
 };
 
-const SimpleTabView: FC<{
-  headerContent: ReactNode;
-  tabs: Array<{
-    label: string;
-    content: ReactNode;
-  }>;
-  tabContent: ReactNode;
-  tabId: string;
-  tabValue: number;
-  hideTabsIfSingle?: boolean;
-  handleTabChange: (newValue: string) => void;
-}> = props => {
-  const tabValueString = props.tabs[props.tabValue].label;
-  return (
-    <BetterTabView
-      {...props}
-      tabs={props.tabs.map(t => ({...t, value: t.label}))}
-      tabValue={tabValueString}
-    />
-  );
-};
-
-export const BetterTabView: FC<{
+export const SimpleTabView: FC<{
   headerContent: ReactNode;
   headerContainerSx?: SxProps<Theme>;
   tabs: Array<{

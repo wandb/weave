@@ -17,7 +17,7 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
-import {BetterTabView, SimplePageLayout} from '../common/SimplePageLayout';
+import {SimplePageLayout, SimpleTabView} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
   useCompareEvaluationsState,
@@ -184,7 +184,7 @@ const CompareEvaluationsPageInner: React.FC<{
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
-  const [tabValue, setTabValue] = useState('report');
+  const [tabValue, setTabValue] = useState('summary');
   return (
     <Box
       sx={{
@@ -192,7 +192,7 @@ const CompareEvaluationsPageInner: React.FC<{
         width: '100%',
         overflow: 'auto',
       }}>
-      <BetterTabView
+      <SimpleTabView
         headerContent={
           <>
             <InvalidEvaluationBanner
