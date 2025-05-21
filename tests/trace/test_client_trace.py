@@ -2748,10 +2748,10 @@ def test_user_cannot_modify_call_weave_dict(client):
     with pytest.raises(TypeError):
         call.attributes["test"] = 123
 
-    with pytest.raises(TypeError):
+    with pytest.raises(KeyError):
         call.attributes["weave"] = {"anything": "blah"}
 
-    with pytest.raises(TypeError):
+    with pytest.raises(KeyError):
         call.attributes["weave"]["anything"] = "blah"
 
     # you can set call.attributes["weave"]["anything"]["something_else"] = "blah"
