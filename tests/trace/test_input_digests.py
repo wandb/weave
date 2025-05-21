@@ -19,6 +19,19 @@ def test_basic_input_digests(client):
     calls = client.get_calls()
     assert len(calls) == 1
     print(calls[0].attributes)
+    assert calls[0].inputs == {'a': 1, 'b': 2}
     assert calls[0].attributes['weave']['input_digests'] == {'a': 'a4aycY80YOGda4BOY1oYV0etpOqiLx1JwB5S3beHW0s', 'b': '1HNeOiZeFu7gP1lxi5tdAwGcB9i2xRXQ2jpmbuwTqzU'}
+
+def test_table_row_stability(client):
+    @weave.op
+    def op_with_dict_input(d: dict):
+        return d['a'] + d['b']
+    
+    res = op_with_dict_input(d={'a': 1, 'b': 2})
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert calls[0].inputs == {'d': {'a': 1, 'b': 2}}
+    assert calls[0].attributes['weave']['input_digests'] == {'d': 'a4aycY80YOGda4BOY1oYV0etpOqiLx1JwB5S3beHW0s'}
+
     
     
