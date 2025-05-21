@@ -363,10 +363,10 @@ export const BetterTabView: FC<{
       )}
       {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
         <Tabs.Root
-          style={{margin: '12px 16px 0 16px'}}
+          style={{padding: '12px 16px 0 16px', borderBottom: `1px solid ${MOON_200}`}}
           value={props.tabValue}
           onValueChange={props.handleTabChange}>
-          <Tabs.List style={{overflowX: 'scroll', scrollbarWidth: 'none'}}>
+          <Tabs.List style={{overflowX: 'scroll', scrollbarWidth: 'none', borderBottom: `0px solid white`}}>
             {props.tabs.map(tab => (
               <Tabs.Trigger
                 key={tab.label}
