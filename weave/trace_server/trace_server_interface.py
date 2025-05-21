@@ -210,7 +210,7 @@ class ObjSchemaForInsert(BaseModel):
     builtin_object_class: Optional[str] = None
     # Keeping `set_base_object_class` here until it is successfully removed from UI client
     set_base_object_class: Optional[str] = Field(
-        include=False, default=None, deprecated=True
+        exclude=True, default=None, deprecated=True
     )
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
