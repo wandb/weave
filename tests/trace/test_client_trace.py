@@ -29,6 +29,7 @@ from tests.trace.util import (
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
+from weave.trace.context.call_context import require_current_call
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
@@ -2729,6 +2730,17 @@ def test_call_has_client_version(client):
 def test_user_cannot_modify_call_weave_dict(client):
     @weave.op
     def test():
+        call = require_current_call()
+
+        # allowed in this context
+        call.attributes["test"] = 123
+
+        with pytest.raises(KeyError):
+            call.attributes["weave"] = {"anything": "blah"}
+
+        with pytest.raises(KeyError):
+            call.attributes["weave"]["anything"] = "blah"
+
         return 1
 
     _, call = test.call()
@@ -2736,10 +2748,10 @@ def test_user_cannot_modify_call_weave_dict(client):
     with pytest.raises(TypeError):
         call.attributes["test"] = 123
 
-    with pytest.raises(KeyError):
+    with pytest.raises(TypeError):
         call.attributes["weave"] = {"anything": "blah"}
 
-    with pytest.raises(KeyError):
+    with pytest.raises(TypeError):
         call.attributes["weave"]["anything"] = "blah"
 
     # you can set call.attributes["weave"]["anything"]["something_else"] = "blah"
