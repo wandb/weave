@@ -217,8 +217,11 @@ export const SimplePageLayoutWithHeader: FC<{
       setAndNotifyTab(tabs[0].label);
     }
   }, [tabs, idxSelected, userSelectedTab, setAndNotifyTab]);
-  const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
-
+  const tabValueString = props.tabs[tabValue].label;
+  const tabsWithValues = useMemo(
+    () => props.tabs.map(t => ({...t, value: t.label})),
+    [props.tabs]
+  );
   return (
     <Box
       sx={{
@@ -285,10 +288,8 @@ export const SimplePageLayoutWithHeader: FC<{
               main={
                 <SimpleTabView
                   headerContent={props.headerContent}
-                  tabContent={tabContent}
-                  tabs={props.tabs}
-                  tabId={tabId}
-                  tabValue={tabValue}
+                  tabs={tabsWithValues}
+                  tabValue={tabValueString}
                   hideTabsIfSingle={props.hideTabsIfSingle}
                   handleTabChange={handleTabChange}
                 />
@@ -301,18 +302,22 @@ export const SimplePageLayoutWithHeader: FC<{
   );
 };
 
-const SimpleTabView: FC<{
+export const SimpleTabView: FC<{
   headerContent: ReactNode;
+  headerContainerSx?: SxProps<Theme>;
   tabs: Array<{
+    value: string;
     label: string;
     content: ReactNode;
   }>;
-  tabContent: ReactNode;
-  tabId: string;
-  tabValue: number;
+  tabValue: string;
   hideTabsIfSingle?: boolean;
   handleTabChange: (newValue: string) => void;
 }> = props => {
+  const selectedTab = useMemo(
+    () => props.tabs.find(t => t.value === props.tabValue),
+    [props.tabs, props.tabValue]
+  );
   return (
     <Box
       sx={{
@@ -332,20 +337,29 @@ const SimpleTabView: FC<{
             pt: 1,
             px: 2,
             alignContent: 'center',
+            ...(props.headerContainerSx ?? {}),
           }}>
           {props.headerContent}
         </Box>
       )}
       {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
         <Tabs.Root
-          style={{margin: '12px 16px 0 16px'}}
-          value={props.tabs[props.tabValue].label}
+          style={{
+            padding: '8px 16px 0 16px',
+            borderBottom: `1px solid ${MOON_200}`,
+          }}
+          value={props.tabValue}
           onValueChange={props.handleTabChange}>
-          <Tabs.List style={{overflowX: 'scroll', scrollbarWidth: 'none'}}>
+          <Tabs.List
+            style={{
+              overflowX: 'scroll',
+              scrollbarWidth: 'none',
+              borderBottom: `0px solid white`,
+            }}>
             {props.tabs.map(tab => (
               <Tabs.Trigger
                 key={tab.label}
-                value={tab.label}
+                value={tab.value}
                 className="h-[30px] whitespace-nowrap text-sm">
                 {tab.label}
               </Tabs.Trigger>
@@ -360,7 +374,9 @@ const SimpleTabView: FC<{
           flexDirection: 'column',
           flex: '1 1 auto',
         }}>
-        <ErrorBoundary key={props.tabId}>{props.tabContent}</ErrorBoundary>
+        <ErrorBoundary key={props.tabValue}>
+          {selectedTab?.content}
+        </ErrorBoundary>
       </Box>
     </Box>
   );

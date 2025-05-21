@@ -50,7 +50,6 @@ export const ExampleFilterSection: React.FC<{
         }}>
         <Box
           sx={{
-            fontSize: '1.5em',
             fontWeight: 'bold',
           }}>
           Example Filter

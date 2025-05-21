@@ -15,7 +15,7 @@ PY313_INCOMPATIBLE_SHARDS = [
     "notdiamond",
     "crewai",
 ]
-PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents"]
+PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents", "dspy"]
 
 
 @nox.session
@@ -37,6 +37,7 @@ def lint(session):
         "trace",
         "flow",
         "trace_server",
+        "trace_server_bindings",
         "anthropic",
         "cerebras",
         "cohere",
@@ -114,6 +115,7 @@ def tests(session, shard):
         "trace": ["trace/"],
         "flow": ["flow/"],
         "trace_server": ["trace_server/"],
+        "trace_server_bindings": ["trace_server_bindings"],
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
         "scorers": ["scorers/"],
