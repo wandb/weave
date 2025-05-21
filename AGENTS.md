@@ -15,6 +15,8 @@
   2. Update `bin/codex_setup.sh` with necessary fixes
   3. Document any manual steps required in this section
 
+*Important:* For OpenAI Codex agents (most likely you!), your environment does not have internet access. If you need something setup beforehand, this is where you need to do it.
+
 ## Codebase Structure
 
 ### Main Components
@@ -31,7 +33,7 @@
   - Marked for future refactoring
   - Avoid making changes to this directory
 
-## Testing Guidelines
+## Python Testing Guidelines
 
 ### Test Framework
 - Testing is managed by `nox` with multiple shards for different Python versions
@@ -45,9 +47,14 @@ Focus on these primary test shards:
 - `tests-3.12(shard='trace_server_bindings')` - Server bindings
 
 ### Running Tests
-1. Run specific shard: `nox -e "tests-3.12(shard='trace')"`
-2. Run all tests: `nox`
-3. Run linting: `nox -e lint`
+1. Run all tests in a specific shard: `nox --no-install -e "tests-3.12(shard='trace')"`
+2. Run a specific test by appending `-- [test]` like so: `nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::test_simple_op`
+3. Run linting: `nox --no-install -e lint` (Note: This will modify files)
+
+*Important:* Since you don't have internet access, you must run `nox` with `--no-install`. We have pre-installed the requirements on the above shards.
+
+## Typescript Testing Guidelines
+TODO: need to fill this out
 
 ## Code Review & PR Guidelines
 
@@ -63,10 +70,28 @@ Focus on these primary test shards:
   - Related issues/PRs
 
 ### Pre-commit Checklist
-1. Run `nox -e lint` (Note: This will modify files)
+1. Run lint
 2. Ensure all tests pass
 3. Update documentation if needed
 4. Check for any breaking changes
+
+## Common Development Patterns
+
+### Code Organization
+- Python code follows standard module organization
+- TypeScript/React components are organized by feature
+- Shared utilities should be placed in appropriate common directories
+
+### Error Handling
+- Use appropriate error types from `weave.errors`
+- Include meaningful error messages
+- Add error handling tests
+
+### Documentation
+- Make sure to add end-user documentation inside the `docs` dir when creating new features.
+- Update relevant docstrings for Python code
+- Add JSDoc comments for TypeScript code
+- Update this file when introducing new patterns or concepts
 
 ---
 
@@ -76,4 +101,5 @@ This section contains a list of questions, clarifications, or tasks that LLM age
 If there is something that doesn't make sense architecturally, devex-wise, or product-wise, please update this file and the humans will take care of it.
 Think of this as the reverse-task assignment - a place where you can communicate back to us.
 
+- [ ] Add TypeScript testing guidelines
 - [ ] ...
