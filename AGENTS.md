@@ -5,6 +5,9 @@
 - When you learn something new about the codebase or introduce a new concept, update this file (`AGENTS.md`) to reflect the new knowledge. This is YOUR FILE! It should grow and evolve with you.
 - If there is something that doesn't make sense architecturally, devix-wise, or product-wise, please update the `Requests to Humans` section below.
 
+## Dev Setup
+- Your machine should be setup for you automatically. However, it is possible that something breaks over time. If you have any issues, please update `bin/codex_setup.sh` accordingly which will run before your next task.
+
 ## Directory Structure
 - `weave/` - contains the implementation of the `weave` python package as well as the backend server implementation (`weave/trace_server`)
 - `docs/` - contains the docs wedbsite
