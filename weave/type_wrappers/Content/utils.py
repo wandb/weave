@@ -1,13 +1,11 @@
-import mimetypes
 from pathlib import Path
 import subprocess
 import logging
 logger = logging.getLogger(__name__)
-import binascii
 import threading
 from hashlib import sha256
 import base64
-from typing import Any, TypedDict, cast
+from typing import TypedDict
 from .mime_resolver import guess_extension, guess_mime_type
 
 class ContentMetadata(TypedDict):
