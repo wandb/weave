@@ -15,7 +15,14 @@ PY313_INCOMPATIBLE_SHARDS = [
     "notdiamond",
     "crewai",
 ]
-PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents", "dspy"]
+PY39_INCOMPATIBLE_SHARDS = [
+    "crewai",
+    "google_genai",
+    "mcp",
+    "smolagents",
+    "dspy",
+    "autogen_tests",
+]
 
 
 @nox.session
@@ -62,6 +69,7 @@ def lint(session):
         "huggingface",
         "smolagents",
         "mcp",
+        "autogen_tests",
     ],
 )
 def tests(session, shard):
@@ -117,6 +125,7 @@ def tests(session, shard):
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
         "scorers": ["scorers/"],
+        "autogen_tests": ["integrations/autogen/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
