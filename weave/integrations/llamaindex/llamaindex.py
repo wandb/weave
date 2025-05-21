@@ -43,6 +43,15 @@ def _convert_instance_to_dict(obj: Any) -> Any:
     return obj
 
 
+def _get_class_name(obj: Any) -> str:
+    """Get a meaningful class name from an object."""
+    # Try class_name() method first (common in LlamaIndex)
+    if hasattr(obj, "class_name") and callable(obj.class_name):
+        return obj.class_name()
+    # Try class name from the class itself
+    return obj.__class__.__name__
+
+
 def _process_inputs(raw_inputs: Dict[str, Any]) -> Dict[str, Any]:
     """Process inputs to ensure JSON serializability and handle special cases."""
     processed = {}
@@ -53,8 +62,11 @@ def _process_inputs(raw_inputs: Dict[str, Any]) -> Dict[str, Any]:
             # Check if list contains class instances
             first_item = v[0]
             if hasattr(first_item, "__class__") and not isinstance(first_item, (str, int, float, bool, dict, list, tuple)):
-                # Convert list of instances to list of dicts
-                processed[k] = [_convert_instance_to_dict(item) for item in v]
+                # Convert list of instances to dict with class names as keys
+                processed[k] = {
+                    f"{_get_class_name(item)}_{i}": _convert_instance_to_dict(item)
+                    for i, item in enumerate(v)
+                }
                 continue
         
         # Handle single instances
