@@ -1652,7 +1652,9 @@ class WeaveClient:
             # If scorer_object_ref is provided, it is used as the runnable_ref_uri
             # Otherwise, we use the op_name from the score_call. This should happen
             # when there is a Scorer subclass that is the source of the score call.
-            scorer_object_ref_uri = scorer_object_ref.uri() if scorer_object_ref else None
+            scorer_object_ref_uri = (
+                scorer_object_ref.uri() if scorer_object_ref else None
+            )
             runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
             score_results = score_call.output
 
