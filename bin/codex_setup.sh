@@ -10,3 +10,7 @@ nox --install-only -e "tests-3.12(shard='flow')"
 nox --install-only -e "tests-3.12(shard='trace_server')"
 nox --install-only -e "tests-3.12(shard='trace_server_bindings')"
 
+pre-commit install
+pre-commit install --install-hooks
+
+nox -e lint -- install-only
