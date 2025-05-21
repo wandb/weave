@@ -1,6 +1,8 @@
 import atexit  # Added for cleanup
 import json
 from typing import Any, Dict, List, Optional, Tuple, Union
+import inspect
+import types
 
 from weave.integrations.patcher import Patcher
 from weave.trace.context import weave_client_context
@@ -146,6 +148,12 @@ def get_op_name_from_event(event: BaseEvent) -> str:
     return f"llama_index.unmapped.{snake_case_name}"
 
 
+def _get_op_name_from_span(span_id: str) -> str:
+    # Use only the ClassName.method_name part for the op_name if a hyphen is present
+    op_name_base = span_id.split("-")[0] if "-" in span_id else span_id
+    return f"llama_index.span.{op_name_base}"
+
+
 def _remove_common_items(d1, d2):
     result = {}
     for key, value in d2.items():
@@ -169,9 +177,82 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
     def class_name(cls) -> str:
         return "WeaveSpanHandler"
 
+    def _map_args_to_params(
+        self,
+        instance: Optional[Any],
+        bound_args: Any,
+        id_: str,
+    ) -> Dict[str, Any]:
+        """Maps arguments to their parameter names using Python's introspection.
+        
+        Args:
+            instance: The class instance if this is a method call
+            bound_args: The BoundArguments object from inspect.signature().bind()
+            id_: The span ID which includes the function's qualified name
+        
+        Returns:
+            Dict containing mapped parameters and instance variables
+        """
+        inputs = {}
+        
+        # First add any relevant instance variables if this is a method call
+        if instance is not None:
+            try:
+                instance_vars = {
+                    k: v for k, v in vars(instance).items() 
+                    if not k.startswith('__') and not callable(v) and not isinstance(v, (types.ModuleType, types.FunctionType))
+                }
+                inputs.update(instance_vars)
+                print(f"Weave(SpanHandler): Instance variables captured: {list(instance_vars.keys())}")
+            except (TypeError, AttributeError):
+                print(f"Weave(SpanHandler): Could not extract instance variables from {type(instance)}")
+
+        # Then add the actual function arguments
+        if bound_args is not None:
+            # Get the function name from the span ID
+            func_name = id_.split(".")[-1].split("-")[0] if "." in id_ else None
+            print(f"Weave(SpanHandler): Processing function: {func_name}")
+            
+            try:
+                # Get the raw args and kwargs
+                args = getattr(bound_args, 'args', ())
+                kwargs = getattr(bound_args, 'kwargs', {})
+
+                if func_name and instance is not None:
+                    # Try to get the method from the instance
+                    method = getattr(instance, func_name, None)
+                    if method is not None:
+                        # If it's a bound method, get its original function
+                        if hasattr(method, '__func__'):
+                            method = method.__func__
+                        
+                        # Get the signature
+                        sig = inspect.signature(method)
+                        
+                        # Instead of trying to bind, we'll match parameters manually
+                        param_names = list(sig.parameters.keys())
+                        
+                        # Map positional args to their parameter names
+                        for i, arg in enumerate(args):
+                            if i < len(param_names):
+                                inputs[param_names[i]] = arg
+                        
+                        # Add any kwargs that match parameter names
+                        for param_name in param_names:
+                            if param_name in kwargs:
+                                inputs[param_name] = kwargs[param_name]
+                        
+                        print(f"Weave(SpanHandler): Arguments captured: {list(inputs.keys())}")
+                    else:
+                        print(f"Weave(SpanHandler): Method {func_name} not found on instance")
+            except Exception as e:
+                print(f"Weave(SpanHandler): Error processing arguments: {str(e)}")
+
+        return inputs
+
     def new_span(
         self,
-        id_: str,  # Often "ClassName.method_name-unique_id"
+        id_: str,
         bound_args: Any,
         instance: Optional[Any] = None,
         parent_span_id: Optional[str] = None,
@@ -180,21 +261,34 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
     ) -> None:
         """Creates a Weave call when a LlamaIndex span starts."""
         gc = get_weave_client()
-        # Use only the ClassName.method_name part for the op_name if a hyphen is present
-        op_name_base = id_.split("-")[0] if "-" in id_ else id_  # More robust split
-        op_name = f"llama_index.span.{op_name_base}"
+        op_name = _get_op_name_from_span(id_)
 
-        inputs = {}
-        if bound_args and hasattr(bound_args, "args") and hasattr(bound_args, "kwargs"):
+        # print(f"Weave(SpanHandler): New span {id_} with op_name {op_name}")
+        # print(f"Weave(SpanHandler): Instance: {instance}")
+        # print(f"Weave(SpanHandler): Bound args: {bound_args}")
+        # print(f"Weave(SpanHandler): Parent span ID: {parent_span_id}")
+        # print(f"Weave(SpanHandler): Tags: {tags}")
+        # print(f"Weave(SpanHandler): kwargs: {kwargs}")
+        # print("--------------------------------")
+
+        # Map arguments to their parameter names
+        raw_combined_inputs = self._map_args_to_params(instance, bound_args, id_)
+        
+        # Process the inputs through our payload processor
+        if raw_combined_inputs:
             try:
-                # process_llamaindex_payload expects a dict
-                raw_inputs = {
-                    "args": [str(arg) for arg in bound_args.args],
-                    "kwargs": {k: str(v) for k, v in bound_args.kwargs.items()},
+                inputs = process_llamaindex_payload(raw_combined_inputs)
+            except Exception as e_processing:
+                inputs = {
+                    "_input_processing_error_": str(e_processing),
+                    "_raw_inputs_preview_": str(raw_combined_inputs)[:500] 
                 }
-                inputs = process_llamaindex_payload(raw_inputs)
-            except Exception:
-                inputs = {"bound_args": str(bound_args)}  # Fallback
+        else:
+            inputs = {"_info_": "No detailed inputs from instance or bound_args"}
+
+        # Add any tags if present
+        if tags:
+            inputs['_tags'] = tags
 
         parent_call = None
         if parent_span_id and parent_span_id in _weave_calls_map:
