@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import atexit
 import datetime
+import json
 import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from multiprocessing import Lock
 from types import MethodType
 from typing import Annotated, Any, TypeVar, Union, cast
 
@@ -181,6 +183,22 @@ def _validate_class_name(name: str) -> str:
     return name
 
 
+class ScorerCache:
+    _cached_scorers: dict[str, Scorer]
+    _cached_scorers_lock: Any
+
+    def __init__(self) -> None:
+        self._cached_scorers = {}
+        self._cached_scorers_lock = Lock()
+
+    def get_scorer(self, scorer_id: str, default_factory: Callable[[], Scorer]) -> Scorer:
+        with self._cached_scorers_lock:
+            if scorer_id not in self._cached_scorers:
+                self._cached_scorers[scorer_id] = default_factory()
+        return self._cached_scorers[scorer_id]
+
+global_scorer_cache = ScorerCache()
+
 class ScoreLogger(BaseModel):
     """This class provides an imperative interface for logging scores."""
 
@@ -234,12 +252,10 @@ class ScoreLogger(BaseModel):
             # No event loop exists, create one with asyncio.run
             return asyncio.run(self.alog_score(scorer, score))
 
-    @validate_call
     async def alog_score(
         self,
         scorer: Annotated[
             Scorer | dict | str,
-            BeforeValidator(_cast_to_cls(Scorer)),
             Field(
                 description="A metadata-only scorer used for comparisons."
                 "Alternatively, you can pass a dict of attributes or just a string"
@@ -248,6 +264,9 @@ class ScoreLogger(BaseModel):
         ],
         score: ScoreType,
     ) -> None:
+        if not isinstance(scorer, Scorer):
+            scorer_id = json.dumps(scorer)
+            scorer = global_scorer_cache.get_scorer(scorer_id, lambda: _cast_to_cls(Scorer)(scorer))
         if self._has_finished:
             raise ValueError("Cannot log score after finish has been called")
 
