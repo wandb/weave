@@ -89,7 +89,6 @@ def encode_custom_obj(obj: Any) -> dict | None:
 
 def decode_custom_inline_obj(obj: dict) -> Any:
     _type = obj["weave_type"]["type"]
-    print(_type)
     if _type in KNOWN_TYPES:
         serializer = get_serializer_by_id(_type)
         if serializer is not None:
@@ -138,7 +137,6 @@ def decode_custom_files_obj(
     _type = weave_type["type"]
     found_serializer = False
 
-    print(_type)
     # First, try to load the object using a known serializer
     if _type in KNOWN_TYPES:
         serializer = get_serializer_by_id(_type)

@@ -31,7 +31,7 @@ class Content(Generic[T]):
     ):
         if not mimetype and not extension:
             if type_hint:
-                if type_hint.startswith(".") or type_hint.index('/') == -1:
+                if type_hint.startswith(".") or type_hint.find('/') == -1:
                     extension = type_hint
                 else:
                     mimetype = type_hint
