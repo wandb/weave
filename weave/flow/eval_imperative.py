@@ -186,14 +186,16 @@ def _validate_class_name(name: str) -> str:
 class ScorerCache:
     _cached_scorers: dict[str, Scorer]
     _cached_scorers_lock: Any
-
-    def __init__(self) -> None:
+    _max_size: int
+    def __init__(self, max_size: int = 1000) -> None:
         self._cached_scorers = {}
         self._cached_scorers_lock = Lock()
-
+        self._max_size = max_size
     def get_scorer(self, scorer_id: str, default_factory: Callable[[], Scorer]) -> Scorer:
         with self._cached_scorers_lock:
             if scorer_id not in self._cached_scorers:
+                if len(self._cached_scorers) >= self._max_size:
+                    self._cached_scorers.popitem()
                 self._cached_scorers[scorer_id] = default_factory()
         return self._cached_scorers[scorer_id]
 
