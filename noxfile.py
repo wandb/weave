@@ -28,7 +28,6 @@ def lint(session):
         session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
 
-
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 @nox.parametrize(
     "shard",
