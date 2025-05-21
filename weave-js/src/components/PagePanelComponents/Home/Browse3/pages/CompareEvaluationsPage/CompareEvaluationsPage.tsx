@@ -243,7 +243,6 @@ const CompareEvaluationsPageInner: React.FC<{
                 sx={{
                   height: '100%',
                   overflow: 'auto',
-                  paddingTop: STANDARD_PADDING,
                   alignItems: 'flex-start',
                   gridGap: STANDARD_PADDING * 2,
                 }}>
@@ -303,7 +302,7 @@ const ResultExplorer: React.FC<{
   height: number;
 }> = ({state, height}) => {
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
-    'detail'
+    'split'
   );
 
   return (
@@ -313,7 +312,7 @@ const ResultExplorer: React.FC<{
         width: '100%',
         overflow: 'hidden',
       }}>
-      <HorizontalBox
+      {/* <HorizontalBox
         sx={{
           flex: '0 0 auto',
           paddingLeft: STANDARD_PADDING,
@@ -330,46 +329,44 @@ const ResultExplorer: React.FC<{
           }}>
           Output Comparison
         </Box>
-      </HorizontalBox>
-      <AdaptiveHeightParent maxHeight={height}>
+      </HorizontalBox> */}
+      <Box
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          height: '100%',
+          borderTop: '1px solid #e0e0e0',
+        }}>
         <Box
           style={{
-            display: 'flex',
-            flexDirection: 'row',
-            height: '100%',
-            borderTop: '1px solid #e0e0e0',
+            flex: 1,
+            width: '50%',
+            display: viewMode !== 'detail' ? 'block' : 'none',
           }}>
-          <Box
-            style={{
-              flex: 1,
-              width: '50%',
-              display: viewMode !== 'detail' ? 'block' : 'none',
-            }}>
-            <ExampleCompareSectionTable
-              state={state}
-              shouldHighlightSelectedRow={viewMode === 'split'}
-              onShowSplitView={() => setViewMode('split')}
-            />
-          </Box>
-
-          <Box
-            style={{
-              flex: 1,
-              width: '50%',
-              borderLeft: '1px solid #e0e0e0',
-              display: viewMode !== 'table' ? 'block' : 'none',
-            }}>
-            <ExampleCompareSectionDetail
-              state={state}
-              onClose={() => setViewMode('table')}
-              onExpandToggle={() =>
-                setViewMode(viewMode === 'detail' ? 'split' : 'detail')
-              }
-              isExpanded={viewMode === 'detail'}
-            />
-          </Box>
+          <ExampleCompareSectionTable
+            state={state}
+            shouldHighlightSelectedRow={viewMode === 'split'}
+            onShowSplitView={() => setViewMode('split')}
+          />
         </Box>
-      </AdaptiveHeightParent>
+
+        <Box
+          style={{
+            flex: 1,
+            width: '50%',
+            borderLeft: '1px solid #e0e0e0',
+            display: viewMode !== 'table' ? 'block' : 'none',
+          }}>
+          <ExampleCompareSectionDetail
+            state={state}
+            onClose={() => setViewMode('table')}
+            onExpandToggle={() =>
+              setViewMode(viewMode === 'detail' ? 'split' : 'detail')
+            }
+            isExpanded={viewMode === 'detail'}
+          />
+        </Box>
+      </Box>
     </VerticalBox>
   );
 };
