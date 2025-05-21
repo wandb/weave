@@ -366,7 +366,7 @@ export const BetterTabView: FC<{
       {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
         <Tabs.Root
           style={{
-            padding: '12px 16px 0 16px',
+            padding: '8px 16px 0 16px',
             borderBottom: `1px solid ${MOON_200}`,
           }}
           value={props.tabValue}

@@ -91,26 +91,16 @@ export const SummaryPlots: React.FC<{
       <HorizontalBox
         sx={{
           alignItems: 'center',
-          justifyContent: 'flex-start',
+          justifyContent: 'space-between',
         }}>
-        <Box
-          sx={{
-            fontWeight: 'bold',
-            flex: '1 1 auto',
-          }}>
-          Summary Metrics
-        </Box>
-        <HorizontalBox>
-          <div style={{display: 'flex', alignItems: 'center'}}>
-            <div style={{marginRight: '4px', whiteSpace: 'nowrap'}}>
-              Configure metrics
-            </div>
-            <MetricsSelector
-              selectedMetrics={selectedMetrics}
-              setSelectedMetrics={setSelectedMetrics}
-              allMetrics={Array.from(allMetricNames)}
-            />
-          </div>
+        <div style={{display: 'flex', alignItems: 'center'}}>
+          <MetricsSelector
+            selectedMetrics={selectedMetrics}
+            setSelectedMetrics={setSelectedMetrics}
+            allMetrics={Array.from(allMetricNames)}
+          />
+        </div>
+        <div style={{display: 'flex', alignItems: 'center'}}>
           <PaginationControls
             currentPage={currentPage}
             totalPages={totalPages}
@@ -122,7 +112,7 @@ export const SummaryPlots: React.FC<{
               setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))
             }
           />
-        </HorizontalBox>
+        </div>
       </HorizontalBox>
 
       <div ref={containerRef} style={{width: '100%'}}>
