@@ -61,3 +61,25 @@ __docspec__ = [
     SavedView,
     Audio,
 ]
+
+__all__ = [
+    "Agent",
+    "AgentState",
+    "AnnotationSpec",
+    "Dataset",
+    "Model",
+    "Evaluation",
+    "EvaluationLogger",
+    "Scorer",
+    "Monitor",
+    "Object",
+    "EasyPrompt",
+    "MessagesPrompt",
+    "Prompt",
+    "StringPrompt",
+    "SavedView",
+    "Scorer",
+    "Audio",
+    "File",
+    "Markdown",
+]
