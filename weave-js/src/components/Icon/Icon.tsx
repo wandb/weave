@@ -16,6 +16,7 @@ import {ReactComponent as ImportBellNotifications} from '../../assets/icons/icon
 import {ReactComponent as ImportBenchmarkSquare} from '../../assets/icons/icon-benchmark-square.svg';
 import {ReactComponent as ImportBlogReport} from '../../assets/icons/icon-blog-report.svg';
 import {ReactComponent as ImportBokeh} from '../../assets/icons/icon-bokeh.svg';
+import {ReactComponent as ImportBold} from '../../assets/icons/icon-bold.svg';
 import {ReactComponent as ImportBookDictionary} from '../../assets/icons/icon-book-dictionary.svg';
 import {ReactComponent as ImportBoolean} from '../../assets/icons/icon-boolean.svg';
 import {ReactComponent as ImportBoxPlot} from '../../assets/icons/icon-box-plot.svg';
@@ -105,6 +106,7 @@ import {ReactComponent as ImportIgnoreOutliers} from '../../assets/icons/icon-ig
 import {ReactComponent as ImportImpersonateMaskAlt} from '../../assets/icons/icon-impersonate-mask-alt.svg';
 import {ReactComponent as ImportImportInsert} from '../../assets/icons/icon-import-insert.svg';
 import {ReactComponent as ImportInfo} from '../../assets/icons/icon-info.svg';
+import {ReactComponent as ImportItalic} from '../../assets/icons/icon-italic.svg';
 import {ReactComponent as ImportJobAutomation} from '../../assets/icons/icon-job-automation.svg';
 import {ReactComponent as ImportJobCalculator} from '../../assets/icons/icon-job-calculator.svg';
 import {ReactComponent as ImportJobProgramCode} from '../../assets/icons/icon-job-program-code.svg';
@@ -225,6 +227,7 @@ import {ReactComponent as ImportStar} from '../../assets/icons/icon-star.svg';
 import {ReactComponent as ImportStarFilled} from '../../assets/icons/icon-star-filled.svg';
 import {ReactComponent as ImportStop} from '../../assets/icons/icon-stop.svg';
 import {ReactComponent as ImportStopped} from '../../assets/icons/icon-stopped.svg';
+import {ReactComponent as ImportStrikethrough} from '../../assets/icons/icon-strikethrough.svg';
 import {ReactComponent as ImportSun} from '../../assets/icons/icon-sun.svg';
 import {ReactComponent as ImportSwap} from '../../assets/icons/icon-swap.svg';
 import {ReactComponent as ImportSweepBayes} from '../../assets/icons/icon-sweep-bayes.svg';
@@ -337,6 +340,9 @@ export const IconBlogReport = (props: SVGIconProps) => (
 );
 export const IconBokeh = (props: SVGIconProps) => (
   <ImportBokeh {...updateIconProps(props)} />
+);
+export const IconBold = (props: SVGIconProps) => (
+  <ImportBold {...updateIconProps(props)} />
 );
 export const IconBookDictionary = (props: SVGIconProps) => (
   <ImportBookDictionary {...updateIconProps(props)} />
@@ -604,6 +610,9 @@ export const IconImportInsert = (props: SVGIconProps) => (
 );
 export const IconInfo = (props: SVGIconProps) => (
   <ImportInfo {...updateIconProps(props)} />
+);
+export const IconItalic = (props: SVGIconProps) => (
+  <ImportItalic {...updateIconProps(props)} />
 );
 export const IconJobAutomation = (props: SVGIconProps) => (
   <ImportJobAutomation {...updateIconProps(props)} />
@@ -965,6 +974,9 @@ export const IconStop = (props: SVGIconProps) => (
 export const IconStopped = (props: SVGIconProps) => (
   <ImportStopped {...updateIconProps(props)} />
 );
+export const IconStrikethrough = (props: SVGIconProps) => (
+  <ImportStrikethrough {...updateIconProps(props)} />
+);
 export const IconSun = (props: SVGIconProps) => (
   <ImportSun {...updateIconProps(props)} />
 );
@@ -1136,6 +1148,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'benchmark-square': IconBenchmarkSquare,
   'blog-report': IconBlogReport,
   bokeh: IconBokeh,
+  bold: IconBold,
   'book-dictionary': IconBookDictionary,
   boolean: IconBoolean,
   'box-plot': IconBoxPlot,
@@ -1225,6 +1238,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'impersonate-mask-alt': IconImpersonateMaskAlt,
   'import-insert': IconImportInsert,
   info: IconInfo,
+  italic: IconItalic,
   'job-automation': IconJobAutomation,
   'job-calculator': IconJobCalculator,
   'job-program-code': IconJobProgramCode,
@@ -1345,6 +1359,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'star-filled': IconStarFilled,
   stop: IconStop,
   stopped: IconStopped,
+  strikethrough: IconStrikethrough,
   sun: IconSun,
   swap: IconSwap,
   'sweep-bayes': IconSweepBayes,
