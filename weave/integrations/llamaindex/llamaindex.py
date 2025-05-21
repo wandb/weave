@@ -33,19 +33,43 @@ def get_weave_client() -> WeaveClient:
     return _weave_client_instance
 
 
-def _ensure_json_serializable(obj: Any) -> Any:
-    """Simple helper to ensure an object is JSON serializable.
-    Returns str(obj) if object can't be serialized to JSON."""
-    try:
-        json.dumps(obj)
-        return obj
-    except (TypeError, OverflowError):
-        return str(obj)
+def _convert_instance_to_dict(obj: Any) -> Any:
+    """Convert a class instance to a dict if possible."""
+    if hasattr(obj, "model_dump"):  # Handle pydantic models
+        return obj.model_dump(exclude_none=True)
+    elif hasattr(obj, "__dict__"):  # Handle regular class instances
+        return {k: v for k, v in vars(obj).items() 
+                if not k.startswith('__') and not callable(v)}
+    return obj
 
 
 def _process_inputs(raw_inputs: Dict[str, Any]) -> Dict[str, Any]:
-    """Basic input processor that just ensures JSON serializability."""
-    return {k: _ensure_json_serializable(v) for k, v in raw_inputs.items()}
+    """Process inputs to ensure JSON serializability and handle special cases."""
+    processed = {}
+    
+    for k, v in raw_inputs.items():
+        # Handle lists of instances
+        if isinstance(v, (list, tuple)) and len(v) > 0:
+            # Check if list contains class instances
+            first_item = v[0]
+            if hasattr(first_item, "__class__") and not isinstance(first_item, (str, int, float, bool, dict, list, tuple)):
+                # Convert list of instances to list of dicts
+                processed[k] = [_convert_instance_to_dict(item) for item in v]
+                continue
+        
+        # Handle single instances
+        if hasattr(v, "__class__") and not isinstance(v, (str, int, float, bool, dict, list, tuple)):
+            processed[k] = _convert_instance_to_dict(v)
+            continue
+            
+        # Ensure JSON serializability for other types
+        try:
+            json.dumps(v)
+            processed[k] = v
+        except (TypeError, OverflowError):
+            processed[k] = str(v)
+    
+    return processed
 
 
 def _get_op_name_from_span(span_id: str) -> str:
