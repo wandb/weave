@@ -123,7 +123,6 @@ const SectionHeader: React.FC<{
     }}>
     <Box
       sx={{
-        fontSize: '1.5em',
         fontWeight: 'bold',
       }}>
       Summary Metrics

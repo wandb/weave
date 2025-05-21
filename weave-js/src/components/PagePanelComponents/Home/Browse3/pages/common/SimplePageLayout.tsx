@@ -313,6 +313,31 @@ const SimpleTabView: FC<{
   hideTabsIfSingle?: boolean;
   handleTabChange: (newValue: string) => void;
 }> = props => {
+  const tabValueString = props.tabs[props.tabValue].label;
+  return (
+    <BetterTabView
+      {...props}
+      tabs={props.tabs.map(t => ({...t, value: t.label}))}
+      tabValue={tabValueString}
+    />
+  );
+};
+
+export const BetterTabView: FC<{
+  headerContent: ReactNode;
+  tabs: Array<{
+    value: string;
+    label: string;
+    content: ReactNode;
+  }>;
+  tabValue: string;
+  hideTabsIfSingle?: boolean;
+  handleTabChange: (newValue: string) => void;
+}> = props => {
+  const selectedTab = useMemo(
+    () => props.tabs.find(t => t.value === props.tabValue),
+    [props.tabs, props.tabValue]
+  );
   return (
     <Box
       sx={{
@@ -339,13 +364,13 @@ const SimpleTabView: FC<{
       {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
         <Tabs.Root
           style={{margin: '12px 16px 0 16px'}}
-          value={props.tabs[props.tabValue].label}
+          value={props.tabValue}
           onValueChange={props.handleTabChange}>
           <Tabs.List style={{overflowX: 'scroll', scrollbarWidth: 'none'}}>
             {props.tabs.map(tab => (
               <Tabs.Trigger
                 key={tab.label}
-                value={tab.label}
+                value={tab.value}
                 className="h-[30px] whitespace-nowrap text-sm">
                 {tab.label}
               </Tabs.Trigger>
@@ -360,7 +385,9 @@ const SimpleTabView: FC<{
           flexDirection: 'column',
           flex: '1 1 auto',
         }}>
-        <ErrorBoundary key={props.tabId}>{props.tabContent}</ErrorBoundary>
+        <ErrorBoundary key={props.tabValue}>
+          {selectedTab?.content}
+        </ErrorBoundary>
       </Box>
     </Box>
   );

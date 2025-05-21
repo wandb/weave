@@ -25,7 +25,7 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
-import {SimplePageLayout} from '../common/SimplePageLayout';
+import {BetterTabView, SimplePageLayout} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
   useCompareEvaluationsState,
@@ -192,6 +192,7 @@ const CompareEvaluationsPageInner: React.FC<{
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
+  const [tabValue, setTabValue] = useState('report');
   return (
     <Box
       sx={{
@@ -199,58 +200,91 @@ const CompareEvaluationsPageInner: React.FC<{
         width: '100%',
         overflow: 'auto',
       }}>
-      <VerticalBox
-        sx={{
-          paddingTop: STANDARD_PADDING,
-          alignItems: 'flex-start',
-          gridGap: STANDARD_PADDING * 2,
-        }}>
-        <InvalidEvaluationBanner
-          evaluationCalls={Object.values(state.summary.evaluationCalls)}
-        />
-        <ComparisonDefinitionSection state={state} />
-        <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />
-        <ScorecardSection state={state} />
-        {resultsLoading ? (
-          <Box
-            sx={{
-              width: '100%',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              height: '50px',
-            }}>
-            <WaveLoader size="small" />
-          </Box>
-        ) : showExamples ? (
+      <BetterTabView
+        headerContent={
           <>
-            {showExampleFilter && <ExampleFilterSection state={state} />}
-            <ResultExplorer state={state} height={props.height} />
+            <InvalidEvaluationBanner
+              evaluationCalls={Object.values(state.summary.evaluationCalls)}
+            />
+            <ComparisonDefinitionSection state={state} />
           </>
-        ) : (
-          <VerticalBox
-            sx={{
-              // alignItems: '',
-              paddingLeft: STANDARD_PADDING,
-              paddingRight: STANDARD_PADDING,
-              width: '100%',
-              overflow: 'auto',
-            }}>
-            <Box
-              sx={{
-                fontSize: '1.5em',
-                fontWeight: 'bold',
-              }}>
-              Examples
-            </Box>
-            <Alert severity="info">
-              The selected evaluations' datasets have 0 rows in common, try
-              comparing evaluations with datasets that have at least one row in
-              common.
-            </Alert>
-          </VerticalBox>
-        )}
-      </VerticalBox>
+        }
+        tabs={[
+          {
+            value: 'report',
+            label: 'Report',
+            content: (
+              <VerticalBox
+                sx={{
+                  paddingTop: STANDARD_PADDING,
+                  alignItems: 'flex-start',
+                  gridGap: STANDARD_PADDING * 2,
+                }}>
+                <SummaryPlots
+                  state={state}
+                  setSelectedMetrics={setSelectedMetrics}
+                />
+                <ScorecardSection state={state} />
+              </VerticalBox>
+            ),
+          },
+          {
+            value: 'results',
+            label: 'Results',
+            content: (
+              <VerticalBox
+                sx={{
+                  paddingTop: STANDARD_PADDING,
+                  alignItems: 'flex-start',
+                  gridGap: STANDARD_PADDING * 2,
+                }}>
+                {resultsLoading ? (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      height: '50px',
+                    }}>
+                    <WaveLoader size="small" />
+                  </Box>
+                ) : showExamples ? (
+                  <>
+                    {showExampleFilter && (
+                      <ExampleFilterSection state={state} />
+                    )}
+                    <ResultExplorer state={state} height={props.height} />
+                  </>
+                ) : (
+                  <VerticalBox
+                    sx={{
+                      // alignItems: '',
+                      paddingLeft: STANDARD_PADDING,
+                      paddingRight: STANDARD_PADDING,
+                      width: '100%',
+                      overflow: 'auto',
+                    }}>
+                    <Box
+                      sx={{
+                        fontWeight: 'bold',
+                      }}>
+                      Examples
+                    </Box>
+                    <Alert severity="info">
+                      The selected evaluations' datasets have 0 rows in common,
+                      try comparing evaluations with datasets that have at least
+                      one row in common.
+                    </Alert>
+                  </VerticalBox>
+                )}
+              </VerticalBox>
+            ),
+          },
+        ]}
+        tabValue={tabValue}
+        handleTabChange={setTabValue}
+      />
     </Box>
   );
 };

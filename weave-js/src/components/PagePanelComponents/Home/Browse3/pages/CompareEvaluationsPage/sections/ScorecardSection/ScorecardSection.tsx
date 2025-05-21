@@ -157,7 +157,6 @@ export const ScorecardSection: React.FC<{
         }}>
         <Box
           sx={{
-            fontSize: '1.5em',
             fontWeight: 'bold',
           }}>
           Scorecard
