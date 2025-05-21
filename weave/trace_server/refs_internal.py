@@ -122,9 +122,11 @@ class InternalObjectRef:
         if self.extra:
             extra_val = "/".join(extra_value_quoter(e) for e in self.extra)
             # Special case for datasets:
-            dataset_row_prefix = f"{OBJECT_ATTR_EDGE_NAME}/rows/{TABLE_ROW_ID_EDGE_NAME}/"
+            dataset_row_prefix = (
+                f"{OBJECT_ATTR_EDGE_NAME}/rows/{TABLE_ROW_ID_EDGE_NAME}/"
+            )
             if extra_val.startswith(dataset_row_prefix):
-                return extra_val[len(dataset_row_prefix):]
+                return extra_val[len(dataset_row_prefix) :]
             content_id += "/" + extra_val
         return content_id
 
