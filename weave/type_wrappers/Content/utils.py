@@ -114,6 +114,7 @@ def normalize_args(
     except ValueError:
         raise ValueError(f"Failed to determine input type")
 
+# Currently unused, will be useful when opening from a tempfile is implemented for non-file Content
 def popen_and_call(on_exit, popen_args):
     """
     Runs the given args in a subprocess.Popen, and then calls the function
