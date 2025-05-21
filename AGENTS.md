@@ -40,7 +40,7 @@
 ### Key Test Shards
 Focus on these primary test shards:
 - `tests-3.12(shard='trace')` - Core tracing functionality
-- `tests-3.12(shard='flow')` - Flow control and execution
+- `tests-3.12(shard='flow')` - Higher level work"flow" objects
 - `tests-3.12(shard='trace_server')` - Server implementation
 - `tests-3.12(shard='trace_server_bindings')` - Server bindings
 
