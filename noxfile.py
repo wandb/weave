@@ -15,13 +15,7 @@ PY313_INCOMPATIBLE_SHARDS = [
     "notdiamond",
     "crewai",
 ]
-PY39_INCOMPATIBLE_SHARDS = [
-    "crewai",
-    "google_genai",
-    "mcp",
-    "smolagents",
-    "autogen_tests",
-]
+PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents", "dspy", "autogen_tests"]
 
 
 @nox.session
