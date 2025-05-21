@@ -75,6 +75,24 @@ TODO: need to fill this out
 3. Update documentation if needed
 4. Check for any breaking changes
 
+## Common Development Patterns
+
+### Code Organization
+- Python code follows standard module organization
+- TypeScript/React components are organized by feature
+- Shared utilities should be placed in appropriate common directories
+
+### Error Handling
+- Use appropriate error types from `weave.errors`
+- Include meaningful error messages
+- Add error handling tests
+
+### Documentation
+- Make sure to add end-user documentation inside the `docs` dir when creating new features.
+- Update relevant docstrings for Python code
+- Add JSDoc comments for TypeScript code
+- Update this file when introducing new patterns or concepts
+
 ---
 
 # Requests to Humans
@@ -83,4 +101,5 @@ This section contains a list of questions, clarifications, or tasks that LLM age
 If there is something that doesn't make sense architecturally, devex-wise, or product-wise, please update this file and the humans will take care of it.
 Think of this as the reverse-task assignment - a place where you can communicate back to us.
 
+- [ ] Add TypeScript testing guidelines
 - [ ] ...
