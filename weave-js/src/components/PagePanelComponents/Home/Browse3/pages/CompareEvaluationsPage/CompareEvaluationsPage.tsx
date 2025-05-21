@@ -179,12 +179,14 @@ const CompareEvaluationsPageInner: React.FC<{
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const showExampleFilter = false;
+  // Keeping this here in case we want to bring it back
   // Object.keys(state.summary.evaluationCalls).length === 2;
   const showExamples =
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
   const [tabValue, setTabValue] = useState('summary');
+
   return (
     <Box
       sx={{
@@ -259,7 +261,6 @@ const CompareEvaluationsPageInner: React.FC<{
                 ) : (
                   <VerticalBox
                     sx={{
-                      // alignItems: '',
                       paddingLeft: STANDARD_PADDING,
                       paddingRight: STANDARD_PADDING,
                       width: '100%',
@@ -304,24 +305,6 @@ const ResultExplorer: React.FC<{
         width: '100%',
         overflow: 'hidden',
       }}>
-      {/* <HorizontalBox
-        sx={{
-          flex: '0 0 auto',
-          paddingLeft: STANDARD_PADDING,
-          paddingRight: STANDARD_PADDING,
-          width: '100%',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          paddingTop: 15,
-        }}>
-        <Box
-          sx={{
-            fontSize: '16px',
-            fontWeight: 'bold',
-          }}>
-          Output Comparison
-        </Box>
-      </HorizontalBox> */}
       <Box
         style={{
           display: 'flex',
