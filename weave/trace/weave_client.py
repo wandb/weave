@@ -1377,7 +1377,7 @@ class WeaveClient:
                         id=call.id,
                         ended_at=ended_at,
                         output=output_json,
-                        summary=summary,
+                        summary=merged_summary,
                         exception=exception_str,
                     )
                 )
