@@ -687,10 +687,10 @@ class Call:
 
         wc = weave_client_context.get_weave_client()
         if wc:
-            scorer_ref_uri = None
+            scorer_ref = None
             if weave_isinstance(scorer, Scorer):
                 # Very important: if the score is generated from a Scorer subclass,
-                # then scorer_ref_uri will be None, and we will use the op_name from
+                # then scorer_ref will be None, and we will use the op_name from
                 # the score_call instead.
                 scorer_ref = get_ref(scorer)
             wc._send_score_call(self, score_call, scorer_ref)
