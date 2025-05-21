@@ -378,7 +378,12 @@ def is_placeholder_call(call: Call) -> bool:
 def _set_python_function_type_on_weave_dict(
     __weave: WeaveKwargs, type_str: str
 ) -> None:
-    __weave.get("attributes", {}).get("weave", {}).get("python", {})["type"] = type_str
+    weave_dict = (
+        __weave.setdefault("attributes", {})
+        .setdefault("weave", {})
+        .setdefault("python", {})
+    )
+    weave_dict["type"] = type_str
 
 
 def _call_sync_func(
