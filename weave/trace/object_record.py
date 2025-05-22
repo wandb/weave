@@ -67,6 +67,8 @@ def class_all_bases_names(cls: type) -> list[str]:
 
 def pydantic_object_record(obj: PydanticBaseModelGeneral) -> ObjectRecord:
     attrs = pydantic_asdict_one_level(obj)
+    if attrs.get("ref") is None:
+        attrs.pop("ref", None)
     for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
         attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
@@ -84,6 +86,8 @@ def dataclass_object_record(obj: Any) -> ObjectRecord:
     if not dataclasses.is_dataclass(obj):
         raise ValueError(f"{obj} is not a dataclass")
     attrs = dataclass_asdict_one_level(obj)
+    if attrs.get("ref") is None:
+        attrs.pop("ref", None)
     for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
         attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
