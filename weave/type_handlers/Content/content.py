@@ -32,9 +32,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> Content:
 def instance_check(obj: object) -> bool:
     if isinstance(obj, Content):
         return True
-
     ser_id = obj.__module__ + "." + getattr(obj, "__name__", "")
-    print(ser_id)
     return ser_id.startswith("weave.") and ser_id.endswith(".Content")
 
 

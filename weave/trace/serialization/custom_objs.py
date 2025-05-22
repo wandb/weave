@@ -26,7 +26,6 @@ class DecodeCustomObjectError(Exception):
 # {target_cls.__module__}.{target_cls.__qualname__}
 KNOWN_TYPES = {
     "Op",
-    "weave.type_wrappers.Content.content.Content",
     "PIL.Image.Image",
     "wave.Wave_read",
     "weave.type_handlers.Audio.audio.Audio",
