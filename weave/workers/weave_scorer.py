@@ -280,11 +280,6 @@ def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, An
     return call_start_res.id, result
 
 
-async def _create_feedback(req: FeedbackCreateReq) -> None:
-    server = get_trace_server()
-    server.feedback_create(req)
-
-
 async def apply_scorer(
     monitor_internal_ref: InternalObjectRef,
     scorer: Scorer,
@@ -315,7 +310,9 @@ async def apply_scorer(
     )
 
     logger.info("Creating feedback for scorer %s and call %s", scorer.name, call.id)
-    await _create_feedback(feedback_req)
+    server = get_trace_server()
+    server.feedback_create(feedback_req)
+    logger.info("Created feedback for scorer %s and call %s", scorer.name, call.id)
 
 
 def _task_done_callback(
