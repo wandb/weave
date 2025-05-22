@@ -47,69 +47,75 @@ class BaseContentHandler(BaseModel):
         return self.model_dump(exclude={"data"})
 
 
-class BytesContentHandler(BaseContentHandler):
-    def __init__(self, input: bytes, /, **values: Any):
-        values["size"] = values["size"] or len(input)
-        if values["mimetype"] is None or values["extension"] is None:
-            mimetype, extension = get_mime_and_extension(
-                buffer=input[:2048],
-                filename=values["filename"],
-                extension=values["extension"],
-                mimetype=values["mimetype"],
-            )
-            values["mimetype"] = mimetype
-            values["extension"] = extension
-        values["filename"] = values["filename"] or default_filename(values["extension"])
+def create_bytes_content(
+    input: bytes, /, **values: Unpack[ContentOptionalArgs]
+) -> BaseContentHandler:
+    values["size"] = values["size"] or len(input)
+    if values["mimetype"] is None or values["extension"] is None:
+        mimetype, extension = get_mime_and_extension(
+            buffer=input[:2048],
+            filename=values["filename"],
+            extension=values["extension"],
+            mimetype=values["mimetype"],
+        )
+        values["mimetype"] = mimetype
+        values["extension"] = extension
 
-        super().__init__(input, **values)
+    values["filename"] = values["filename"] or default_filename(
+        str(values["extension"])
+    )
 
-
-class FileContentHandler(BytesContentHandler):
-    def __init__(self, input: str | Path, **values: Any):
-        if not is_valid_path(input):
-            raise ValueError(f"Input {input} is not a valid file path.")
-
-        path = Path(input)
-        values["path"] = str(path)
-        values["size"] = path.stat().st_size
-        # Allow overriding the filename when submitting to weave
-        values["filename"] = values.get("filename", path.name)
-        data = path.read_bytes()
-        super().__init__(data, **values)
+    return BaseContentHandler(input, **values)
 
 
-class Base64ContentHandler(BytesContentHandler):
-    def __init__(self, input: str | bytes, **values: Unpack[ContentOptionalArgs]):
-        try:
-            data = base64.b64decode(input, validate=True)
-            super().__init__(data, **values)
-        except Exception as e:
-            raise ValueError(f"Invalid base64 string: {e}") from e
+def create_file_content(
+    input: str | Path, /, **values: Unpack[ContentOptionalArgs]
+) -> BaseContentHandler:
+    if not is_valid_path(input):
+        raise ValueError(f"Input {input} is not a valid file path.")
+
+    path = Path(input)
+    values["path"] = str(path)
+    values["size"] = path.stat().st_size
+    values["filename"] = path.name
+    data = path.read_bytes()
+    return create_bytes_content(data, **values)
 
 
-class ObjectContentHandler(BytesContentHandler):
-    def __init__(self, input: object, **values: Unpack[ContentOptionalArgs]):
-        if not input.__getattribute__("__class__"):
-            raise ValueError("Input object does not have a class attribute.")
+def create_b64_content(
+    input: str | bytes, /, **values: Unpack[ContentOptionalArgs]
+) -> BaseContentHandler:
+    try:
+        data = base64.b64decode(input, validate=True)
+        return create_bytes_content(data, **values)
+    except Exception as e:
+        raise ValueError(f"Invalid base64 string: {e}") from e
 
-        handler: Callable[..., bytes] | None = None
 
-        class_members = inspect.getmembers(input.__class__)
-        for name, _ in class_members:
-            if name in TO_BYTES_METHODS:
-                handler = getattr(input, name)
+def create_object_content(
+    input: object, /, **values: Unpack[ContentOptionalArgs]
+) -> BaseContentHandler:
+    if not input.__getattribute__("__class__"):
+        raise ValueError("Input object does not have a class attribute.")
 
-        if handler is None:
-            raise ValueError(
-                """
+    handler: Callable[..., bytes] | None = None
+
+    class_members = inspect.getmembers(input.__class__)
+    for name, _ in class_members:
+        if name in TO_BYTES_METHODS:
+            handler = getattr(input, name)
+
+    if handler is None:
+        raise ValueError(
+            """
                 No valid method found to convert object to bytes.
                 If your object has a method to convert to bytes, please supply the name
                 in the the to_bytes keyword arguement
                 """
-            )
+        )
 
-        data = handler()
-        super().__init__(data, **values)
+    data = handler()
+    return create_bytes_content(data, **values)
 
 
 T = TypeVar("T", bound=str)
@@ -147,17 +153,17 @@ class Content(Generic[T]):
         )
 
         if isinstance(input, Path):
-            self.content_handler = FileContentHandler(
+            self.content_handler = create_file_content(
                 str(input), **values_with_defaults
             )
         elif isinstance(input, str):
             if is_valid_path(str(input)):
-                self.content_handler = FileContentHandler(
+                self.content_handler = create_file_content(
                     str(input), **values_with_defaults
                 )
             else:
                 try:
-                    self.content_handler = Base64ContentHandler(
+                    self.content_handler = create_b64_content(
                         str(input), **values_with_defaults
                     )
                 except ValueError:
@@ -165,9 +171,9 @@ class Content(Generic[T]):
                         f"Could not parse string {input} as a valid path or base64 string"
                     )
         elif isinstance(input, bytes):
-            self.content_handler = BytesContentHandler(input, **values_with_defaults)
+            self.content_handler = create_bytes_content(input, **values_with_defaults)
         elif hasattr(input, "__class__"):
-            self.content_handler = ObjectContentHandler(input, **values_with_defaults)
+            self.content_handler = create_object_content(input, **values_with_defaults)
         else:
             raise ValueError(f"Unsupported input type: {type(input)}")
 
