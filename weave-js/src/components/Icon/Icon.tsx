@@ -292,8 +292,8 @@ const updateIconProps = (props: SVGIconProps) => {
     height: 20,
     ...props,
     style: {
-      ...props.style,
       flexShrink: 0,
+      ...props.style,
     },
   };
 };
