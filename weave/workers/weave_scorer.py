@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import uuid
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Optional, TypedDict
@@ -44,7 +45,7 @@ from weave.trace_server.refs_internal import (
 )
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(f"weave.workers.weave_scorer.{str(uuid.uuid4())[:8]}")
 logger.setLevel(logging.INFO)
 
 _TRACE_SERVER: Optional[ClickHouseTraceServer] = None
@@ -177,7 +178,7 @@ class CallNotWrittenError(Exception):
 @retry(
     retry=retry_if_exception_type(CallNotWrittenError),
     wait=wait_fixed(1),
-    stop=stop_after_attempt(5),
+    stop=stop_after_attempt(10),
     before=before_log(logger, logging.INFO),
 )
 async def get_filtered_calls(
