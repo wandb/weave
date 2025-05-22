@@ -318,7 +318,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+    def call_end(self, req: tsi.CallEndReq, publish: bool = True) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
@@ -328,7 +328,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # the call does not already exist
         self._insert_call(ch_call)
 
-        self.kafka_producer.produce_call_end(req.end)
+        if publish:
+            self.kafka_producer.produce_call_end(req.end)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
@@ -2252,6 +2253,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
+        logger.info("Flushing %s calls", len(self._call_batch))
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:

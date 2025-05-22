@@ -275,7 +275,7 @@ def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, An
         )
     )
 
-    server.call_end(call_end_req)
+    server.call_end(call_end_req, publish=False)
 
     return call_start_res.id, result
 
@@ -311,6 +311,7 @@ async def apply_scorer(
         trigger_ref=monitor_internal_ref.uri(),
     )
 
+    logger.info("Creating feedback for scorer %s and call %s", scorer.name, call.id)
     server.feedback_create(feedback_req)
 
 
