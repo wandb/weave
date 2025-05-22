@@ -1169,6 +1169,7 @@ const useRootObjectVersions = (
         object_ids: deepFilter?.objectIds,
         latest_only: deepFilter?.latestOnly,
         is_op: false,
+        wb_user_ids: deepFilter?.userIds,
       },
       limit: params.limit,
       metadata_only: params.metadataOnly,

@@ -753,6 +753,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_query_builder.add_base_object_classes_condition(
                     req.filter.base_object_classes
                 )
+            if req.filter.wb_user_ids:
+                object_query_builder.add_wb_user_ids_condition(req.filter.wb_user_ids)
         if req.limit is not None:
             object_query_builder.set_limit(req.limit)
         if req.offset is not None:

@@ -3,4 +3,5 @@ import {KnownBaseObjectClassType} from '../wfReactInterface/wfDataModelHooksInte
 export type WFHighLevelObjectVersionFilter = {
   objectName?: string | null;
   baseObjectClass?: KnownBaseObjectClassType | null;
+  userIds?: string[];
 };

@@ -258,11 +258,19 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        if req.filter is not None:
+            if req.filter.wb_user_ids is not None:
+                req.filter.wb_user_ids = [
+                    self._idc.ext_to_int_user_id(user_id)
+                    for user_id in req.filter.wb_user_ids
+                ]
         res = self._ref_apply(self._internal_trace_server.objs_query, req)
         for obj in res.objs:
             if obj.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
             obj.project_id = original_project_id
+            if obj.wb_user_id is not None:
+                obj.wb_user_id = self._idc.int_to_ext_user_id(obj.wb_user_id)
         return res
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
