@@ -1,43 +1,88 @@
 from __future__ import annotations
 
 import mimetypes
+from pathlib import Path
+import magic
 
 try:
-    import magic
-    try:
-        # Try to create a magic instance to check if the library is installed + functional
-        _MAGIC_INSTANCE_FOR_CHECK = magic.Magic(mime=True)
-        MAGIC_LIB_AVAILABLE = True
-        del _MAGIC_INSTANCE_FOR_CHECK  # Clean up
-    except magic.MagicException as e:
-        MAGIC_LIB_AVAILABLE = False
-
-except ImportError:
+    _MAGIC_INSTANCE_FOR_CHECK = magic.Magic(mime=True)
+    MAGIC_LIB_AVAILABLE = True
+    del _MAGIC_INSTANCE_FOR_CHECK  # Clean up
+except magic.MagicException as e:
     MAGIC_LIB_AVAILABLE = False
 
-def guess_extension(mime_type: str) -> str | None:
-    ext = mimetypes.guess_extension(mime_type)
-    return ext.lstrip(".") if ext else None
+def get_extension_from_mimetype(mimetype: str) -> str:
+    extension = mimetypes.guess_extension(mimetype)
+    if not extension:
+        raise ValueError(f"Got mime-type {mimetype} but failed to resolve a valid extension")
+    return extension
 
-def guess_mime_type(**kwargs) -> str | None:
-    mime_type = None
+def guess_from_buffer(buffer: bytes) -> str | None:
+    if not MAGIC_LIB_AVAILABLE:
+        return None
+    return magic.Magic(mime=True).from_buffer(buffer)
 
-    if filename := kwargs.get("filename"):
-        mime_type = mimetypes.guess_type(filename)[0]
-    elif extension := kwargs.get("extension"):
-        mime_type = mimetypes.guess_type(f"file.{extension}")[0]
+def guess_from_filename(filename: str) -> str | None:
+    return mimetypes.guess_type(filename)[0]
 
-    if mime_type is None and "buffer" in kwargs:
-        if not MAGIC_LIB_AVAILABLE:  # Check if libmagic itself is usable
-            raise RuntimeError(
-                "Failed to determine MIME type from file extension and cannot infer from data"
-                "MIME type detection from raw data requires a functional python-magic library "
-                "and its underlying libmagic dependency. Please install or configure them correctly."
-            )
-        magic_detector = magic.Magic(mime=True)
-        return magic_detector.from_buffer(kwargs.get("buffer"))
+def guess_from_extension(extension: str) -> str | None:
+    filename = f"file.{extension.lstrip('.')}"
+    return guess_from_filename(filename)
 
-    return None
+def guess_from_path(path: Path) -> str | None:
+    mimetype = guess_from_filename(path.name)
+    return mimetype
+
+
+def get_mime_and_extension(**kwargs) -> tuple[str, str]:
+    mimetype = kwargs.get("mimetype")
+    extension = kwargs.get("extension")
+
+    if mimetype and extension:
+        return mimetype, extension
+    elif mimetype and not extension:
+        return mimetype, get_extension_from_mimetype(mimetype)
+
+    for key in ["mimetype", "filename", "extension", "path", "buffer"]:
+        if not key in kwargs or kwargs[key] is None:
+            continue
+
+        value = kwargs[key]
+
+        if key == "mimetype":
+            mimetype = value
+        elif key == "filename":
+            mimetype = guess_from_filename(value)
+        elif key == "extension":
+            mimetype = guess_from_extension(value)
+            # Only set if we got a valid mime type from it
+        elif key == "path":
+            value = Path(value)
+            mimetype = guess_from_path(value)
+            if mimetype is None and kwargs.get("buffer") is None:
+                mimetype = guess_from_buffer(value.read_bytes()[:2048])
+        elif key == "buffer":
+            mimetype = guess_from_buffer(value)
+
+        if mimetype:
+            break
+
+    if mimetype and extension:
+        return mimetype, extension
+    elif mimetype and not extension:
+        return mimetype, get_extension_from_mimetype(mimetype)
+    elif not MAGIC_LIB_AVAILABLE:
+        raise RuntimeError(
+            "Failed to determine MIME type from file extension and cannot infer from data"
+            "MIME type detection from raw data requires a functional python-magic library "
+            "and its underlying libmagic dependency. Please install or configure them correctly."
+            "See: https://pypi.org/project/python-magic/ for detailed instructions"
+        )
+    else:
+        raise RuntimeError(
+            "Failed to determine MIME type from file extension and cannot infer from data"
+        )
+
 
 def is_mime_type(mime_string):
     """

@@ -1,90 +1,203 @@
-import os
+from collections.abc import Callable
+import inspect
 from pathlib import Path
+from typing import Any, TypeVar
+from typing import Any, Generic
+from pydantic import BaseModel
+from pydantic.dataclasses import dataclass
 import subprocess
-import logging
 import sys
-from typing import Generic
-from typing_extensions import TypeVar
+import os
+import logging
+import base64
+from weave.type_wrappers.Content.mime_resolver import get_mime_and_extension
+
 logger = logging.getLogger(__name__)
-from .utils import (
-    ContentMetadata,
-    ContentProperties,
-    normalize_args,
-    normalize_file_args,
-    normalize_bytes_args,
-    normalize_base64_args,
-)
+
+TO_BYTES_METHODS = [
+    'tobytes', # Numpy, Pandas, etc
+    'to_bytes', # Some custom classes and int
+    'read', # File-like objects
+    'read_bytes', # File-like objects, Path, etc
+    'as_bytes', # Some custom classes
+]
+
+CONTENT_KWARGS = [
+    'filename',
+    'path',
+    'extension',
+    'mimetype',
+]
+
+def default_name_fn(mimetype: str, extension: str) -> str:
+    return mimetype.split("/")[1] + "." + extension
+
+def is_valid_path(input: str | Path) -> bool:
+    if isinstance(input, str):
+        input = Path(input)
+    return input.exists() and input.is_file()
+
+def resolve_filename(
+    default_fn: Callable[..., str] = default_name_fn,
+    **kwargs
+) -> str:
+    if filename := kwargs.get("filename", None):
+        return filename
+    elif path := kwargs.get("path", None):
+        return Path(path).name
+
+    return default_fn(**kwargs)
+
+
+@dataclass
+class BaseContentHandler(BaseModel):
+    size: int
+    filename: str
+    mimetype: str
+    extension: str
+    data: bytes
+    extra: dict[str, Any] = {}
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        metadata = self.model_dump(exclude={"data", "extra"})
+        for key, value in self.extra.items():
+            metadata[key] = value
+        return metadata
+
+class FileInput(BaseContentHandler):
+    def __init__(self, input: str | Path, **kwargs):
+        if not is_valid_path(input):
+            raise ValueError(f"Input {input} is not a valid file path.")
+
+        # Set in extra so it is written to the metadata
+        self.extra['original_path'] = str(input)
+        path = Path(input)
+        self.size = path.stat().st_size
+        self.data = path.read_bytes()
+        # Allow overriding the filename
+        self.filename = kwargs.get("filename", path.name)
+        self.mimetype, self.extension = get_mime_and_extension(
+            buffer=self.data[:2048],
+            **kwargs
+        )
+
+        for key, value in kwargs.keys():
+            if key not in CONTENT_KWARGS:
+                self.extra[key] = value
+
+
+
+class BytesContentHandler(BaseContentHandler):
+    def __init__(self, input: bytes, **kwargs):
+        self.data = input
+        self.size = len(self.data)
+        self.mimetype, self.extension = get_mime_and_extension(
+            buffer=self.data[:2048],
+            **kwargs
+        )
+        self.filename = resolve_filename(**kwargs)
+        self.original_path = kwargs.get("path", None)
+
+        for key, value in kwargs.keys():
+            if key not in CONTENT_KWARGS:
+                self.extra[key] = value
+
+class Base64ContentHandler(BytesContentHandler):
+    def __init__(self, input: str | bytes, **kwargs):
+        try:
+            data = base64.b64decode(input, validate=True)
+            super().__init__(data, **kwargs)
+        except Exception as e:
+            raise ValueError(f"Invalid base64 string: {e}") from e
+
+class ObjectContentHandler(BytesContentHandler):
+    def __init__(self, input: object, **kwargs):
+        if not input.__getattribute__('__class__'):
+            raise ValueError("Input object does not have a class attribute.")
+
+        handler: Callable[..., bytes] | None = None
+
+        class_members = inspect.getmembers(input.__class__)
+        for name, _ in class_members:
+            if name in TO_BYTES_METHODS:
+                handler = getattr(input, name)
+
+        if handler is None:
+            raise ValueError(
+                """
+                No valid method found to convert object to bytes.
+                If your object has a method to convert to bytes, please supply the name
+                in the the to_bytes keyword arguement
+                """
+            )
+
+        data = handler()
+        super().__init__(data, **kwargs)
 
 T = TypeVar("T", bound=str)
 
 class Content(Generic[T]):
-    """A class representing a file, raw bytes or base64 content with path, mimetype, and size information."""
-    properties: ContentProperties
+    content_handler: BaseContentHandler
 
-     # Take a type hint which can be either extension or mimetype so that the annotation parser doesn't have to deal with it
     def __init__(
         self,
-        input: bytes | str | Path | ContentProperties,
+        input: Any,
         type_hint: str | None = None,
-        mimetype: str | None = None,
-        extension: str | None = None,
+        **kwargs
     ):
-        if not mimetype and not extension:
-            if type_hint:
-                if type_hint.startswith(".") or type_hint.find('/') == -1:
-                    extension = type_hint
-                else:
-                    mimetype = type_hint
-                mimetype = type_hint
-        if not isinstance(input, dict):
-            self.properties = normalize_args(input, mimetype, extension)
-            return
+        if type_hint:
+            if type_hint.find("/") != -1:
+                kwargs["mimetype"] = type_hint
+            else:
+                kwargs["extension"] = type_hint.lstrip(".")
 
-        self.properties = input
+        if isinstance(input, Path):
+            self.content_handler = FileInput(str(input), **kwargs)
+        elif isinstance(input, str):
+            if is_valid_path(str(input)):
+                self.content_handler = FileInput(str(input), **kwargs)
+            else:
+                try:
+                    self.content_handler = Base64ContentHandler(str(input), **kwargs)
+                except ValueError:
+                    raise ValueError(
+                        f"Could not parse string {input} as a valid path or base64 string"
+                    )
+        elif isinstance(input, bytes):
+            self.content_handler = Base64ContentHandler(input, **kwargs)
+        elif hasattr(input, "__class__"):
+            self.content_handler = ObjectContentHandler(input, **kwargs)
+        else:
+            raise ValueError(f"Unsupported input type: {type(input)}")
 
-    # For backwards compatibility
-    @classmethod
-    def from_path(cls, path: Path, mimetype=None, extension=None):
-        cls(normalize_file_args(path, mimetype, extension))
-
-    # For backwards compatibility
-    @classmethod
-    def from_bytes(cls, data: bytes, mimetype=None, extension=None):
-        cls(normalize_bytes_args(data, mimetype, extension))
-
-    # For backwards compatibility
-    @classmethod
-    def from_base64(cls, data: str | bytes, mimetype=None, extension=None):
-        if isinstance(data, bytes):
-            data = data.decode("ascii")
-        cls(normalize_base64_args(data, mimetype, extension))
+    @property
+    def metadata(self) -> dict[str, Any]:
+        return self.content_handler.metadata
 
     @property
     def data(self) -> bytes:
-        """Get the raw content data."""
-        return self.properties["data"]
-
-    @property
-    def mimetype(self) -> str:
-        """Get the MIME type of the content."""
-        return self.properties["mimetype"]
-
-    @property
-    def extension(self) -> str:
-        """Get the file extension of the content."""
-        return self.properties["extension"]
-
-    @property
-    def filename(self) -> str:
-        return self.properties["filename"]
-
-    @property
-    def original_path(self) -> str | None:
-        return self.properties["original_path"]
+        return self.content_handler.data
 
     @property
     def size(self) -> int:
-        return self.properties["size"]
+        return self.content_handler.size
+
+    @property
+    def filename(self) -> str:
+        return self.content_handler.filename
+
+    @property
+    def original_path(self) -> str | None:
+        return self.content_handler.extra.get("original_path", None)
+
+    @property
+    def extension(self) -> str:
+        return self.content_handler.extension
+
+    @property
+    def mimetype(self) -> str:
+        return self.content_handler.mimetype
 
     def open(self) -> bool:
         """Open the file using the operating system's default application.
@@ -111,29 +224,6 @@ class Content(Generic[T]):
             return False
         return True
 
-    @property
-    def pyclass(self) -> str:
-        return self.properties["pyclass"]
-
-    @property
-    def class_id(self) -> str:
-        return self.properties["pyclass"]
-
-    @property
-    def metadata(self) -> ContentMetadata:
-        """Get the metadata of the content.
-        Returns:
-            dict: A dictionary containing the metadata of the content.
-        """
-        return {
-            "mimetype": self.mimetype,
-            "extension": self.extension,
-            "filename": self.filename,
-            "original_path": self.original_path,
-            "size": self.size,
-            "pyclass": "weave.Content"
-        }
-
     def save(self, dest: str | Path) -> None:
         """Copy the file to the specified destination path.
 
@@ -148,4 +238,3 @@ class Content(Generic[T]):
         # Otherwise write the data to the path
         with open(path, "wb") as f:
             f.write(self.data)
-
