@@ -1,4 +1,5 @@
 import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
+import {PaginationModel} from '../CompareEvaluationsPage/ecpTypes';
 import {memoize} from './memoize';
 import {TraceServerClient} from './traceServerClient';
 import {TraceCallSchema} from './traceServerClientTypes';
@@ -11,8 +12,7 @@ const pagedPredictAndScoresQuery = async (
   entity: string,
   project: string,
   evaluationCallId: string,
-  limit: number,
-  offset: number
+  paginationModel: PaginationModel
 ): Promise<TraceCallSchema[]> => {
   const projectId = projectIdFromParts({entity: entity, project: project});
   const evalTraceResProm = client.callsStreamQuery({
@@ -23,8 +23,8 @@ const pagedPredictAndScoresQuery = async (
         `weave:///${entity}/${project}/op/${PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC}:*`,
       ],
     },
-    limit: limit,
-    offset: offset,
+    limit: paginationModel.pageSize,
+    offset: paginationModel.page * paginationModel.pageSize,
     sort_by: [
       {
         field: 'started_at',
@@ -39,8 +39,8 @@ const pagedPredictAndScoresQuery = async (
 // Create memoized version
 export const memoizedPredictAndScoresQuery = memoize(
   pagedPredictAndScoresQuery,
-  (client, entity, project, evaluationCallId, limit, offset) =>
-    JSON.stringify({entity, project, evaluationCallId, limit, offset}),
+  (client, entity, project, evaluationCallId, paginationModel) =>
+    JSON.stringify({entity, project, evaluationCallId, paginationModel}),
   100
 );
 
@@ -64,8 +64,10 @@ const lookupPredictAndScoreMatch = async (
       entity,
       project,
       evaluationCallId,
-      limit,
-      offset
+      {
+        pageSize: limit,
+        page: offset,
+      }
     );
     hasMoreRows = calls.length === limit;
     offset += calls.length;

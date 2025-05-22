@@ -63,9 +63,7 @@ export const maybeExtractDatasetRowRefDigest = (value: any): string | null => {
     return null;
   }
   const datasetRowPrefix = `${OBJECT_ATTR_EDGE_NAME}/rows/${TABLE_ID_EDGE_NAME}/`;
-  if (
-    !(parsedMaybe.artifactRefExtra?.startsWith(datasetRowPrefix))
-  ) {
+  if (!parsedMaybe.artifactRefExtra?.startsWith(datasetRowPrefix)) {
     return null;
   }
   return parsedMaybe.artifactRefExtra.slice(datasetRowPrefix.length);

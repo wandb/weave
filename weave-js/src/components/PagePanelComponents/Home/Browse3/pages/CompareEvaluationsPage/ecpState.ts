@@ -15,6 +15,7 @@ import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
 import {
   EvaluationComparisonResults,
   EvaluationComparisonSummary,
+  PaginationModel,
 } from './ecpTypes';
 import {getMetricIds} from './ecpUtil';
 
@@ -34,6 +35,7 @@ export type EvaluationComparisonState = {
   selectedMetrics?: Record<string, boolean>;
   // Ordered call Ids
   evaluationCallIdsOrdered: string[];
+  // comparison page
 };
 
 export type ComparisonDimensionsType = Array<{
@@ -51,6 +53,7 @@ export const useEvaluationComparisonState = (
   entity: string,
   project: string,
   evaluationCallIds: string[],
+  paginationModel: PaginationModel,
   comparisonDimensions?: ComparisonDimensionsType,
   selectedInputDigest?: string,
   selectedMetrics?: Record<string, boolean>
@@ -67,7 +70,8 @@ export const useEvaluationComparisonState = (
     entity,
     project,
     orderedCallIds,
-    summaryData.result
+    summaryData.result,
+    paginationModel
   );
 
   const value = useMemo(() => {

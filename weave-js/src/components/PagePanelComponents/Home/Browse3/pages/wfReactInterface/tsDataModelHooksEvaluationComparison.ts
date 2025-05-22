@@ -84,6 +84,7 @@ import {
   EvaluationComparisonResults,
   EvaluationComparisonSummary,
   MetricDefinition,
+  PaginationModel,
 } from '../CompareEvaluationsPage/ecpTypes';
 import {
   EVALUATION_NAME_DEFAULT,
@@ -160,7 +161,8 @@ export const useEvaluationComparisonResults = (
   entity: string,
   project: string,
   evaluationCallIds: string[],
-  summaryData: EvaluationComparisonSummary | null
+  summaryData: EvaluationComparisonSummary | null,
+  paginationModel: PaginationModel
 ): Loadable<EvaluationComparisonResults> => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [data, setData] = useState<EvaluationComparisonResults | null>(null);
@@ -177,8 +179,9 @@ export const useEvaluationComparisonResults = (
       getTraceServerClient(),
       entity,
       project,
-      evaluationCallIdsMemo
-      // summaryData
+      evaluationCallIdsMemo,
+      paginationModel,
+      summaryData
     ).then(dataRes => {
       if (mounted) {
         evaluationCallIdsRef.current = evaluationCallIdsMemo;
@@ -194,6 +197,7 @@ export const useEvaluationComparisonResults = (
     project,
     getTraceServerClient,
     summaryData,
+    paginationModel,
   ]);
 
   return useMemo(() => {
@@ -383,8 +387,9 @@ const fetchEvaluationComparisonResults = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
   entity: string,
   project: string,
-  evaluationCallIds: string[]
-  // summaryData: EvaluationComparisonSummary
+  evaluationCallIds: string[],
+  paginationModel: PaginationModel,
+  summaryData: EvaluationComparisonSummary
 ): Promise<EvaluationComparisonResults> => {
   if (evaluationCallIds.length === 0) {
     return {
@@ -397,8 +402,7 @@ const fetchEvaluationComparisonResults = async (
     entity,
     project,
     evaluationCallIds[0],
-    100,
-    0
+    paginationModel
   );
 
   const comparisonPredictAndScoreCallsProms = evaluationCallIds
@@ -430,7 +434,6 @@ const fetchEvaluationComparisonResults = async (
       return calculatePredictAndScoreCallExampleDigest(call);
     }
   );
-
 
   const result: EvaluationComparisonResults = {
     resultRows: _.mapValues(groupedByDigest, (calls, rowDigest) => {
@@ -469,7 +472,6 @@ const fetchEvaluationComparisonResults = async (
       };
     }),
   };
-
 
   return result;
 

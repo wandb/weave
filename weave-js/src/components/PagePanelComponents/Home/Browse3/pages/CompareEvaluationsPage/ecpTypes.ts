@@ -138,3 +138,8 @@ export type MetricResult = {
   value: MetricValueType;
   sourceCallId: string;
 };
+
+export type PaginationModel = {
+  pageSize: number;
+  page: number;
+};

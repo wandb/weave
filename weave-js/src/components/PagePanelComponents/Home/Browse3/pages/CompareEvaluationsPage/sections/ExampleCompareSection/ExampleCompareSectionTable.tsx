@@ -827,6 +827,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         flex: 1,
         ...DISABLED_ROW_SPANNING,
         disableReorder: true,
+        sortable: false, // should be true eventually (server-side)
+        filterable: false, // should be true eventually (server-side)
         valueGetter: (value: any, row: RowData) => {
           if (row._pivot === 'modelsAsColumns') {
             return null;
@@ -867,6 +869,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                 disableColumnMenu: false,
                 disableReorder: true,
                 flex: 0,
+                sortable: false, // should be true eventually (server-side)
+                filterable: false, // should be true eventually (server-side)
                 valueGetter: (value: any, row: RowData) => {
                   if (row._pivot === 'modelsAsColumns') {
                     // This does not make sense for models as columns
@@ -1056,7 +1060,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     rows
   );
 
-
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
       ...inputFields(
@@ -1086,6 +1089,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             ...DISABLED_ROW_SPANNING,
             disableColumnMenu: false,
             disableReorder: true,
+            sortable: false, // should be true eventually (server-side)
+            filterable: false, // should be true eventually (server-side)
             renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
                 <EvaluationModelLink
@@ -1127,6 +1132,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                     ...DISABLED_ROW_SPANNING,
                     disableColumnMenu: false,
                     disableReorder: true,
+                    sortable: false, // should be true eventually (server-side)
+                    filterable: false, // should be true eventually (server-side)
                     renderHeader: (params: GridColumnHeaderParams<RowData>) => {
                       return (
                         <EvaluationModelLink
@@ -1301,6 +1308,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
       pagination
+      paginationMode="server"
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
       slots={{columnsPanel: ColumnsManagementPanel}}
