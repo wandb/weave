@@ -152,11 +152,31 @@ export const memoizedLookupPredictAndScoreMatchMany = memoize(
 
 /*
   /// TODO:
-  remove sorting of table
-inform user that we always show the baseline metrics & results
-test trials
-test imperative
-make all the links work (summary, predict, scoring, etc..)
-paging creates a full-reload
-should maintain the selected row between pages
+
+
+
+
+
+
+Further impovement:
+    * no need to load all the comparison data first - can lazily load that when needed on screen!
+
+Changes:
+    (temp) Removed sorting / filtering of the table
+    Show the scores and rows from baseline - instead of union
+
+Known Bugs:
+    * should maintain the selected row between pages
+    * paging creates a full-reload
+    * latency and total tokens are broken
+    * Link to summary call is broken
+    * Link to model calls are broken
+    * Link to scorer calls are broken
+    * (existing) single trial does not expand (and therefore no link to pas)
+
+Variations to test:
+    Num Evals (1, 2, Many)
+    Pivot Dimensions
+    Logger vs Framework
+    Trials
   */

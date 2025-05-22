@@ -85,6 +85,7 @@ import {
   EvaluationComparisonSummary,
   MetricDefinition,
   PaginationModel,
+  PredictAndScoreCall,
 } from '../CompareEvaluationsPage/ecpTypes';
 import {
   EVALUATION_NAME_DEFAULT,
@@ -227,6 +228,7 @@ const fetchEvaluationSummaryData = async (
     models: {},
     scoreMetrics: {},
     summaryMetrics: {},
+    scorerNameToRefHeuristicMap: {},
   };
   // 1. Fetch the evaluation calls
   // 2. For each evaluation:
@@ -471,13 +473,21 @@ const fetchEvaluationComparisonResults = async (
                   scoreMetrics: {},
                   _rawPredictAndScoreTraceData: call,
                   _rawPredictTraceData: undefined,
-                },
+                } as PredictAndScoreCall,
               ];
             })
           ),
         };
       }),
     };
+  });
+
+  _.forEach(resultRows, row => {
+    _.forEach(row.evaluations, evalEntry => {
+      _.forEach(evalEntry.predictAndScores, pasEntry => {
+        populateSummaryScoreMetrics(pasEntry, summaryData);
+      });
+    });
   });
 
   const totalRowCount = await rowCountProm;
@@ -731,7 +741,10 @@ const processEvaluationSummary = (
       );
       if (foundScorerNameMaybe != null) {
         score = output[foundScorerNameMaybe];
+        result.scorerNameToRefHeuristicMap[foundScorerNameMaybe] = scorerRef;
       }
+    } else {
+      result.scorerNameToRefHeuristicMap[scorerKey] = scorerRef;
     }
     const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
       if (isBinarySummaryScore(scoreVal)) {
@@ -1066,6 +1079,78 @@ const populatePredictionsAndScoresImperative = (
     } catch (e) {
       console.warn('Error processing imperative evaluation:', e);
     }
+  });
+};
+
+const populateSummaryScoreMetrics = (
+  predictAndScoreEntry: PredictAndScoreCall,
+  summaryData: EvaluationComparisonSummary
+) => {
+  console.log('predictAndScoreEntry', predictAndScoreEntry);
+  const output = predictAndScoreEntry._rawPredictAndScoreTraceData.output;
+  let scores = {};
+  if (
+    typeof output === 'object' &&
+    output &&
+    'scores' in output &&
+    typeof output.scores === 'object' &&
+    output.scores != null
+  ) {
+    scores = output.scores;
+  }
+  Object.entries(scores).forEach(([scorerKey, scoreOutput]) => {
+    const scorerRef = summaryData.scorerNameToRefHeuristicMap[scorerKey];
+    if (scorerRef == null) {
+      return;
+    }
+
+    const processScoreOutput = (output: any, path: string[] = []) => {
+      if (typeof output === 'boolean') {
+        const metricDef: MetricDefinition = {
+          scoreType: 'binary',
+          metricSubPath: path,
+          source: 'scorer',
+          scorerOpOrObjRef: scorerRef,
+        };
+        const metricId = metricDefinitionId(metricDef);
+
+        // Store the binary metric ID in summary.scoreMetrics
+        // very important to ensure it gets included in the composite metrics map
+        summaryData.scoreMetrics[metricId] = metricDef;
+
+        predictAndScoreEntry.scoreMetrics[metricId] = {
+          sourceCallId: undefined,
+          value: output,
+        };
+      } else if (typeof output === 'number') {
+        // Similar update for continuous metrics
+        const metricDef: MetricDefinition = {
+          scoreType: 'continuous',
+          metricSubPath: path,
+          source: 'scorer',
+          scorerOpOrObjRef: scorerRef,
+        };
+        const metricId = metricDefinitionId(metricDef);
+
+        // Store the continuous metric ID in summary.scoreMetrics
+        summaryData.scoreMetrics[metricId] = metricDef;
+
+        predictAndScoreEntry.scoreMetrics[metricId] = {
+          sourceCallId: undefined,
+          value: output,
+        };
+      } else if (
+        output &&
+        typeof output === 'object' &&
+        !Array.isArray(output)
+      ) {
+        Object.entries(output).forEach(([key, value]) => {
+          processScoreOutput(value, [...path, key]);
+        });
+      }
+    };
+
+    processScoreOutput(scoreOutput);
   });
 };
 

@@ -34,6 +34,8 @@ export type EvaluationComparisonSummary = {
   // SummaryMetrics define the metrics that are associated with the evaluation as a whole
   // often aggregated from the scoreMetrics.
   summaryMetrics: MetricDefinitionMap;
+
+  scorerNameToRefHeuristicMap: {[scorerName: string]: string};
 };
 
 export type EvaluationComparisonResults = {
@@ -137,7 +139,7 @@ type MetricResultMap = {[metricId: string]: MetricResult};
 export type MetricValueType = boolean | number;
 export type MetricResult = {
   value: MetricValueType;
-  sourceCallId: string;
+  sourceCallId?: string;
 };
 
 export type PaginationModel = {
