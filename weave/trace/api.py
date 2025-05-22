@@ -24,6 +24,7 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace.term import configure_logger
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,8 @@ def init(
     Returns:
         A Weave client.
     """
+    configure_logger()
+
     parse_and_apply_settings(settings)
 
     global _global_postprocess_inputs
