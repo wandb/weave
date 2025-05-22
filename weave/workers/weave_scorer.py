@@ -45,8 +45,11 @@ from weave.trace_server.refs_internal import (
     parse_internal_uri,
 )
 
+# We add a unique identifier to differentiate between workers
 logger = logging.getLogger(f"weave.workers.weave_scorer.{str(uuid.uuid4())[:8]}")
 logger.setLevel(logging.INFO)
+# This is to prevent propagation to the weave SDK logger
+logger.propagate = False
 
 _TRACE_SERVER: Optional[ClickHouseTraceServer] = None
 
