@@ -433,7 +433,6 @@ export const ExampleCompareSectionDetail: React.FC<{
     return dimensionsForThisScorer[metricIndex];
   };
 
-
   const lookupTargetTrial = (
     evalIndex: number,
     trialIndex: number
