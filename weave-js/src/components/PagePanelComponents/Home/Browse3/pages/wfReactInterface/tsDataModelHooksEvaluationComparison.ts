@@ -100,6 +100,10 @@ import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
 import {memoize} from './memoize';
 import {TraceCallSchema} from './traceServerClientTypes';
 
+// Configuration constants
+const CHUNK_SIZE = 250;
+const MEMOIZE_CACHE_SIZE = 10;
+
 /**
  * Primary react hook for fetching evaluation comparison data. This could be
  * moved into the Trace Server hooks at some point, hence the location of the file.
@@ -1151,7 +1155,10 @@ const populatePredictionsAndScoresNonImperative = (
   });
 };
 
-const CHUNK_SIZE = 250;
+/**
+ * Fetches the subtree of calls for a single evaluation call.
+ * This includes all predict and score calls associated with the evaluation.
+ */
 const fetchEvalSubtree = async (
   client: TraceServerClient,
   projectId: string,
@@ -1204,9 +1211,13 @@ const fetchEvalSubtree = async (
 const memoizedFetchEvalSubtree = memoize(
   fetchEvalSubtree,
   (client, projectId, evalCallId) => JSON.stringify({projectId, evalCallId}),
-  10
+  MEMOIZE_CACHE_SIZE
 );
 
+/**
+ * Fetches subtrees for multiple evaluation calls in parallel.
+ * Uses memoization to prevent duplicate fetches of the same evaluation.
+ */
 const fetchEvalSubtreesParallel = async (
   client: TraceServerClient,
   projectId: string,

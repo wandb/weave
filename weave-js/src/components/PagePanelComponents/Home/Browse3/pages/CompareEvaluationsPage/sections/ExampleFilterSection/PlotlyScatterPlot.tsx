@@ -133,7 +133,7 @@ export const PlotlyScatterPlot: React.FC<{
     if (divRef.current) {
       const current = divRef.current;
       let mountedInternal = false;
-      // Move out of render loop to avoid race condition
+      // Move out of render loop
       const to = setTimeout(() => {
         Plotly.newPlot(current, plotlyData, plotlyLayout, plotlyConfig);
 
