@@ -135,7 +135,7 @@ This will run `predict` on each example and score the output with each scoring f
 
 ### (Optional) Define a function to evaluate
 
-Alternatively, you can also evaluate a function that is wrapped in a `@weave.op()`.
+Alternatively, you can also evaluate a custom function tracked by `@weave.op()`.
 
 ```python
 @weave.op
@@ -163,7 +163,7 @@ asyncio.run(evaluation.evaluate(model))
 
 ### (Optional) Run multiple trials
 
-You can set the `trials` parameter on the `Evaluation` object to run each example multiple times. This is helpful for models with non-deterministic outputs (e.g. LLMs with temperature > 0).
+You can set the `trials` parameter on the `Evaluation` object to run each example multiple times.
 
 ```python
 evaluation = Evaluation(dataset=examples, scorers=[match_score], trials=3)
