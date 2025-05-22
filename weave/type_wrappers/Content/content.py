@@ -11,6 +11,8 @@ from typing import Any, Generic, TypeVar, Unpack
 from pydantic import BaseModel
 
 from weave.type_wrappers.Content.utils import (
+    BaseContentArgs,
+    ContentKeywordArgs,
     ContentOptionalArgs,
     get_mime_and_extension,
     is_valid_path,
@@ -43,7 +45,7 @@ class BaseContentHandler(BaseModel):
     data: bytes
     extra: dict[str, Any] = {}
 
-    def __init__(self, **kwargs: Unpack[ContentOptionalArgs]):
+    def __init__(self, **kwargs: Unpack[BaseContentArgs]):
         super().__init__(**kwargs)
         for key, value in kwargs.items():
             if key not in self.model_fields_set:
@@ -59,23 +61,32 @@ class BaseContentHandler(BaseModel):
 
 class BytesContentHandler(BaseContentHandler):
     def __init__(self, input: bytes, **kwargs: Unpack[ContentOptionalArgs]):
-        kwargs["size"] = kwargs.get("size", len(input))
-
-        mimetype = kwargs.get("mimetype", None)
-        extension = kwargs.get("extension", None)
-        if not mimetype or not extension:
+        size = kwargs.get("size") or len(input)
+        mimetype = kwargs.get("mimetype") or None
+        extension = kwargs.get("extension") or None
+        if mimetype is None or extension is None:
             mimetype, extension = get_mime_and_extension(buffer=input[:2048], **kwargs)
-            kwargs["mimetype"] = mimetype
-            kwargs["extension"] = extension
 
-        kwargs["filename"] = kwargs.get("filename", resolve_filename(**kwargs))
-        original_path = kwargs.get("path", None)
+        filename = kwargs.get("filename")
+        original_path = kwargs.get("path")
+        if not filename and original_path:
+            filename = Path(original_path).name
+        else:
+            filename = resolve_filename(mimetype, extension)
+
+        extra = kwargs.get("extra") or {}
+
         if original_path is not None:
-            extra = kwargs.get("extra") or {}
             extra["original_path"] = original_path
-            kwargs["extra"] = extra
 
-        super().__init__(**kwargs)
+        super().__init__(
+            data=input,
+            size=size,
+            filename=filename,
+            mimetype=mimetype,
+            extension=extension,
+            extra=extra,
+        )
 
 
 class FileInput(BytesContentHandler):
@@ -137,7 +148,7 @@ class Content(Generic[T]):
         self,
         input: Any,
         type_hint: str | None = None,
-        **kwargs: Unpack[ContentOptionalArgs],
+        **kwargs: Unpack[ContentKeywordArgs],
     ):
         if type_hint:
             if type_hint.find("/") != -1:
@@ -145,22 +156,34 @@ class Content(Generic[T]):
             else:
                 kwargs["extension"] = type_hint.lstrip(".")
 
+        kwargs_with_defaults = ContentOptionalArgs(
+            filename=kwargs.get("filename", None),
+            path=kwargs.get("path", None),
+            extension=kwargs.get("extension", None),
+            mimetype=kwargs.get("mimetype", None),
+            size=kwargs.get("size", None),
+            data=kwargs.get("data", None),
+            extra=kwargs.get("extra", {}),
+        )
+
         if isinstance(input, Path):
-            self.content_handler = FileInput(str(input), **kwargs)
+            self.content_handler = FileInput(str(input), **kwargs_with_defaults)
         elif isinstance(input, str):
             if is_valid_path(str(input)):
-                self.content_handler = FileInput(str(input), **kwargs)
+                self.content_handler = FileInput(str(input), **kwargs_with_defaults)
             else:
                 try:
-                    self.content_handler = Base64ContentHandler(str(input), **kwargs)
+                    self.content_handler = Base64ContentHandler(
+                        str(input), **kwargs_with_defaults
+                    )
                 except ValueError:
                     raise ValueError(
                         f"Could not parse string {input} as a valid path or base64 string"
                     )
         elif isinstance(input, bytes):
-            self.content_handler = BytesContentHandler(input, **kwargs)
+            self.content_handler = BytesContentHandler(input, **kwargs_with_defaults)
         elif hasattr(input, "__class__"):
-            self.content_handler = ObjectContentHandler(input, **kwargs)
+            self.content_handler = ObjectContentHandler(input, **kwargs_with_defaults)
         else:
             raise ValueError(f"Unsupported input type: {type(input)}")
 

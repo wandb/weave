@@ -23,13 +23,12 @@ class BaseContentArgs(TypedDict):
     extension: str
     mimetype: str
     filename: str
-    path: str
     size: int
     data: bytes
     extra: dict[str, Any]
 
 
-class ContentOptionalArgs(TypedDict, total=False):
+class ContentOptionalArgs(TypedDict):
     extension: str | None
     mimetype: str | None
     filename: str | None
@@ -39,8 +38,14 @@ class ContentOptionalArgs(TypedDict, total=False):
     extra: dict[str, Any] | None
 
 
-def default_name_fn(mimetype: str, extension: str) -> str:
-    return mimetype.split("/")[1] + "." + extension
+class ContentKeywordArgs(TypedDict, total=False):
+    extension: str
+    mimetype: str
+    filename: str
+    path: str
+    size: int
+    data: bytes
+    extra: dict[str, Any]
 
 
 def is_valid_path(input: str | Path) -> bool:
@@ -50,15 +55,17 @@ def is_valid_path(input: str | Path) -> bool:
 
 
 def resolve_filename(
-    default_fn: Callable[..., str] = default_name_fn,
-    **kwargs: Unpack[ContentOptionalArgs],
+    mimetype: str | None,
+    extension: str | None,
+    default_fn: Callable[..., str] | None = None,
 ) -> str:
-    if filename := kwargs.get("filename", None):
-        return filename
-    elif path := kwargs.get("path", None):
-        return Path(path).name
-
-    return default_fn(**kwargs)
+    if not default_fn:
+        if not extension or not mimetype:
+            raise ValueError(
+                "Cannot create default filename without extension and mimetype"
+            )
+        return mimetype.split("/")[1] + "." + extension
+    return default_fn(mimetype, extension)
 
 
 def get_extension_from_mimetype(mimetype: str) -> str:
