@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import uuid
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Optional, TypedDict
@@ -45,14 +44,14 @@ from weave.trace_server.refs_internal import (
     parse_internal_uri,
 )
 
-# We add a unique identifier to differentiate between workers
-logger = logging.getLogger(f"weave.workers.weave_scorer.{str(uuid.uuid4())[:8]}")
+# We add the hostname to differentiate between workers. This will be the pod name in Kubernetes.
+hostname = os.environ.get("HOSTNAME", "localhost")
+logging.basicConfig(
+    level=logging.INFO,
+    format=f"%(levelname)s:{hostname}:%(name)s: %(message)s",
+)
+logger = logging.getLogger("weave.workers.weave_scorer")
 logger.setLevel(logging.INFO)
-# This is to prevent propagation to the weave SDK logger
-logger.propagate = False
-handler = logging.StreamHandler()
-handler.setLevel(logging.INFO)
-logger.addHandler(handler)
 
 
 _TRACE_SERVER: Optional[ClickHouseTraceServer] = None
@@ -321,7 +320,6 @@ async def apply_scorer(
     logger.info("Creating feedback for scorer %s and call %s", scorer.name, call.id)
     server = get_trace_server()
     server.feedback_create(feedback_req)
-    logger.info("Created feedback for scorer %s and call %s", scorer.name, call.id)
 
 
 def _task_done_callback(
@@ -486,4 +484,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    logger.info("Starting scorer worker...")
     asyncio.run(main())
