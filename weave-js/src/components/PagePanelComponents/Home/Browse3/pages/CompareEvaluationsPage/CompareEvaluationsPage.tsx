@@ -290,10 +290,6 @@ const ResultExplorer: React.FC<{
     'split'
   );
   const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
-  const [showRegressionFinder, setShowRegressionFinder] = useState(true);
-  const toggleRegressionFinder = useCallback(() => {
-    setShowRegressionFinder(v => !v);
-  }, []);
 
   return (
     <VerticalBox
@@ -302,9 +298,7 @@ const ResultExplorer: React.FC<{
         width: '100%',
         overflow: 'auto',
       }}>
-      {regressionFinderEnabled && showRegressionFinder && (
-        <ExampleFilterSection state={state} />
-      )}
+      {regressionFinderEnabled && <ExampleFilterSection state={state} />}
       <Box
         style={{
           display: 'flex',
@@ -322,9 +316,6 @@ const ResultExplorer: React.FC<{
             state={state}
             shouldHighlightSelectedRow={viewMode === 'split'}
             onShowSplitView={() => setViewMode('split')}
-            showRegressionFinder={showRegressionFinder}
-            regressionFinderEnabled={regressionFinderEnabled}
-            onToggleRegressionFinder={toggleRegressionFinder}
           />
         </Box>
 

@@ -8,7 +8,6 @@ import {
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
 import {MOON_50} from '@wandb/weave/common/css/color.styles';
-import {Button} from '@wandb/weave/components';
 import {Icon} from '@wandb/weave/components/Icon';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
@@ -113,9 +112,6 @@ interface ExampleCompareSectionTableProps {
   state: EvaluationComparisonState;
   shouldHighlightSelectedRow?: boolean;
   onShowSplitView: () => void;
-  onToggleRegressionFinder: () => void;
-  showRegressionFinder: boolean;
-  regressionFinderEnabled: boolean;
 }
 
 /**
@@ -280,23 +276,6 @@ export const ExampleCompareSectionTable: React.FC<
           justifyContent: 'flex-start',
           alignItems: 'center',
         }}>
-        <Tooltip
-          title={
-            props.regressionFinderEnabled
-              ? props.showRegressionFinder
-                ? 'Hide Regression Finder'
-                : 'Show Regression Finder'
-              : 'Requires exactly 2 evaluations'
-          }>
-          <Button
-            onClick={props.onToggleRegressionFinder}
-            icon="type-boolean"
-            size="small"
-            variant="ghost"
-            disabled={!props.regressionFinderEnabled}
-          />
-        </Tooltip>
-
         <Tooltip title="Increase Row Height">
           <IconButton onClick={increaseRowHeight}>
             <Icon name="expand-uncollapse" />
