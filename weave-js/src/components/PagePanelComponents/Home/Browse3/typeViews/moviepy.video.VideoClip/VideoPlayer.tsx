@@ -1,18 +1,16 @@
 import * as Dialog from '@wandb/weave/components/Dialog/Dialog';
+import {IconPlay} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {WeaveflowPeekContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
 import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotApplicable';
-import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/CustomWeaveTypeDispatcher';
-import {WeaveflowPeekContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
-import VideoViewer from '@wandb/weave/components/Panel2/VideoViewer';
-import {IconPlay} from '@wandb/weave/components/Icon';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Pill} from '@wandb/weave/components/Tag';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useContext, useEffect, useMemo, useRef, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
 
 type VideoFormat = 'gif' | 'mp4' | 'webm';
 type VideoFileKeys = `video.${VideoFormat}`;
