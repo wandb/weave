@@ -757,8 +757,15 @@ export const CallsTable: FC<{
     tableData.forEach(row => {
       Object.keys(row).forEach(key => keysSet.add(key));
     });
+    // `storage_size_bytes` is never shown in the table view, so don't include it
+    keysSet.delete('storage_size_bytes');
+    // set the `total_storage_size_bytes` based on whether we are showing trace roots only
+    if (!effectiveFilter.traceRootsOnly) {
+      keysSet.delete('total_storage_size_bytes');
+    }
+
     return Array.from(keysSet);
-  }, [tableData]);
+  }, [tableData, effectiveFilter]);
 
   const visibleColumns = useMemo(() => {
     return tableData.length > 0
