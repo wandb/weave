@@ -1,0 +1,3 @@
+Removed end_session:
+From sentry docs:
+The Python SDK automatically drains on shutdown unless the AtExitIntegration is removed or the shutdown_timeout config key is set to 0. To manually drain the client provides a close method:

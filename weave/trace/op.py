@@ -53,8 +53,8 @@ from weave.trace.context.call_context import (
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.refs import ObjectRef
-from weave.type_wrappers import Content
 from weave.trace.util import log_once
+from weave.type_wrappers import Content
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter

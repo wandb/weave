@@ -1,51 +1,38 @@
-from collections.abc import Callable
+import base64
 import inspect
-from pathlib import Path
-from typing import Any, TypeVar
-from typing import Any, Generic
-from pydantic import BaseModel
+import logging
+import os
 import subprocess
 import sys
-import os
-import logging
-import base64
-from weave.type_wrappers.Content.mime_resolver import get_mime_and_extension
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any, Generic, TypeVar, Unpack
+
+from pydantic import BaseModel
+
+from weave.type_wrappers.Content.utils import (
+    ContentOptionalArgs,
+    get_mime_and_extension,
+    is_valid_path,
+    resolve_filename,
+)
 
 logger = logging.getLogger(__name__)
 
 TO_BYTES_METHODS = [
-    'tobytes', # Numpy, Pandas, etc
-    'to_bytes', # Some custom classes and int
-    'read', # File-like objects
-    'read_bytes', # File-like objects, Path, etc
-    'as_bytes', # Some custom classes
+    "tobytes",  # Numpy, Pandas, etc
+    "to_bytes",  # Some custom classes and int
+    "read",  # File-like objects
+    "read_bytes",  # File-like objects, Path, etc
+    "as_bytes",  # Some custom classes
 ]
 
 CONTENT_KWARGS = [
-    'filename',
-    'path',
-    'extension',
-    'mimetype',
+    "filename",
+    "path",
+    "extension",
+    "mimetype",
 ]
-
-def default_name_fn(mimetype: str, extension: str) -> str:
-    return mimetype.split("/")[1] + "." + extension
-
-def is_valid_path(input: str | Path) -> bool:
-    if isinstance(input, str):
-        input = Path(input)
-    return input.exists() and input.is_file()
-
-def resolve_filename(
-    default_fn: Callable[..., str] = default_name_fn,
-    **kwargs
-) -> str:
-    if filename := kwargs.get("filename", None):
-        return filename
-    elif path := kwargs.get("path", None):
-        return Path(path).name
-
-    return default_fn(**kwargs)
 
 
 class BaseContentHandler(BaseModel):
@@ -56,7 +43,7 @@ class BaseContentHandler(BaseModel):
     data: bytes
     extra: dict[str, Any] = {}
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Unpack[ContentOptionalArgs]):
         super().__init__(**kwargs)
         for key, value in kwargs.items():
             if key not in self.model_fields_set:
@@ -71,66 +58,53 @@ class BaseContentHandler(BaseModel):
 
 
 class BytesContentHandler(BaseContentHandler):
-    def __init__(self, input: bytes, **kwargs):
-        size = kwargs.pop("size", None) or len(input)
-        mimetype = kwargs.pop("mimetype", None)
-        extension = kwargs.pop("extension", None)
+    def __init__(self, input: bytes, **kwargs: Unpack[ContentOptionalArgs]):
+        kwargs["size"] = kwargs.get("size", len(input))
 
+        mimetype = kwargs.get("mimetype", None)
+        extension = kwargs.get("extension", None)
         if not mimetype or not extension:
-            mimetype, extension = get_mime_and_extension(
-                buffer=input[:2048],
-                **kwargs
-            )
+            mimetype, extension = get_mime_and_extension(buffer=input[:2048], **kwargs)
+            kwargs["mimetype"] = mimetype
+            kwargs["extension"] = extension
 
-        filename = kwargs.pop('filename', None)
-        if not filename:
-            filename = resolve_filename(mimetype=mimetype, extension=extension, **kwargs)
-
+        kwargs["filename"] = kwargs.get("filename", resolve_filename(**kwargs))
         original_path = kwargs.get("path", None)
-
-        extra = kwargs.pop("extra", {})
         if original_path is not None:
-            extra['original_path'] = original_path
-        kwargs['extra'] = extra
+            extra = kwargs.get("extra") or {}
+            extra["original_path"] = original_path
+            kwargs["extra"] = extra
 
-        super().__init__(
-            size=size,
-            data=input,
-            filename=filename,
-            extension=extension,
-            mimetype=mimetype,
-            **kwargs
-        )
+        super().__init__(**kwargs)
+
 
 class FileInput(BytesContentHandler):
-    def __init__(self, input: str | Path, **kwargs):
+    def __init__(self, input: str | Path, **kwargs: Unpack[ContentOptionalArgs]):
         if not is_valid_path(input):
             raise ValueError(f"Input {input} is not a valid file path.")
 
         path = Path(input)
         size = path.stat().st_size
-
         data = path.read_bytes()
         # # Allow overriding the filename
-        filename = kwargs.pop("filename", path.name)
-        super().__init__(
-            input=data,
-            size=size,
-            filename=filename,
-            **kwargs
-        )
+        filename = kwargs.get("filename", path.name)
+        kwargs["filename"] = filename
+        kwargs["size"] = size
+        super().__init__(input=data, **kwargs)
+
 
 class Base64ContentHandler(BytesContentHandler):
-    def __init__(self, input: str | bytes, **kwargs):
+    def __init__(self, input: str | bytes, **kwargs: Unpack[ContentOptionalArgs]):
         try:
             data = base64.b64decode(input, validate=True)
             super().__init__(data, **kwargs)
         except Exception as e:
             raise ValueError(f"Invalid base64 string: {e}") from e
 
+
 class ObjectContentHandler(BytesContentHandler):
-    def __init__(self, input: object, **kwargs):
-        if not input.__getattribute__('__class__'):
+    def __init__(self, input: object, **kwargs: Unpack[ContentOptionalArgs]):
+        if not input.__getattribute__("__class__"):
             raise ValueError("Input object does not have a class attribute.")
 
         handler: Callable[..., bytes] | None = None
@@ -152,7 +126,9 @@ class ObjectContentHandler(BytesContentHandler):
         data = handler()
         super().__init__(data, **kwargs)
 
+
 T = TypeVar("T", bound=str)
+
 
 class Content(Generic[T]):
     content_handler: BaseContentHandler
@@ -161,7 +137,7 @@ class Content(Generic[T]):
         self,
         input: Any,
         type_hint: str | None = None,
-        **kwargs
+        **kwargs: Unpack[ContentOptionalArgs],
     ):
         if type_hint:
             if type_hint.find("/") != -1:
@@ -248,7 +224,6 @@ class Content(Generic[T]):
             dest: Destination path where the file will be copied to (string or pathlib.Path)
                   The destination path can be a file or a directory.
         """
-
         path = Path(dest) if isinstance(dest, str) else dest
         os.makedirs(path.parent, exist_ok=True)
 

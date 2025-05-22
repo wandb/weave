@@ -1,0 +1,251 @@
+flow/scorer.py:    column_map: Optional[dict[str, str]] = Field(
+flow/scorer.py:    passed: bool = Field(description="Whether the scorer passed or not")
+flow/scorer.py:    metadata: dict[str, Any] = Field(
+flow/eval_imperative.py:            Field(
+flow/eval_imperative.py:        Field(
+flow/eval_imperative.py:        Field(
+flow/eval_imperative.py:        Field(
+flow/agent.py:    history: list[Any] = Field(default_factory=list)
+flow/agent.py:    tools: list[Any] = Field(default_factory=list)
+flow/obj.py:    ref: Optional[ObjectRef] = Field(default=None, repr=False)
+scorers/string_scorer.py:    distance: Callable[[str, str], int] = Field(
+flow/monitor.py:    sampling_rate: float = Field(ge=0, le=1, default=1)
+scorers/coherence_scorer.py:    model_max_length: int = Field(
+flow/prompt/prompt.py:    messages: list[dict] = Field(default_factory=list)
+flow/prompt/prompt.py:    data: list = Field(default_factory=list)
+flow/prompt/prompt.py:    config: dict = Field(default_factory=dict)
+flow/prompt/prompt.py:    requirements: dict = Field(default_factory=dict)
+trace/autopatch.py:    op_settings: OpSettings = Field(default_factory=OpSettings)
+trace/autopatch.py:    anthropic: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    cerebras: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    cohere: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    crewai: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    google_generativeai: IntegrationSettings = Field(
+trace/autopatch.py:    google_genai_sdk: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    groq: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    huggingface: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    instructor: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    litellm: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    mistral: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    mcp: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    openai_agents: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    chatnvidia: IntegrationSettings = Field(default_factory=IntegrationSettings)
+trace/autopatch.py:    smolagents: IntegrationSettings = Field(default_factory=IntegrationSettings)
+scorers/hallucination_scorer.py:    hallucination_type: str = Field(
+scorers/hallucination_scorer.py:    observation: str = Field(
+scorers/hallucination_scorer.py:    chain_of_thought: str = Field(
+scorers/hallucination_scorer.py:    reasonings: list[HallucinationReasoning] = Field(
+scorers/hallucination_scorer.py:    conclusion: str = Field(description="The conclusion of the analysis.")
+scorers/hallucination_scorer.py:    has_hallucination: bool = Field(
+scorers/hallucination_scorer.py:    temperature: float = Field(
+scorers/hallucination_scorer.py:    max_tokens: int = Field(
+scorers/hallucination_scorer.py:    threshold: float = Field(
+scorers/hallucination_scorer.py:    task: str = Field(
+scorers/moderation_scorer.py:    model_id: str = Field(
+scorers/moderation_scorer.py:    total_threshold: int = Field(
+scorers/moderation_scorer.py:    category_threshold: int = Field(
+scorers/moderation_scorer.py:    threshold: float = Field(
+scorers/prompt_injection_guardrail.py:    temperature: float = Field(
+scorers/prompt_injection_guardrail.py:    max_tokens: int = Field(
+scorers/fluency_scorer.py:    threshold: float = Field(
+scorers/presidio_guardrail.py:    language: str = Field(
+scorers/presidio_guardrail.py:    custom_recognizers: list[Any] = Field(
+scorers/presidio_guardrail.py:    selected_entities: Optional[list[str]] = Field(
+scorers/similarity_scorer.py:    threshold: float = Field(0.5, description="The threshold for the similarity score")
+scorers/bedrock_guardrails.py:    guardrail_id: str = Field(description="The identifier of the guardrail to use.")
+scorers/bedrock_guardrails.py:    guardrail_version: str = Field(
+scorers/bedrock_guardrails.py:    source: Literal["INPUT", "OUTPUT"] = Field(
+scorers/bedrock_guardrails.py:    bedrock_runtime_kwargs: dict[str, Any] = Field(
+scorers/ragas_scorer.py:    entities: list[str] = Field(
+scorers/ragas_scorer.py:    temperature: float = Field(
+scorers/ragas_scorer.py:    max_tokens: int = Field(
+scorers/ragas_scorer.py:    reasoning: str = Field(
+scorers/ragas_scorer.py:    relevancy_score: int = Field(
+scorers/ragas_scorer.py:    temperature: float = Field(
+scorers/ragas_scorer.py:    max_tokens: int = Field(
+scorers/scorer_types.py:    model_id: str = Field(
+scorers/scorer_types.py:    task: str = Field(
+scorers/scorer_types.py:    model_name_or_path: str = Field(default="", description="The path to the model")
+scorers/scorer_types.py:    device: str = Field(
+scorers/scorer_types.py:    model_name_or_path: str = Field(default="", description="The path to the model")
+scorers/scorer_types.py:    device: str = Field(
+scorers/scorer_types.py:    overlap: int = Field(
+scorers/scorer_types.py:    aggregation_method: Literal["max", "mean"] = Field(
+scorers/summarization_scorer.py:    entities: list[str] = Field(
+scorers/summarization_scorer.py:    think_step_by_step: str = Field(
+scorers/summarization_scorer.py:    summarization_evaluation: summarization_quality_options = Field(
+scorers/summarization_scorer.py:    temperature: float = Field(
+scorers/summarization_scorer.py:    max_tokens: int = Field(
+scorers/context_relevance_scorer.py:    threshold: float = Field(
+scorers/context_relevance_scorer.py:    return_all_spans: bool = Field(
+scorers/trust_scorer.py:    device: str = Field(
+scorers/trust_scorer.py:    context_relevance_model_name_or_path: str = Field(
+scorers/trust_scorer.py:    hallucination_model_name_or_path: str = Field(
+scorers/trust_scorer.py:    toxicity_model_name_or_path: str = Field(
+scorers/trust_scorer.py:    fluency_model_name_or_path: str = Field(
+scorers/trust_scorer.py:    coherence_model_name_or_path: str = Field(
+scorers/trust_scorer.py:    run_in_parallel: bool = Field(
+trace_server/clickhouse_trace_server_batched.py:                field = OrderField(
+trace_server/clickhouse_trace_server_batched.py:                    field=QueryBuilderDynamicField(
+trace_server/clickhouse_trace_server_batched.py:                OrderField(
+trace_server/clickhouse_trace_server_batched.py:                    field=QueryBuilderField(field=ROW_ORDER_COLUMN_NAME),
+trace_server/opentelemetry/helpers.py:    if value.HasField("string_value"):
+trace_server/opentelemetry/helpers.py:    elif value.HasField("bool_value"):
+trace_server/opentelemetry/helpers.py:    elif value.HasField("int_value"):
+trace_server/opentelemetry/helpers.py:    elif value.HasField("double_value"):
+trace_server/opentelemetry/helpers.py:    elif value.HasField("array_value"):
+trace_server/opentelemetry/helpers.py:    elif value.HasField("kvlist_value"):
+trace_server/opentelemetry/helpers.py:    elif value.HasField("bytes_value"):
+trace_server/calls_query_builder/calls_query_builder.py:class QueryBuilderField(BaseModel):
+trace_server/calls_query_builder/calls_query_builder.py:class CallsMergedField(QueryBuilderField):
+trace_server/calls_query_builder/calls_query_builder.py:class CallsMergedAggField(CallsMergedField):
+trace_server/calls_query_builder/calls_query_builder.py:class CallsMergedDynamicField(CallsMergedAggField):
+trace_server/calls_query_builder/calls_query_builder.py:        return CallsMergedDynamicField(
+trace_server/calls_query_builder/calls_query_builder.py:class CallsMergedSummaryField(CallsMergedField):
+trace_server/calls_query_builder/calls_query_builder.py:class CallsMergedFeedbackPayloadField(CallsMergedField):
+trace_server/calls_query_builder/calls_query_builder.py:            return CallsMergedFeedbackPayloadField(
+trace_server/calls_query_builder/calls_query_builder.py:            return CallsMergedFeedbackPayloadField(
+trace_server/calls_query_builder/calls_query_builder.py:class AggregatedDataSizeField(CallsMergedField):
+trace_server/calls_query_builder/calls_query_builder.py:class QueryBuilderDynamicField(QueryBuilderField):
+trace_server/calls_query_builder/calls_query_builder.py:class OrderField(BaseModel):
+trace_server/calls_query_builder/calls_query_builder.py:    select_fields: list[CallsMergedField] = Field(default_factory=list)
+trace_server/calls_query_builder/calls_query_builder.py:    query_conditions: list[Condition] = Field(default_factory=list)
+trace_server/calls_query_builder/calls_query_builder.py:    order_fields: list[OrderField] = Field(default_factory=list)
+trace_server/calls_query_builder/calls_query_builder.py:            OrderField(field=get_field_by_name(field), direction=direction)
+trace_server/calls_query_builder/calls_query_builder.py:    "project_id": CallsMergedField(field="project_id"),
+trace_server/calls_query_builder/calls_query_builder.py:    "id": CallsMergedField(field="id"),
+trace_server/calls_query_builder/calls_query_builder.py:    "trace_id": CallsMergedAggField(field="trace_id", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "parent_id": CallsMergedAggField(field="parent_id", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "op_name": CallsMergedAggField(field="op_name", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "started_at": CallsMergedAggField(field="started_at", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "attributes_dump": CallsMergedDynamicField(field="attributes_dump", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "inputs_dump": CallsMergedDynamicField(field="inputs_dump", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "input_refs": CallsMergedAggField(field="input_refs", agg_fn="array_concat_agg"),
+trace_server/calls_query_builder/calls_query_builder.py:    "ended_at": CallsMergedAggField(field="ended_at", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "output_dump": CallsMergedDynamicField(field="output_dump", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "output_refs": CallsMergedAggField(field="output_refs", agg_fn="array_concat_agg"),
+trace_server/calls_query_builder/calls_query_builder.py:    "summary_dump": CallsMergedDynamicField(field="summary_dump", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "exception": CallsMergedAggField(field="exception", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "wb_user_id": CallsMergedAggField(field="wb_user_id", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "wb_run_id": CallsMergedAggField(field="wb_run_id", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "deleted_at": CallsMergedAggField(field="deleted_at", agg_fn="any"),
+trace_server/calls_query_builder/calls_query_builder.py:    "display_name": CallsMergedAggField(field="display_name", agg_fn="argMaxMerge"),
+trace_server/calls_query_builder/calls_query_builder.py:    "total_storage_size_bytes": AggregatedDataSizeField(
+trace_server/calls_query_builder/calls_query_builder.py:            return CallsMergedSummaryField(field=name, summary_field=summary_field)
+trace_server/interface/feedback_types.py:    note: str = Field(min_length=1, max_length=1024)
+trace_server/trace_server_interface.py:    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+trace_server/trace_server_interface.py:    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+trace_server/trace_server_interface.py:    set_base_object_class: Optional[str] = Field(
+trace_server/trace_server_interface.py:    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+trace_server/trace_server_interface.py:    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+trace_server/trace_server_interface.py:    partial_success: Optional[ExportTracePartialSuccess] = Field(
+trace_server/trace_server_interface.py:    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+trace_server/trace_server_interface.py:    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+trace_server/trace_server_interface.py:    track_llm_call: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    include_costs: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    include_feedback: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    include_storage_size: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    include_total_storage_size: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    expand_columns: Optional[list[str]] = Field(
+trace_server/trace_server_interface.py:    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+trace_server/trace_server_interface.py:    metadata_only: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    base_object_classes: Optional[list[str]] = Field(
+trace_server/trace_server_interface.py:    object_ids: Optional[list[str]] = Field(
+trace_server/trace_server_interface.py:    is_op: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    latest_only: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    project_id: str = Field(
+trace_server/trace_server_interface.py:    filter: Optional[ObjectVersionFilter] = Field(
+trace_server/trace_server_interface.py:    limit: Optional[int] = Field(
+trace_server/trace_server_interface.py:    offset: Optional[int] = Field(
+trace_server/trace_server_interface.py:    sort_by: Optional[list[SortBy]] = Field(
+trace_server/trace_server_interface.py:    metadata_only: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    include_storage_size: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    digests: Optional[list[str]] = Field(
+trace_server/trace_server_interface.py:    updated_row_digests: list[str] = Field(
+trace_server/trace_server_interface.py:    row_digests: list[str] = Field(
+trace_server/trace_server_interface.py:    row_digests: Optional[list[str]] = Field(
+trace_server/trace_server_interface.py:    project_id: str = Field(
+trace_server/trace_server_interface.py:    digest: str = Field(
+trace_server/trace_server_interface.py:    filter: Optional[TableRowFilter] = Field(
+trace_server/trace_server_interface.py:    limit: Optional[int] = Field(
+trace_server/trace_server_interface.py:    offset: Optional[int] = Field(
+trace_server/trace_server_interface.py:    sort_by: Optional[list[SortBy]] = Field(
+trace_server/trace_server_interface.py:    project_id: str = Field(
+trace_server/trace_server_interface.py:    digest: str = Field(
+trace_server/trace_server_interface.py:    project_id: str = Field(
+trace_server/trace_server_interface.py:    digests: Optional[list[str]] = Field(
+trace_server/trace_server_interface.py:    include_storage_size: Optional[bool] = Field(
+trace_server/trace_server_interface.py:    project_id: str = Field(examples=["entity/project"])
+trace_server/trace_server_interface.py:    weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
+trace_server/trace_server_interface.py:    creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
+trace_server/trace_server_interface.py:    feedback_type: str = Field(examples=["custom"])
+trace_server/trace_server_interface.py:    payload: dict[str, Any] = Field(
+trace_server/trace_server_interface.py:    annotation_ref: Optional[str] = Field(
+trace_server/trace_server_interface.py:    runnable_ref: Optional[str] = Field(
+trace_server/trace_server_interface.py:    call_ref: Optional[str] = Field(
+trace_server/trace_server_interface.py:    trigger_ref: Optional[str] = Field(
+trace_server/trace_server_interface.py:    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+trace_server/trace_server_interface.py:    project_id: str = Field(examples=["entity/project"])
+trace_server/trace_server_interface.py:    fields: Optional[list[str]] = Field(
+trace_server/trace_server_interface.py:    limit: Optional[int] = Field(default=None, examples=[10])
+trace_server/trace_server_interface.py:    offset: Optional[int] = Field(default=None, examples=[0])
+trace_server/trace_server_interface.py:    project_id: str = Field(examples=["entity/project"])
+trace_server/trace_server_interface.py:    prompt_token_cost_unit: Optional[str] = Field(
+trace_server/trace_server_interface.py:    completion_token_cost_unit: Optional[str] = Field(
+trace_server/trace_server_interface.py:    effective_date: Optional[datetime.datetime] = Field(
+trace_server/trace_server_interface.py:    provider_id: Optional[str] = Field(
+trace_server/trace_server_interface.py:    project_id: str = Field(examples=["entity/project"])
+trace_server/trace_server_interface.py:    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+trace_server/trace_server_interface.py:    project_id: str = Field(examples=["entity/project"])
+trace_server/trace_server_interface.py:    fields: Optional[list[str]] = Field(
+trace_server/trace_server_interface.py:    limit: Optional[int] = Field(default=None, examples=[10])
+trace_server/trace_server_interface.py:    offset: Optional[int] = Field(default=None, examples=[0])
+trace_server/trace_server_interface.py:    id: Optional[str] = Field(default=None, examples=["2341-asdf-asdf"])
+trace_server/trace_server_interface.py:    llm_id: Optional[str] = Field(default=None, examples=["gpt4"])
+trace_server/trace_server_interface.py:    prompt_token_cost: Optional[float] = Field(default=None, examples=[1.0])
+trace_server/trace_server_interface.py:    completion_token_cost: Optional[float] = Field(default=None, examples=[1.0])
+trace_server/trace_server_interface.py:    prompt_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
+trace_server/trace_server_interface.py:    completion_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
+trace_server/trace_server_interface.py:    effective_date: Optional[datetime.datetime] = Field(
+trace_server/trace_server_interface.py:    provider_id: Optional[str] = Field(default=None, examples=["openai"])
+trace_server/trace_server_interface.py:    project_id: str = Field(examples=["entity/project"])
+trace_server/trace_server_interface.py:    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+trace_server/interface/builtin_object_classes/saved_view.py:    path: Optional[list[PathElement]] = Field(default=None)
+trace_server/interface/builtin_object_classes/saved_view.py:    label: Optional[str] = Field(default=None)
+trace_server/interface/builtin_object_classes/saved_view.py:    filter: Optional[tsi.CallsFilter] = Field(default=None)
+trace_server/interface/builtin_object_classes/saved_view.py:    query: Optional[tsi.Query] = Field(default=None)
+trace_server/interface/builtin_object_classes/saved_view.py:    cols: Optional[dict[str, bool]] = Field(default=None)
+trace_server/interface/builtin_object_classes/saved_view.py:    columns: Optional[list[Column]] = Field(default=None)
+trace_server/interface/builtin_object_classes/saved_view.py:    pin: Optional[Pin] = Field(default=None)
+trace_server/interface/builtin_object_classes/saved_view.py:    sort_by: Optional[list[tsi.SortBy]] = Field(default=None)
+trace_server/interface/builtin_object_classes/saved_view.py:    page_size: Optional[int] = Field(default=None)
+trace_server/clickhouse_schema.py:    output_refs: list[str] = Field(default_factory=list)  # sadly, this is required
+trace_server/clickhouse_schema.py:    input_refs: list[str] = Field(default_factory=list)  # sadly, this is required
+trace_server/clickhouse_schema.py:    input_refs: list[str] = Field(default_factory=list)
+trace_server/clickhouse_schema.py:    output_refs: list[str] = Field(default_factory=list)
+trace_server/clickhouse_schema.py:    input_refs: list[str] = Field(default_factory=list)
+trace_server/clickhouse_schema.py:    output_refs: list[str] = Field(default_factory=list)
+trace_server/interface/builtin_object_classes/actions.py:    config: ActionConfigType = Field(..., discriminator="action_type")
+trace_server/interface/builtin_object_classes/provider.py:    extra_headers: dict[str, str] = Field(default_factory=dict)
+trace_server/interface/builtin_object_classes/provider.py:    return_type: ProviderReturnType = Field(default=ProviderReturnType.OPENAI)
+trace_server/interface/builtin_object_classes/llm_structured_model.py:    default_params: LLMStructuredCompletionModelDefaultParams = Field(
+trace_server/interface/builtin_object_classes/test_only_example.py:    aliased_property: int = Field(alias="aliased_property_alias")
+trace_server/interface/builtin_object_classes/annotation_spec.py:    field_schema: dict[str, Any] = Field(
+trace_server/interface/builtin_object_classes/annotation_spec.py:    op_scope: Optional[list[str]] = Field(
+trace_server/interface/builtin_object_classes/annotation_spec.py:            temp_field_tuple = (field_schema, Field())
+trace_server/interface/query.py:    ] = Field(alias="$literal")
+trace_server/interface/query.py:    get_field_: str = Field(alias="$getField")
+trace_server/interface/query.py:    convert_: "ConvertSpec" = Field(alias="$convert")
+trace_server/interface/query.py:    and_: list["Operand"] = Field(alias="$and")
+trace_server/interface/query.py:    or_: list["Operand"] = Field(alias="$or")
+trace_server/interface/query.py:    not_: tuple["Operand"] = Field(alias="$not")
+trace_server/interface/query.py:    eq_: tuple["Operand", "Operand"] = Field(alias="$eq")
+trace_server/interface/query.py:    gt_: tuple["Operand", "Operand"] = Field(alias="$gt")
+trace_server/interface/query.py:    gte_: tuple["Operand", "Operand"] = Field(alias="$gte")
+trace_server/interface/query.py:    in_: tuple["Operand", list["Operand"]] = Field(alias="$in")
+trace_server/interface/query.py:    contains_: "ContainsSpec" = Field(alias="$contains")
+trace_server/interface/query.py:    expr_: Operation = Field(alias="$expr")

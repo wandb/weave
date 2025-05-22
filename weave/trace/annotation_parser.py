@@ -15,7 +15,6 @@ class ContentAnnotation(BaseModel):
     type_hint: str | None = None
 
 
-
 def parse_data_annotation(annotation_string: str) -> ContentAnnotation | None:
     """
     The function expects the string to be of the form:
