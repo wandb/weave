@@ -2,6 +2,7 @@ import inspect
 from typing import Any, Optional, get_type_hints
 
 import pytest
+from tests.trace.util import AnyStrMatcher
 
 import weave
 from weave.trace.op import OpCallError, is_op, op
@@ -127,7 +128,7 @@ def test_sync_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            _digest="nzAe1JtLJFEVeEo3yX0TOYYGhh7vAOFYRentYI9ik6U",
+            _digest=AnyStrMatcher(),
             _extra=(),
         ),
         "a": 1,
@@ -162,7 +163,7 @@ async def test_async_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            _digest="nzAe1JtLJFEVeEo3yX0TOYYGhh7vAOFYRentYI9ik6U",
+            _digest=AnyStrMatcher(),
             _extra=(),
         ),
         "a": 1,
