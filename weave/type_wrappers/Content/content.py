@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Generic, TypeVar, Unpack
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from weave.type_wrappers.Content.utils import (
     ContentKeywordArgs,
@@ -36,21 +36,15 @@ class BaseContentHandler(BaseModel):
     extension: str
     data: bytes
     path: str | None = None
+    model_config = ConfigDict(extra='allow')
 
     def __init__(self, data: bytes, /, **values: Any):
-        if "extra" in values.keys():
-            extra = values.pop("extra") or {}
-        else:
-            extra = {}
-
-        for k in values:
-            if k in self.model_fields_set:
-                raise ValueError(f"Got invalid extra metadata field: {k}")
+        extra: dict[str, Any] = values.pop('extra')
         super().__init__(data=data, **{**values, **extra})
 
     @property
     def metadata(self) -> dict[str, Any]:
-        return self.model_dump(exclude={"data"}, exclude_unset=True, exclude_none=True)
+        return self.model_dump(exclude={"data"})
 
 
 class BytesContentHandler(BaseContentHandler):
@@ -76,7 +70,7 @@ class FileContentHandler(BytesContentHandler):
             raise ValueError(f"Input {input} is not a valid file path.")
 
         path = Path(input)
-        values["path"] = path
+        values["path"] = str(path)
         values["size"] = path.stat().st_size
         # Allow overriding the filename when submitting to weave
         values["filename"] = values.get("filename", path.name)

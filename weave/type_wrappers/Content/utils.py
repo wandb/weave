@@ -33,7 +33,7 @@ class ContentOptionalArgs(TypedDict):
     filename: str | None
     path: str | None
     size: int | None
-    extra: dict[str, Any] | None
+    extra: dict[str, Any]
 
 
 class ContentKeywordArgs(TypedDict, total=False):
