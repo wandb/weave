@@ -1,6 +1,7 @@
 import {weaveImage} from '../media';
 import {op} from '../op';
 import {OpOptions} from '../opType';
+import {addInstrumentation} from './instrumentations';
 
 // exported just for testing
 export const openAIStreamReducer = {
@@ -233,6 +234,30 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
         return betaProxy;
       }
       return targetVal;
+    },
+  });
+}
+
+export function instrumentOpenAI() {
+  addInstrumentation({
+    moduleName: 'openai',
+    subPath: 'index.js',
+    version: '>= 4.0.0',
+    hook: exports => {
+      const OriginalOpenAIClass = exports.OpenAI;
+
+      exports.OpenAI = new Proxy(OriginalOpenAIClass, {
+        construct(target, args, newTarget) {
+          const instance = new target(...args);
+          return wrapOpenAI(instance);
+        },
+      });
+
+      if (exports.default) {
+        exports.default.OpenAI = exports.OpenAI;
+      }
+
+      return exports;
     },
   });
 }
