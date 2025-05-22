@@ -121,9 +121,7 @@ export const CompareEvaluationsPageContent: React.FC<
       setSelectedInputDigest={setSelectedInputDigest}>
       <CustomWeaveTypeProjectContext.Provider
         value={{entity: props.entity, project: props.project}}>
-        <AutoSizer style={{height: '100%', width: '100%'}}>
-          {({height, width}) => <CompareEvaluationsPageInner height={height} />}
-        </AutoSizer>
+        <CompareEvaluationsPageInner />
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
   );
@@ -174,13 +172,8 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
   );
 };
 
-const CompareEvaluationsPageInner: React.FC<{
-  height: number;
-}> = props => {
+const CompareEvaluationsPageInner: React.FC<{}> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  const showRegressionFinder = false;
-  // Keeping this here in case we want to bring it back
-  // Object.keys(state.summary.evaluationCalls).length === 2;
   const showExamples =
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
@@ -190,7 +183,7 @@ const CompareEvaluationsPageInner: React.FC<{
   return (
     <Box
       sx={{
-        height: props.height,
+        height: '100%',
         width: '100%',
         overflow: 'auto',
       }}>
@@ -252,12 +245,11 @@ const CompareEvaluationsPageInner: React.FC<{
                     <WaveLoader size="small" />
                   </Box>
                 ) : showExamples ? (
-                  <>
-                    {showRegressionFinder && (
-                      <ExampleFilterSection state={state} />
-                    )}
-                    <ResultExplorer state={state} height={props.height} />
-                  </>
+                  <AutoSizer style={{height: '100%', width: '100%'}}>
+                    {({height, width}) => {
+                      return <ResultExplorer state={state} height={height} />;
+                    }}
+                  </AutoSizer>
                 ) : (
                   <VerticalBox
                     sx={{
@@ -308,7 +300,7 @@ const ResultExplorer: React.FC<{
       sx={{
         height: '100%',
         width: '100%',
-        overflow: 'hidden',
+        overflow: 'auto',
       }}>
       {regressionFinderEnabled && showRegressionFinder && (
         <ExampleFilterSection state={state} />
@@ -317,7 +309,7 @@ const ResultExplorer: React.FC<{
         style={{
           display: 'flex',
           flexDirection: 'row',
-          height: '100%',
+          height: height,
           borderTop: '1px solid #e0e0e0',
         }}>
         <Box
