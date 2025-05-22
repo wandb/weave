@@ -492,13 +492,14 @@ const fetchEvaluationComparisonResults = async (
     });
   });
 
-
   // Fill in the autosummary source calls
   const projectId = projectIdFromParts({entity, project});
   const summaryCalls = traceServerClient.callsStreamQuery({
     project_id: projectId,
-    filter: {parent_ids: evaluationCallIds,
-      op_names: [`weave:///${entity}/${project}/op/Evaluation.summarize:*`],},
+    filter: {
+      parent_ids: evaluationCallIds,
+      op_names: [`weave:///${entity}/${project}/op/Evaluation.summarize:*`],
+    },
     columns: ['id', 'parent_id', 'op_name'],
   });
   (await summaryCalls).calls.forEach(summaryCall => {
@@ -604,8 +605,6 @@ const fetchEvaluationComparisonResults = async (
   //     call.parent_id &&
   //     evaluationCallIds.includes(call.parent_id)
   // );
-
-
 
   // const modelRefs = Object.values(summaryData.evaluationCalls).map(
   //   evalCall => evalCall.modelRef

@@ -3,7 +3,14 @@ import {WarningAmberOutlined} from '@mui/icons-material';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import _ from 'lodash';
-import React, {FC, useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import styled from 'styled-components';
 
 import {
@@ -23,6 +30,8 @@ import {isCustomWeaveTypePayload} from '../../../../typeViews/customWeaveType.ty
 import {CustomWeaveTypeDispatcher} from '../../../../typeViews/CustomWeaveTypeDispatcher';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
+import {useGetTraceServerClientContext} from '../../../wfReactInterface/traceServerClientContext';
+import {memoizedFindPredictAndScoreChildrenCalls} from '../../../wfReactInterface/tsDataModelHooksEvaluationComparisonFast';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
@@ -33,7 +42,11 @@ import {
 } from '../../compositeMetricsUtil';
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpState';
-import {EvaluationCall, MetricDefinition, MetricValueType} from '../../ecpTypes';
+import {
+  EvaluationCall,
+  MetricDefinition,
+  MetricValueType,
+} from '../../ecpTypes';
 import {
   dimensionUnit,
   flattenedDimensionPath,
@@ -54,8 +67,6 @@ import {
   useExampleCompareDataAndPrefetch,
   useFilteredAggregateRows,
 } from './exampleCompareSectionUtil';
-import { memoizedFindPredictAndScoreChildrenOps } from '../../../wfReactInterface/tsDataModelHooksEvaluationComparisonFast';
-import { useGetTraceServerClientContext } from '../../../wfReactInterface/traceServerClientContext';
 
 const SIDEBAR_WIDTH_PX = 250;
 const MIN_EVAL_WIDTH_PX = 350;
@@ -212,6 +223,8 @@ export const ExampleCompareSectionDetail: React.FC<{
   onExpandToggle: () => void;
   isExpanded: boolean;
 }> = props => {
+  const getClient = useGetTraceServerClientContext();
+  const client = getClient();
   const ctx = useCompareEvaluationsState();
   // Prefer the method below (since `state` diverging from the
   // context would certainly be a bug)
@@ -527,8 +540,6 @@ export const ExampleCompareSectionDetail: React.FC<{
     return orderedCallIds[evalIndex];
   };
 
-  
-
   const evalOutputValueComp = (evalIndex: number, outputPropIndex: number) => {
     const value = lookupOutputValue(evalIndex, outputPropIndex);
     return <ICValueView value={value} />;
@@ -603,18 +614,35 @@ export const ExampleCompareSectionDetail: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ) => {
+    const dimension = lookupDimension(scorerIndex, metricIndex);
     const scoreId = lookupDimensionId(scorerIndex, metricIndex);
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
 
     if (lookupIsDerivedMetric(scorerIndex)) {
       return undefined;
     }
-    const sourceCallId =
-      targetTrial.predictAndScore.scoreMetrics[scoreId].sourceCallId;
-    if (sourceCallId == null) {
-      return undefined;
-    }
-    return () => onScorerClick(sourceCallId);
+
+    return () => {
+      memoizedFindPredictAndScoreChildrenCalls(
+        client,
+        targetTrial.predictAndScore._rawPredictAndScoreTraceData
+      ).then(ops => {
+        const matchingCall = ops.find(
+          op => op.op_name === dimension.scorerOpOrObjRef
+        );
+        if (matchingCall == null) {
+          return;
+        }
+        onScorerClick(matchingCall.id);
+      });
+    };
+
+    // const sourceCallId =
+    //   targetTrial.predictAndScore.scoreMetrics[scoreId].sourceCallId;
+    // if (sourceCallId == null) {
+    //   return undefined;
+    // }
+    // return () => onScorerClick(sourceCallId);
   };
 
   const scorerComp = (scorerIndex: number) => {
@@ -815,7 +843,12 @@ export const ExampleCompareSectionDetail: React.FC<{
                 <GridCell
                   key={evalMapKey(evalIndex)}
                   style={{...stickyHeaderStyleMixin}}>
-                  <EvalSelectedTrialPredictCallComp evalIndex={evalIndex} orderedCallIds={orderedCallIds} evaluationCalls={props.state.summary.evaluationCalls} lookupSelectedTrialForEval={lookupSelectedTrialForEval} />
+                  <EvalSelectedTrialPredictCallComp
+                    evalIndex={evalIndex}
+                    orderedCallIds={orderedCallIds}
+                    evaluationCalls={props.state.summary.evaluationCalls}
+                    lookupSelectedTrialForEval={lookupSelectedTrialForEval}
+                  />
                 </GridCell>
               );
             })}
@@ -968,45 +1001,55 @@ export const ExampleCompareSectionDetail: React.FC<{
   );
 };
 
-const EvalSelectedTrialPredictCallComp: FC<{evalIndex: number, orderedCallIds: string[], evaluationCalls: {
-  [callId: string]: EvaluationCall;
-}, lookupSelectedTrialForEval: (evalIndex: number) => PivotedRow | undefined}> = ({evalIndex, orderedCallIds, evaluationCalls, lookupSelectedTrialForEval  }) => {
+const EvalSelectedTrialPredictCallComp: FC<{
+  evalIndex: number;
+  orderedCallIds: string[];
+  evaluationCalls: {
+    [callId: string]: EvaluationCall;
+  };
+  lookupSelectedTrialForEval: (evalIndex: number) => PivotedRow | undefined;
+}> = ({
+  evalIndex,
+  orderedCallIds,
+  evaluationCalls,
+  lookupSelectedTrialForEval,
+}) => {
   const getClient = useGetTraceServerClientContext();
   const client = getClient();
   const [trialCallInfo, setTrialCallInfo] = useState<{
-    opName: string,
-    callId: string
-  } | null>(null)
+    opName: string;
+    callId: string;
+  } | null>(null);
 
   const currEvalCallId = orderedCallIds[evalIndex];
   const selectedTrial = lookupSelectedTrialForEval(evalIndex);
-    const predictAndScoreCall = selectedTrial?.predictAndScore._rawPredictAndScoreTraceData
-    useEffect(() => {
+  const predictAndScoreCall =
+    selectedTrial?.predictAndScore._rawPredictAndScoreTraceData;
+  useEffect(() => {
     if (!predictAndScoreCall) {
       return;
     }
-    memoizedFindPredictAndScoreChildrenOps(client, predictAndScoreCall).then(ops => {
-      console.log(ops)
-      if (!ops || ops.length === 0) {
-        return;
+    memoizedFindPredictAndScoreChildrenCalls(client, predictAndScoreCall).then(
+      ops => {
+        if (!ops || ops.length === 0) {
+          return;
+        }
+        // Probably messed up for converters
+        const predictOp = ops[0];
+        setTrialCallInfo({
+          opName: parseRefMaybe(predictOp.op_name)?.artifactName ?? 'Predict',
+          callId: predictOp.id,
+        });
       }
-      // Probably messed up for converters
-      const predictOp = ops[0];
-      setTrialCallInfo({
-        opName: parseRefMaybe(
-          predictOp.op_name
-        )?.artifactName ?? 'Predict',
-        callId: predictOp.id,
-      })
-    })
-  }, [client, predictAndScoreCall])
+    );
+  }, [client, predictAndScoreCall]);
 
   if (selectedTrial == null || trialCallInfo == null) {
     return null;
   }
 
-  const [trialEntity, trialProject] = predictAndScoreCall?.project_id.split('/') ?? [];
-
+  const [trialEntity, trialProject] =
+    predictAndScoreCall?.project_id.split('/') ?? [];
 
   const evaluationCall = evaluationCalls[currEvalCallId];
   if (trialEntity && trialProject) {
