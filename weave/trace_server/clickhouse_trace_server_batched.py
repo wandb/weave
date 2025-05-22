@@ -137,6 +137,7 @@ from weave.trace_server.trace_server_common import (
 from weave.trace_server.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     bytes_digest,
+    calculate_input_digests,
     extract_refs_from_values,
     str_digest,
 )
@@ -2434,6 +2435,11 @@ def _start_call_for_insert_to_ch_insertable_start_call(
     # wrong trace id (one that does not match the parent_id)!
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
+    input_digests = calculate_input_digests(start_call.inputs)
+    attributes = start_call.attributes.copy()
+    weave_attrs = attributes.setdefault("weave", {})
+    weave_attrs["input_digests"] = input_digests
+
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -2441,7 +2447,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         parent_id=start_call.parent_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
-        attributes_dump=_dict_value_to_dump(start_call.attributes),
+        attributes_dump=_dict_value_to_dump(attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,

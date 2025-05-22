@@ -31,7 +31,6 @@ import {VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {ExampleCompareSectionDetail} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
 import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
-import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
 
@@ -178,12 +177,6 @@ const CompareEvaluationsPageInner: React.FC<{
   height: number;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  const showExampleFilter = false;
-  // Keeping this here in case we want to bring it back
-  // Object.keys(state.summary.evaluationCalls).length === 2;
-  const showExamples =
-    Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
-      .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
   const [tabValue, setTabValue] = useState('summary');
 
@@ -251,33 +244,8 @@ const CompareEvaluationsPageInner: React.FC<{
                     }}>
                     <WaveLoader size="small" />
                   </Box>
-                ) : showExamples ? (
-                  <>
-                    {showExampleFilter && (
-                      <ExampleFilterSection state={state} />
-                    )}
-                    <ResultExplorer state={state} height={props.height} />
-                  </>
                 ) : (
-                  <VerticalBox
-                    sx={{
-                      paddingLeft: STANDARD_PADDING,
-                      paddingRight: STANDARD_PADDING,
-                      width: '100%',
-                      overflow: 'auto',
-                    }}>
-                    <Box
-                      sx={{
-                        fontWeight: 'bold',
-                      }}>
-                      Examples
-                    </Box>
-                    <Alert severity="info">
-                      The selected evaluations' datasets have 0 rows in common,
-                      try comparing evaluations with datasets that have at least
-                      one row in common.
-                    </Alert>
-                  </VerticalBox>
+                  <ResultExplorer state={state} height={props.height} />
                 )}
               </VerticalBox>
             ),

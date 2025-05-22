@@ -7,6 +7,7 @@ import {LinearProgress} from '../../../../../LinearProgress';
 import {useEvaluationComparisonState} from './ecpState';
 import {EvaluationComparisonState} from './ecpState';
 import {ComparisonDimensionsType} from './ecpState';
+import {PaginationModel} from './ecpTypes';
 
 export type CompareEvaluationContext = {
   state: EvaluationComparisonState;
@@ -21,6 +22,7 @@ export type CompareEvaluationContext = {
 
   getCachedRowData: (digest: string) => any;
   setCachedRowData: (digest: string, data: any) => void;
+  setPaginationModel: React.Dispatch<React.SetStateAction<PaginationModel>>;
 };
 
 const CompareEvaluationsContext =
@@ -68,11 +70,16 @@ export const CompareEvaluationsProvider: React.FC<{
   useEffect(() => {
     setEvaluationCallIds(initialEvaluationCallIdsMemo);
   }, [initialEvaluationCallIdsMemo]);
+  const [paginationModel, setPaginationModel] = React.useState({
+    pageSize: 50,
+    page: 0,
+  });
 
   const initialState = useEvaluationComparisonState(
     entity,
     project,
     evaluationCallIds,
+    paginationModel,
     comparisonDimensions,
     selectedInputDigest,
     selectedMetrics ?? undefined
@@ -119,6 +126,7 @@ export const CompareEvaluationsProvider: React.FC<{
       },
       getCachedRowData,
       setCachedRowData,
+      setPaginationModel,
     };
   }, [
     initialState.loading,
@@ -128,6 +136,7 @@ export const CompareEvaluationsProvider: React.FC<{
     setSelectedMetrics,
     evaluationCallIds,
     onEvaluationCallIdsUpdate,
+    setPaginationModel,
   ]);
 
   if (!value) {

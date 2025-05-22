@@ -3,7 +3,14 @@ import {WarningAmberOutlined} from '@mui/icons-material';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useRef} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import styled from 'styled-components';
 
 import {
@@ -23,6 +30,8 @@ import {isCustomWeaveTypePayload} from '../../../../typeViews/customWeaveType.ty
 import {CustomWeaveTypeDispatcher} from '../../../../typeViews/CustomWeaveTypeDispatcher';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {CallLink} from '../../../common/Links';
+import {useGetTraceServerClientContext} from '../../../wfReactInterface/traceServerClientContext';
+import {memoizedFindPredictAndScoreChildrenCalls} from '../../../wfReactInterface/tsDataModelHooksEvaluationComparisonFast';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
@@ -33,7 +42,11 @@ import {
 } from '../../compositeMetricsUtil';
 import {SIGNIFICANT_DIGITS} from '../../ecpConstants';
 import {EvaluationComparisonState} from '../../ecpState';
-import {MetricDefinition, MetricValueType} from '../../ecpTypes';
+import {
+  EvaluationCall,
+  MetricDefinition,
+  MetricValueType,
+} from '../../ecpTypes';
 import {
   dimensionUnit,
   flattenedDimensionPath,
@@ -210,6 +223,8 @@ export const ExampleCompareSectionDetail: React.FC<{
   onExpandToggle: () => void;
   isExpanded: boolean;
 }> = props => {
+  const getClient = useGetTraceServerClientContext();
+  const client = getClient();
   const ctx = useCompareEvaluationsState();
   // Prefer the method below (since `state` diverging from the
   // context would certainly be a bug)
@@ -219,7 +234,7 @@ export const ExampleCompareSectionDetail: React.FC<{
     outputColumnKeys,
     leafDims: orderedCallIds,
   } = useFilteredAggregateRows(props.state);
-  const {setSelectedInputDigest} = ctx;
+  const {setSelectedInputDigest, setPaginationModel} = ctx;
   const targetIndex = useMemo(() => {
     const selectedDigest = props.state.selectedInputDigest;
     if (selectedDigest) {
@@ -239,6 +254,48 @@ export const ExampleCompareSectionDetail: React.FC<{
 
   const {targetRowValue, loading: loadingInputValue} =
     useExampleCompareDataAndPrefetch(ctx, filteredRows, targetIndex);
+  const effectiveIndexOffset =
+    ctx.state.paginationModel.page * ctx.state.paginationModel.pageSize;
+
+  const goToPreviousExample = useCallback(() => {
+    const newTargetIndex = targetIndex - 1;
+    if (newTargetIndex === -1) {
+      if (effectiveIndexOffset > 0) {
+        setPaginationModel(prev => ({...prev, page: prev.page - 1}));
+        setSelectedInputDigest(null);
+      }
+    } else {
+      setSelectedInputDigest(filteredRows[newTargetIndex].inputDigest);
+    }
+  }, [
+    targetIndex,
+    effectiveIndexOffset,
+    setPaginationModel,
+    setSelectedInputDigest,
+    filteredRows,
+  ]);
+
+  const goToNextExample = useCallback(() => {
+    const newTargetIndex = targetIndex + 1;
+    if (newTargetIndex === filteredRows.length) {
+      if (
+        effectiveIndexOffset <
+        (ctx.state.loadableComparisonResults.result?.totalRowCount ?? 0) - 1
+      ) {
+        setPaginationModel(prev => ({...prev, page: prev.page + 1}));
+        setSelectedInputDigest(null);
+      }
+    } else {
+      setSelectedInputDigest(filteredRows[newTargetIndex].inputDigest);
+    }
+  }, [
+    targetIndex,
+    filteredRows,
+    effectiveIndexOffset,
+    ctx.state.loadableComparisonResults.result?.totalRowCount,
+    setPaginationModel,
+    setSelectedInputDigest,
+  ]);
 
   const inputColumnKeys = useMemo(() => {
     return Object.keys(targetRowValue ?? {});
@@ -376,13 +433,6 @@ export const ExampleCompareSectionDetail: React.FC<{
     return dimensionsForThisScorer[metricIndex];
   };
 
-  const lookupDimensionId = (
-    scorerIndex: number,
-    metricIndex: number
-  ): string => {
-    return metricDefinitionId(lookupDimension(scorerIndex, metricIndex));
-  };
-
   const lookupTargetTrial = (
     evalIndex: number,
     trialIndex: number
@@ -483,40 +533,6 @@ export const ExampleCompareSectionDetail: React.FC<{
     return orderedCallIds[evalIndex];
   };
 
-  const evalSelectedTrialPredictCallComp = (evalIndex: number) => {
-    const currEvalCallId = orderedCallIds[evalIndex];
-    const selectedTrial = lookupSelectedTrialForEval(evalIndex);
-    if (selectedTrial == null) {
-      return null;
-    }
-    const trialPredict = selectedTrial.predictAndScore._rawPredictTraceData;
-    const [trialEntity, trialProject] =
-      trialPredict?.project_id.split('/') ?? [];
-    const trialOpName = parseRefMaybe(
-      trialPredict?.op_name ?? ''
-    )?.artifactName;
-    const trialCallId = trialPredict?.id;
-    const evaluationCall = props.state.summary.evaluationCalls[currEvalCallId];
-    if (trialEntity && trialProject && trialOpName && trialCallId) {
-      return (
-        <Box
-          style={{
-            overflow: 'hidden',
-          }}>
-          <CallLink
-            entityName={trialEntity}
-            projectName={trialProject}
-            opName={trialOpName}
-            callId={trialCallId}
-            icon={<Icon name="filled-circle" color={evaluationCall.color} />}
-            color={MOON_800}
-          />
-        </Box>
-      );
-    }
-    return null;
-  };
-
   const evalOutputValueComp = (evalIndex: number, outputPropIndex: number) => {
     const value = lookupOutputValue(evalIndex, outputPropIndex);
     return <ICValueView value={value} />;
@@ -591,16 +607,34 @@ export const ExampleCompareSectionDetail: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ) => {
-    const scoreId = lookupDimensionId(scorerIndex, metricIndex);
+    const dimension = lookupDimension(scorerIndex, metricIndex);
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
 
     if (lookupIsDerivedMetric(scorerIndex)) {
       return undefined;
     }
-    return () =>
-      onScorerClick(
-        targetTrial.predictAndScore.scoreMetrics[scoreId].sourceCallId
-      );
+
+    return () => {
+      memoizedFindPredictAndScoreChildrenCalls(
+        client,
+        targetTrial.predictAndScore._rawPredictAndScoreTraceData
+      ).then(ops => {
+        const matchingCall = ops.find(
+          op => op.op_name === dimension.scorerOpOrObjRef
+        );
+        if (matchingCall == null) {
+          return;
+        }
+        onScorerClick(matchingCall.id);
+      });
+    };
+
+    // const sourceCallId =
+    //   targetTrial.predictAndScore.scoreMetrics[scoreId].sourceCallId;
+    // if (sourceCallId == null) {
+    //   return undefined;
+    // }
+    // return () => onScorerClick(sourceCallId);
   };
 
   const scorerComp = (scorerIndex: number) => {
@@ -668,18 +702,14 @@ export const ExampleCompareSectionDetail: React.FC<{
         <Tooltip title="Previous Example">
           <IconButton
             // disabled={targetIndex === 0}
-            onClick={() => {
-              setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
-            }}>
+            onClick={goToPreviousExample}>
             <Icon name="chevron-up" />
           </IconButton>
         </Tooltip>
         <Tooltip title="Next Example">
           <IconButton
             // disabled={targetIndex === filteredRows.length - 1}
-            onClick={() => {
-              setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
-            }}>
+            onClick={goToNextExample}>
             <Icon name="chevron-down" />
           </IconButton>
         </Tooltip>
@@ -693,7 +723,9 @@ export const ExampleCompareSectionDetail: React.FC<{
           style={{
             flex: 1,
           }}>
-          {`Example ${targetIndex + 1} of ${filteredRows.length}`}
+          {`Example ${effectiveIndexOffset + targetIndex + 1} of ${
+            ctx.state.loadableComparisonResults.result?.totalRowCount ?? '...'
+          }`}
         </Box>
       </HorizontalBox>
 
@@ -803,7 +835,12 @@ export const ExampleCompareSectionDetail: React.FC<{
                 <GridCell
                   key={evalMapKey(evalIndex)}
                   style={{...stickyHeaderStyleMixin}}>
-                  {evalSelectedTrialPredictCallComp(evalIndex)}
+                  <EvalSelectedTrialPredictCallComp
+                    evalIndex={evalIndex}
+                    orderedCallIds={orderedCallIds}
+                    evaluationCalls={props.state.summary.evaluationCalls}
+                    lookupSelectedTrialForEval={lookupSelectedTrialForEval}
+                  />
                 </GridCell>
               );
             })}
@@ -954,6 +991,77 @@ export const ExampleCompareSectionDetail: React.FC<{
       </GridContainer>
     </VerticalBox>
   );
+};
+
+const EvalSelectedTrialPredictCallComp: FC<{
+  evalIndex: number;
+  orderedCallIds: string[];
+  evaluationCalls: {
+    [callId: string]: EvaluationCall;
+  };
+  lookupSelectedTrialForEval: (evalIndex: number) => PivotedRow | undefined;
+}> = ({
+  evalIndex,
+  orderedCallIds,
+  evaluationCalls,
+  lookupSelectedTrialForEval,
+}) => {
+  const getClient = useGetTraceServerClientContext();
+  const client = getClient();
+  const [trialCallInfo, setTrialCallInfo] = useState<{
+    opName: string;
+    callId: string;
+  } | null>(null);
+
+  const currEvalCallId = orderedCallIds[evalIndex];
+  const selectedTrial = lookupSelectedTrialForEval(evalIndex);
+  const predictAndScoreCall =
+    selectedTrial?.predictAndScore._rawPredictAndScoreTraceData;
+  useEffect(() => {
+    if (!predictAndScoreCall) {
+      return;
+    }
+    memoizedFindPredictAndScoreChildrenCalls(client, predictAndScoreCall).then(
+      ops => {
+        if (!ops || ops.length === 0) {
+          return;
+        }
+        // Probably messed up for converters
+        const predictOp = ops[0];
+        setTrialCallInfo({
+          opName: parseRefMaybe(predictOp.op_name)?.artifactName ?? 'Predict',
+          callId: predictOp.id,
+        });
+      }
+    );
+  }, [client, predictAndScoreCall]);
+
+  if (selectedTrial == null || trialCallInfo == null) {
+    return null;
+  }
+
+  const [trialEntity, trialProject] =
+    predictAndScoreCall?.project_id.split('/') ?? [];
+
+  const evaluationCall = evaluationCalls[currEvalCallId];
+  if (trialEntity && trialProject) {
+    return (
+      <Box
+        style={{
+          overflow: 'hidden',
+        }}>
+        <CallLink
+          entityName={trialEntity}
+          projectName={trialProject}
+          opName={trialCallInfo.opName}
+          callId={trialCallInfo.callId}
+          icon={<Icon name="filled-circle" color={evaluationCall.color} />}
+          color={MOON_800}
+        />
+      </Box>
+    );
+  }
+  return null;
 };
 
 const ICValueView: React.FC<{value: any}> = ({value}) => {

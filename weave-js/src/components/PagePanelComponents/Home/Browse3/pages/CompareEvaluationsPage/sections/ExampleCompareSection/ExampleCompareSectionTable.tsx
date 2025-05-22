@@ -611,6 +611,7 @@ const inputFields = (
     filterable: false,
     width: columnWidths[key],
     maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+    // flex: 1,
     valueGetter: (value: any, row: RowData) => {
       return row.inputDigest;
     },
@@ -823,8 +824,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         renderHeader: () => removePrefix(key, 'output.'),
         width: outputWidths[key],
         maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+        // flex: 1,
         ...DISABLED_ROW_SPANNING,
         disableReorder: true,
+        sortable: false, // should be true eventually (server-side)
+        filterable: false, // should be true eventually (server-side)
         valueGetter: (value: any, row: RowData) => {
           if (row._pivot === 'modelsAsColumns') {
             return null;
@@ -864,6 +868,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                 ...DISABLED_ROW_SPANNING,
                 disableColumnMenu: false,
                 disableReorder: true,
+                flex: 0,
+                sortable: false, // should be true eventually (server-side)
+                filterable: false, // should be true eventually (server-side)
                 valueGetter: (value: any, row: RowData) => {
                   if (row._pivot === 'modelsAsColumns') {
                     // This does not make sense for models as columns
@@ -1001,9 +1008,16 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
       pagination
+      paginationMode="server"
+      paginationModel={ctx.state.paginationModel}
+      onPaginationModelChange={ctx.setPaginationModel}
+      rowCount={
+        ctx.state.loadableComparisonResults.result?.totalRowCount ?? undefined
+      }
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
       slots={{columnsPanel: ColumnsManagementPanel}}
+      hideFooterSelectedRowCount
     />
   );
 };
@@ -1078,9 +1092,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             headerName: `${key}.${evaluationCallId}`,
             width: outputWidths[key],
             maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+            // flex: 1,
             ...DISABLED_ROW_SPANNING,
             disableColumnMenu: false,
             disableReorder: true,
+            sortable: false, // should be true eventually (server-side)
+            filterable: false, // should be true eventually (server-side)
             renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
                 <EvaluationModelLink
@@ -1122,6 +1139,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                     ...DISABLED_ROW_SPANNING,
                     disableColumnMenu: false,
                     disableReorder: true,
+                    sortable: false, // should be true eventually (server-side)
+                    filterable: false, // should be true eventually (server-side)
                     renderHeader: (params: GridColumnHeaderParams<RowData>) => {
                       return (
                         <EvaluationModelLink
@@ -1296,9 +1315,16 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
       pagination
+      paginationMode="server"
+      paginationModel={ctx.state.paginationModel}
+      onPaginationModelChange={ctx.setPaginationModel}
+      rowCount={
+        ctx.state.loadableComparisonResults.result?.totalRowCount ?? undefined
+      }
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
       slots={{columnsPanel: ColumnsManagementPanel}}
+      hideFooterSelectedRowCount
     />
   );
 };

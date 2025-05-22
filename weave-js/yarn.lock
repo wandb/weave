@@ -1527,6 +1527,11 @@
   dependencies:
     commander "^2.15.1"
 
+"@cryptography/sha256@^0.2.0":
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/@cryptography/sha256/-/sha256-0.2.0.tgz#45d785be6b5928fd44ab59465ef3d6f611769215"
+  integrity sha512-BptcDkQWplfUjMJAxewmMN/O8JD19cwJM6XUFQrqaCDMYt5e40Czm4S7BEFc+PN7dElNH79ik687/5aMk4uDSQ==
+
 "@cspotcode/source-map-support@^0.8.0":
   version "0.8.1"
   resolved "https://registry.yarnpkg.com/@cspotcode/source-map-support/-/source-map-support-0.8.1.tgz#00629c35a688e05a88b1cda684fb9d5e73f000a1"

@@ -47,6 +47,7 @@ from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
     bytes_digest,
+    calculate_input_digests,
     extract_refs_from_values,
     str_digest,
 )
@@ -176,6 +177,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise ValueError("trace_id is required")
         if req.start.id is None:
             raise ValueError("id is required")
+
+        input_digests = calculate_input_digests(req.start.inputs)
+        attributes = req.start.attributes.copy()
+        weave_attrs = attributes.setdefault("weave", {})
+        weave_attrs["input_digests"] = input_digests
+
         with self.lock:
             # Converts the user-provided call details into a clickhouse schema.
             # This does validation and conversion of the input data as well
@@ -203,7 +210,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.op_name,
                     req.start.display_name,
                     req.start.started_at.isoformat(),
-                    json.dumps(req.start.attributes),
+                    json.dumps(attributes),
                     json.dumps(req.start.inputs),
                     json.dumps(
                         extract_refs_from_values(list(req.start.inputs.values()))

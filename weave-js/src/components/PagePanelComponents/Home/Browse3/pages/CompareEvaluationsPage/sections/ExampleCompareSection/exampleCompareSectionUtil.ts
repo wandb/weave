@@ -24,7 +24,7 @@ type RowBase = {
   id: string;
   evaluationCallId: string;
   inputDigest: string;
-  inputRef: string;
+  inputRef?: string;
   path: string[];
   predictAndScore: PredictAndScoreCall;
 };
@@ -50,7 +50,7 @@ const aggregateGroupedNestedRows = <T>(
       rows.reduce<{
         [flatKey: string]: {[callId: string]: any[]};
       }>((acc, row) => {
-        Object.entries(row[field]).forEach(([key, val]) => {
+        Object.entries(row[field] ?? {}).forEach(([key, val]) => {
           Object.entries(val).forEach(([subKey, subVal]) => {
             if (acc[key] == null) {
               acc[key] = {};
@@ -126,7 +126,7 @@ export type FilteredAggregateRows = {
   id: string;
   count: number;
   inputDigest: string;
-  inputRef: ObjectRef | null;
+  inputRef?: ObjectRef | null;
   output: {
     [k: string]: {
       [k: string]: any;
@@ -161,7 +161,15 @@ export const useFilteredAggregateRows = (
       Object.values(rowCollection.evaluations).forEach(modelCollection => {
         Object.values(modelCollection.predictAndScores).forEach(
           (predictAndScoreRes, trialNdx) => {
-            const output = predictAndScoreRes._rawPredictTraceData?.output;
+            // TODO: make this a helper / move to state
+            const predictAndScoreOutput =
+              predictAndScoreRes._rawPredictAndScoreTraceData?.output;
+            const backupOuput = _.isPlainObject(predictAndScoreOutput)
+              ? (predictAndScoreOutput as any)?.output ??
+                (predictAndScoreOutput as any)?.model_output
+              : undefined;
+            const output =
+              predictAndScoreRes._rawPredictTraceData?.output ?? backupOuput;
             rows.push({
               id: predictAndScoreRes.callId,
               evaluationCallId: predictAndScoreRes.evaluationCallId,
@@ -246,7 +254,9 @@ export const useFilteredAggregateRows = (
             id: inputDigest, // required for the data grid
             count: rows.length,
             inputDigest,
-            inputRef: parseRefMaybe(rows[0].inputRef), // Should be the same for all,
+            inputRef: rows[0].inputRef
+              ? parseRefMaybe(rows[0].inputRef)
+              : undefined, // Should be the same for all,
             output: aggregateGroupedNestedRows(
               rows,
               'output',

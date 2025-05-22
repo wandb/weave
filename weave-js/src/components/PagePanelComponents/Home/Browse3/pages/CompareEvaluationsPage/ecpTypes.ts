@@ -34,6 +34,8 @@ export type EvaluationComparisonSummary = {
   // SummaryMetrics define the metrics that are associated with the evaluation as a whole
   // often aggregated from the scoreMetrics.
   summaryMetrics: MetricDefinitionMap;
+
+  scorerNameToRefHeuristicMap: {[scorerName: string]: string};
 };
 
 export type EvaluationComparisonResults = {
@@ -59,6 +61,7 @@ export type EvaluationComparisonResults = {
       };
     };
   };
+  totalRowCount: number;
 };
 /**
  * The EvaluationObj is the primary object that defines the evaluation itself.
@@ -101,7 +104,7 @@ type ModelObj = {
  */
 export type PredictAndScoreCall = {
   callId: string;
-  exampleRef: string;
+  exampleRef?: string;
   rowDigest: string;
   modelRef: string;
   evaluationCallId: string;
@@ -136,5 +139,10 @@ type MetricResultMap = {[metricId: string]: MetricResult};
 export type MetricValueType = boolean | number;
 export type MetricResult = {
   value: MetricValueType;
-  sourceCallId: string;
+  sourceCallId?: string;
+};
+
+export type PaginationModel = {
+  pageSize: number;
+  page: number;
 };
