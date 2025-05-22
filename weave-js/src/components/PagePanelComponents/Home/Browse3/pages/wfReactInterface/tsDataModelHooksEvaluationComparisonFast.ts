@@ -7,6 +7,34 @@ import {projectIdFromParts} from './tsDataModelHooks';
 import {calculatePredictAndScoreCallExampleDigest} from './tsDataModelHooksEvaluationComparisonUtilities';
 
 // Original query function
+const predictAndScoresCountQuery = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  evaluationCallId: string
+): Promise<number> => {
+  const projectId = projectIdFromParts({entity: entity, project: project});
+  const evalTraceResProm = client.callsQueryStats({
+    project_id: projectId,
+    filter: {
+      parent_ids: [evaluationCallId],
+      op_names: [
+        `weave:///${entity}/${project}/op/${PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC}:*`,
+      ],
+    },
+  });
+  const res = await evalTraceResProm;
+  return res.count;
+};
+
+export const memoizedPredictAndScoresCountQuery = memoize(
+  predictAndScoresCountQuery,
+  (client, entity, project, evaluationCallId) =>
+    JSON.stringify({entity, project, evaluationCallId}),
+  100
+);
+
+// Original query function
 const pagedPredictAndScoresQuery = async (
   client: TraceServerClient,
   entity: string,

@@ -59,6 +59,7 @@ export type EvaluationComparisonResults = {
       };
     };
   };
+  totalRowCount: number;
 };
 /**
  * The EvaluationObj is the primary object that defines the evaluation itself.

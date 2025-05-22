@@ -101,6 +101,7 @@ import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
 import {TraceCallSchema} from './traceServerClientTypes';
 import {
   memoizedLookupPredictAndScoreMatchMany,
+  memoizedPredictAndScoresCountQuery,
   memoizedPredictAndScoresQuery,
 } from './tsDataModelHooksEvaluationComparisonFast';
 import {
@@ -394,8 +395,16 @@ const fetchEvaluationComparisonResults = async (
   if (evaluationCallIds.length === 0) {
     return {
       resultRows: {},
+      totalRowCount: 0,
     };
   }
+
+  const rowCountProm = memoizedPredictAndScoresCountQuery(
+    traceServerClient,
+    entity,
+    project,
+    evaluationCallIds[0]
+  );
 
   const baselinePredictAndScoreCalls = await memoizedPredictAndScoresQuery(
     traceServerClient,
@@ -435,42 +444,47 @@ const fetchEvaluationComparisonResults = async (
     }
   );
 
+  const resultRows = _.mapValues(groupedByDigest, (calls, rowDigest) => {
+    const example = calls[0].inputs.example;
+
+    const rawDataRow = maybeExtractDatasetRowRefDigest(example)
+      ? undefined
+      : example;
+    const groupedByEval = _.groupBy(calls, call => {
+      return call.parent_id;
+    });
+
+    return {
+      rawDataRow,
+      evaluations: _.mapValues(groupedByEval, (calls, evaluationCallId) => {
+        return {
+          predictAndScores: Object.fromEntries(
+            calls.map(call => {
+              return [
+                call.id,
+                {
+                  callId: call.id,
+                  exampleRef: call.inputs.example,
+                  rowDigest,
+                  modelRef: call.inputs.model,
+                  evaluationCallId,
+                  scoreMetrics: {},
+                  _rawPredictAndScoreTraceData: call,
+                  _rawPredictTraceData: undefined,
+                },
+              ];
+            })
+          ),
+        };
+      }),
+    };
+  });
+
+  const totalRowCount = await rowCountProm;
+
   const result: EvaluationComparisonResults = {
-    resultRows: _.mapValues(groupedByDigest, (calls, rowDigest) => {
-      const example = calls[0].inputs.example;
-
-      const rawDataRow = maybeExtractDatasetRowRefDigest(example)
-        ? undefined
-        : example;
-      const groupedByEval = _.groupBy(calls, call => {
-        return call.parent_id;
-      });
-
-      return {
-        rawDataRow,
-        evaluations: _.mapValues(groupedByEval, (calls, evaluationCallId) => {
-          return {
-            predictAndScores: Object.fromEntries(
-              calls.map(call => {
-                return [
-                  call.id,
-                  {
-                    callId: call.id,
-                    exampleRef: call.inputs.example,
-                    rowDigest,
-                    modelRef: call.inputs.model,
-                    evaluationCallId,
-                    scoreMetrics: {},
-                    _rawPredictAndScoreTraceData: call,
-                    _rawPredictTraceData: undefined,
-                  },
-                ];
-              })
-            ),
-          };
-        }),
-      };
-    }),
+    totalRowCount,
+    resultRows,
   };
 
   return result;

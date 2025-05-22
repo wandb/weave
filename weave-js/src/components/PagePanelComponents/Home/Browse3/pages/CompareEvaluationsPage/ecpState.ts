@@ -36,6 +36,7 @@ export type EvaluationComparisonState = {
   // Ordered call Ids
   evaluationCallIdsOrdered: string[];
   // comparison page
+  paginationModel: PaginationModel;
 };
 
 export type ComparisonDimensionsType = Array<{
@@ -121,6 +122,7 @@ export const useEvaluationComparisonState = (
         selectedInputDigest,
         selectedMetrics,
         evaluationCallIdsOrdered: evaluationCallIds,
+        paginationModel,
       },
     };
   }, [
@@ -131,6 +133,7 @@ export const useEvaluationComparisonState = (
     selectedInputDigest,
     selectedMetrics,
     evaluationCallIds,
+    paginationModel,
   ]);
 
   return value;

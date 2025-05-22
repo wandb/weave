@@ -1008,9 +1008,14 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       columnGroupingModel={columnGroupingModel}
       disableRowSelectionOnClick
       pagination
+      paginationMode="server"
+      paginationModel={ctx.state.paginationModel}
+      onPaginationModelChange={ctx.setPaginationModel}
+      rowCount={ctx.state.loadableComparisonResults.result?.totalRowCount ?? undefined}
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
       slots={{columnsPanel: ColumnsManagementPanel}}
+      hideFooterSelectedRowCount
     />
   );
 };
@@ -1309,9 +1314,13 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       disableRowSelectionOnClick
       pagination
       paginationMode="server"
+      paginationModel={ctx.state.paginationModel}
+      onPaginationModelChange={ctx.setPaginationModel}
+      rowCount={ctx.state.loadableComparisonResults.result?.totalRowCount ?? undefined}
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
       slots={{columnsPanel: ColumnsManagementPanel}}
+      hideFooterSelectedRowCount
     />
   );
 };
