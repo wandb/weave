@@ -1,6 +1,7 @@
 import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
 
 import {OBJECT_ATTR_EDGE_NAME, TABLE_ID_EDGE_NAME} from './constants';
+import {TraceCallSchema} from './traceServerClientTypes';
 
 export const generateStableDigest = (obj: any): string => {
   if (obj === undefined || obj === null) {
@@ -34,6 +35,19 @@ export const generateStableDigest = (obj: any): string => {
   }
 };
 
+export const calculatePredictAndScoreCallExampleDigest = (
+  call: TraceCallSchema
+): string => {
+  const example = call.inputs.example;
+
+  const maybeDigest = maybeExtractDatasetRowRefDigest(example);
+  if (maybeDigest !== null) {
+    return maybeDigest;
+  }
+
+  return generateStableDigest(example);
+};
+
 export const maybeExtractDatasetRowRefDigest = (value: any): string | null => {
   if (typeof value !== 'string') {
     return null;
@@ -48,20 +62,11 @@ export const maybeExtractDatasetRowRefDigest = (value: any): string | null => {
   if (parsedMaybe.weaveKind !== 'object') {
     return null;
   }
+  const datasetRowPrefix = `${OBJECT_ATTR_EDGE_NAME}/rows/${TABLE_ID_EDGE_NAME}/`;
   if (
-    !(parsedMaybe.artifactRefExtra && parsedMaybe.artifactRefExtra.length === 4)
+    !(parsedMaybe.artifactRefExtra?.startsWith(datasetRowPrefix))
   ) {
     return null;
   }
-  if (
-    !(parsedMaybe.artifactRefExtra[0] === OBJECT_ATTR_EDGE_NAME) &&
-    parsedMaybe.artifactRefExtra[1] === 'rows' &&
-    parsedMaybe.artifactRefExtra[2] === TABLE_ID_EDGE_NAME
-  ) {
-    return null;
-  }
-  if (typeof parsedMaybe.artifactRefExtra[3] !== 'string') {
-    return null;
-  }
-  return parsedMaybe.artifactRefExtra[3];
+  return parsedMaybe.artifactRefExtra.slice(datasetRowPrefix.length);
 };

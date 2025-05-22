@@ -610,7 +610,8 @@ const inputFields = (
     sortable: false,
     filterable: false,
     width: columnWidths[key],
-    maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+    // maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+    flex: 1,
     valueGetter: (value: any, row: RowData) => {
       return row.inputDigest;
     },
@@ -822,7 +823,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         headerName: key,
         renderHeader: () => removePrefix(key, 'output.'),
         width: outputWidths[key],
-        maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+        // maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+        flex: 1,
         ...DISABLED_ROW_SPANNING,
         disableReorder: true,
         valueGetter: (value: any, row: RowData) => {
@@ -864,6 +866,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                 ...DISABLED_ROW_SPANNING,
                 disableColumnMenu: false,
                 disableReorder: true,
+                flex: 0,
                 valueGetter: (value: any, row: RowData) => {
                   if (row._pivot === 'modelsAsColumns') {
                     // This does not make sense for models as columns
@@ -1053,6 +1056,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     rows
   );
 
+
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
       ...inputFields(
@@ -1077,7 +1081,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             field: `output.${key}.${evaluationCallId}`,
             headerName: `${key}.${evaluationCallId}`,
             width: outputWidths[key],
-            maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+            // maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+            flex: 1,
             ...DISABLED_ROW_SPANNING,
             disableColumnMenu: false,
             disableReorder: true,
@@ -1307,6 +1312,7 @@ const useColumnsWithControlledWidths = (columns: GridColDef<RowData>[]) => {
   const columnWdithOverrides = useRef<{[key: string]: number}>({});
 
   const columnsWithControlledWidths = useMemo(() => {
+    console.log({columnWdithOverrides});
     return columns.map(col => {
       return {
         ...col,

@@ -3,10 +3,7 @@ import {memoize} from './memoize';
 import {TraceServerClient} from './traceServerClient';
 import {TraceCallSchema} from './traceServerClientTypes';
 import {projectIdFromParts} from './tsDataModelHooks';
-import {
-  generateStableDigest,
-  maybeExtractDatasetRowRefDigest,
-} from './tsDataModelHooksEvaluationComparisonUtilities';
+import {calculatePredictAndScoreCallExampleDigest} from './tsDataModelHooksEvaluationComparisonUtilities';
 
 // Original query function
 const pagedPredictAndScoresQuery = async (
@@ -46,17 +43,6 @@ export const memoizedPredictAndScoresQuery = memoize(
     JSON.stringify({entity, project, evaluationCallId, limit, offset}),
   100
 );
-
-const calculatePredictAndScoreCallExampleDigest = (
-  call: TraceCallSchema
-): string => {
-  const example = call.inputs.example;
-  const maybeDigest = maybeExtractDatasetRowRefDigest(example);
-  if (maybeDigest !== null) {
-    return maybeDigest;
-  }
-  return generateStableDigest(example);
-};
 
 const lookupPredictAndScoreMatch = async (
   client: TraceServerClient,
@@ -137,5 +123,8 @@ export const memoizedLookupPredictAndScoreMatchMany = memoize(
 /*
   /// TODO:
   remove sorting of table
-
+inform user that we always show the baseline metrics & results
+test trials
+test imperative
+make all the links work (summary, predict, scoring, etc..)
   */

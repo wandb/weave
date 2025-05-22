@@ -102,7 +102,11 @@ import {
   memoizedLookupPredictAndScoreMatchMany,
   memoizedPredictAndScoresQuery,
 } from './tsDataModelHooksEvaluationComparisonFast';
-import {generateStableDigest} from './tsDataModelHooksEvaluationComparisonUtilities';
+import {
+  calculatePredictAndScoreCallExampleDigest,
+  generateStableDigest,
+  maybeExtractDatasetRowRefDigest,
+} from './tsDataModelHooksEvaluationComparisonUtilities';
 
 /**
  * Primary react hook for fetching evaluation comparison data. This could be
@@ -173,8 +177,8 @@ export const useEvaluationComparisonResults = (
       getTraceServerClient(),
       entity,
       project,
-      evaluationCallIdsMemo,
-      summaryData
+      evaluationCallIdsMemo
+      // summaryData
     ).then(dataRes => {
       if (mounted) {
         evaluationCallIdsRef.current = evaluationCallIdsMemo;
@@ -379,11 +383,16 @@ const fetchEvaluationComparisonResults = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
   entity: string,
   project: string,
-  evaluationCallIds: string[],
-  summaryData: EvaluationComparisonSummary
+  evaluationCallIds: string[]
+  // summaryData: EvaluationComparisonSummary
 ): Promise<EvaluationComparisonResults> => {
-  // Test only:
-  const predictAndScoreCallsTest = await memoizedPredictAndScoresQuery(
+  if (evaluationCallIds.length === 0) {
+    return {
+      resultRows: {},
+    };
+  }
+
+  const baselinePredictAndScoreCalls = await memoizedPredictAndScoresQuery(
     traceServerClient,
     entity,
     project,
@@ -391,150 +400,208 @@ const fetchEvaluationComparisonResults = async (
     100,
     0
   );
-  console.log({predictAndScoreCallsTest});
-  const predictAndScoreCallsTest2 =
-    await memoizedLookupPredictAndScoreMatchMany(
-      traceServerClient,
-      entity,
-      project,
-      evaluationCallIds[1],
-      predictAndScoreCallsTest
-    );
-  console.log({predictAndScoreCallsTest2});
 
-  const projectId = projectIdFromParts({entity, project});
-  const result: EvaluationComparisonResults = {
-    resultRows: {},
-  };
-
-  return result;
-
-  // Kick off the trace query to get the actual trace data
-  // Note: we split this into 2 steps to ensure we only get level 2 children
-  // of the evaluations. This avoids massive overhead of fetching gigantic traces
-  // for every evaluation.
-  const evalTraceIds = Object.values(summaryData.evaluationCalls).map(
-    call => call.traceId
-  );
-  // First, get all the children of the evaluations (predictAndScoreCalls + summary)
-  const evalTraceResProm = traceServerClient
-    .callsStreamQuery({
-      project_id: projectId,
-      filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
-    })
-    .then(predictAndScoreCallRes => {
-      // Then, get all the children of those calls (predictions + scores)
-      const predictAndScoreIds = predictAndScoreCallRes.calls.map(
-        call => call.id
+  const comparisonPredictAndScoreCallsProms = evaluationCallIds
+    .slice(1)
+    .map(async evalCallId => {
+      return await memoizedLookupPredictAndScoreMatchMany(
+        traceServerClient,
+        entity,
+        project,
+        evalCallId,
+        baselinePredictAndScoreCalls
       );
-
-      return Promise.all(
-        _.chunk(predictAndScoreIds, 500).map(chunk => {
-          return traceServerClient
-            .callsStreamQuery({
-              project_id: projectId,
-              filter: {trace_ids: evalTraceIds, parent_ids: chunk},
-            })
-            .then(predictionsAndScoresCallsRes => {
-              return predictionsAndScoresCallsRes.calls;
-            });
-        })
-      ).then(predictionsAndScoresCallsResMany => {
-        return {
-          calls: [
-            ...predictAndScoreCallRes.calls,
-            ...predictionsAndScoresCallsResMany.flat(),
-          ],
-        };
-      });
     });
 
-  // 4. Populate the predictions and scores
-  const evalTraceRes = await evalTraceResProm;
-
-  // Calculate all necessary data first
-  const imperativeEvalCalls = evalTraceRes.calls.filter(isImperativeEvalCall);
-  const nonImperativeEvalCalls = evalTraceRes.calls.filter(
-    call => !isImperativeEvalCall(call)
+  const comparisonPredictAndScoreCalls = await Promise.all(
+    comparisonPredictAndScoreCallsProms
   );
+  const flattenedComparisonPredictAndScoreCalls = [
+    ...baselinePredictAndScoreCalls,
+    ...(comparisonPredictAndScoreCalls
+      .flat()
+      .map(({sourceCall, matchedCall}) => matchedCall)
+      .filter(Boolean) as TraceCallSchema[]),
+  ];
 
-  // Create a set of all of the scorer refs
-  const scorerRefs = new Set(
-    Object.values(summaryData.evaluations).flatMap(
-      evaluation => evaluation.scorerRefs
-    )
-  );
-
-  // Create a map of all the predict_and_score_ops
-  const predictAndScoreOps = Object.fromEntries(
-    evalTraceRes.calls
-      .filter(
-        call =>
-          call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC) ||
-          call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_JS)
-      )
-      .map(call => [call.id, call])
-  );
-
-  const summaryOps = evalTraceRes.calls.filter(
-    call =>
-      call.op_name.includes('Evaluation.summarize:') &&
-      call.parent_id &&
-      evaluationCallIds.includes(call.parent_id)
-  );
-
-  // Fill in the autosummary source calls
-  summaryOps.forEach(summarizedOp => {
-    const evalCallId = summarizedOp.parent_id!;
-    const evalCall = summaryData.evaluationCalls[evalCallId];
-    if (evalCall == null) {
-      return;
+  const groupedByDigest = _.groupBy(
+    flattenedComparisonPredictAndScoreCalls,
+    call => {
+      return calculatePredictAndScoreCallExampleDigest(call);
     }
-    Object.entries(evalCall.summaryMetrics).forEach(
-      ([metricId, metricResult]) => {
-        if (
-          summaryData.summaryMetrics[metricId].source === 'scorer' ||
-          // Special case that the model latency is also a summary metric calc
-          metricDefinitionId(modelLatencyMetricDimension) === metricId
-        ) {
-          metricResult.sourceCallId = summarizedOp.id;
-        }
-      }
-    );
-  });
-
-  const modelRefs = Object.values(summaryData.evaluationCalls).map(
-    evalCall => evalCall.modelRef
   );
 
-  // Now call both populate functions side by side
-  populatePredictionsAndScoresImperative(
-    {calls: imperativeEvalCalls},
-    result,
-    summaryData
-  );
 
-  populatePredictionsAndScoresNonImperative(
-    {calls: nonImperativeEvalCalls},
-    result,
-    summaryData,
-    summaryOps,
-    scorerRefs,
-    predictAndScoreOps,
-    modelRefs
-  );
+  const result: EvaluationComparisonResults = {
+    resultRows: _.mapValues(groupedByDigest, (calls, rowDigest) => {
+      const example = calls[0].inputs.example;
 
-  // Filter out non-intersecting rows
-  result.resultRows = Object.fromEntries(
-    Object.entries(result.resultRows).filter(([digest, row]) => {
-      return (
-        Object.values(row.evaluations).length ===
-        Object.values(summaryData.evaluationCalls).length
-      );
-    })
-  );
+      const rawDataRow = maybeExtractDatasetRowRefDigest(example)
+        ? undefined
+        : example;
+      const groupedByEval = _.groupBy(calls, call => {
+        return call.parent_id;
+      });
+
+      return {
+        rawDataRow,
+        evaluations: _.mapValues(groupedByEval, (calls, evaluationCallId) => {
+          return {
+            predictAndScores: Object.fromEntries(
+              calls.map(call => {
+                return [
+                  call.id,
+                  {
+                    callId: call.id,
+                    exampleRef: call.inputs.example,
+                    rowDigest,
+                    modelRef: call.inputs.model,
+                    evaluationCallId,
+                    scoreMetrics: {},
+                    _rawPredictAndScoreTraceData: call,
+                    _rawPredictTraceData: undefined,
+                  },
+                ];
+              })
+            ),
+          };
+        }),
+      };
+    }),
+  };
+
 
   return result;
+
+  // const projectId = projectIdFromParts({entity, project});
+  //
+  // // Kick off the trace query to get the actual trace data
+  // // Note: we split this into 2 steps to ensure we only get level 2 children
+  // // of the evaluations. This avoids massive overhead of fetching gigantic traces
+  // // for every evaluation.
+  // const evalTraceIds = Object.values(summaryData.evaluationCalls).map(
+  //   call => call.traceId
+  // );
+  // // First, get all the children of the evaluations (predictAndScoreCalls + summary)
+  // const evalTraceResProm = traceServerClient
+  //   .callsStreamQuery({
+  //     project_id: projectId,
+  //     filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
+  //   })
+  //   .then(predictAndScoreCallRes => {
+  //     // Then, get all the children of those calls (predictions + scores)
+  //     const predictAndScoreIds = predictAndScoreCallRes.calls.map(
+  //       call => call.id
+  //     );
+
+  //     return Promise.all(
+  //       _.chunk(predictAndScoreIds, 500).map(chunk => {
+  //         return traceServerClient
+  //           .callsStreamQuery({
+  //             project_id: projectId,
+  //             filter: {trace_ids: evalTraceIds, parent_ids: chunk},
+  //           })
+  //           .then(predictionsAndScoresCallsRes => {
+  //             return predictionsAndScoresCallsRes.calls;
+  //           });
+  //       })
+  //     ).then(predictionsAndScoresCallsResMany => {
+  //       return {
+  //         calls: [
+  //           ...predictAndScoreCallRes.calls,
+  //           ...predictionsAndScoresCallsResMany.flat(),
+  //         ],
+  //       };
+  //     });
+  //   });
+
+  // // 4. Populate the predictions and scores
+  // const evalTraceRes = await evalTraceResProm;
+
+  // // Calculate all necessary data first
+  // const imperativeEvalCalls = evalTraceRes.calls.filter(isImperativeEvalCall);
+  // const nonImperativeEvalCalls = evalTraceRes.calls.filter(
+  //   call => !isImperativeEvalCall(call)
+  // );
+
+  // // Create a set of all of the scorer refs
+  // const scorerRefs = new Set(
+  //   Object.values(summaryData.evaluations).flatMap(
+  //     evaluation => evaluation.scorerRefs
+  //   )
+  // );
+
+  // // Create a map of all the predict_and_score_ops
+  // const predictAndScoreOps = Object.fromEntries(
+  //   evalTraceRes.calls
+  //     .filter(
+  //       call =>
+  //         call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC) ||
+  //         call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_JS)
+  //     )
+  //     .map(call => [call.id, call])
+  // );
+
+  // const summaryOps = evalTraceRes.calls.filter(
+  //   call =>
+  //     call.op_name.includes('Evaluation.summarize:') &&
+  //     call.parent_id &&
+  //     evaluationCallIds.includes(call.parent_id)
+  // );
+
+  // // TIM NOTE: This is optional! just makes the cells linkable.
+  // // Fill in the autosummary source calls
+  // // summaryOps.forEach(summarizedOp => {
+  // //   const evalCallId = summarizedOp.parent_id!;
+  // //   const evalCall = summaryData.evaluationCalls[evalCallId];
+  // //   if (evalCall == null) {
+  // //     return;
+  // //   }
+  // //   Object.entries(evalCall.summaryMetrics).forEach(
+  // //     ([metricId, metricResult]) => {
+  // //       if (
+  // //         summaryData.summaryMetrics[metricId].source === 'scorer' ||
+  // //         // Special case that the model latency is also a summary metric calc
+  // //         metricDefinitionId(modelLatencyMetricDimension) === metricId
+  // //       ) {
+  // //         metricResult.sourceCallId = summarizedOp.id;
+  // //       }
+  // //     }
+  // //   );
+  // // });
+
+  // const modelRefs = Object.values(summaryData.evaluationCalls).map(
+  //   evalCall => evalCall.modelRef
+  // );
+
+  // // Now call both populate functions side by side
+  // populatePredictionsAndScoresImperative(
+  //   {calls: imperativeEvalCalls},
+  //   result,
+  //   summaryData
+  // );
+
+  // populatePredictionsAndScoresNonImperative(
+  //   {calls: nonImperativeEvalCalls},
+  //   result,
+  //   summaryData,
+  //   summaryOps,
+  //   scorerRefs,
+  //   predictAndScoreOps,
+  //   modelRefs
+  // );
+
+  // // Filter out non-intersecting rows
+  // result.resultRows = Object.fromEntries(
+  //   Object.entries(result.resultRows).filter(([digest, row]) => {
+  //     return (
+  //       Object.values(row.evaluations).length ===
+  //       Object.values(summaryData.evaluationCalls).length
+  //     );
+  //   })
+  // );
+
+  // return result;
 };
 
 /// Non exported helpers below
