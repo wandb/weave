@@ -20,6 +20,7 @@ except magic.MagicException as e:
 logger = logging.getLogger(__name__)
 
 
+# TODO: Mypy is really unfriendly to kwargs. Can we use pydantic or something to not make this so repetitive?
 class BaseContentArgs(TypedDict):
     extension: str
     mimetype: str
