@@ -290,8 +290,11 @@ const updateIconProps = (props: SVGIconProps) => {
   return {
     width: 20,
     height: 20,
-    flexShrink: 0,
     ...props,
+    style: {
+      ...props.style,
+      flexShrink: 0,
+    },
   };
 };
 export const IconAddNew = (props: SVGIconProps) => (
