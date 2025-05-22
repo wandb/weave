@@ -193,6 +193,7 @@ async def get_filtered_calls(
     op_names: list[str],
     query: Optional[tsi.Query],
 ) -> list[Call]:
+    """This function is used to get the calls that match the filter."""
     logger.info("Attempting to get %s calls", len(call_ids))
     server = get_trace_server()
     count_req = tsi.CallsQueryStatsReq(
