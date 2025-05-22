@@ -36,10 +36,10 @@ class BaseContentHandler(BaseModel):
     extension: str
     data: bytes
     path: str | None = None
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     def __init__(self, data: bytes, /, **values: Any):
-        extra: dict[str, Any] = values.pop('extra')
+        extra: dict[str, Any] = values.pop("extra")
         super().__init__(data=data, **{**values, **extra})
 
     @property
