@@ -492,6 +492,34 @@ const fetchEvaluationComparisonResults = async (
     });
   });
 
+
+  // Fill in the autosummary source calls
+  const projectId = projectIdFromParts({entity, project});
+  const summaryCalls = traceServerClient.callsStreamQuery({
+    project_id: projectId,
+    filter: {parent_ids: evaluationCallIds,
+      op_names: [`weave:///${entity}/${project}/op/Evaluation.summarize:*`],},
+    columns: ['id', 'parent_id', 'op_name'],
+  });
+  (await summaryCalls).calls.forEach(summaryCall => {
+    const evalCallId = summaryCall.parent_id!;
+    const evalCall = summaryData.evaluationCalls[evalCallId];
+    if (evalCall == null) {
+      return;
+    }
+    Object.entries(evalCall.summaryMetrics).forEach(
+      ([metricId, metricResult]) => {
+        if (
+          summaryData.summaryMetrics[metricId].source === 'scorer' ||
+          // Special case that the model latency is also a summary metric calc
+          metricDefinitionId(modelLatencyMetricDimension) === metricId
+        ) {
+          metricResult.sourceCallId = summaryCall.id;
+        }
+      }
+    );
+  });
+
   const totalRowCount = await rowCountProm;
 
   const result: EvaluationComparisonResults = {
@@ -577,26 +605,7 @@ const fetchEvaluationComparisonResults = async (
   //     evaluationCallIds.includes(call.parent_id)
   // );
 
-  // // TIM NOTE: This is optional! just makes the cells linkable.
-  // // Fill in the autosummary source calls
-  // // summaryOps.forEach(summarizedOp => {
-  // //   const evalCallId = summarizedOp.parent_id!;
-  // //   const evalCall = summaryData.evaluationCalls[evalCallId];
-  // //   if (evalCall == null) {
-  // //     return;
-  // //   }
-  // //   Object.entries(evalCall.summaryMetrics).forEach(
-  // //     ([metricId, metricResult]) => {
-  // //       if (
-  // //         summaryData.summaryMetrics[metricId].source === 'scorer' ||
-  // //         // Special case that the model latency is also a summary metric calc
-  // //         metricDefinitionId(modelLatencyMetricDimension) === metricId
-  // //       ) {
-  // //         metricResult.sourceCallId = summarizedOp.id;
-  // //       }
-  // //     }
-  // //   );
-  // // });
+
 
   // const modelRefs = Object.values(summaryData.evaluationCalls).map(
   //   evalCall => evalCall.modelRef

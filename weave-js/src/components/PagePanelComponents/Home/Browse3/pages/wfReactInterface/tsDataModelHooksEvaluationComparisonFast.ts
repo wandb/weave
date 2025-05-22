@@ -150,6 +150,27 @@ export const memoizedLookupPredictAndScoreMatchMany = memoize(
   100
 );
 
+
+const findPredictAndScoreChildrenOps = async (
+    client: TraceServerClient,
+    predictAndScoreCall: TraceCallSchema
+): Promise<TraceCallSchema[]> => {
+    const calls = await client.callsQuery({
+        project_id: predictAndScoreCall.project_id,
+        filter: {parent_ids: [predictAndScoreCall.id]},
+        columns: ['id', 'op_name'],
+        sort_by: [{field: 'started_at', direction: 'asc'}],
+    });
+    return calls.calls;
+};
+
+export const memoizedFindPredictAndScoreChildrenOps = memoize(
+    findPredictAndScoreChildrenOps,
+    (client, predictAndScoreCall) =>
+        JSON.stringify({client, predictAndScoreCall}),
+    100
+);
+
 /*
   /// TODO:
 
@@ -160,21 +181,20 @@ export const memoizedLookupPredictAndScoreMatchMany = memoize(
 
 Further impovement:
     * no need to load all the comparison data first - can lazily load that when needed on screen!
+    * probably should just revise the table to be based on the baseline data
+    * should probably pre-fetch a few pages (requires more revisions)
 
 Changes:
     (temp) Removed sorting / filtering of the table
     Show the scores and rows from baseline - instead of union
 
 Known Bugs:
-    * should maintain the selected row between pages (arrow keys don't work beyond the existing page!)
-    * paging creates a full-reload
-    * Link to summary call is broken
-    * Link to model calls are broken
     * Link to scorer calls are broken
     * (existing) single trial does not expand (and therefore no link to pas)
 
 Hacks:
     * Tokens and Latency are calculated from the predict and score, not the predict call!
+    * CLicking "pprevious" when already at the top and paged will go back be X results, not 1
 
 Variations to test:
     Num Evals (1, 2, Many)
