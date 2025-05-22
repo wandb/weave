@@ -161,7 +161,10 @@ export const useFilteredAggregateRows = (
       Object.values(rowCollection.evaluations).forEach(modelCollection => {
         Object.values(modelCollection.predictAndScores).forEach(
           (predictAndScoreRes, trialNdx) => {
-            const output = predictAndScoreRes._rawPredictTraceData?.output;
+            const predictAndScoreOutput = predictAndScoreRes._rawPredictAndScoreTraceData?.output;
+            const backupOuput = _.isPlainObject(predictAndScoreOutput) ? ((predictAndScoreOutput as any)?.output ?? (predictAndScoreOutput as any)?.model_output) : undefined;
+            const output = predictAndScoreRes._rawPredictTraceData?.output ?? backupOuput;
+            console.log("output", output)
             rows.push({
               id: predictAndScoreRes.callId,
               evaluationCallId: predictAndScoreRes.evaluationCallId,

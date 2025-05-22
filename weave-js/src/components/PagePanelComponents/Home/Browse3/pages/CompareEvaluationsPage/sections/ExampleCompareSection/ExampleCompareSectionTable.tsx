@@ -610,8 +610,8 @@ const inputFields = (
     sortable: false,
     filterable: false,
     width: columnWidths[key],
-    // maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
-    flex: 1,
+    maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+    // flex: 1,
     valueGetter: (value: any, row: RowData) => {
       return row.inputDigest;
     },
@@ -823,8 +823,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         headerName: key,
         renderHeader: () => removePrefix(key, 'output.'),
         width: outputWidths[key],
-        // maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
-        flex: 1,
+        maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+        // flex: 1,
         ...DISABLED_ROW_SPANNING,
         disableReorder: true,
         sortable: false, // should be true eventually (server-side)
@@ -1091,8 +1091,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             field: `output.${key}.${evaluationCallId}`,
             headerName: `${key}.${evaluationCallId}`,
             width: outputWidths[key],
-            // maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
-            flex: 1,
+            maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+            // flex: 1,
             ...DISABLED_ROW_SPANNING,
             disableColumnMenu: false,
             disableReorder: true,
@@ -1333,7 +1333,6 @@ const useColumnsWithControlledWidths = (columns: GridColDef<RowData>[]) => {
   const columnWdithOverrides = useRef<{[key: string]: number}>({});
 
   const columnsWithControlledWidths = useMemo(() => {
-    console.log({columnWdithOverrides});
     return columns.map(col => {
       return {
         ...col,
