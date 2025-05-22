@@ -32,7 +32,7 @@ const RESULT_FILTER_INSTRUCTIONS =
 export const ExampleFilterSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const [isExpanded, setIsExpanded] = React.useState(true);
+  const [isExpanded, setIsExpanded] = React.useState(false);
 
   return (
     <VerticalBox
@@ -47,14 +47,7 @@ export const ExampleFilterSection: React.FC<{
           alignItems: 'center',
           justifyContent: 'flex-start',
           marginBottom: '8px',
-        }}>
-        <Box
-          sx={{
-            fontWeight: 'bold',
-          }}>
-          Example Filter
-        </Box>
-      </HorizontalBox>
+        }}></HorizontalBox>
       <HorizontalBox
         sx={{
           flex: '1 1 auto',

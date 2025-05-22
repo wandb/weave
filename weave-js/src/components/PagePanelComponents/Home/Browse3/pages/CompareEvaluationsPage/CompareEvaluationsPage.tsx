@@ -178,7 +178,7 @@ const CompareEvaluationsPageInner: React.FC<{
   height: number;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  const showExampleFilter = false;
+  const showRegressionFinder = false;
   // Keeping this here in case we want to bring it back
   // Object.keys(state.summary.evaluationCalls).length === 2;
   const showExamples =
@@ -253,7 +253,7 @@ const CompareEvaluationsPageInner: React.FC<{
                   </Box>
                 ) : showExamples ? (
                   <>
-                    {showExampleFilter && (
+                    {showRegressionFinder && (
                       <ExampleFilterSection state={state} />
                     )}
                     <ResultExplorer state={state} height={props.height} />
@@ -297,6 +297,11 @@ const ResultExplorer: React.FC<{
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
     'split'
   );
+  const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
+  const [showRegressionFinder, setShowRegressionFinder] = useState(true);
+  const toggleRegressionFinder = useCallback(() => {
+    setShowRegressionFinder(v => !v);
+  }, []);
 
   return (
     <VerticalBox
@@ -305,6 +310,9 @@ const ResultExplorer: React.FC<{
         width: '100%',
         overflow: 'hidden',
       }}>
+      {regressionFinderEnabled && showRegressionFinder && (
+        <ExampleFilterSection state={state} />
+      )}
       <Box
         style={{
           display: 'flex',
@@ -322,6 +330,9 @@ const ResultExplorer: React.FC<{
             state={state}
             shouldHighlightSelectedRow={viewMode === 'split'}
             onShowSplitView={() => setViewMode('split')}
+            showRegressionFinder={showRegressionFinder}
+            regressionFinderEnabled={regressionFinderEnabled}
+            onToggleRegressionFinder={toggleRegressionFinder}
           />
         </Box>
 
