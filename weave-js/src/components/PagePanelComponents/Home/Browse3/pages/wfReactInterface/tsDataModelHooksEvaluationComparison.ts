@@ -108,6 +108,7 @@ import {
 import {
   calculatePredictAndScoreCallExampleDigest,
   generateStableDigest,
+  maybeExtractDatasetRowRef,
   maybeExtractDatasetRowRefDigest,
 } from './tsDataModelHooksEvaluationComparisonUtilities';
 
@@ -442,6 +443,11 @@ const fetchEvaluationComparisonResults = async (
   const groupedByDigest = _.groupBy(
     flattenedComparisonPredictAndScoreCalls,
     call => {
+      console.log(
+        'call',
+        call,
+        calculatePredictAndScoreCallExampleDigest(call)
+      );
       return calculatePredictAndScoreCallExampleDigest(call);
     }
   );
@@ -466,7 +472,8 @@ const fetchEvaluationComparisonResults = async (
                 call.id,
                 {
                   callId: call.id,
-                  exampleRef: call.inputs.example,
+                  exampleRef:
+                    maybeExtractDatasetRowRef(call.inputs.example) ?? undefined,
                   rowDigest,
                   modelRef: call.inputs.model,
                   evaluationCallId,
@@ -1086,8 +1093,8 @@ const populateSummaryScoreMetrics = (
   predictAndScoreEntry: PredictAndScoreCall,
   summaryData: EvaluationComparisonSummary
 ) => {
-  console.log('predictAndScoreEntry', predictAndScoreEntry);
-  const output = predictAndScoreEntry._rawPredictAndScoreTraceData.output;
+  const predictAndScoreCall = predictAndScoreEntry._rawPredictAndScoreTraceData;
+  const output = predictAndScoreCall.output;
   let scores = {};
   if (
     typeof output === 'object' &&
@@ -1152,6 +1159,44 @@ const populateSummaryScoreMetrics = (
 
     processScoreOutput(scoreOutput);
   });
+  // Add model latency as a metric
+  const modelLatencyMetricId = metricDefinitionId(modelLatencyMetricDimension);
+  let modelLatency: number | undefined;
+  if (
+    typeof output === 'object' &&
+    output &&
+    'model_latency' in output &&
+    typeof output.model_latency === 'number' &&
+    output.model_latency != null
+  ) {
+    modelLatency = output.model_latency;
+  } else if (predictAndScoreCall.ended_at) {
+    // THIS IS TECHNICALLY INCORRECT - we should be using the predict call's latency
+    modelLatency =
+      (convertISOToDate(predictAndScoreCall.ended_at).getTime() -
+        convertISOToDate(predictAndScoreCall.started_at).getTime()) /
+      1000;
+  }
+  if (modelLatency != null) {
+    predictAndScoreEntry.scoreMetrics[modelLatencyMetricId] = {
+      value: modelLatency,
+      sourceCallId: undefined,
+    };
+  }
+
+  // Add token metrics
+  const totalTokensMetricId = metricDefinitionId(totalTokensMetricDimension);
+  // THIS IS TECHNICALLY INCORRECT - we should be using the predict call's usage
+  const totalTokens = sum(
+    Object.values(predictAndScoreCall.summary?.usage ?? {}).map(
+      (x: any) => x?.total_tokens ?? 0
+    )
+  );
+
+  predictAndScoreEntry.scoreMetrics[totalTokensMetricId] = {
+    value: totalTokens,
+    sourceCallId: undefined,
+  };
 };
 
 const populatePredictionsAndScoresNonImperative = (

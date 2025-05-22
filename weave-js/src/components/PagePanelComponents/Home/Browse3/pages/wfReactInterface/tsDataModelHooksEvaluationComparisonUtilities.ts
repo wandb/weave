@@ -1,4 +1,9 @@
-import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
+import sha256 from '@cryptography/sha256';
+import {
+  isWeaveObjectRef,
+  parseRefMaybe,
+  WeaveObjectRef,
+} from '@wandb/weave/react';
 
 import {OBJECT_ATTR_EDGE_NAME, TABLE_ID_EDGE_NAME} from './constants';
 import {TraceCallSchema} from './traceServerClientTypes';
@@ -27,7 +32,7 @@ export const generateStableDigest = (obj: any): string => {
         }, {});
     };
 
-    return JSON.stringify(sortObjectKeys(obj));
+    return sha256(JSON.stringify(sortObjectKeys(obj)), 'hex');
   } catch (e) {
     // In case of any JSON serialization errors, return a fallback value
     console.warn('Error generating stable digest:', e);
@@ -48,7 +53,18 @@ export const calculatePredictAndScoreCallExampleDigest = (
   return generateStableDigest(example);
 };
 
+const datasetRowPrefix = `${OBJECT_ATTR_EDGE_NAME}/rows/${TABLE_ID_EDGE_NAME}/`;
 export const maybeExtractDatasetRowRefDigest = (value: any): string | null => {
+  const parsedMaybe = maybeExtractDatasetRowRef(value);
+  if (parsedMaybe == null) {
+    return null;
+  }
+  return parsedMaybe.artifactRefExtra!.slice(datasetRowPrefix.length);
+};
+
+export const maybeExtractDatasetRowRef = (
+  value: any
+): WeaveObjectRef | null => {
   if (typeof value !== 'string') {
     return null;
   }
@@ -62,9 +78,8 @@ export const maybeExtractDatasetRowRefDigest = (value: any): string | null => {
   if (parsedMaybe.weaveKind !== 'object') {
     return null;
   }
-  const datasetRowPrefix = `${OBJECT_ATTR_EDGE_NAME}/rows/${TABLE_ID_EDGE_NAME}/`;
   if (!parsedMaybe.artifactRefExtra?.startsWith(datasetRowPrefix)) {
     return null;
   }
-  return parsedMaybe.artifactRefExtra.slice(datasetRowPrefix.length);
+  return parsedMaybe;
 };

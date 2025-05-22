@@ -597,10 +597,12 @@ export const ExampleCompareSectionDetail: React.FC<{
     if (lookupIsDerivedMetric(scorerIndex)) {
       return undefined;
     }
-    return () =>
-      onScorerClick(
-        targetTrial.predictAndScore.scoreMetrics[scoreId].sourceCallId
-      );
+    const sourceCallId =
+      targetTrial.predictAndScore.scoreMetrics[scoreId].sourceCallId;
+    if (sourceCallId == null) {
+      return undefined;
+    }
+    return () => onScorerClick(sourceCallId);
   };
 
   const scorerComp = (scorerIndex: number) => {

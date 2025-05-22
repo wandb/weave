@@ -166,13 +166,15 @@ Changes:
     Show the scores and rows from baseline - instead of union
 
 Known Bugs:
-    * should maintain the selected row between pages
+    * should maintain the selected row between pages (arrow keys don't work beyond the existing page!)
     * paging creates a full-reload
-    * latency and total tokens are broken
     * Link to summary call is broken
     * Link to model calls are broken
     * Link to scorer calls are broken
     * (existing) single trial does not expand (and therefore no link to pas)
+
+Hacks:
+    * Tokens and Latency are calculated from the predict and score, not the predict call!
 
 Variations to test:
     Num Evals (1, 2, Many)

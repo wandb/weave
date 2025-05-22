@@ -104,7 +104,7 @@ type ModelObj = {
  */
 export type PredictAndScoreCall = {
   callId: string;
-  exampleRef: string;
+  exampleRef?: string;
   rowDigest: string;
   modelRef: string;
   evaluationCallId: string;
