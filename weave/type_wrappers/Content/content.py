@@ -8,10 +8,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Generic, TypeVar, Unpack
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from weave.type_wrappers.Content.utils import (
-    BaseContentArgs,
     ContentKeywordArgs,
     ContentOptionalArgs,
     default_filename,
@@ -36,81 +35,65 @@ class BaseContentHandler(BaseModel):
     mimetype: str
     extension: str
     data: bytes
-    extra: dict[str, Any] = {}
+    path: str | None = None
+    # Extra optional attributes for metadata and functionality
+    # Examples: original_path, timestamp, etc
+    model_config = ConfigDict(extra="allow")
 
-    def __init__(self, **kwargs: Unpack[BaseContentArgs]):
-        super().__init__(**kwargs)
-        for key, value in kwargs.items():
-            if key not in self.model_fields_set:
-                self.extra[key] = value
+    def __init__(self, /, **values: Any):
+        if "extra" in values and isinstance(values["extra"], dict):
+            extra: dict[str, Any] = dict(values.pop("extra"))
+        else:
+            extra = {}
+        super().__init__(**{**values, **extra})
 
     @property
     def metadata(self) -> dict[str, Any]:
-        metadata = self.model_dump(exclude={"data", "extra"})
-        for key, value in self.extra.items():
-            metadata[key] = value
-        return metadata
+        return self.model_dump(exclude={"data"}, exclude_unset=True, exclude_none=True)
 
 
 class BytesContentHandler(BaseContentHandler):
-    def __init__(self, input: bytes, **kwargs: Unpack[ContentOptionalArgs]):
-        size = kwargs["size"] or len(input)
+    def __init__(self, input: bytes, /, **values: Any):
+        values["size"] = values["size"] or len(input)
+        if values["mimetype"] is None or values["extension"] is None:
+            mimetype, extension = get_mime_and_extension(
+                buffer=input[:2048],
+                filename=values["filename"],
+                extension=values["extension"],
+                mimetype=values["mimetype"],
+            )
+            values["mimetype"] = mimetype
+            values["extension"] = extension
+        values["filename"] = values["filename"] or default_filename(values["extension"])
 
-        mimetype = kwargs["mimetype"]
-        extension = kwargs["extension"]
-
-        if mimetype is None or extension is None:
-            mimetype, extension = get_mime_and_extension(buffer=input[:2048], **kwargs)
-
-        filename = kwargs["filename"]
-        original_path = kwargs["path"]
-
-        if filename is None and original_path is not None:
-            filename = Path(original_path).name
-        elif filename is None:
-            filename = default_filename(extension)
-
-        extra = kwargs.get("extra") or {}
-
-        if original_path is not None:
-            extra["original_path"] = original_path
-
-        super().__init__(
-            data=input,
-            size=size,
-            filename=filename,
-            mimetype=mimetype,
-            extension=extension,
-            extra=extra,
-        )
+        super().__init__(data=input, **values)
 
 
 class FileContentHandler(BytesContentHandler):
-    def __init__(self, input: str | Path, **kwargs: Unpack[ContentOptionalArgs]):
+    def __init__(self, input: str | Path, **values: Any):
         if not is_valid_path(input):
             raise ValueError(f"Input {input} is not a valid file path.")
 
         path = Path(input)
-        size = path.stat().st_size
+        values["path"] = path
+        values["size"] = path.stat().st_size
+        # Allow overriding the filename when submitting to weave
+        values["filename"] = values.get("filename", path.name)
         data = path.read_bytes()
-        # # Allow overriding the filename
-        filename = kwargs.get("filename", path.name)
-        kwargs["filename"] = filename
-        kwargs["size"] = size
-        super().__init__(input=data, **kwargs)
+        super().__init__(data, **values)
 
 
 class Base64ContentHandler(BytesContentHandler):
-    def __init__(self, input: str | bytes, **kwargs: Unpack[ContentOptionalArgs]):
+    def __init__(self, input: str | bytes, **values: Unpack[ContentOptionalArgs]):
         try:
             data = base64.b64decode(input, validate=True)
-            super().__init__(data, **kwargs)
+            super().__init__(data, **values)
         except Exception as e:
             raise ValueError(f"Invalid base64 string: {e}") from e
 
 
 class ObjectContentHandler(BytesContentHandler):
-    def __init__(self, input: object, **kwargs: Unpack[ContentOptionalArgs]):
+    def __init__(self, input: object, **values: Unpack[ContentOptionalArgs]):
         if not input.__getattribute__("__class__"):
             raise ValueError("Input object does not have a class attribute.")
 
@@ -131,7 +114,7 @@ class ObjectContentHandler(BytesContentHandler):
             )
 
         data = handler()
-        super().__init__(data, **kwargs)
+        super().__init__(data, **values)
 
 
 T = TypeVar("T", bound=str)
@@ -150,46 +133,47 @@ class Content(Generic[T]):
         self,
         input: Any,
         type_hint: str | None = None,
-        **kwargs: Unpack[ContentKeywordArgs],
+        /,
+        **values: Unpack[ContentKeywordArgs],
     ):
         if type_hint:
             if type_hint.find("/") != -1:
-                kwargs["mimetype"] = type_hint
+                values["mimetype"] = type_hint
             else:
-                kwargs["extension"] = type_hint.lstrip(".")
+                values["extension"] = type_hint.lstrip(".")
 
-        kwargs_with_defaults = ContentOptionalArgs(
-            filename=kwargs.get("filename", None),
-            path=kwargs.get("path", None),
-            extension=kwargs.get("extension", None),
-            mimetype=kwargs.get("mimetype", None),
-            size=kwargs.get("size", None),
-            data=kwargs.get("data", None),
-            extra=kwargs.get("extra", {}),
+        values_with_defaults = ContentOptionalArgs(
+            filename=values.get("filename", None),
+            path=values.get("path", None),
+            extension=values.get("extension", None),
+            mimetype=values.get("mimetype", None),
+            size=values.get("size", None),
+            data=values.get("data", None),
+            extra=values.get("extra", {}),
         )
 
         if isinstance(input, Path):
             self.content_handler = FileContentHandler(
-                str(input), **kwargs_with_defaults
+                str(input), **values_with_defaults
             )
         elif isinstance(input, str):
             if is_valid_path(str(input)):
                 self.content_handler = FileContentHandler(
-                    str(input), **kwargs_with_defaults
+                    str(input), **values_with_defaults
                 )
             else:
                 try:
                     self.content_handler = Base64ContentHandler(
-                        str(input), **kwargs_with_defaults
+                        str(input), **values_with_defaults
                     )
                 except ValueError:
                     raise ValueError(
                         f"Could not parse string {input} as a valid path or base64 string"
                     )
         elif isinstance(input, bytes):
-            self.content_handler = BytesContentHandler(input, **kwargs_with_defaults)
+            self.content_handler = BytesContentHandler(input, **values_with_defaults)
         elif hasattr(input, "__class__"):
-            self.content_handler = ObjectContentHandler(input, **kwargs_with_defaults)
+            self.content_handler = ObjectContentHandler(input, **values_with_defaults)
         else:
             raise ValueError(f"Unsupported input type: {type(input)}")
 
@@ -211,7 +195,7 @@ class Content(Generic[T]):
 
     @property
     def original_path(self) -> str | None:
-        return self.content_handler.extra.get("original_path", None)
+        return self.content_handler.metadata.get("original_path")
 
     @property
     def extension(self) -> str:

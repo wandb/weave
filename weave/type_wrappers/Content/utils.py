@@ -4,7 +4,7 @@ import logging
 import mimetypes
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypedDict, Unpack
+from typing import Any, TypedDict
 
 import magic
 
@@ -25,8 +25,6 @@ class BaseContentArgs(TypedDict):
     mimetype: str
     filename: str
     size: int
-    data: bytes
-    extra: dict[str, Any]
 
 
 class ContentOptionalArgs(TypedDict):
@@ -94,37 +92,22 @@ def guess_from_path(path: str | Path) -> str | None:
 
 
 def get_mime_and_extension(
-    buffer: bytes | None, **kwargs: Unpack[ContentOptionalArgs]
+    *,
+    mimetype: str | None,
+    extension: str | None,
+    filename: str | None,
+    buffer: bytes | None,
 ) -> tuple[str, str]:
-    mimetype = kwargs.get("mimetype", None)
-    extension = kwargs.get("extension", None)
-
     if mimetype and extension:
         return mimetype, extension
     elif mimetype and not extension:
         return mimetype, get_extension_from_mimetype(mimetype)
 
-    for key in ["mimetype", "filename", "extension", "path"]:
-        if not key in kwargs or kwargs.get(key) is None:
-            continue
-
-        value = str(kwargs.get(key))
-
-        if key == "mimetype":
-            mimetype = value
-        elif key == "filename":
-            mimetype = guess_from_filename(value)
-        elif key == "extension":
-            mimetype = guess_from_extension(value)
-            # Only set if we got a valid mime type from it
-        elif key == "path":
-            mimetype = guess_from_path(Path(value))
-            if mimetype is None and buffer is None:
-                mimetype = guess_from_buffer(Path(value).read_bytes()[:2048])
-        if mimetype:
-            break
-
-    if not mimetype and buffer:
+    if filename is not None:
+        mimetype = guess_from_filename(filename)
+    if not mimetype and extension is not None:
+        mimetype = guess_from_extension(extension)
+    if not mimetype and buffer is not None:
         mimetype = guess_from_buffer(buffer)
 
     if mimetype and extension:
@@ -138,7 +121,6 @@ def get_mime_and_extension(
             "and its underlying libmagic dependency. Please install or configure them correctly."
             "See: https://pypi.org/project/python-magic/ for detailed instructions"
         )
-
     raise RuntimeError(
         "Failed to determine MIME type from file extension and cannot infer from data"
     )
