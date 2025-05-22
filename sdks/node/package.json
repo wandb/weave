@@ -38,11 +38,16 @@
     "projects": [
       {
         "displayName": "legacy",
-        "testMatch": ["<rootDir>/src/__tests__/legacy/**/*.test.ts"],
+        "testMatch": [
+          "<rootDir>/src/__tests__/legacy/**/*.test.ts"
+        ],
         "transform": {
-          "^.+\\.tsx?$": ["ts-jest", {
-            "tsconfig": "<rootDir>/src/__tests__/legacy/tsconfig.json"
-          }]
+          "^.+\\.tsx?$": [
+            "ts-jest",
+            {
+              "tsconfig": "<rootDir>/src/__tests__/legacy/tsconfig.json"
+            }
+          ]
         },
         "moduleNameMapper": {
           "^weave$": "<rootDir>/src/index.ts",
@@ -51,11 +56,16 @@
       },
       {
         "displayName": "modern",
-        "testMatch": ["<rootDir>/src/__tests__/modern/**/*.test.ts"],
+        "testMatch": [
+          "<rootDir>/src/__tests__/modern/**/*.test.ts"
+        ],
         "transform": {
-          "^.+\\.tsx?$": ["ts-jest", {
-            "tsconfig": "<rootDir>/src/__tests__/modern/tsconfig.json"
-          }]
+          "^.+\\.tsx?$": [
+            "ts-jest",
+            {
+              "tsconfig": "<rootDir>/src/__tests__/modern/tsconfig.json"
+            }
+          ]
         },
         "moduleNameMapper": {
           "^weave$": "<rootDir>/src/index.ts",
@@ -73,9 +83,12 @@
           "/modern/"
         ],
         "transform": {
-          "^.+\\.tsx?$": ["ts-jest", {
-            "tsconfig": "<rootDir>/src/__tests__/tsconfig.json"
-          }]
+          "^.+\\.tsx?$": [
+            "ts-jest",
+            {
+              "tsconfig": "<rootDir>/src/__tests__/tsconfig.json"
+            }
+          ]
         },
         "moduleNameMapper": {
           "^weave$": "<rootDir>/src/index.ts",
@@ -125,7 +138,9 @@
   "dependencies": {
     "cli-progress": "^3.12.0",
     "cross-spawn": "^7.0.5",
+    "import-in-the-middle": "^1.13.2",
     "ini": "^5.0.0",
+    "module-details-from-path": "^1.0.4",
     "openai": "^4.68.4",
     "uuidv7": "^1.0.1"
   },
@@ -142,9 +157,9 @@
     "ts-jest": "^29.2.5",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.19.1",
-    "typescript": "^5.3.3",
-    "typedoc": "^0.26.10",
-    "typedoc-plugin-markdown": "^4.2.9"
+    "typedoc": "^0.28",
+    "typedoc-plugin-markdown": "^4.2.9",
+    "typescript": "^5.3.3"
   },
   "packageManager": "pnpm@10.8.1+sha512.c50088ba998c67b8ca8c99df8a5e02fd2ae2e2b29aaf238feaa9e124248d3f48f9fb6db2424949ff901cffbb5e0f0cc1ad6aedb602cd29450751d11c35023677"
 }
