@@ -522,6 +522,11 @@ class ObjectVersionFilter(BaseModel):
         description="If True, return only the latest version of each object. `False` and `None` will return all versions",
         examples=[True, False],
     )
+    wb_user_ids: Optional[list[str]] = Field(
+        default=None,
+        description="Filter objects created by these user ids",
+        examples=[["user1", "user2"]],
+    )
 
 
 class ObjQueryReq(BaseModel):

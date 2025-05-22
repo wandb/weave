@@ -214,6 +214,7 @@ interface TraceObjectsFilter {
   object_ids?: string[];
   is_op?: boolean;
   latest_only?: boolean;
+  wb_user_ids?: string[];
 }
 export type TraceObjQueryReq = {
   project_id: string;

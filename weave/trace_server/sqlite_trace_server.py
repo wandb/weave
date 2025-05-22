@@ -890,6 +890,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 placeholders = ",".join(["?" for _ in req.filter.base_object_classes])
                 conds.append(f"base_object_class IN ({placeholders})")
                 parameters["base_object_classes"] = req.filter.base_object_classes
+            if req.filter.wb_user_ids:
+                placeholders = ",".join(["?" for _ in req.filter.wb_user_ids])
+                conds.append(f"wb_user_id IN ({placeholders})")
+                parameters["wb_user_ids"] = req.filter.wb_user_ids
 
         objs = self._select_objs_query(
             req.project_id,

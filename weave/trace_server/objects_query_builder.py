@@ -227,6 +227,10 @@ class ObjectMetadataQueryBuilder:
         )
         self.parameters.update({"base_object_classes": base_object_classes})
 
+    def add_wb_user_ids_condition(self, wb_user_ids: list[str]) -> None:
+        self._conditions.append("wb_user_id IN {wb_user_ids: Array(String)}")
+        self.parameters.update({"wb_user_ids": wb_user_ids})
+
     def add_order(self, field: str, direction: str) -> None:
         direction = direction.lower()
         if direction not in ("asc", "desc"):
