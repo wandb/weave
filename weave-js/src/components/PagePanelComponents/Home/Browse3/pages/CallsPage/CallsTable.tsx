@@ -106,6 +106,10 @@ export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
   'summary.weave.feedback',
   'summary.status_counts',
+  // attributes.python was logged for a short period of time
+  // accidentally in v0.51.47. We can hide it for a while
+  // and remove this after a few months (say Sept 2025)
+  'attributes.python',
   'wb_run_id',
   'attributes.otel_span',
 ];
