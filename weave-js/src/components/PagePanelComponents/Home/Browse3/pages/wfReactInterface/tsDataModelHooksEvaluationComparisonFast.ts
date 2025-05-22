@@ -169,27 +169,3 @@ export const memoizedFindPredictAndScoreChildrenCalls = memoize(
     JSON.stringify({client, predictAndScoreCall}),
   100
 );
-
-/*
-Further improvements:
-    * No need to load all the comparison data first - can lazily load that when needed on screen!
-    * Probably should just revise the table to be based on the baseline data
-    * Should probably pre-fetch a few pages (requires more revisions)
-
-Changes:
-    (temp) Removed sorting / filtering of the table
-    Show the scores and rows from baseline - instead of union
-
-Known Bugs:
-    * (existing) Single trial does not expand (and therefore no link to pas)
-
-Hacks:
-    * Tokens and Latency are calculated from the predict and score, not the predict call!
-    * Clicking "previous" when already at the top and paged will go back by X results, not 1
-
-Variations to test:
-    Num Evals (1, 2, Many)
-    Pivot Dimensions
-    Logger vs Framework
-    Trials
-  */

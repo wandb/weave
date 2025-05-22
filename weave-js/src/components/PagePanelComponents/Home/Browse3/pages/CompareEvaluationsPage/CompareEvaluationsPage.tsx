@@ -31,7 +31,6 @@ import {VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
 import {ExampleCompareSectionDetail} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
 import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
-import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
 

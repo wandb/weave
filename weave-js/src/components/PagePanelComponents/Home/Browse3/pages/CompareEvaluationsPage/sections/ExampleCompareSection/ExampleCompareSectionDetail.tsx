@@ -433,12 +433,6 @@ export const ExampleCompareSectionDetail: React.FC<{
     return dimensionsForThisScorer[metricIndex];
   };
 
-  const lookupDimensionId = (
-    scorerIndex: number,
-    metricIndex: number
-  ): string => {
-    return metricDefinitionId(lookupDimension(scorerIndex, metricIndex));
-  };
 
   const lookupTargetTrial = (
     evalIndex: number,
@@ -615,7 +609,6 @@ export const ExampleCompareSectionDetail: React.FC<{
     metricIndex: number
   ) => {
     const dimension = lookupDimension(scorerIndex, metricIndex);
-    const scoreId = lookupDimensionId(scorerIndex, metricIndex);
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
 
     if (lookupIsDerivedMetric(scorerIndex)) {
