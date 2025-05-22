@@ -70,7 +70,7 @@ export const useEvaluationComparisonState = (
   const resultsData = useEvaluationComparisonResults(
     entity,
     project,
-    orderedCallIds,
+    evaluationCallIds,
     summaryData.result,
     paginationModel
   );

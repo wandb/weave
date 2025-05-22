@@ -1011,7 +1011,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       paginationMode="server"
       paginationModel={ctx.state.paginationModel}
       onPaginationModelChange={ctx.setPaginationModel}
-      rowCount={ctx.state.loadableComparisonResults.result?.totalRowCount ?? undefined}
+      rowCount={
+        ctx.state.loadableComparisonResults.result?.totalRowCount ?? undefined
+      }
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
       slots={{columnsPanel: ColumnsManagementPanel}}
@@ -1316,7 +1318,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       paginationMode="server"
       paginationModel={ctx.state.paginationModel}
       onPaginationModelChange={ctx.setPaginationModel}
-      rowCount={ctx.state.loadableComparisonResults.result?.totalRowCount ?? undefined}
+      rowCount={
+        ctx.state.loadableComparisonResults.result?.totalRowCount ?? undefined
+      }
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
       slots={{columnsPanel: ColumnsManagementPanel}}

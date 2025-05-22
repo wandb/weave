@@ -83,8 +83,8 @@ const lookupPredictAndScoreMatch = async (
   const sourceExampleDigest =
     calculatePredictAndScoreCallExampleDigest(sourceCall);
 
-  const limit = 100;
-  let offset = 0;
+  const pageSize = 100;
+  let page = 0;
 
   while (hasMoreRows) {
     const calls = await memoizedPredictAndScoresQuery(
@@ -93,12 +93,12 @@ const lookupPredictAndScoreMatch = async (
       project,
       evaluationCallId,
       {
-        pageSize: limit,
-        page: offset,
+        pageSize: pageSize,
+        page: page,
       }
     );
-    hasMoreRows = calls.length === limit;
-    offset += calls.length;
+    hasMoreRows = calls.length === pageSize;
+    page += 1;
     for (const call of calls) {
       const exampleDigest = calculatePredictAndScoreCallExampleDigest(call);
       if (exampleDigest === sourceExampleDigest) {
@@ -157,4 +157,6 @@ inform user that we always show the baseline metrics & results
 test trials
 test imperative
 make all the links work (summary, predict, scoring, etc..)
+paging creates a full-reload
+should maintain the selected row between pages
   */
