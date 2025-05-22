@@ -98,6 +98,11 @@ import {
 } from '../wfReactInterface/tsDataModelHooks';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
 import {TraceCallSchema} from './traceServerClientTypes';
+import {
+  memoizedLookupPredictAndScoreMatchMany,
+  memoizedPredictAndScoresQuery,
+} from './tsDataModelHooksEvaluationComparisonFast';
+import {generateStableDigest} from './tsDataModelHooksEvaluationComparisonUtilities';
 
 /**
  * Primary react hook for fetching evaluation comparison data. This could be
@@ -377,10 +382,32 @@ const fetchEvaluationComparisonResults = async (
   evaluationCallIds: string[],
   summaryData: EvaluationComparisonSummary
 ): Promise<EvaluationComparisonResults> => {
+  // Test only:
+  const predictAndScoreCallsTest = await memoizedPredictAndScoresQuery(
+    traceServerClient,
+    entity,
+    project,
+    evaluationCallIds[0],
+    100,
+    0
+  );
+  console.log({predictAndScoreCallsTest});
+  const predictAndScoreCallsTest2 =
+    await memoizedLookupPredictAndScoreMatchMany(
+      traceServerClient,
+      entity,
+      project,
+      evaluationCallIds[1],
+      predictAndScoreCallsTest
+    );
+  console.log({predictAndScoreCallsTest2});
+
   const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonResults = {
     resultRows: {},
   };
+
+  return result;
 
   // Kick off the trace query to get the actual trace data
   // Note: we split this into 2 steps to ensure we only get level 2 children
@@ -779,38 +806,6 @@ const processImperativeEvaluationSummary = (
 
 export const isImperativeEvalCall = (call: TraceCallSchema) => {
   return call.attributes?._weave_eval_meta?.imperative;
-};
-
-const generateStableDigest = (obj: any): string => {
-  if (obj === undefined || obj === null) {
-    return 'null'; // Return consistent string for null/undefined
-  }
-
-  try {
-    // Sort keys to ensure stable stringification
-    const sortObjectKeys = (val: any): any => {
-      if (val === null || val === undefined) {
-        return null;
-      }
-
-      if (typeof val !== 'object' || Array.isArray(val)) {
-        return val;
-      }
-
-      return Object.keys(val)
-        .sort()
-        .reduce((result: any, key) => {
-          result[key] = sortObjectKeys(val[key]);
-          return result;
-        }, {});
-    };
-
-    return JSON.stringify(sortObjectKeys(obj));
-  } catch (e) {
-    // In case of any JSON serialization errors, return a fallback value
-    console.warn('Error generating stable digest:', e);
-    return `digest_${Date.now()}`;
-  }
 };
 
 const populatePredictionsAndScoresImperative = (

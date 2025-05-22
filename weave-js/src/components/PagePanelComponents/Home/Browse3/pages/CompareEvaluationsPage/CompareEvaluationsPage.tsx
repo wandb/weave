@@ -263,15 +263,11 @@ const CompareEvaluationsPageInner: React.FC<{
                     sx={{
                       paddingLeft: STANDARD_PADDING,
                       paddingRight: STANDARD_PADDING,
+                      paddingTop: STANDARD_PADDING / 2,
+
                       width: '100%',
                       overflow: 'auto',
                     }}>
-                    <Box
-                      sx={{
-                        fontWeight: 'bold',
-                      }}>
-                      Examples
-                    </Box>
                     <Alert severity="info">
                       The selected evaluations' datasets have 0 rows in common,
                       try comparing evaluations with datasets that have at least
