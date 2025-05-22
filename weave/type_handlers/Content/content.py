@@ -17,7 +17,6 @@ def save(obj: Content, artifact: MemTraceFilesArtifact, name: str) -> None:
     with artifact.new_file("content", binary=True) as f:
         f.write(obj.data)
 
-    print(obj.metadata)
     with artifact.new_file("metadata.json", binary=False) as f:
         json.dump(obj.metadata, f)
 
@@ -28,7 +27,6 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> Content:
         metadata = json.load(f)
 
     path = artifact.path("content")
-    print(metadata)
     return Content(path, metadata["mimetype"])
 
 def instance_check(obj: object) -> bool:

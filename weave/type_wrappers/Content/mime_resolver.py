@@ -15,7 +15,7 @@ def get_extension_from_mimetype(mimetype: str) -> str:
     extension = mimetypes.guess_extension(mimetype)
     if not extension:
         raise ValueError(f"Got mime-type {mimetype} but failed to resolve a valid extension")
-    return extension
+    return extension.lstrip(".")
 
 def guess_from_buffer(buffer: bytes) -> str | None:
     if not MAGIC_LIB_AVAILABLE:
@@ -35,8 +35,9 @@ def guess_from_path(path: Path) -> str | None:
 
 
 def get_mime_and_extension(**kwargs) -> tuple[str, str]:
-    mimetype = kwargs.get("mimetype")
-    extension = kwargs.get("extension")
+
+    mimetype = kwargs.get("mimetype", None)
+    extension = kwargs.get("mimetype", None)
 
     if mimetype and extension:
         return mimetype, extension
@@ -97,18 +98,3 @@ def is_mime_type(mime_string):
     if not isinstance(mime_string, str):
         return False
     return mimetypes.guess_type(mime_string)[0] is not None
-
-def is_valid_extension(extension):
-    """
-    Checks if a string is a valid file extension.
-    Args:
-        extension: The string to check.
-    Returns:
-        True if the string is a valid file extension, False otherwise.
-    """
-    if not isinstance(extension, str):
-        return False
-
-    # Ensure we have a leading dot
-    extension = f".{extension.lstrip('.')}"
-    return mimetypes.guess_extension(extension) is not None

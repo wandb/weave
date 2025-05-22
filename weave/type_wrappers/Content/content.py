@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, TypeVar
 from typing import Any, Generic
 from pydantic import BaseModel
-from pydantic.dataclasses import dataclass
 import subprocess
 import sys
 import os
@@ -49,7 +48,6 @@ def resolve_filename(
     return default_fn(**kwargs)
 
 
-@dataclass
 class BaseContentHandler(BaseModel):
     size: int
     filename: str
@@ -58,6 +56,12 @@ class BaseContentHandler(BaseModel):
     data: bytes
     extra: dict[str, Any] = {}
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        for key, value in kwargs.items():
+            if key not in self.model_fields_set:
+                self.extra[key] = value
+
     @property
     def metadata(self) -> dict[str, Any]:
         metadata = self.model_dump(exclude={"data", "extra"})
@@ -65,43 +69,56 @@ class BaseContentHandler(BaseModel):
             metadata[key] = value
         return metadata
 
-class FileInput(BaseContentHandler):
+
+class BytesContentHandler(BaseContentHandler):
+    def __init__(self, input: bytes, **kwargs):
+        size = kwargs.pop("size", None) or len(input)
+        mimetype = kwargs.pop("mimetype", None)
+        extension = kwargs.pop("extension", None)
+
+        if not mimetype or not extension:
+            mimetype, extension = get_mime_and_extension(
+                buffer=input[:2048],
+                **kwargs
+            )
+
+        filename = kwargs.pop('filename', None)
+        if not filename:
+            filename = resolve_filename(mimetype=mimetype, extension=extension, **kwargs)
+
+        original_path = kwargs.get("path", None)
+
+        extra = kwargs.pop("extra", {})
+        if original_path is not None:
+            extra['original_path'] = original_path
+        kwargs['extra'] = extra
+
+        super().__init__(
+            size=size,
+            data=input,
+            filename=filename,
+            extension=extension,
+            mimetype=mimetype,
+            **kwargs
+        )
+
+class FileInput(BytesContentHandler):
     def __init__(self, input: str | Path, **kwargs):
         if not is_valid_path(input):
             raise ValueError(f"Input {input} is not a valid file path.")
 
-        # Set in extra so it is written to the metadata
-        self.extra['original_path'] = str(input)
         path = Path(input)
-        self.size = path.stat().st_size
-        self.data = path.read_bytes()
-        # Allow overriding the filename
-        self.filename = kwargs.get("filename", path.name)
-        self.mimetype, self.extension = get_mime_and_extension(
-            buffer=self.data[:2048],
+        size = path.stat().st_size
+
+        data = path.read_bytes()
+        # # Allow overriding the filename
+        filename = kwargs.pop("filename", path.name)
+        super().__init__(
+            input=data,
+            size=size,
+            filename=filename,
             **kwargs
         )
-
-        for key, value in kwargs.keys():
-            if key not in CONTENT_KWARGS:
-                self.extra[key] = value
-
-
-
-class BytesContentHandler(BaseContentHandler):
-    def __init__(self, input: bytes, **kwargs):
-        self.data = input
-        self.size = len(self.data)
-        self.mimetype, self.extension = get_mime_and_extension(
-            buffer=self.data[:2048],
-            **kwargs
-        )
-        self.filename = resolve_filename(**kwargs)
-        self.original_path = kwargs.get("path", None)
-
-        for key, value in kwargs.keys():
-            if key not in CONTENT_KWARGS:
-                self.extra[key] = value
 
 class Base64ContentHandler(BytesContentHandler):
     def __init__(self, input: str | bytes, **kwargs):
@@ -165,7 +182,7 @@ class Content(Generic[T]):
                         f"Could not parse string {input} as a valid path or base64 string"
                     )
         elif isinstance(input, bytes):
-            self.content_handler = Base64ContentHandler(input, **kwargs)
+            self.content_handler = BytesContentHandler(input, **kwargs)
         elif hasattr(input, "__class__"):
             self.content_handler = ObjectContentHandler(input, **kwargs)
         else:
