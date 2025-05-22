@@ -53,17 +53,20 @@ class BaseContentHandler(BaseModel):
 
 class BytesContentHandler(BaseContentHandler):
     def __init__(self, input: bytes, **kwargs: Unpack[ContentOptionalArgs]):
-        size = kwargs.get("size") or len(input)
-        mimetype = kwargs.get("mimetype") or None
-        extension = kwargs.get("extension") or None
+        size = kwargs['size'] or len(input)
+
+        mimetype = kwargs['mimetype']
+        extension = kwargs['extension']
+
         if mimetype is None or extension is None:
             mimetype, extension = get_mime_and_extension(buffer=input[:2048], **kwargs)
 
-        filename = kwargs.get("filename")
-        original_path = kwargs.get("path")
-        if not filename and original_path:
+        filename = kwargs['filename']
+        original_path = kwargs['path']
+
+        if filename is None and original_path is not None:
             filename = Path(original_path).name
-        else:
+        elif filename is None:
             filename = default_filename(extension)
 
         extra = kwargs.get("extra") or {}
@@ -81,7 +84,7 @@ class BytesContentHandler(BaseContentHandler):
         )
 
 
-class FileInput(BytesContentHandler):
+class FileContentHandler(BytesContentHandler):
     def __init__(self, input: str | Path, **kwargs: Unpack[ContentOptionalArgs]):
         if not is_valid_path(input):
             raise ValueError(f"Input {input} is not a valid file path.")
@@ -134,6 +137,11 @@ T = TypeVar("T", bound=str)
 
 
 class Content(Generic[T]):
+    """
+    This is similar to a factory but uses the instance as an attribute so we can
+    benefit from the organization of the content handlers without having to
+    manage the object recognition for the weave serializers
+    """
     content_handler: BaseContentHandler
 
     def __init__(
@@ -159,10 +167,10 @@ class Content(Generic[T]):
         )
 
         if isinstance(input, Path):
-            self.content_handler = FileInput(str(input), **kwargs_with_defaults)
+            self.content_handler = FileContentHandler(str(input), **kwargs_with_defaults)
         elif isinstance(input, str):
             if is_valid_path(str(input)):
-                self.content_handler = FileInput(str(input), **kwargs_with_defaults)
+                self.content_handler = FileContentHandler(str(input), **kwargs_with_defaults)
             else:
                 try:
                     self.content_handler = Base64ContentHandler(
