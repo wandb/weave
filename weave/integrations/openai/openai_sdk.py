@@ -328,14 +328,14 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            def _wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
                 if kwargs.get("stream") and kwargs.get("stream_options") is None:
-                    completion = args[0]
+                    completion = self
                     base_url = str(completion._client._base_url)
                     # Only set stream_options if it targets the OpenAI endpoints
                     if urlparse(base_url).hostname == "api.openai.com":
                         kwargs["stream_options"] = {"include_usage": True}
-                return fn(*args, **kwargs)
+                return fn(self, *args, **kwargs)
 
             return _wrapper
 
@@ -369,14 +369,14 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            async def _wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
                 if kwargs.get("stream") and kwargs.get("stream_options") is None:
-                    completion = args[0]
+                    completion = self
                     base_url = str(completion._client._base_url)
                     # Only set stream_options if it targets the OpenAI endpoints
                     if urlparse(base_url).hostname == "api.openai.com":
                         kwargs["stream_options"] = {"include_usage": True}
-                return await fn(*args, **kwargs)
+                return await fn(self, *args, **kwargs)
 
             return _wrapper
 
