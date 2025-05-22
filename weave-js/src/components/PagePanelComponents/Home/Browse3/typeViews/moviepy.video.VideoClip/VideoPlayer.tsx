@@ -108,12 +108,13 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
 
       const thumbnailContent = (
         <Tailwind>
-          <div 
-            className="flex h-full w-full items-center justify-start relative"
+          <div
+            className="relative flex h-full w-full items-center justify-start"
             style={{cursor: 'pointer'}}
-            onClick={() => setShowPopup(true)}
-          >
-            <div style={{height: thumbnailHeight, width: thumbnailWidth}} className="relative">
+            onClick={() => setShowPopup(true)}>
+            <div
+              style={{height: thumbnailHeight, width: thumbnailWidth}}
+              className="relative">
               {videoBinary.result ? (
                 <>
                   <VideoContent
@@ -125,7 +126,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
                     isThumbnail={true}
                     videoRef={videoRef}
                   />
-                  <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 hover:bg-oblivion/10 transition-all duration-200">
+                  <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 transition-all duration-200 hover:bg-oblivion/10">
                     <IconPlay className="text-white" />
                   </div>
                 </>
@@ -139,7 +140,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
 
       return (
         <>
-          <Tooltip 
+          <Tooltip
             trigger={thumbnailContent}
             content={`${fileExt.toUpperCase()} Video - Click to play`}
           />
@@ -167,10 +168,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
       // List view - show simple link
       return (
         <div className="flex h-full w-full items-center justify-start">
-          <div 
-            className="cursor-pointer" 
-            onClick={() => setShowPopup(true)}
-          >
+          <div className="cursor-pointer" onClick={() => setShowPopup(true)}>
             <Pill
               label={videoText}
               icon="play"
@@ -259,21 +257,22 @@ const VideoContent: React.FC<VideoContentProps> = ({
   }
 
   return containerHeight >= 1 ? (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      overflow: 'hidden',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
       <video
         ref={videoRef}
         src={url}
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'contain'
+          objectFit: 'contain',
         }}
         controls={!isThumbnail}
         autoPlay={false}
