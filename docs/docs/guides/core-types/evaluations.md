@@ -30,7 +30,7 @@ Weave will take each example, pass it through your application and score the out
 
 ### (Optional) Custom naming
 
-There are two types of csutomizable names in the evaluation flow:
+There are two types of customizable names in the evaluation flow:
 
 - [_Evaluation object name_ (`evaluation_name`)](#name-the-evaluation-object): A persistent label for your configured `Evaluation` object.
 - [_Evaluation run display name_ (`__weave["display_name"]`)](#name-individual-evaluation-runs): A label for a specific evaluation execution, shown in the UI. 
@@ -138,7 +138,7 @@ This will run `predict` on each example and score the output with each scoring f
 Alternatively, you can also evaluate a function that is wrapped in a `@weave.op()`.
 
 ```python
-@weave.op()
+@weave.op
 def function_to_evaluate(question: str):
     # here's where you would add your LLM call and return the output
     return  {'generated_text': 'some response'}
