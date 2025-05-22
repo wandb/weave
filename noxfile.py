@@ -21,9 +21,16 @@ PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents", "dspy
 @nox.session
 def lint(session):
     session.install("pre-commit", "jupyter")
-    install_only = session.posargs and "install-only" in session.posargs
-    if install_only:
-        session.run("pre-commit", "install", "--install-hooks")
+    dry_run = session.posargs and "dry-run" in session.posargs
+    if dry_run:
+        session.run(
+            "pre-commit",
+            "run",
+            "--hook-stage",
+            "pre-push",
+            "--files",
+            "./weave/__init__.py",
+        )
     else:
         session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
