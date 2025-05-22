@@ -14,9 +14,9 @@ from weave.type_wrappers.Content.utils import (
     BaseContentArgs,
     ContentKeywordArgs,
     ContentOptionalArgs,
+    default_filename,
     get_mime_and_extension,
     is_valid_path,
-    default_filename,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,7 @@ TO_BYTES_METHODS = [
     "read_bytes",  # File-like objects, Path, etc
     "as_bytes",  # Some custom classes
 ]
+
 
 class BaseContentHandler(BaseModel):
     size: int
@@ -53,16 +54,16 @@ class BaseContentHandler(BaseModel):
 
 class BytesContentHandler(BaseContentHandler):
     def __init__(self, input: bytes, **kwargs: Unpack[ContentOptionalArgs]):
-        size = kwargs['size'] or len(input)
+        size = kwargs["size"] or len(input)
 
-        mimetype = kwargs['mimetype']
-        extension = kwargs['extension']
+        mimetype = kwargs["mimetype"]
+        extension = kwargs["extension"]
 
         if mimetype is None or extension is None:
             mimetype, extension = get_mime_and_extension(buffer=input[:2048], **kwargs)
 
-        filename = kwargs['filename']
-        original_path = kwargs['path']
+        filename = kwargs["filename"]
+        original_path = kwargs["path"]
 
         if filename is None and original_path is not None:
             filename = Path(original_path).name
@@ -142,6 +143,7 @@ class Content(Generic[T]):
     benefit from the organization of the content handlers without having to
     manage the object recognition for the weave serializers
     """
+
     content_handler: BaseContentHandler
 
     def __init__(
@@ -167,10 +169,14 @@ class Content(Generic[T]):
         )
 
         if isinstance(input, Path):
-            self.content_handler = FileContentHandler(str(input), **kwargs_with_defaults)
+            self.content_handler = FileContentHandler(
+                str(input), **kwargs_with_defaults
+            )
         elif isinstance(input, str):
             if is_valid_path(str(input)):
-                self.content_handler = FileContentHandler(str(input), **kwargs_with_defaults)
+                self.content_handler = FileContentHandler(
+                    str(input), **kwargs_with_defaults
+                )
             else:
                 try:
                     self.content_handler = Base64ContentHandler(

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import logging
 import mimetypes
-from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any, TypedDict, Unpack
-from datetime import datetime
 
 import magic
 
@@ -86,6 +85,7 @@ def guess_from_filename(filename: str) -> str | None:
 def guess_from_extension(extension: str) -> str | None:
     filename = f"file.{extension.lstrip('.')}"
     return guess_from_filename(filename)
+
 
 def guess_from_path(path: str | Path) -> str | None:
     path = Path(path)
