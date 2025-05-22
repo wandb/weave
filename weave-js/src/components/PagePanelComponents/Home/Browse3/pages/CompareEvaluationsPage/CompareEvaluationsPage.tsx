@@ -4,7 +4,6 @@
 
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
-import {Typography} from '@mui/material';
 import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -223,11 +222,15 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
                 <ScorecardSection state={state} />
                 <Tailwind style={{width: '100%'}}>
                   <div className="px-16">
-                    <div className="w-full p-16 border border-dashed border-moon-300 rounded-lg bg-moon-50 flex flex-col items-center gap-3">
+                    <div className="flex w-full flex-col items-center gap-3 rounded-lg border border-dashed border-moon-300 bg-moon-50 p-16">
                       <Icon name="table" size="large" color="moon-500 mb-4" />
-                      <div className="flex flex-col items-center mb-4">
-                        <p className="font-semibold text-center">Looking for your evaluation results?</p>
-                        <p className="text-center text-moon-500">You can find it in our new results tab.</p>
+                      <div className="mb-4 flex flex-col items-center">
+                        <p className="text-center font-semibold">
+                          Looking for your evaluation results?
+                        </p>
+                        <p className="text-center text-moon-500">
+                          You can find it in our new results tab.
+                        </p>
                       </div>
                       <Button
                         variant="secondary"
