@@ -50,6 +50,10 @@ logger = logging.getLogger(f"weave.workers.weave_scorer.{str(uuid.uuid4())[:8]}"
 logger.setLevel(logging.INFO)
 # This is to prevent propagation to the weave SDK logger
 logger.propagate = False
+handler = logging.StreamHandler()
+handler.setLevel(logging.INFO)
+logger.addHandler(handler)
+
 
 _TRACE_SERVER: Optional[ClickHouseTraceServer] = None
 
