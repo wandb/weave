@@ -180,12 +180,13 @@ class CallNotWrittenError(Exception):
     stop=stop_after_attempt(5),
     before=before_log(logger, logging.INFO),
 )
-def get_filtered_calls(
+async def get_filtered_calls(
     project_id: str,
     call_ids: list[str],
     op_names: list[str],
     query: Optional[tsi.Query],
 ) -> list[Call]:
+    logger.info("Attempting to get %s calls", len(call_ids))
     server = get_trace_server()
     count_req = tsi.CallsQueryStatsReq(
         project_id=project_id,
@@ -389,7 +390,7 @@ async def process_project_ended_calls(
         # We could merge the call filters and do a single query, but then
         # we would need to figure out which call match what monitor filter.
         # Currently we have no way to apply filters outside the DB
-        calls = get_filtered_calls(
+        calls = await get_filtered_calls(
             project_id,
             call_ids,
             monitor.op_names,
