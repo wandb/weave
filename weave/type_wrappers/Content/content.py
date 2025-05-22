@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Generic, TypeVar, Unpack
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 from weave.type_wrappers.Content.utils import (
     ContentKeywordArgs,
@@ -36,16 +36,17 @@ class BaseContentHandler(BaseModel):
     extension: str
     data: bytes
     path: str | None = None
-    # Extra optional attributes for metadata and functionality
-    # Examples: original_path, timestamp, etc
-    model_config = ConfigDict(extra="allow")
 
-    def __init__(self, /, **values: Any):
-        if "extra" in values and isinstance(values["extra"], dict):
-            extra: dict[str, Any] = dict(values.pop("extra"))
+    def __init__(self, data: bytes, /, **values: Any):
+        if "extra" in values.keys():
+            extra = values.pop("extra") or {}
         else:
             extra = {}
-        super().__init__(**{**values, **extra})
+
+        for k in values:
+            if k in self.model_fields_set:
+                raise ValueError(f"Got invalid extra metadata field: {k}")
+        super().__init__(data=data, **{**values, **extra})
 
     @property
     def metadata(self) -> dict[str, Any]:
@@ -66,7 +67,7 @@ class BytesContentHandler(BaseContentHandler):
             values["extension"] = extension
         values["filename"] = values["filename"] or default_filename(values["extension"])
 
-        super().__init__(data=input, **values)
+        super().__init__(input, **values)
 
 
 class FileContentHandler(BytesContentHandler):
@@ -148,7 +149,6 @@ class Content(Generic[T]):
             extension=values.get("extension", None),
             mimetype=values.get("mimetype", None),
             size=values.get("size", None),
-            data=values.get("data", None),
             extra=values.get("extra", {}),
         )
 
