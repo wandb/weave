@@ -52,6 +52,7 @@ export const useCallsForQuery = (
   gridSort?: GridSortModel,
   expandedColumns?: Set<string>,
   columns?: string[],
+  currentUserId?: string | null,
   options?: {
     includeTotalStorageSize?: boolean;
   }
@@ -99,8 +100,8 @@ export const useCallsForQuery = (
   });
 
   const callResults = useMemo(() => {
-    return getFeedbackMerged(calls.result ?? []);
-  }, [calls]);
+    return getFeedbackMerged(calls.result ?? [], currentUserId);
+  }, [calls, currentUserId]);
 
   const total = useMemo(() => {
     if (callsStats.loading || callsStats.result == null) {
@@ -162,8 +163,8 @@ export const useCallsForQuery = (
   }, [storageSize]);
 
   const costResults = useMemo(() => {
-    return getFeedbackMerged(costs.result ?? []);
-  }, [costs]);
+    return getFeedbackMerged(costs.result ?? [], currentUserId);
+  }, [costs, currentUserId]);
   const refetch = useCallback(() => {
     calls.refetch();
     costs.refetch();
@@ -325,13 +326,48 @@ export const convertLowLevelFilterToHighLevelFilter = (
   return highLevelFilter;
 };
 
-const getFeedbackMerged = (calls: CallSchema[]) => {
+const getFeedbackMerged = (
+  calls: CallSchema[],
+  currentUserId?: string | null
+) => {
   // for each call, reduce all feedback to the latest feedback of each type
   return calls.map(c => {
     if (!c.traceCall?.summary?.weave?.feedback) {
       return c;
     }
-    const feedback = c.traceCall?.summary?.weave?.feedback?.reduce(
+
+    // Filter feedback by currentUserId if provided
+    let feedbackToProcess = c.traceCall?.summary?.weave?.feedback;
+    // Ensure feedbackToProcess is an array (for filterings)
+    if (!Array.isArray(feedbackToProcess)) {
+      // If feedback is an object, convert it to an array of values
+      if (typeof feedbackToProcess === 'object' && feedbackToProcess !== null) {
+        feedbackToProcess = Object.values(feedbackToProcess);
+      } else {
+        // If feedback is not an array or object, return the call as is
+        return c;
+      }
+    }
+
+    if (currentUserId) {
+      feedbackToProcess = feedbackToProcess.filter(
+        (feedback: Record<string, any>) => feedback.creator === currentUserId
+      );
+
+      // If no feedback from current user, return call without feedback
+      if (feedbackToProcess.length === 0) {
+        const callWithoutFeedback = {...c};
+        if (callWithoutFeedback.traceCall?.summary?.weave) {
+          callWithoutFeedback.traceCall.summary.weave = {
+            ...callWithoutFeedback.traceCall.summary.weave,
+            feedback: {},
+          };
+        }
+        return callWithoutFeedback;
+      }
+    }
+
+    const feedback = feedbackToProcess.reduce(
       (acc: Record<string, any>, curr: Record<string, any>) => {
         // keep most recent feedback of each type
         if (acc[curr.feedback_type]?.created_at > curr.created_at) {
@@ -342,6 +378,7 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
       },
       {}
     );
+
     c.traceCall = {
       ...c.traceCall,
       summary: {
