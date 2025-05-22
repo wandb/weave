@@ -127,7 +127,7 @@ export const useEvaluationComparisonSummary = (
   const evaluationCallIdsRef = useRef(evaluationCallIdsMemo);
 
   useEffect(() => {
-    setData(null);
+    // setData(null);
     let mounted = true;
     fetchEvaluationSummaryData(
       getTraceServerClient(),
@@ -173,7 +173,7 @@ export const useEvaluationComparisonResults = (
   const evaluationCallIdsRef = useRef(evaluationCallIdsMemo);
 
   useEffect(() => {
-    setData(null);
+    // setData(null);
     let mounted = true;
     if (summaryData == null) {
       return;
@@ -443,11 +443,6 @@ const fetchEvaluationComparisonResults = async (
   const groupedByDigest = _.groupBy(
     flattenedComparisonPredictAndScoreCalls,
     call => {
-      console.log(
-        'call',
-        call,
-        calculatePredictAndScoreCallExampleDigest(call)
-      );
       return calculatePredictAndScoreCallExampleDigest(call);
     }
   );
