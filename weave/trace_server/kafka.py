@@ -35,6 +35,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             "client.id": socket.gethostname(),
             "group.id": group_id,
             "auto.offset.reset": "earliest",
+            "enable.auto.commit": False,
         }
         consumer = cls(conf)
         return consumer

@@ -9,6 +9,7 @@ from typing import Any, Optional, TypedDict
 import sentry_sdk
 from confluent_kafka import KafkaError, Message
 from tenacity import (
+    RetryError,
     before_log,
     retry,
     retry_if_exception_type,
@@ -44,7 +45,6 @@ from weave.trace_server.refs_internal import (
     parse_internal_uri,
 )
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(f"weave.workers.weave_scorer.{str(uuid.uuid4())[:8]}")
 logger.setLevel(logging.INFO)
 
@@ -329,6 +329,8 @@ def _task_done_callback(
         task.result()
         for msg in messages:
             consumer.commit(msg)
+    except RetryError as e:
+        logger.warning("Retries exhausted. Messages should be re-consumed.")
     except Exception as e:
         logger.exception(
             f"Error processing message: {e.__class__.__name__} {e}", exc_info=e
