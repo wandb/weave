@@ -97,6 +97,7 @@ import {
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
+import {memoize} from './memoize';
 import {TraceCallSchema} from './traceServerClientTypes';
 
 /**
@@ -382,48 +383,13 @@ const fetchEvaluationComparisonResults = async (
     resultRows: {},
   };
 
-  // Kick off the trace query to get the actual trace data
-  // Note: we split this into 2 steps to ensure we only get level 2 children
-  // of the evaluations. This avoids massive overhead of fetching gigantic traces
-  // for every evaluation.
-  const evalTraceIds = Object.values(summaryData.evaluationCalls).map(
-    call => call.traceId
-  );
-  // First, get all the children of the evaluations (predictAndScoreCalls + summary)
-  const evalTraceResProm = traceServerClient
-    .callsStreamQuery({
-      project_id: projectId,
-      filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
-    })
-    .then(predictAndScoreCallRes => {
-      // Then, get all the children of those calls (predictions + scores)
-      const predictAndScoreIds = predictAndScoreCallRes.calls.map(
-        call => call.id
-      );
-
-      return Promise.all(
-        _.chunk(predictAndScoreIds, 500).map(chunk => {
-          return traceServerClient
-            .callsStreamQuery({
-              project_id: projectId,
-              filter: {trace_ids: evalTraceIds, parent_ids: chunk},
-            })
-            .then(predictionsAndScoresCallsRes => {
-              return predictionsAndScoresCallsRes.calls;
-            });
-        })
-      ).then(predictionsAndScoresCallsResMany => {
-        return {
-          calls: [
-            ...predictAndScoreCallRes.calls,
-            ...predictionsAndScoresCallsResMany.flat(),
-          ],
-        };
-      });
-    });
-
-  // 4. Populate the predictions and scores
-  const evalTraceRes = await evalTraceResProm;
+  const evalTraceRes = {
+    calls: await fetchEvalSubtreesParallel(
+      traceServerClient,
+      projectId,
+      evaluationCallIds
+    ),
+  };
 
   // Calculate all necessary data first
   const imperativeEvalCalls = evalTraceRes.calls.filter(isImperativeEvalCall);
@@ -821,6 +787,15 @@ const populatePredictionsAndScoresImperative = (
   const predictAndScoreCalls = evalTraceRes.calls.filter(call =>
     call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
   );
+  const predictCalls = evalTraceRes.calls.filter(c =>
+    c.op_name.includes(PREDICT_OP_NAME)
+  );
+  const scoreCalls = evalTraceRes.calls.filter(
+    c => c.attributes?._weave_eval_meta?.score
+  );
+
+  const evalPredictCallsByParentId = _.groupBy(predictCalls, 'parent_id');
+  const evalScoreCallsByParentId = _.groupBy(scoreCalls, 'parent_id');
 
   // Process imperative predict and score calls
   predictAndScoreCalls.forEach(call => {
@@ -880,9 +855,7 @@ const populatePredictionsAndScoresImperative = (
       };
 
       // Find the corresponding predict call
-      const predictCalls = evalTraceRes.calls.filter(
-        c => c.parent_id === call.id && c.op_name.includes(PREDICT_OP_NAME)
-      );
+      const predictCalls = evalPredictCallsByParentId[call.id] ?? [];
 
       if (predictCalls.length > 0) {
         predictAndScoreEntry._rawPredictTraceData = predictCalls[0];
@@ -920,9 +893,7 @@ const populatePredictionsAndScoresImperative = (
       }
 
       // Find and add score calls
-      const scoreCalls = evalTraceRes.calls.filter(
-        c => c.parent_id === call.id && c.attributes?._weave_eval_meta?.score
-      );
+      const scoreCalls = evalScoreCallsByParentId[call.id] ?? [];
 
       scoreCalls.forEach(scoreCall => {
         if (!scoreCall || !scoreCall.op_name) {
@@ -1178,4 +1149,74 @@ const populatePredictionsAndScoresNonImperative = (
       }
     }
   });
+};
+
+const CHUNK_SIZE = 250;
+const fetchEvalSubtree = async (
+  client: TraceServerClient,
+  projectId: string,
+  evalCallId: string
+): Promise<TraceCallSchema[]> => {
+  // First, get the count of expected calls (this is generally fast)
+  const predictAndScoreCallQueryBase = {
+    project_id: projectId,
+    filter: {parent_ids: [evalCallId]},
+  };
+  const predictAndScoreCallIdCount = (
+    await client.callsQueryStats(predictAndScoreCallQueryBase)
+  ).count;
+
+  // Next, fetch the results parallizing sub-batches
+  const fetchPredictAndScoreSubtreeBatch = async (
+    offset: number,
+    limit: number
+  ) => {
+    const predictAndScoreCalls = await client.callsStreamQuery({
+      ...predictAndScoreCallQueryBase,
+      offset,
+      limit,
+      sort_by: [
+        {
+          field: 'started_at',
+          direction: 'asc',
+        },
+      ],
+    });
+    const predictAndScoreIds = predictAndScoreCalls.calls.map(call => call.id);
+    const predictAndScoreChildren = await client.callsStreamQuery({
+      project_id: projectId,
+      filter: {parent_ids: predictAndScoreIds},
+    });
+    return [
+      ...predictAndScoreCalls.calls,
+      ...predictAndScoreChildren.calls.flat(),
+    ];
+  };
+  const proms = [];
+  for (let i = 0; i < predictAndScoreCallIdCount; i += CHUNK_SIZE) {
+    proms.push(fetchPredictAndScoreSubtreeBatch(i, CHUNK_SIZE));
+  }
+  const predictAndScoreCalls = await Promise.all(proms);
+
+  return predictAndScoreCalls.flat();
+};
+
+const memoizedFetchEvalSubtree = memoize(
+  fetchEvalSubtree,
+  (client, projectId, evalCallId) => JSON.stringify({projectId, evalCallId}),
+  10
+);
+
+const fetchEvalSubtreesParallel = async (
+  client: TraceServerClient,
+  projectId: string,
+  evalCallIds: string[]
+): Promise<TraceCallSchema[]> => {
+  return (
+    await Promise.all(
+      evalCallIds.map(evalCallId =>
+        memoizedFetchEvalSubtree(client, projectId, evalCallId)
+      )
+    )
+  ).flat();
 };

@@ -1,6 +1,7 @@
 import {Box, SxProps, Theme} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
 import {IconName} from '@wandb/weave/components/Icon';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
 import React, {
@@ -309,6 +310,7 @@ export const SimpleTabView: FC<{
     value: string;
     label: string;
     content: ReactNode;
+    loading?: boolean;
   }>;
   tabValue: string;
   hideTabsIfSingle?: boolean;
@@ -362,6 +364,7 @@ export const SimpleTabView: FC<{
                 value={tab.value}
                 className="h-[30px] whitespace-nowrap text-sm">
                 {tab.label}
+                {tab.loading && <LoadingDots />}
               </Tabs.Trigger>
             ))}
           </Tabs.List>
