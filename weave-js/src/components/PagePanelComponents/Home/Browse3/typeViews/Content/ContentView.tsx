@@ -74,9 +74,6 @@ type ContentMetadata = {
 
 export const ContentView = ({entity, project, data}: ContentViewProps) => {
   const {useFileContent} = useWFHooks();
-  console.log(data)
-
-  console.log(data.files)
   const metadata = useFileContent({
     entity,
     project,

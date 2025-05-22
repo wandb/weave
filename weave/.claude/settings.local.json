@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(grep:*)",
-      "Bash(python -m pytest trace/tests/test_trace_sentry.py -v)"
-    ],
-    "deny": []
-  }
-}

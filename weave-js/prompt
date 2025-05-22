@@ -1,0 +1,13 @@
+You are a senior typescript developer tasked with implementing a VideoViewer
+
+Inside of src/components/PagePanelComponents/Home/Browse3/typeViews/Content/ContentView.tsx the mime type of a generic object is used to determine what view to dispatch it content to. Currently, only PDFs have a specific viewer.
+
+Your job is to implement a viewer like src/components/PagePanelComponents/Home/Browse3/typeViews/Content/PDFView.tsx for video and audio content
+
+For video, this viewer should be implemented in src/components/PagePanelComponents/Home/Browse3/typeViews/Content/VideoView.tsx
+
+For audio, this viewer should be implemented in src/components/PagePanelComponents/Home/Browse3/typeViews/Content/AudioPlayer.tsx
+
+You may use existing viewers for these content types as inspiration:
+src/components/PagePanelComponents/Home/Browse3/typeViews/moviepy.video.VideoClip/VideoPlayer.tsx
+src/components/PagePanelComponents/Home/Browse3/typeViews/Audio/AudioPlayer.tsx
