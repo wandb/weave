@@ -4,6 +4,7 @@ This module provides functionality for displaying progress bars when flushing
 tasks in the WeaveClient.
 """
 
+import logging
 from typing import Callable
 
 from rich.console import Console
@@ -17,6 +18,8 @@ from rich.progress import (
 )
 
 from weave.trace.weave_client import FlushStatus
+
+logger = logging.getLogger(__name__)
 
 
 def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
@@ -65,7 +68,7 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
 
             # Print initial message
             if not progress.live.is_started:
-                print(f"Flushing {counts['total_jobs']} pending tasks...")
+                logger.info(f"Flushing {counts['total_jobs']} pending tasks...")
 
             # Create the task
             task_id = progress.add_task("Flushing tasks", total=counts["total_jobs"])

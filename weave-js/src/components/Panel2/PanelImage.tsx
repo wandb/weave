@@ -214,19 +214,33 @@ const PanelImage: FC<PanelImageProps> = ({config, input}) => {
 
   if (tileLayout === 'MASKS_NEXT_TO_IMAGE') {
     return (
-      <div style={{display: 'flex', width: '100%', height: '100%'}}>
-        <CardImage image={imageInCard} imageFileNode={inputNode} />
-        <CardImage
-          image={imageInCard}
-          imageFileNode={inputNode}
-          boundingBoxes={imageBoxes}
-          masks={imageMasks}
-          classSets={classSets}
-          boxSliders={config?.boxSliders}
-          maskControls={maskControls}
-          boxControls={boxControls}
-          hideImage={hideImage ?? hideImageDefault}
-        />
+      <div
+        style={{
+          display: 'flex',
+          height: '100%',
+          width: '100%',
+          overflow: 'auto',
+        }}>
+        <div style={{flex: 1}}>
+          <CardImage
+            image={imageInCard}
+            imageFileNode={inputNode}
+            hideImage={false}
+          />
+        </div>
+        <div style={{flex: 1}}>
+          <CardImage
+            image={imageInCard}
+            imageFileNode={inputNode}
+            boundingBoxes={imageBoxes}
+            masks={imageMasks}
+            classSets={classSets}
+            boxSliders={config?.boxSliders}
+            maskControls={maskControls}
+            boxControls={boxControls}
+            hideImage={hideImage ?? hideImageDefault}
+          />
+        </div>
       </div>
     );
   }
@@ -242,28 +256,39 @@ const PanelImage: FC<PanelImageProps> = ({config, input}) => {
       maskControls.every(mc => bc.name !== mc.name)
     );
     return (
-      <div style={{display: 'flex', width: '100%', height: '100%'}}>
-        <CardImage
-          image={imageInCard}
-          imageFileNode={inputNode}
-          boundingBoxes={imageBoxes}
-          classSets={classSets}
-          boxSliders={config?.boxSliders}
-          boxControls={otherBoxes}
-        />
-        {controls.map(([mc, bc], i) => (
+      <div
+        style={{
+          display: 'flex',
+          height: '100%',
+          width: '100%',
+          overflow: 'auto',
+        }}>
+        <div style={{minHeight: '200px', flex: 1}}>
           <CardImage
-            key={i}
             image={imageInCard}
             imageFileNode={inputNode}
             boundingBoxes={imageBoxes}
-            masks={imageMasks?.slice(i, i + 1)}
             classSets={classSets}
             boxSliders={config?.boxSliders}
-            maskControls={mc ? [mc] : undefined}
-            boxControls={bc ? [bc] : undefined}
-            hideImage={mc.hideImage ?? hideImageDefault}
+            boxControls={otherBoxes}
+            hideImage={hideImage ?? hideImageDefault}
           />
+        </div>
+        {controls.map(([mc, bc], i) => (
+          <div key={i} style={{minHeight: '200px', flex: 1}}>
+            <CardImage
+              key={i}
+              image={imageInCard}
+              imageFileNode={inputNode}
+              boundingBoxes={imageBoxes}
+              masks={imageMasks?.slice(i, i + 1)}
+              classSets={classSets}
+              boxSliders={config?.boxSliders}
+              maskControls={mc ? [mc] : undefined}
+              boxControls={bc ? [bc] : undefined}
+              hideImage={mc.hideImage ?? hideImageDefault}
+            />
+          </div>
         ))}
       </div>
     );

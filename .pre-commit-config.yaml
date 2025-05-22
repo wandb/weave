@@ -7,7 +7,7 @@ repos:
       # Run the linter.
       - id: ruff
         types_or: [python, pyi, jupyter]
-        args: [--fix, --exit-non-zero-on-fix]
+        args: [--fix, --exit-non-zero-on-fix, --config=pyproject.toml]
       # Run the formatter.
       - id: ruff-format
         types_or: [python, pyi, jupyter]

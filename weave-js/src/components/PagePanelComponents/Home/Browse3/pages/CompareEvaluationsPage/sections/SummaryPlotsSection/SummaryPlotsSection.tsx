@@ -84,71 +84,53 @@ export const SummaryPlots: React.FC<{
       sx={{
         paddingLeft: STANDARD_PADDING,
         paddingRight: STANDARD_PADDING,
-        flex: '1 1 auto',
+        // flex: '1 1 auto',
         width: '100%',
+        gridGap: STANDARD_PADDING / 2,
       }}>
-      <SectionHeader
-        selectedMetrics={selectedMetrics}
-        setSelectedMetrics={setSelectedMetrics}
-        allMetrics={Array.from(allMetricNames)}
-      />
-      <div ref={containerRef} style={{width: '100%', display: 'flex'}}>
+      <HorizontalBox
+        sx={{
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+        <div style={{display: 'flex', alignItems: 'center'}}>
+          <MetricsSelector
+            selectedMetrics={selectedMetrics}
+            setSelectedMetrics={setSelectedMetrics}
+            allMetrics={Array.from(allMetricNames)}
+          />
+        </div>
+        <div style={{display: 'flex', alignItems: 'center'}}>
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            totalPlots={totalPlots}
+            onPrevPage={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
+            onNextPage={() =>
+              setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))
+            }
+          />
+        </div>
+      </HorizontalBox>
+
+      <div ref={containerRef} style={{width: '100%'}}>
         <HorizontalBox>{plotsToShow}</HorizontalBox>
       </div>
-      <PaginationControls
-        currentPage={currentPage}
-        totalPages={totalPages}
-        startIndex={startIndex}
-        endIndex={endIndex}
-        totalPlots={totalPlots}
-        onPrevPage={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
-        onNextPage={() =>
-          setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))
-        }
-      />
     </VerticalBox>
   );
 };
-
-const SectionHeader: React.FC<{
-  selectedMetrics: Record<string, boolean> | undefined;
-  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
-  allMetrics: string[];
-}> = ({selectedMetrics, setSelectedMetrics, allMetrics}) => (
-  <HorizontalBox
-    sx={{
-      width: '100%',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-    }}>
-    <Box
-      sx={{
-        fontSize: '1.5em',
-        fontWeight: 'bold',
-      }}>
-      Summary Metrics
-    </Box>
-    <Box sx={{marginLeft: 'auto'}}>
-      <div style={{display: 'flex', alignItems: 'center'}}>
-        <div style={{marginRight: '4px'}}>Configure displayed metrics</div>
-        <MetricsSelector
-          selectedMetrics={selectedMetrics}
-          setSelectedMetrics={setSelectedMetrics}
-          allMetrics={allMetrics}
-        />
-      </div>
-    </Box>
-  </HorizontalBox>
-);
 
 const RadarPlotBox: React.FC<{data: RadarPlotData}> = ({data}) => (
   <Box
     sx={{
       height: PLOT_HEIGHT,
-      width: PLOT_HEIGHT * 2,
+      width: PLOT_HEIGHT * 1.5,
       borderRadius: BOX_RADIUS,
       border: STANDARD_BORDER,
       padding: PLOT_PADDING,
+      flex: '1 0 auto',
     }}>
     <PlotlyRadarPlot height={PLOT_HEIGHT} data={data} />
   </Box>
@@ -169,6 +151,7 @@ const BarPlotBox: React.FC<{
       paddingBottom: PLOT_PADDING,
       paddingLeft: PLOT_PADDING,
       paddingRight: PLOT_PADDING,
+      flex: '1 1 auto',
     }}>
     <Button
       variant="ghost"
@@ -215,7 +198,6 @@ const PaginationControls: React.FC<{
   <HorizontalBox sx={{width: '100%'}}>
     <Box
       sx={{
-        marginLeft: 'auto',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

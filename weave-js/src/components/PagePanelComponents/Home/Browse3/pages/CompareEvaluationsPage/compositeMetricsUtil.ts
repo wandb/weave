@@ -242,7 +242,7 @@ export const evalCallIdToScorerRefs = (
 
 // Helper Functions
 
-const groupNameForMetric = (metric: MetricDefinition): string => {
+export const groupNameForMetric = (metric: MetricDefinition): string => {
   let groupName = '';
 
   if (metric.source === 'derived') {

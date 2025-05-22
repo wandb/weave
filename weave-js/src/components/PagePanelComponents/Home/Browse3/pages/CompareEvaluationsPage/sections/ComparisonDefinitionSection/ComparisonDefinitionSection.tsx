@@ -66,7 +66,7 @@ export const ComparisonDefinitionSection: React.FC<{
 
   return (
     <Tailwind>
-      <div className="flex w-full items-center gap-4 overflow-x-auto px-16">
+      <div className="flex w-full items-center gap-4 overflow-x-auto pl-16">
         <HorizontalBox>
           <DraggableSection
             useDragHandle
@@ -170,10 +170,7 @@ const AddEvaluationButton: React.FC<{
 
   return (
     <>
-      <div
-        ref={refBar}
-        className="flex cursor-pointer items-center gap-4 rounded px-8 py-4 outline outline-moon-250 hover:outline-2 hover:outline-teal-500/40"
-        onClick={onClick}>
+      <div ref={refBar} onClick={onClick}>
         <div ref={refLabel}>
           <Button variant="ghost" size="large" icon="add-new">
             Add evaluation

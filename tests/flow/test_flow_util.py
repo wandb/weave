@@ -15,14 +15,16 @@ async def test_async_foreach_basic():
         await asyncio.sleep(0.1)  # Simulate async work
         return x * 2
 
-    async for item, result in async_foreach(
+    async for index, item, result in async_foreach(
         input_data, process, max_concurrent_tasks=2
     ):
-        results.append((item, result))
+        results.append((index, item, result))
+
+    results.sort(key=lambda x: x[0])
 
     assert len(results) == 5
-    assert all(result == item * 2 for item, result in results)
-    assert [item for item, _ in results] == list(range(5))
+    assert all(result == item * 2 for _, item, result in results)
+    assert [item for _, item, _ in results] == list(range(5))
 
 
 @pytest.mark.asyncio
@@ -41,7 +43,7 @@ async def test_async_foreach_concurrency():
         return x
 
     max_concurrent = 3
-    async for _, _ in async_foreach(
+    async for _ in async_foreach(
         input_data, process, max_concurrent_tasks=max_concurrent
     ):
         pass
@@ -65,7 +67,7 @@ async def test_async_foreach_lazy_loading():
         return x
 
     # Process first 3 items then break
-    async for _, _ in async_foreach(lazy_range(100), process, max_concurrent_tasks=2):
+    async for _ in async_foreach(lazy_range(100), process, max_concurrent_tasks=2):
         if items_loaded >= 3:
             break
 
@@ -84,7 +86,7 @@ async def test_async_foreach_error_handling():
         return x
 
     with pytest.raises(ValueError, match="Test error"):
-        async for _, _ in async_foreach(input_data, process, max_concurrent_tasks=2):
+        async for _ in async_foreach(input_data, process, max_concurrent_tasks=2):
             pass
 
 
@@ -96,8 +98,8 @@ async def test_async_foreach_empty_input():
     async def process(x: int) -> int:
         return x
 
-    async for item, result in async_foreach([], process, max_concurrent_tasks=2):
-        results.append((item, result))
+    async for index, item, result in async_foreach([], process, max_concurrent_tasks=2):
+        results.append((index, item, result))
 
     assert len(results) == 0
 
@@ -114,10 +116,10 @@ async def test_async_foreach_cancellation():
 
     # Create a task we can cancel
     async def run_foreach():
-        async for item, result in async_foreach(
+        async for index, item, result in async_foreach(
             input_data, slow_process, max_concurrent_tasks=3
         ):
-            results.append((item, result))
+            results.append((index, item, result))
             if len(results) >= 2:  # Cancel after 2 results
                 raise asyncio.CancelledError()
 
@@ -135,7 +137,7 @@ async def test_async_foreach_cancellation():
 async def test_async_foreach_execution_order():
     """Test that results are yielded in input sequence order regardless of completion order."""
     # Create input data with deliberately varying processing times
-    input_data = [(0, 0.3), (1, 0.1), (2, 0.2)]  # (value, delay) pairs
+    input_data = [(0, 0.5), (1, 0.1), (2, 0.2)]  # (value, delay) pairs
     calls = []
     results = []
 
@@ -145,11 +147,18 @@ async def test_async_foreach_execution_order():
         await asyncio.sleep(delay)  # Different delays to force out-of-order completion
         return value * 2
 
-    async for item, result in async_foreach(
+    async for index, item, result in async_foreach(
         input_data, process, max_concurrent_tasks=3
     ):
-        results.append((item[0], result))  # Store (original_value, processed_result)
+        results.append(
+            (index, item[0], result)
+        )  # Store (original_value, processed_result)
+
+    # Assert that results done sooner were indeed returned first
+    assert results == [(1, 1, 2), (2, 2, 4), (0, 0, 0)]
+
+    results.sort(key=lambda x: x[0])
 
     # Verify results are in original sequence order
-    assert results == [(0, 0), (1, 2), (2, 4)]
-    assert calls == [(0, 0.3), (1, 0.1), (2, 0.2)]
+    assert results == [(0, 0, 0), (1, 1, 2), (2, 2, 4)]
+    assert calls == [(0, 0.5), (1, 0.1), (2, 0.2)]

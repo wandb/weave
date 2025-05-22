@@ -217,6 +217,7 @@ class Server:
         self.register_handler_fn("ensure_file", self.handle_ensure_file)
         self.register_handler_fn("direct_url", self.handle_direct_url)
         self.register_handler_fn("sleep", self.handle_sleep)
+        self.register_handler_fn("ensure_incremental_files", self.handle_ensure_incremental_files)
 
         if process:
             self.request_handler = aioprocessing.AioProcess(
@@ -236,6 +237,8 @@ class Server:
         self.response_queue_router = threading.Thread(
             target=self._response_queue_router_fn, daemon=True
         )
+
+        self._ensure_incremental_files_sem = asyncio.Semaphore(16)
 
     # server_process runs the server's main coroutine
     def _request_handler_fn(self) -> None:
@@ -417,6 +420,34 @@ class Server:
         ):
             raise errors.WeaveInternalError("invalid scheme ", uri)
         return await self.wandb_file_manager.ensure_file(uri)
+    
+    async def handle_ensure_incremental_files(self, artifact_uris: list[str]) -> list[typing.Optional[str]]:
+        """The method is primarily used to download increments for incremental tables
+        
+        Increments are only ever shown in a run workspace, so to maintain the existing
+        concurrency pattern of mapped file table ops, which uses a ThreadExecutor with
+        a budget of 16.
+        """
+        async def download_one(uri_str):
+            # Use the shared semaphore for all incr downloads
+            async with self._ensure_incremental_files_sem:
+                uri = uris.WeaveURI.parse(uri_str)
+                if not isinstance(
+                    uri,
+                    (artifact_wandb.WeaveWBArtifactURI, artifact_wandb.WeaveWBArtifactByIDURI),
+                ):
+                    raise errors.WeaveInternalError("invalid scheme ", uri)
+                try:
+                    return await self.wandb_file_manager.ensure_file(uri)
+                except Exception as e:
+                    # Log a warning here only. When the file is accessed by
+                    # _get_table_data_from_file(), it'll raise an exception there.
+                    logging.warning(f"Failed to download {uri_str}: {e}")
+                    return None
+
+        tasks = [download_one(uri_str) for uri_str in artifact_uris]
+        results = await asyncio.gather(*tasks)
+        return results
 
     async def handle_ensure_file_downloaded(
         self, download_url: str
@@ -570,6 +601,19 @@ class AsyncConnection:
     async def sleep(self, seconds: float) -> float:
         return await self.request("sleep", seconds)
 
+    def ensure_incremental_files(
+        self,
+        artifact_uris: list[typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, 
+            artifact_wandb.WeaveWBArtifactByIDURI,
+            str
+        ]]
+    ) -> list[typing.Optional[str]]:
+        """Batch download multiple files."""
+        # Convert any URI objects to strings
+        uri_strings = [str(uri) for uri in artifact_uris]
+        return self.request("ensure_incremental_files", uri_strings)
+
 
 class AsyncClient:
     def __init__(self, server: Server) -> None:
@@ -665,6 +709,19 @@ class SyncClient:
     def sleep(self, seconds: float) -> None:
         return self.request("sleep", seconds)
 
+    def ensure_incremental_files(
+        self,
+        artifact_uris: list[typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, 
+            artifact_wandb.WeaveWBArtifactByIDURI,
+            str
+        ]]
+    ) -> list[typing.Optional[str]]:
+        """Batch download multiple files."""
+        # Convert any URI objects to strings
+        uri_strings = [str(uri) for uri in artifact_uris]
+        return self.request("ensure_incremental_files", uri_strings)
+
 
 class ServerlessClient:
     def __init__(self, fs: filesystem.Filesystem) -> None:
@@ -704,6 +761,27 @@ class ServerlessClient:
 
     def sleep(self, seconds: float) -> None:
         time.sleep(seconds)
+
+    def ensure_incremental_files(
+        self,
+        artifact_uris: list[typing.Union[
+            artifact_wandb.WeaveWBArtifactURI, 
+            artifact_wandb.WeaveWBArtifactByIDURI,
+            str
+        ]]
+    ) -> list[typing.Optional[str]]:
+        """Batch download multiple files."""
+        results = []
+        for uri in artifact_uris:
+            if isinstance(uri, str):
+                uri = uris.WeaveURI.parse(uri)
+            try:
+                file_path = self.wandb_file_manager.ensure_file(uri)
+                results.append(file_path)
+            except Exception as e:
+                logging.warning(f"Failed to download {uri}: {e}")
+                results.append(None)
+        return results
 
 
 def get_sync_client() -> typing.Union[SyncClient, ServerlessClient]:

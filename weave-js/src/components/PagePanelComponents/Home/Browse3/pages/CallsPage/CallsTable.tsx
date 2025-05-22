@@ -106,6 +106,10 @@ export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
   'summary.weave.feedback',
   'summary.status_counts',
+  // attributes.python was logged for a short period of time
+  // accidentally in v0.51.47. We can hide it for a while
+  // and remove this after a few months (say Sept 2025)
+  'attributes.python',
   'wb_run_id',
   'attributes.otel_span',
 ];
@@ -753,8 +757,15 @@ export const CallsTable: FC<{
     tableData.forEach(row => {
       Object.keys(row).forEach(key => keysSet.add(key));
     });
+    // `storage_size_bytes` is never shown in the table view, so don't include it
+    keysSet.delete('storage_size_bytes');
+    // set the `total_storage_size_bytes` based on whether we are showing trace roots only
+    if (!effectiveFilter.traceRootsOnly) {
+      keysSet.delete('total_storage_size_bytes');
+    }
+
     return Array.from(keysSet);
-  }, [tableData]);
+  }, [tableData, effectiveFilter]);
 
   const visibleColumns = useMemo(() => {
     return tableData.length > 0

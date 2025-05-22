@@ -1,65 +1,86 @@
-# Evaluation Overview
+# Evaluations
 
-Evaluation-driven development helps you reliably iterate on an application. The `Evaluation` class is designed to assess the performance of a `Model` on a given `Dataset` or set of examples using scoring functions.
+_Evaluation-driven LLM application development_ helps you systematically improve LLM applications by systematically measuring their behavior using consistent, curated examples.
 
-![Evals hero](../../../static/img/evals-hero.png)
+In Weave, the core of the workflow is the _`Evaluation` object_, which defines:
 
-```python
-import weave
-from weave import Evaluation
-import asyncio
+- A [`Dataset`](../core-types/datasets) or list of dictionaries for test examples.
+- One or more [scoring functions](../evaluation/scorers.md).
+- Optional configuration like [input preprocessing](#format-dataset-rows-before-evaluating).
 
-# Collect your examples
-examples = [
-    {"question": "What is the capital of France?", "expected": "Paris"},
-    {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
-    {"question": "What is the square root of 64?", "expected": "8"},
-]
+Once you’ve defined the `Evaluation`, you can run it against a [`Model`](../core-types/models.md) object or any custom function containing LLM application logic. Each call to `.evaluate()` triggers an _evaluation run_. Think of the `Evaluation` object as a blueprint, and each run as a measurement of how your application performs under that setup.
 
-# Define any custom scoring function
-@weave.op()
-def match_score1(expected: str, output: dict) -> dict:
-    # Here is where you'd define the logic to score the model output
-    return {'match': expected == output['generated_text']}
+To get started with evaluations, complete the following steps:
 
-@weave.op()
-def function_to_evaluate(question: str):
-    # here's where you would add your LLM call and return the output
-    return  {'generated_text': 'Paris'}
+1. [Create an `Evaluation` object](#1-create-an-evaluation-object)
+2. [Define a dataset of examples](#2-define-a-datset-of-test-examples)
+3. [Define scoring functions](#3-define-scoring-functions)
+4. [Define a `Model` to evaluate](#4-define-a-model-to-evaluate)
+5. [Run the evaluation](#5-run-the-evaluation)
 
-# Score your examples using scoring functions
-evaluation = Evaluation(
-    dataset=examples, scorers=[match_score1]
-)
 
-# Start tracking the evaluation
-weave.init('intro-example')
-# Run the evaluation
-asyncio.run(evaluation.evaluate(function_to_evaluate))
-```
+A complete evaluation code sample can be found [here](#full-evaluation-code-sample). You can also learn more about [advanced evaluation features](#advanced-evaluation-usage) like [Saved views](#saved-views) and [Imperative evaluations](#imperative-evaluations-evaluationlogger).
 
-:::info Looking for a less opinionated approach?
 
-If you prefer a more flexible evaluation framework, check out Weave's [`EvaluationLogger`](../evaluation/evaluation_logger.md). The imperative approach offers more flexibility for complex workflows, while the standard evaluation framework provides more structure and guidance.
-:::
+## 1. Create an `Evaluation` object
 
-## Create an Evaluation
-
-To systematically improve your application, it's helpful to test your changes against a consistent dataset of potential inputs so that you catch regressions and can inspect your apps behaviour under different conditions. Using the `Evaluation` class, you can be sure you're comparing apples-to-apples by keeping track of all of the details that you're experimenting and evaluating with.
+Creating an `Evaluation` object is the first step in setting up your evaluation configuration. An `Evaluation` consists of example data, scoring logic, and optional preprocessing. You’ll later use it to run one or more evaluations.
 
 Weave will take each example, pass it through your application and score the output on multiple custom scoring functions. By doing this, you'll have a view of the performance of your application, and a rich UI to drill into individual outputs and scores.
 
-### Define an evaluation dataset
+### (Optional) Custom naming
 
-First, define a [Dataset](/guides/core-types/datasets) or list of dictionaries with a collection of examples to be evaluated. These examples are often failure cases that you want to test for, these are similar to unit tests in Test-Driven Development (TDD).
+There are two types of customizable names in the evaluation flow:
 
-### Defining scoring functions
+- [_Evaluation object name_ (`evaluation_name`)](#name-the-evaluation-object): A persistent label for your configured `Evaluation` object.
+- [_Evaluation run display name_ (`__weave["display_name"]`)](#name-individual-evaluation-runs): A label for a specific evaluation execution, shown in the UI. 
 
-Then, create a list of scoring functions. These are used to score each example. Each function should have a `output` and optionally, other inputs from your examples, and return a dictionary with the scores.
+#### Name the `Evaluation` object
+
+To name the `Evaluation` object itself, pass an `evaluation_name` parameter to the `Evaluation` class. This name helps you identify the Evaluation in code and UI listings.
+
+```python
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1], evaluation_name="My Evaluation"
+)
+```
+
+#### Name individual evaluation runs
+
+To name a specific evaluation run (a call to `evaluate()`), use the `__weave` dictionary with a `display_name`. This affects what is shown in the UI for that run.
+
+```python
+evaluation = Evaluation(
+    dataset=examples, scorers=[match_score1]
+)
+evaluation.evaluate(model, __weave={"display_name": "My Evaluation Run"})
+```
+
+## 2. Define a datset of test examples
+
+First, define a [Dataset](../core-types/datasets.md) object or list of dictionaries with a collection of examples to be evaluated. These examples are often failure cases that you want to test for, these are similar to unit tests in Test-Driven Development (TDD).
+
+The following examples shows a dataset defined as a list of dictionaries:
+
+```python
+examples = [
+    {"question": "What is the capital of France?", "expected": "Paris"},
+    {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+    {"question": "What is the square root of 64?", "expected": "8"},
+]
+```
+
+## 3. Define scoring functions
+
+Then, create one or more [scoring functions](../evaluation/scorers.md). These are used to score each example in the `Dataset`. Each scoring function must have a `output`, and return a dictionary with the scores. Optionally, you can include other inputs from your examples.
 
 Scoring functions need to have a `output` keyword argument, but the other arguments are user defined and are taken from the dataset examples. It will only take the necessary keys by using a dictionary key based on the argument name.
 
-This will take `expected` from the dictionary for scoring.
+:::tip
+If your scorer expects an `output` argument but isn’t receiving it, check if it might be using the legacy `model_output` key. To fix this, update your scorer function to use output as a keyword argument.
+:::
+
+The following example scorer function `match_score1` uses the `expected` value from the `examples` dictionary for scoring.
 
 ```python
 import weave
@@ -78,13 +99,13 @@ def match_score1(expected: str, output: dict) -> dict:
     return {'match': expected == output['generated_text']}
 ```
 
-### Optional: Define a custom `Scorer` class
+### (Optional) Define a custom `Scorer` class
 
 In some applications we want to create custom `Scorer` classes - where for example a standardized `LLMJudge` class should be created with specific parameters (e.g. chat model, prompt), specific scoring of each row, and specific calculation of an aggregate score.
 
-See the tutorial on defining a `Scorer` class in the next chapter on [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class) for more information.
+See the tutorial on defining a `Scorer` class in [Model-Based Evaluation of RAG applications](/tutorial-rag#optional-defining-a-scorer-class) for more information.
 
-### Define a Model to evaluate
+## 4. Define a `Model` to evaluate
 
 To evaluate a `Model`, call `evaluate` on it using an `Evaluation`. `Models` are used when you have parameters that you want to experiment with and capture in weave.
 
@@ -111,38 +132,13 @@ asyncio.run(evaluation.evaluate(model))
 
 This will run `predict` on each example and score the output with each scoring functions.
 
-#### Custom Naming
 
-You can change the name of the Evaluation itself by passing a `name` parameter to the `Evaluation` class.
+### (Optional) Define a function to evaluate
 
-```python
-evaluation = Evaluation(
-    dataset=examples, scorers=[match_score1], name="My Evaluation"
-)
-```
-
-You can also change the name of individual evaluations by setting the `display_name` key of the `__weave` dictionary.
-
-:::note
-
-Using the `__weave` dictionary sets the call display name which is distinct from the Evaluation object name. In the
-UI, you will see the display name if set, otherwise the Evaluation object name will be used.
-
-:::
+Alternatively, you can also evaluate a custom function tracked by `@weave.op()`.
 
 ```python
-evaluation = Evaluation(
-    dataset=examples, scorers=[match_score1]
-)
-evaluation.evaluate(model, __weave={"display_name": "My Evaluation Run"})
-```
-
-### Define a function to evaluate
-
-Alternatively, you can also evaluate a function that is wrapped in a `@weave.op()`.
-
-```python
-@weave.op()
+@weave.op
 def function_to_evaluate(question: str):
     # here's where you would add your LLM call and return the output
     return  {'generated_text': 'some response'}
@@ -150,7 +146,34 @@ def function_to_evaluate(question: str):
 asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
 
-### Pulling it all together
+## 5. Run the evaluation
+
+To run an evaluation, call `.evaluate()` on the object you want to evaluate.
+For example, assuming an `Evaluation` object called `evaluation` and a `Model` object to evaluate called `model`, the following code instatiates an evaluation run.
+
+```python
+asyncio.run(evaluation.evaluate(model))
+```
+
+:::tip Evaluation run tips
+1. The `evaluate()` method returns a summary of results across all examples. To access the full set of scored rows including outputs and scores, use `get_eval_results()`.
+2. If you don't provide a `display_name` when calling `.evaluate()`, Weave will automatically generate one using the date and a random memorable name. To learn more, see [how to name individual evaluation runs](#name-individual-evaluation-runs).
+3.  The model passed to `.evaluate` must be a `Model` or a function tracked with `@weave.op`. Regular Python functions are not supported unless wrapped with `@weave.op`.
+:::
+
+### (Optional) Run multiple trials
+
+You can set the `trials` parameter on the `Evaluation` object to run each example multiple times.
+
+```python
+evaluation = Evaluation(dataset=examples, scorers=[match_score], trials=3)
+```
+
+Each example will be passed to the `model` three times, and each run will be scored and displayed independently in Weave.
+
+## Full evaluation code sample
+
+The following code sample demonstrates a complete evaluation run from start to finish. The `examples` dictionary is used by the `match_score1` and `match_score2` scoring functions to evaluate `MyModel` given the value of `prompt`, as well as a custom function `function_to_evaluate`. The evaluation runs for both the `Model` and the function are invoked via `asyncio.run(evaluation.evaluate()`.
 
 ```python
 from weave import Evaluation, Model
@@ -189,16 +212,17 @@ def function_to_evaluate(question: str):
     # here's where you would add your LLM call and return the output
     return  {'generated_text': 'some response' + question}
 
-asyncio.run(evaluation.evaluate(function_to_evaluate))
+asyncio.run(evaluation.evaluate(function_to_evaluate("What is the capitol of France?")))
 ```
+
+![Evals hero](../../../static/img/evals-hero.png)
 
 ## Advanced evaluation usage
 
-### Using `preprocess_model_input` to format dataset rows before evaluating
+### Format dataset rows before evaluating
 
 :::important
-The `preprocess_model_input` function is only applied to inputs before passing them to the model's prediction function.  
-Scorer functions always receive the original dataset example, without any preprocessing applied.
+The `preprocess_model_input` function is only applied to inputs before passing them to the model's prediction function. Scorer functions always receive the original dataset example, without any preprocessing applied.
 :::
 
 The `preprocess_model_input` parameter allows you to transform your dataset examples before they are passed to your evaluation function. This is useful when you need to:
@@ -259,14 +283,18 @@ The preprocessing function:
 
 This is particularly useful when working with external datasets that may have different field names or structures than what your model expects.
 
-### Using HuggingFace Datasets with evaluations
+### Use HuggingFace datasets with evaluations
 
 We are continuously improving our integrations with third-party services and libraries.
 
 While we work on building more seamless integrations, you can use `preprocess_model_input` as a temporary workaround for using HuggingFace Datasets in Weave evaluations.
 
-See our [Using HuggingFace Datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.
+See our [Using HuggingFace datasets in evaluations cookbook](/reference/gen_notebooks/hf_dataset_evals) for the current approach.
 
-## Saved views 
+### Saved views 
 
 You can save your Evals table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).
+
+### Imperative evaluations (`EvaluationLogger`)
+
+If you prefer a more flexible evaluation framework, check out Weave's [`EvaluationLogger`](../evaluation/evaluation_logger.md). The imperative approach offers more flexibility for complex workflows, while the standard evaluation framework provides more structure and guidance.

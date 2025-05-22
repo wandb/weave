@@ -687,14 +687,13 @@ class Call:
 
         wc = weave_client_context.get_weave_client()
         if wc:
-            scorer_ref_uri = None
+            scorer_ref = None
             if weave_isinstance(scorer, Scorer):
                 # Very important: if the score is generated from a Scorer subclass,
-                # then scorer_ref_uri will be None, and we will use the op_name from
+                # then scorer_ref will be None, and we will use the op_name from
                 # the score_call instead.
                 scorer_ref = get_ref(scorer)
-                scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
-            wc._send_score_call(self, score_call, scorer_ref_uri)
+            wc._send_score_call(self, score_call, scorer_ref)
         return apply_scorer_result
 
     def to_dict(self) -> CallDict:
@@ -1148,9 +1147,7 @@ class WeaveClient:
 
         # First create an AttributesDict with global attributes, then update with local attributes
         # Local attributes take precedence over global ones
-        attributes_dict = AttributesDict()
-        attributes_dict.update(_global_attributes)
-        attributes_dict.update(attributes)
+        attributes_dict = AttributesDict(**zip_dicts(_global_attributes, attributes))
 
         if should_capture_client_info():
             attributes_dict._set_weave_item("client_version", version.VERSION)
@@ -1634,7 +1631,7 @@ class WeaveClient:
         self,
         predict_call: Call,
         score_call: Call,
-        scorer_object_ref_uri: str | None = None,
+        scorer_object_ref: ObjectRef | None = None,
     ) -> Future[str]:
         """(Private) Adds a score to a call. This is particularly useful
         for adding evaluation metrics to a call.
@@ -1650,9 +1647,12 @@ class WeaveClient:
                 raise ValueError("Score call must have a ref")
             scorer_call_ref_uri = scorer_call_ref.uri()
 
-            # If scorer_object_ref_uri is provided, it is used as the runnable_ref_uri
+            # If scorer_object_ref is provided, it is used as the runnable_ref_uri
             # Otherwise, we use the op_name from the score_call. This should happen
             # when there is a Scorer subclass that is the source of the score call.
+            scorer_object_ref_uri = (
+                scorer_object_ref.uri() if scorer_object_ref else None
+            )
             runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
             score_results = score_call.output
 
@@ -2392,6 +2392,27 @@ def elide_display_name(name: str) -> str:
         )
         return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
     return name
+
+
+def zip_dicts(base_dict: dict, new_dict: dict) -> dict:
+    final_dict = {}
+    for key, value in base_dict.items():
+        if key in new_dict:
+            # Shared key (if both dicts, merge)
+            new_value = new_dict[key]
+            if isinstance(value, dict) and isinstance(new_value, dict):
+                final_dict[key] = zip_dicts(value, new_value)
+            else:
+                # base-only key
+                final_dict[key] = new_value
+        else:
+            final_dict[key] = value
+    for key, value in new_dict.items():
+        if key not in base_dict:
+            # new-only key
+            final_dict[key] = value
+
+    return final_dict
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

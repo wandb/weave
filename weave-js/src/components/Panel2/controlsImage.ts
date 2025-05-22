@@ -85,7 +85,7 @@ function createBaseControls(
 export function createMaskControls(
   ...args: Parameters<typeof createBaseControls>
 ): MaskControlState {
-  return {...createBaseControls(...args), type: 'mask'};
+  return {...createBaseControls(...args), type: 'mask', hideImage: false};
 }
 
 export function createBoxControls(
