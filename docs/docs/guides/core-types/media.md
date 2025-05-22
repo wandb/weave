@@ -172,117 +172,70 @@ This audio is logged to Weave and automatically displayed in the UI, along with 
 Try our cookbook for [Audio Logging](/reference/gen_notebooks/audio_with_weave) or <a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/audio_with_weave.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>. The cookbook also includes an advanced example of a Real Time Audio API based assistant integrated with Weave.
 :::
 
-## Files (PDFs, CSVs)
+## Files 
 
 <Tabs groupId="programming-language" queryString>
-  <TabItem value="python" label="Python" default>
-  
-  ### PDFs
-  You can log and visualize various file types like [PDFs](#pdfs) and [CSVs](#csvs) using the `weave.File` object. This includes PDFs with varying lengths or content. Weave captures file metadata like path, MIME type, and size in traces. You can also [preview](#preview-a-file) or [download](#download-a-file) traced files from the **Traces** tab.
+   <TabItem value="python" label="Python" default>
 
-  ```python
-  import weave
-  from pathlib import Path
+   You can log and visualize various file types using the `weave.File` object. This includes PDFs, CSVs, or any arbitrary file. Weave captures file metadata like path, MIME type, and size in traces. You can [download traced files](#download-a-file) from the **Traces** tab. For supported file types, like PDFs, Weave also provides [in-app previews](#preview-a-file).
 
-  weave.init("pdf-example")
+   ### Log arbitrary files
 
-  @weave.op
-  def return_file_pdf() -> weave.File:
-      # Returns a PDF file "example.pdf" as a Weave file object.
-      # Modify the filename/path as needed
-      file_path = Path(__file__).parent.resolve() / "assets" / "example.pdf"
-      return weave.File(file_path)
+   Weave file support allows you to trace and inspect a wide variety of file types. However, only files with supported MIME types (currently just PDFs) support in-app preview.
 
-  @weave.op
-  def accept_file_pdf(val: weave.File) -> str:
-      # Accepts a Weave file object and prints metadata to the trace.
-      # Useful for debugging or file inspection in ops.
-      print("Path:", val.path)
-      print("MIME type:", val.mimetype)
-      print("Size:", val.size)
-      return f"File size: {val.size}"
+   To log a file to Weave, you must first convert the file to a `weave.File` object, as demonstrated by the code sample below.
 
-  # Run the file through the accept_file_pdf function to inspect it
-  accept_file_pdf(return_file_pdf())
-  ```
-   
-  ![Trace view of `accept_file_pdf`](imgs/accept-file-pdf.png)
+    ```python
+    import weave
+    from pathlib import Path
 
-  You can also work with multi-page PDFs:
-  
-  ```python
-  @weave.op
-  def return_file_pdf_many_pages() -> weave.File:
-      # Similar to the above, but returns a multi-page PDF as a Weave file object.
-      # Replace the file path with your own multi-page document.
-      file_path = Path(__file__).parent.resolve() / "assets" / "example-many-pages.pdf"
-      return weave.File(file_path)
+    weave.init("file-example")
 
-  @weave.op
-  def accept_file_pdf_many_pages(val: weave.File) -> str:
-      # Upload and trace a multi-page PDF file in Weave and log its metadata.
-      print("Path:", val.path)
-      print("MIME type:", val.mimetype)
-      print("Size:", val.size)
-      return f"File size: {val.size}"
+    @weave.op
+    def return_file() -> weave.File:
+        # Returns a file as a Weave file object. Update the file name as needed.
+        file_path = Path(__file__).parent.resolve() / "assets" / "example.csv"
+        return weave.File(file_path)
 
-  accept_file_pdf_many_pages(return_file_pdf_many_pages())
-  ```
+    @weave.op
+    def accept_file(val: weave.File) -> str:
+        # Accepts a Weave file object and prints metadata to the trace.
+        print("Path:", val.path)
+        print("MIME type:", val.mimetype)
+        print("Size:", val.size)
+        return f"File size: {val.size}"
 
-  ### CSVs
-  Similarly, you can log and work with CSV files using `weave.File`. This is useful for inspecting tabular data inputs.
+    # Use accept_file to log the weave.File object created by return_file
+    accept_file(return_file())
+    ```
 
-  ```python
-  import weave
-  from pathlib import Path
+   ### Preview a file
 
-  weave.init("csv-example")
-  
-  @weave.op
-  def return_file_csv() -> weave.File:
-      # Returns a CSV file as a Weave file object.
-      # Replace the path if you want to use your own CSV.
-      file_path = Path(__file__).parent.resolve() / "assets" / "example.csv"
-      return weave.File(file_path)
+   :::important
+   Currently, in-app preview only supports PDFs.
+   :::
 
-  @weave.op
-  def accept_file_csv(val: weave.File) -> str:
-      # Prints metadata for a CSV file trace in Weave and returns its size as a string.
-      print("Path:", val.path)
-      print("MIME type:", val.mimetype)
-      print("Size:", val.size)
-      return f"File size: {val.size}"
+   To preview the file from the **Traces** tab, do the following:
 
-  accept_file_csv(return_file_csv())
-  ```
+   1. In the **Traces** tab, select the trace for the uploaded file.
 
-  This allows you to trace, inspect, and optionally process CSVs as part of your pipeline.
-
-  ![Trace view of `accept_file_csv`](imgs/accept-file-csv.png)
-  
-  ### Download a file
-  To download the file from the **Traces** tab, do the following:
-
-  1. In the **Traces** tab, select the trace for the uploaded file (e.g. **accept_file_pdf**).
-
-     ![Preview or download a file from the Traces tab](imgs/pdf-preview-download.png)
+      ![Preview or download a file from the Traces tab](imgs/pdf-preview-download.png)
      
-  2. To the right of the filename, click the download button. Your file is downloaded to your device.
+   2. To the left of the filename, click the icon or filename. A preview of the file displays in Weave.
+   3. To close the preview, click the `X` in the upper right hand corner.
 
-  ### Preview a file
+   ### Download a file
 
-  To preview the file from the **Traces** tab, do the following:
+   To download the file from the **Traces** tab, do the following:
 
-  1. In the **Traces** tab, select the trace for the uploaded file (e.g. **accept_file_pdf**).
+   1. In the **Traces** tab, select the trace for the uploaded file (e.g. **accept_file_pdf**).
+        
+        ![Preview or download a file from the Traces tab](imgs/pdf-preview-download.png)
+    
+   2. To the right of the filename, click the download button. Your file is downloaded to your device.
 
-     ![Preview or download a file from the Traces tab](imgs/pdf-preview-download.png)
-     
-  2. To the left of the filename, click the icon or filename. A preview of the file displays in Weave.
-  3. To close the preview, click the `X` in the upper right hand corner.
-  
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
   This feature is not yet available in TypeScript.
   </TabItem>
-  
 </Tabs>
