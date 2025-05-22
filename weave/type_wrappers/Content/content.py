@@ -16,7 +16,7 @@ from weave.type_wrappers.Content.utils import (
     ContentOptionalArgs,
     get_mime_and_extension,
     is_valid_path,
-    resolve_filename,
+    default_filename,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,14 +28,6 @@ TO_BYTES_METHODS = [
     "read_bytes",  # File-like objects, Path, etc
     "as_bytes",  # Some custom classes
 ]
-
-CONTENT_KWARGS = [
-    "filename",
-    "path",
-    "extension",
-    "mimetype",
-]
-
 
 class BaseContentHandler(BaseModel):
     size: int
@@ -72,7 +64,7 @@ class BytesContentHandler(BaseContentHandler):
         if not filename and original_path:
             filename = Path(original_path).name
         else:
-            filename = resolve_filename(mimetype, extension)
+            filename = default_filename(extension)
 
         extra = kwargs.get("extra") or {}
 

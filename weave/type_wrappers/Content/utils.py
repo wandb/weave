@@ -5,6 +5,7 @@ import mimetypes
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypedDict, Unpack
+from datetime import datetime
 
 import magic
 
@@ -54,18 +55,12 @@ def is_valid_path(input: str | Path) -> bool:
     return input.exists() and input.is_file()
 
 
-def resolve_filename(
-    mimetype: str | None,
-    extension: str | None,
-    default_fn: Callable[..., str] | None = None,
+def default_filename(
+    extension: str,
 ) -> str:
-    if not default_fn:
-        if not extension or not mimetype:
-            raise ValueError(
-                "Cannot create default filename without extension and mimetype"
-            )
-        return mimetype.split("/")[1] + "." + extension
-    return default_fn(mimetype, extension)
+    now = datetime.now()
+    datetime_str = now.strftime("%Y%m%d_%H%M%S")
+    return datetime_str + "." + extension
 
 
 def get_extension_from_mimetype(mimetype: str) -> str:
@@ -91,7 +86,6 @@ def guess_from_extension(extension: str) -> str | None:
     filename = f"file.{extension.lstrip('.')}"
     return guess_from_filename(filename)
 
-
 def guess_from_path(path: str | Path) -> str | None:
     path = Path(path)
     mimetype = guess_from_filename(path.name)
@@ -102,7 +96,7 @@ def get_mime_and_extension(
     buffer: bytes | None, **kwargs: Unpack[ContentOptionalArgs]
 ) -> tuple[str, str]:
     mimetype = kwargs.get("mimetype", None)
-    extension = kwargs.get("mimetype", None)
+    extension = kwargs.get("extension", None)
 
     if mimetype and extension:
         return mimetype, extension
