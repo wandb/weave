@@ -1,4 +1,3 @@
-import asyncio
 import copy
 import inspect
 import traceback
@@ -28,6 +27,7 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
+from weave.trace.op_caller import async_call
 from weave.trace.vals import WeaveObject, WeaveTable
 from weave.trace.weave_client import (
     Call,
@@ -318,12 +318,8 @@ class Dataset(Object):
                                 f"Function expects parameter '{name}' but this column "
                                 f"is not in the dataset row: {short_str(row)}"
                             )
-
-                result = func(**kwargs)
-
-                # If the user function is async, await it
-                if asyncio.iscoroutine(result):
-                    result = await result
+                # asyncify the function call
+                result = await async_call(func, **kwargs)
 
                 # Handle the result based on its type
                 if not isinstance(result, dict):
