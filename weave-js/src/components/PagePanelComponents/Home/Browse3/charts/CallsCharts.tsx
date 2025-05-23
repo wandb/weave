@@ -43,6 +43,8 @@ const CallsChartsInner = ({
   filter,
   filterModelProp,
 }: CallsChartsProps) => {
+  // Track the previous layouts to detect which chart was resized
+  const prevLayoutsRef = React.useRef<Record<string, Layout[]>>({});
   const columns = React.useMemo(
     () => ['started_at', 'ended_at', 'exception', 'id'],
     []
@@ -160,8 +162,13 @@ const CallsChartsInner = ({
     return layouts;
   }, [charts]);
 
-  // Function to reflow layouts into a row-based format
-  const reflowLayout = (items: Layout[], cols: number): Layout[] => {
+  // Function to reflow layouts into a row-based format with height syncing
+  const reflowLayout = (
+    items: Layout[], 
+    cols: number, 
+    syncHeights: boolean = true,
+    resizedItemId?: string
+  ): Layout[] => {
     if (items.length === 0) return [];
 
     // Sort items by their current position (y first, then x)
@@ -171,8 +178,8 @@ const CallsChartsInner = ({
     });
 
     // Create rows based on current layout
-    const rows: Array<{y: number; height: number; items: Layout[]}> = [];
-    let currentRow: {y: number; height: number; items: Layout[]} | null = null;
+    const rows: Array<{y: number; height: number; items: Layout[]; hasResizedItem: boolean}> = [];
+    let currentRow: {y: number; height: number; items: Layout[]; hasResizedItem: boolean} | null = null;
 
     sortedItems.forEach(item => {
       // Check if item belongs to current row (similar y position)
@@ -182,11 +189,19 @@ const CallsChartsInner = ({
           y: item.y,
           height: item.h,
           items: [item],
+          hasResizedItem: item.i === resizedItemId,
         };
         rows.push(currentRow);
       } else {
         currentRow.items.push(item);
-        currentRow.height = Math.max(currentRow.height, item.h);
+        if (item.i === resizedItemId) {
+          currentRow.hasResizedItem = true;
+          // If this is the resized item, use its height for the row
+          currentRow.height = item.h;
+        } else if (!currentRow.hasResizedItem) {
+          // Only update with max if we haven't found the resized item yet
+          currentRow.height = Math.max(currentRow.height, item.h);
+        }
       }
     });
 
@@ -213,6 +228,7 @@ const CallsChartsInner = ({
           ...item,
           x: currentX,
           y: currentY,
+          h: syncHeights ? rowHeight : item.h, // Sync heights if enabled
         });
 
         currentX += item.w;
@@ -224,6 +240,7 @@ const CallsChartsInner = ({
 
     return reflowedItems;
   };
+
 
   const effectiveLayouts = React.useMemo(() => {
     // Make sure we only use layouts that match our breakpoints
@@ -264,15 +281,21 @@ const CallsChartsInner = ({
         };
       });
 
-      // Reflow the layout to ensure row-based alignment
+      // Reflow the layout to ensure row-based alignment with height syncing
       validLayouts[breakpoint] = reflowLayout(
         layoutItems,
-        COLUMN_SIZES[breakpoint as keyof typeof COLUMN_SIZES]
+        COLUMN_SIZES[breakpoint as keyof typeof COLUMN_SIZES],
+        true // Enable height syncing
       );
     });
 
     return validLayouts;
   }, [layouts, defaultLayouts, charts]);
+
+  // Update the previous layouts reference when layouts change
+  React.useEffect(() => {
+    prevLayoutsRef.current = effectiveLayouts;
+  }, [effectiveLayouts]);
 
   return (
     <Tailwind>
@@ -309,14 +332,36 @@ const CallsChartsInner = ({
             preventCollision={false}
             isDroppable={false}
             onLayoutChange={(layout, allLayouts) => {
-              // Apply reflow to ensure row-based alignment
+              // Detect which chart was resized by comparing with previous layouts
+              let resizedItemId: string | undefined;
+              
+              // Check each breakpoint to find the resized item
+              Object.keys(allLayouts).forEach(breakpoint => {
+                const currentLayouts = allLayouts[breakpoint];
+                const previousLayouts = prevLayoutsRef.current[breakpoint] || [];
+                
+                currentLayouts.forEach(currentItem => {
+                  const prevItem = previousLayouts.find(p => p.i === currentItem.i);
+                  if (prevItem && prevItem.h !== currentItem.h) {
+                    resizedItemId = currentItem.i;
+                  }
+                });
+              });
+
+              // Apply reflow to ensure row-based alignment with height syncing
               const reflowedLayouts: Record<string, Layout[]> = {};
               Object.keys(allLayouts).forEach(breakpoint => {
                 reflowedLayouts[breakpoint] = reflowLayout(
                   allLayouts[breakpoint],
-                  COLUMN_SIZES[breakpoint as keyof typeof COLUMN_SIZES]
+                  COLUMN_SIZES[breakpoint as keyof typeof COLUMN_SIZES],
+                  true, // Enable height syncing
+                  resizedItemId // Pass the resized item ID
                 );
               });
+              
+              // Update the previous layouts reference
+              prevLayoutsRef.current = reflowedLayouts;
+              
               dispatch({type: 'UPDATE_LAYOUTS', layouts: reflowedLayouts});
             }}>
             {charts.map(chart => {
