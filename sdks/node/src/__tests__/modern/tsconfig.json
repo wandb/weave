@@ -7,5 +7,5 @@
     "outDir": "../../../dist/__tests__/modern",
     "tsBuildInfoFile": "../../../dist/__tests__/modern/.tsbuildinfo"
   },
-  "include": ["../../../src/**/*"]
+  "include": ["../../../src/**/*", "../../../types/**/*"]
 } 

@@ -142,6 +142,7 @@
     "ini": "^5.0.0",
     "module-details-from-path": "^1.0.4",
     "openai": "^4.68.4",
+    "semifies": "^1.0.0",
     "uuidv7": "^1.0.1"
   },
   "devDependencies": {
