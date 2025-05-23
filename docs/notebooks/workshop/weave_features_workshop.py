@@ -439,12 +439,13 @@ print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 # Import pre-built scorers
 try:
     from weave.scorers import (
-        ValidJSONScorer,
-        ValidXMLScorer,
-        PydanticScorer,
         EmbeddingSimilarityScorer,
         OpenAIModerationScorer,
+        PydanticScorer,
+        ValidJSONScorer,
+        ValidXMLScorer,
     )
+
     SCORERS_AVAILABLE = True
 except ImportError:
     SCORERS_AVAILABLE = False
@@ -452,6 +453,7 @@ except ImportError:
 
 # Example 1: ValidJSONScorer - Check if output is valid JSON
 if SCORERS_AVAILABLE:
+
     @weave.op
     def generate_user_data(request: str) -> str:
         """Generate user data in JSON format."""
@@ -474,7 +476,7 @@ if SCORERS_AVAILABLE:
 
     # Use the ValidJSONScorer
     json_scorer = ValidJSONScorer()
-    
+
     print("🎯 Example 1: ValidJSONScorer")
     # Quick test
     test_output = generate_user_data("Generate valid user JSON")
@@ -484,12 +486,12 @@ if SCORERS_AVAILABLE:
 # Example 2: PydanticScorer - Validate against a schema
 if SCORERS_AVAILABLE:
     from pydantic import EmailStr
-    
+
     class UserData(BaseModel):
         name: str
         age: int
         email: EmailStr
-    
+
     @weave.op
     def generate_structured_data(request: str) -> str:
         """Generate data that should match UserData schema."""
@@ -497,10 +499,10 @@ if SCORERS_AVAILABLE:
             return '{"name": "Alice Smith", "age": 28, "email": "alice@example.com"}'
         else:
             return '{"name": "Bob", "age": "twenty-five", "email": "not-an-email"}'
-    
+
     # Use PydanticScorer with our schema
     pydantic_scorer = PydanticScorer(model=UserData)
-    
+
     print("\n🎯 Example 2: PydanticScorer")
     test_output = generate_structured_data("Generate correct data")
     pydantic_result = asyncio.run(pydantic_scorer.score(output=test_output))
@@ -521,7 +523,7 @@ if SCORERS_AVAILABLE:
             },
         ],
     )
-    
+
     @weave.op
     def paraphrase_model(input: str) -> str:
         """A model that attempts to paraphrase."""
@@ -530,18 +532,19 @@ if SCORERS_AVAILABLE:
             return "What are the weather conditions?"
         else:
             return "Something completely different"
-    
+
     # Use EmbeddingSimilarityScorer (requires OpenAI API key)
     similarity_scorer = EmbeddingSimilarityScorer(
         model_id="openai/text-embedding-3-small",
         threshold=0.7,  # Cosine similarity threshold
     )
-    
+
     print("\n🎯 Example 3: EmbeddingSimilarityScorer")
     print("  (Compares semantic similarity between outputs and targets)")
 
 # Example 4: OpenAIModerationScorer - Content safety
 if SCORERS_AVAILABLE:
+
     @weave.op
     def user_content_generator(prompt: str) -> str:
         """Generate user content based on prompt."""
@@ -549,7 +552,7 @@ if SCORERS_AVAILABLE:
             return "I'm so frustrated with this terrible service!"
         else:
             return "Thank you for the wonderful support!"
-    
+
     moderation_dataset = Dataset(
         name="moderation_test",
         rows=[
@@ -557,10 +560,10 @@ if SCORERS_AVAILABLE:
             {"prompt": "Write a positive review"},
         ],
     )
-    
+
     # Use OpenAIModerationScorer
     moderation_scorer = OpenAIModerationScorer()
-    
+
     print("\n🎯 Example 4: OpenAIModerationScorer")
     print("  (Checks for potentially harmful content)")
 
@@ -1013,66 +1016,72 @@ from datetime import datetime
 # Define more realistic production scorers
 class ContentModerationScorer(Scorer):
     """Production-ready content moderation scorer."""
-    
+
     @weave.op
     def score(self, output: dict) -> dict:
         """Check for inappropriate content using multiple signals."""
         # Handle both success and error cases
         if output.get("status") != "success":
-            return {
-                "flagged": False,
-                "flags": [],
-                "severity": "none",
-                "action": "pass"
-            }
-            
+            return {"flagged": False, "flags": [], "severity": "none", "action": "pass"}
+
         analysis = output.get("analysis", {})
         issue_text = analysis.get("issue", "").lower()
         sentiment = analysis.get("sentiment", "neutral")
-        
+
         # Check for various inappropriate content patterns
-        profanity_patterns = ["stupid", "idiotic", "garbage", "trash", "sucks", "terrible", "awful", "worst"]
+        profanity_patterns = [
+            "stupid",
+            "idiotic",
+            "garbage",
+            "trash",
+            "sucks",
+            "terrible",
+            "awful",
+            "worst",
+        ]
         threat_patterns = ["sue", "lawyer", "legal action", "court", "lawsuit"]
-        
+
         flags = []
         severity = "none"
-        
+
         # Check profanity
         profanity_found = []
         for word in profanity_patterns:
             if word in issue_text:
                 profanity_found.append(word)
-                
+
         if profanity_found:
             flags.append(f"Profanity detected: {', '.join(profanity_found)}")
             severity = "medium"
-                
+
         # Check threats
         threats_found = []
         for pattern in threat_patterns:
             if pattern in issue_text:
                 threats_found.append(pattern)
-                
+
         if threats_found:
             flags.append(f"Legal threat: {', '.join(threats_found)}")
             severity = "high"
-                
+
         # Check extreme sentiment with profanity
         if sentiment == "negative" and profanity_found:
             severity = "high"
             flags.append("Negative sentiment with profanity")
-            
+
         return {
             "flagged": len(flags) > 0,
             "flags": flags,
             "severity": severity,
-            "action": "block" if severity == "high" else ("review" if severity == "medium" else "pass")
+            "action": "block"
+            if severity == "high"
+            else ("review" if severity == "medium" else "pass"),
         }
 
 
 class ExtractionQualityScorer(Scorer):
     """Monitor extraction quality and completeness."""
-    
+
     @weave.op
     def score(self, output: dict, email: str) -> dict:
         """Comprehensive quality assessment."""
@@ -1082,52 +1091,58 @@ class ExtractionQualityScorer(Scorer):
                 "passed": False,
                 "issues": ["Failed to process email"],
                 "recommendations": [],
-                "extraction_grade": "F"
+                "extraction_grade": "F",
             }
-            
+
         analysis = output.get("analysis", {})
         quality_metrics = {
             "completeness": 0.0,
             "specificity": 0.0,
             "accuracy": 0.0,
-            "consistency": 0.0
+            "consistency": 0.0,
         }
         issues = []
         recommendations = []
-        
+
         # 1. Completeness checks (40% weight)
-        if analysis.get("customer_name") and analysis["customer_name"] not in ["Unknown", "", None]:
+        if analysis.get("customer_name") and analysis["customer_name"] not in [
+            "Unknown",
+            "",
+            None,
+        ]:
             quality_metrics["completeness"] += 0.15
         else:
             issues.append("Missing customer name")
             recommendations.append("Check email signatures and greetings for names")
-            
+
         if analysis.get("product") and analysis["product"] not in ["Unknown", "", None]:
             quality_metrics["completeness"] += 0.15
         else:
             issues.append("Missing product identification")
             recommendations.append("Look for product names mentioned in the email")
-            
+
         if analysis.get("issue") and len(analysis["issue"]) > 10:
             quality_metrics["completeness"] += 0.10
         else:
             issues.append("Issue description too brief or missing")
             recommendations.append("Extract a more detailed problem description")
-            
+
         # 2. Specificity checks (30% weight)
         product_name = analysis.get("product", "")
         if product_name and any(char.isdigit() for char in str(product_name)):
             # Product includes version/model number
             quality_metrics["specificity"] += 0.15
         elif product_name:
-            recommendations.append("Extract product version/model numbers when available")
-            
+            recommendations.append(
+                "Extract product version/model numbers when available"
+            )
+
         issue_desc = analysis.get("issue", "")
         if issue_desc and len(str(issue_desc)) > 30:
             quality_metrics["specificity"] += 0.15
         elif issue_desc:
             recommendations.append("Provide more specific issue details")
-            
+
         # 3. Accuracy checks (20% weight)
         # Check if extracted content actually appears in email
         email_lower = email.lower()
@@ -1139,7 +1154,7 @@ class ExtractionQualityScorer(Scorer):
                 quality_metrics["accuracy"] += 0.10
             else:
                 issues.append("Extracted name not found in original email")
-                
+
         product_mentioned = analysis.get("product", "")
         if product_mentioned and product_mentioned != "Unknown":
             # Check for partial matches (product names might be extracted differently)
@@ -1148,50 +1163,64 @@ class ExtractionQualityScorer(Scorer):
                 quality_metrics["accuracy"] += 0.10
             else:
                 issues.append("Extracted product not clearly mentioned in email")
-                
+
         # 4. Consistency checks (10% weight)
         sentiment = analysis.get("sentiment", "neutral")
         urgency = output.get("urgency", "low")
-        
+
         # Check sentiment/urgency consistency
         consistency_ok = True
         if sentiment == "negative" and urgency == "low":
-            if not any(word in issue_desc.lower() for word in ["minor", "small", "slight"]):
+            if not any(
+                word in issue_desc.lower() for word in ["minor", "small", "slight"]
+            ):
                 consistency_ok = False
-                issues.append("Negative sentiment but low urgency - might be inconsistent")
+                issues.append(
+                    "Negative sentiment but low urgency - might be inconsistent"
+                )
         elif sentiment == "positive" and urgency == "high":
             consistency_ok = False
             issues.append("Positive sentiment with high urgency is unusual")
-            
+
         if consistency_ok:
             quality_metrics["consistency"] += 0.10
-            
+
         # Calculate overall score
         total_score = sum(quality_metrics.values())
-        
+
         return {
             "quality_score": total_score,
             "quality_metrics": quality_metrics,
             "passed": total_score >= 0.6,  # Lowered threshold for demo
             "issues": issues,
             "recommendations": recommendations,
-            "extraction_grade": "A" if total_score >= 0.9 else ("B" if total_score >= 0.8 else ("C" if total_score >= 0.6 else ("D" if total_score >= 0.4 else "F")))
+            "extraction_grade": "A"
+            if total_score >= 0.9
+            else (
+                "B"
+                if total_score >= 0.8
+                else (
+                    "C" if total_score >= 0.6 else ("D" if total_score >= 0.4 else "F")
+                )
+            ),
         }
 
 
 class ResponseTimeScorer(Scorer):
     """Monitor response time SLAs."""
-    
+
     @weave.op
     def score(self, output: dict, processing_time_ms: float) -> dict:
         """Check if response time meets SLA."""
         sla_ms = 1000  # 1 second SLA
-        
+
         return {
             "processing_time_ms": processing_time_ms,
             "sla_met": processing_time_ms <= sla_ms,
             "sla_margin_ms": sla_ms - processing_time_ms,
-            "performance_grade": "fast" if processing_time_ms < 500 else ("normal" if processing_time_ms < 1000 else "slow")
+            "performance_grade": "fast"
+            if processing_time_ms < 500
+            else ("normal" if processing_time_ms < 1000 else "slow"),
         }
 
 
@@ -1201,7 +1230,7 @@ def production_email_handler(
 ) -> dict[str, Any]:
     """Production-ready email handler that returns structured analysis results."""
     start_time = datetime.now()
-    
+
     # Generate request ID if not provided
     if not request_id:
         request_id = f"req_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{random.randint(1000, 9999)}"
@@ -1209,10 +1238,10 @@ def production_email_handler(
     try:
         # Process the email using our existing analyzer
         analysis = analyze_customer_email(email)
-        
+
         # Calculate urgency based on the analysis
         urgency = classify_urgency(email, analysis.sentiment)
-        
+
         # Calculate processing time
         processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
 
@@ -1224,7 +1253,7 @@ def production_email_handler(
                 "customer_name": analysis.customer_name,
                 "product": analysis.product,
                 "issue": analysis.issue,
-                "sentiment": analysis.sentiment
+                "sentiment": analysis.sentiment,
             },
             "urgency": urgency,
             "processing_time_ms": processing_time_ms,
@@ -1256,14 +1285,16 @@ async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
 
     # Always apply response time scorer
     time_score = await call.apply_scorer(
-        response_time_scorer, 
-        additional_scorer_kwargs={"processing_time_ms": result.get("processing_time_ms", 0)}
+        response_time_scorer,
+        additional_scorer_kwargs={
+            "processing_time_ms": result.get("processing_time_ms", 0)
+        },
     )
-    
+
     if result["status"] == "success":
         # Apply content moderation (guardrail)
         moderation_check = await call.apply_scorer(content_moderation_scorer)
-        
+
         # Apply quality monitoring
         quality_check = await call.apply_scorer(
             quality_scorer, additional_scorer_kwargs={"email": email}
@@ -1277,7 +1308,9 @@ async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
                 result["blocked"] = True
                 result["block_reason"] = moderation_check.result["flags"]
             elif action == "review":
-                print(f"⚠️ Content flagged for review: {moderation_check.result['flags']}")
+                print(
+                    f"⚠️ Content flagged for review: {moderation_check.result['flags']}"
+                )
                 result["needs_review"] = True
                 result["review_reason"] = moderation_check.result["flags"]
 
@@ -1285,19 +1318,19 @@ async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
         result["quality_metrics"] = {
             "grade": quality_check.result["extraction_grade"],
             "score": quality_check.result["quality_score"],
-            "passed": quality_check.result["passed"]
+            "passed": quality_check.result["passed"],
         }
-        
+
         if quality_check.result["issues"]:
             print(f"📊 Quality issues: {quality_check.result['issues']}")
-        
+
         if quality_check.result["recommendations"]:
             print(f"💡 Recommendations: {quality_check.result['recommendations']}")
-            
+
     # Add performance metrics
     result["performance"] = {
         "sla_met": time_score.result["sla_met"],
-        "grade": time_score.result["performance_grade"]
+        "grade": time_score.result["performance_grade"],
     }
 
     return result
@@ -1311,42 +1344,42 @@ production_test_emails = [
     # Good quality extraction - should pass all checks
     {
         "email": "Hello Support Team,\n\nI'm Sarah Mitchell from Acme Corp. Our CloudSync Enterprise v3.2.1 stopped syncing files yesterday at 2pm. The error message says 'Authentication failed'. This is really frustrating and affecting our entire team.\n\nBest regards,\nSarah Mitchell\nIT Manager, Acme Corp",
-        "expected": "✅ High quality extraction with version numbers"
+        "expected": "✅ High quality extraction with version numbers",
     },
     # Profanity with legal threat - should be blocked
     {
         "email": "This stupid software is absolute garbage! I'm John Davis and your DataSync Pro is the worst trash I've ever used. My lawyer will be contacting you about this terrible product that lost our data!",
-        "expected": "🚫 Should be blocked - profanity + legal threat"
+        "expected": "🚫 Should be blocked - profanity + legal threat",
     },
     # Poor quality but processable - low score but not blocked
     {
         "email": "Hi support, product broken. Fix please. - Tom",
-        "expected": "📊 Low quality - minimal details but processable"
+        "expected": "📊 Low quality - minimal details but processable",
     },
     # Good extraction with negative sentiment - quality pass
     {
         "email": "Dear Support,\n\nI'm Mary Johnson, CTO at TechStart Inc. Our DataVault Pro v2.5 backup failed last night with error code 'E501: connection timeout'. This is concerning as we rely on nightly backups for compliance.\n\nMary Johnson\nCTO, TechStart Inc",
-        "expected": "✅ Good quality despite negative sentiment"
+        "expected": "✅ Good quality despite negative sentiment",
     },
     # Needs review - mild profanity - should flag for review
     {
         "email": "Mike Wilson here. Your EmailPro system really sucks compared to what was promised, but I guess it's still better than the competition. Can you help me configure the spam filter? It's blocking legitimate emails.",
-        "expected": "⚠️ Should flag for review - mild profanity"
+        "expected": "⚠️ Should flag for review - mild profanity",
     },
     # Excellent quality - should get high scores
     {
         "email": "Hi there,\n\nI'm Lisa Chen from GlobalTech Solutions. I wanted to thank you for the excellent support on our CloudBackup Enterprise v4.2 deployment. Everything is working perfectly and the performance improvements are fantastic!\n\nBest,\nLisa Chen\nVP of Engineering",
-        "expected": "✅ Excellent quality with positive sentiment"
+        "expected": "✅ Excellent quality with positive sentiment",
     },
     # Missing critical info - should fail quality check
     {
         "email": "Your system crashed and we lost everything! This is unacceptable! Fix this immediately!!!",
-        "expected": "❌ Should fail quality - missing customer/product info"
+        "expected": "❌ Should fail quality - missing customer/product info",
     },
     # Edge case - urgent but positive
     {
         "email": "Urgent: I'm Alex Kumar and I love your RapidDeploy tool! Need to purchase 50 more licenses ASAP for our new team starting Monday. Please expedite!\n\nAlex Kumar\nProcurement Manager",
-        "expected": "📊 Unusual case - urgent but positive sentiment"
+        "expected": "📊 Unusual case - urgent but positive sentiment",
     },
 ]
 
@@ -1354,58 +1387,68 @@ for i, test_case in enumerate(production_test_emails):
     print(f"\n{'='*60}")
     print(f"📧 Test {i+1}/8: {test_case['expected']}")
     print(f"{'='*60}")
-    
+
     # Show email preview
-    email_lines = test_case['email'].split('\n')
+    email_lines = test_case["email"].split("\n")
     print("📝 Email Content:")
     for line in email_lines[:3]:  # Show first 3 lines
         if line.strip():
             print(f"   {line[:70]}{'...' if len(line) > 70 else ''}")
     if len(email_lines) > 3:
         print(f"   ... ({len(email_lines)-3} more lines)")
-    
+
     # Process with monitoring
     result = asyncio.run(handle_email_with_monitoring(test_case["email"]))
-    
+
     # Show extraction results
-    print(f"\n🔍 Extraction Results:")
+    print("\n🔍 Extraction Results:")
     if result["status"] == "success":
         analysis = result["analysis"]
         print(f"   Customer: {analysis.get('customer_name', 'Unknown')}")
         print(f"   Product: {analysis.get('product', 'Unknown')}")
-        print(f"   Issue: {analysis.get('issue', 'Unknown')[:50]}{'...' if len(analysis.get('issue', '')) > 50 else ''}")
+        print(
+            f"   Issue: {analysis.get('issue', 'Unknown')[:50]}{'...' if len(analysis.get('issue', '')) > 50 else ''}"
+        )
         print(f"   Sentiment: {analysis.get('sentiment', 'Unknown')}")
         print(f"   Urgency: {result.get('urgency', 'Unknown')}")
     else:
         print(f"   ❌ Error: {result.get('error', 'Unknown error')}")
-    
+
     # Show scorer results
-    print(f"\n📊 Scorer Results:")
-    
+    print("\n📊 Scorer Results:")
+
     # 1. Performance
-    perf = result.get('performance', {})
-    print(f"   ⏱️  Response Time: {perf.get('grade', 'unknown')} ({result.get('processing_time_ms', 0):.0f}ms)")
-    print(f"      SLA Status: {'✅ Met' if perf.get('sla_met', False) else '❌ Exceeded'}")
-    
+    perf = result.get("performance", {})
+    print(
+        f"   ⏱️  Response Time: {perf.get('grade', 'unknown')} ({result.get('processing_time_ms', 0):.0f}ms)"
+    )
+    print(
+        f"      SLA Status: {'✅ Met' if perf.get('sla_met', False) else '❌ Exceeded'}"
+    )
+
     # 2. Content Moderation
     if result["status"] == "success":
         if result.get("blocked"):
-            print(f"   🚫 Content Moderation: BLOCKED")
+            print("   🚫 Content Moderation: BLOCKED")
             print(f"      Reason: {result['block_reason']}")
         elif result.get("needs_review"):
-            print(f"   ⚠️  Content Moderation: REVIEW NEEDED")
+            print("   ⚠️  Content Moderation: REVIEW NEEDED")
             print(f"      Flags: {result['review_reason']}")
         else:
-            print(f"   ✅ Content Moderation: PASSED")
-    
+            print("   ✅ Content Moderation: PASSED")
+
     # 3. Quality Assessment
     if result["status"] == "success":
-        quality = result.get('quality_metrics', {})
-        print(f"   📏 Quality Assessment: Grade {quality.get('grade', 'F')} (Score: {quality.get('score', 0):.2f})")
-        
+        quality = result.get("quality_metrics", {})
+        print(
+            f"   📏 Quality Assessment: Grade {quality.get('grade', 'F')} (Score: {quality.get('score', 0):.2f})"
+        )
+
         # Show what contributed to the score
-        if quality.get('score', 0) < 0.6:
-            print(f"      Status: {'⚠️ Below threshold' if quality.get('passed', False) else '❌ Failed'}")
+        if quality.get("score", 0) < 0.6:
+            print(
+                f"      Status: {'⚠️ Below threshold' if quality.get('passed', False) else '❌ Failed'}"
+            )
             # The actual issues are logged by the scorers and visible in Weave UI
 
 print("\n" + "=" * 70)
