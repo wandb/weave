@@ -75,7 +75,24 @@ By the end of this workshop, participants will be able to:
 **Teaching Tip:**
 Show how the dataset is intentionally challenging to leave room for improvement
 
-### Part 3b: EvaluationLogger (10 mins)
+### Part 3b: Pre-built Scorers (10 mins)
+**Key Points:**
+- Weave provides many scorers out of the box
+- No need to reinvent common metrics
+- Categories: validation (JSON, XML, Pydantic), similarity, moderation, LLM-based scorers
+- Requires `pip install weave[scorers]`
+
+**Demo:**
+- Show ValidJSONScorer for JSON validation
+- Demonstrate PydanticScorer for schema validation
+- Show EmbeddingSimilarityScorer for semantic similarity
+- Mention OpenAIModerationScorer for content safety
+- List other scorers: HallucinationFreeScorer, SummarizationScorer, RAGAS scorers
+
+**Teaching Tip:**
+Emphasize that pre-built scorers save time and are battle-tested. Show how they integrate seamlessly with evaluations.
+
+### Part 3c: EvaluationLogger (10 mins)
 **Key Points:**
 - Flexible incremental logging
 - Perfect for streaming or custom workflows
