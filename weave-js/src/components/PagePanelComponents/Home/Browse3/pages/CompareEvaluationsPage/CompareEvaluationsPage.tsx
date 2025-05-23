@@ -247,6 +247,7 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
           {
             value: 'results',
             label: 'Results',
+            loading: resultsLoading,
             content: (
               <VerticalBox
                 sx={{
@@ -277,15 +278,10 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
                     sx={{
                       paddingLeft: STANDARD_PADDING,
                       paddingRight: STANDARD_PADDING,
+                      paddingTop: STANDARD_PADDING,
                       width: '100%',
                       overflow: 'auto',
                     }}>
-                    <Box
-                      sx={{
-                        fontWeight: 'bold',
-                      }}>
-                      Examples
-                    </Box>
                     <Alert severity="info">
                       The selected evaluations' datasets have 0 rows in common,
                       try comparing evaluations with datasets that have at least
