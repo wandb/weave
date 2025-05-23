@@ -160,6 +160,71 @@ const CallsChartsInner = ({
     return layouts;
   }, [charts]);
 
+  // Function to reflow layouts into a row-based format
+  const reflowLayout = (items: Layout[], cols: number): Layout[] => {
+    if (items.length === 0) return [];
+
+    // Sort items by their current position (y first, then x)
+    const sortedItems = [...items].sort((a, b) => {
+      if (a.y !== b.y) return a.y - b.y;
+      return a.x - b.x;
+    });
+
+    // Create rows based on current layout
+    const rows: Array<{y: number; height: number; items: Layout[]}> = [];
+    let currentRow: {y: number; height: number; items: Layout[]} | null = null;
+
+    sortedItems.forEach(item => {
+      // Check if item belongs to current row (similar y position)
+      if (!currentRow || Math.abs(item.y - currentRow.y) > 2) {
+        // Start a new row
+        currentRow = {
+          y: item.y,
+          height: item.h,
+          items: [item],
+        };
+        rows.push(currentRow);
+      } else {
+        currentRow.items.push(item);
+        currentRow.height = Math.max(currentRow.height, item.h);
+      }
+    });
+
+    // Now reflow items within each row and pack rows tightly
+    const reflowedItems: Layout[] = [];
+    let currentY = 0;
+
+    rows.forEach(row => {
+      // Sort items in the row by x position
+      row.items.sort((a, b) => a.x - b.x);
+      
+      // Pack items in the row from left to right
+      let currentX = 0;
+      const rowHeight = row.height;
+
+      row.items.forEach(item => {
+        // If item doesn't fit in current row, wrap to next row
+        if (currentX + item.w > cols) {
+          currentX = 0;
+          currentY += rowHeight;
+        }
+
+        reflowedItems.push({
+          ...item,
+          x: currentX,
+          y: currentY,
+        });
+
+        currentX += item.w;
+      });
+
+      // Move to next row
+      currentY += rowHeight;
+    });
+
+    return reflowedItems;
+  };
+
   const effectiveLayouts = React.useMemo(() => {
     // Make sure we only use layouts that match our breakpoints
     if (!layouts || Object.keys(layouts).length === 0) {
@@ -175,7 +240,7 @@ const CallsChartsInner = ({
       const existingLayoutMap = new Map(existingLayouts.map(l => [l.i, l]));
       
       // For each chart, use existing layout if available, otherwise use default
-      validLayouts[breakpoint] = charts.map(chart => {
+      const layoutItems = charts.map(chart => {
         const existing = existingLayoutMap.get(chart.id);
         if (existing) {
           return existing;
@@ -188,33 +253,22 @@ const CallsChartsInner = ({
         }
         
         // If no default layout exists (new chart), create one
-        // Find a good position that doesn't overlap with existing charts
-        const occupiedPositions = new Set(
-          existingLayouts.map(l => `${l.x},${l.y}`)
-        );
-        
-        let x = 0;
-        let y = 0;
-        
-        // Find first available position
-        while (occupiedPositions.has(`${x},${y}`)) {
-          x += defaultW;
-          if (x + defaultW > COLUMN_SIZES[breakpoint as keyof typeof COLUMN_SIZES]) {
-            x = 0;
-            y += defaultH;
-          }
-        }
-        
         return {
           i: chart.id,
-          x,
-          y,
+          x: 0,
+          y: 0,
           w: Math.min(defaultW, COLUMN_SIZES[breakpoint as keyof typeof COLUMN_SIZES]),
           h: defaultH,
           minW: MIN_W,
           minH: MIN_H,
         };
       });
+
+      // Reflow the layout to ensure row-based alignment
+      validLayouts[breakpoint] = reflowLayout(
+        layoutItems,
+        COLUMN_SIZES[breakpoint as keyof typeof COLUMN_SIZES]
+      );
     });
 
     return validLayouts;
@@ -251,8 +305,19 @@ const CallsChartsInner = ({
             isResizable
             isDraggable
             margin={[8, 8]}
+            compactType="horizontal"
+            preventCollision={false}
+            isDroppable={false}
             onLayoutChange={(layout, allLayouts) => {
-              dispatch({type: 'UPDATE_LAYOUTS', layouts: allLayouts});
+              // Apply reflow to ensure row-based alignment
+              const reflowedLayouts: Record<string, Layout[]> = {};
+              Object.keys(allLayouts).forEach(breakpoint => {
+                reflowedLayouts[breakpoint] = reflowLayout(
+                  allLayouts[breakpoint],
+                  COLUMN_SIZES[breakpoint as keyof typeof COLUMN_SIZES]
+                );
+              });
+              dispatch({type: 'UPDATE_LAYOUTS', layouts: reflowedLayouts});
             }}>
             {charts.map(chart => {
               const yField = chartAxisFields.find(f => f.key === chart.yAxis);
