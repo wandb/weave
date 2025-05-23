@@ -76,9 +76,11 @@ Let me show you something cool. I'm going to run this customer email analyzer...
 
 Look at this! We can see:
 - The exact email input
-- The structured output from GPT-3.5
+- The structured output from GPT-4o-mini
 - How long it took (about 1.2 seconds)
 - Even the exact model used
+
+Note: We're using gpt-4o-mini because it supports structured outputs with Pydantic models. The older gpt-3.5-turbo doesn't support this feature.
 
 Click on the trace... and we can see the full OpenAI request and response. This is incredibly powerful for debugging."
 
@@ -345,9 +347,11 @@ If GPT-4 fails or is too slow, automatically fall back to GPT-3.5. But here's th
 "[In Weave UI]
 
 Look at this cost tracking:
-- GPT-4 call: More expensive but more accurate
-- GPT-3.5 fallback: Cheaper but still works
-- You can see exactly when fallbacks happen
+- GPT-4o call: More expensive but most accurate
+- GPT-4o-mini fallback: Good balance of cost and capability
+- Both support structured outputs (required for our Pydantic models)
+
+The cost difference is significant - gpt-4o-mini is about 30x cheaper than gpt-4o!
 
 Now multiply that by 100,000 calls per day... you see why this matters?"
 

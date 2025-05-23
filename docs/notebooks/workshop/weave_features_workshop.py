@@ -58,12 +58,13 @@ print("\n---")
 # 🏠 Initialize your W&B project
 print("🐝 Initializing Weave...")
 weave_client = weave.init("weave-workshop")  # 🐝 Your W&B project name
-print("✅ Weave initialized! Check your traces at https://wandb.ai/home")
 
 # %% [markdown]
 # ## 🔍 Part 1: Tracing & Debugging with Weave
 #
 # Let's start by building a simple LLM application and see how Weave automatically tracks everything.
+#
+# Note: We're using `gpt-4o-mini` which supports structured outputs while being cost-effective.
 
 
 # %%
@@ -82,7 +83,7 @@ def analyze_customer_email(email: str) -> CustomerEmail:
     client = OpenAI()
 
     response = client.beta.chat.completions.parse(
-        model="gpt-3.5-turbo",  # Using cheaper model to make errors more likely
+        model="gpt-4o-mini",  # Using mini model for cost efficiency
         messages=[
             {
                 "role": "system",
@@ -402,7 +403,7 @@ print("💡 Tip: The rich metadata makes it easy to filter and compare evaluatio
 class EmailAnalyzerModel(Model):
     """Base model for email analysis with configurable parameters."""
 
-    model_name: str = "gpt-3.5-turbo"
+    model_name: str = "gpt-4o-mini"
     temperature: float = 0.1
     system_prompt: str = "You are a customer support analyst."
 
@@ -523,7 +524,7 @@ def analyze_detailed_email(email: str) -> DetailedCustomerEmail:
     client = OpenAI()
 
     response = client.beta.chat.completions.parse(
-        model="gpt-3.5-turbo",  # Using weaker model
+        model="gpt-4o-mini",  # Still capable but may struggle with complex schema
         messages=[
             {
                 "role": "system",
@@ -604,8 +605,8 @@ for i, response in enumerate(test_responses):
 @weave.op
 def analyze_with_fallback(
     email: str,
-    primary_model: str = "gpt-4o-mini",
-    fallback_model: str = "gpt-3.5-turbo",
+    primary_model: str = "gpt-4o",
+    fallback_model: str = "gpt-4o-mini",
 ) -> CustomerEmail:
     """Analyze email with automatic fallback on error."""
     client = OpenAI()
