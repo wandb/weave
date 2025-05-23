@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -8,6 +9,8 @@ import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import Op, ProcessedInputs, _add_accumulator
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
@@ -488,8 +491,9 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         # Not obvious how to handle these since there is no output_index
         if not acc.output:
             acc.output = [""]
-        if value.delta is not None:
-            acc.output[0] += value.delta
+        if value.delta is None:
+            logger.warn(f"Could not determine delta for value: {value}")
+        acc.output[0] += value.delta
 
     # Everything else
     elif isinstance(
