@@ -16,7 +16,7 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "include": ["src/**/*", "types/**/*"],
+  "include": ["src/**/*"],
   "exclude": [
     "examples",
     "dist",

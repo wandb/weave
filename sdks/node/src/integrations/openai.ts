@@ -242,6 +242,9 @@ export function instrumentOpenAI() {
   addInstrumentation({
     moduleName: 'openai',
     subPath: 'index.js',
+    // 4.0.0 is the prevalently used version of openai at the time of writing
+    // if we want to support other versions with different implementations,
+    // we can add a call of `addInstrumentation()` for each version.
     version: '>= 4.0.0',
     hook: exports => {
       const OriginalOpenAIClass = exports.OpenAI;
