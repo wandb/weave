@@ -44,6 +44,7 @@ import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
 import {RemovableTag} from '../../../../../Tag';
 import {RemoveAction} from '../../../../../Tag/RemoveAction';
 import {TailwindContents} from '../../../../../Tailwind';
+import {ToggleButtonGroup} from '../../../../../ToggleButtonGroup';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {CallsCharts} from '../../charts/CallsCharts';
 import {
@@ -181,6 +182,9 @@ export const CallsTable: FC<{
   allowedColumnPatterns?: string[];
 
   currentViewId?: string;
+  
+  chartsVisible?: boolean;
+  setChartsVisible?: (visible: boolean) => void;
 }> = ({
   entity,
   project,
@@ -201,9 +205,14 @@ export const CallsTable: FC<{
   setPaginationModel,
   allowedColumnPatterns,
   currentViewId,
+  chartsVisible,
+  setChartsVisible,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const [isMetricsChecked, setMetricsChecked] = useState(false);
+  const [viewMode, setViewMode] = useControllableState<'table' | 'charts'>(
+    chartsVisible ? 'charts' : 'table',
+    setChartsVisible ? (mode) => setChartsVisible(mode === 'charts') : undefined
+  );
 
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
@@ -864,6 +873,9 @@ export const CallsTable: FC<{
         pb: 1,
         display: hideControls ? 'none' : 'flex',
         alignItems: 'center',
+        ...(viewMode === 'charts' ? {
+          borderBottom: `1px solid ${MOON_200}`,
+        } : {}),
       }}
       filterListItems={
         <TailwindContents>
@@ -1043,12 +1055,22 @@ export const CallsTable: FC<{
               />
             )}
             <div className="flex items-center gap-6">
-              <Button
-                variant="ghost"
-                icon="chart-vertical-bars"
-                active={isMetricsChecked}
-                onClick={() => setMetricsChecked(!isMetricsChecked)}
-                tooltip={isMetricsChecked ? 'Hide metrics' : 'Show metrics'}
+              <ToggleButtonGroup
+                value={viewMode}
+                onValueChange={(value: string) => setViewMode(value as 'table' | 'charts')}
+                size="small"
+                options={[
+                  {
+                    value: 'table',
+                    icon: 'table',
+                    tooltip: 'Table view',
+                  },
+                  {
+                    value: 'charts',
+                    icon: 'chart-vertical-bars',
+                    tooltip: 'Charts view',
+                  },
+                ]}
               />
             </div>
             <div className="flex-none">
@@ -1073,14 +1095,16 @@ export const CallsTable: FC<{
           </div>
         </TailwindContents>
       }>
-      {isMetricsChecked && (
-        <CallsCharts
-          entity={entity}
-          project={project}
-          filter={filter}
-          filterModelProp={filterModelResolved}
-        />
-      )}
+      {viewMode === 'charts' ? (
+        <div style={{flex: '1 1 auto', overflow: 'auto'}}>
+          <CallsCharts
+            entity={entity}
+            project={project}
+            filter={filter}
+            filterModelProp={filterModelResolved}
+          />
+        </div>
+      ) : (
       <StyledDataGrid
         // Start Column Menu
         // ColumnMenu is needed to support pinning and column visibility
@@ -1164,6 +1188,7 @@ export const CallsTable: FC<{
         }}
         className="tw-style"
       />
+      )}
     </FilterLayoutTemplate>
   );
 };

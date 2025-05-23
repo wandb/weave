@@ -182,8 +182,8 @@ const CallsChartsInner = ({
           background: ${TEAL_400} !important;
         }
       `}</style>
-      <div className="w-full md:max-w-[calc(100vw-56px)]">
-        <div className="px-4 pb-0 pt-2">
+      <div className="w-full min-h-screen overflow-auto bg-moon-50">
+        <div className="px-4 pb-4 pt-2">
           <div className="mb-2 flex items-center justify-between">
             <span className="mr-2 text-base font-semibold text-moon-750">
               Charts
@@ -205,7 +205,6 @@ const CallsChartsInner = ({
             isResizable
             isDraggable
             margin={[8, 8]}
-            style={{minHeight: 220}}
             onLayoutChange={(layout, allLayouts) => {
               dispatch({type: 'UPDATE_LAYOUTS', layouts: allLayouts});
             }}>
