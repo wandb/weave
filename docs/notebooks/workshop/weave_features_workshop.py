@@ -22,18 +22,18 @@
 # %pip install wandb weave openai pydantic nest_asyncio -qqq
 
 import asyncio
-import os
-from getpass import getpass
-from typing import Any, Optional
 import json
+import os
 import random
 from datetime import datetime
+from getpass import getpass
+from typing import Any, Optional
 
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
 import weave
-from weave import Dataset, Evaluation, Model, EvaluationLogger, Scorer
+from weave import Dataset, Evaluation, EvaluationLogger, Model, Scorer
 
 # 🔑 Setup your API keys
 print("---")
@@ -181,7 +181,7 @@ print(f"Needs immediate attention: {ticket['needs_immediate_attention']}")
 # %% [markdown]
 # ## 📊 Part 3: Building Evaluations
 #
-# Now let's evaluate our email analyzer using Weave's evaluation framework. 
+# Now let's evaluate our email analyzer using Weave's evaluation framework.
 # We'll use a more challenging dataset to expose model weaknesses.
 
 # %%
@@ -282,6 +282,7 @@ print("🏃 Running evaluation...")
 # eval_results = await evaluation.evaluate(analyze_customer_email)
 # For Python scripts, use:
 import nest_asyncio
+
 nest_asyncio.apply()
 eval_results = asyncio.run(evaluation.evaluate(analyze_customer_email))
 print("✅ Evaluation complete! Check the Weave UI for detailed results.")
@@ -292,8 +293,8 @@ print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 # The `EvaluationLogger` provides a flexible way to log evaluation data incrementally.
 # This is perfect when you don't have all your data upfront or want more control.
 #
-# **Important**: Since EvaluationLogger doesn't use Model/Dataset objects, the `model` 
-# and `dataset` parameters are crucial for identification. You can use strings or 
+# **Important**: Since EvaluationLogger doesn't use Model/Dataset objects, the `model`
+# and `dataset` parameters are crucial for identification. You can use strings or
 # dictionaries for rich metadata!
 
 # %%
@@ -301,7 +302,7 @@ print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 # You can use simple strings for identification
 eval_logger = EvaluationLogger(
     model="email_analyzer_gpt35",  # Model name/version
-    dataset="support_emails"  # Dataset name stays consistent
+    dataset="support_emails",  # Dataset name stays consistent
 )
 
 # Or use dictionaries for richer identification (recommended!)
@@ -311,14 +312,14 @@ eval_logger_rich = EvaluationLogger(
         "version": "v1.2",
         "llm": "gpt-3.5-turbo",
         "temperature": 0.7,
-        "prompt_version": "2024-01"
+        "prompt_version": "2024-01",
     },
     dataset={
         "name": "support_emails",
         "version": "2024Q1",
         "size": len(eval_examples),
-        "source": "production_samples"
-    }
+        "source": "production_samples",
+    },
 )
 
 # Let's use the rich logger for our demo
@@ -329,60 +330,53 @@ for i, example in enumerate(eval_examples[:3]):  # Just first 3 for demo
     # Analyze the email
     try:
         output = analyze_customer_email(example["email"])
-        
+
         # Log the prediction
         pred_logger = eval_logger_rich.log_prediction(
-            inputs={"email": example["email"]},
-            output=output.model_dump()
+            inputs={"email": example["email"]}, output=output.model_dump()
         )
-        
+
         # Log multiple scores for this prediction
         # Check name accuracy
         name_match = example["expected_name"].lower() == output.customer_name.lower()
-        pred_logger.log_score(
-            scorer="name_accuracy",
-            score=1.0 if name_match else 0.0
-        )
-        
+        pred_logger.log_score(scorer="name_accuracy", score=1.0 if name_match else 0.0)
+
         # Check sentiment
         sentiment_match = example["expected_sentiment"] == output.sentiment
         pred_logger.log_score(
-            scorer="sentiment_accuracy", 
-            score=1.0 if sentiment_match else 0.0
+            scorer="sentiment_accuracy", score=1.0 if sentiment_match else 0.0
         )
-        
+
         # Custom business logic score
         if "urgent" in example["email"].lower() and output.sentiment != "negative":
             pred_logger.log_score(
                 scorer="urgency_detection",
-                score=0.0  # Failed to detect urgency
+                score=0.0,  # Failed to detect urgency
             )
         else:
-            pred_logger.log_score(
-                scorer="urgency_detection",
-                score=1.0
-            )
-        
+            pred_logger.log_score(scorer="urgency_detection", score=1.0)
+
         # Always finish logging for each prediction
         pred_logger.finish()
-        
+
     except Exception as e:
         print(f"Error processing example {i+1}: {e}")
         # You can still log failed predictions
         pred_logger = eval_logger_rich.log_prediction(
-            inputs={"email": example["email"]},
-            output={"error": str(e)}
+            inputs={"email": example["email"]}, output={"error": str(e)}
         )
         pred_logger.log_score(scorer="success", score=0.0)
         pred_logger.finish()
 
 # Log summary statistics
-eval_logger_rich.log_summary({
-    "total_examples": 3,
-    "evaluation_type": "manual",
-    "timestamp": datetime.now().isoformat(),
-    "notes": "Workshop demo with rich metadata"
-})
+eval_logger_rich.log_summary(
+    {
+        "total_examples": 3,
+        "evaluation_type": "manual",
+        "timestamp": datetime.now().isoformat(),
+        "notes": "Workshop demo with rich metadata",
+    }
+)
 
 print("✅ EvaluationLogger demo complete! Check the Weave UI.")
 print("💡 Tip: The rich metadata makes it easy to filter and compare evaluations!")
@@ -463,7 +457,7 @@ balanced_model = EmailAnalyzerModel(
 async def compare_models(models: list[Model], dataset: Dataset) -> dict[str, Any]:
     """Run A/B comparison of multiple models."""
     results = {}
-    
+
     # Create a single evaluation definition that will be used for all models
     evaluation = Evaluation(
         name="email_analyzer_comparison",  # Same eval for all models
@@ -473,11 +467,10 @@ async def compare_models(models: list[Model], dataset: Dataset) -> dict[str, Any
 
     for model in models:
         print(f"\n📊 Evaluating {model.name}...")
-        
+
         # Run evaluation with optional display name for this specific run
         eval_result = await evaluation.evaluate(
-            model,
-            __weave={"display_name": f"Run: {model.name}"}
+            model, __weave={"display_name": f"Run: {model.name}"}
         )
         results[model.name] = eval_result
 
@@ -501,6 +494,7 @@ print("\n🎉 Comparison complete! View the results in the Weave UI.")
 # Weave automatically tracks exceptions, helping you debug failures in production.
 # This is especially useful when dealing with structured outputs.
 
+
 # %%
 # Define a stricter data structure that's more likely to fail
 class DetailedCustomerEmail(BaseModel):
@@ -512,18 +506,19 @@ class DetailedCustomerEmail(BaseModel):
     issue: str = Field(description="Detailed issue description")
     severity: str = Field(description="critical, high, medium, or low")
     sentiment: str = Field(description="positive, neutral, or negative")
-    
+
+
 @weave.op
 def analyze_detailed_email(email: str) -> DetailedCustomerEmail:
     """Analyze email with strict schema - more likely to fail."""
     client = OpenAI()
-    
+
     response = client.beta.chat.completions.parse(
         model="gpt-3.5-turbo",  # Using weaker model
         messages=[
             {
                 "role": "system",
-                "content": "Extract ALL fields. Use 'Unknown' if not found."
+                "content": "Extract ALL fields. Use 'Unknown' if not found.",
             },
             {
                 "role": "user",
@@ -533,8 +528,9 @@ def analyze_detailed_email(email: str) -> DetailedCustomerEmail:
         response_format=DetailedCustomerEmail,
         temperature=0.8,  # Higher temperature = more errors
     )
-    
+
     return response.choices[0].message.parsed
+
 
 # Test with various emails to see exceptions
 test_emails_for_errors = [
@@ -553,25 +549,27 @@ for i, email in enumerate(test_emails_for_errors):
         print(f"❌ Error: {type(e).__name__}: {str(e)}")
         print("   Check Weave UI to see the full error trace!")
 
+
 # Demonstrate JSON parsing errors
 @weave.op
 def parse_customer_response(response_text: str) -> dict:
     """Parse a JSON response - demonstrates parsing errors."""
     # This will fail if response_text is not valid JSON
     data = json.loads(response_text)
-    
+
     # This will fail if required fields are missing
     return {
         "name": data["customer"]["name"],  # Nested field access
         "issue": data["issue"]["description"],
-        "priority": data["priority"]
+        "priority": data["priority"],
     }
+
 
 # Test parsing errors
 test_responses = [
     '{"customer": {"name": "John"}, "issue": {"description": "Bug"}, "priority": "high"}',  # Valid
     '{"name": "Jane", "issue": "Problem"}',  # Missing nested structure
-    'Not JSON at all!',  # Invalid JSON
+    "Not JSON at all!",  # Invalid JSON
 ]
 
 print("\n\n🔍 Testing JSON parsing errors...")
@@ -653,6 +651,7 @@ print("  - Cost tracking (when available)")
 # %%
 from datetime import datetime
 
+
 # Define custom scorers for production monitoring
 class ToxicityScorer(Scorer):
     @weave.op
@@ -660,22 +659,19 @@ class ToxicityScorer(Scorer):
         """Check for toxic or inappropriate content."""
         # Simplified toxicity check - in production, use a real model
         toxic_words = ["stupid", "hate", "terrible", "worst"]
-        
+
         text_to_check = str(output.get("issue", "")).lower()
-        
+
         for word in toxic_words:
             if word in text_to_check:
                 return {
                     "flagged": True,
                     "reason": f"Contains potentially toxic word: {word}",
-                    "severity": "medium"
+                    "severity": "medium",
                 }
-        
-        return {
-            "flagged": False,
-            "reason": None,
-            "severity": None
-        }
+
+        return {"flagged": False, "reason": None, "severity": None}
+
 
 class ResponseQualityScorer(Scorer):
     @weave.op
@@ -683,23 +679,23 @@ class ResponseQualityScorer(Scorer):
         """Evaluate the quality of the extraction."""
         score = 0.0
         issues = []
-        
+
         # Check completeness
         if not output.get("customer_name") or output["customer_name"] == "Unknown":
             issues.append("Missing customer name")
         else:
             score += 0.25
-            
+
         if not output.get("product") or output["product"] == "Unknown":
             issues.append("Missing product")
         else:
             score += 0.25
-            
+
         if not output.get("issue") or len(output["issue"]) < 10:
             issues.append("Insufficient issue description")
         else:
             score += 0.25
-            
+
         # Check relevance
         if email and len(output.get("issue", "")) > 0:
             # Simple relevance check - in production, use embeddings
@@ -710,12 +706,9 @@ class ResponseQualityScorer(Scorer):
                 score += 0.25
             else:
                 issues.append("Issue description may not match email content")
-        
-        return {
-            "quality_score": score,
-            "passed": score >= 0.75,
-            "issues": issues
-        }
+
+        return {"quality_score": score, "passed": score >= 0.75, "issues": issues}
+
 
 @weave.op
 def production_email_handler(
@@ -725,12 +718,12 @@ def production_email_handler(
     # Generate request ID if not provided
     if not request_id:
         request_id = f"req_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{random.randint(1000, 9999)}"
-    
+
     try:
         # Process the email
         analysis = analyze_customer_email(email)
         urgency = classify_urgency(email, analysis.sentiment)
-        
+
         # Return the result
         return {
             "request_id": request_id,
@@ -739,7 +732,7 @@ def production_email_handler(
             "urgency": urgency,
             "timestamp": datetime.now().isoformat(),
         }
-        
+
     except Exception as e:
         # Log error and return error response
         return {
@@ -749,36 +742,38 @@ def production_email_handler(
             "timestamp": datetime.now().isoformat(),
         }
 
+
 # Initialize scorers once (for performance)
 toxicity_scorer = ToxicityScorer()
 quality_scorer = ResponseQualityScorer()
+
 
 async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
     """Handle email with production monitoring and guardrails."""
     # Process the email and get the Call object
     result, call = production_email_handler.call(email)
-    
+
     if result["status"] == "success":
         # Apply scorers for monitoring
         toxicity_check = await call.apply_scorer(toxicity_scorer)
         quality_check = await call.apply_scorer(
-            quality_scorer,
-            additional_scorer_kwargs={"email": email}
+            quality_scorer, additional_scorer_kwargs={"email": email}
         )
-        
+
         # Check toxicity (guardrail)
         if toxicity_check.result["flagged"]:
             print(f"⚠️ Content flagged: {toxicity_check.result['reason']}")
             # In production, you might modify or block the response
             result["warning"] = "Content flagged for review"
-        
+
         # Check quality (monitoring)
         if not quality_check.result["passed"]:
             print(f"📊 Quality issues: {quality_check.result['issues']}")
             # Log for improvement but don't block
             result["quality_score"] = quality_check.result["quality_score"]
-    
+
     return result
+
 
 # Test production monitoring
 print("🏭 Testing production monitoring with scorers...")
@@ -821,8 +816,9 @@ def problematic_analyzer(email: str) -> Optional[CustomerEmail]:
     if "urgent" in email.lower():
         # Simulate a timeout
         import time
+
         time.sleep(0.1)  # In real scenarios, this might be a network timeout
-        
+
     return analyze_customer_email(email)
 
 
@@ -854,23 +850,23 @@ print("  - Timing information for slow calls")
 # ## 🎉 Wrap Up
 #
 # Congratulations! You've learned how to:
-# 
+#
 # ✅ **Trace** - Track every function call with `@weave.op`
 # ✅ **Evaluate** - Build comprehensive evaluation suites
 # ✅ **Compare** - Make data-driven model decisions
 # ✅ **Monitor** - Use scorers as guardrails and monitors
 # ✅ **Debug** - Track exceptions and analyze failures
-# 
+#
 # ### 🚀 Next Steps
-# 
+#
 # 1. **This week**: Add Weave to one of your existing projects
 # 2. **Explore**: Try the built-in scorers (HallucinationFreeScorer, SummarizationScorer, etc.)
 # 3. **Share**: Join the W&B Community and share your experiences
-# 
+#
 # ### 📚 Resources
-# 
+#
 # - [Weave Documentation](https://weave-docs.wandb.ai/)
 # - [Built-in Scorers](https://weave-docs.wandb.ai/guides/evaluation/builtin_scorers)
 # - [W&B Community](https://wandb.ai/community)
-# 
+#
 # Happy building with Weave! 🐝

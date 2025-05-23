@@ -7,8 +7,8 @@
 # %%
 import asyncio
 import json
-from typing import Any
 from datetime import datetime
+from typing import Any
 
 from openai import OpenAI
 
@@ -444,14 +444,12 @@ def compare_models(
 #
 # Here's how to use dictionary identification for production-grade evaluation tracking:
 
+
 # %%
 def create_production_eval_logger(
-    model_config: dict,
-    experiment_name: str,
-    dataset_info: dict
+    model_config: dict, experiment_name: str, dataset_info: dict
 ) -> EvaluationLogger:
     """Create an evaluation logger with rich metadata for production use."""
-    
     # Rich model identification
     model_metadata = {
         "name": model_config.get("name", "unknown_model"),
@@ -467,7 +465,7 @@ def create_production_eval_logger(
         "experiment": experiment_name,
         "deployed_at": model_config.get("deployed_at", datetime.now().isoformat()),
     }
-    
+
     # Rich dataset identification
     dataset_metadata = {
         "name": dataset_info.get("name", "unknown_dataset"),
@@ -477,13 +475,11 @@ def create_production_eval_logger(
         "created_at": dataset_info.get("created_at", datetime.now().isoformat()),
         "filters": dataset_info.get("filters", {}),
         "split": dataset_info.get("split", "test"),
-        "characteristics": dataset_info.get("characteristics", {})
+        "characteristics": dataset_info.get("characteristics", {}),
     }
-    
-    return EvaluationLogger(
-        model=model_metadata,
-        dataset=dataset_metadata
-    )
+
+    return EvaluationLogger(model=model_metadata, dataset=dataset_metadata)
+
 
 # Example usage
 model_config = {
@@ -494,7 +490,7 @@ model_config = {
     "temperature": 0.3,
     "max_tokens": 200,
     "prompt_template_version": "v3_detailed",
-    "deployed_at": "2024-01-15T10:00:00Z"
+    "deployed_at": "2024-01-15T10:00:00Z",
 }
 
 dataset_info = {
@@ -505,24 +501,20 @@ dataset_info = {
     "filters": {
         "date_range": "2024-01-01 to 2024-03-31",
         "language": "en",
-        "region": "US"
+        "region": "US",
     },
     "split": "test",
     "characteristics": {
         "avg_length": 150,
-        "sentiment_distribution": {
-            "positive": 0.2,
-            "neutral": 0.3,
-            "negative": 0.5
-        }
-    }
+        "sentiment_distribution": {"positive": 0.2, "neutral": 0.3, "negative": 0.5},
+    },
 }
 
 # Create logger with rich metadata
 production_logger = create_production_eval_logger(
     model_config=model_config,
     experiment_name="q1_2024_performance_review",
-    dataset_info=dataset_info
+    dataset_info=dataset_info,
 )
 
 # %% [markdown]
