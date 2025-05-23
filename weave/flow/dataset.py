@@ -293,7 +293,11 @@ class Dataset(Object):
         sig = inspect.signature(func)
         param_names = list(sig.parameters.keys())
 
-        func = weave.op(wrap_lambda(func))
+        # Convert lambda to named function for better async handling
+        func = wrap_lambda(func)
+
+        # Apply weave.op after lambda conversion
+        func = weave.op(func)
 
         async def process_row(row: dict) -> dict:
             try:

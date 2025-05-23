@@ -30,7 +30,8 @@ def wrap_lambda(func: Callable) -> Callable:
             stacklevel=2,
         )
 
-        def lambda_wrapper(*args, **kwargs):
+        # Create a named function wrapper for the lambda
+        def lambda_wrapper(*args: Any, **kwargs: Any) -> Any:
             return func(*args, **kwargs)
 
         # Copy the signature and other attributes
