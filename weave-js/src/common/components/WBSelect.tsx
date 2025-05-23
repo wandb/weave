@@ -1,5 +1,3 @@
-import {WBIcon} from '@wandb/ui';
-import {WBPopup} from '@wandb/ui';
 import React from 'react';
 
 import {useOnMouseDownOutside} from '../util/dom';
@@ -11,6 +9,8 @@ import {
   WBMenuTheme,
 } from './WBMenu';
 import * as S from './WBSelect.styles';
+import {Icon} from '../../components/Icon';
+import {WBPopup} from './WBPopup';
 
 export type WBSelectProps = {
   className?: string;
@@ -98,7 +98,7 @@ export const WBSelect: React.FC<WBSelectProps> = props => {
           <S.CaretWrapper
             ref={node => setOpenerEl(node)}
             onMouseDown={() => setOpen(o => !o)}>
-            <WBIcon name="next" />
+            <Icon name="chevron-next" />
           </S.CaretWrapper>
         </S.TypeableWrapper>
       ) : (
