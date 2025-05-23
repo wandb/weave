@@ -5,6 +5,7 @@ import random
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, Optional, TypeVar
+import warnings
 
 from rich.progress import Progress, ProgressColumn, Task, TaskID, Text
 from rich.text import Text
@@ -17,6 +18,28 @@ ItemReturnType = tuple[int, T, U]
 
 _shown_warnings = set()
 
+def wrap_lambda(func: Callable) -> Callable:
+    """Convert a lambda function to a named function for better tracking and async handling."""
+    if func.__name__ == "<lambda>":
+        warnings.warn(
+            "We are converting your lambda function to a named function for better tracking "
+            "and async handling. For optimal performance and debugging, consider using named functions directly. "
+            "Example: `def process(x): return {'result': x*2}` instead of `lambda x: {'result': x*2}`",
+            UserWarning,
+            stacklevel=2,
+        )
+
+        def lambda_wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        
+        # Copy the signature and other attributes
+        lambda_wrapper.__name__ = "lambda_func"
+        lambda_wrapper.__doc__ = getattr(func, "__doc__", None)
+        lambda_wrapper.__annotations__ = getattr(func, "__annotations__", {})
+        
+        # Use the wrapper instead of the original lambda
+        return lambda_wrapper
+    return func
 
 def transpose(rows: list[dict]) -> dict[str, list]:
     cols = defaultdict(list)

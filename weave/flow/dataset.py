@@ -22,7 +22,7 @@ from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
-from weave.flow.util import IterationSpeedColumn, async_foreach, short_str
+from weave.flow.util import IterationSpeedColumn, async_foreach, short_str, wrap_lambda
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.isinstance import weave_isinstance
@@ -288,19 +288,13 @@ class Dataset(Object):
             # }
             ```
         """
-        processed_rows = []
+        processed_rows: list[tuple[int, dict]] = []
 
         # Inspect the function signature
         sig = inspect.signature(func)
         param_names = list(sig.parameters.keys())
 
-        if func.__name__ == "<lambda>":
-            warnings.warn(
-                "For better tracking and visualization in the UI, use named functions instead. "
-                "Example: `def process(x): return {'result': x*2}` instead of `lambda x: {'result': x*2}`",
-                UserWarning,
-                stacklevel=2,
-            )
+        func = weave.op(wrap_lambda(func))
 
         async def process_row(row: dict) -> dict:
             try:
@@ -351,13 +345,17 @@ class Dataset(Object):
             transient=True,  # Remove progress bar when done
         ) as progress:
             # Return the coroutine so the caller can await it
-            async for _, processed_row in async_foreach(
+            async for index, _, processed_row in async_foreach(
                 self.rows,
                 process_row,
                 num_procs,
                 progress=progress,
                 progress_desc="Mapping dataset",
             ):
-                processed_rows.append(processed_row)
+                processed_rows.append((index, processed_row))
 
-        return self.__class__(rows=processed_rows)
+        # Sort by index to maintain original order
+        processed_rows.sort(key=lambda x: x[0])
+        final_rows = [processed_row for _, processed_row in processed_rows]
+
+        return self.__class__(rows=final_rows)
