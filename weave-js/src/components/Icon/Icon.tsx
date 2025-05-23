@@ -1425,7 +1425,8 @@ export interface IconProps {
 export const Icon = ({name, ...props}: IconProps) => {
   const IconComponent: ElementType = ICON_NAME_TO_ICON[name];
   if (!IconComponent) {
-    throw new Error(`Could not find icon ${name}`);
+    console.error(`Could not find icon ${name}`);
+    return null;
   }
   return <IconComponent {...props} />;
 };
