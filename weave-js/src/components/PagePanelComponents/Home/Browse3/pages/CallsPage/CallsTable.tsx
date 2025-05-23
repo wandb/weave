@@ -885,6 +885,36 @@ export const CallsTable: FC<{
                 onClick={() => calls.refetch()}
                 disabled={callsLoading}
               />
+              <div className="flex items-center">
+                <Button
+                  variant='ghost'
+                  active={viewMode === 'table'}
+                  icon="table"
+                  aria-label="Table view"
+                  tooltip="Table view"
+                  onClick={() => setViewMode('table')}
+                  style={{minWidth: 0, padding: 4}}
+                  className={
+                    viewMode === 'table'
+                      ? 'rounded-l-md rounded-r-none'
+                      : 'rounded-l-md rounded-r-none border-r-0'
+                  }
+                />
+                <Button
+                  variant='ghost'
+                  active={viewMode === 'charts'}
+                  icon="chart-vertical-bars"
+                  aria-label="Charts view"
+                  tooltip="Charts view"
+                  onClick={() => setViewMode('charts')}
+                  style={{minWidth: 0, padding: 4}}
+                  className={
+                    viewMode === 'charts'
+                      ? 'rounded-r-md rounded-l-none'
+                      : 'rounded-r-md rounded-l-none border-l-0'
+                  }
+                />
+              </div>
               {columnVisibilityModel && setColumnVisibilityModel && (
                 <div className="flex-none">
                   <ManageColumnsButton
@@ -1054,25 +1084,6 @@ export const CallsTable: FC<{
                 }
               />
             )}
-            <div className="flex items-center gap-6">
-              <ToggleButtonGroup
-                value={viewMode}
-                onValueChange={(value: string) => setViewMode(value as 'table' | 'charts')}
-                size="small"
-                options={[
-                  {
-                    value: 'table',
-                    icon: 'table',
-                    tooltip: 'Table view',
-                  },
-                  {
-                    value: 'charts',
-                    icon: 'chart-vertical-bars',
-                    tooltip: 'Charts view',
-                  },
-                ]}
-              />
-            </div>
             <div className="flex-none">
               <ExportSelector
                 selectedCalls={selectedCalls}
