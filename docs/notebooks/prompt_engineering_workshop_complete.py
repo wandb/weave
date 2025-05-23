@@ -7,7 +7,7 @@
 # 1. **Basic Prompt Engineering** - Extracting structured data from unstructured text
 # 2. **Prompt Iteration** - Using Weave to track and compare different prompts
 # 3. **Few-shot Learning** - Improving results with examples
-# 4. **Evaluation** - Building datasets and scoring functions
+# 4. **Evaluation** - Building datasets and scoring functions with Weave's evaluation framework
 # 5. **Advanced Techniques** - Chain of thought, role playing, and more
 #
 # ## Our Use Case: Customer Support Triage 📧
@@ -19,15 +19,15 @@
 
 # %%
 # Setup
-import json
 import os
+import json
+import asyncio
+from typing import List, Dict, Optional, Any
 from getpass import getpass
-from typing import List
-
 from openai import OpenAI
 from pydantic import BaseModel, Field
-
 import weave
+from weave import Evaluation, Dataset, Model
 
 # Get OpenAI API key
 if not os.environ.get("OPENAI_API_KEY"):
@@ -214,168 +214,231 @@ v3_result = extract_properties_v3_fewshot(sample_emails[1])
 print(v3_result.model_dump_json(indent=2))
 
 # %% [markdown]
-# ## Part 4: Building an Evaluation Dataset 📊
+# ## Part 4: Building Evaluations with Weave 📊
 #
-# Now let's create a proper evaluation dataset and scoring function to measure our improvements.
+# Now let's use Weave's evaluation framework to systematically measure our improvements.
+# We'll explore two approaches: the structured `Evaluation` class and the flexible `EvaluationLogger`.
 
 # %%
 # Create evaluation dataset
-eval_dataset = [
+eval_examples = [
     {
         "email": "Hello support team, I'm John Doe. My XPhone 12 Pro keeps randomly shutting off during calls. This is really frustrating!",
-        "expected": {
-            "customer_name": "John Doe",
-            "product_model": "XPhone 12 Pro",
-            "issue_description": "Phone randomly shuts off during calls",
-        },
+        "expected_customer_name": "John Doe",
+        "expected_product_model": "XPhone 12 Pro",
+        "expected_issue_description": "Phone randomly shuts off during calls"
     },
     {
         "email": "My new AeroWatch V2's strap completely fell apart after just one day of use. This is unacceptable! - Jane Smith",
-        "expected": {
-            "customer_name": "Jane Smith",
-            "product_model": "AeroWatch V2",
-            "issue_description": "Watch strap fell apart after one day",
-        },
+        "expected_customer_name": "Jane Smith",
+        "expected_product_model": "AeroWatch V2",
+        "expected_issue_description": "Watch strap fell apart after one day"
     },
     {
         "email": "Hi, Bob Wilson here. The SmartTV X500 I bought last month suddenly stopped connecting to my WiFi network.",
-        "expected": {
-            "customer_name": "Bob Wilson",
-            "product_model": "SmartTV X500",
-            "issue_description": "TV won't connect to WiFi",
-        },
+        "expected_customer_name": "Bob Wilson",
+        "expected_product_model": "SmartTV X500",
+        "expected_issue_description": "TV won't connect to WiFi"
     },
     {
         "email": "URGENT: Gaming Console Z crashed and won't turn back on. Blue light flashes 3 times. -Alex Kumar",
-        "expected": {
-            "customer_name": "Alex Kumar",
-            "product_model": "Gaming Console Z",
-            "issue_description": "Console crashed, blue light flashes 3 times",
-        },
+        "expected_customer_name": "Alex Kumar",
+        "expected_product_model": "Gaming Console Z",
+        "expected_issue_description": "Console crashed, blue light flashes 3 times"
     },
     {
         "email": "Lisa Park writing about my EcoVac R10 robot vacuum. It keeps getting stuck under furniture even though it's supposed to detect obstacles.",
-        "expected": {
-            "customer_name": "Lisa Park",
-            "product_model": "EcoVac R10",
-            "issue_description": "Robot vacuum gets stuck under furniture",
-        },
-    },
+        "expected_customer_name": "Lisa Park",
+        "expected_product_model": "EcoVac R10",
+        "expected_issue_description": "Robot vacuum gets stuck under furniture"
+    }
 ]
 
 # Create a Weave Dataset
-weave_dataset = weave.Dataset(name="support_emails", rows=eval_dataset)
+support_emails_dataset = Dataset(name="support_emails", rows=eval_examples)
 
+# %% [markdown]
+# ### Define Scoring Functions
+#
+# Weave scorers take the `output` from your function and any other fields from your dataset examples.
 
 # %%
 # Define scoring functions
 @weave.op
-def exact_match_scorer(expected: dict, predicted: MessageProperties) -> dict:
+def exact_match_scorer(
+    expected_customer_name: str,
+    expected_product_model: str,
+    expected_issue_description: str,
+    output: MessageProperties
+) -> dict:
     """Score based on exact field matches"""
-    predicted_dict = predicted.model_dump()
-
-    scores = {}
-    for field in ["customer_name", "product_model", "issue_description"]:
-        scores[f"{field}_exact_match"] = int(
-            expected.get(field, "").lower().strip()
-            == predicted_dict.get(field, "").lower().strip()
-        )
-
-    scores["all_fields_correct"] = int(all(scores.values()))
-    return scores
-
-
-@weave.op
-def similarity_scorer(expected: dict, predicted: MessageProperties) -> dict:
-    """Score based on semantic similarity (simplified version)"""
-    from difflib import SequenceMatcher
-
-    predicted_dict = predicted.model_dump()
-    scores = {}
-
-    for field in ["customer_name", "product_model", "issue_description"]:
-        expected_val = expected.get(field, "").lower().strip()
-        predicted_val = predicted_dict.get(field, "").lower().strip()
-
-        similarity = SequenceMatcher(None, expected_val, predicted_val).ratio()
-        scores[f"{field}_similarity"] = similarity
-
-    scores["avg_similarity"] = sum(scores.values()) / len(scores)
-    return scores
-
-
-# %%
-# Create evaluation function
-@weave.op
-def evaluate_extractor(extractor_func, dataset: weave.Dataset):
-    """Evaluate an extraction function on a dataset"""
-    results = []
-
-    for row in dataset.rows:
-        try:
-            # Extract properties
-            extracted = extractor_func(row["email"])
-
-            # Score the extraction
-            exact_scores = exact_match_scorer(row["expected"], extracted)
-            similarity_scores = similarity_scorer(row["expected"], extracted)
-
-            results.append(
-                {
-                    "email": row["email"],
-                    "expected": row["expected"],
-                    "predicted": extracted.model_dump(),
-                    **exact_scores,
-                    **similarity_scores,
-                }
-            )
-        except Exception as e:
-            print(f"Error processing email: {e}")
-            results.append({"email": row["email"], "error": str(e)})
-
-    # Calculate summary metrics
-    summary = {
-        "total_examples": len(results),
-        "avg_exact_match": sum(r.get("all_fields_correct", 0) for r in results)
-        / len(results),
-        "avg_similarity": sum(r.get("avg_similarity", 0) for r in results)
-        / len(results),
+    
+    scores = {
+        'customer_name_match': int(expected_customer_name.lower().strip() == output.customer_name.lower().strip()),
+        'product_model_match': int(expected_product_model.lower().strip() == output.product_model.lower().strip()),
+        'issue_description_match': int(expected_issue_description.lower().strip() == output.issue_description.lower().strip())
     }
+    
+    scores['all_fields_correct'] = int(all(scores.values()))
+    return scores
 
-    return results, summary
-
-
-# Run evaluation on all versions
-print("Evaluating all versions...\n")
-
-for version, func in [
-    ("v1_basic", extract_properties_v1),
-    ("v2_improved", extract_properties_v2),
-    ("v3_fewshot", extract_properties_v3_fewshot),
-]:
-    results, summary = evaluate_extractor(func, weave_dataset)
-    print(f"{version}:")
-    print(f"  Exact match rate: {summary['avg_exact_match']:.2%}")
-    print(f"  Average similarity: {summary['avg_similarity']:.2%}")
-    print()
+@weave.op
+def similarity_scorer(
+    expected_customer_name: str,
+    expected_product_model: str,
+    expected_issue_description: str,
+    output: MessageProperties
+) -> dict:
+    """Score based on string similarity"""
+    from difflib import SequenceMatcher
+    
+    scores = {}
+    
+    # Calculate similarity for each field
+    scores['customer_name_similarity'] = SequenceMatcher(
+        None, expected_customer_name.lower(), output.customer_name.lower()
+    ).ratio()
+    
+    scores['product_model_similarity'] = SequenceMatcher(
+        None, expected_product_model.lower(), output.product_model.lower()
+    ).ratio()
+    
+    scores['issue_similarity'] = SequenceMatcher(
+        None, expected_issue_description.lower(), output.issue_description.lower()
+    ).ratio()
+    
+    scores['avg_similarity'] = sum(scores.values()) / len(scores)
+    return scores
 
 # %% [markdown]
-# ## Part 5: Advanced Techniques 🚀
+# ### Method 1: Using the Structured Evaluation Framework
 #
-# Let's explore some advanced prompt engineering techniques.
-
+# This approach is great when you have a predefined dataset and want to evaluate functions or models systematically.
 
 # %%
-# Chain of Thought (CoT) approach
+# Create evaluation for our extraction functions
+evaluation = Evaluation(
+    dataset=support_emails_dataset,
+    scorers=[exact_match_scorer, similarity_scorer],
+    name="Email Extraction Evaluation"
+)
+
+# Evaluate each version
+print("Evaluating Version 1 (Basic)...")
+results_v1 = asyncio.run(evaluation.evaluate(extract_properties_v1))
+
+print("\nEvaluating Version 2 (Improved)...")
+results_v2 = asyncio.run(evaluation.evaluate(extract_properties_v2))
+
+print("\nEvaluating Version 3 (Few-shot)...")
+results_v3 = asyncio.run(evaluation.evaluate(extract_properties_v3_fewshot))
+
+print("\n✅ Evaluations complete! Check the Weave UI to see detailed results and comparisons.")
+
+# %% [markdown]
+# ### Method 2: Using EvaluationLogger for Flexible Evaluation
+#
+# The `EvaluationLogger` is perfect for more complex workflows where you want to log evaluations incrementally.
+
+# %%
+from weave import EvaluationLogger
+
+# Example of using EvaluationLogger for more flexible evaluation
 @weave.op
-def extract_properties_v4_cot(message: str) -> MessageProperties:
-    """Version 4: Chain of Thought reasoning"""
-    system_prompt = """You are an expert at analyzing customer support emails.
-    Think step-by-step to extract information accurately."""
+def evaluate_with_logger(extractor_func, dataset_rows):
+    """Demonstrate EvaluationLogger for incremental evaluation"""
+    
+    # Initialize the logger
+    eval_logger = EvaluationLogger(
+        model=extractor_func.__name__,
+        dataset="support_emails"
+    )
+    
+    # Process each example
+    for row in dataset_rows:
+        # Extract properties
+        extracted = extractor_func(row['email'])
+        
+        # Log the prediction
+        pred_logger = eval_logger.log_prediction(
+            inputs={'email': row['email']},
+            output=extracted.model_dump()
+        )
+        
+        # Calculate and log exact match score
+        exact_match = all([
+            row['expected_customer_name'].lower() == extracted.customer_name.lower(),
+            row['expected_product_model'].lower() == extracted.product_model.lower(),
+            row['expected_issue_description'].lower() == extracted.issue_description.lower()
+        ])
+        pred_logger.log_score(scorer="exact_match", score=exact_match)
+        
+        # Calculate and log field-level scores
+        pred_logger.log_score(
+            scorer="customer_name_correct",
+            score=row['expected_customer_name'].lower() == extracted.customer_name.lower()
+        )
+        pred_logger.log_score(
+            scorer="product_model_correct", 
+            score=row['expected_product_model'].lower() == extracted.product_model.lower()
+        )
+        
+        # Finish logging for this prediction
+        pred_logger.finish()
+    
+    # Log summary statistics
+    eval_logger.log_summary({
+        "evaluation_method": "incremental_logger",
+        "total_examples": len(dataset_rows)
+    })
+    
+    print(f"✅ Logged evaluation for {extractor_func.__name__}")
 
-    user_prompt = f"""Analyze this customer support email step by step:
+# Run logger-based evaluation for comparison
+print("\nDemonstrating EvaluationLogger approach:")
+evaluate_with_logger(extract_properties_v1, eval_examples)
+evaluate_with_logger(extract_properties_v2, eval_examples)
+evaluate_with_logger(extract_properties_v3_fewshot, eval_examples)
 
-Email: {message}
+# %% [markdown]
+# ## Part 5: Advanced Techniques with Models 🚀
+#
+# Let's explore advanced prompt engineering techniques using Weave's `Model` class for better parameter tracking.
+
+# %%
+# Define extraction models with different strategies
+class ExtractionModel(Model):
+    """Base model for email extraction with configurable prompts"""
+    
+    system_prompt: str
+    user_prompt_template: str
+    temperature: float = 0.1
+    
+    @weave.op
+    def predict(self, email: str) -> MessageProperties:
+        user_prompt = self.user_prompt_template.format(email=email)
+        
+        client = OpenAI()
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=self.temperature
+        )
+        
+        parsed = json.loads(response.choices[0].message.content)
+        return MessageProperties(**parsed)
+
+# Chain of Thought Model
+cot_model = ExtractionModel(
+    system_prompt="""You are an expert at analyzing customer support emails.
+    Think step-by-step to extract information accurately.""",
+    user_prompt_template="""Analyze this customer support email step by step:
+
+Email: {email}
 
 Follow these steps:
 1. First, identify any names mentioned or signatures
@@ -383,57 +446,28 @@ Follow these steps:
 3. Finally, summarize the main issue in a concise way
 4. Return your findings as JSON with fields: customer_name, product_model, issue_description
 
-Think through each step before providing your final answer."""
+Think through each step before providing your final answer.""",
+    temperature=0.1
+)
 
-    client = OpenAI()
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.1,
-    )
-
-    parsed = json.loads(response.choices[0].message.content)
-    return MessageProperties(**parsed)
-
-
-# Role-based approach
-@weave.op
-def extract_properties_v5_role(message: str) -> MessageProperties:
-    """Version 5: Role-based persona"""
-    system_prompt = """You are a senior customer support specialist with 10 years of experience.
+# Role-based Model
+role_model = ExtractionModel(
+    system_prompt="""You are a senior customer support specialist with 10 years of experience.
     You excel at quickly identifying key information from customer emails to route them to the right team.
-    You're known for your accuracy and attention to detail."""
+    You're known for your accuracy and attention to detail.""",
+    user_prompt_template="""As an experienced support specialist, extract the key information from this email:
 
-    user_prompt = f"""As an experienced support specialist, extract the key information from this email:
-
-{message}
+{email}
 
 Provide a JSON summary with:
 - customer_name: The customer's full name
 - product_model: The exact product model (be specific)
-- issue_description: A clear, concise summary suitable for ticket routing"""
-
-    client = OpenAI()
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.1,
-    )
-
-    parsed = json.loads(response.choices[0].message.content)
-    return MessageProperties(**parsed)
-
+- issue_description: A clear, concise summary suitable for ticket routing""",
+    temperature=0.1
+)
 
 # %%
-# Test advanced techniques
+# Test advanced models
 test_email = """Subject: HELP! Expensive headphones failing
 
 I can't believe this is happening. I paid $350 for these SoundMax Pro Elite 
@@ -446,92 +480,56 @@ This is completely unacceptable for such expensive headphones.
 Frustrated customer,
 Patricia Martinez"""
 
-print("Testing advanced techniques on complex email:\n")
+print("Testing advanced models on complex email:\n")
 print(f"Email:\n{test_email}\n")
 print("-" * 50)
 
-# Test each advanced version
-for name, func in [
-    ("Chain of Thought", extract_properties_v4_cot),
-    ("Role-based", extract_properties_v5_role),
-]:
-    print(f"\n{name} approach:")
-    result = func(test_email)
-    print(result.model_dump_json(indent=2))
+# Test Chain of Thought model
+print("\nChain of Thought approach:")
+cot_result = cot_model.predict(test_email)
+print(cot_result.model_dump_json(indent=2))
 
-# %% [markdown]
-# ## Part 6: Using Weave to Compare and Analyze 📈
-#
-# Now let's use Weave's features to compare all our approaches and understand what works best.
-
+# Test Role-based model
+print("\nRole-based approach:")
+role_result = role_model.predict(test_email)
+print(role_result.model_dump_json(indent=2))
 
 # %%
-# Create a comprehensive comparison
-@weave.op
-def compare_all_versions(test_emails: List[str]):
-    """Compare all extraction versions"""
-    versions = {
-        "v1_basic": extract_properties_v1,
-        "v2_improved": extract_properties_v2,
-        "v3_fewshot": extract_properties_v3_fewshot,
-        "v4_cot": extract_properties_v4_cot,
-        "v5_role": extract_properties_v5_role,
-    }
+# Evaluate the advanced models
+print("\nEvaluating advanced models...")
 
-    comparison_results = []
+print("Chain of Thought Model:")
+cot_results = asyncio.run(evaluation.evaluate(cot_model))
 
-    for email in test_emails:
-        email_results = {"email": email[:50] + "...", "results": {}}
+print("\nRole-based Model:")
+role_results = asyncio.run(evaluation.evaluate(role_model))
 
-        for version_name, func in versions.items():
-            try:
-                result = func(email)
-                email_results["results"][version_name] = result.model_dump()
-            except Exception as e:
-                email_results["results"][version_name] = {"error": str(e)}
-
-        comparison_results.append(email_results)
-
-    return comparison_results
-
-
-# Run comparison
-comparison = compare_all_versions([row["email"] for row in eval_dataset[:3]])
-
-print("Comparison of all versions (first email):")
-first_email_results = comparison[0]["results"]
-for version, result in first_email_results.items():
-    print(f"\n{version}:")
-    if "error" not in result:
-        print(f"  Customer: {result['customer_name']}")
-        print(f"  Product: {result['product_model']}")
-        print(f"  Issue: {result['issue_description'][:50]}...")
-    else:
-        print(f"  Error: {result['error']}")
+print("\n✅ Advanced model evaluations complete!")
 
 # %% [markdown]
 # ## Workshop Exercises 🎯
 #
-# Now it's your turn! Try these exercises to practice prompt engineering:
+# Now it's your turn! Try these exercises to practice prompt engineering and evaluation:
 #
 # ### Exercise 1: Handle Edge Cases
-# Create a new version that handles emails where:
+# Create a new model that handles emails where:
 # - The customer name is not explicitly stated
 # - Multiple products are mentioned
 # - The issue is vague or unclear
 #
-# ### Exercise 2: Add New Fields
+# ### Exercise 2: Add New Fields and Scorers
 # Extend the extraction to include:
 # - Urgency level (low/medium/high)
 # - Customer sentiment (positive/neutral/negative)
 # - Category (hardware/software/other)
 #
-# ### Exercise 3: Multi-language Support
-# Create a version that can handle emails in different languages
+# Then create custom scorers for these new fields!
 #
-# ### Exercise 4: Custom Evaluation Metrics
-# Design your own scoring function that better reflects real-world requirements
-
+# ### Exercise 3: Multi-language Support
+# Create a model that can handle emails in different languages
+#
+# ### Exercise 4: Build Your Own Evaluation
+# Create a comprehensive evaluation comparing all approaches using Weave's evaluation framework
 
 # %%
 # Exercise starter code
@@ -543,20 +541,29 @@ class ExtendedMessageProperties(BaseModel):
     customer_sentiment: str = Field(description="positive/neutral/negative")
     category: str = Field(description="hardware/software/other")
 
-
-@weave.op
-def extract_properties_extended(message: str) -> ExtendedMessageProperties:
-    """Your implementation here!"""
-    # TODO: Implement your enhanced extraction
-    pass
-
+class ExtendedExtractionModel(Model):
+    """Your enhanced model here!"""
+    system_prompt: str
+    user_prompt_template: str
+    
+    @weave.op
+    def predict(self, email: str) -> ExtendedMessageProperties:
+        # TODO: Implement your enhanced extraction
+        pass
 
 # Test with edge cases
 edge_case_emails = [
     "Your product is terrible! Nothing works anymore!",  # No name, no specific product
     "Both my iPhone 14 and iPad Pro are having issues with the screen. Very urgent!",  # Multiple products
-    "Something's wrong with my device. Please help.",  # Vague description
+    "Something's wrong with my device. Please help."  # Vague description
 ]
+
+# Create a custom scorer for the new fields
+@weave.op
+def urgency_scorer(expected_urgency: str, output: ExtendedMessageProperties) -> dict:
+    """Score urgency detection accuracy"""
+    # TODO: Implement your scorer
+    pass
 
 # %% [markdown]
 # ## Key Takeaways 🎓
@@ -564,20 +571,23 @@ edge_case_emails = [
 # 1. **Start Simple**: Begin with basic prompts and iterate
 # 2. **Be Specific**: Clear instructions improve results
 # 3. **Use Examples**: Few-shot learning can significantly improve accuracy
-# 4. **Test Systematically**: Use evaluation datasets to measure improvements
+# 4. **Test Systematically**: Use Weave's evaluation framework to measure improvements
 # 5. **Track Everything**: Weave helps you understand what works and why
 #
 # ## Weave Features Showcased:
 # - **@weave.op**: Track function calls and compare versions
-# - **weave.Dataset**: Organize evaluation data
+# - **Model**: Organize prompts and parameters
+# - **Dataset**: Structure your evaluation data
+# - **Evaluation**: Systematic testing with multiple scorers
+# - **EvaluationLogger**: Flexible, incremental evaluation logging
 # - **Automatic Logging**: See inputs, outputs, and errors
-# - **Version Comparison**: Understand which prompts work best
 # - **Performance Tracking**: Monitor latency and costs
 #
 # ## Next Steps:
 # 1. Explore the Weave dashboard to see all your tracked experiments
-# 2. Try different models (GPT-4, Claude, etc.)
-# 3. Build more complex chains and workflows
-# 4. Create production-ready evaluations
+# 2. Compare evaluation results across different models
+# 3. Try different LLMs (GPT-4, Claude, etc.)
+# 4. Build more complex evaluation pipelines
+# 5. Create production-ready models with comprehensive testing
 #
 # Happy prompting! 🚀
