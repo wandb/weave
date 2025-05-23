@@ -1,5 +1,6 @@
 import React from 'react';
 
+import {Icon} from '../../components/Icon';
 import {useOnMouseDownOutside} from '../util/dom';
 import {
   getOptionDisplayName,
@@ -8,9 +9,8 @@ import {
   WBMenuOption,
   WBMenuTheme,
 } from './WBMenu';
-import * as S from './WBSelect.styles';
-import {Icon} from '../../components/Icon';
 import {WBPopup} from './WBPopup';
+import * as S from './WBSelect.styles';
 
 export type WBSelectProps = {
   className?: string;

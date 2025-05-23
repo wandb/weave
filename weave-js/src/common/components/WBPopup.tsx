@@ -1,11 +1,11 @@
-import React from 'react'
-import ReactDOM from 'react-dom'
-import Measure from 'react-measure'
+import React from 'react';
+import ReactDOM from 'react-dom';
+import Measure from 'react-measure';
 
-import * as S from './WBPopup.styles'
+import * as S from './WBPopup.styles';
 
-const VERTICAL_MARGIN = 2
-const HORIZONTAL_MARGIN = 16
+const VERTICAL_MARGIN = 2;
+const HORIZONTAL_MARGIN = 16;
 
 export type WBPopupDirection =
   | 'top left'
@@ -15,24 +15,24 @@ export type WBPopupDirection =
   | 'center right'
   | 'bottom left'
   | 'bottom center'
-  | 'bottom right'
+  | 'bottom right';
 
 export type WBPopupProps = {
-  className?: string
-  style?: React.CSSProperties
-  x: number
-  y: number
+  className?: string;
+  style?: React.CSSProperties;
+  x: number;
+  y: number;
   // setting an explicit maxHeight disables expansion on scroll
-  maxHeight?: number
-  direction?: WBPopupDirection
+  maxHeight?: number;
+  direction?: WBPopupDirection;
   // setting this makes x, y, and direction determine the positioning
   // of the provided child element rather than the whole popup.
-  elementToPosition?: HTMLElement | null
-  noPortal?: boolean
-  scrollerRef?: React.Ref<HTMLDivElement>
-  onScroll?: (event: React.UIEvent<HTMLDivElement, UIEvent>) => void
-  children: React.ReactNode
-}
+  elementToPosition?: HTMLElement | null;
+  noPortal?: boolean;
+  scrollerRef?: React.Ref<HTMLDivElement>;
+  onScroll?: (event: React.UIEvent<HTMLDivElement, UIEvent>) => void;
+  children: React.ReactNode;
+};
 
 export const WBPopup = React.forwardRef<HTMLDivElement, WBPopupProps>(
   (
@@ -47,78 +47,79 @@ export const WBPopup = React.forwardRef<HTMLDivElement, WBPopupProps>(
       scrollerRef,
       maxHeight: propsMaxHeight,
       onScroll,
-      children
+      children,
     },
     ref
   ) => {
-    const appliedDirection = direction ?? 'bottom center'
+    const appliedDirection = direction ?? 'bottom center';
     const [scrollerElement, setScrollerElement] =
-      React.useState<HTMLDivElement | null>(null)
-    const [height, setHeight] = React.useState(0)
-    const [top, setTop] = React.useState(0)
-    const [left, setLeft] = React.useState(0)
-    const [contentHeight, setContentHeight] = React.useState(0)
-    const maxHeight = propsMaxHeight ?? window.innerHeight - 2 * VERTICAL_MARGIN
+      React.useState<HTMLDivElement | null>(null);
+    const [height, setHeight] = React.useState(0);
+    const [top, setTop] = React.useState(0);
+    const [left, setLeft] = React.useState(0);
+    const [contentHeight, setContentHeight] = React.useState(0);
+    const maxHeight =
+      propsMaxHeight ?? window.innerHeight - 2 * VERTICAL_MARGIN;
     React.useLayoutEffect(() => {
       if (scrollerElement == null) {
-        return
+        return;
       }
       const [verticalDirection, horizontalDirection] =
-        appliedDirection.split(' ')
+        appliedDirection.split(' ');
       const anchorWidth = elementToPosition
         ? elementToPosition.offsetWidth
-        : scrollerElement.offsetWidth
+        : scrollerElement.offsetWidth;
       const anchorHeight = elementToPosition
         ? elementToPosition.offsetHeight
-        : contentHeight
+        : contentHeight;
 
-      let adjustedY = y
+      let adjustedY = y;
       if (elementToPosition) {
-        adjustedY -= elementToPosition.offsetTop
+        adjustedY -= elementToPosition.offsetTop;
       }
       switch (verticalDirection) {
         case 'top':
-          adjustedY -= anchorHeight
-          break
+          adjustedY -= anchorHeight;
+          break;
         case 'center':
-          adjustedY -= anchorHeight / 2
-          break
+          adjustedY -= anchorHeight / 2;
+          break;
         case 'bottom':
-          break
+          break;
       }
 
-      let adjustedX = x
+      let adjustedX = x;
       if (elementToPosition) {
-        adjustedX -= elementToPosition.offsetLeft
+        adjustedX -= elementToPosition.offsetLeft;
       }
       switch (horizontalDirection) {
         case 'left':
-          adjustedX -= anchorWidth
-          break
+          adjustedX -= anchorWidth;
+          break;
         case 'center':
-          adjustedX -= anchorWidth / 2
-          break
+          adjustedX -= anchorWidth / 2;
+          break;
         case 'right':
-          break
+          break;
       }
 
-      let cutTop = 0
+      let cutTop = 0;
       if (adjustedY < VERTICAL_MARGIN) {
-        cutTop = VERTICAL_MARGIN - adjustedY
+        cutTop = VERTICAL_MARGIN - adjustedY;
       }
-      const newTop = Math.max(VERTICAL_MARGIN, adjustedY)
-      setTop(newTop)
+      const newTop = Math.max(VERTICAL_MARGIN, adjustedY);
+      setTop(newTop);
       setHeight(
         Math.min(
           contentHeight - cutTop,
           window.innerHeight - VERTICAL_MARGIN - newTop,
           maxHeight
         )
-      )
+      );
       // this condition prevents snapping back
       // whenever the popup moves
       if (cutTop > scrollerElement.scrollTop) {
-        scrollerElement.scrollTo({ top: cutTop })
+        scrollerElement.scrollTo({top: cutTop});
       }
       setLeft(
         Math.max(
@@ -128,7 +129,7 @@ export const WBPopup = React.forwardRef<HTMLDivElement, WBPopupProps>(
           ),
           HORIZONTAL_MARGIN
         )
-      )
+      );
     }, [
       scrollerElement,
       x,
@@ -136,22 +137,22 @@ export const WBPopup = React.forwardRef<HTMLDivElement, WBPopupProps>(
       appliedDirection,
       elementToPosition,
       maxHeight,
-      contentHeight
-    ])
+      contentHeight,
+    ]);
 
     const scrollerCallbackRef = React.useCallback(
       (node: HTMLDivElement | null) => {
         if (scrollerRef) {
           if (typeof scrollerRef === 'function') {
-            scrollerRef(node)
+            scrollerRef(node);
           } else {
-            ;(scrollerRef as any).current = node
+            (scrollerRef as any).current = node;
           }
         }
-        setScrollerElement(node)
+        setScrollerElement(node);
       },
       [scrollerRef]
-    )
+    );
 
     const content = (
       <S.Wrapper
@@ -160,57 +161,54 @@ export const WBPopup = React.forwardRef<HTMLDivElement, WBPopupProps>(
         height={Math.max(height, 0)}
         top={top}
         className={className}
-        style={style}
-      >
+        style={style}>
         <Measure
           bounds
-          onResize={({ bounds }) => {
-            setContentHeight(bounds?.height || 0)
-          }}
-        >
-          {({ measureRef }) => {
+          onResize={({bounds}) => {
+            setContentHeight(bounds?.height || 0);
+          }}>
+          {({measureRef}) => {
             return (
               <S.Scroller
                 ref={scrollerCallbackRef}
                 contentOverflows={contentHeight > height}
                 onScroll={e => {
-                  onScroll?.(e)
+                  onScroll?.(e);
                   if (propsMaxHeight || height >= maxHeight) {
-                    return
+                    return;
                   }
                   if (top === VERTICAL_MARGIN) {
                     // scrolling up
                     const previousScrollTop =
                       e.currentTarget.scrollHeight -
-                      e.currentTarget.offsetHeight
+                      e.currentTarget.offsetHeight;
                     const scrollDist = Math.min(
                       previousScrollTop - e.currentTarget.scrollTop,
                       window.innerHeight - VERTICAL_MARGIN - top
-                    )
-                    setHeight(height + scrollDist)
+                    );
+                    setHeight(height + scrollDist);
                     e.currentTarget.scrollTo({
-                      top: e.currentTarget.scrollHeight
-                    })
+                      top: e.currentTarget.scrollHeight,
+                    });
                   } else {
                     // scrolling down
                     const scrollDist = Math.min(
                       e.currentTarget.scrollTop,
                       top - VERTICAL_MARGIN
-                    )
-                    setHeight(height + scrollDist)
-                    setTop(top - scrollDist)
-                    e.currentTarget.scrollTo({ top: 0 })
+                    );
+                    setHeight(height + scrollDist);
+                    setTop(top - scrollDist);
+                    e.currentTarget.scrollTo({top: 0});
                   }
-                }}
-              >
+                }}>
                 <div ref={measureRef}>{children}</div>
               </S.Scroller>
-            )
+            );
           }}
         </Measure>
       </S.Wrapper>
-    )
+    );
 
-    return noPortal ? content : ReactDOM.createPortal(content, document.body)
+    return noPortal ? content : ReactDOM.createPortal(content, document.body);
   }
-)
+);

@@ -1,9 +1,9 @@
-import styled from 'styled-components'
+import styled from 'styled-components';
 
 export const Wrapper = styled.div<{
-  left: number
-  height: number
-  top: number
+  left: number;
+  height: number;
+  top: number;
 }>`
   position: fixed;
   pointer-events: auto;
@@ -11,9 +11,9 @@ export const Wrapper = styled.div<{
   left: ${props => props.left}px;
   top: ${props => props.top}px;
   height: ${props => props.height}px;
-`
+`;
 
-export const Scroller = styled.div<{ contentOverflows?: boolean }>`
+export const Scroller = styled.div<{contentOverflows?: boolean}>`
   width: 100%;
   height: 100%;
   overflow: ${props => (props.contentOverflows ? `auto` : `visible`)};
@@ -25,4 +25,4 @@ export const Scroller = styled.div<{ contentOverflows?: boolean }>`
     width: 0;
     height: 0;
   }
-`
+`;
