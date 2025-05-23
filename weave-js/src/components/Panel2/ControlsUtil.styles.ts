@@ -1,5 +1,5 @@
-import {GLOBAL_COLORS} from '@wandb/weave/common/util/colors';
 import styled from 'styled-components';
+import {GLOBAL_COLORS} from '../../common/util/colors';
 
 export const InputWrapper = styled.div`
   font-size: 13px;

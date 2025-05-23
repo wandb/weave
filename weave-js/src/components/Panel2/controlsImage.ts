@@ -2,10 +2,10 @@ import {
   BoundingBoxSliderControl,
   LineStyle,
 } from '@wandb/weave/common/components/MediaCard';
-import {colorFromName, colorN, ROBIN16} from '@wandb/weave/common/util/colors';
 import {ImageType, nullableTaggableStrip, Type} from '@wandb/weave/core';
 import * as _ from 'lodash';
 import {useMemo} from 'react';
+import {colorFromName, colorN, ROBIN16} from '../../common/util/colors';
 
 export interface OverlayControls {
   [overlayID: string]: OverlayState;

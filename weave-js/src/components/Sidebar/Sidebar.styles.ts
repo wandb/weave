@@ -1,7 +1,7 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
-import {GLOBAL_COLORS} from '@wandb/weave/common/util/colors';
 import {Button} from 'semantic-ui-react';
 import styled from 'styled-components';
+import {GLOBAL_COLORS} from '../../common/util/colors';
 
 export const Wrapper = styled.div<{collapsed: boolean; width: number}>`
   height: 100vh;
