@@ -53,14 +53,14 @@ type Colors = {
 
 const THEME_COLORS: {[t in WBMenuTheme]: Colors} = {
   dark: {
-    background: globals.darkerGray,
-    highlight: globals.primary,
-    text: globals.white,
+    background: globals.MOON_850,
+    highlight: globals.TEAL_500,
+    text: globals.WHITE,
   },
   light: {
-    background: globals.white,
-    highlight: globals.gray100,
-    text: globals.gray800,
+    background: globals.WHITE,
+    highlight: globals.MOON_100,
+    text: globals.MOON_750,
   },
 };
 

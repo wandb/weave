@@ -42,10 +42,10 @@ export const TypeableWrapper = styled.div<{
     !props.inputFocused &&
     css`
       &:hover {
-        border: 1px solid ${globals.border};
+        border: 1px solid ${globals.MOON_300};
         ${CaretWrapper} {
           background: #f1f1f1;
-          border-left: 1px solid ${globals.border};
+          border-left: 1px solid ${globals.MOON_300};
         }
         .wbic-ic-next {
           color: black;
@@ -86,7 +86,7 @@ export const StyledAutoCompletingInput = styled(AutoCompletingInput)`
 `;
 
 export const DropdownArrow = styled.div`
-  border-top: 0.25em solid ${globals.textPrimary};
+  border-top: 0.25em solid ${globals.MOON_750};
   border-left: 0.25em solid transparent;
   border-right: 0.25em solid transparent;
   position: relative;
