@@ -296,6 +296,9 @@ class Dataset(Object):
         # Convert lambda to named function for better async handling
         func = wrap_lambda(func)
 
+        # Store the function name before applying weave.op
+        func_name = getattr(func, "__name__", "unknown_function")
+
         # Apply weave.op after lambda conversion
         func = weave.op(func)
 
@@ -323,7 +326,7 @@ class Dataset(Object):
                     # Raise error for non-dictionary returns
                     raise TypeError(
                         f"Function must return a dictionary, but got {type(result).__name__} "
-                        f"from function '{func.__name__}'. Use a dictionary to specify "
+                        f"from function '{func_name}'. Use a dictionary to specify "
                         f"which columns to add or update."
                     )
             except Exception as e:
