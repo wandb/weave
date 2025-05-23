@@ -1,3 +1,0 @@
-Tracing
-    * Decorator
-    * Auto Instrumentation
