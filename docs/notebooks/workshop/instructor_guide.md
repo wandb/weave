@@ -81,17 +81,19 @@ Show how the dataset is intentionally challenging to leave room for improvement
 - Perfect for streaming or custom workflows
 - Handle errors gracefully
 - **Critical**: Model and dataset identification is crucial since there are no objects
-- Can use dictionaries for rich metadata (recommended!)
+- Model can use dictionaries for rich metadata (recommended!)
+- Dataset must be a string
 
 **Demo:**
-- Show simple string identification vs dictionary identification
+- Show model can be string or dictionary
+- Dataset must be string (can encode version in the string)
 - Emphasize how dictionary metadata helps with filtering/comparison
 - Show custom scoring logic
 - Process examples one-by-one
 - Add summary statistics
 
 **Teaching Note:**
-Emphasize that unlike standard Evaluation, EvaluationLogger relies entirely on the model and dataset parameters for identification. Show how dictionary metadata makes evaluations more discoverable and comparable.
+Emphasize that unlike standard Evaluation, EvaluationLogger relies entirely on the model and dataset parameters for identification. Model can use dictionary metadata for rich tracking, while dataset must be a string (but you can encode metadata in the string name).
 
 ### Part 4: Model Comparison (20 mins)
 **Key Points:**

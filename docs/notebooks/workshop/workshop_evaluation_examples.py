@@ -442,7 +442,8 @@ def compare_models(
 # %% [markdown]
 # ## Advanced EvaluationLogger Patterns with Rich Metadata
 #
-# Here's how to use dictionary identification for production-grade evaluation tracking:
+# EvaluationLogger allows rich metadata for the model parameter (dictionary) while
+# the dataset parameter must be a string. Here's how to use this pattern effectively:
 
 
 # %%
@@ -466,7 +467,12 @@ def create_production_eval_logger(
         "deployed_at": model_config.get("deployed_at", datetime.now().isoformat()),
     }
 
-    # Rich dataset identification
+    # Dataset identification must be a string
+    # You can include metadata in the string name if needed
+    dataset_name = f"{dataset_info.get('name', 'unknown_dataset')}_v{dataset_info.get('version', '1.0.0')}"
+
+    # Store dataset metadata separately if needed for tracking
+    # (Could log this separately or include in summary)
     dataset_metadata = {
         "name": dataset_info.get("name", "unknown_dataset"),
         "version": dataset_info.get("version", "1.0.0"),
@@ -478,7 +484,7 @@ def create_production_eval_logger(
         "characteristics": dataset_info.get("characteristics", {}),
     }
 
-    return EvaluationLogger(model=model_metadata, dataset=dataset_metadata)
+    return EvaluationLogger(model=model_metadata, dataset=dataset_name)
 
 
 # Example usage
@@ -518,9 +524,12 @@ production_logger = create_production_eval_logger(
 )
 
 # %% [markdown]
-# This rich metadata pattern enables:
-# 1. **Easy filtering** in the Weave UI by any metadata field
-# 2. **Version tracking** for both models and datasets
+# This metadata pattern enables:
+# 1. **Model filtering** in the Weave UI by model metadata fields
+# 2. **Version tracking** for models (dataset version encoded in string name)
 # 3. **Experiment grouping** to compare related evaluations
 # 4. **Audit trails** with timestamps and deployment info
 # 5. **Performance analysis** by correlating with model parameters
+#
+# Note: While dataset must be a string, you can encode version info in the name
+# (e.g., "support_emails_v1.2.0") and track full metadata separately if needed.

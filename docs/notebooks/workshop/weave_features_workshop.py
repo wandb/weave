@@ -25,6 +25,7 @@ import asyncio
 import json
 import os
 import random
+import re
 from datetime import datetime
 from getpass import getpass
 from typing import Any, Optional
@@ -195,36 +196,165 @@ print(f"Needs immediate attention: {ticket['needs_immediate_attention']}")
 # We'll use a more challenging dataset to expose model weaknesses.
 
 # %%
-# Create a challenging evaluation dataset
+# Create a challenging evaluation dataset with tricky examples
 eval_examples = [
+    # Easy examples (even basic model should get these)
     {
-        "email": "John Smith here. My DataProcessor-Pro v2.5 isn't working correctly. The data export feature that worked yesterday is now producing corrupted files.",
+        "email": "Hi Support, I'm John Smith and my DataProcessor-Pro v2.5 isn't working correctly. The data export feature is producing corrupted files. Very frustrated!",
         "expected_name": "John Smith",
         "expected_product": "DataProcessor-Pro v2.5",
         "expected_sentiment": "negative",
     },
     {
-        "email": "Jane from accounting. CloudSync Plus Enterprise works but sometimes the sync is delayed by 10-15 minutes. Not urgent but would like it fixed.",
-        "expected_name": "Jane",
-        "expected_product": "CloudSync Plus Enterprise",
-        "expected_sentiment": "neutral",
-    },
-    {
-        "email": "My SmartHub (model SH-2000) won't connect. - Bob Wilson, Senior Manager",
-        "expected_name": "Bob Wilson",
-        "expected_product": "SmartHub SH-2000",
-        "expected_sentiment": "negative",
-    },
-    {
-        "email": "Hi! Dr. Alice Chen writing. The AI-Assistant tool is fantastic! Minor suggestion: could you add dark mode? Overall very happy.",
+        "email": "Hello, this is Dr. Alice Chen. I wanted to say that your AI-Assistant tool is fantastic! Everything works perfectly. Thank you!",
         "expected_name": "Dr. Alice Chen",
         "expected_product": "AI-Assistant",
         "expected_sentiment": "positive",
     },
+    # Medium difficulty - ambiguous names/products
     {
-        "email": "URGENT!!! System completely down! Can't access anything on WorkflowMax! This is costing us thousands per hour! Contact: Mike O'Brien, CEO",
-        "expected_name": "Mike O'Brien",
+        "email": "Jane from accounting here. The CloudSync Plus works fine but Enterprise Sync Module has delays. Not critical.",
+        "expected_name": "Jane",
+        "expected_product": "Enterprise Sync Module",  # NOT CloudSync Plus!
+        "expected_sentiment": "neutral",
+    },
+    {
+        "email": "My SmartHub won't connect to anything. Super annoying. - Bob Wilson\nSenior Manager\nTech Solutions Inc",
+        "expected_name": "Bob Wilson",
+        "expected_product": "SmartHub",  # Model info missing
+        "expected_sentiment": "negative",
+    },
+    {
+        "email": "Spoke with Sarah about the issue. Still having problems with WorkflowMax crashing. Mike O'Brien, CEO",
+        "expected_name": "Mike O'Brien",  # NOT Sarah
         "expected_product": "WorkflowMax",
+        "expected_sentiment": "negative",
+    },
+    # Hard examples - names in unusual places
+    {
+        "email": "The new update broke everything! Nothing works anymore on the ProSuite 3000. Call me - signed, frustrated customer Zhang Wei",
+        "expected_name": "Zhang Wei",
+        "expected_product": "ProSuite 3000",
+        "expected_sentiment": "negative",
+    },
+    {
+        "email": "RE: Ticket #1234\nCustomer María García called about CloudVault. She says thanks for fixing the sync issue! Works great now.",
+        "expected_name": "María García",
+        "expected_product": "CloudVault",
+        "expected_sentiment": "positive",
+    },
+    {
+        "email": "My assistant Jennifer will send the logs. The actual problem is with DataMiner Pro, not the viewer. -Raj (Dr. Rajesh Patel)",
+        "expected_name": "Dr. Rajesh Patel",  # NOT Jennifer, and full name from signature
+        "expected_product": "DataMiner Pro",  # NOT the viewer
+        "expected_sentiment": "neutral",  # Matter-of-fact, not emotional
+    },
+    # Very hard - misleading information
+    {
+        "email": "Johnson recommended your software. Smith from our team loves CloudSync. But I'm having issues with it. Brown, James Brown.",
+        "expected_name": "James Brown",  # NOT Johnson or Smith
+        "expected_product": "CloudSync",
+        "expected_sentiment": "negative",  # Having issues despite others liking it
+    },
+    {
+        "email": "Great product! Though the InvoiceGen module crashes sometimes. Still recommend it! Anna from Stockholm",
+        "expected_name": "Anna",
+        "expected_product": "InvoiceGen module",
+        "expected_sentiment": "positive",  # Overall positive despite crashes
+    },
+    {
+        "email": "Update on case by Thompson: Lee's WorkStation Pro still showing error 0x80004005. Previous tech couldn't resolve.",
+        "expected_name": "Lee",  # NOT Thompson
+        "expected_product": "WorkStation Pro",
+        "expected_sentiment": "negative",
+    },
+    # Extremely hard - complex scenarios
+    {
+        "email": "Hi, chatted with your colleague Emma (super helpful!). Anyway, ReportBuilder works ok but takes forever. —Samantha Park, CTO",
+        "expected_name": "Samantha Park",  # NOT Emma
+        "expected_product": "ReportBuilder",
+        "expected_sentiment": "neutral",  # "works ok" but slow - not fully negative
+    },
+    {
+        "email": "FYI - Customer called: Pierre-Alexandre Dubois mentioned the API-Gateway is fantastic, just needs better docs. Direct quote.",
+        "expected_name": "Pierre-Alexandre Dubois",
+        "expected_product": "API-Gateway",
+        "expected_sentiment": "positive",  # "fantastic" outweighs doc complaint
+    },
+    {
+        "email": "Worst experience ever with tech support! Though I admit ProductX works well. O'Sullivan here (Francis).",
+        "expected_name": "Francis O'Sullivan",  # Name split across sentence
+        "expected_product": "ProductX",
+        "expected_sentiment": "negative",  # Support experience outweighs product working
+    },
+    # Trick examples - products that sound like names
+    {
+        "email": "Maxwell keeps crashing! This software is terrible. Signed, angry user Li Chen",
+        "expected_name": "Li Chen",
+        "expected_product": "Maxwell",  # Maxwell is the product, not a person
+        "expected_sentiment": "negative",
+    },
+    {
+        "email": "Please tell Gordon that the Morgan Analytics Suite works perfectly now. Thanks! - Yuki Tanaka",
+        "expected_name": "Yuki Tanaka",  # NOT Gordon
+        "expected_product": "Morgan Analytics Suite",  # Morgan is part of product name
+        "expected_sentiment": "positive",
+    },
+    # Ambiguous sentiment
+    {
+        "email": "DataFlow Pro is exactly what I expected from your company. Classic experience. João Silva, Product Manager",
+        "expected_name": "João Silva",
+        "expected_product": "DataFlow Pro",
+        "expected_sentiment": "negative",  # Sarcastic - "expected" and "classic" imply typically bad
+    },
+    {
+        "email": "The ChromaEdit tool works... I guess. Does what it says. Whatever. -Kim",
+        "expected_name": "Kim",
+        "expected_product": "ChromaEdit tool",
+        "expected_sentiment": "neutral",  # Apathetic, not negative or positive
+    },
+    # Multiple products mentioned
+    {
+        "email": "Upgraded from TaskMaster to ProjectPro. Having issues with ProjectPro's gantt charts. Anne-Marie Rousseau",
+        "expected_name": "Anne-Marie Rousseau",
+        "expected_product": "ProjectPro",  # The one with issues, not TaskMaster
+        "expected_sentiment": "negative",
+    },
+    {
+        "email": "Hi! love your VideoEdit, PhotoEdit, and AudioEdit apps! Especially AudioEdit! Muhammad here :)",
+        "expected_name": "Muhammad",
+        "expected_product": "AudioEdit",  # The one especially mentioned
+        "expected_sentiment": "positive",
+    },
+    # Edge cases
+    {
+        "email": "Yo! Sup? Ur SystemMonitor thing is broke af. fix it asap!!!! - xXx_Dmitri_xXx",
+        "expected_name": "Dmitri",  # Extract from gamertag
+        "expected_product": "SystemMonitor",
+        "expected_sentiment": "negative",
+    },
+    {
+        "email": "¡Hola! Carlos Méndez aquí. Su programa FinanceTracker es excelente pero muy caro. Gracias.",
+        "expected_name": "Carlos Méndez",
+        "expected_product": "FinanceTracker",
+        "expected_sentiment": "neutral",  # Good but expensive = neutral
+    },
+    {
+        "email": "Re: Jackson's complaint\n\nI disagree with Jackson. The Scheduler App works fine for me.\n\nBest,\nPriya Sharma\nHead of IT",
+        "expected_name": "Priya Sharma",  # NOT Jackson
+        "expected_product": "Scheduler App",
+        "expected_sentiment": "positive",  # Disagrees with complaint
+    },
+    {
+        "email": "This is regarding the issue with CloudBackup Pro v3.2.1 that Jennifer Chen reported. I'm her manager, David Kim, following up.",
+        "expected_name": "David Kim",  # The sender, not Jennifer
+        "expected_product": "CloudBackup Pro v3.2.1",
+        "expected_sentiment": "negative",  # Following up on an issue
+    },
+    {
+        "email": "😡😡😡 InventoryMaster deleted everything!!! 😭😭😭 - call me back NOW! //Singh",
+        "expected_name": "Singh",
+        "expected_product": "InventoryMaster",
         "expected_sentiment": "negative",
     },
 ]
@@ -298,24 +428,118 @@ eval_results = asyncio.run(evaluation.evaluate(analyze_customer_email))
 print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 
 # %% [markdown]
+# ## 🎯 Part 3c: Using Pre-built Scorers
+#
+# Weave provides many pre-built scorers for common evaluation tasks!
+# No need to reinvent the wheel for standard metrics.
+
+# %%
+# Note about pre-built scorers
+# Weave provides many pre-built scorers that can be imported as needed.
+# Common scorers include:
+# - String matching: exact match, contains, regex patterns
+# - Classification: precision, recall, F1
+# - Text generation: BLEU, ROUGE
+# - Custom validators: JSON validation, schema checking
+#
+# Example of creating scorer-like functions:
+print("🎯 Demonstrating scorer patterns similar to pre-built scorers...")
+
+
+# Example: Using pre-built scorers
+@weave.op
+def customer_name_extractor(email: str) -> dict[str, str]:
+    """Simple extraction function for demonstration."""
+    # Simplified extraction logic
+    lines = email.strip().split("\n")
+    name = "Unknown"
+    for line in lines:
+        if any(greeting in line.lower() for greeting in ["hi", "hello", "dear"]):
+            continue
+        # Look for potential names (simplified)
+        words = line.split()
+        if 2 <= len(words) <= 4 and not any(char.isdigit() for char in line):
+            name = line.strip(" ,-")
+            break
+
+    return {"extracted_name": name, "email": email}
+
+
+# Create dataset with expected values
+name_dataset = Dataset(
+    name="name_extraction_test",
+    rows=[
+        {
+            "email": "Hello, I need help with my account.\n\nBest regards,\nJohn Smith",
+            "expected_name": "John Smith",
+        },
+        {
+            "email": "Hi Support,\n\nMy product is broken.\n\nThanks,\nJane Doe",
+            "expected_name": "Jane Doe",
+        },
+    ],
+)
+
+
+# Creating scorers that mimic pre-built functionality
+@weave.op
+def exact_match_scorer(extracted_name: str, expected_name: str) -> dict[str, Any]:
+    """Similar to a StringMatchScorer."""
+    match = extracted_name == expected_name
+    return {"exact_match": match, "score": 1.0 if match else 0.0}
+
+
+@weave.op
+def contains_scorer(extracted_name: str, expected_name: str) -> dict[str, Any]:
+    """Similar to a ContainsScorer with ignore_case."""
+    contains = expected_name.lower() in extracted_name.lower()
+    return {"contains": contains, "score": 1.0 if contains else 0.0}
+
+
+@weave.op
+def regex_pattern_scorer(extracted_name: str) -> dict[str, Any]:
+    """Similar to a RegexMatchScorer."""
+    import re
+
+    pattern = r"[A-Z][a-z]+ [A-Z][a-z]+"  # Simple name pattern
+    matches = bool(re.match(pattern, extracted_name))
+    return {"valid_name_format": matches, "score": 1.0 if matches else 0.0}
+
+
+# Run evaluation with custom scorers that mimic pre-built ones
+print("🎯 Using custom scorers (similar to pre-built scorers)...")
+custom_eval = Evaluation(
+    name="custom_scorers_demo",
+    dataset=name_dataset,
+    scorers=[exact_match_scorer, contains_scorer, regex_pattern_scorer],
+)
+
+# Note: Weave provides many pre-built scorers in the library
+print("✅ Custom scorers configured!")
+print("💡 Tip: Check the Weave docs for the full list of pre-built scorers:")
+print("   https://docs.wandb.ai/guides/weave/evaluation#predefined-scorers")
+
+# %% [markdown]
 # ## 📝 Part 3b: Using EvaluationLogger
 #
 # The `EvaluationLogger` provides a flexible way to log evaluation data incrementally.
 # This is perfect when you don't have all your data upfront or want more control.
 #
 # **Important**: Since EvaluationLogger doesn't use Model/Dataset objects, the `model`
-# and `dataset` parameters are crucial for identification. You can use strings or
-# dictionaries for rich metadata!
+# and `dataset` parameters are crucial for identification.
+# - `model`: Can be a string OR dictionary (for rich metadata)
+# - `dataset`: Must be a string
 
 # %%
 # Example using EvaluationLogger for custom evaluation flow
 # You can use simple strings for identification
 eval_logger = EvaluationLogger(
     model="email_analyzer_gpt35",  # Model name/version
-    dataset="support_emails",  # Dataset name stays consistent
+    dataset="support_emails",  # Dataset name (must be string)
 )
 
-# Or use dictionaries for richer identification (recommended!)
+# Model can use dictionaries for richer identification (recommended!)
+# Dataset must be a string
 eval_logger_rich = EvaluationLogger(
     model={
         "name": "email_analyzer",
@@ -324,12 +548,7 @@ eval_logger_rich = EvaluationLogger(
         "temperature": 0.7,
         "prompt_version": "2024-01",
     },
-    dataset={
-        "name": "support_emails",
-        "version": "2024Q1",
-        "size": len(eval_examples),
-        "source": "production_samples",
-    },
+    dataset="support_emails_2024Q1",  # Dataset must be string
 )
 
 # Let's use the rich logger for our demo
@@ -403,6 +622,7 @@ print("💡 Tip: The rich metadata makes it easy to filter and compare evaluatio
 class EmailAnalyzerModel(Model):
     """Base model for email analysis with configurable parameters."""
 
+    label: str = "email_analyzer"
     model_name: str = "gpt-4o-mini"
     temperature: float = 0.1
     system_prompt: str = "You are a customer support analyst."
@@ -427,31 +647,44 @@ class EmailAnalyzerModel(Model):
 
 # Create model variants with different quality levels
 basic_model = EmailAnalyzerModel(
-    name="basic_analyzer",
-    system_prompt="Extract name, product, issue, sentiment.",  # Too simple
-    temperature=0.9,  # Too high - more random
+    label="basic_analyzer",
+    system_prompt="Extract customer name, product name, issue, and sentiment from email.",  # Too simple - no guidance
+    temperature=0.95,  # Very high - more random/mistakes
 )
 
 detailed_model = EmailAnalyzerModel(
-    name="detailed_analyzer",
-    system_prompt="""You are an expert customer support analyst.
-    Carefully extract:
-    - Customer name (full name, check signatures and greetings)
-    - Product name (include version/model numbers)
-    - Issue description (be specific)
-    - Sentiment (positive/neutral/negative based on tone and urgency)
-    
-    Pay attention to edge cases like names in signatures or product versions.""",
-    temperature=0.0,
-    model_name="gpt-4o-mini",  # Better model
+    label="detailed_analyzer",
+    system_prompt="""You are an expert customer support analyst. Carefully analyze the email:
+
+CRITICAL RULES:
+1. Customer name: Extract the name of the person WRITING the email (not people mentioned)
+   - Check signatures, sign-offs, and self-introductions
+   - If multiple names appear, identify who is actually writing
+   - Include full name if available (e.g., "Dr. Rajesh Patel" not just "Raj")
+   
+2. Product: Identify the SPECIFIC product having issues
+   - If multiple products mentioned, focus on the problematic one
+   - Include version numbers if provided
+   - Don't confuse product names with people names
+   
+3. Sentiment: Analyze the OVERALL tone
+   - positive: satisfied, happy, thankful (even with minor complaints)
+   - negative: frustrated, angry, disappointed
+   - neutral: matter-of-fact, indifferent, mixed feelings
+   - Consider sarcasm and actual meaning beyond words""",
+    temperature=0.0,  # Precise
 )
 
 balanced_model = EmailAnalyzerModel(
-    name="balanced_analyzer",
-    system_prompt="""Extract customer information from support emails.
-    Look for: customer name (anywhere in email), product (with any version info),
-    issue description, and sentiment. Be thorough but concise.""",
-    temperature=0.3,
+    label="balanced_analyzer",
+    system_prompt="""Extract customer support information from emails.
+    
+    Guidelines:
+    - Customer name: The person sending the email (check signatures)
+    - Product: The main product being discussed
+    - Issue: Brief description of the problem
+    - Sentiment: Overall tone (positive/negative/neutral)""",
+    temperature=0.4,  # Moderate temperature
 )
 
 # %% [markdown]
@@ -476,15 +709,16 @@ async def compare_models(models: list[Model], dataset: Dataset) -> dict[str, Any
     )
 
     for model in models:
-        print(f"\n📊 Evaluating {model.name}...")
+        print(f"\n📊 Evaluating {model.label}...")
 
         # Run evaluation with optional display name for this specific run
         eval_result = await evaluation.evaluate(
-            model, __weave={"display_name": f"Run: {model.name}"}
+            model,
+            __weave={"display_name": f"email_analyzer_comparison - {model.label}"},
         )
-        results[model.name] = eval_result
+        results[model.label] = eval_result
 
-        print(f"✅ {model.name} evaluation complete!")
+        print(f"✅ {model.label} evaluation complete!")
 
     return results
 
@@ -503,6 +737,9 @@ print("\n🎉 Comparison complete! View the results in the Weave UI.")
 #
 # Weave automatically tracks exceptions, helping you debug failures in production.
 # This is especially useful when dealing with structured outputs.
+#
+# **Workshop Note**: We intentionally use an older model (gpt-3.5-turbo) without
+# structured output support to demonstrate real-world parsing challenges and exceptions.
 
 
 # %%
@@ -523,41 +760,89 @@ def analyze_detailed_email(email: str) -> DetailedCustomerEmail:
     """Analyze email with strict schema - more likely to fail."""
     client = OpenAI()
 
-    response = client.beta.chat.completions.parse(
-        model="gpt-4o-mini",  # Still capable but may struggle with complex schema
+    # Use a less capable model without structured outputs
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",  # Older model, no structured outputs
         messages=[
             {
                 "role": "system",
-                "content": "Extract ALL fields. Use 'Unknown' if not found.",
+                "content": """Extract ALL fields from the email and return as JSON:
+                {
+                    "customer_name": "full name",
+                    "customer_title": "job title or null",
+                    "company": "company name or null", 
+                    "product": "product name with version",
+                    "product_version": "version number or null",
+                    "issue": "detailed issue description",
+                    "severity": "critical/high/medium/low",
+                    "sentiment": "positive/neutral/negative"
+                }
+                Use null for missing optional fields. All fields are required.""",
             },
             {
                 "role": "user",
                 "content": email,
             },
         ],
-        response_format=DetailedCustomerEmail,
-        temperature=0.8,  # Higher temperature = more errors
+        temperature=0.9,  # High temperature = more unpredictable
     )
 
-    return response.choices[0].message.parsed
+    # Manual JSON parsing - prone to errors!
+    try:
+        # Extract JSON from response (model might add extra text)
+        response_text = response.choices[0].message.content
+
+        # Try to find JSON in the response (brittle!)
+        json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+        if not json_match:
+            raise ValueError("No JSON found in response")
+
+        json_str = json_match.group(0)
+        data = json.loads(json_str)
+
+        # Manual validation and construction (many failure points!)
+        return DetailedCustomerEmail(
+            customer_name=data["customer_name"],
+            customer_title=data.get("customer_title"),
+            company=data.get("company"),
+            product=data["product"],
+            product_version=data.get("product_version"),
+            issue=data["issue"],
+            severity=data["severity"],
+            sentiment=data["sentiment"],
+        )
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        # Re-raise with more context
+        raise ValueError(
+            f"Failed to parse model response: {str(e)}. Response was: {response_text[:200]}..."
+        )
 
 
 # Test with various emails to see exceptions
 test_emails_for_errors = [
-    "Fix this NOW!",  # Too short, missing info
+    "Fix this NOW!",  # Too short, missing almost everything
     "The thing is broken - Anonymous",  # Missing key details
-    test_email,  # Should work
+    "My product isn't working",  # No name, no specific product
+    "😡😡😡",  # Just emojis
+    "Contact: J. Smith\nProduct: Version 2.0\nIssue: Yes",  # Ambiguous/incomplete
+    "HELP! Everything is on fire! Call 911!",  # Panic mode, no real info
+    test_email,  # This one might work
+    "I am very satisfied with your service. Thank you! -A Customer",  # Positive but missing product
 ]
 
-print("🐞 Testing exception tracking...")
+print("🐞 Testing exception tracking with challenging emails...")
+print("=" * 60)
 for i, email in enumerate(test_emails_for_errors):
-    print(f"\n📧 Test {i+1}:")
+    print(f"\n📧 Test {i+1}: '{email[:50]}{'...' if len(email) > 50 else ''}'")
     try:
         result = analyze_detailed_email(email)
         print(f"✅ Success: {result.customer_name} - {result.product}")
+        print(f"   Severity: {result.severity}, Sentiment: {result.sentiment}")
+    except ValueError as e:
+        print(f"❌ Parsing Error: {str(e)[:100]}...")
     except Exception as e:
-        print(f"❌ Error: {type(e).__name__}: {str(e)}")
-        print("   Check Weave UI to see the full error trace!")
+        print(f"❌ {type(e).__name__}: {str(e)[:100]}...")
+    print("   → Check Weave UI for full trace!")
 
 
 # Demonstrate JSON parsing errors
