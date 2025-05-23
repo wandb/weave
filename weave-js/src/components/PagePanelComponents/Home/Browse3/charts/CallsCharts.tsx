@@ -305,19 +305,21 @@ const CallsChartsInner = ({
           border: dashed 1px ${TEAL_600} !important;
         }
       `}</style>
-      <div className="w-full min-h-screen overflow-auto bg-moon-50">
-        <div className="px-4 pb-4 pt-2">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="mr-2 text-base font-semibold text-moon-750">
-              Charts
-            </span>
+      <div className="w-full min-h-screen overflow-auto bg-moon-100">
+        <div>
+          <div className="px-16 pt-14 mb-8 flex items-center justify-between">
+            <h2 className="mr-2 text-lg">
+              Dashboard
+            </h2>
             <Button
               icon="add-new"
-              variant="secondary"
-              size="small"
+              variant="primary"
               onClick={openCreateDrawer}
-            />
+            >
+              Add panel
+            </Button>
           </div>
+          <div className="px-8">
           <ResponsiveGridLayout
             className="layout"
             layouts={effectiveLayouts}
@@ -387,6 +389,7 @@ const CallsChartsInner = ({
               );
             })}
           </ResponsiveGridLayout>
+          </div>
         </div>
         {drawerState.open && (
           <ChartDrawer
