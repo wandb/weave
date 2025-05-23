@@ -102,7 +102,7 @@ google_genai = ["google-genai>=1.0.0", "pillow>=11.1.0"]
 groq = ["groq>=0.13.0"]
 huggingface = ["huggingface-hub>=0.28.1"]
 smolagents = [
-  "openai>=1.0.0,<1.82.0",
+  "openai>=1.0.0",
   "litellm>=1.58",
   "smolagents>=1.8.1",
   "huggingface-hub>=0.28.1",
@@ -143,7 +143,7 @@ scorers = [
   "presidio-anonymizer>=2.2.0",
 ]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
-openai = ["openai>=1.0.0,<1.82.0"]
+openai = ["openai>=1.0.0"]
 openai_agents = ["openai-agents>=0.0.4"]
 pandas-test = ["pandas>=2.2.3"]
 presidio = ["presidio-analyzer==2.2.357", "presidio-anonymizer==2.2.357"]

@@ -424,7 +424,6 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         ResponseOutputItemDoneEvent,
         ResponseRefusalDeltaEvent,
         ResponseRefusalDoneEvent,
-        ResponseTextAnnotationDeltaEvent,
         ResponseTextDeltaEvent,
         ResponseTextDoneEvent,
         ResponseWebSearchCallCompletedEvent,
@@ -485,14 +484,12 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
             ResponseAudioTranscriptDeltaEvent,
         ),
     ):
+        # Note: Audio unrelated events are being sent as ResponseAudioDeltaEvent by some tool calls in 1.82.0
         # Not obvious how to handle these since there is no output_index
         if not acc.output:
             acc.output = [""]
-        acc.output[0] += value.delta
-
-    elif isinstance(value, ResponseTextAnnotationDeltaEvent):
-        # Not obvious how to handle this since there is no delta
-        ...
+        if value.delta is not None:
+            acc.output[0] += value.delta
 
     # Everything else
     elif isinstance(
