@@ -62,8 +62,8 @@ The workshop is divided into 9 parts, each focusing on different Weave features:
 - **`weave_features_workshop.py`** - Main workshop notebook
 - **`workshop_evaluation_examples.py`** - Advanced evaluation patterns
 - **`workshop_quickstart.py`** - Environment setup checker
-- **`weave_workshop_README.md`** - This file
-- **`weave_workshop_instructor_guide.md`** - Guide for instructors
+- **`README.md`** - This file
+- **`instructor_guide.md`** - Guide for instructors
 
 ## 🛠️ Key Concepts
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Prompt Engineering Workshop - Quick Start Script
+Weave Workshop - Quick Start Script
 Run this to verify your environment is set up correctly.
 """
 
+import os
 import sys
 
 
@@ -11,7 +12,12 @@ def check_imports():
     """Check if required packages are installed"""
     print("🔍 Checking required packages...")
 
-    packages = {"weave": "weave", "openai": "openai", "pydantic": "pydantic"}
+    packages = {
+        "weave": "weave",
+        "openai": "openai",
+        "pydantic": "pydantic",
+        "wandb": "wandb",
+    }
 
     missing = []
     for package, import_name in packages.items():
@@ -29,31 +35,30 @@ def check_imports():
     return True
 
 
-def check_openai():
-    """Check OpenAI API key."""
-    try:
-        client = OpenAI()
-        client.models.list()
-        print("✅ OpenAI API key is valid")
-    except Exception as e:
-        print(f"❌ OpenAI API key error: {e}")
+def check_api_keys():
+    """Check if API keys are set"""
+    print("\n🔑 Checking API keys...")
+
+    keys_found = True
+
+    if os.getenv("OPENAI_API_KEY"):
+        print("✅ OPENAI_API_KEY is set")
     else:
-        print("OpenAI connection successful")
+        print("❌ OPENAI_API_KEY is NOT set")
+        keys_found = False
 
-
-def check_weave():
-    """Check Weave connection."""
-    try:
-        weave.init("test-project")
-        print("✅ Weave initialization successful")
-    except Exception as e:
-        print(f"❌ Weave initialization error: {e}")
+    if os.getenv("WANDB_API_KEY"):
+        print("✅ WANDB_API_KEY is set")
     else:
-        print("Weave connection successful")
+        print("❌ WANDB_API_KEY is NOT set")
+        print("   Get your API key at: https://wandb.ai/authorize")
+        keys_found = False
+
+    return keys_found
 
 
-def test_basic_call():
-    """Test a basic OpenAI API call"""
+def test_openai_connection():
+    """Test OpenAI API connection"""
     print("\n🤖 Testing OpenAI API connection...")
 
     try:
@@ -69,6 +74,8 @@ def test_basic_call():
         return True
     except Exception as e:
         print(f"❌ API call failed: {str(e)}")
+        if "api_key" in str(e).lower():
+            print("   Make sure OPENAI_API_KEY is set correctly")
         return False
 
 
@@ -79,7 +86,7 @@ def test_weave():
     try:
         import weave
 
-        weave.init("workshop_test")
+        weave.init("workshop-test")
 
         @weave.op
         def test_function(x: int) -> int:
@@ -87,38 +94,49 @@ def test_weave():
 
         result = test_function(21)
         print(f"✅ Weave is working! Test result: {result}")
+        print("   Check your traces at: https://wandb.ai/home")
         return True
     except Exception as e:
         print(f"❌ Weave test failed: {str(e)}")
+        if "WANDB_API_KEY" in str(e):
+            print("   Make sure WANDB_API_KEY is set correctly")
         return False
 
 
 def main():
     """Run all checks"""
-    print("🚀 Prompt Engineering Workshop - Environment Check\n")
+    print("🚀 Weave Workshop - Environment Check\n")
 
-    checks = [
-        ("Package Installation", check_imports),
-        ("OpenAI API Key", check_openai),
-        ("API Connection", test_basic_call),
-        ("Weave Setup", test_weave),
-    ]
+    # Run all checks
+    checks_passed = []
 
-    results = []
-    for name, check_func in checks:
-        try:
-            success = check_func()
-            results.append((name, success))
-        except Exception as e:
-            print(f"❌ {name} check failed with error: {str(e)}")
-            results.append((name, False))
+    # Check imports
+    imports_ok = check_imports()
+    checks_passed.append(("Package Installation", imports_ok))
 
+    if not imports_ok:
+        print("\n⚠️  Please install missing packages before continuing")
+        return 1
+
+    # Check API keys
+    keys_ok = check_api_keys()
+    checks_passed.append(("API Keys", keys_ok))
+
+    # Test OpenAI connection
+    openai_ok = test_openai_connection()
+    checks_passed.append(("OpenAI Connection", openai_ok))
+
+    # Test Weave
+    weave_ok = test_weave()
+    checks_passed.append(("Weave Setup", weave_ok))
+
+    # Summary
     print("\n" + "=" * 50)
     print("📋 SUMMARY:")
     print("=" * 50)
 
     all_passed = True
-    for name, success in results:
+    for name, success in checks_passed:
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{name}: {status}")
         if not success:
@@ -129,11 +147,9 @@ def main():
     if all_passed:
         print("\n🎉 All checks passed! You're ready for the workshop!")
         print("\n📝 Next steps:")
-        print(
-            "1. Open the workshop notebook: prompt_engineering_workshop_complete.ipynb"
-        )
+        print("1. Open the main workshop file: weave_features_workshop.py")
         print("2. Visit https://wandb.ai/home to see your Weave dashboard")
-        print("3. Get ready to build awesome prompts! 🚀")
+        print("3. Get ready to build awesome AI applications! 🚀")
     else:
         print(
             "\n⚠️  Some checks failed. Please fix the issues above before starting the workshop."
