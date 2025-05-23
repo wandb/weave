@@ -491,9 +491,13 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         # Not obvious how to handle these since there is no output_index
         if not acc.output:
             acc.output = [""]
-        if value.delta is None:
-            logger.warn(f"Could not determine delta for value: {value}")
-        acc.output[0] += value.delta
+
+        if value.delta != None:
+            acc.output[0] += value.delta
+        else:
+            # Can't use value.delta is None because it should never be None and linter removes it
+            logger.warning(f"Could not determine delta for value: {value}")
+            return acc
 
     # Everything else
     elif isinstance(
