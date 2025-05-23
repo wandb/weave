@@ -23,7 +23,7 @@ import {chartAxisFields, extractCallData} from './extractData';
 
 const ResponsiveGridLayout = WidthProvider(RGL.Responsive);
 
-const COLUMN_SIZES = {lg: 12, md: 8, sm: 4, xs: 2, xxs: 1};
+const COLUMN_SIZES = {lg: 12, xxs: 1};
 
 type CallsChartsProps = {
   entity: string;
@@ -35,7 +35,7 @@ type CallsChartsProps = {
 // Constants for grid layout
 const GRID_ROW_HEIGHT = 24;
 const MIN_W = 3;
-const MIN_H = 3;
+const MIN_H = 12; // 300px minimum height (12 * 24px = 312px)
 
 const CallsChartsInner = ({
   entity,
@@ -132,7 +132,7 @@ const CallsChartsInner = ({
 
   // Default layouts if none are persisted
   const defaultW = 4;
-  const defaultH = 12;
+  const defaultH = 12; // ~300px height (12 * 24px = 312px)
   const defaultLayouts = React.useMemo(() => {
     const layouts: Record<string, Layout[]> = {};
 
@@ -168,12 +168,57 @@ const CallsChartsInner = ({
 
     const validLayouts: Record<string, Layout[]> = {};
     Object.keys(CHART_BREAKPOINTS).forEach(breakpoint => {
-      validLayouts[breakpoint] =
-        layouts[breakpoint] || defaultLayouts[breakpoint] || [];
+      const existingLayouts = layouts[breakpoint] || [];
+      const defaultLayoutsForBreakpoint = defaultLayouts[breakpoint] || [];
+      
+      // Create a map of existing layouts by chart id
+      const existingLayoutMap = new Map(existingLayouts.map(l => [l.i, l]));
+      
+      // For each chart, use existing layout if available, otherwise use default
+      validLayouts[breakpoint] = charts.map(chart => {
+        const existing = existingLayoutMap.get(chart.id);
+        if (existing) {
+          return existing;
+        }
+        
+        // Find the default layout for this chart
+        const defaultLayout = defaultLayoutsForBreakpoint.find(l => l.i === chart.id);
+        if (defaultLayout) {
+          return defaultLayout;
+        }
+        
+        // If no default layout exists (new chart), create one
+        // Find a good position that doesn't overlap with existing charts
+        const occupiedPositions = new Set(
+          existingLayouts.map(l => `${l.x},${l.y}`)
+        );
+        
+        let x = 0;
+        let y = 0;
+        
+        // Find first available position
+        while (occupiedPositions.has(`${x},${y}`)) {
+          x += defaultW;
+          if (x + defaultW > COLUMN_SIZES[breakpoint as keyof typeof COLUMN_SIZES]) {
+            x = 0;
+            y += defaultH;
+          }
+        }
+        
+        return {
+          i: chart.id,
+          x,
+          y,
+          w: Math.min(defaultW, COLUMN_SIZES[breakpoint as keyof typeof COLUMN_SIZES]),
+          h: defaultH,
+          minW: MIN_W,
+          minH: MIN_H,
+        };
+      });
     });
 
     return validLayouts;
-  }, [layouts, defaultLayouts]);
+  }, [layouts, defaultLayouts, charts]);
 
   return (
     <Tailwind>
