@@ -36,20 +36,29 @@ import weave
 from weave import Dataset, Evaluation, EvaluationLogger, Model, Scorer
 
 # 🔑 Setup your API keys
-print("---")
-print(
-    "You can find your Weights and Biases API key here: https://wandb.ai/settings#api"
-)
-if not os.environ.get("WANDB_API_KEY"):
-    os.environ["WANDB_API_KEY"] = getpass("Enter your Weights and Biases API key: ")
-print("---")
-print("You can generate your OpenAI API key here: https://platform.openai.com/api-keys")
+print("📝 Setting up API keys...")
+
+# Weights & Biases will automatically prompt if needed
+# It checks: 1) WANDB_API_KEY env var, 2) ~/.netrc, 3) prompts user
+print("✅ W&B authentication will be handled automatically by Weave")
+print("   (Optional: You can set WANDB_API_KEY env variable if you prefer)")
+
+# OpenAI requires manual setup
+print("\n🤖 OpenAI Setup:")
 if not os.environ.get("OPENAI_API_KEY"):
+    print(
+        "You can generate your OpenAI API key here: https://platform.openai.com/api-keys"
+    )
     os.environ["OPENAI_API_KEY"] = getpass("Enter your OpenAI API key: ")
-print("---")
+else:
+    print("✅ OpenAI API key found in environment")
+
+print("\n---")
 
 # 🏠 Initialize your W&B project
+print("🐝 Initializing Weave...")
 weave_client = weave.init("weave-workshop")  # 🐝 Your W&B project name
+print("✅ Weave initialized! Check your traces at https://wandb.ai/home")
 
 # %% [markdown]
 # ## 🔍 Part 1: Tracing & Debugging with Weave

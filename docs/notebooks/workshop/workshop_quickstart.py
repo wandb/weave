@@ -6,6 +6,7 @@ Run this to verify your environment is set up correctly.
 
 import os
 import sys
+from pathlib import Path
 
 
 def check_imports():
@@ -36,26 +37,45 @@ def check_imports():
     return True
 
 
-def check_api_keys():
-    """Check if API keys are set"""
-    print("\n🔑 Checking API keys...")
+def check_wandb_auth():
+    """Check W&B authentication status"""
+    print("\n🔑 Checking W&B authentication...")
 
-    keys_found = True
+    # Check environment variable
+    if os.getenv("WANDB_API_KEY"):
+        print("✅ WANDB_API_KEY found in environment")
+        return True
+
+    # Check ~/.netrc file
+    netrc_path = Path.home() / ".netrc"
+    if netrc_path.exists():
+        try:
+            with open(netrc_path) as f:
+                if "api.wandb.ai" in f.read():
+                    print("✅ W&B credentials found in ~/.netrc")
+                    return True
+        except:
+            pass
+
+    # W&B will prompt automatically
+    print("🟡 No W&B credentials found, but that's OK!")
+    print("   Weave will prompt you to log in when needed")
+    print("   Get your API key at: https://wandb.ai/authorize")
+    return True  # Not a blocking issue
+
+
+def check_openai_key():
+    """Check if OpenAI API key is set"""
+    print("\n🔑 Checking OpenAI API key...")
 
     if os.getenv("OPENAI_API_KEY"):
         print("✅ OPENAI_API_KEY is set")
+        return True
     else:
         print("❌ OPENAI_API_KEY is NOT set")
-        keys_found = False
-
-    if os.getenv("WANDB_API_KEY"):
-        print("✅ WANDB_API_KEY is set")
-    else:
-        print("❌ WANDB_API_KEY is NOT set")
-        print("   Get your API key at: https://wandb.ai/authorize")
-        keys_found = False
-
-    return keys_found
+        print("   Set it with: export OPENAI_API_KEY='your-key-here'")
+        print("   Get your API key at: https://platform.openai.com/api-keys")
+        return False
 
 
 def test_openai_connection():
@@ -87,6 +107,7 @@ def test_weave():
     try:
         import weave
 
+        # This will use existing auth or prompt if needed
         weave.init("workshop-test")
 
         @weave.op
@@ -100,7 +121,7 @@ def test_weave():
     except Exception as e:
         print(f"❌ Weave test failed: {str(e)}")
         if "WANDB_API_KEY" in str(e):
-            print("   Make sure WANDB_API_KEY is set correctly")
+            print("   Try logging in with: wandb login")
         return False
 
 
@@ -119,15 +140,19 @@ def main():
         print("\n⚠️  Please install missing packages before continuing")
         return 1
 
-    # Check API keys
-    keys_ok = check_api_keys()
-    checks_passed.append(("API Keys", keys_ok))
+    # Check authentication
+    wandb_ok = check_wandb_auth()
+    checks_passed.append(("W&B Authentication", wandb_ok))
 
-    # Test OpenAI connection
-    openai_ok = test_openai_connection()
-    checks_passed.append(("OpenAI Connection", openai_ok))
+    openai_ok = check_openai_key()
+    checks_passed.append(("OpenAI API Key", openai_ok))
 
-    # Test Weave
+    # Test connections (only if keys are available)
+    if openai_ok:
+        openai_test = test_openai_connection()
+        checks_passed.append(("OpenAI Connection", openai_test))
+
+    # Test Weave (will handle auth automatically)
     weave_ok = test_weave()
     checks_passed.append(("Weave Setup", weave_ok))
 
@@ -136,12 +161,18 @@ def main():
     print("📋 SUMMARY:")
     print("=" * 50)
 
-    all_passed = True
+    all_passed = all(success for _, success in checks_passed)
+    critical_failures = []
+
     for name, success in checks_passed:
-        status = "✅ PASS" if success else "❌ FAIL"
+        if name == "W&B Authentication":
+            # Special case - show yellow if not found
+            status = "✅ READY" if success else "🟡 WILL PROMPT"
+        else:
+            status = "✅ PASS" if success else "❌ FAIL"
+            if not success:
+                critical_failures.append(name)
         print(f"{name}: {status}")
-        if not success:
-            all_passed = False
 
     print("=" * 50)
 
@@ -152,12 +183,16 @@ def main():
         print("2. Visit https://wandb.ai/home to see your Weave dashboard")
         print("3. Get ready to build awesome AI applications! 🚀")
     else:
-        print(
-            "\n⚠️  Some checks failed. Please fix the issues above before starting the workshop."
-        )
-        print("\nNeed help? Ask your instructor or check the workshop README.")
+        if not critical_failures:
+            print("\n🎉 You're ready for the workshop!")
+            print("W&B will prompt for authentication when needed.")
+        else:
+            print(
+                "\n⚠️  Some checks failed. Please fix the issues above before starting the workshop."
+            )
+            print("\nNeed help? Ask your instructor or check the workshop README.")
 
-    return 0 if all_passed else 1
+    return 0 if not critical_failures else 1
 
 
 if __name__ == "__main__":

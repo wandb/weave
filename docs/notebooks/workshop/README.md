@@ -33,9 +33,25 @@ pip install wandb weave openai pydantic nest_asyncio
 ```
 
 ### 3. Set API Keys
+
+#### OpenAI (Required)
 ```bash
-export WANDB_API_KEY='your-wandb-key'
 export OPENAI_API_KEY='your-openai-key'
+```
+
+#### Weights & Biases (Optional)
+W&B authentication is handled automatically. Weave will check:
+1. `WANDB_API_KEY` environment variable
+2. `~/.netrc` file (from previous `wandb login`)
+3. Prompt you to log in if needed
+
+You can set it manually if preferred:
+```bash
+# Option 1: Environment variable
+export WANDB_API_KEY='your-wandb-key'
+
+# Option 2: Interactive login
+wandb login
 ```
 
 ### 4. Run Setup Check
@@ -134,11 +150,23 @@ After running examples, visit [wandb.ai](https://wandb.ai) to:
 
 ## 🐛 Troubleshooting
 
-### API Key Issues
+### W&B Authentication
 ```bash
-# Check if keys are set
-echo $WANDB_API_KEY
+# W&B will automatically prompt if needed
+# You can also manually log in:
+wandb login
+
+# Or check your current status:
+wandb status
+```
+
+### OpenAI API Key Issues
+```bash
+# Check if key is set
 echo $OPENAI_API_KEY
+
+# Set it if missing
+export OPENAI_API_KEY='your-key-here'
 ```
 
 ### Import Errors

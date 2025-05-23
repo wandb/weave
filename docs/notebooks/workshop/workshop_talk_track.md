@@ -46,9 +46,11 @@ Let's make sure everyone's ready..."
 python workshop_quickstart.py
 ```
 
-Drop a 🎉 in chat when you see 'All checks passed!' 
+Drop a 🎉 in chat when you see all green checkmarks! 
 
 [Wait for responses]
+
+If you see a yellow indicator for W&B authentication, that's perfectly fine - Weave will prompt you to log in when we run our first example. For OpenAI, you'll need that key set before we start.
 
 Perfect! If anyone's still having issues, our TAs will help you out."
 

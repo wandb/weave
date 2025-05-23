@@ -18,7 +18,7 @@ By the end of this workshop, participants will be able to:
 
 ## 📋 Pre-Workshop Checklist
 
-- [ ] Participants have W&B accounts
+- [ ] Participants have W&B accounts (or ready to create)
 - [ ] OpenAI API keys ready (have backup keys)
 - [ ] Workshop Python files downloaded
 - [ ] Weave UI accessible
@@ -46,7 +46,8 @@ By the end of this workshop, participants will be able to:
 - Highlight inputs, outputs, latency
 
 **Common Issues:**
-- API key not set → Check environment variables
+- API key not set → Only OpenAI needs manual setup
+- W&B auth → Will prompt automatically if needed
 - Weave not initialized → Run `weave.init()`
 
 ### Part 2: Call Traces (15 mins)
@@ -257,9 +258,10 @@ Show scorer results and demonstrate:
 - Verify event loop not already running
 
 ### "API errors"
-- Verify API keys
+- Verify OpenAI API key (required)
+- W&B will handle auth automatically
 - Check rate limits
-- Have backup keys ready
+- Have backup OpenAI keys ready
 
 ### "Scorer not working"
 - Check `.call()` method usage
