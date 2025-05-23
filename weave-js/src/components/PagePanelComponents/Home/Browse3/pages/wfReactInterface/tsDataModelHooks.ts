@@ -670,6 +670,9 @@ const useCallsExport = () => {
         expand_columns: params.expandedRefCols ?? undefined,
         include_feedback: params.includeFeedback ?? false,
         include_costs: params.includeCosts ?? false,
+        include_total_storage_size: (params.columns ?? []).includes(
+          'total_storage_size_bytes'
+        ),
       };
       return getTsClient().callsStreamDownload(req, params.contentType);
     },
