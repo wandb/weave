@@ -2,12 +2,13 @@
 # # Advanced Evaluation Examples for the Workshop
 #
 # This notebook provides additional examples of using Weave's evaluation features
-# for the prompt engineering workshop.
+# for the Weave workshop, including the EvaluationLogger's dictionary identification pattern.
 
 # %%
 import asyncio
 import json
 from typing import Any
+from datetime import datetime
 
 from openai import OpenAI
 
@@ -15,7 +16,7 @@ import weave
 from weave import Dataset, Evaluation, EvaluationLogger, Model
 
 # Initialize Weave
-weave.init("prompt_engineering_workshop")
+weave.init("weave_workshop")
 
 # %% [markdown]
 # ## Example 1: Custom Scorer Class
@@ -436,3 +437,98 @@ def compare_models(
     for model in models:
         results[model.name] = evaluate_model(model, dataset, scorers)
     return results
+
+
+# %% [markdown]
+# ## Advanced EvaluationLogger Patterns with Rich Metadata
+#
+# Here's how to use dictionary identification for production-grade evaluation tracking:
+
+# %%
+def create_production_eval_logger(
+    model_config: dict,
+    experiment_name: str,
+    dataset_info: dict
+) -> EvaluationLogger:
+    """Create an evaluation logger with rich metadata for production use."""
+    
+    # Rich model identification
+    model_metadata = {
+        "name": model_config.get("name", "unknown_model"),
+        "version": model_config.get("version", "0.0.0"),
+        "provider": model_config.get("provider", "openai"),
+        "base_model": model_config.get("base_model", "gpt-3.5-turbo"),
+        "parameters": {
+            "temperature": model_config.get("temperature", 0.7),
+            "max_tokens": model_config.get("max_tokens", 150),
+            "top_p": model_config.get("top_p", 1.0),
+        },
+        "prompt_template": model_config.get("prompt_template_version", "v1"),
+        "experiment": experiment_name,
+        "deployed_at": model_config.get("deployed_at", datetime.now().isoformat()),
+    }
+    
+    # Rich dataset identification
+    dataset_metadata = {
+        "name": dataset_info.get("name", "unknown_dataset"),
+        "version": dataset_info.get("version", "1.0.0"),
+        "source": dataset_info.get("source", "production"),
+        "size": dataset_info.get("size", 0),
+        "created_at": dataset_info.get("created_at", datetime.now().isoformat()),
+        "filters": dataset_info.get("filters", {}),
+        "split": dataset_info.get("split", "test"),
+        "characteristics": dataset_info.get("characteristics", {})
+    }
+    
+    return EvaluationLogger(
+        model=model_metadata,
+        dataset=dataset_metadata
+    )
+
+# Example usage
+model_config = {
+    "name": "customer_support_analyzer",
+    "version": "2.1.0",
+    "provider": "openai",
+    "base_model": "gpt-4",
+    "temperature": 0.3,
+    "max_tokens": 200,
+    "prompt_template_version": "v3_detailed",
+    "deployed_at": "2024-01-15T10:00:00Z"
+}
+
+dataset_info = {
+    "name": "support_emails_q1_2024",
+    "version": "1.2.0",
+    "source": "production_sampling",
+    "size": 1000,
+    "filters": {
+        "date_range": "2024-01-01 to 2024-03-31",
+        "language": "en",
+        "region": "US"
+    },
+    "split": "test",
+    "characteristics": {
+        "avg_length": 150,
+        "sentiment_distribution": {
+            "positive": 0.2,
+            "neutral": 0.3,
+            "negative": 0.5
+        }
+    }
+}
+
+# Create logger with rich metadata
+production_logger = create_production_eval_logger(
+    model_config=model_config,
+    experiment_name="q1_2024_performance_review",
+    dataset_info=dataset_info
+)
+
+# %% [markdown]
+# This rich metadata pattern enables:
+# 1. **Easy filtering** in the Weave UI by any metadata field
+# 2. **Version tracking** for both models and datasets
+# 3. **Experiment grouping** to compare related evaluations
+# 4. **Audit trails** with timestamps and deployment info
+# 5. **Performance analysis** by correlating with model parameters

@@ -10,19 +10,21 @@
 By the end of this workshop, participants will be able to:
 1. Use `@weave.op` to trace function calls
 2. Debug LLM applications using Weave's UI
-3. Build and run evaluations
+3. Build and run evaluations with both Evaluation and EvaluationLogger
 4. Compare models systematically
-5. Monitor applications in production
-6. Use Weave for cost and performance tracking
+5. Track and debug exceptions in production
+6. Monitor applications with scorers as guardrails
+7. Use Weave for cost and performance tracking
 
 ## 📋 Pre-Workshop Checklist
 
 - [ ] Participants have W&B accounts
 - [ ] OpenAI API keys ready (have backup keys)
-- [ ] Workshop notebooks downloaded
+- [ ] Workshop Python files downloaded
 - [ ] Weave UI accessible
 - [ ] Screen sharing setup tested
 - [ ] Example traces pre-generated (optional)
+- [ ] Decide on execution environment (notebook vs script)
 
 ## 🏃 Workshop Flow
 
@@ -70,31 +72,57 @@ By the end of this workshop, participants will be able to:
 - Explore results in the UI
 
 **Teaching Tip:**
-Show how to click through individual examples in the eval results
+Show how the dataset is intentionally challenging to leave room for improvement
+
+### Part 3b: EvaluationLogger (10 mins)
+**Key Points:**
+- Flexible incremental logging
+- Perfect for streaming or custom workflows
+- Handle errors gracefully
+- **Critical**: Model and dataset identification is crucial since there are no objects
+- Can use dictionaries for rich metadata (recommended!)
+
+**Demo:**
+- Show simple string identification vs dictionary identification
+- Emphasize how dictionary metadata helps with filtering/comparison
+- Show custom scoring logic
+- Process examples one-by-one
+- Add summary statistics
+
+**Teaching Note:**
+Emphasize that unlike standard Evaluation, EvaluationLogger relies entirely on the model and dataset parameters for identification. Show how dictionary metadata makes evaluations more discoverable and comparable.
 
 ### Part 4: Model Comparison (20 mins)
 **Key Points:**
 - Models encapsulate parameters
 - Easy A/B testing
 - Side-by-side comparisons in UI
+- **Important**: Use ONE evaluation definition for all models
 
 **Demo:**
-- Show the three model variants
+- Show the three model variants (basic, detailed, balanced)
 - Run evaluations on each
 - Use Weave's comparison view
+- Explain why we use the same evaluation object for all models:
+  - Ensures fair comparison
+  - Allows workshop participants to see aggregated results
+  - Each run still gets a unique ID automatically
 
-### Part 5: A/B Testing (15 mins)
+**Teaching Note:**
+Emphasize that the evaluation definition (dataset + scorers) should be consistent across model comparisons. Individual runs can be named with `__weave={"display_name": "..."}` if needed.
+
+### Part 6: Exception Tracking (15 mins)
 **Key Points:**
-- Head-to-head comparisons
-- Statistical insights
-- Decision making with data
+- Automatic exception capture
+- Full stack traces in UI
+- Debug JSON parsing errors
 
-**Interactive:**
-- Let participants suggest new model variants
-- Run live A/B test
-- Discuss results
+**Activity:**
+- Run the strict schema examples
+- Show different error types
+- Explore failed calls in UI
 
-### Part 6: Cost & Performance (15 mins)
+### Part 7: Cost & Performance (15 mins)
 **Key Points:**
 - Automatic token tracking
 - Latency measurements
@@ -105,18 +133,18 @@ Show how to click through individual examples in the eval results
 - Latency breakdown
 - Fallback mechanism
 
-### Part 7: Production Monitoring (15 mins)
+### Part 8: Production Monitoring (20 mins)
 **Key Points:**
-- Production-ready patterns
-- Error tracking
-- Alerting on issues
+- Scorers as guardrails vs monitors
+- The `.call()` method for getting Call objects
+- Async scoring patterns
 
-**Discuss:**
-- Request ID tracking
-- Error handling patterns
-- Monitoring dashboards
+**Demo:**
+- Show ToxicityScorer blocking content
+- Show ResponseQualityScorer tracking quality
+- Demonstrate apply_scorer pattern
 
-### Part 8: Debugging (15 mins)
+### Part 9: Debugging (15 mins)
 **Key Points:**
 - Failed calls highlighted in red
 - Full error traces
@@ -127,15 +155,10 @@ Show how to click through individual examples in the eval results
 - Find failures in UI
 - Debug together
 
-### Part 9: Advanced Features (10 mins)
-**Quick Overview:**
-- Custom metadata
-- Tagging and filtering
-- Export capabilities
-
 ### Wrap-up (15 mins)
 - Q&A session
 - Show additional resources
+- Mention built-in scorers
 - Encourage experimentation
 
 ## 💡 Teaching Tips
@@ -146,14 +169,24 @@ Show how to click through individual examples in the eval results
 - **Questions**: Pause for questions after each section
 
 ### Common Stumbling Blocks
-1. **Async/Await**: Some may not be familiar - explain briefly
+1. **Async/Await**: 
+   - In notebooks: Can use `await` directly or `asyncio.run()` with `nest_asyncio`
+   - In scripts: Use `asyncio.run()`
+   - Workshop code uses `asyncio.run()` for compatibility
 2. **Type Hints**: Emphasize they improve Weave traces
 3. **Dataset Format**: Show the expected structure clearly
+4. **Model Quality**: Explain why basic model performs worse (intentional)
+
+### Notebook vs Script Execution
+- **Notebooks**: May need to replace `asyncio.run()` with `await`
+- **Scripts**: Works as-is with `asyncio.run()`
+- **Both**: Require `nest_asyncio` package
 
 ### Emphasize Practical Value
 - "This helps you debug production issues"
 - "See exactly where your money goes"
 - "Catch regressions before deployment"
+- "Block harmful content in real-time"
 
 ## 🎯 Key Weave Features to Highlight
 
@@ -166,16 +199,19 @@ Show how to click through individual examples in the eval results
    - Interactive trace explorer
    - Evaluation comparisons
    - Cost tracking
+   - Exception details
 
 3. **Evaluation Framework**
    - Flexible scorer system
    - Dataset versioning
    - Reproducible results
+   - EvaluationLogger for custom workflows
 
 4. **Production Ready**
    - Low overhead
    - Async support
    - Error handling
+   - Scorer-based guardrails
 
 ## 📊 Suggested Demos
 
@@ -191,11 +227,17 @@ Open multiple evaluation runs and show:
 - Individual example inspection
 - Model performance trends
 
-### Demo 3: Cost Analysis
-Filter traces by date and show:
-- Total token usage
-- Cost per model
-- Optimization opportunities
+### Demo 3: Exception Analysis
+Show failed calls and demonstrate:
+- Red highlighting for errors
+- Full stack traces
+- Input that caused failure
+
+### Demo 4: Production Monitoring
+Show scorer results and demonstrate:
+- Toxic content blocking
+- Quality score tracking
+- Filtering by score values
 
 ## 🚨 Troubleshooting Guide
 
@@ -209,15 +251,26 @@ Filter traces by date and show:
 - Verify scorer signatures
 - Look for async/await issues
 
+### "Asyncio errors"
+- In notebooks: Use `await` or install `nest_asyncio`
+- Check Python version (3.7+)
+- Verify event loop not already running
+
 ### "API errors"
 - Verify API keys
 - Check rate limits
 - Have backup keys ready
 
+### "Scorer not working"
+- Check `.call()` method usage
+- Verify scorer inherits from Scorer
+- Check parameter matching
+
 ## 📚 Additional Resources
 
 Share these with participants:
 - [Weave Documentation](https://weave-docs.wandb.ai/)
+- [Built-in Scorers](https://weave-docs.wandb.ai/guides/evaluation/builtin_scorers)
 - [Example Notebooks](https://github.com/wandb/weave/tree/main/examples)
 - [Community Forum](https://community.wandb.ai/)
 

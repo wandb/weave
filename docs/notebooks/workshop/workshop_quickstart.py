@@ -17,6 +17,7 @@ def check_imports():
         "openai": "openai",
         "pydantic": "pydantic",
         "wandb": "wandb",
+        "nest_asyncio": "nest_asyncio",
     }
 
     missing = []

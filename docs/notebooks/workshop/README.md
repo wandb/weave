@@ -29,7 +29,7 @@ cd weave-workshop
 
 ### 2. Install Dependencies
 ```bash
-pip install wandb weave openai pydantic
+pip install wandb weave openai pydantic nest_asyncio
 ```
 
 ### 3. Set API Keys
@@ -64,6 +64,25 @@ The workshop is divided into 9 parts, each focusing on different Weave features:
 - **`workshop_quickstart.py`** - Environment setup checker
 - **`README.md`** - This file
 - **`instructor_guide.md`** - Guide for instructors
+
+### 📓 Converting to Jupyter Notebooks
+
+The workshop files are provided as Python scripts for better version control and compatibility. 
+If you prefer Jupyter notebooks, you can convert them:
+
+```bash
+# Install jupytext if needed
+pip install jupytext
+
+# Convert to notebooks
+jupytext --to notebook weave_features_workshop.py workshop_evaluation_examples.py
+
+# Or use the provided script
+./convert_to_notebooks.sh
+
+# Or use make
+make notebooks
+```
 
 ## 🛠️ Key Concepts
 
@@ -125,8 +144,14 @@ echo $OPENAI_API_KEY
 ### Import Errors
 ```bash
 # Reinstall dependencies
-pip install --upgrade wandb weave openai pydantic
+pip install --upgrade wandb weave openai pydantic nest_asyncio
 ```
+
+### Async/Await in Notebooks
+If you're running in a Jupyter notebook and see asyncio errors:
+- The workshop code uses `asyncio.run()` for compatibility
+- In Jupyter, you can replace `asyncio.run(...)` with `await ...`
+- Or use the provided code as-is with `nest_asyncio` installed
 
 ### Weave Connection Issues
 ```python

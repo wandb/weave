@@ -34,7 +34,8 @@ By the end of this workshop, you'll know how to:
 - Trace every LLM call automatically
 - Build comprehensive evaluations
 - Compare models scientifically
-- Monitor production applications
+- Track and debug exceptions
+- Monitor production applications with guardrails
 - And debug issues in seconds instead of hours
 
 Let's make sure everyone's ready..."
@@ -73,7 +74,7 @@ Let me show you something cool. I'm going to run this customer email analyzer...
 
 Look at this! We can see:
 - The exact email input
-- The structured output from GPT-4
+- The structured output from GPT-3.5
 - How long it took (about 1.2 seconds)
 - Even the exact model used
 
@@ -152,7 +153,7 @@ The answer: Systematic evaluation.
 
 [Show evaluation dataset]
 
-Look at this - we've created a test dataset with examples and expected outputs. This is your safety net."
+Look at this - we've created a more challenging test dataset with tricky names, product versions, and edge cases. This is your safety net."
 
 ### Understanding Scorers (5 mins)
 "Scorers are functions that measure how well your model performs. Let's look at three types:
@@ -179,18 +180,18 @@ This is running our analyzer on each test example and applying all three scorers
 - Drill down into individual examples
 - See exactly where the model succeeded or failed
 
-Click on a failed example... see exactly what went wrong. This is how you improve systematically!"
+Click on a failed example... see exactly what went wrong. Notice how it struggles with complex names and product versions? This is how you improve systematically!"
 
 ### Interpreting Results (5 mins)
 "Let's analyze these results together:
-- Name accuracy: 67% - Why? [Click through to see]
-- Sentiment accuracy: 100% - Great!
-- Extraction quality: 78% - Room for improvement
+- Name accuracy: Lower than expected - Why? [Click through to see]
+- Sentiment accuracy: Pretty good!
+- Extraction quality: Room for improvement
 
-What patterns do you notice? Where is our model struggling?"
+What patterns do you notice? The model struggles with names in signatures and product version numbers."
 
 ### Group Exercise (5 mins)
-"Let's add a new scorer together. What about checking if the product name is spelled correctly? Or if the issue description is concise?
+"Let's add a new scorer together. What about checking if the product version was extracted correctly?
 
 [Code along with participants]
 
@@ -198,10 +199,53 @@ See how easy that was? You can create scorers for ANY criteria that matters to y
 
 ---
 
+## 📝 Part 3b: EvaluationLogger (10 mins)
+
+### Flexible Evaluation Logging (3 mins)
+"Sometimes you need more control over your evaluation process. Maybe you're processing data incrementally, or you want custom logging logic. That's where EvaluationLogger comes in.
+
+[Show EvaluationLogger code]
+
+Key difference from standard Evaluation - there are no Model or Dataset objects here. So the identification is CRUCIAL. Look at this:
+- Simple strings work: 'email_analyzer_gpt35'
+- But dictionaries are better! You can track version, parameters, anything
+- This metadata helps you filter and compare evaluations later
+
+See how we can log predictions one by one, add multiple scores per prediction, and even handle errors gracefully?"
+
+### Live Demo (5 mins)
+"Watch this - we're logging each prediction individually...
+
+[Run the EvaluationLogger example]
+
+Notice how we're using rich metadata:
+- Model: version, LLM type, temperature, prompt version
+- Dataset: version, size, source
+- This makes it super easy to filter in the UI later!
+
+We can:
+- Process examples one at a time
+- Add custom business logic scores
+- Handle errors without stopping the whole evaluation
+- Add summary statistics at the end
+
+This is perfect for production scenarios where you're evaluating continuously!"
+
+### When to Use (2 mins)
+"Use EvaluationLogger when:
+- You're processing streaming data
+- You need custom scoring logic
+- You want to handle errors gracefully
+- You're building custom evaluation pipelines
+
+It's more flexible than the standard Evaluation, but requires more code."
+
+---
+
 ## 🏆 Part 4: Model Comparison (20 mins)
 
 ### The Power of A/B Testing (5 mins)
-"Here's the million-dollar question: Is GPT-4 really better than GPT-3.5 for YOUR use case? Is temperature 0 better than 0.7? 
+"Here's the million-dollar question: Is GPT-4 really better than GPT-3.5 for YOUR use case? Is temperature 0 better than 0.9? 
 
 Without Weave: You're guessing.
 With Weave: You have data.
@@ -213,30 +257,68 @@ Let me show you how to compare models scientifically..."
 
 [Show EmailAnalyzerModel class]
 
-Each model is a configuration - different prompts, temperatures, even different LLMs. This is proper experimentation!"
+Each model is a configuration - different prompts, temperatures, even different LLMs. Notice how we've made the basic model intentionally worse with a simple prompt and high temperature?"
 
 ### Running Comparisons (5 mins)
 "Watch this - we'll compare three variants:
 
 [Run model comparison]
 
-While this runs, notice we're using THE SAME evaluation dataset. This is crucial for fair comparison."
+Important point here - notice we create ONE evaluation object and use it for all models. Why? Because:
+- The evaluation definition (dataset + scorers) is the same
+- Each run automatically gets a unique ID
+- This lets everyone in the workshop compare results!
+
+We can optionally name individual runs with display_name, but the evaluation itself stays consistent."
 
 ### Analyzing Results (5 mins)
 "[Open Weave UI comparison view]
 
 🤯 This is beautiful! Side-by-side comparison:
-- Basic model: 72% average
-- Detailed model: 89% average  
-- Empathetic model: 81% average
+- Basic model: Lower scores as expected
+- Detailed model: Best performance with GPT-4  
+- Balanced model: Good middle ground
 
-But here's the key insight - look at the breakdown by metric. The empathetic model is best at sentiment but worse at name extraction. 
-
-This is how you make informed decisions!"
+But here's the key insight - look at the breakdown by metric. The detailed model is best overall but costs more. The balanced model might be your sweet spot for production!"
 
 ---
 
-## 💰 Part 6: Cost & Performance (15 mins)
+## 🐞 Part 6: Exception Tracking (15 mins)
+
+### When Things Go Wrong (3 mins)
+"Let's talk about something that happens in every production system - exceptions. How quickly can you figure out what went wrong?
+
+[Show DetailedCustomerEmail schema]
+
+Look at this stricter schema - it requires more fields, making failures more likely. This is actually good for learning!"
+
+### Live Exception Demo (7 mins)
+"Watch what happens when we feed it problematic inputs...
+
+[Run exception tracking examples]
+
+Look at the different types of failures:
+- Too short emails fail parsing
+- Missing fields cause validation errors
+- Invalid JSON crashes everything
+
+[Switch to Weave UI]
+
+In the Weave UI, failed calls are highlighted in red. Click on one... you see the FULL stack trace, the exact input that caused it, and when it happened. This is gold for debugging!"
+
+### JSON Parsing Errors (3 mins)
+"Here's a common scenario - expecting JSON responses:
+
+[Run JSON parsing examples]
+
+See how Weave captures different error types? JSONDecodeError vs KeyError - each tells you exactly what went wrong."
+
+### Your Turn (2 mins)
+"Try to break the analyzer! Feed it weird inputs and see what exceptions you can trigger. Check the Weave UI to see how they're tracked."
+
+---
+
+## 💰 Part 7: Cost & Performance (15 mins)
 
 ### The Hidden Costs (3 mins)
 "Let's talk about something that matters to your boss - money. LLM calls aren't free, and they add up FAST.
@@ -261,69 +343,69 @@ If GPT-4 fails or is too slow, automatically fall back to GPT-3.5. But here's th
 "[In Weave UI]
 
 Look at this cost tracking:
-- GPT-4 call: ~$0.003 
-- GPT-3.5 fallback: ~$0.0004
-- That's 7.5x difference!
+- GPT-4 call: More expensive but more accurate
+- GPT-3.5 fallback: Cheaper but still works
+- You can see exactly when fallbacks happen
 
 Now multiply that by 100,000 calls per day... you see why this matters?"
 
 ### Optimization Exercise (3 mins)
 "Quick exercise: If you had to reduce costs by 50%, what would you do? Think about:
 - Model selection
-- Prompt length
+- Prompt length optimization
 - Caching strategies
 
 Share your ideas in chat!"
 
 ---
 
-## 🏭 Part 7: Production Monitoring (15 mins)
+## 🏭 Part 8: Production Monitoring with Scorers (20 mins)
 
-### Production Realities (3 mins)
-"Development is one thing, but production is where things get real. You need:
-- Error tracking
-- Performance monitoring  
-- Alerting on anomalies
-- Request tracing
+### Guardrails vs Monitors (5 mins)
+"Production isn't just about handling requests - it's about ensuring quality and safety. Weave's scorer system gives you both guardrails and monitors.
 
-Weave gives you all of this out of the box."
+**Guardrails**: Block bad content before users see it
+**Monitors**: Track quality over time
 
-### Production Patterns (5 mins)
-"Look at this production-ready handler:
+The beauty? They use the same scorer interface!"
 
-[Show production_email_handler code]
+### Building Production Scorers (5 mins)
+"Look at our custom scorers:
 
-Key features:
-- Request ID tracking
-- Error handling
-- Performance metrics
-- Priority alerting
+[Show ToxicityScorer and ResponseQualityScorer]
 
-This is how you sleep well at night!"
+The ToxicityScorer acts as a guardrail - it can block content.
+The ResponseQualityScorer monitors extraction quality - it helps you improve.
 
-### Monitoring Demo (4 mins)
-"Let's simulate production traffic...
+Notice how scorers can access both the output AND the original input?"
 
-[Run production simulation]
+### Live Production Demo (7 mins)
+"Let's see this in action...
 
-In Weave UI, you can:
-- Filter by time range
-- Search by request ID
-- Set up alerts for high-urgency tickets
-- Track error rates
+[Run production monitoring example]
 
-This is enterprise-grade monitoring for AI applications."
+Watch what happens:
+1. Email gets processed
+2. We get the Call object using .call()
+3. Scorers run asynchronously
+4. Toxic content gets flagged
+5. Quality issues are logged
+
+[Switch to Weave UI]
+
+In the UI, you can see scorer results attached to each call. Filter by score values, find problematic requests, analyze patterns!"
 
 ### Best Practices (3 mins)
-"Production tips from the trenches:
-1. Always use request IDs
-2. Log business metrics, not just technical ones
-3. Set up alerts for anomalies
-4. Review traces weekly with your team"
+"Production tips:
+1. Initialize scorers once (outside your handler)
+2. Use async scoring for better performance
+3. Set appropriate thresholds
+4. Sample monitoring to reduce load
+5. Always handle scorer failures gracefully"
 
 ---
 
-## 🐛 Part 8: Debugging Failed Calls (15 mins)
+## 🐛 Part 9: Debugging Failed Calls (15 mins)
 
 ### When Things Go Wrong (3 mins)
 "Let's be honest - things WILL go wrong in production. The question is: how quickly can you fix them?
@@ -348,7 +430,7 @@ This transforms debugging from hours to minutes!"
 ### Common Failure Patterns (3 mins)
 "From experience, here are the most common LLM failures:
 1. Timeout/rate limits
-2. Invalid JSON responses
+2. Invalid structured output
 3. Token limits exceeded
 4. Unexpected input formats
 
@@ -364,51 +446,17 @@ Go!"
 
 ---
 
-## 🎯 Part 9: Advanced Features (10 mins)
-
-### Custom Metadata (3 mins)
-"Let's talk about some power features. First - custom metadata:
-
-[Show analyze_with_metadata code]
-
-You can attach ANY metadata to traces:
-- User IDs
-- Feature flags
-- A/B test variants
-- Business context
-
-This makes analysis incredibly powerful."
-
-### Quick Tips (4 mins)
-"Lightning round of pro tips:
-
-1. **Use tags** - Tag traces with environment, version, customer tier
-2. **Create dashboards** - Save your favorite queries  
-3. **Export data** - Get CSVs for deeper analysis
-4. **Integrate with alerts** - Connect to PagerDuty, Slack
-5. **Use in CI/CD** - Run evaluations in your pipeline"
-
-### The Future (3 mins)
-"Where is this going? Imagine:
-- Automatic prompt optimization based on evaluations
-- Anomaly detection on model behavior  
-- Cost optimization recommendations
-- Team collaboration on debugging
-
-The future of AI development is observable, measurable, and improving!"
-
----
-
 ## 🎉 Wrap-Up (15 mins)
 
 ### Key Takeaways (5 mins)
 "Let's recap what you've learned:
 
 ✅ **Tracing** - Never guess what your AI is doing
-✅ **Evaluation** - Measure to improve
+✅ **Evaluation** - Measure to improve systematically
 ✅ **Comparison** - Make data-driven decisions
-✅ **Monitoring** - Production-grade observability
-✅ **Debugging** - From hours to minutes
+✅ **Exception Tracking** - Debug failures instantly
+✅ **Monitoring** - Production-grade observability with scorers
+✅ **Cost Tracking** - Know where your money goes
 
 You now have superpowers for building AI applications!"
 
@@ -418,7 +466,8 @@ You now have superpowers for building AI applications!"
 1. **This week**: Add Weave to one existing project
 2. **Next week**: Create an evaluation suite
 3. **This month**: Run your first model comparison
-4. **Share**: Tweet your traces! Tag @weights_biases
+4. **Explore**: Try the built-in scorers (HallucinationFreeScorer, SummarizationScorer)
+5. **Share**: Tweet your traces! Tag @weights_biases
 
 Remember - the goal isn't just to build AI apps, it's to build GREAT AI apps."
 
