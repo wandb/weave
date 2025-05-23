@@ -424,7 +424,6 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         ResponseOutputItemDoneEvent,
         ResponseRefusalDeltaEvent,
         ResponseRefusalDoneEvent,
-        ResponseTextAnnotationDeltaEvent,
         ResponseTextDeltaEvent,
         ResponseTextDoneEvent,
         ResponseWebSearchCallCompletedEvent,
@@ -489,10 +488,6 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         if not acc.output:
             acc.output = [""]
         acc.output[0] += value.delta
-
-    elif isinstance(value, ResponseTextAnnotationDeltaEvent):
-        # Not obvious how to handle this since there is no delta
-        ...
 
     # Everything else
     elif isinstance(
