@@ -1,6 +1,4 @@
 import {CSSProperties} from '@material-ui/core/styles/withStyles';
-import {WBMenuOption} from '@wandb/ui';
-import {OptionRenderer} from '@wandb/ui';
 import EditableField from '@wandb/weave/common/components/EditableField';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import {INPUT_SLIDER_CLASS} from '@wandb/weave/common/components/elements/SliderInput';
@@ -19,10 +17,10 @@ import {
   opCount,
   voidNode,
 } from '@wandb/weave/core';
-import {TableState} from '@wandb/weave/index';
 import React, {useCallback, useContext, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
+import {OptionRenderer, WBMenuOption} from '../../../common/components/WBMenu';
 import {Item, ItemIcon} from '../../../common/components/WBMenu.styles';
 import {WBPopupMenuTrigger} from '../../../common/components/WBPopupMenuTrigger';
 import {useWeaveContext} from '../../../context';
@@ -778,8 +776,8 @@ export const ColumnHeader: React.FC<{
                   )}
                   {isGroupCol && (
                     <S.ControlIcon
-                      name="group-runs"
-                      onClick={e => {
+                      name="group"
+                      onClick={() => {
                         recordEvent('REMOVE_COLUMN_GROUPING');
                         doUngroup();
                       }}
@@ -801,7 +799,7 @@ export const ColumnHeader: React.FC<{
                   <S.EllipsisIcon
                     ref={anchorRef}
                     data-test="column-options"
-                    name="overflow"
+                    name="overflow-vertical"
                     className="column-actions-trigger"
                     onClick={() => setOpen(o => !o)}
                   />
@@ -826,8 +824,8 @@ const SortStateToggle: React.FC<{
   if (colSortState && colSortState === 'desc') {
     return (
       <S.ControlIcon
-        name="down-arrow"
-        onClick={async e => {
+        name="sort-descending"
+        onClick={async () => {
           recordEvent('REMOVE_COLUMN_SORT');
           updateTableState(Table.disableSortByCol(tableState, colId));
         }}
@@ -836,8 +834,8 @@ const SortStateToggle: React.FC<{
   } else if (colSortState && colSortState === 'asc') {
     return (
       <S.ControlIcon
-        name="up-arrow"
-        onClick={async e => {
+        name="sort-ascending"
+        onClick={async () => {
           recordEvent('UPDATE_COLUMN_SORT_DESC');
           updateTableState(
             Table.enableSortByCol(Table.disableSort(tableState), colId, false)
@@ -873,10 +871,10 @@ const ColumnMenuOptionRenderer: OptionRenderer = ({
     data-test={option['data-test']}
     hovered={hovered}
     style={{justifyContent: 'flex-start'}}>
-    <ItemIcon
-      style={{marginRight: '8px', marginLeft: 0}}
-      name={option.icon ?? (selected && option.icon ? 'check' : 'blank')}
-    />
+    {selected && option.icon && (
+      <ItemIcon style={{marginRight: '8px', marginLeft: 0}} name="checkmark" />
+    )}
+
     {option.name ?? option.value}
   </Item>
 );

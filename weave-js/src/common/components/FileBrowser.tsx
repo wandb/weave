@@ -773,7 +773,7 @@ const SearchInput = (props: {
 }) => {
   return (
     <S.SearchInputContainer>
-      <S.SearchInputIcon name="search" />
+      <S.SearchInputIcon />
       <input
         value={props.value}
         placeholder="Search"

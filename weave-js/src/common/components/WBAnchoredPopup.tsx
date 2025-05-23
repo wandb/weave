@@ -1,10 +1,10 @@
-import {WBPopup, WBPopupDirection} from '@wandb/ui';
 import {disableBodyScroll, enableBodyScroll} from 'body-scroll-lock';
 import React, {useCallback} from 'react';
 import ReactDOM from 'react-dom';
 
 import PointyTriangle, {PointyTriangleDirection} from './PointyTriangle';
 import * as S from './WBAnchoredPopup.styles';
+import {WBPopup, WBPopupDirection} from './WBPopup';
 
 function getScrollParent(node: Element | null): Element | null {
   if (node == null) {
