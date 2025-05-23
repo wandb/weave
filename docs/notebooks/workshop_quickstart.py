@@ -29,19 +29,27 @@ def check_imports():
     return True
 
 
-def check_openai_key():
-    """Check if OpenAI API key is set"""
-    print("\n🔑 Checking OpenAI API key...")
-
-    import os
-
-    if os.environ.get("OPENAI_API_KEY"):
-        print("✅ OpenAI API key is set")
-        return True
+def check_openai():
+    """Check OpenAI API key."""
+    try:
+        client = OpenAI()
+        client.models.list()
+        print("✅ OpenAI API key is valid")
+    except Exception as e:
+        print(f"❌ OpenAI API key error: {e}")
     else:
-        print("❌ OpenAI API key is NOT set")
-        print("Set it with: export OPENAI_API_KEY='your-key-here'")
-        return False
+        print("OpenAI connection successful")
+
+
+def check_weave():
+    """Check Weave connection."""
+    try:
+        weave.init("test-project")
+        print("✅ Weave initialization successful")
+    except Exception as e:
+        print(f"❌ Weave initialization error: {e}")
+    else:
+        print("Weave connection successful")
 
 
 def test_basic_call():
@@ -91,7 +99,7 @@ def main():
 
     checks = [
         ("Package Installation", check_imports),
-        ("OpenAI API Key", check_openai_key),
+        ("OpenAI API Key", check_openai),
         ("API Connection", test_basic_call),
         ("Weave Setup", test_weave),
     ]

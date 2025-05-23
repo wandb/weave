@@ -47,7 +47,7 @@ def extract_properties_from_message(message: str) -> MessageProperties:
 
     from the customer support message:
     {message}
-    
+
     Return as JSON with exactly these field names.
     """
 
@@ -114,7 +114,7 @@ dataset = [
 SCHEMA_FIELDS = ["customer_name", "product_model", "issue_description"]
 
 # 3. Few-shot exemplars (use first 3 of dataset)
-FEW_SHOT_EXAMPLES = dataset[:3]
+FEW_SHOT_EXAMPLES = list(dataset[:3])
 
 # 4. Prompt templates
 ZERO_SHOT_TEMPLATE = """
@@ -150,9 +150,7 @@ def format_few_shot_examples(examples):
 # 6. Updated call_model function using our existing function
 @weave.op
 def call_model(prompt: str) -> str:
-    """
-    Call the LLM with the given prompt and return JSON string.
-    """
+    """Call the LLM with the given prompt and return JSON string."""
     openai = OpenAI()
     response = openai.chat.completions.create(
         model="gpt-3.5-turbo",

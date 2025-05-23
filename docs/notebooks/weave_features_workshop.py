@@ -24,7 +24,7 @@
 import asyncio
 import os
 from getpass import getpass
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -147,7 +147,7 @@ def classify_urgency(email: str, sentiment: str) -> str:
 
 
 @weave.op
-def process_support_ticket(email: str) -> Dict[str, Any]:
+def process_support_ticket(email: str) -> dict[str, Any]:
     """Complete support ticket processing pipeline."""
     # Step 1: Clean the email
     cleaned_email = preprocess_email(email)
@@ -209,7 +209,7 @@ support_dataset = Dataset(name="support_emails", rows=eval_examples)
 
 # 🎯 Define scoring functions
 @weave.op
-def name_accuracy(expected_name: str, output: CustomerEmail) -> Dict[str, Any]:
+def name_accuracy(expected_name: str, output: CustomerEmail) -> dict[str, Any]:
     """Check if the extracted name matches."""
     is_correct = expected_name.lower() == output.customer_name.lower()
     return {"correct": is_correct, "score": 1.0 if is_correct else 0.0}
@@ -218,14 +218,14 @@ def name_accuracy(expected_name: str, output: CustomerEmail) -> Dict[str, Any]:
 @weave.op
 def sentiment_accuracy(
     expected_sentiment: str, output: CustomerEmail
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Check if the sentiment analysis is correct."""
     is_correct = expected_sentiment.lower() == output.sentiment.lower()
     return {"correct": is_correct, "score": 1.0 if is_correct else 0.0}
 
 
 @weave.op
-def extraction_quality(email: str, output: CustomerEmail) -> Dict[str, Any]:
+def extraction_quality(email: str, output: CustomerEmail) -> dict[str, Any]:
     """Evaluate overall extraction quality."""
     score = 0.0
     feedback = []
@@ -306,7 +306,7 @@ basic_model = EmailAnalyzerModel(
 
 detailed_model = EmailAnalyzerModel(
     name="detailed_analyzer",
-    system_prompt="""You are an expert customer support analyst. 
+    system_prompt="""You are an expert customer support analyst.
     Carefully extract:
     - Customer name (look for signatures or greetings)
     - Product name (exact product mentioned)
@@ -330,7 +330,7 @@ empathetic_model = EmailAnalyzerModel(
 
 # %%
 @weave.op
-async def compare_models(models: List[Model], dataset: Dataset) -> Dict[str, Any]:
+async def compare_models(models: list[Model], dataset: Dataset) -> dict[str, Any]:
     """Run A/B comparison of multiple models."""
     results = {}
 
@@ -373,9 +373,7 @@ def analyze_with_fallback(
 ) -> CustomerEmail:
     """Analyze email with automatic fallback on error."""
     client = OpenAI()
-
     try:
-        # Try primary model first
         response = client.beta.chat.completions.parse(
             model=primary_model,
             messages=[
@@ -386,12 +384,9 @@ def analyze_with_fallback(
         )
         print(f"✅ Used primary model: {primary_model}")
         return response.choices[0].message.parsed
-
     except Exception as e:
         print(f"⚠️ Primary model failed: {e}")
         print(f"🔄 Falling back to {fallback_model}")
-
-        # Fallback to secondary model
         response = client.beta.chat.completions.parse(
             model=fallback_model,
             messages=[
@@ -431,7 +426,9 @@ from datetime import datetime
 
 
 @weave.op
-def production_email_handler(email: str, request_id: str = None) -> Dict[str, Any]:
+def production_email_handler(
+    email: str, request_id: Optional[str] = None
+) -> dict[str, Any]:
     """Production-ready email handler with monitoring."""
     start_time = datetime.now()
 
@@ -447,7 +444,7 @@ def production_email_handler(email: str, request_id: str = None) -> Dict[str, An
         # Log success metrics
         processing_time = (datetime.now() - start_time).total_seconds()
 
-        result = {
+        result: dict[str, Any] = {
             "request_id": request_id,
             "status": "success",
             "processing_time_seconds": processing_time,
@@ -494,22 +491,16 @@ for email in production_emails:
 @weave.op
 def problematic_analyzer(email: str) -> Optional[CustomerEmail]:
     """An analyzer that might fail - perfect for debugging!"""
-    # Simulate different failure modes
     if "error" in email.lower():
         raise ValueError("Email contains error keyword!")
-
     if len(email) < 20:
         print("⚠️ Email too short, returning None")
         return None
-
     if "urgent" in email.lower():
-        # Simulate a timeout or rate limit
         import time
 
         print("⏳ Processing urgent email (simulating delay)...")
         time.sleep(2)
-
-    # Normal processing
     return analyze_customer_email(email)
 
 
@@ -549,17 +540,11 @@ print("  - Review inputs that caused failures")
 @weave.op
 def analyze_with_metadata(
     email: str, source: str = "unknown", priority: str = "normal"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Analyze email with custom metadata tracking."""
-    # Add custom attributes to the Weave trace
-    weave_op = analyze_with_metadata
-
-    # Process email
     result = analyze_customer_email(email)
-
-    # Return enriched result
     return {
-        "analysis": result.model_dump(),
+        "analysis": result.model_dump() if result else {},
         "metadata": {
             "source": source,
             "priority": priority,

@@ -7,7 +7,7 @@
 # %%
 import asyncio
 import json
-from typing import Any, Dict, List
+from typing import Any
 
 from openai import OpenAI
 
@@ -31,26 +31,26 @@ class LLMJudgeScorer(Scorer):
 
     model_name: str = "gpt-4o-mini"
     judge_prompt: str = """You are an expert evaluator of information extraction systems.
-    
+
     Given an email and the extracted information, rate the extraction quality on a scale of 1-10.
     Consider:
     - Accuracy of extracted information
     - Completeness (did it miss anything important?)
     - Conciseness of the issue description
-    
+
     Email: {email}
-    
+
     Extracted Information:
     - Customer Name: {customer_name}
     - Product Model: {product_model}
     - Issue Description: {issue_description}
-    
+
     Provide a score from 1-10 and a brief explanation.
     Return as JSON with fields: score (number), explanation (string)
     """
 
     @weave.op
-    def score(self, email: str, output: Dict[str, Any]) -> Dict[str, Any]:
+    def score(self, email: str, output: dict[str, Any]) -> dict[str, Any]:
         """Score using LLM as judge"""
         client = OpenAI()
 
@@ -83,7 +83,7 @@ class LLMJudgeScorer(Scorer):
 
 # %%
 @weave.op
-def batch_evaluate_with_progress(models: List[Model], dataset: Dataset, scorers: List):
+def batch_evaluate_with_progress(models: list[Model], dataset: Dataset, scorers: list):
     """Evaluate multiple models and show progress"""
     results = {}
     total_evaluations = len(models)
@@ -193,7 +193,7 @@ class MultiStageEvaluator:
 
 # %%
 @weave.op
-def ab_test_models(model_a: Model, model_b: Model, dataset: Dataset) -> Dict[str, Any]:
+def ab_test_models(model_a: Model, model_b: Model, dataset: Dataset) -> dict[str, Any]:
     """Run A/B test between two models"""
     logger_a = EvaluationLogger(
         model=f"{model_a.__class__.__name__}_A", dataset=dataset.name
@@ -287,7 +287,7 @@ def ab_test_models(model_a: Model, model_b: Model, dataset: Dataset) -> Dict[str
 @weave.op
 def cross_validate_model(
     model: Model, dataset: Dataset, n_folds: int = 3
-) -> List[Dict]:
+) -> list[dict]:
     """Perform k-fold cross-validation style evaluation"""
     rows = dataset.rows
     fold_size = len(rows) // n_folds
@@ -409,3 +409,30 @@ cv_results = cross_validate_model(your_model, your_dataset, n_folds=5)
 # 5. **Progress Tracking**: Use EvaluationLogger for real-time progress updates
 #
 # These patterns help you build more sophisticated evaluation pipelines that go beyond simple accuracy metrics!
+
+
+@weave.op
+def evaluate_model(
+    model: Model,
+    dataset: Dataset,
+    scorers: list[Scorer],
+) -> dict[str, Any]:
+    """Run evaluation on a model."""
+    results = {}
+    for scorer in scorers:
+        score = scorer(model, dataset)
+        results[scorer.__name__] = score
+    return results
+
+
+@weave.op
+def compare_models(
+    models: list[Model],
+    dataset: Dataset,
+    scorers: list[Scorer],
+) -> dict[str, dict[str, Any]]:
+    """Compare multiple models using the same evaluation."""
+    results = {}
+    for model in models:
+        results[model.name] = evaluate_model(model, dataset, scorers)
+    return results
