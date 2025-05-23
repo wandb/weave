@@ -5,7 +5,7 @@ import {GridFilterModel, GridSortDirection} from '@mui/x-data-grid-pro';
 import React from 'react';
 import RGL, {Layout, WidthProvider} from 'react-grid-layout';
 
-import {TEAL_400} from '../../../../../common/css/color.styles';
+import {TEAL_300, TEAL_600} from '../../../../../common/css/color.styles';
 import {Button} from '../../../../../components/Button';
 import {Tailwind} from '../../../../Tailwind';
 import {WFHighLevelCallFilter} from '../pages/CallsPage/callsTableFilter';
@@ -224,7 +224,8 @@ const CallsChartsInner = ({
     <Tailwind>
       <style>{`
         .react-grid-placeholder {
-          background: ${TEAL_400} !important;
+          background: ${TEAL_300} !important;
+          border: dashed 1px ${TEAL_600} !important;
         }
       `}</style>
       <div className="w-full min-h-screen overflow-auto bg-moon-50">
