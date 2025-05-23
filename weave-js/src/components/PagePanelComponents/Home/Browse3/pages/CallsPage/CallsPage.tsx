@@ -76,6 +76,9 @@ export const CallsPage: FC<{
 
   paginationModel: GridPaginationModel;
   setPaginationModel: (newModel: GridPaginationModel) => void;
+
+  chartsVisible?: boolean;
+  setChartsVisible?: (visible: boolean) => void;
 }> = props => {
   const {entity, project, baseView, views, fetchViews, onRecordLastView} =
     props;
@@ -311,6 +314,8 @@ export const CallsPage: FC<{
                   paginationModel={props.paginationModel}
                   setPaginationModel={props.setPaginationModel}
                   currentViewId={savedViewsInfo.currentViewId}
+                  chartsVisible={props.chartsVisible}
+                  setChartsVisible={props.setChartsVisible}
                 />
               ),
             },

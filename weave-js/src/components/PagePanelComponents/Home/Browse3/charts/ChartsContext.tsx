@@ -5,7 +5,8 @@ import {loadChartsConfig, saveChartsConfig} from './chartsConfigPersistence';
 import {chartAxisFields} from './extractData';
 
 // Define breakpoints that match those in CallsCharts.tsx
-export const CHART_BREAKPOINTS = {lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0};
+// Simplified to desktop (12 cols) and mobile (1 col)
+export const CHART_BREAKPOINTS = {lg: 768, xxs: 0};
 
 export type ChartConfig = {
   id: string;
