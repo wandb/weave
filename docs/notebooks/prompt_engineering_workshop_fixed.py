@@ -17,6 +17,7 @@ import json
 
 from openai import OpenAI
 from pydantic import BaseModel
+
 import weave
 
 
@@ -24,6 +25,7 @@ class MessageProperties(BaseModel):
     customer_name: str
     product_model: str
     issue_description: str
+
 
 @weave.op
 def extract_properties_from_message(message: str) -> MessageProperties:
@@ -59,7 +61,7 @@ def extract_properties_from_message(message: str) -> MessageProperties:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        response_format={"type": "json_object"}  # This ensures JSON output
+        response_format={"type": "json_object"},  # This ensures JSON output
     )
 
     # Parse the response
@@ -70,6 +72,7 @@ def extract_properties_from_message(message: str) -> MessageProperties:
 
     # Return the result
     return result
+
 
 # %%
 """
@@ -134,6 +137,7 @@ Email:
 \"\"\"{email}\"\"\"
 """
 
+
 # 5. Helper function to format few-shot examples
 def format_few_shot_examples(examples):
     formatted = []
@@ -141,6 +145,7 @@ def format_few_shot_examples(examples):
         formatted.append(f"Email: {ex['email']}")
         formatted.append(f"Extracted: {json.dumps(ex['gold'], indent=2)}\n")
     return "\n".join(formatted)
+
 
 # 6. Updated call_model function using our existing function
 @weave.op
@@ -155,9 +160,10 @@ def call_model(prompt: str) -> str:
             {"role": "system", "content": "Extract information and return valid JSON."},
             {"role": "user", "content": prompt},
         ],
-        response_format={"type": "json_object"}
+        response_format={"type": "json_object"},
     )
     return response.choices[0].message.content
+
 
 # 7. Evaluation function
 def evaluate(prompt_fn, use_few_shot: bool = False):
@@ -198,12 +204,15 @@ def evaluate(prompt_fn, use_few_shot: bool = False):
 
     return results, full_pass
 
+
 # 8. Prompt builder functions
 def build_zero_shot_prompt(email: str) -> str:
     return ZERO_SHOT_TEMPLATE.format(email=email)
 
+
 def build_few_shot_prompt(few_shot_block: str, email: str) -> str:
     return FEW_SHOT_TEMPLATE.format(examples=few_shot_block, email=email)
+
 
 # 9. Main demonstration
 if __name__ == "__main__":
@@ -225,4 +234,4 @@ if __name__ == "__main__":
             print(f"{f}: {fs_results[f]}/{total} correct")
         print(f"Full-pass: {fs_full}/{total}")
     except Exception as e:
-        print(f"Error in few-shot: {e}") 
+        print(f"Error in few-shot: {e}")
