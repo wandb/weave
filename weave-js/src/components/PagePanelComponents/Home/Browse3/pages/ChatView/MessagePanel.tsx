@@ -19,6 +19,7 @@ type MessagePanelProps = {
   isNested?: boolean;
   pendingToolResponseId?: string;
   messageHeader?: React.ReactNode;
+  isLast?: boolean;
 };
 
 export const MessagePanel = ({
@@ -32,7 +33,9 @@ export const MessagePanel = ({
   // and on save the tool call response will be updated and sent to the LLM
   pendingToolResponseId,
   messageHeader,
+  isLast = false,
 }: MessagePanelProps) => {
+  // If the message is the last message, we show the whole message by default
   const [isShowingMore, setIsShowingMore] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [editorHeight, setEditorHeight] = useState<number | null>(
@@ -40,19 +43,54 @@ export const MessagePanel = ({
   );
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const {isPlayground} = usePlaygroundContext();
+  const {isPlayground, isStreaming} = usePlaygroundContext();
   useEffect(() => {
     if (contentRef.current) {
       setIsOverflowing(contentRef.current.scrollHeight > 400);
     }
   }, [message.content, contentRef?.current?.scrollHeight]);
 
+  const debouncedScroll = useRef(
+    _.debounce((element: HTMLElement) => {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end',
+      });
+    }, 10)
+  ).current;
+
+  useEffect(() => {
+    if (
+      isPlayground &&
+      contentRef.current &&
+      message.content &&
+      isStreaming &&
+      isLast
+    ) {
+      debouncedScroll(contentRef.current);
+    }
+  }, [
+    message.content,
+    isPlayground,
+    isStreaming,
+    debouncedScroll,
+    isLast,
+    isShowingMore,
+    isOverflowing,
+  ]);
+
   // Set isShowingMore to true when editor is opened
   useEffect(() => {
-    if (editorHeight !== null) {
+    if (editorHeight !== null && !isShowingMore) {
       setIsShowingMore(true);
     }
-  }, [editorHeight]);
+  }, [editorHeight, isShowingMore]);
+
+  useEffect(() => {
+    if (isLast && !isShowingMore && isOverflowing && isPlayground) {
+      setIsShowingMore(true);
+    }
+  }, [isLast, isShowingMore, isOverflowing, isPlayground]);
 
   const isUser = message.role === 'user';
   const isSystemPrompt = message.role === 'system';

@@ -370,6 +370,21 @@ export type CompletionsCreateRes = {
   weave_call_id?: string;
 };
 
+// Streaming completions returns NDJSON chunks. Consumers can turn chunks into
+// the final response they need. We expose the raw chunk list for maximum
+// flexibility.
+export type CompletionsCreateStreamReq = CompletionsCreateReq;
+
+export type CompletionChunk = any; // TODO: add exact typing if desired
+
+export type CompletionsCreateStreamRes = {
+  chunks: CompletionChunk[];
+  weave_call_id?: string;
+};
+
+// Callback invoked whenever a new chunk is parsed during streaming.
+export type OnCompletionChunk = (chunk: CompletionChunk) => void;
+
 export type ProjectStatsReq = {
   project_id: string;
 };
