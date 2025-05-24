@@ -11,6 +11,7 @@ import pytest
 import requests
 import tenacity
 
+from weave.trace.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.remote_http_trace_server import (
@@ -300,6 +301,7 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     This test modifies the retry mechanism to use a short wait time and limited retries
     to verify behavior when retries are exhausted.
     """
+    configure_logger()
     # Configure mock to timeout twice to exhaust retries
     mock_post.side_effect = [
         # First batch times out twice
