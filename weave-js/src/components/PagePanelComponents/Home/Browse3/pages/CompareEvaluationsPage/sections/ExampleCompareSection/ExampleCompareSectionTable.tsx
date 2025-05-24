@@ -18,8 +18,16 @@ import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
+import {useHistory} from 'react-router-dom';
+
 import {NotApplicable} from '../../../../NotApplicable';
 import {StyledDataGrid} from '../../../../StyledDataGrid';
+import {
+  useWeaveflowRouteContext,
+  usePeekLocation,
+  HIDE_TRACETREE_PARAM,
+  SHOW_FEEDBACK_PARAM,
+} from '../../../../context';
 import {IdPanel} from '../../../common/Id';
 import {CallLink} from '../../../common/Links';
 import {
@@ -68,6 +76,35 @@ const styledDataGridStyleOverrides: SxProps = {
     minHeight: '40px !important',
   },
   width: '100%',
+};
+
+/**
+ * Hook to handle navigation to a call
+ */
+const useCallNavigation = () => {
+  const history = useHistory();
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const peekLoc = usePeekLocation();
+  
+  return useCallback((entityName: string, projectName: string, callId: string) => {
+    const peekParams = new URLSearchParams(peekLoc?.search ?? '');
+    const traceTreeParam = peekParams.get(HIDE_TRACETREE_PARAM);
+    const hideTraceTree = traceTreeParam === '1' ? true : traceTreeParam === '0' ? false : undefined;
+    const showFeedbackParam = peekParams.get(SHOW_FEEDBACK_PARAM);
+    const showFeedbackExpand = showFeedbackParam === '1' ? true : showFeedbackParam === '0' ? false : undefined;
+    
+    const url = peekingRouter.callUIUrl(
+      entityName,
+      projectName,
+      '',
+      callId,
+      undefined,
+      hideTraceTree,
+      showFeedbackExpand
+    );
+    
+    history.push(url);
+  }, [history, peekingRouter, peekLoc]);
 };
 
 /**
@@ -802,6 +839,7 @@ const inputFields = (
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
+            cursor: 'pointer',
           }}
           onClick={() => {
             setSelectedInputDigest(params.row.inputDigest);
@@ -944,6 +982,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     outputColumnKeys,
     rows
   );
+  
+  const navigateToCall = useCallNavigation();
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
@@ -1034,9 +1074,12 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                 style={{
                   overflow: 'hidden',
                   height: '100%',
+                  width: '100%',
                   display: 'flex',
                   alignItems: 'center',
-                }}>
+                  cursor: 'pointer',
+                }}
+                onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
                 <CallLink
                   entityName={trialEntity}
                   projectName={trialProject}
@@ -1086,9 +1129,12 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                   style={{
                     overflow: 'hidden',
                     height: '100%',
+                    width: '100%',
                     display: 'flex',
                     alignItems: 'center',
-                  }}>
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
                   <CallLink
                     entityName={trialEntity}
                     projectName={trialProject}
@@ -1137,9 +1183,12 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                       style={{
                         overflow: 'hidden',
                         height: '100%',
+                        width: '100%',
                         display: 'flex',
                         alignItems: 'center',
-                      }}>
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
                       <CallLink
                         entityName={trialEntity}
                         projectName={trialProject}
@@ -1270,6 +1319,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     outputWidths,
     filteredRows,
     props.lineClamp,
+    navigateToCall,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -1421,6 +1471,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     outputColumnKeys,
     rows
   );
+  
+  const navigateToCall = useCallNavigation();
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
@@ -1491,9 +1543,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                     style={{
                       overflow: 'hidden',
                       height: '100%',
+                      width: '100%',
                       display: 'flex',
                       alignItems: 'center',
-                    }}>
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
                     <CallLink
                       entityName={trialEntity}
                       projectName={trialProject}
@@ -1629,6 +1684,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     outputWidths,
     filteredRows,
     props.lineClamp,
+    navigateToCall,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
