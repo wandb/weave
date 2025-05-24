@@ -98,6 +98,7 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
+    lite_llm_completion_stream,
 )
 from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
@@ -1977,6 +1978,197 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CompletionsCreateRes(
             response=res.response, weave_call_id=start_call.id
         )
+
+    # -------------------------------------------------------------------
+    # Streaming variant
+    # -------------------------------------------------------------------
+
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        """Stream LLM completion chunks.
+
+        Mirrors ``completions_create`` but with streaming enabled.  If
+        ``track_llm_call`` is True we emit a call_start record immediately and
+        a call_end record once the stream finishes (successfully or not).
+        """
+
+        # --- Shared setup logic (copy of completions_create up to litellm call)
+        model_name = req.inputs.model
+        api_key = None
+        provider = None
+
+        base_url: Optional[str] = None
+        extra_headers: dict[str, str] = {}
+        return_type: Optional[str] = None
+
+        model_info = self._model_to_provider_info_map.get(model_name)
+
+        if model_info:
+            secret_name = model_info.get("api_key_name")
+            if not secret_name:
+                raise InvalidRequest(f"No secret name found for model {model_name}")
+
+            secret_fetcher = _secret_fetcher_context.get()
+            if not secret_fetcher:
+                raise InvalidRequest(
+                    f"No secret fetcher found, cannot fetch API key for model {model_name}"
+                )
+
+            api_key = (
+                secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+            )
+            provider = model_info.get("litellm_provider", "openai")
+
+            if not api_key and provider not in ("bedrock", "bedrock_converse"):
+                raise MissingLLMApiKeyError(
+                    f"No API key {secret_name} found for model {model_name}",
+                    api_key_name=secret_name,
+                )
+        else:
+            # Custom provider path
+            try:
+                custom_provider_info = get_custom_provider_info(
+                    project_id=req.project_id,
+                    model_name=model_name,
+                    obj_read_func=self.obj_read,
+                )
+
+                base_url = custom_provider_info.base_url
+                api_key = custom_provider_info.api_key
+                extra_headers = custom_provider_info.extra_headers
+                return_type = custom_provider_info.return_type
+                actual_model_name = custom_provider_info.actual_model_name
+
+            except Exception as e:
+                # Yield error as single chunk then stop.
+                def _single_error_iter(e):
+                    yield {"error": str(e)}
+
+                return _single_error_iter(e)
+
+            provider = "custom"
+            req.inputs.model = (
+                "ollama/" + actual_model_name
+                if "ollama" in model_name
+                else actual_model_name
+            )
+
+        # Track start call if requested
+        start_call: Optional[CallStartCHInsertable] = None
+        if req.track_llm_call:
+            start = tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
+                op_name=COMPLETIONS_CREATE_OP_NAME,
+                started_at=datetime.datetime.now(),
+                inputs={**req.inputs.model_dump(exclude_none=True)},
+                attributes={},
+            )
+            start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+            # Insert immediately so that callers can see the call in progress
+            self._insert_call(start_call)
+
+        # --- Build the underlying chunk iterator
+        chunk_iter = lite_llm_completion_stream(
+            api_key=api_key or "",
+            inputs=req.inputs,
+            provider=provider,
+            base_url=base_url,
+            extra_headers=extra_headers,
+            return_type=return_type,
+        )
+
+        # If tracking not requested just return chunks directly
+        if not req.track_llm_call or start_call is None:
+            return chunk_iter
+
+        # Otherwise, wrap the iterator:
+        #   1. Emit a leading metadata chunk with the generated weave_call_id so
+        #      clients can link the live stream to the stored Call record.
+        #   2. Proxy provider chunks through to the caller.
+        #   3. On normal completion or error, write the `call_end` record.
+
+        def _stream_wrapper() -> Iterator[dict[str, Any]]:
+            # (1) send meta chunk first so clients can associate stream
+            yield {"_meta": {"weave_call_id": start_call.id}}
+
+            # Used to build final output/usage for call_end summary
+            aggregated_output: dict[str, Any] | None = None
+            # For OpenAI-style chat completions we gradually build up assistant
+            # content to mirror what the client does.
+            assistant_acc: list[str] = []
+            usage_block: Any = None
+            last_chunk: dict[str, Any] | None = None
+
+            try:
+                for chunk in chunk_iter:
+                    print(
+                        f"DEBUG: Chunk type: {type(chunk)}, Content: {chunk}"
+                    )  # Debug the chunk
+                    last_chunk = chunk
+                    # Yield to client immediately
+                    yield chunk
+
+                    # Accumulate assistant content if present
+                    choices = chunk.get("choices") if isinstance(chunk, dict) else None
+                    if choices:
+                        delta = choices[0].get("delta") if choices else None
+                        if delta and isinstance(delta, dict):
+                            content_piece = delta.get("content")
+                            if content_piece:
+                                assistant_acc.append(content_piece)
+
+                    # Capture usage if provided (may come in final chunk).
+                    if "usage" in chunk:
+                        print(
+                            f"DEBUG: Found usage in chunk: {chunk['usage']}"
+                        )  # Debug usage
+                        if "choices" in chunk and isinstance(chunk["choices"], list):
+                            usage_block = chunk["usage"]
+            finally:
+                print(
+                    f"DEBUG: Final usage block before summary: {usage_block}"
+                )  # Debug final usage
+                # Build aggregated output if we captured pieces
+                if assistant_acc:
+                    aggregated_output = {
+                        "choices": [
+                            {
+                                "message": {
+                                    "role": "assistant",
+                                    "content": "".join(assistant_acc),
+                                }
+                            }
+                        ]
+                    }
+                # Fallback: if last_chunk looks like a full completion include it
+                elif last_chunk and "choices" in last_chunk and "usage" in last_chunk:
+                    aggregated_output = last_chunk
+
+                # Prepare summary
+                summary: dict[str, Any] = {}
+                if usage_block is not None:
+                    print(
+                        f"DEBUG: Adding usage to summary: {usage_block}"
+                    )  # Debug summary usage
+                    summary["usage"] = {model_name: usage_block}
+                else:
+                    print(
+                        "DEBUG: No usage block found for summary"
+                    )  # Debug missing usage
+
+                end = tsi.EndedCallSchemaForInsert(
+                    project_id=req.project_id,
+                    id=start_call.id,
+                    ended_at=datetime.datetime.now(),
+                    output=aggregated_output,
+                    summary=summary,
+                )
+                end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+                self._insert_call(end_call)
+
+        return _stream_wrapper()
 
     # Private Methods
     @property
