@@ -17,6 +17,7 @@ import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 import {NotApplicable} from '../../../../NotApplicable';
 import {SmallRef} from '../../../../smallRef/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
+import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
   CompositeScoreMetrics,
@@ -73,16 +74,23 @@ GridCell.displayName = 'S.GridCell';
 export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const modelRefs = useMemo(
-    () => getOrderedModelRefs(props.state),
-    [props.state]
+  const {hiddenEvaluationIds} = useCompareEvaluationsState();
+  
+  const evalCallIds = useMemo(
+    () => getOrderedCallIds(props.state).filter(id => !hiddenEvaluationIds.has(id)),
+    [props.state, hiddenEvaluationIds]
   );
+  
+  const modelRefs = useMemo(() => {
+    // Get all model refs from visible evaluations only
+    const visibleEvalCalls = evalCallIds.map(id => props.state.summary.evaluationCalls[id]);
+    const visibleModelRefs = new Set(visibleEvalCalls.map(call => call.modelRef));
+    // Keep the ordering from getOrderedModelRefs but filter to only visible ones
+    return getOrderedModelRefs(props.state).filter(ref => visibleModelRefs.has(ref));
+  }, [props.state, evalCallIds]);
+  
   const datasetRefs = useMemo(
     () => Object.values(props.state.summary.evaluations).map(e => e.datasetRef),
-    [props.state]
-  );
-  const evalCallIds = useMemo(
-    () => getOrderedCallIds(props.state),
     [props.state]
   );
 
@@ -399,8 +407,10 @@ export const ScorecardSection: React.FC<{
                       {metricKey}
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
+                      // Use the first visible evaluation as baseline
+                      const baselineCallId = evalCallIds[0];
                       const baseline = resolveSummaryMetricResult(
-                        getBaselineCallId(props.state),
+                        baselineCallId,
                         groupName,
                         metricKey,
                         compositeSummaryMetrics,

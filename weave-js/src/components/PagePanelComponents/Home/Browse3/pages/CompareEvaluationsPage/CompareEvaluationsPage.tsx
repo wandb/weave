@@ -313,6 +313,7 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
 }> = ({state, height}) => {
+  const {hiddenEvaluationIds} = useCompareEvaluationsState();
   const peekLocation = usePeekLocation();
   const isPeekDrawerOpen = peekLocation != null;
 
@@ -326,7 +327,12 @@ const ResultExplorer: React.FC<{
   const [isResizing, setIsResizing] = useState(false);
   const [wasAutoExpanded, setWasAutoExpanded] = useState(false); // Track if expansion was automatic
   const containerRef = useRef<HTMLDivElement>(null);
-  const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
+  
+  // Only enable regression finder if exactly 2 evaluations are visible
+  const visibleEvaluationCount = state.evaluationCallIdsOrdered.filter(
+    id => !hiddenEvaluationIds.has(id)
+  ).length;
+  const regressionFinderEnabled = visibleEvaluationCount === 2;
 
   // When peek drawer opens and we're in split view, automatically expand to detail view
   // When peek drawer closes and we're in detail view, automatically collapse back to split view

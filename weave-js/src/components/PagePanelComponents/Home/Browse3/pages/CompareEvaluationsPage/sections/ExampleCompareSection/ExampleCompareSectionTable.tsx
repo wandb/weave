@@ -587,6 +587,7 @@ const DenseCellValue: React.FC<
 export const ExampleCompareSectionTable: React.FC<
   ExampleCompareSectionTableProps
 > = props => {
+  const {hiddenEvaluationIds} = useCompareEvaluationsState();
   const [modelsAsRows, setModelsAsRows] = useState(false);
   const [rowHeight, setRowHeight] = useState(32);
   const [lineClamp, setLineClamp] = useState(1);
@@ -606,11 +607,29 @@ export const ExampleCompareSectionTable: React.FC<
     });
     setLineClamp(v => Math.max(v - 1, 1));
   }, []);
-  const onlyOneModel = props.state.evaluationCallIdsOrdered.length === 1;
+  
+  // Filter out hidden evaluations
+  const visibleEvaluationCallIds = useMemo(() => {
+    return props.state.evaluationCallIdsOrdered.filter(
+      id => !hiddenEvaluationIds.has(id)
+    );
+  }, [props.state.evaluationCallIdsOrdered, hiddenEvaluationIds]);
+  
+  const onlyOneModel = visibleEvaluationCallIds.length === 1;
+  
+  // Create a modified state with filtered evaluation call IDs
+  const filteredState = useMemo(() => {
+    return {
+      ...props.state,
+      evaluationCallIdsOrdered: visibleEvaluationCallIds
+    };
+  }, [props.state, visibleEvaluationCallIds]);
+  
   const inner =
     modelsAsRows || onlyOneModel ? (
       <ExampleCompareSectionTableModelsAsRows
         {...props}
+        state={filteredState}
         rowHeight={rowHeight}
         lineClamp={lineClamp}
         increaseRowHeight={increaseRowHeight}
@@ -621,6 +640,7 @@ export const ExampleCompareSectionTable: React.FC<
     ) : (
       <ExampleCompareSectionTableModelsAsColumns
         {...props}
+        state={filteredState}
         rowHeight={rowHeight}
         lineClamp={lineClamp}
         increaseRowHeight={increaseRowHeight}

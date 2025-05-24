@@ -7,6 +7,7 @@ import classNames from 'classnames';
 import React, {useState} from 'react';
 import {SortableElement, SortableHandle} from 'react-sortable-hoc';
 
+import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {EvaluationComparisonState} from '../../ecpState';
 import {EvaluationCallLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 
@@ -34,8 +35,10 @@ export const DraggableItem = SortableElement(
     onRemoveItem,
     onSetBaseline,
   }: DraggableItemProps) => {
+    const {hiddenEvaluationIds, toggleHideEvaluation} = useCompareEvaluationsState();
     const isDeletable = numItems > 1;
     const isBaseline = idx === 0;
+    const isHidden = hiddenEvaluationIds.has(item.value);
     const [isOpen, setIsOpen] = useState(false);
 
     const onMakeBaselinePropagated = (e: React.MouseEvent) => {
@@ -48,17 +51,26 @@ export const DraggableItem = SortableElement(
       onRemoveItem(item.value);
     };
 
+    const onToggleHidePropagated = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      toggleHideEvaluation(item.value);
+    };
+
     return (
       <Tailwind>
         <div
           className={classNames(
-            'flex select-none items-center gap-4 whitespace-nowrap rounded-[4px] border-[1px] border-moon-250 bg-white px-4 py-8 text-sm font-semibold hover:border-moon-350 hover:bg-moon-100'
+            'flex select-none items-center gap-4 whitespace-nowrap rounded-[4px] border-[1px] border-moon-250 bg-white px-4 py-8 text-sm font-semibold hover:border-moon-350 hover:bg-moon-100',
+            isHidden && 'opacity-50'
           )}>
           <DragHandle />
           <div className="flex items-center">
             <EvaluationCallLink callId={item.value} state={state} />
             {isBaseline && (
               <Pill color="teal" label="Baseline" className="ml-8" />
+            )}
+            {isHidden && (
+              <Pill color="moon" label="Hidden" className="ml-8" />
             )}
           </div>
           <DropdownMenu.Root open={isOpen} onOpenChange={setIsOpen}>
@@ -77,6 +89,10 @@ export const DraggableItem = SortableElement(
                   disabled={isBaseline}>
                   <Icon name="baseline-alt" />
                   Make baseline
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onClick={onToggleHidePropagated}>
+                  <Icon name={isHidden ? "show-visible" : "hide-hidden"} />
+                  {isHidden ? "Unhide evaluation" : "Hide evaluation"}
                 </DropdownMenu.Item>
                 {isDeletable && (
                   <>
