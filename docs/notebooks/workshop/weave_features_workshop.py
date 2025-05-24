@@ -83,6 +83,9 @@ def analyze_customer_email(email: str) -> CustomerEmail:
     """Analyze a customer support email and extract key information."""
     client = OpenAI()
 
+    # TODO: (Requires human) Verify that the "open in playground" works for client.beta.chat.completions.parse calls with a response format
+    # TODO: Add a note tellng the student that `client.beta.chat.completions.parse` is automatically
+    #       traced (along with dozens of other standard libraries and frameworks - with a link)
     response = client.beta.chat.completions.parse(
         model="gpt-4o-mini",  # Using mini model for cost efficiency
         messages=[
@@ -119,11 +122,23 @@ print(f"Customer: {result.customer_name}")
 print(f"Sentiment: {result.sentiment}")
 print("\n🔍 Check the Weave UI to see the trace!")
 
+# TODO: Lecture note: UI elements to touch on: 
+#   # Call Detail Page:
+#       * Trace View (3 sub views + sliders), 
+#       * Inputs/Outputs (different render modes), 
+#       * Code Tracking, 
+#       * Summary (Tokens, Cost, Latency, Metadata)
+#   # Playground
+#       * For the nested OpenAI call, show the "open in playground" button - Open it!
+#       * Features: Edit previous messages, tweek settings, compare models, save model
+#       * Talk about custom model support
+
 # %% [markdown]
 # ## 🐛 Part 2: Debugging with Call Traces
 #
 # Weave tracks nested function calls, making debugging easy. Let's build a more complex example.
 
+# TODO: This doesn't seem like "part 2" - this seems like a subset of part 1
 
 # %%
 @weave.op
@@ -189,11 +204,36 @@ print("\n🎫 Ticket processed!")
 print(f"Urgency: {ticket['urgency']}")
 print(f"Needs immediate attention: {ticket['needs_immediate_attention']}")
 
+# TODO: Lecture note: 
+#   * Highlight the code view in the trace table
+#   * Highlight the ability to filter / sort in the Trace Table
+#   * Highlight the ability to save pre-configured views
+
+# TODO: (NEW CELL still focused on basic tracing) I would like to add another cell on tracing here that showcases Media Classes
+#   * Media Classes
+#       * Image support
+#           * OpenAI's base64 pattern
+#           * Standard PIL images are supported
+#       * Video Support (Using the new annotations pattern)
+#       * Audio support
+#       * PDFs
+
+# TODO: (NEW CELL still focused on basic tracing) I would like to add another cell on tracing here that showcases pre- and post- processing to control what gets serialized
+
+
+# TODO: (NEW CELL still focused on basic tracing) We should show that different forms of generators / iterators can be traced as well.
+
 # %% [markdown]
 # ## 📊 Part 3: Building Evaluations
 #
 # Now let's evaluate our email analyzer using Weave's evaluation framework.
 # We'll use a more challenging dataset to expose model weaknesses.
+
+# TODO: Take this opprtunity to describe the data model a bit:
+# 1. An "evaluation" is the pairing of a dataset and a set of scorers (think of it like a test suite for a specific task) (dataset, scorers)
+# 2. An "evluation run" is the result of running an evaluation against a specific model (evaluation, model)
+# 3. Within an evaluation run, there are N "predict_and_score" blocks which contain the prediction calls and the scoring calls for a single row of the dataset (evaluation run, (prediction, scores))
+# 4. Scores are stored within the predict_and_score output, but also adirectly on the prediction call itself.
 
 # %%
 # Create a challenging evaluation dataset with tricky examples
@@ -411,6 +451,7 @@ def extraction_quality(email: str, output: CustomerEmail) -> dict[str, Any]:
 
 
 # 🚀 Run the evaluation (notebook-friendly version)
+# TODO: (consider using the `trails` param of Evaluation set to 3 to discuss how trials work (they run the same row `trails` times and the analytics are now aggregated over those trials - helps with randomness))
 evaluation = Evaluation(
     dataset=support_dataset,
     scorers=[name_accuracy, sentiment_accuracy, extraction_quality],
@@ -426,6 +467,11 @@ import nest_asyncio
 nest_asyncio.apply()
 eval_results = asyncio.run(evaluation.evaluate(analyze_customer_email))
 print("✅ Evaluation complete! Check the Weave UI for detailed results.")
+
+# TODO: Lecture note: 
+#   * in the UI, showcase the eval tab (list view), the eval detail view, and the predict and score table. (primary flow for a single eval)
+
+# TODO: (New Cell) - Let's add a cell specifically to showcase pairwise scoring (Human to link to content here.)
 
 # %% [markdown]
 # ## 🎯 Part 3b: Using Pre-built Scorers
@@ -443,7 +489,6 @@ try:
         OpenAIModerationScorer,
         PydanticScorer,
         ValidJSONScorer,
-        ValidXMLScorer,
     )
 
     SCORERS_AVAILABLE = True
@@ -757,6 +802,7 @@ balanced_model = EmailAnalyzerModel(
 # everyone in the workshop to see aggregated results. Each evaluation run gets a
 # unique ID automatically, but the evaluation definition stays consistent.
 
+# TODO: This is not really "Part 5" - it is more of a continuation of Part 4.
 
 # %%
 async def compare_models(models: list[Model], dataset: Dataset) -> dict[str, Any]:
@@ -794,6 +840,22 @@ comparison_results = asyncio.run(
 )
 print("\n🎉 Comparison complete! View the results in the Weave UI.")
 
+# TODO: Lecture note: 
+#   * Show the table view
+#   * Compare 2 models
+#   * Show the comparison view
+#       * Summary Plots
+#       * Scorecard (diff view, + linkable sources)
+#       * Results tab
+#           * interactive regression filter
+#           * pivoted result viewer
+#           * model comparison detail view (everything linkable)
+
+# TODO: Interactive challenge time. (leaderboard competition)
+    # Now we are going to see who can creat the best model 
+    # TODO: setup the leaderboard (either interactively in the UI, or add a cell below)
+    # Invite students to iterate on the prompt / model to get higher performance (which we will track in the leaderboard!)
+
 # %% [markdown]
 # ## 🐞 Part 6: Exception Tracking
 #
@@ -803,6 +865,8 @@ print("\n🎉 Comparison complete! View the results in the Weave UI.")
 # **Workshop Note**: We intentionally use an older model (gpt-3.5-turbo) without
 # structured output support to demonstrate real-world parsing challenges and exceptions.
 
+# TODO: Let's move this block up to the tracing section - it belongs there as we are showing students how errors are tracked at a basic level.
+# TODO: Also, this section is pretty verbose jsut to highlight error tracking - if we can make it simplier so that the student has less to read through and undersand, that would be great.
 
 # %%
 # Define a stricter data structure that's more likely to fail
@@ -947,6 +1011,8 @@ for i, response in enumerate(test_responses):
 #
 # Weave automatically tracks metrics like latency and token usage. Let's explore these features.
 
+# TODO: We can remove this section completely - nearly every cell above will produce calls with costs and latency, it will naturally be covered above.
+
 
 # %%
 @weave.op
@@ -1012,6 +1078,7 @@ print("  - Cost tracking (when available)")
 # %%
 from datetime import datetime
 
+# TODO: In general, scorers work best if emitting boolean or numeric values. while you can include additional information to help contenxtualize the scores, focus on bools and numbers (for example: severity should be a quantity)
 
 # Define more realistic production scorers
 class ContentModerationScorer(Scorer):
@@ -1205,6 +1272,7 @@ class ExtractionQualityScorer(Scorer):
             ),
         }
 
+# TODO: This response time seems a bit overkill - let's remove it completely.
 
 class ResponseTimeScorer(Scorer):
     """Monitor response time SLAs."""
@@ -1481,11 +1549,27 @@ print("   - Guardrails (block/review) vs Monitors (quality/performance)")
 print("   - All scorer results are tracked in Weave for analysis")
 print("\n✅ Check the Weave UI to see detailed scorer results and traces!")
 
+# TODO: Lecture Notes: here the main teaching moments are:
+# 1. Use `call.apply_scorer` to apply a score to a call
+# 2. Operate on the results to impact control flow
+# 3. In the UI, these are automatically tracked under the call's Scores
+# 4. you can filter/sort to find the best/worst cases
+# 5. From there, you can build derivitive dataset
+
+# TODO: New Cell: Here, we are going to make an interactive "app" that renders in the cell so that the user can directly interact with the model. This will then generate calls in the UI and we can see calls coming into the application. From there we can setup a human feedback column interactively, collect examples, narrow down to the hard cases, and add to a dataset, which can then be used for the next round of evaluations:
+#   1. Create an interactive output that allows for form-fill-style querying of the model
+#   2. Add feedback so that the user can mark the reponse as good or bad (use the API to send this feedback)
+#       * (Show in the UI that you can configure custom columns and form fill directly in the app if you have experts on your side)
+#   3. (UI) Query for the bad results in the UI
+#   4. (UI) Add the bad results to a dataset
+#   5. (Optional) Next cell: create a new evaluation using the new dataset - presumably the models have a harder time... or just say that it is possible
+
 # %% [markdown]
 # ## 🐛 Part 9: Debugging Failed Calls
 #
 # Weave makes it easy to debug when things go wrong.
 
+# TODO: This is a much better error tracking example than the one above. merge them and put them in the tracing section.
 
 # %%
 @weave.op
@@ -1528,6 +1612,8 @@ print("\n💡 Check the Weave UI to see:")
 print("  - Red highlighted failed calls")
 print("  - Full stack traces for exceptions")
 print("  - Timing information for slow calls")
+
+# TODO: (New cell) Let's showcase OTEL support and how that works at the end here
 
 # %% [markdown]
 # ## 🎉 Wrap Up
