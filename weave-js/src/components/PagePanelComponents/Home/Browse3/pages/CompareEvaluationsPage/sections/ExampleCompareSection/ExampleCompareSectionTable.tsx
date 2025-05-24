@@ -196,7 +196,7 @@ const DISABLED_ROW_SPANNING = {
 
 const SCORE_COLUMN_SETTINGS = {
   flex: 1,
-  minWidth: 120,
+  minWidth: 162,
 };
 
 // Constants for column width calculations
