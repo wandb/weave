@@ -20,6 +20,7 @@ import {
 import React, {useCallback, useContext, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
+import {OptionRenderer, WBMenuOption} from '../../../common/components/WBMenu';
 import {Item, ItemIcon} from '../../../common/components/WBMenu.styles';
 import {WBPopupMenuTrigger} from '../../../common/components/WBPopupMenuTrigger';
 import {useWeaveContext} from '../../../context';
@@ -36,7 +37,6 @@ import * as S from '../PanelTable.styles';
 import {WeaveFormatContext} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {defineColumnName, stripTag} from './util';
-import {OptionRenderer, WBMenuOption} from '../../../common/components/WBMenu';
 
 const recordEvent = makeEventRecorder('Table');
 

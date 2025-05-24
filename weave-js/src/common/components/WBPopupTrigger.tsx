@@ -1,8 +1,8 @@
 import React from 'react';
 
+import {useOnMouseDownOutside} from '../util/dom';
 import {WBAnchoredPopup} from './WBAnchoredPopup';
 import {WBPopupDirection} from './WBPopup';
-import {useOnMouseDownOutside} from '../util/dom';
 
 export type TriggerGenerator = (props: {
   anchorRef: (node: Element | null) => void;

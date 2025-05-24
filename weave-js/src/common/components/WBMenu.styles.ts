@@ -1,8 +1,8 @@
-import * as globals from '../css/globals.styles';
 import styled from 'styled-components';
 
-import type {WBMenuTheme} from './WBMenu';
 import {Icon} from '../../components/Icon';
+import * as globals from '../css/globals.styles';
+import type {WBMenuTheme} from './WBMenu';
 
 type ContentProps = {
   width?: number;

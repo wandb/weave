@@ -1,8 +1,8 @@
 import {Table} from 'semantic-ui-react';
 import styled from 'styled-components';
 
-import * as globals from '../css/globals.styles';
 import {Icon} from '../../components/Icon';
+import * as globals from '../css/globals.styles';
 
 export const FileTableBody = styled(Table.Body)`
   border-top-left-radius: 4px;

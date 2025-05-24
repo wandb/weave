@@ -9,6 +9,7 @@ import * as _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {Button, ButtonGroup} from 'semantic-ui-react';
 
+import {Icon} from '../Icon';
 import {ControlsBox} from './ControlBox';
 import * as S from './ControlImageOverlays.styles';
 import {ControlsMask} from './ControlMask';
@@ -23,7 +24,6 @@ import {
   SearchInput,
 } from './ControlsUtil';
 import {DEFAULT_TILE_LAYOUT} from './ImageWithOverlays';
-import {Icon} from '../Icon';
 
 type BoxSliderControlsProps = {
   boxes: {[boxGroup: string]: BoundingBox2D[]};

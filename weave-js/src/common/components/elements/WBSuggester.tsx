@@ -1,13 +1,13 @@
 import React from 'react';
 
+import {OnParentScrollOption} from '../WBAnchoredPopup';
+import {OptionRenderer, WBMenuOnSelectHandler, WBMenuOption} from '../WBMenu';
 import {
   SortScoreFn,
   WBMenuOptionFetcher,
   WBMenuOptionFetcherResult,
 } from './WBQueryMenu';
 import * as S from './WBSuggester.styles';
-import {OptionRenderer, WBMenuOnSelectHandler, WBMenuOption} from '../WBMenu';
-import {OnParentScrollOption} from '../WBAnchoredPopup';
 
 const DEFAULT_OPTION_RENDERER: OptionRenderer = ({option, hovered}) => (
   <S.Option hovered={hovered}>{option.name ?? option.value}</S.Option>

@@ -3,8 +3,8 @@ import WBSuggester, {
 } from '@wandb/weave/common/components/elements/WBSuggester';
 import React from 'react';
 
-import {InlineContentEditable, PanelNameSpan} from './Editor.styles';
 import {WBMenuOption} from '../../common/components/WBMenu';
+import {InlineContentEditable, PanelNameSpan} from './Editor.styles';
 
 interface PanelNameEditorProps {
   value: string;

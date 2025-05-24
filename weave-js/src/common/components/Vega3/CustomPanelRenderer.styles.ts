@@ -1,7 +1,7 @@
 import styled, {css} from 'styled-components';
 
-import {GLOBAL_COLORS} from '../../util/colors';
 import {Icon} from '../../../components/Icon';
+import {GLOBAL_COLORS} from '../../util/colors';
 
 export const Wrapper = styled.div<{showBindings?: boolean}>`
   width: 100%;

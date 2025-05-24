@@ -1,9 +1,9 @@
 import React from 'react';
 
+import {Icon} from '../Icon';
 import {ControlsImageOverlaysControls} from './ControlImageOverlays';
 import * as Controls from './controlsImage';
 import {DEFAULT_TILE_LAYOUT, defaultHideImageState} from './ImageWithOverlays';
-import {Icon} from '../Icon';
 
 type ControlMaskProps = {
   mask: Controls.MaskControlState;

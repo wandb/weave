@@ -1,5 +1,6 @@
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
+
 import {Icon} from '../Icon';
 
 export const ControlBar = styled.div`
