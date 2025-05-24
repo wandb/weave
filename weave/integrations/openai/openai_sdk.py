@@ -474,8 +474,8 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         ),
     ):
         acc = _pad_output(acc, value)
-        if value.delta is not None:
-            acc.output[value.output_index] += value.delta
+        
+        acc.output[value.output_index] += value.delta
 
     # 2b. Events without an output_index
     elif isinstance(
@@ -488,8 +488,8 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         # Not obvious how to handle these since there is no output_index
         if not acc.output:
             acc.output = [""]
-        if value.delta is not None:
-            acc.output[0] += value.delta
+        
+        acc.output[0] += value.delta
 
     # Everything else
     elif isinstance(
