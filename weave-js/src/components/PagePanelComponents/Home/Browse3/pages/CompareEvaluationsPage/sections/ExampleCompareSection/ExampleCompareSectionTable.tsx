@@ -75,6 +75,12 @@ const styledDataGridStyleOverrides: SxProps = {
   '& .MuiTablePagination-root': {
     minHeight: '40px !important',
   },
+  '& .input-digest-cell': {
+    padding: '0px !important',
+  },
+  '& .input-digest-cell:hover': {
+    backgroundColor: '#E9F8FB !important',
+  },
   width: '100%',
 };
 
@@ -829,6 +835,7 @@ const inputFields = (
     filterable: false,
     sortable: false,
     hideable: false,
+    cellClassName: 'input-digest-cell',
     renderCell: params => {
       return (
         <Box
@@ -845,7 +852,7 @@ const inputFields = (
             setSelectedInputDigest(params.row.inputDigest);
             onShowSplitView();
           }}>
-          <span style={{flexShrink: 1}}>
+          <span style={{flexShrink: 1, marginLeft: 'auto', marginRight: 'auto'}}>
             <IdPanel clickable>{params.row.inputDigest.slice(-4)}</IdPanel>
           </span>
         </Box>
