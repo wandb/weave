@@ -1,7 +1,8 @@
-import {Box, Tooltip} from '@material-ui/core';
+import {Box} from '@material-ui/core';
 import {WarningAmberOutlined} from '@mui/icons-material';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import styled from 'styled-components';
@@ -619,13 +620,13 @@ export const ExampleCompareSectionDetail: React.FC<{
     } else {
       inner = (
         <Tooltip
-          title={
+          content={
             SCORER_VARIATION_WARNING_TITLE +
             ': ' +
             SCORER_VARIATION_WARNING_EXPLANATION
-          }>
-          <WarningAmberOutlined color="warning" />
-        </Tooltip>
+          }
+          trigger={<WarningAmberOutlined color="warning" />}
+        />
       );
     }
 
@@ -667,24 +668,30 @@ export const ExampleCompareSectionDetail: React.FC<{
           alignItems: 'center',
           flex: 1,
         }}>
-        <Tooltip title="Previous Example">
-          <IconButton
-            // disabled={targetIndex === 0}
-            onClick={() => {
-              setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
-            }}>
-            <Icon name="chevron-up" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Next Example">
-          <IconButton
-            // disabled={targetIndex === filteredRows.length - 1}
-            onClick={() => {
-              setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
-            }}>
-            <Icon name="chevron-down" />
-          </IconButton>
-        </Tooltip>
+        <Tooltip
+          content="Previous Example"
+          trigger={
+            <IconButton
+              // disabled={targetIndex === 0}
+              onClick={() => {
+                setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
+              }}>
+              <Icon name="chevron-up" />
+            </IconButton>
+          }
+        />
+        <Tooltip
+          content="Next Example"
+          trigger={
+            <IconButton
+              // disabled={targetIndex === filteredRows.length - 1}
+              onClick={() => {
+                setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
+              }}>
+              <Icon name="chevron-down" />
+            </IconButton>
+          }
+        />
         <Box
           style={{
             flex: 0,
@@ -701,39 +708,44 @@ export const ExampleCompareSectionDetail: React.FC<{
 
       <HorizontalBox>
         <Tooltip
-          title={
+          content={
             props.isExpanded
               ? props.isPeekDrawerOpen
                 ? 'Cannot collapse while peek drawer is open'
                 : 'Collapse'
               : 'Full Screen'
-          }>
-          <IconButton
-            style={{
-              ...(props.isExpanded && props.isPeekDrawerOpen
-                ? {opacity: 0.5, cursor: 'not-allowed'}
-                : {}),
-            }}
-            onClick={() => {
-              if (!(props.isExpanded && props.isPeekDrawerOpen)) {
-                props.onExpandToggle();
-              }
-            }}>
-            <Icon
-              name={
-                props.isExpanded ? 'minimize-mode' : 'full-screen-mode-expand'
-              }
-            />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Close">
-          <IconButton
-            onClick={() => {
-              props.onClose();
-            }}>
-            <Icon name={'close'} />
-          </IconButton>
-        </Tooltip>
+          }
+          trigger={
+            <IconButton
+              style={{
+                ...(props.isExpanded && props.isPeekDrawerOpen
+                  ? {opacity: 0.5, cursor: 'not-allowed'}
+                  : {}),
+              }}
+              onClick={() => {
+                if (!(props.isExpanded && props.isPeekDrawerOpen)) {
+                  props.onExpandToggle();
+                }
+              }}>
+              <Icon
+                name={
+                  props.isExpanded ? 'minimize-mode' : 'full-screen-mode-expand'
+                }
+              />
+            </IconButton>
+          }
+        />
+        <Tooltip
+          content="Close"
+          trigger={
+            <IconButton
+              onClick={() => {
+                props.onClose();
+              }}>
+              <Icon name={'close'} />
+            </IconButton>
+          }
+        />
       </HorizontalBox>
     </HorizontalBox>
   );
