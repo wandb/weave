@@ -84,7 +84,7 @@ export const EvaluationModelLink: React.FC<{
           textDecoration: 'line-through',
         }}>
         <Box display="flex" alignItems="center">
-          <ModelIcon />
+          <Icon name="filled-circle" color={evaluationCall.color} />
           {objectRefDisplayName(objRef).label}
         </Box>
       </Box>
@@ -99,7 +99,7 @@ export const EvaluationModelLink: React.FC<{
       version={objRef.artifactVersion}
       versionIndex={objectVersion.result?.versionIndex ?? 0}
       color={MOON_800}
-      icon={<ModelIcon color={evaluationCall.color} />}
+      icon={<Icon name="filled-circle" color={evaluationCall.color} />}
     />
   );
 };
