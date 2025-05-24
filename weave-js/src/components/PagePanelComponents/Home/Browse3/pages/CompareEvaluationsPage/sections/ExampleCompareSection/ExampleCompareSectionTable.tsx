@@ -326,6 +326,7 @@ export const ExampleCompareSectionTable: React.FC<
     });
     setLineClamp(v => Math.min(v + 1, 8));
   }, []);
+
   const decreaseRowHeight = useCallback(() => {
     setRowHeight(v => {
       const newHeight = Math.max(v - 17, 32); // Min 1 line
@@ -733,12 +734,16 @@ const expansionField = (
   renderHeader: (params: GridColumnHeaderParams<RowData>) => {
     return (
       <Tooltip
-        content={defaultExpandState === 'expanded' ? 'Hide trials' : 'Show trials'}
+        content={
+          defaultExpandState === 'expanded' ? 'Hide trials' : 'Show trials'
+        }
         trigger={
           <IconButton onClick={toggleDefaultExpansionState}>
             <Icon
               name={
-                defaultExpandState === 'expanded' ? 'collapse' : 'expand-uncollapse'
+                defaultExpandState === 'expanded'
+                  ? 'collapse'
+                  : 'expand-uncollapse'
               }
             />
           </IconButton>
@@ -926,17 +931,21 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
           if (params.row._pivot === 'modelsAsColumns') {
             return null;
           }
-          
+
           // For trial rows, we have direct access to predictAndScore
-          if (params.row._type === 'trial' && params.row._pivot === 'modelsAsRows') {
-            const trialPredict = params.row.predictAndScore._rawPredictTraceData;
+          if (
+            params.row._type === 'trial' &&
+            params.row._pivot === 'modelsAsRows'
+          ) {
+            const trialPredict =
+              params.row.predictAndScore._rawPredictTraceData;
             const [trialEntity, trialProject] =
               trialPredict?.project_id.split('/') ?? [];
             const trialOpName = parseRefMaybe(
               trialPredict?.op_name ?? ''
             )?.artifactName;
             const trialCallId = params.row.predictAndScore.callId;
-            
+
             if (trialEntity && trialProject && trialOpName && trialCallId) {
               return (
                 <Box
@@ -957,7 +966,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
               );
             }
           }
-          
+
           // For summary rows, we need to get the first trial from filteredRows
           if (params.row._type === 'summary') {
             // Find the corresponding filtered row
@@ -966,26 +975,28 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
             );
             if (correspondingFilteredRow) {
               // For modelsAsRows, we can use evaluationCallId directly
-              const evalCallId = (params.row as RowData)._pivot === 'modelsAsRows' 
-                ? (params.row as ModelAsRowsRowData).evaluationCallId 
-                : (params.row as RowData)._pivot === 'modelsAsColumns' 
+              const evalCallId =
+                (params.row as RowData)._pivot === 'modelsAsRows'
+                  ? (params.row as ModelAsRowsRowData).evaluationCallId
+                  : (params.row as RowData)._pivot === 'modelsAsColumns'
                   ? props.state.evaluationCallIdsOrdered[0] // Use first evaluation for modelsAsColumns
                   : null;
-              
+
               if (!evalCallId) return null;
-              
+
               const firstTrial = correspondingFilteredRow.originalRows.find(
                 row => row.evaluationCallId === evalCallId
               );
               if (firstTrial) {
-                const trialPredict = firstTrial.predictAndScore._rawPredictTraceData;
+                const trialPredict =
+                  firstTrial.predictAndScore._rawPredictTraceData;
                 const [trialEntity, trialProject] =
                   trialPredict?.project_id.split('/') ?? [];
                 const trialOpName = parseRefMaybe(
                   trialPredict?.op_name ?? ''
                 )?.artifactName;
                 const trialCallId = firstTrial.predictAndScore.callId;
-                
+
                 if (trialEntity && trialProject && trialOpName && trialCallId) {
                   return (
                     <Box
@@ -1008,7 +1019,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
               }
             }
           }
-          
+
           return null;
         },
       },
@@ -1300,14 +1311,15 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             fr => fr.inputDigest === params.row.inputDigest
           );
           if (correspondingFilteredRow) {
-            const trial = params.row._type === 'trial'
-              ? correspondingFilteredRow.originalRows.filter(
-                  row => row.evaluationCallId === evaluationCallId
-                )[params.row._trialNdx]
-              : correspondingFilteredRow.originalRows.find(
-                  row => row.evaluationCallId === evaluationCallId
-                );
-                
+            const trial =
+              params.row._type === 'trial'
+                ? correspondingFilteredRow.originalRows.filter(
+                    row => row.evaluationCallId === evaluationCallId
+                  )[params.row._trialNdx]
+                : correspondingFilteredRow.originalRows.find(
+                    row => row.evaluationCallId === evaluationCallId
+                  );
+
             if (trial) {
               const trialPredict = trial.predictAndScore._rawPredictTraceData;
               const [trialEntity, trialProject] =
@@ -1316,7 +1328,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                 trialPredict?.op_name ?? ''
               )?.artifactName;
               const trialCallId = trial.predictAndScore.callId;
-              
+
               if (trialEntity && trialProject && trialOpName && trialCallId) {
                 return (
                   <Box
@@ -1473,9 +1485,11 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       {
         groupId: 'predictCalls',
         headerName: 'Calls',
-        children: props.state.evaluationCallIdsOrdered.map(evaluationCallId => ({
-          field: `predictCall.${evaluationCallId}`,
-        })),
+        children: props.state.evaluationCallIdsOrdered.map(
+          evaluationCallId => ({
+            field: `predictCall.${evaluationCallId}`,
+          })
+        ),
       },
       {
         groupId: 'output',
