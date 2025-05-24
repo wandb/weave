@@ -5,6 +5,8 @@ import {
   GridColumnHeaderParams,
   GridColumnNode,
   GridEventListener,
+  GridFooter,
+  GridFooterContainer,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
 import {MOON_50} from '@wandb/weave/common/css/color.styles';
@@ -36,7 +38,6 @@ import {
   ColumnsManagementPanel,
   CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY,
 } from './ColumnsManagementPanel';
-import {HEADER_HIEGHT_PX} from './common';
 import {
   evalAggScorerMetricCompGeneric,
   lookupMetricValueDirect,
@@ -62,6 +63,70 @@ const styledDataGridStyleOverrides: SxProps = {
     zIndex: '7 !important',
   },
   width: '100%',
+};
+
+/**
+ * Custom footer component that includes controls and pagination
+ */
+interface CustomFooterProps {
+  increaseRowHeight: () => void;
+  decreaseRowHeight: () => void;
+  onlyOneModel: boolean;
+  setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
+  shouldHighlightSelectedRow?: boolean;
+  onShowSplitView: () => void;
+}
+
+const CustomFooter: React.FC<CustomFooterProps> = props => {
+  return (
+    <GridFooterContainer>
+      <HorizontalBox
+        sx={{
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+          padding: '0 16px',
+          gap: 1,
+        }}>
+        <Tooltip
+          content="Increase Row Height"
+          trigger={
+            <IconButton onClick={props.increaseRowHeight}>
+              <Icon name="row-height-small" />
+            </IconButton>
+          }
+        />
+        <Tooltip
+          content="Decrease Row Height"
+          trigger={
+            <IconButton onClick={props.decreaseRowHeight}>
+              <Icon name="row-height-large" />
+            </IconButton>
+          }
+        />
+        {!props.onlyOneModel && (
+          <Tooltip
+            content="Pivot on Model"
+            trigger={
+              <IconButton onClick={() => props.setModelsAsRows(v => !v)}>
+                <Icon name="table" />
+              </IconButton>
+            }
+          />
+        )}
+        {!props.shouldHighlightSelectedRow && (
+          <Tooltip
+            content="Show Detail Panel"
+            trigger={
+              <IconButton onClick={props.onShowSplitView}>
+                <Icon name="panel" />
+              </IconButton>
+            }
+          />
+        )}
+      </HorizontalBox>
+      <GridFooter sx={{ border: 'none' }} />
+    </GridFooterContainer>
+  );
 };
 
 /**
@@ -335,90 +400,29 @@ export const ExampleCompareSectionTable: React.FC<
     setLineClamp(v => Math.max(v - 1, 1));
   }, []);
   const onlyOneModel = props.state.evaluationCallIdsOrdered.length === 1;
-  const header = (
-    <HorizontalBox
-      sx={{
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        bgcolor: MOON_50,
-        padding: '16px',
-        height: HEADER_HIEGHT_PX,
-      }}>
-      <HorizontalBox
-        sx={{
-          justifyContent: 'flex-start',
-          alignItems: 'center',
-        }}>
-        <Tooltip
-          content="Increase Row Height"
-          trigger={
-            <IconButton onClick={increaseRowHeight}>
-              <Icon name="expand-uncollapse" />
-            </IconButton>
-          }
-        />
-        <Tooltip
-          content="Decrease Row Height"
-          trigger={
-            <IconButton onClick={decreaseRowHeight}>
-              <Icon name="collapse" />
-            </IconButton>
-          }
-        />
-        {!onlyOneModel && (
-          <Tooltip
-            content="Pivot on Model"
-            trigger={
-              <IconButton onClick={() => setModelsAsRows(v => !v)}>
-                <Icon name="table" />
-              </IconButton>
-            }
-          />
-        )}
-      </HorizontalBox>
-      <HorizontalBox
-        sx={{
-          justifyContent: 'flex-start',
-          alignItems: 'center',
-        }}>
-        {!props.shouldHighlightSelectedRow && (
-          <Tooltip
-            content="Show Detail Panel"
-            trigger={
-              <IconButton onClick={props.onShowSplitView}>
-                <Icon name="panel" />
-              </IconButton>
-            }
-          />
-        )}
-      </HorizontalBox>
-    </HorizontalBox>
-  );
   const inner =
     modelsAsRows || onlyOneModel ? (
       <ExampleCompareSectionTableModelsAsRows
         {...props}
         rowHeight={rowHeight}
         lineClamp={lineClamp}
+        increaseRowHeight={increaseRowHeight}
+        decreaseRowHeight={decreaseRowHeight}
+        setModelsAsRows={setModelsAsRows}
+        onlyOneModel={onlyOneModel}
       />
     ) : (
       <ExampleCompareSectionTableModelsAsColumns
         {...props}
         rowHeight={rowHeight}
         lineClamp={lineClamp}
+        increaseRowHeight={increaseRowHeight}
+        decreaseRowHeight={decreaseRowHeight}
+        setModelsAsRows={setModelsAsRows}
+        onlyOneModel={onlyOneModel}
       />
     );
-  return (
-    <VerticalBox
-      sx={{
-        height: '100%',
-        width: '100%',
-        gridGap: '0px',
-      }}>
-      {header}
-      {inner}
-    </VerticalBox>
-  );
+  return inner;
 };
 
 /**
@@ -778,7 +782,14 @@ const expansionField = (
 
 // Component for displaying models as rows
 export const ExampleCompareSectionTableModelsAsRows: React.FC<
-  ExampleCompareSectionTableProps & {rowHeight: number; lineClamp: number}
+  ExampleCompareSectionTableProps & {
+    rowHeight: number;
+    lineClamp: number;
+    increaseRowHeight: () => void;
+    decreaseRowHeight: () => void;
+    setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
+    onlyOneModel: boolean;
+  }
 > = props => {
   const ctx = useCompareEvaluationsState();
   const onlyOneModel = ctx.state.evaluationCallIdsOrdered.length === 1;
@@ -1216,7 +1227,19 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       pagination
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
-      slots={{columnsPanel: ColumnsManagementPanel}}
+      slots={{
+        columnsPanel: ColumnsManagementPanel,
+        footer: () => (
+          <CustomFooter
+            increaseRowHeight={props.increaseRowHeight}
+            decreaseRowHeight={props.decreaseRowHeight}
+            onlyOneModel={props.onlyOneModel}
+            setModelsAsRows={props.setModelsAsRows}
+            shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
+            onShowSplitView={props.onShowSplitView}
+          />
+        ),
+      }}
     />
   );
 };
@@ -1236,7 +1259,14 @@ const useOnlyExpandedRows = (
 
 // Component for displaying models as columns
 export const ExampleCompareSectionTableModelsAsColumns: React.FC<
-  ExampleCompareSectionTableProps & {rowHeight: number; lineClamp: number}
+  ExampleCompareSectionTableProps & {
+    rowHeight: number;
+    lineClamp: number;
+    increaseRowHeight: () => void;
+    decreaseRowHeight: () => void;
+    setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
+    onlyOneModel: boolean;
+  }
 > = props => {
   const ctx = useCompareEvaluationsState();
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(ctx.state);
@@ -1591,7 +1621,19 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       pagination
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
-      slots={{columnsPanel: ColumnsManagementPanel}}
+      slots={{
+        columnsPanel: ColumnsManagementPanel,
+        footer: () => (
+          <CustomFooter
+            increaseRowHeight={props.increaseRowHeight}
+            decreaseRowHeight={props.decreaseRowHeight}
+            onlyOneModel={props.onlyOneModel}
+            setModelsAsRows={props.setModelsAsRows}
+            shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
+            onShowSplitView={props.onShowSplitView}
+          />
+        ),
+      }}
     />
   );
 };
