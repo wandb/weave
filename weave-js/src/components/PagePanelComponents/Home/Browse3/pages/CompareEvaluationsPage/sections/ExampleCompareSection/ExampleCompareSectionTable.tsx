@@ -778,12 +778,17 @@ const expansionField = (
           height: '100%',
           width: '100%',
         }}>
-        <IconButton
-          onClick={() => {
-            toggleExpansion(params.row._expansionId);
-          }}>
-          <Icon name={itemIsExpanded ? 'collapse' : 'expand-uncollapse'} />
-        </IconButton>
+        <Tooltip
+          content={itemIsExpanded ? 'Hide trials' : 'Show trials'}
+          trigger={
+            <IconButton
+              onClick={() => {
+                toggleExpansion(params.row._expansionId);
+              }}>
+              <Icon name={itemIsExpanded ? 'collapse' : 'expand-uncollapse'} />
+            </IconButton>
+          }
+        />
       </Box>
     );
   },
