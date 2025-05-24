@@ -19,7 +19,7 @@ export const IdPanel = styled.div<{clickable?: boolean}>`
   font-family: monospace;
   font-size: 10px;
   line-height: 20px;
-  cursor: ${props => (props.clickable ? 'pointer' : 'default')};
+  cursor: pointer;
   &:hover {
     color: ${TEAL_500};
   }
