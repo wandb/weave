@@ -422,6 +422,7 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         ResponseInProgressEvent,
         ResponseOutputItemAddedEvent,
         ResponseOutputItemDoneEvent,
+        ResponseOutputTextAnnotationAddedEvent,
         ResponseRefusalDeltaEvent,
         ResponseRefusalDoneEvent,
         ResponseTextDeltaEvent,
@@ -429,7 +430,6 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         ResponseWebSearchCallCompletedEvent,
         ResponseWebSearchCallInProgressEvent,
         ResponseWebSearchCallSearchingEvent,
-        ResponseOutputTextAnnotationAddedEvent,
     )
 
     if acc is None:
