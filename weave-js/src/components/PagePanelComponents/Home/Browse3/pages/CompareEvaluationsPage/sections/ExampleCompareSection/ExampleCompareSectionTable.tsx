@@ -132,6 +132,16 @@ interface CustomFooterProps {
 }
 
 const CustomFooter: React.FC<CustomFooterProps> = props => {
+  const [columnMenuAnchorEl, setColumnMenuAnchorEl] = useState<HTMLElement | null>(null);
+
+  const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setColumnMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleColumnMenuClose = () => {
+    setColumnMenuAnchorEl(null);
+  };
+
   return (
     <GridFooterContainer>
       <HorizontalBox
@@ -178,8 +188,38 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
             }
           />
         )}
+        <Tooltip
+          content="Show/Hide Columns"
+          trigger={
+            <IconButton onClick={handleColumnMenuOpen}>
+              <Icon name="column" />
+            </IconButton>
+          }
+        />
       </HorizontalBox>
       <GridFooter sx={{border: 'none'}} />
+      <Popover
+        open={Boolean(columnMenuAnchorEl)}
+        anchorEl={columnMenuAnchorEl}
+        onClose={handleColumnMenuClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        slotProps={{
+          paper: {
+            sx: {
+              maxHeight: '400px',
+              overflow: 'auto',
+            },
+          },
+        }}>
+        <ColumnsManagementPanel />
+      </Popover>
     </GridFooterContainer>
   );
 };
