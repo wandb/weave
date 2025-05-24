@@ -61,7 +61,7 @@ export const useSaveModelConfiguration = ({
       stop: state.stopSequences ?? [],
       response_format:
         state.responseFormat === PlaygroundResponseFormats.JsonObject
-          ? ResponseFormatSchema.parse('json')
+          ? ResponseFormatSchema.parse('json_object')
           : state.responseFormat === PlaygroundResponseFormats.Text
           ? ResponseFormatSchema.parse('text')
           : undefined,

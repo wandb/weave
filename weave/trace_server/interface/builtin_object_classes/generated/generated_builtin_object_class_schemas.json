@@ -1109,13 +1109,18 @@
         "response_format": {
           "anyOf": [
             {
-              "$ref": "#/$defs/ResponseFormat"
+              "enum": [
+                "json_object",
+                "text"
+              ],
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "title": "Response Format"
         }
       },
       "required": [
@@ -1298,6 +1303,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Content"
         },
         "name": {
@@ -1309,6 +1315,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Name"
         },
         "function_call": {
@@ -1320,6 +1327,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Function Call"
         },
         "tool_call_id": {
@@ -1331,15 +1339,12 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Tool Call Id"
         }
       },
       "required": [
-        "role",
-        "content",
-        "name",
-        "function_call",
-        "tool_call_id"
+        "role"
       ],
       "title": "Message",
       "type": "object"
@@ -1616,14 +1621,6 @@
       ],
       "title": "Query",
       "type": "object"
-    },
-    "ResponseFormat": {
-      "enum": [
-        "json",
-        "text"
-      ],
-      "title": "ResponseFormat",
-      "type": "string"
     },
     "SavedView": {
       "properties": {
