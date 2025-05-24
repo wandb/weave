@@ -316,6 +316,7 @@ const ResultExplorer: React.FC<{
     'table'
   );
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null); // null means use default calc(100% - 160px)
+  const [previousSidebarWidth, setPreviousSidebarWidth] = useState<number | null>(null); // Store width before expanding
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
@@ -398,7 +399,9 @@ const ResultExplorer: React.FC<{
               top: 0,
               right: 0,
               width:
-                sidebarWidth !== null
+                viewMode === 'detail'
+                  ? '100%'
+                  : sidebarWidth !== null
                   ? `${sidebarWidth}px`
                   : 'calc(100% - 160px)',
               height: '100%',
@@ -409,38 +412,49 @@ const ResultExplorer: React.FC<{
               flexDirection: 'row',
               zIndex: 1000,
             }}>
-            <div
-              style={{
-                position: 'absolute',
-                left: -3,
-                top: 0,
-                bottom: 0,
-                width: 5,
-                cursor: 'col-resize',
-                backgroundColor: isResizing ? '#13A9BA' : 'transparent',
-                transition: isResizing ? 'none' : 'background-color 0.2s',
-                zIndex: 1001,
-              }}
-              onMouseDown={handleMouseDown}
-              onMouseEnter={e => {
-                if (!isResizing) {
-                  e.currentTarget.style.backgroundColor =
-                    'rgba(169, 237, 242, 0.5)';
-                }
-              }}
-              onMouseLeave={e => {
-                if (!isResizing) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
-              }}
-            />
+            {viewMode !== 'detail' && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: -3,
+                  top: 0,
+                  bottom: 0,
+                  width: 5,
+                  cursor: 'col-resize',
+                  backgroundColor: isResizing ? '#13A9BA' : 'transparent',
+                  transition: isResizing ? 'none' : 'background-color 0.2s',
+                  zIndex: 1001,
+                }}
+                onMouseDown={handleMouseDown}
+                onMouseEnter={e => {
+                  if (!isResizing) {
+                    e.currentTarget.style.backgroundColor =
+                      'rgba(169, 237, 242, 0.5)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isResizing) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
+              />
+            )}
             <Box style={{flex: 1, overflow: 'hidden'}}>
               <ExampleCompareSectionDetail
                 state={state}
                 onClose={() => setViewMode('table')}
-                onExpandToggle={() =>
-                  setViewMode(viewMode === 'detail' ? 'split' : 'detail')
-                }
+                onExpandToggle={() => {
+                  if (viewMode === 'detail') {
+                    // Collapsing from detail mode back to split mode
+                    setViewMode('split');
+                    // Restore the previous width
+                    setSidebarWidth(previousSidebarWidth);
+                  } else {
+                    // Expanding to detail mode
+                    setPreviousSidebarWidth(sidebarWidth);
+                    setViewMode('detail');
+                  }
+                }}
                 isExpanded={viewMode === 'detail'}
               />
             </Box>
