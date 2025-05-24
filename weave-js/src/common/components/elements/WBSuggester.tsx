@@ -1,9 +1,3 @@
-import {
-  OnParentScrollOption,
-  OptionRenderer,
-  WBMenuOnSelectHandler,
-  WBMenuOption,
-} from '@wandb/ui';
 import React from 'react';
 
 import {
@@ -12,6 +6,8 @@ import {
   WBMenuOptionFetcherResult,
 } from './WBQueryMenu';
 import * as S from './WBSuggester.styles';
+import {OptionRenderer, WBMenuOnSelectHandler, WBMenuOption} from '../WBMenu';
+import {OnParentScrollOption} from '../WBAnchoredPopup';
 
 const DEFAULT_OPTION_RENDERER: OptionRenderer = ({option, hovered}) => (
   <S.Option hovered={hovered}>{option.name ?? option.value}</S.Option>
