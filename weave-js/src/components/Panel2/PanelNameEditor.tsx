@@ -1,10 +1,10 @@
-import {WBMenuOption} from '@wandb/ui';
 import WBSuggester, {
   WBSuggesterOptionFetcher,
 } from '@wandb/weave/common/components/elements/WBSuggester';
 import React from 'react';
 
 import {InlineContentEditable, PanelNameSpan} from './Editor.styles';
+import {WBMenuOption} from '../../common/components/WBMenu';
 
 interface PanelNameEditorProps {
   value: string;
