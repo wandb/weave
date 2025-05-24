@@ -2,6 +2,7 @@
 
 import React from 'react';
 
+import {EMPTY_PROPS_ACTION_SPECS} from '../common/EmptyContent';
 import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
 export const LLMJudgesTab: React.FC<{
   entity: string;
@@ -18,6 +19,7 @@ export const LLMJudgesTab: React.FC<{
         // for now they are the only kind (!!)
         baseObjectClass: 'ActionSpec',
       }}
+      propsEmpty={EMPTY_PROPS_ACTION_SPECS}
     />
   );
 };

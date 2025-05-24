@@ -7,12 +7,14 @@ from typing import Any, Callable, Optional, Union, cast
 
 import numpy as np
 from pydantic import BaseModel, Field
+from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
+from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, sanitize_object_name
 
 
@@ -33,6 +35,17 @@ class Scorer(Object):
     @weave.op()
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
+
+
+class BuiltInScorer(Scorer):
+    @classmethod
+    def from_obj(cls, obj: WeaveObject) -> Self:
+        field_values = {}
+        for field_name in cls.model_fields:
+            if hasattr(obj, field_name):
+                field_values[field_name] = getattr(obj, field_name)
+
+        return cls(**field_values)
 
 
 def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
@@ -185,54 +198,15 @@ class ApplyScorerSuccess:
 ApplyScorerResult = ApplyScorerSuccess
 
 
-async def apply_scorer_async(
+def preparer_scorer_op_args(
     scorer: Union[Op, Scorer], example: dict, model_output: Any
-) -> ApplyScorerResult:
-    """Apply a scoring function to model output and example data asynchronously.
-
-    This function handles the application of a scoring function to evaluate model outputs.
-    It supports both function-based scorers (Op) and class-based scorers (Scorer),
-    managing argument mapping and validation.
-
-    Args:
-        scorer: Either an Op (function) or Scorer (class) that implements scoring logic
-        example: Dictionary containing the input example data with features to score against
-        model_output: Dictionary containing the model's output to be scored
-
-    Returns:
-        ApplyScorerResult: Contains the scoring result and the Call object representing
-            the scoring operation
-
-    Raises:
-        OpCallError: If there are issues with argument mapping or scorer execution
-        ValueError: If the column mapping configuration is invalid
-    """
-    # For class-based scorers, we need to keep track of the instance
-    scorer_self = None
-    if weave_isinstance(scorer, Scorer):
-        scorer_self = scorer
-
+) -> tuple[Op, dict[str, Any]]:
     # Extract the core components of the scorer
     scorer_attributes = get_scorer_attributes(scorer)
     scorer_name = scorer_attributes.scorer_name
     score_op = scorer_attributes.score_op
     score_signature = inspect.signature(score_op)
     score_arg_names = list(score_signature.parameters.keys())
-
-    # Determine which parameter name is used for model output
-    # Scorers must have either 'output' or 'model_output' (deprecated) parameter
-    if "output" in score_arg_names:
-        score_output_name = "output"
-    elif "model_output" in score_arg_names:
-        score_output_name = "model_output"
-    else:
-        message = textwrap.dedent(
-            f"""
-            Scorer {scorer_name} must have an `output` or `model_output` argument, to receive the
-            output of the model function.
-            """
-        )
-        raise OpCallError(message)
 
     # The keys of `score_args` must match the argument names of the scorer's `score` method.
     # If scorer.column_map is set, then user is indicating that the dataset column(s)
@@ -317,8 +291,52 @@ async def apply_scorer_async(
         # Without column mapping, directly match scorer arguments to example keys
         score_args = {k: v for k, v in example.items() if k in score_arg_names}
 
-    # Add the model output to the arguments
-    score_args[score_output_name] = model_output
+    # Determine which parameter name is used for model output
+    # Scorers must have either 'output' or 'model_output' (deprecated) parameter
+    if "output" in score_arg_names:
+        score_args["output"] = model_output
+    elif "model_output" in score_arg_names:
+        score_args["model_output"] = model_output
+    else:
+        message = textwrap.dedent(
+            f"""
+            Scorer {scorer_name} must have an `output` or `model_output` argument, to receive the
+            output of the model function.
+            """
+        )
+        raise OpCallError(message)
+
+    return score_op, score_args
+
+
+async def apply_scorer_async(
+    scorer: Union[Op, Scorer], example: dict, model_output: Any
+) -> ApplyScorerResult:
+    """Apply a scoring function to model output and example data asynchronously.
+
+    This function handles the application of a scoring function to evaluate model outputs.
+    It supports both function-based scorers (Op) and class-based scorers (Scorer),
+    managing argument mapping and validation.
+
+    Args:
+        scorer: Either an Op (function) or Scorer (class) that implements scoring logic
+        example: Dictionary containing the input example data with features to score against
+        model_output: Dictionary containing the model's output to be scored
+
+    Returns:
+        ApplyScorerResult: Contains the scoring result and the Call object representing
+            the scoring operation
+
+    Raises:
+        OpCallError: If there are issues with argument mapping or scorer execution
+        ValueError: If the column mapping configuration is invalid
+    """
+    # For class-based scorers, we need to keep track of the instance
+    scorer_self = None
+    if weave_isinstance(scorer, Scorer):
+        scorer_self = scorer
+
+    score_op, score_args = preparer_scorer_op_args(scorer, example, model_output)
 
     try:
         # Execute the scoring operation
@@ -335,12 +353,20 @@ async def apply_scorer_async(
         dataset_column_names_str = ", ".join(dataset_column_names[:3])
         if len(dataset_column_names) > 10:
             dataset_column_names_str += ", ..."
+
+        score_signature = inspect.signature(score_op)
+
         required_arg_names = [
             param.name
             for param in score_signature.parameters.values()
             if param.default == inspect.Parameter.empty
         ]
+        score_output_name = "output" if "output" in score_args else "model_output"
         required_arg_names.remove(score_output_name)
+
+        scorer_name = score_op.name
+
+        score_arg_names = list(score_args.keys())
 
         message = textwrap.dedent(
             f"""

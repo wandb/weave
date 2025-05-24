@@ -1,7 +1,7 @@
 import React from 'react';
 
 import * as Colors from '../../../../common/css/color.styles';
-import {Icon} from '../../../Icon';
+import {Icon, IconNames} from '../../../Icon';
 import {Tooltip} from '../../../Tooltip';
 
 type CellValueBooleanProps = {
@@ -9,9 +9,7 @@ type CellValueBooleanProps = {
 };
 
 export const CellValueBoolean = ({value}: CellValueBooleanProps) => {
-  const color = value ? Colors.GREEN_600 : Colors.RED_600;
   const label = value ? 'True' : 'False';
-  const icon = value ? 'checkmark' : 'close';
   return (
     <div
       style={{
@@ -21,7 +19,13 @@ export const CellValueBoolean = ({value}: CellValueBooleanProps) => {
         alignItems: 'center',
         justifyContent: 'center',
       }}>
-      <Tooltip trigger={<Icon color={color} name={icon} />} content={label} />
+      <Tooltip trigger={<BooleanIcon value={value} />} content={label} />
     </div>
   );
+};
+
+export const BooleanIcon = ({value}: {value: boolean}) => {
+  const color = value ? Colors.GREEN_600 : Colors.RED_600;
+  const icon = value ? IconNames.Checkmark : IconNames.Close;
+  return <Icon color={color} name={icon} />;
 };

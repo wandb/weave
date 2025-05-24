@@ -239,7 +239,7 @@ export const useFilterSortby = (
   };
 };
 
-const getFilterByRaw = (
+export const getFilterByRaw = (
   gridFilter: GridFilterModel
 ): Query['$expr'] | undefined => {
   const completeItems = gridFilter.items.filter(
