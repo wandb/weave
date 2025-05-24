@@ -1174,7 +1174,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       },
       {
         groupId: 'predictCall',
-        headerName: 'Predict Call',
+        headerName: 'Calls',
         children: [{field: 'predictCall'}],
       },
       {
