@@ -976,7 +976,7 @@ const inputFields = (
         />
       );
     },
-  })),
+  } as GridColDef<RowData>)),
 ];
 
 const expansionField = (
@@ -1122,7 +1122,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                   />
                 );
               },
-            },
+            } as GridColDef<RowData>,
           ]),
       ...(hasTrials
         ? [
@@ -1356,7 +1356,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
             />
           );
         },
-      })),
+      } as GridColDef<RowData>)),
       ...Object.entries(compositeMetrics).flatMap(
         ([metricGroupKey, metricGroupDef]) => {
           return Object.entries(metricGroupDef.metrics).map(
@@ -1411,7 +1411,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                     baselineValue
                   );
                 },
-              };
+              } as GridColDef<RowData>;
             }
           );
         }
@@ -1684,7 +1684,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
           }
           return null;
         },
-      })),
+      } as GridColDef<RowData>)),
       ...outputColumnKeys.flatMap(key => {
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
@@ -1723,7 +1723,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                 />
               );
             },
-          };
+          } as GridColDef<RowData>;
         });
       }),
       ...Object.entries(compositeMetrics).flatMap(
@@ -1779,7 +1779,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                         baselineValue
                       );
                     },
-                  };
+                  } as GridColDef<RowData>;
                 }
               );
             }
