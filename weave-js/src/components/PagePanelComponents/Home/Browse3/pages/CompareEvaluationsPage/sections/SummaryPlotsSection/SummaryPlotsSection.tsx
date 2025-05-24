@@ -3,6 +3,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 
+import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
   BOX_RADIUS,
@@ -451,12 +452,13 @@ const usePaginatedPlots = (
 const usePlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): {radarData: RadarPlotData; allMetricNames: Set<string>} => {
+  const {hiddenEvaluationIds} = useCompareEvaluationsState();
   const compositeMetrics = useMemo(() => {
     return buildCompositeMetricsMap(state.summary, 'summary');
   }, [state]);
   const callIds = useMemo(() => {
-    return getOrderedCallIds(state);
-  }, [state]);
+    return getOrderedCallIds(state).filter(id => !hiddenEvaluationIds.has(id));
+  }, [state, hiddenEvaluationIds]);
 
   return useMemo(() => {
     const metrics = Object.values(compositeMetrics)

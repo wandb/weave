@@ -18,6 +18,8 @@ export type CompareEvaluationContext = {
   addEvaluationCall: (newCallId: string) => void;
   removeEvaluationCall: (callId: string) => void;
   setEvaluationCallOrder: (newCallIdOrder: string[]) => void;
+  hiddenEvaluationIds: Set<string>;
+  toggleHideEvaluation: (callId: string) => void;
 
   getCachedRowData: (digest: string) => any;
   setCachedRowData: (digest: string, data: any) => void;
@@ -65,6 +67,10 @@ export const CompareEvaluationsProvider: React.FC<{
   const [evaluationCallIds, setEvaluationCallIds] = useState(
     initialEvaluationCallIdsMemo
   );
+  const [hiddenEvaluationIds, setHiddenEvaluationIds] = useState<Set<string>>(
+    new Set()
+  );
+
   useEffect(() => {
     setEvaluationCallIds(initialEvaluationCallIdsMemo);
   }, [initialEvaluationCallIdsMemo]);
@@ -96,6 +102,17 @@ export const CompareEvaluationsProvider: React.FC<{
         ]?.rawDataRow
       );
     };
+    const toggleHideEvaluation = (callId: string) => {
+      setHiddenEvaluationIds(prev => {
+        const next = new Set(prev);
+        if (next.has(callId)) {
+          next.delete(callId);
+        } else {
+          next.add(callId);
+        }
+        return next;
+      });
+    };
     return {
       state: initialState.result,
       setComparisonDimensions,
@@ -117,6 +134,8 @@ export const CompareEvaluationsProvider: React.FC<{
         setEvaluationCallIds(newCallIdOrder);
         onEvaluationCallIdsUpdate(newCallIdOrder);
       },
+      hiddenEvaluationIds,
+      toggleHideEvaluation,
       getCachedRowData,
       setCachedRowData,
     };
@@ -127,6 +146,7 @@ export const CompareEvaluationsProvider: React.FC<{
     setSelectedInputDigest,
     setSelectedMetrics,
     evaluationCallIds,
+    hiddenEvaluationIds,
     onEvaluationCallIdsUpdate,
   ]);
 

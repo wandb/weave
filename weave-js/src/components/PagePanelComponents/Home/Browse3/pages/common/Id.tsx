@@ -2,7 +2,11 @@
  * Show truncated ID with full value in a tooltip.
  */
 
-import {GREEN_600, MOON_150} from '@wandb/weave/common/css/color.styles';
+import {
+  GREEN_600,
+  MOON_150,
+  TEAL_500,
+} from '@wandb/weave/common/css/color.styles';
 import {IconCheckmark} from '@wandb/weave/components/Icon';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {TooltipDeprecated} from '@wandb/weave/components/TooltipDeprecated';
@@ -19,7 +23,10 @@ export const IdPanel = styled.div<{clickable?: boolean}>`
   font-family: monospace;
   font-size: 10px;
   line-height: 20px;
-  cursor: ${props => (props.clickable ? 'pointer' : 'default')};
+  cursor: pointer;
+  &:hover {
+    color: ${TEAL_500};
+  }
 `;
 IdPanel.displayName = 'S.IdPanel';
 

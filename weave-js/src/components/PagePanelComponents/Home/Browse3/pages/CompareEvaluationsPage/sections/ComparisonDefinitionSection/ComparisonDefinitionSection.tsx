@@ -162,7 +162,7 @@ const AddEvaluationButton: React.FC<{
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const onClick = (event: React.MouseEvent<HTMLElement>) => {
+  const onClick = () => {
     setAnchorEl(anchorEl ? null : refBar.current);
   };
   const open = Boolean(anchorEl);
