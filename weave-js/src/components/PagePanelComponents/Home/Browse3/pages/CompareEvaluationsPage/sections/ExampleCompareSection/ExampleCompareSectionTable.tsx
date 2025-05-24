@@ -657,13 +657,18 @@ const expansionField = (
   headerAlign: 'center',
   renderHeader: (params: GridColumnHeaderParams<RowData>) => {
     return (
-      <IconButton onClick={toggleDefaultExpansionState}>
-        <Icon
-          name={
-            defaultExpandState === 'expanded' ? 'collapse' : 'expand-uncollapse'
-          }
-        />
-      </IconButton>
+      <Tooltip
+        content={defaultExpandState === 'expanded' ? 'Hide trials' : 'Show trials'}
+        trigger={
+          <IconButton onClick={toggleDefaultExpansionState}>
+            <Icon
+              name={
+                defaultExpandState === 'expanded' ? 'collapse' : 'expand-uncollapse'
+              }
+            />
+          </IconButton>
+        }
+      />
     );
   },
   valueGetter: (value: any, row: RowData) => {
