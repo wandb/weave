@@ -9,7 +9,6 @@ import {
   GridFooterContainer,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
-import {MOON_50} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
@@ -32,7 +31,7 @@ import {
   DERIVED_SCORER_REF_PLACEHOLDER,
 } from '../../compositeMetricsUtil';
 import {EvaluationComparisonState} from '../../ecpState';
-import {HorizontalBox, VerticalBox} from '../../Layout';
+import {HorizontalBox} from '../../Layout';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
   ColumnsManagementPanel,
@@ -85,7 +84,6 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
           justifyContent: 'flex-start',
           alignItems: 'center',
           padding: '0 16px',
-          gap: 1,
         }}>
         <Tooltip
           content="Increase Row Height"
@@ -124,7 +122,7 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
           />
         )}
       </HorizontalBox>
-      <GridFooter sx={{ border: 'none' }} />
+      <GridFooter sx={{border: 'none'}} />
     </GridFooterContainer>
   );
 };
@@ -290,9 +288,12 @@ const DenseCellValue: React.FC<
   if (props.value == null) {
     return <NotApplicable />;
   }
-  
+
   // For string values, render directly with line-clamp
-  if (typeof props.value === 'string' && !props.value.startsWith('data:image/')) {
+  if (
+    typeof props.value === 'string' &&
+    !props.value.startsWith('data:image/')
+  ) {
     return (
       <Box
         sx={{
@@ -322,7 +323,7 @@ const DenseCellValue: React.FC<
       </Box>
     );
   }
-  
+
   // For objects/arrays that will be JSON stringified, also apply line-clamp
   if (typeof props.value === 'object') {
     const stringified = JSON.stringify(props.value);
@@ -357,7 +358,7 @@ const DenseCellValue: React.FC<
       </Box>
     );
   }
-  
+
   // For non-string values, use the default CellValue component
   return (
     <Box
@@ -1145,6 +1146,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     outputColumnKeys,
     compositeMetrics,
     outputWidths,
+    filteredRows,
+    props.lineClamp,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -1501,6 +1504,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     outputColumnKeys,
     compositeMetrics,
     outputWidths,
+    filteredRows,
+    props.lineClamp,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
