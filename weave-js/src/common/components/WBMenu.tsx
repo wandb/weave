@@ -5,11 +5,12 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {ThemeProvider} from 'styled-components';
 
 import * as S from './WBMenu.styles';
+import {type IconName} from '../../components/Icon';
 
 export type WBMenuOption = {
   name?: string;
   value: string | number;
-  icon?: string | null;
+  icon?: IconName | null;
   disabled?: boolean;
   'data-test'?: string;
   render?(props: {hovered: boolean; selected: boolean}): React.ReactNode;
