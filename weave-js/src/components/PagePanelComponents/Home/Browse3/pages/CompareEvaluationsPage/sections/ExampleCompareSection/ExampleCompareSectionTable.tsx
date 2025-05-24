@@ -81,6 +81,12 @@ const styledDataGridStyleOverrides: SxProps = {
   '& .input-digest-cell:hover': {
     backgroundColor: '#E9F8FB !important',
   },
+  '& .call-id-cell': {
+    padding: '0px !important',
+  },
+  '& .call-id-cell:hover': {
+    backgroundColor: '#E9F8FB !important',
+  },
   width: '100%',
 };
 
@@ -1084,6 +1090,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
                 }}
                 onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
@@ -1110,6 +1117,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         sortable: false,
         filterable: false,
         hideable: false,
+        headerAlign: 'center',
+        cellClassName: 'call-id-cell',
         ...DISABLED_ROW_SPANNING,
         renderCell: (params: GridRenderCellParams<RowData>) => {
           if (params.row._pivot === 'modelsAsColumns') {
@@ -1139,6 +1148,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                     width: '100%',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     cursor: 'pointer',
                   }}
                   onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
@@ -1193,6 +1203,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                         width: '100%',
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         cursor: 'pointer',
                       }}
                       onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
@@ -1511,6 +1522,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         disableReorder: true,
         sortable: false,
         filterable: false,
+        headerAlign: 'center',
+        cellClassName: 'call-id-cell',
         ...DISABLED_ROW_SPANNING,
         renderHeader: (params: GridColumnHeaderParams<RowData>) => {
           return (
@@ -1553,6 +1566,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                       width: '100%',
                       display: 'flex',
                       alignItems: 'center',
+                      justifyContent: 'center',
                       cursor: 'pointer',
                     }}
                     onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
