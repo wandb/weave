@@ -475,7 +475,7 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         ),
     ):
         acc = _pad_output(acc, value)
-        
+
         acc.output[value.output_index] += value.delta
 
     # 2b. Events without an output_index
@@ -489,7 +489,7 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         # Not obvious how to handle these since there is no output_index
         if not acc.output:
             acc.output = [""]
-        
+
         acc.output[0] += value.delta
 
     elif isinstance(value, ResponseOutputTextAnnotationAddedEvent):
