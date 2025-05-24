@@ -61,6 +61,12 @@ const styledDataGridStyleOverrides: SxProps = {
     backgroundColor: 'white',
     zIndex: '7 !important',
   },
+  '& .MuiDataGrid-footerContainer': {
+    minHeight: '40px !important',
+  },
+  '& .MuiTablePagination-root': {
+    minHeight: '40px !important',
+  },
   width: '100%',
 };
 
@@ -84,6 +90,8 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
           justifyContent: 'flex-start',
           alignItems: 'center',
           padding: '0 16px',
+          minHeight: '40px',
+          height: '40px',
         }}>
         <Tooltip
           content="Increase Row Height"
@@ -1220,6 +1228,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       pinnedColumns={{
         left: ['inputDigest'],
       }}
+      columnHeaderHeight={36}
       rowHeight={props.rowHeight}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
@@ -1616,6 +1625,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       pinnedColumns={{
         left: ['inputDigest'],
       }}
+      columnHeaderHeight={36}
       rowHeight={props.rowHeight}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
