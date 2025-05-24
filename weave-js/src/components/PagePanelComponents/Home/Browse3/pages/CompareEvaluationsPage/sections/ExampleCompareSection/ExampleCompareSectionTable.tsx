@@ -1,4 +1,4 @@
-import {Box, SxProps, Tooltip} from '@mui/material';
+import {Box, SxProps} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroupingModel,
@@ -11,6 +11,7 @@ import {MOON_50} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
 import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
@@ -276,22 +277,31 @@ export const ExampleCompareSectionTable: React.FC<
           justifyContent: 'flex-start',
           alignItems: 'center',
         }}>
-        <Tooltip title="Increase Row Height">
-          <IconButton onClick={increaseRowHeight}>
-            <Icon name="expand-uncollapse" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Decrease Row Height">
-          <IconButton onClick={decreaseRowHeight}>
-            <Icon name="collapse" />
-          </IconButton>
-        </Tooltip>
-        {!onlyOneModel && (
-          <Tooltip title="Pivot on Model">
-            <IconButton onClick={() => setModelsAsRows(v => !v)}>
-              <Icon name="table" />
+        <Tooltip
+          content="Increase Row Height"
+          trigger={
+            <IconButton onClick={increaseRowHeight}>
+              <Icon name="expand-uncollapse" />
             </IconButton>
-          </Tooltip>
+          }
+        />
+        <Tooltip
+          content="Decrease Row Height"
+          trigger={
+            <IconButton onClick={decreaseRowHeight}>
+              <Icon name="collapse" />
+            </IconButton>
+          }
+        />
+        {!onlyOneModel && (
+          <Tooltip
+            content="Pivot on Model"
+            trigger={
+              <IconButton onClick={() => setModelsAsRows(v => !v)}>
+                <Icon name="table" />
+              </IconButton>
+            }
+          />
         )}
       </HorizontalBox>
       <HorizontalBox
@@ -300,11 +310,14 @@ export const ExampleCompareSectionTable: React.FC<
           alignItems: 'center',
         }}>
         {!props.shouldHighlightSelectedRow && (
-          <Tooltip title="Show Detail Panel">
-            <IconButton onClick={props.onShowSplitView}>
-              <Icon name="panel" />
-            </IconButton>
-          </Tooltip>
+          <Tooltip
+            content="Show Detail Panel"
+            trigger={
+              <IconButton onClick={props.onShowSplitView}>
+                <Icon name="panel" />
+              </IconButton>
+            }
+          />
         )}
       </HorizontalBox>
     </HorizontalBox>
