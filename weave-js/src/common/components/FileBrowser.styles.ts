@@ -1,8 +1,8 @@
-import {WBIcon} from '@wandb/ui';
 import {Table} from 'semantic-ui-react';
 import styled from 'styled-components';
 
 import * as globals from '../css/globals.styles';
+import {Icon} from '../../components/Icon';
 
 export const FileTableBody = styled(Table.Body)`
   border-top-left-radius: 4px;
@@ -61,7 +61,7 @@ export const SearchInputContainer = styled.span`
   }
 `;
 
-export const SearchInputIcon = styled(WBIcon)`
+export const SearchInputIcon: typeof Icon = styled(Icon)`
   color: ${globals.gray500};
   width: 24px;
   font-size: 28px;
