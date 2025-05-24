@@ -3,6 +3,7 @@ import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Pill} from '@wandb/weave/components/Tag/Pill';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import classNames from 'classnames';
 import React, {useState} from 'react';
 import {SortableElement, SortableHandle} from 'react-sortable-hoc';
@@ -70,7 +71,12 @@ export const DraggableItem = SortableElement(
               <Pill color="teal" label="Baseline" className="ml-8" />
             )}
             {isHidden && (
-              <Pill color="moon" label="Hidden" className="ml-8" />
+              <Tooltip 
+                content="This evaluation is hidden"
+                trigger={
+                  <Icon name="hide-hidden" className="ml-8 text-moon-500" />
+                }
+              />
             )}
           </div>
           <DropdownMenu.Root open={isOpen} onOpenChange={setIsOpen}>
