@@ -59,6 +59,7 @@ const GridCell = styled.div<{
 }>`
   padding: 6px 16px;
   min-width: 100px;
+  font-size: 14px;
   ${props =>
     props.button &&
     `
@@ -249,8 +250,8 @@ export const ScorecardSection: React.FC<{
           style={{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
             backgroundColor: MOON_100,
-            color: MOON_600,
-            fontWeight: 'bold',
+            fontWeight: 600,
+            fontSize: '16px',
             borderTop: '1px solid #ccc',
             borderBottom: '1px solid #ccc',
             display: 'flex',
@@ -265,7 +266,7 @@ export const ScorecardSection: React.FC<{
               flexDirection: 'row',
               gap: '8px',
             }}>
-            <span>diff only</span>
+            <span style={{fontSize: '14px'}}>Diff only</span>
             <Checkbox checked={diffOnly} onClick={() => setDiffOnly(v => !v)} />
           </div>
         </GridCell>
@@ -319,8 +320,8 @@ export const ScorecardSection: React.FC<{
           style={{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
             backgroundColor: MOON_100,
-            color: MOON_600,
-            fontWeight: 'bold',
+            fontWeight: 600,
+            fontSize: '16px',
             borderTop: '1px solid #ccc',
             borderBottom: '1px solid #ccc',
           }}>
