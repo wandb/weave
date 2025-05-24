@@ -11,8 +11,8 @@ import {MOON_50} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useMemo, useRef, useState} from 'react';
@@ -835,6 +835,107 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
           return null;
         },
       },
+      {
+        field: 'predictCall',
+        headerName: 'Call',
+        width: 100,
+        maxWidth: 150,
+        resizable: true,
+        disableColumnMenu: true,
+        sortable: false,
+        filterable: false,
+        hideable: false,
+        ...DISABLED_ROW_SPANNING,
+        renderCell: (params: GridRenderCellParams<RowData>) => {
+          if (params.row._pivot === 'modelsAsColumns') {
+            return null;
+          }
+          
+          // For trial rows, we have direct access to predictAndScore
+          if (params.row._type === 'trial' && params.row._pivot === 'modelsAsRows') {
+            const trialPredict = params.row.predictAndScore._rawPredictTraceData;
+            const [trialEntity, trialProject] =
+              trialPredict?.project_id.split('/') ?? [];
+            const trialOpName = parseRefMaybe(
+              trialPredict?.op_name ?? ''
+            )?.artifactName;
+            const trialCallId = params.row.predictAndScore.callId;
+            
+            if (trialEntity && trialProject && trialOpName && trialCallId) {
+              return (
+                <Box
+                  style={{
+                    overflow: 'hidden',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}>
+                  <CallLink
+                    entityName={trialEntity}
+                    projectName={trialProject}
+                    opName={trialOpName}
+                    callId={trialCallId}
+                    noName
+                  />
+                </Box>
+              );
+            }
+          }
+          
+          // For summary rows, we need to get the first trial from filteredRows
+          if (params.row._type === 'summary') {
+            // Find the corresponding filtered row
+            const correspondingFilteredRow = filteredRows.find(
+              fr => fr.inputDigest === params.row.inputDigest
+            );
+            if (correspondingFilteredRow) {
+              // For modelsAsRows, we can use evaluationCallId directly
+              const evalCallId = (params.row as RowData)._pivot === 'modelsAsRows' 
+                ? (params.row as ModelAsRowsRowData).evaluationCallId 
+                : (params.row as RowData)._pivot === 'modelsAsColumns' 
+                  ? props.state.evaluationCallIdsOrdered[0] // Use first evaluation for modelsAsColumns
+                  : null;
+              
+              if (!evalCallId) return null;
+              
+              const firstTrial = correspondingFilteredRow.originalRows.find(
+                row => row.evaluationCallId === evalCallId
+              );
+              if (firstTrial) {
+                const trialPredict = firstTrial.predictAndScore._rawPredictTraceData;
+                const [trialEntity, trialProject] =
+                  trialPredict?.project_id.split('/') ?? [];
+                const trialOpName = parseRefMaybe(
+                  trialPredict?.op_name ?? ''
+                )?.artifactName;
+                const trialCallId = firstTrial.predictAndScore.callId;
+                
+                if (trialEntity && trialProject && trialOpName && trialCallId) {
+                  return (
+                    <Box
+                      style={{
+                        overflow: 'hidden',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}>
+                      <CallLink
+                        entityName={trialEntity}
+                        projectName={trialProject}
+                        opName={trialOpName}
+                        callId={trialCallId}
+                        noName
+                      />
+                    </Box>
+                  );
+                }
+              }
+            }
+          }
+          
+          return null;
+        },
+      },
       ...outputColumnKeys.map(key => ({
         field: `output.${key}`,
         headerName: key,
@@ -954,6 +1055,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         children: inputSubFields.inputSubFields.map(key => ({
           field: `inputs.${key}`,
         })),
+      },
+      {
+        groupId: 'predictCall',
+        headerName: 'Predict Call',
+        children: [{field: 'predictCall'}],
       },
       {
         groupId: 'scores',
@@ -1089,6 +1195,73 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             ),
           ]
         : []),
+      // Add predict call columns for each evaluation
+      ...props.state.evaluationCallIdsOrdered.map(evaluationCallId => ({
+        field: `predictCall.${evaluationCallId}`,
+        headerName: 'Call',
+        width: 100,
+        maxWidth: 150,
+        resizable: true,
+        disableColumnMenu: false,
+        disableReorder: true,
+        sortable: false,
+        filterable: false,
+        ...DISABLED_ROW_SPANNING,
+        renderHeader: (params: GridColumnHeaderParams<RowData>) => {
+          return (
+            <EvaluationModelLink
+              callId={evaluationCallId}
+              state={props.state}
+            />
+          );
+        },
+        renderCell: (params: GridRenderCellParams<RowData>) => {
+          // Find the corresponding filtered row
+          const correspondingFilteredRow = filteredRows.find(
+            fr => fr.inputDigest === params.row.inputDigest
+          );
+          if (correspondingFilteredRow) {
+            const trial = params.row._type === 'trial'
+              ? correspondingFilteredRow.originalRows.filter(
+                  row => row.evaluationCallId === evaluationCallId
+                )[params.row._trialNdx]
+              : correspondingFilteredRow.originalRows.find(
+                  row => row.evaluationCallId === evaluationCallId
+                );
+                
+            if (trial) {
+              const trialPredict = trial.predictAndScore._rawPredictTraceData;
+              const [trialEntity, trialProject] =
+                trialPredict?.project_id.split('/') ?? [];
+              const trialOpName = parseRefMaybe(
+                trialPredict?.op_name ?? ''
+              )?.artifactName;
+              const trialCallId = trial.predictAndScore.callId;
+              
+              if (trialEntity && trialProject && trialOpName && trialCallId) {
+                return (
+                  <Box
+                    style={{
+                      overflow: 'hidden',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}>
+                    <CallLink
+                      entityName={trialEntity}
+                      projectName={trialProject}
+                      opName={trialOpName}
+                      callId={trialCallId}
+                      noName
+                    />
+                  </Box>
+                );
+              }
+            }
+          }
+          return null;
+        },
+      })),
       ...outputColumnKeys.flatMap(key => {
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
@@ -1214,6 +1387,13 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         headerName: 'Inputs',
         children: inputSubFields.inputSubFields.map(key => ({
           field: `inputs.${key}`,
+        })),
+      },
+      {
+        groupId: 'predictCalls',
+        headerName: 'Calls',
+        children: props.state.evaluationCallIdsOrdered.map(evaluationCallId => ({
+          field: `predictCall.${evaluationCallId}`,
         })),
       },
       {
