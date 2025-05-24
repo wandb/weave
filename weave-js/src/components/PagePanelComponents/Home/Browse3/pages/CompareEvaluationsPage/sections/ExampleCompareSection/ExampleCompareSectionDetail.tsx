@@ -658,6 +658,7 @@ export const ExampleCompareSectionDetail: React.FC<{
         alignItems: 'center',
         bgcolor: MOON_50,
         padding: '16px',
+        borderLeft: '1px solid #e0e0e0',
         height: HEADER_HIEGHT_PX,
       }}>
       <HorizontalBox
