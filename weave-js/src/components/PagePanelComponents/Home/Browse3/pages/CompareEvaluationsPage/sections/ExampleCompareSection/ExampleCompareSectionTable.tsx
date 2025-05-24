@@ -1,4 +1,4 @@
-import {Box, SxProps} from '@mui/material';
+import {Box, Popover, SxProps} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroupingModel,
@@ -16,7 +16,7 @@ import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {NotApplicable} from '../../../../NotApplicable';
 import {StyledDataGrid} from '../../../../StyledDataGrid';
@@ -289,10 +289,88 @@ const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps> = props => {
   );
 };
 
+// Component for showing preview of cell content in a popover
+const CellPreviewPopover: React.FC<{
+  anchorEl: HTMLElement | null;
+  onClose: () => void;
+  content: any;
+  isJsonContent?: boolean;
+}> = ({anchorEl, onClose, content, isJsonContent}) => {
+  if (!anchorEl) return null;
+
+  const displayContent = isJsonContent
+    ? JSON.stringify(content, null, 2)
+    : content;
+
+  return (
+    <Popover
+      open={Boolean(anchorEl)}
+      anchorEl={anchorEl}
+      onClose={onClose}
+      anchorOrigin={{
+        vertical: 'center',
+        horizontal: 'center',
+      }}
+      transformOrigin={{
+        vertical: 'center',
+        horizontal: 'center',
+      }}
+      slotProps={{
+        paper: {
+          sx: {
+            maxWidth: '600px',
+            maxHeight: '400px',
+            overflow: 'auto',
+            p: 2,
+            boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.15)',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+          },
+        },
+      }}>
+      <Box
+        sx={{
+          fontFamily: isJsonContent ? 'monospace' : 'inherit',
+          fontSize: '14px',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}>
+        {displayContent}
+      </Box>
+    </Popover>
+  );
+};
+
 const DenseCellValue: React.FC<
   React.ComponentProps<typeof CellValue> & {lineClamp?: number}
 > = props => {
   const {lineClamp = 1, ...cellValueProps} = props;
+  const [previewAnchorEl, setPreviewAnchorEl] = useState<HTMLElement | null>(
+    null
+  );
+  const textRef = useRef<HTMLDivElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  // Check if text is overflowing
+  useEffect(() => {
+    if (textRef.current) {
+      const isTextOverflowing =
+        textRef.current.scrollHeight > textRef.current.clientHeight ||
+        textRef.current.scrollWidth > textRef.current.clientWidth;
+      setIsOverflowing(isTextOverflowing);
+    }
+  }, [props.value, lineClamp]);
+
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (isOverflowing) {
+      event.stopPropagation();
+      setPreviewAnchorEl(event.currentTarget);
+    }
+  };
+
+  const handleClosePreview = () => {
+    setPreviewAnchorEl(null);
+  };
+
   if (props.value == null) {
     return <NotApplicable />;
   }
@@ -303,32 +381,47 @@ const DenseCellValue: React.FC<
     !props.value.startsWith('data:image/')
   ) {
     return (
-      <Box
-        sx={{
-          height: '100%',
-          width: '100%',
-          padding: '6px 4px',
-          display: 'flex',
-          alignItems: 'flex-start',
-        }}>
+      <>
         <Box
           sx={{
+            height: '100%',
             width: '100%',
-            overflow: 'hidden',
-            textAlign: 'left',
-            lineHeight: '17px',
-            display: '-webkit-box',
-            WebkitLineClamp: lineClamp,
-            WebkitBoxOrient: 'vertical',
-            textOverflow: 'ellipsis',
-            wordBreak: 'break-word',
-            whiteSpace: 'normal',
-            cursor: 'pointer',
+            padding: '6px 4px',
+            display: 'flex',
+            alignItems: 'flex-start',
           }}
-          title={props.value}>
-          {props.value.trim()}
+          onClick={handleClick}>
+          <Box
+            ref={textRef}
+            sx={{
+              width: '100%',
+              overflow: 'hidden',
+              textAlign: 'left',
+              lineHeight: '17px',
+              display: '-webkit-box',
+              WebkitLineClamp: lineClamp,
+              WebkitBoxOrient: 'vertical',
+              textOverflow: 'ellipsis',
+              wordBreak: 'break-word',
+              whiteSpace: 'normal',
+              cursor: isOverflowing ? 'pointer' : 'default',
+              '&:hover': isOverflowing
+                ? {
+                    textDecoration: 'underline',
+                    textDecorationStyle: 'dotted',
+                  }
+                : {},
+            }}
+            title={isOverflowing ? 'Click to preview' : undefined}>
+            {props.value.trim()}
+          </Box>
         </Box>
-      </Box>
+        <CellPreviewPopover
+          anchorEl={previewAnchorEl}
+          onClose={handleClosePreview}
+          content={props.value}
+        />
+      </>
     );
   }
 
@@ -336,34 +429,50 @@ const DenseCellValue: React.FC<
   if (typeof props.value === 'object') {
     const stringified = JSON.stringify(props.value);
     return (
-      <Box
-        sx={{
-          height: '100%',
-          width: '100%',
-          padding: '6px 4px',
-          display: 'flex',
-          alignItems: 'flex-start',
-        }}>
+      <>
         <Box
           sx={{
+            height: '100%',
             width: '100%',
-            overflow: 'hidden',
-            textAlign: 'left',
-            lineHeight: '17px',
-            display: '-webkit-box',
-            WebkitLineClamp: lineClamp,
-            WebkitBoxOrient: 'vertical',
-            textOverflow: 'ellipsis',
-            wordBreak: 'break-word',
-            whiteSpace: 'normal',
-            cursor: 'pointer',
-            fontFamily: 'monospace',
-            fontSize: '0.875em',
+            padding: '6px 4px',
+            display: 'flex',
+            alignItems: 'flex-start',
           }}
-          title={stringified}>
-          {stringified}
+          onClick={handleClick}>
+          <Box
+            ref={textRef}
+            sx={{
+              width: '100%',
+              overflow: 'hidden',
+              textAlign: 'left',
+              lineHeight: '17px',
+              display: '-webkit-box',
+              WebkitLineClamp: lineClamp,
+              WebkitBoxOrient: 'vertical',
+              textOverflow: 'ellipsis',
+              wordBreak: 'break-word',
+              whiteSpace: 'normal',
+              cursor: isOverflowing ? 'pointer' : 'default',
+              fontFamily: 'monospace',
+              fontSize: '0.875em',
+              '&:hover': isOverflowing
+                ? {
+                    textDecoration: 'underline',
+                    textDecorationStyle: 'dotted',
+                  }
+                : {},
+            }}
+            title={isOverflowing ? 'Click to preview' : undefined}>
+            {stringified}
+          </Box>
         </Box>
-      </Box>
+        <CellPreviewPopover
+          anchorEl={previewAnchorEl}
+          onClose={handleClosePreview}
+          content={props.value}
+          isJsonContent={true}
+        />
+      </>
     );
   }
 
