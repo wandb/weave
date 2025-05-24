@@ -527,7 +527,7 @@ const CustomPanelRenderer: React.FC<CustomPanelRendererProps> = props => {
             )}
             {hasBindings && (
               <S.ToggleBindingsButton
-                name={showBindings ? 'close' : 'configuration'}
+                name={showBindings ? 'close' : 'settings'}
                 onClick={() => setShowBindings(s => !s)}
               />
             )}

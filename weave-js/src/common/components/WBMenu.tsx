@@ -4,12 +4,13 @@ import computeScrollIntoView from 'compute-scroll-into-view';
 import React, {useEffect, useMemo, useState} from 'react';
 import {ThemeProvider} from 'styled-components';
 
+import {type IconName} from '../../components/Icon';
 import * as S from './WBMenu.styles';
 
 export type WBMenuOption = {
   name?: string;
   value: string | number;
-  icon?: string | null;
+  icon?: IconName | null;
   disabled?: boolean;
   'data-test'?: string;
   render?(props: {hovered: boolean; selected: boolean}): React.ReactNode;
@@ -44,11 +45,7 @@ const DEFAULT_OPTION_RENDERER: OptionRenderer = ({
     fontSize={fontSize}
     lineHeight={lineHeight}>
     {getOptionDisplayName(option)}
-    <S.ItemIcon
-      name={
-        option.icon ?? (selected && option.icon !== null ? 'check' : 'blank')
-      }
-    />
+    {option.icon && selected && <S.ItemIcon name="checkmark" />}
   </S.Item>
 );
 

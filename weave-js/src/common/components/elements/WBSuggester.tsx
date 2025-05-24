@@ -1,11 +1,7 @@
-import {
-  OnParentScrollOption,
-  OptionRenderer,
-  WBMenuOnSelectHandler,
-  WBMenuOption,
-} from '@wandb/ui';
 import React from 'react';
 
+import {OnParentScrollOption} from '../WBAnchoredPopup';
+import {OptionRenderer, WBMenuOnSelectHandler, WBMenuOption} from '../WBMenu';
 import {
   SortScoreFn,
   WBMenuOptionFetcher,

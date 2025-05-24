@@ -1,5 +1,3 @@
-import {TriggerGenerator, WBPopupTrigger} from '@wandb/ui';
-import {WBPopupDirection} from '@wandb/ui';
 import React from 'react';
 
 import {
@@ -9,6 +7,8 @@ import {
   WBMenuOption,
   WBMenuTheme,
 } from '../../common/components/WBMenu';
+import {WBPopupDirection} from './WBPopup';
+import {TriggerGenerator, WBPopupTrigger} from './WBPopupTrigger';
 
 export interface WBPopupMenuTriggerProps {
   options: WBMenuOption[];

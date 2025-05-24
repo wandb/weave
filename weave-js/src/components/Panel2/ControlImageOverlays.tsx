@@ -1,4 +1,3 @@
-import {WBIcon} from '@wandb/ui';
 import HelpPopup from '@wandb/weave/common/components/elements/HelpPopup';
 import {BoundingBoxSliderControl} from '@wandb/weave/common/components/MediaCard';
 import {ShowMoreContainer} from '@wandb/weave/common/components/showMoreContainer';
@@ -10,6 +9,7 @@ import * as _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {Button, ButtonGroup} from 'semantic-ui-react';
 
+import {Icon} from '../Icon';
 import {ControlsBox} from './ControlBox';
 import * as S from './ControlImageOverlays.styles';
 import {ControlsMask} from './ControlMask';
@@ -189,7 +189,7 @@ const TileLayoutButtons: React.FC<TileLayoutButtonsProps> = ({
             'action-button--active': tileLayout === 'ALL_STACKED',
           })}
           onClick={() => setLayoutType('ALL_STACKED')}>
-          <WBIcon name="overlay-stack" />
+          <Icon name="overlay-stack" />
         </Button>
         <Button
           size="tiny"
@@ -198,7 +198,7 @@ const TileLayoutButtons: React.FC<TileLayoutButtonsProps> = ({
             'action-button--active': tileLayout === 'MASKS_NEXT_TO_IMAGE',
           })}
           onClick={() => setLayoutType('MASKS_NEXT_TO_IMAGE')}>
-          <WBIcon name={'overlay-2-column'} />
+          <Icon name={'overlay-2-column'} />
         </Button>
         {maskCount > 1 && (
           <Button
@@ -208,7 +208,7 @@ const TileLayoutButtons: React.FC<TileLayoutButtonsProps> = ({
               'action-button--active': tileLayout === 'ALL_SPLIT',
             })}
             onClick={() => setLayoutType('ALL_SPLIT')}>
-            <WBIcon name="overlay-3-column" />
+            <Icon name="overlay-3-column" />
           </Button>
         )}
       </ButtonGroup>
