@@ -674,7 +674,9 @@ export const ExampleCompareSectionDetail: React.FC<{
             <IconButton
               // disabled={targetIndex === 0}
               onClick={() => {
-                setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
+                setSelectedInputDigest(
+                  filteredRows[targetIndex - 1].inputDigest
+                );
               }}>
               <Icon name="chevron-up" />
             </IconButton>
@@ -686,7 +688,9 @@ export const ExampleCompareSectionDetail: React.FC<{
             <IconButton
               // disabled={targetIndex === filteredRows.length - 1}
               onClick={() => {
-                setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
+                setSelectedInputDigest(
+                  filteredRows[targetIndex + 1].inputDigest
+                );
               }}>
               <Icon name="chevron-down" />
             </IconButton>

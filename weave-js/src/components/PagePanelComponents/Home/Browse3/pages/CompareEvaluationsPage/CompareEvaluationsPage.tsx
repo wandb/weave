@@ -315,12 +315,14 @@ const ResultExplorer: React.FC<{
 }> = ({state, height}) => {
   const peekLocation = usePeekLocation();
   const isPeekDrawerOpen = peekLocation != null;
-  
+
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
     'table'
   );
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null); // null means use default calc(100% - 160px)
-  const [previousSidebarWidth, setPreviousSidebarWidth] = useState<number | null>(null); // Store width before expanding
+  const [previousSidebarWidth, setPreviousSidebarWidth] = useState<
+    number | null
+  >(null); // Store width before expanding
   const [isResizing, setIsResizing] = useState(false);
   const [wasAutoExpanded, setWasAutoExpanded] = useState(false); // Track if expansion was automatic
   const containerRef = useRef<HTMLDivElement>(null);
@@ -339,7 +341,13 @@ const ResultExplorer: React.FC<{
       setSidebarWidth(previousSidebarWidth);
       setWasAutoExpanded(false);
     }
-  }, [isPeekDrawerOpen, viewMode, sidebarWidth, previousSidebarWidth, wasAutoExpanded]);
+  }, [
+    isPeekDrawerOpen,
+    viewMode,
+    sidebarWidth,
+    previousSidebarWidth,
+    wasAutoExpanded,
+  ]);
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
