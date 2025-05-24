@@ -717,8 +717,7 @@ export const ExampleCompareSectionDetail: React.FC<{
       <HorizontalBox
         sx={{
           gridGap: '8px',
-        }}
-      >
+        }}>
         <Tooltip
           content={
             props.isExpanded

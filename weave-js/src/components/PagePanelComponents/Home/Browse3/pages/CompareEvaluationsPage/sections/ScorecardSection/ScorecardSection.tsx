@@ -7,7 +7,6 @@ import styled from 'styled-components';
 import {
   MOON_100,
   MOON_300,
-  MOON_600,
 } from '../../../../../../../../common/css/color.styles';
 import {parseRefMaybe, WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
@@ -33,7 +32,6 @@ import {
 } from '../../ecpConstants';
 import {
   EvaluationComparisonState,
-  getBaselineCallId,
   getOrderedCallIds,
   getOrderedModelRefs,
 } from '../../ecpState';
@@ -76,20 +74,27 @@ export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const {hiddenEvaluationIds} = useCompareEvaluationsState();
-  
+
   const evalCallIds = useMemo(
-    () => getOrderedCallIds(props.state).filter(id => !hiddenEvaluationIds.has(id)),
+    () =>
+      getOrderedCallIds(props.state).filter(id => !hiddenEvaluationIds.has(id)),
     [props.state, hiddenEvaluationIds]
   );
-  
+
   const modelRefs = useMemo(() => {
     // Get all model refs from visible evaluations only
-    const visibleEvalCalls = evalCallIds.map(id => props.state.summary.evaluationCalls[id]);
-    const visibleModelRefs = new Set(visibleEvalCalls.map(call => call.modelRef));
+    const visibleEvalCalls = evalCallIds.map(
+      id => props.state.summary.evaluationCalls[id]
+    );
+    const visibleModelRefs = new Set(
+      visibleEvalCalls.map(call => call.modelRef)
+    );
     // Keep the ordering from getOrderedModelRefs but filter to only visible ones
-    return getOrderedModelRefs(props.state).filter(ref => visibleModelRefs.has(ref));
+    return getOrderedModelRefs(props.state).filter(ref =>
+      visibleModelRefs.has(ref)
+    );
   }, [props.state, evalCallIds]);
-  
+
   const datasetRefs = useMemo(
     () => Object.values(props.state.summary.evaluations).map(e => e.datasetRef),
     [props.state]

@@ -17,17 +17,16 @@ import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-
 import {useHistory} from 'react-router-dom';
 
-import {NotApplicable} from '../../../../NotApplicable';
-import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {
-  useWeaveflowRouteContext,
-  usePeekLocation,
   HIDE_TRACETREE_PARAM,
   SHOW_FEEDBACK_PARAM,
+  usePeekLocation,
+  useWeaveflowRouteContext,
 } from '../../../../context';
+import {NotApplicable} from '../../../../NotApplicable';
+import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {IdPanel} from '../../../common/Id';
 import {CallLink} from '../../../common/Links';
 import {
@@ -114,26 +113,39 @@ const useCallNavigation = () => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
   const peekLoc = usePeekLocation();
-  
-  return useCallback((entityName: string, projectName: string, callId: string) => {
-    const peekParams = new URLSearchParams(peekLoc?.search ?? '');
-    const traceTreeParam = peekParams.get(HIDE_TRACETREE_PARAM);
-    const hideTraceTree = traceTreeParam === '1' ? true : traceTreeParam === '0' ? false : undefined;
-    const showFeedbackParam = peekParams.get(SHOW_FEEDBACK_PARAM);
-    const showFeedbackExpand = showFeedbackParam === '1' ? true : showFeedbackParam === '0' ? false : undefined;
-    
-    const url = peekingRouter.callUIUrl(
-      entityName,
-      projectName,
-      '',
-      callId,
-      undefined,
-      hideTraceTree,
-      showFeedbackExpand
-    );
-    
-    history.push(url);
-  }, [history, peekingRouter, peekLoc]);
+
+  return useCallback(
+    (entityName: string, projectName: string, callId: string) => {
+      const peekParams = new URLSearchParams(peekLoc?.search ?? '');
+      const traceTreeParam = peekParams.get(HIDE_TRACETREE_PARAM);
+      const hideTraceTree =
+        traceTreeParam === '1'
+          ? true
+          : traceTreeParam === '0'
+          ? false
+          : undefined;
+      const showFeedbackParam = peekParams.get(SHOW_FEEDBACK_PARAM);
+      const showFeedbackExpand =
+        showFeedbackParam === '1'
+          ? true
+          : showFeedbackParam === '0'
+          ? false
+          : undefined;
+
+      const url = peekingRouter.callUIUrl(
+        entityName,
+        projectName,
+        '',
+        callId,
+        undefined,
+        hideTraceTree,
+        showFeedbackExpand
+      );
+
+      history.push(url);
+    },
+    [history, peekingRouter, peekLoc]
+  );
 };
 
 /**
@@ -149,7 +161,8 @@ interface CustomFooterProps {
 }
 
 const CustomFooter: React.FC<CustomFooterProps> = props => {
-  const [columnMenuAnchorEl, setColumnMenuAnchorEl] = useState<HTMLElement | null>(null);
+  const [columnMenuAnchorEl, setColumnMenuAnchorEl] =
+    useState<HTMLElement | null>(null);
 
   const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setColumnMenuAnchorEl(event.currentTarget);
@@ -624,24 +637,24 @@ export const ExampleCompareSectionTable: React.FC<
     });
     setLineClamp(v => Math.max(v - 1, 1));
   }, []);
-  
+
   // Filter out hidden evaluations
   const visibleEvaluationCallIds = useMemo(() => {
     return props.state.evaluationCallIdsOrdered.filter(
       id => !hiddenEvaluationIds.has(id)
     );
   }, [props.state.evaluationCallIdsOrdered, hiddenEvaluationIds]);
-  
+
   const onlyOneModel = visibleEvaluationCallIds.length === 1;
-  
+
   // Create a modified state with filtered evaluation call IDs
   const filteredState = useMemo(() => {
     return {
       ...props.state,
-      evaluationCallIdsOrdered: visibleEvaluationCallIds
+      evaluationCallIdsOrdered: visibleEvaluationCallIds,
     };
   }, [props.state, visibleEvaluationCallIds]);
-  
+
   const inner =
     modelsAsRows || onlyOneModel ? (
       <ExampleCompareSectionTableModelsAsRows
@@ -935,7 +948,8 @@ const inputFields = (
             setSelectedInputDigest(params.row.inputDigest);
             onShowSplitView();
           }}>
-          <span style={{flexShrink: 1, marginLeft: 'auto', marginRight: 'auto'}}>
+          <span
+            style={{flexShrink: 1, marginLeft: 'auto', marginRight: 'auto'}}>
             <IdPanel clickable>{params.row.inputDigest.slice(-4)}</IdPanel>
           </span>
         </Box>
@@ -1072,7 +1086,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     outputColumnKeys,
     rows
   );
-  
+
   const navigateToCall = useCallNavigation();
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
@@ -1170,7 +1184,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                   justifyContent: 'center',
                   cursor: 'pointer',
                 }}
-                onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
+                onClick={() =>
+                  navigateToCall(trialEntity, trialProject, trialCallId)
+                }>
                 <CallLink
                   entityName={trialEntity}
                   projectName={trialProject}
@@ -1228,7 +1244,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                     justifyContent: 'center',
                     cursor: 'pointer',
                   }}
-                  onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
+                  onClick={() =>
+                    navigateToCall(trialEntity, trialProject, trialCallId)
+                  }>
                   <CallLink
                     entityName={trialEntity}
                     projectName={trialProject}
@@ -1283,7 +1301,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                         justifyContent: 'center',
                         cursor: 'pointer',
                       }}
-                      onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
+                      onClick={() =>
+                        navigateToCall(trialEntity, trialProject, trialCallId)
+                      }>
                       <CallLink
                         entityName={trialEntity}
                         projectName={trialProject}
@@ -1566,7 +1586,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     outputColumnKeys,
     rows
   );
-  
+
   const navigateToCall = useCallNavigation();
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
@@ -1646,7 +1666,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                       justifyContent: 'center',
                       cursor: 'pointer',
                     }}
-                    onClick={() => navigateToCall(trialEntity, trialProject, trialCallId)}>
+                    onClick={() =>
+                      navigateToCall(trialEntity, trialProject, trialCallId)
+                    }>
                     <CallLink
                       entityName={trialEntity}
                       projectName={trialProject}

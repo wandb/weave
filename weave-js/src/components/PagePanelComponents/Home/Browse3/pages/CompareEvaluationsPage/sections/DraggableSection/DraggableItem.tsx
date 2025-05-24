@@ -36,7 +36,8 @@ export const DraggableItem = SortableElement(
     onRemoveItem,
     onSetBaseline,
   }: DraggableItemProps) => {
-    const {hiddenEvaluationIds, toggleHideEvaluation} = useCompareEvaluationsState();
+    const {hiddenEvaluationIds, toggleHideEvaluation} =
+      useCompareEvaluationsState();
     const isDeletable = numItems > 1;
     const isBaseline = idx === 0;
     const isHidden = hiddenEvaluationIds.has(item.value);
@@ -71,7 +72,7 @@ export const DraggableItem = SortableElement(
               <Pill color="teal" label="Baseline" className="ml-8" />
             )}
             {isHidden && (
-              <Tooltip 
+              <Tooltip
                 content="This evaluation is hidden"
                 trigger={
                   <Icon name="hide-hidden" className="ml-8 text-moon-500" />
@@ -97,8 +98,8 @@ export const DraggableItem = SortableElement(
                   Make baseline
                 </DropdownMenu.Item>
                 <DropdownMenu.Item onClick={onToggleHidePropagated}>
-                  <Icon name={isHidden ? "show-visible" : "hide-hidden"} />
-                  {isHidden ? "Unhide evaluation" : "Hide evaluation"}
+                  <Icon name={isHidden ? 'show-visible' : 'hide-hidden'} />
+                  {isHidden ? 'Unhide evaluation' : 'Hide evaluation'}
                 </DropdownMenu.Item>
                 {isDeletable && (
                   <>

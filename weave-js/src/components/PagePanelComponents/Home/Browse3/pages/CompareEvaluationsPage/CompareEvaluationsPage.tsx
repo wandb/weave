@@ -327,7 +327,7 @@ const ResultExplorer: React.FC<{
   const [isResizing, setIsResizing] = useState(false);
   const [wasAutoExpanded, setWasAutoExpanded] = useState(false); // Track if expansion was automatic
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // Only enable regression finder if exactly 2 evaluations are visible
   const visibleEvaluationCount = state.evaluationCallIdsOrdered.filter(
     id => !hiddenEvaluationIds.has(id)

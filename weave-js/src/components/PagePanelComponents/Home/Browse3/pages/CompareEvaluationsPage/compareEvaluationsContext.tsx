@@ -70,7 +70,7 @@ export const CompareEvaluationsProvider: React.FC<{
   const [hiddenEvaluationIds, setHiddenEvaluationIds] = useState<Set<string>>(
     new Set()
   );
-  
+
   useEffect(() => {
     setEvaluationCallIds(initialEvaluationCallIdsMemo);
   }, [initialEvaluationCallIdsMemo]);

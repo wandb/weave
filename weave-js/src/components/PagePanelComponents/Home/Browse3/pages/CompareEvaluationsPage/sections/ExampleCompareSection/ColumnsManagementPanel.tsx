@@ -81,9 +81,7 @@ const ColumnGroup: FC<{
           checked={isGroupIndeterminate ? 'indeterminate' : isGroupChecked}
           onCheckedChange={toggleColumnGroup}
         />
-        <label
-          htmlFor={idCheckboxGroup}
-          className="ml-4 cursor-pointer">
+        <label htmlFor={idCheckboxGroup} className="ml-4 cursor-pointer">
           {group.headerName ?? group.groupId}
         </label>
       </div>
@@ -94,7 +92,7 @@ const ColumnGroup: FC<{
               const idCheckbox = `toggle-vis_${child.field}`;
               const checked = columnVisibilityModel[child.field] !== false;
               const label = columnLookup[child.field].headerName ?? child.field;
-              
+
               return (
                 <div key={child.field} className="flex items-center py-2">
                   <Checkbox
@@ -103,9 +101,7 @@ const ColumnGroup: FC<{
                     checked={checked}
                     onCheckedChange={() => toggleColumn(child.field, !checked)}
                   />
-                  <label
-                    htmlFor={idCheckbox}
-                    className="ml-4 cursor-pointer">
+                  <label htmlFor={idCheckbox} className="ml-4 cursor-pointer">
                     {label}
                   </label>
                 </div>
@@ -148,8 +144,10 @@ export const ColumnsManagementPanel: FC<GridColumnsPanelProps> = props => {
 
   return (
     <Tailwind>
-      <div className="min-w-[360px] p-12" style={{fontFamily: 'Source Sans Pro', fontSize: '14px'}}>
-        <div className="font-semibold mb-4">Manage columns</div>
+      <div
+        className="min-w-[360px] p-12"
+        style={{fontFamily: 'Source Sans Pro', fontSize: '14px'}}>
+        <div className="mb-4 font-semibold">Manage columns</div>
         <div>
           {columnGroupingModel.map(group => (
             <ColumnGroup
