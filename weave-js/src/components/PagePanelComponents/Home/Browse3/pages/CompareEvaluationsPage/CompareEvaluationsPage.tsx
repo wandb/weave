@@ -24,6 +24,7 @@ import {Button} from '../../../../../Button';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
+  usePeekLocation,
 } from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {SimplePageLayout, SimpleTabView} from '../common/SimplePageLayout';
@@ -312,14 +313,33 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
 }> = ({state, height}) => {
+  const peekLocation = usePeekLocation();
+  const isPeekDrawerOpen = peekLocation != null;
+  
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
     'table'
   );
   const [sidebarWidth, setSidebarWidth] = useState<number | null>(null); // null means use default calc(100% - 160px)
   const [previousSidebarWidth, setPreviousSidebarWidth] = useState<number | null>(null); // Store width before expanding
   const [isResizing, setIsResizing] = useState(false);
+  const [wasAutoExpanded, setWasAutoExpanded] = useState(false); // Track if expansion was automatic
   const containerRef = useRef<HTMLDivElement>(null);
   const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
+
+  // When peek drawer opens and we're in split view, automatically expand to detail view
+  // When peek drawer closes and we're in detail view, automatically collapse back to split view
+  useEffect(() => {
+    if (isPeekDrawerOpen && viewMode === 'split') {
+      setPreviousSidebarWidth(sidebarWidth);
+      setViewMode('detail');
+      setWasAutoExpanded(true);
+    } else if (!isPeekDrawerOpen && viewMode === 'detail' && wasAutoExpanded) {
+      // Only collapse back if we auto-expanded
+      setViewMode('split');
+      setSidebarWidth(previousSidebarWidth);
+      setWasAutoExpanded(false);
+    }
+  }, [isPeekDrawerOpen, viewMode, sidebarWidth, previousSidebarWidth, wasAutoExpanded]);
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -449,13 +469,16 @@ const ResultExplorer: React.FC<{
                     setViewMode('split');
                     // Restore the previous width
                     setSidebarWidth(previousSidebarWidth);
+                    setWasAutoExpanded(false); // Clear auto-expanded flag
                   } else {
                     // Expanding to detail mode
                     setPreviousSidebarWidth(sidebarWidth);
                     setViewMode('detail');
+                    setWasAutoExpanded(false); // This was manual expansion
                   }
                 }}
                 isExpanded={viewMode === 'detail'}
+                isPeekDrawerOpen={isPeekDrawerOpen}
               />
             </Box>
           </Box>
