@@ -22,9 +22,9 @@ import {AutoSizer} from 'react-virtualized';
 
 import {Button} from '../../../../../Button';
 import {
+  usePeekLocation,
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
-  usePeekLocation,
 } from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {SimplePageLayout, SimpleTabView} from '../common/SimplePageLayout';

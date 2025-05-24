@@ -700,17 +700,30 @@ export const ExampleCompareSectionDetail: React.FC<{
       </HorizontalBox>
 
       <HorizontalBox>
-        <Tooltip title={props.isExpanded ? (props.isPeekDrawerOpen ? "Cannot collapse while peek drawer is open" : "Collapse") : "Full Screen"}>
+        <Tooltip
+          title={
+            props.isExpanded
+              ? props.isPeekDrawerOpen
+                ? 'Cannot collapse while peek drawer is open'
+                : 'Collapse'
+              : 'Full Screen'
+          }>
           <IconButton
             style={{
-              ...(props.isExpanded && props.isPeekDrawerOpen ? { opacity: 0.5, cursor: 'not-allowed' } : {})
+              ...(props.isExpanded && props.isPeekDrawerOpen
+                ? {opacity: 0.5, cursor: 'not-allowed'}
+                : {}),
             }}
             onClick={() => {
               if (!(props.isExpanded && props.isPeekDrawerOpen)) {
                 props.onExpandToggle();
               }
             }}>
-            <Icon name={props.isExpanded ? "minimize-mode" : "full-screen-mode-expand"} />
+            <Icon
+              name={
+                props.isExpanded ? 'minimize-mode' : 'full-screen-mode-expand'
+              }
+            />
           </IconButton>
         </Tooltip>
         <Tooltip title="Close">
