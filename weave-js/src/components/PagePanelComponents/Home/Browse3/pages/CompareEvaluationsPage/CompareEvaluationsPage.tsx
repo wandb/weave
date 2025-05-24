@@ -8,7 +8,15 @@ import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import React, {FC, useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
@@ -312,14 +320,19 @@ const ResultExplorer: React.FC<{
   const containerRef = useRef<HTMLDivElement>(null);
   const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (isResizing && containerRef.current) {
-      e.preventDefault();
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const newWidthPx = containerRect.right - e.clientX;
-      setSidebarWidth(Math.min(Math.max(newWidthPx, 200), containerRect.width - 160)); // Constrain between 200px and container width - 2
-    }
-  }, [isResizing]);
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (isResizing && containerRef.current) {
+        e.preventDefault();
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const newWidthPx = containerRect.right - e.clientX;
+        setSidebarWidth(
+          Math.min(Math.max(newWidthPx, 200), containerRect.width - 160)
+        ); // Constrain between 200px and container width - 2
+      }
+    },
+    [isResizing]
+  );
 
   const handleMouseUp = useCallback(() => {
     setIsResizing(false);
@@ -371,7 +384,9 @@ const ResultExplorer: React.FC<{
           }}>
           <ExampleCompareSectionTable
             state={state}
-            shouldHighlightSelectedRow={viewMode === 'split' || viewMode === 'detail'}
+            shouldHighlightSelectedRow={
+              viewMode === 'split' || viewMode === 'detail'
+            }
             onShowSplitView={() => setViewMode('split')}
           />
         </Box>
@@ -382,10 +397,14 @@ const ResultExplorer: React.FC<{
               position: 'absolute',
               top: 0,
               right: 0,
-              width: sidebarWidth !== null ? `${sidebarWidth}px` : 'calc(100% - 160px)',
+              width:
+                sidebarWidth !== null
+                  ? `${sidebarWidth}px`
+                  : 'calc(100% - 160px)',
               height: '100%',
               backgroundColor: 'white',
-              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+              boxShadow:
+                '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
               display: 'flex',
               flexDirection: 'row',
               zIndex: 1000,
@@ -403,12 +422,13 @@ const ResultExplorer: React.FC<{
                 zIndex: 1001,
               }}
               onMouseDown={handleMouseDown}
-              onMouseEnter={(e) => {
+              onMouseEnter={e => {
                 if (!isResizing) {
-                  e.currentTarget.style.backgroundColor = 'rgba(169, 237, 242, 0.5)';
+                  e.currentTarget.style.backgroundColor =
+                    'rgba(169, 237, 242, 0.5)';
                 }
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={e => {
                 if (!isResizing) {
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }
