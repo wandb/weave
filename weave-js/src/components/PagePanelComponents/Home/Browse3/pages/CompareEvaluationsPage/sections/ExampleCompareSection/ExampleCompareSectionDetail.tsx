@@ -705,6 +705,8 @@ export const ExampleCompareSectionDetail: React.FC<{
         <Box
           style={{
             flex: 1,
+            fontSize: '16px',
+            fontWeight: '600',
           }}>
           {`Example ${targetIndex + 1} of ${filteredRows.length}`}
         </Box>
