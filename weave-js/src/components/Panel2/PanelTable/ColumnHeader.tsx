@@ -776,8 +776,8 @@ export const ColumnHeader: React.FC<{
                   )}
                   {isGroupCol && (
                     <S.ControlIcon
-                      name="group-runs"
-                      onClick={e => {
+                      name="group"
+                      onClick={() => {
                         recordEvent('REMOVE_COLUMN_GROUPING');
                         doUngroup();
                       }}
@@ -799,7 +799,7 @@ export const ColumnHeader: React.FC<{
                   <S.EllipsisIcon
                     ref={anchorRef}
                     data-test="column-options"
-                    name="overflow"
+                    name="overflow-vertical"
                     className="column-actions-trigger"
                     onClick={() => setOpen(o => !o)}
                   />
@@ -824,8 +824,8 @@ const SortStateToggle: React.FC<{
   if (colSortState && colSortState === 'desc') {
     return (
       <S.ControlIcon
-        name="down-arrow"
-        onClick={async e => {
+        name="sort-descending"
+        onClick={async () => {
           recordEvent('REMOVE_COLUMN_SORT');
           updateTableState(Table.disableSortByCol(tableState, colId));
         }}
@@ -834,8 +834,8 @@ const SortStateToggle: React.FC<{
   } else if (colSortState && colSortState === 'asc') {
     return (
       <S.ControlIcon
-        name="up-arrow"
-        onClick={async e => {
+        name="sort-ascending"
+        onClick={async () => {
           recordEvent('UPDATE_COLUMN_SORT_DESC');
           updateTableState(
             Table.enableSortByCol(Table.disableSort(tableState), colId, false)
