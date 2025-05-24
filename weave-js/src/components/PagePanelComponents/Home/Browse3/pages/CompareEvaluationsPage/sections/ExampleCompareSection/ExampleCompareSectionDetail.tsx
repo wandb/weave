@@ -662,11 +662,13 @@ export const ExampleCompareSectionDetail: React.FC<{
         padding: '16px',
         borderLeft: '1px solid #e0e0e0',
         height: HEADER_HIEGHT_PX,
+        gridGap: '8px',
       }}>
       <HorizontalBox
         sx={{
           alignItems: 'center',
           flex: 1,
+          gridGap: '8px',
         }}>
         <Tooltip
           content="Previous Example"
@@ -712,7 +714,11 @@ export const ExampleCompareSectionDetail: React.FC<{
         </Box>
       </HorizontalBox>
 
-      <HorizontalBox>
+      <HorizontalBox
+        sx={{
+          gridGap: '8px',
+        }}
+      >
         <Tooltip
           content={
             props.isExpanded
