@@ -1,6 +1,7 @@
 import {toast} from '@wandb/weave/common/components/elements/Toast';
 import React, {Dispatch, SetStateAction} from 'react';
 import {Link} from 'react-router-dom';
+import throttle from 'lodash/throttle';
 
 import {Message} from '../../ChatView/types';
 import {useGetTraceServerClientContext} from '../../wfReactInterface/traceServerClientContext';
@@ -32,6 +33,24 @@ export const useChatCompletionFunctions = (
       inputs,
       track_llm_call: updatedStates[callIndex].trackLLMCall,
     });
+  };
+
+  // Streaming variant of completion request. Returns the parsed chunk array.
+  const makeCompletionStreamRequest = (
+    callIndex: number,
+    updatedStates: PlaygroundState[],
+    onChunk: (chunk: any) => void
+  ): Promise<any> => {
+    const inputs = getInputFromPlaygroundState(updatedStates[callIndex]);
+
+    return getTsClient().completionsCreateStream(
+      {
+        project_id: `${entity}/${project}`,
+        inputs,
+        track_llm_call: updatedStates[callIndex].trackLLMCall,
+      },
+      onChunk
+    );
   };
 
   const handleErrorsAndUpdate = async (
@@ -120,6 +139,96 @@ export const useChatCompletionFunctions = (
     }
   };
 
+  /*
+   * Streaming-friendly send. Uses makeCompletionStreamRequest and updates
+   * state as each chunk arrives so the UI can reflect partial generation.
+   */
+  const handleStreamSend = async (
+    role: PlaygroundMessageRole,
+    chatText: string,
+    callIndex?: number,
+    content?: string,
+    toolCallId?: string
+  ) => {
+    try {
+      const chatsToUpdate =
+        callIndex !== undefined
+          ? [callIndex]
+          : playgroundStates.map((_, i) => i);
+
+      const newMessageContent = content || chatText;
+      const newMessage = createMessage(role, newMessageContent, toolCallId);
+
+      const updatedStates = [...playgroundStates];
+      chatsToUpdate.forEach(idx => {
+        const updatedState = appendChoiceToMessages(playgroundStates[idx]);
+        if (newMessageContent && updatedState.traceCall?.inputs?.messages) {
+          updatedState.traceCall.inputs.messages.push(newMessage);
+        }
+        updatedState.loading = true;
+        updatedStates[idx] = filterNullMessages(updatedState);
+      });
+
+      setPlaygroundStates(updatedStates);
+      setChatText('');
+
+      const streamPromises = chatsToUpdate.map(idx => {
+        // Aggregate content incrementally per chat
+        let aggregatedRes: any = {
+          choices: [{message: {role: 'assistant', content: ''}}],
+        };
+
+        // Frequent per-token setState calls from multiple parallel streams can
+        // saturate React's render queue, making later streams appear to start
+        // only after earlier ones finish.  Throttling each chat's state
+        // updates keeps the UI responsive and lets all streams render
+        // concurrently while still feeling live.
+        const throttledUpdate = throttle((newContent: string) => {
+          setPlaygroundStates(prev => {
+            const next = [...prev];
+            const tgt = next[idx];
+            tgt.traceCall = {...tgt.traceCall, output: aggregatedRes} as any;
+            return next;
+          });
+        }, 80); // 80-ms cadence feels responsive without blocking
+
+        // Need to fix usage
+        // Need to fix stop reason
+
+        return makeCompletionStreamRequest(idx, updatedStates, chunk => {
+          const delta = chunk.choices?.[0]?.delta;
+          if (delta?.content) {
+            aggregatedRes.choices[0].message.content += delta.content;
+            throttledUpdate(delta.content);
+          }
+        })
+          .then(res => {
+            const finalResponse = {
+              response: aggregatedRes,
+              weave_call_id: res?.weave_call_id,
+            } as CompletionsCreateRes;
+
+            return handleErrorsAndUpdate(finalResponse, idx).then(() => {
+              setPlaygroundStateField(idx, 'loading', false);
+              return {idx, success: true};
+            });
+          })
+          .catch(err => {
+            console.error(`Error streaming completion for chat ${idx}:`, err);
+            setPlaygroundStateField(idx, 'loading', false);
+            return {idx, success: false};
+          });
+      });
+
+      await Promise.all(streamPromises);
+    } catch (error) {
+      console.error('Error processing streamed completion:', error);
+      playgroundStates.forEach((_, idx) => {
+        setPlaygroundStateField(idx, 'loading', false);
+      });
+    }
+  };
+
   const handleRetry = async (
     callIndex: number,
     messageIndex: number,
@@ -162,7 +271,82 @@ export const useChatCompletionFunctions = (
     }
   };
 
-  return {handleRetry, handleSend};
+  /*
+   * Streaming-aware retry. Performs same state modifications as handleRetry
+   * but uses the streaming completions endpoint so the UI can progressively
+   * show the regenerated answer.
+   */
+  const handleRetryStream = async (
+    callIndex: number,
+    messageIndex: number,
+    choiceIndex?: number
+  ) => {
+    try {
+      setPlaygroundStateField(callIndex, 'loading', true);
+
+      const updatedStates = filterNullMessagesFromStates(
+        playgroundStates.map((state, index) => {
+          if (index === callIndex) {
+            if (choiceIndex !== undefined) {
+              return appendChoiceToMessages(state, choiceIndex);
+            }
+            const updatedState = JSON.parse(JSON.stringify(state));
+            if (updatedState.traceCall?.inputs?.messages) {
+              updatedState.traceCall.inputs.messages =
+                updatedState.traceCall.inputs.messages.slice(
+                  0,
+                  messageIndex + 1
+                );
+            }
+            return updatedState;
+          }
+          return state;
+        })
+      );
+
+      // Accumulate chunks into a single response object while streaming
+      let aggregatedRes: any = {
+        choices: [{message: {role: 'assistant', content: ''}}],
+      };
+
+      // Kick off streaming request
+      const res = await makeCompletionStreamRequest(
+        callIndex,
+        updatedStates,
+        chunk => {
+          const delta = chunk.choices?.[0]?.delta;
+          if (delta?.content) {
+            aggregatedRes.choices[0].message.content += delta.content;
+            // Live update UI
+            setPlaygroundStates(prev => {
+              const newState = [...prev];
+              const tgt = newState[callIndex];
+              tgt.traceCall = {
+                ...tgt.traceCall,
+                output: aggregatedRes,
+              } as any;
+              return newState;
+            });
+          }
+        }
+      );
+
+      const finalResponse = {
+        response: aggregatedRes,
+        weave_call_id: res?.weave_call_id,
+      } as CompletionsCreateRes;
+
+      const success = await handleErrorsAndUpdate(finalResponse, callIndex);
+      if (!success) {
+        setPlaygroundStateField(callIndex, 'loading', false);
+      }
+    } catch (error) {
+      console.error('Error processing streamed completion retry:', error);
+      setPlaygroundStateField(callIndex, 'loading', false);
+    }
+  };
+
+  return {handleRetry, handleSend, handleStreamSend, handleRetryStream};
 };
 
 // Helper functions

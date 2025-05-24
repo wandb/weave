@@ -61,6 +61,8 @@ import {
   TraceTableQueryRes,
   TraceTableQueryStatsBatchReq,
   TraceTableQueryStatsBatchRes,
+  CompletionsCreateStreamReq,
+  CompletionsCreateStreamRes,
 } from './traceServerClientTypes';
 
 export class DirectTraceServerClient {
@@ -371,6 +373,101 @@ export class DirectTraceServerClient {
       }
       return Promise.reject(error);
     }
+  }
+
+  public completionsCreateStream(
+    req: CompletionsCreateStreamReq,
+    onChunk?: (chunk: any) => void
+  ): Promise<CompletionsCreateStreamRes> {
+    const url = `${this.baseUrl}/completions/create_stream`;
+    const reqBody = JSON.stringify(req);
+
+    const headers: {[key: string]: string} = {
+      'Content-Type': 'application/json',
+      Authorization: 'Basic ' + btoa(':'),
+    };
+    const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
+    if (useAdminPrivileges) {
+      headers['use-admin-privileges'] = 'true';
+    }
+
+    return new Promise((resolve, reject) => {
+      fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: reqBody,
+      })
+        .then(response => {
+          if (!response.ok || !response.body) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          const chunks: any[] = [];
+          let weaveCallId: string | undefined;
+
+          const read = (): Promise<void> => {
+            return reader.read().then(({done, value}) => {
+              if (done) {
+                // flush remainder
+                if (buffer.trim() !== '') {
+                  try {
+                    const parsed = JSON.parse(buffer);
+                    if (parsed._meta?.weave_call_id) {
+                      weaveCallId = parsed._meta.weave_call_id;
+                    } else {
+                      chunks.push(parsed);
+                      onChunk?.(parsed);
+                    }
+                  } catch (err) {
+                    console.error(
+                      'Error parsing completion chunk line:',
+                      buffer,
+                      err
+                    );
+                  }
+                }
+                resolve({chunks, weave_call_id: weaveCallId});
+                return;
+              }
+
+              buffer += decoder.decode(value, {stream: true});
+              let newlineIndex;
+              while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+                const line = buffer.slice(0, newlineIndex);
+                buffer = buffer.slice(newlineIndex + 1);
+                if (line.trim() === '') continue;
+                try {
+                  const parsed = JSON.parse(line);
+                  if (parsed._meta?.weave_call_id) {
+                    weaveCallId = parsed._meta.weave_call_id;
+                  } else {
+                    chunks.push(parsed);
+                    onChunk?.(parsed);
+                  }
+                } catch (err) {
+                  console.error(
+                    'Error parsing completion chunk line:',
+                    line,
+                    err
+                  );
+                }
+              }
+              return read();
+            });
+          };
+
+          return read();
+        })
+        .catch(err => {
+          if ((err as any)?.api_key_name) {
+            console.error('Missing LLM API key:', (err as any).api_key_name);
+          }
+          reject(err);
+        });
+    });
   }
 
   public projectStats(req: ProjectStatsReq): Promise<ProjectStatsRes> {
