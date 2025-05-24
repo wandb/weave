@@ -409,7 +409,6 @@ const ResultExplorer: React.FC<{
           display: 'flex',
           flexDirection: 'row',
           height: height,
-          borderTop: '1px solid #e0e0e0',
           position: 'relative',
         }}>
         <Box

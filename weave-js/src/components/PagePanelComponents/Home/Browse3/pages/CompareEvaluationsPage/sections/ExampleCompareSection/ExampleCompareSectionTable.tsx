@@ -57,6 +57,7 @@ import {
 } from './exampleCompareSectionUtil';
 
 const styledDataGridStyleOverrides: SxProps = {
+  borderTop: 0,
   '& .MuiDataGrid-row:hover': {
     backgroundColor: 'white',
   },
