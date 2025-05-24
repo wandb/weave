@@ -74,6 +74,23 @@ const styledDataGridStyleOverrides: SxProps = {
   },
   '& .MuiTablePagination-root': {
     minHeight: '40px !important',
+    fontFamily: 'Source Sans Pro',
+    color: '#79808A', // moon-500
+  },
+  '& .MuiTablePagination-displayedRows': {
+    fontFamily: 'Source Sans Pro',
+    color: '#79808A', // moon-500
+  },
+  '& .MuiTablePagination-selectLabel': {
+    fontFamily: 'Source Sans Pro',
+    color: '#79808A', // moon-500
+  },
+  '& .MuiTablePagination-select': {
+    fontFamily: 'Source Sans Pro',
+    color: '#79808A', // moon-500
+  },
+  '& .MuiTablePagination-actions': {
+    color: '#79808A', // moon-500
   },
   '& .input-digest-cell': {
     padding: '0px !important',
