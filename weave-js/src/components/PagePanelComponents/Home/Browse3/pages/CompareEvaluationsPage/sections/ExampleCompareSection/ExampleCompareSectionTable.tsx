@@ -153,7 +153,7 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
           height: '40px',
         }}>
         <Tooltip
-          content="Increase Row Height"
+          content="Increase row height"
           trigger={
             <IconButton onClick={props.increaseRowHeight}>
               <Icon name="row-height-small" />
@@ -161,24 +161,32 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
           }
         />
         <Tooltip
-          content="Decrease Row Height"
+          content="Decrease row height"
           trigger={
             <IconButton onClick={props.decreaseRowHeight}>
               <Icon name="row-height-large" />
             </IconButton>
           }
         />
+        <Tooltip
+          content="Show/hide columns"
+          trigger={
+            <IconButton onClick={handleColumnMenuOpen}>
+              <Icon name="column" />
+            </IconButton>
+          }
+        />
         {!props.onlyOneModel && (
           <Tooltip
-            content="Pivot on Model"
+            content="Pivot on eval"
             trigger={
               <IconButton onClick={() => props.setModelsAsRows(v => !v)}>
-                <Icon name="table" />
+                <Icon name="retry" />
               </IconButton>
             }
           />
         )}
-        {!props.shouldHighlightSelectedRow && (
+        {/* {!props.shouldHighlightSelectedRow && (
           <Tooltip
             content="Show Detail Panel"
             trigger={
@@ -187,15 +195,7 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
               </IconButton>
             }
           />
-        )}
-        <Tooltip
-          content="Show/Hide Columns"
-          trigger={
-            <IconButton onClick={handleColumnMenuOpen}>
-              <Icon name="column" />
-            </IconButton>
-          }
-        />
+        )} */}
       </HorizontalBox>
       <GridFooter sx={{border: 'none'}} />
       <Popover
