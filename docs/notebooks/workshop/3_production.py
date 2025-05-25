@@ -428,6 +428,8 @@ production_test_emails = [
     },
 ]
 
+# %%
+# Run a "production" simulation
 for i, test_case in enumerate(production_test_emails):
     print(f"\n{'='*60}")
     print(f"📧 Test {i+1}/5: {test_case['expected']}")
