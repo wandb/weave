@@ -1,21 +1,22 @@
 # %% [markdown]
-# # 🐝 Weave Workshop: Build, Track, and Evaluate LLM Applications
+# # Part 2: Evaluations with Weave
 #
 # <img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 #
-# Welcome to the Weave workshop! In this hands-on session, you'll learn how to use Weave to develop, debug, and evaluate AI-powered applications.
+# Learn how to systematically evaluate LLM applications using Weave's evaluation framework.
 #
-# **What you'll learn:**
-# - 🔍 **Trace & Debug**: Track every LLM call, see inputs/outputs, and debug issues
-# - 📊 **Evaluate**: Build rigorous evaluations with multiple scoring functions
-# - 🏃 **Compare**: Run A/B tests and compare different approaches
-# - 📈 **Monitor**: Track costs, latency, and performance metrics
-# - 🎯 **Iterate**: Use data-driven insights to improve your application
+# **In this section:**
+# - 📊 **Dataset Creation**: Build evaluation datasets with challenging examples
+# - 🎯 **Custom Scorers**: Write scoring functions to measure performance
+# - 🏃 **Running Evaluations**: Execute evaluations and analyze results
+# - 📈 **Pre-built Scorers**: Use Weave's built-in evaluation metrics
+# - 🔄 **Model Comparison**: Compare different models and configurations
+# - 📝 **EvaluationLogger**: Flexible evaluation logging for custom workflows
 
 # %% [markdown]
-# ## 🔑 Prerequisites
+# ## Setup
 #
-# Before we begin, let's set up your environment.
+# Install dependencies and configure API keys.
 
 # %%
 # Install dependencies
@@ -33,29 +34,13 @@ from pydantic import BaseModel, Field
 import weave
 from weave import Dataset, Evaluation, EvaluationLogger, Model
 
-# 🔑 Setup your API keys
-print("📝 Setting up API keys...")
-
-# Weights & Biases will automatically prompt if needed
-# It checks: 1) WANDB_API_KEY env var, 2) ~/.netrc, 3) prompts user
-print("✅ W&B authentication will be handled automatically by Weave")
-print("   (Optional: You can set WANDB_API_KEY env variable if you prefer)")
-
-# OpenAI requires manual setup
-print("\n🤖 OpenAI Setup:")
+# Setup API keys
 if not os.environ.get("OPENAI_API_KEY"):
-    print(
-        "You can generate your OpenAI API key here: https://platform.openai.com/api-keys"
-    )
+    print("Get your OpenAI API key: https://platform.openai.com/api-keys")
     os.environ["OPENAI_API_KEY"] = getpass("Enter your OpenAI API key: ")
-else:
-    print("✅ OpenAI API key found in environment")
 
-print("\n---")
-
-# 🏠 Initialize your W&B project
-print("🐝 Initializing Weave...")
-weave_client = weave.init("weave-workshop")  # 🐝 Your W&B project name
+# Initialize Weave
+weave_client = weave.init("weave-workshop")
 
 
 # %% [markdown]

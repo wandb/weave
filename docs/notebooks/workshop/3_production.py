@@ -1,21 +1,22 @@
 # %% [markdown]
-# # 🐝 Weave Workshop: Build, Track, and Evaluate LLM Applications
+# # Part 3: Production Monitoring with Weave
 #
 # <img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 #
-# Welcome to the Weave workshop! In this hands-on session, you'll learn how to use Weave to develop, debug, and evaluate AI-powered applications.
+# Learn how to monitor LLM applications in production using Weave's scorer system for real-time guardrails and quality monitoring.
 #
-# **What you'll learn:**
-# - 🔍 **Trace & Debug**: Track every LLM call, see inputs/outputs, and debug issues
-# - 📊 **Evaluate**: Build rigorous evaluations with multiple scoring functions
-# - 🏃 **Compare**: Run A/B tests and compare different approaches
-# - 📈 **Monitor**: Track costs, latency, and performance metrics
-# - 🎯 **Iterate**: Use data-driven insights to improve your application
+# **In this section:**
+# - 🛡️ **Guardrails**: Block or modify responses with content moderation
+# - 📊 **Quality Monitoring**: Track extraction quality and completeness
+# - ⚡ **Performance Tracking**: Monitor response times and SLA compliance
+# - 🔄 **Real-time Scoring**: Apply scorers to live production calls
+# - 👥 **Human Feedback**: Collect feedback and build datasets from production
+# - 📈 **Continuous Improvement**: Use production data to improve models
 
 # %% [markdown]
-# ## 🔑 Prerequisites
+# ## Setup
 #
-# Before we begin, let's set up your environment.
+# Install dependencies and configure API keys.
 
 # %%
 # Install dependencies
@@ -31,29 +32,13 @@ from typing import Any, Optional
 import weave
 from weave import Scorer
 
-# 🔑 Setup your API keys
-print("📝 Setting up API keys...")
-
-# Weights & Biases will automatically prompt if needed
-# It checks: 1) WANDB_API_KEY env var, 2) ~/.netrc, 3) prompts user
-print("✅ W&B authentication will be handled automatically by Weave")
-print("   (Optional: You can set WANDB_API_KEY env variable if you prefer)")
-
-# OpenAI requires manual setup
-print("\n🤖 OpenAI Setup:")
+# Setup API keys
 if not os.environ.get("OPENAI_API_KEY"):
-    print(
-        "You can generate your OpenAI API key here: https://platform.openai.com/api-keys"
-    )
+    print("Get your OpenAI API key: https://platform.openai.com/api-keys")
     os.environ["OPENAI_API_KEY"] = getpass("Enter your OpenAI API key: ")
-else:
-    print("✅ OpenAI API key found in environment")
 
-print("\n---")
-
-# 🏠 Initialize your W&B project
-print("🐝 Initializing Weave...")
-weave_client = weave.init("weave-workshop")  # 🐝 Your W&B project name
+# Initialize Weave
+weave_client = weave.init("weave-workshop")
 
 
 # %% [markdown]
@@ -499,11 +484,9 @@ print("   - Guardrails (block/review) vs Monitors (quality/performance)")
 print("   - All scorer results are tracked in Weave for analysis")
 print("\n✅ Check the Weave UI to see detailed scorer results and traces!")
 
-
 # %% [markdown]
-# ### 👥 Part 3.1: Human Feedback & Dataset Building
-#
-# Learn how to collect human feedback and build datasets from production data.
+# ### 🔄 Part 3.1: Human Feedback & Data Collection
+# # Learn how to collect human feedback and build datasets from production data.
 # This creates a feedback loop for continuous model improvement.
 # TODO: New Cell: Here, we are going to make an interactive "app" that renders in the cell so that the user can directly interact with the model. This will then generate calls in the UI and we can see calls coming into the application. From there we can setup a human feedback column interactively, collect examples, narrow down to the hard cases, and add to a dataset, which can then be used for the next round of evaluations:
 #   1. Create an interactive output that allows for form-fill-style querying of the model
@@ -512,3 +495,34 @@ print("\n✅ Check the Weave UI to see detailed scorer results and traces!")
 #   3. (UI) Query for the bad results in the UI
 #   4. (UI) Add the bad results to a dataset
 #   5. (Optional) Next cell: create a new evaluation using the new dataset - presumably the models have a harder time... or just say that it is possible
+
+
+# %% [markdown]
+# ## Summary
+#
+# You've learned how to monitor LLM applications in production:
+#
+# - ✅ **Guardrails**: Implemented content moderation to block inappropriate responses
+# - ✅ **Quality Monitoring**: Built comprehensive quality assessment scorers
+# - ✅ **Real-time Scoring**: Applied scorers to production calls with `call.apply_scorer()`
+# - ✅ **Production Patterns**: Handled errors, edge cases, and performance monitoring
+# - ✅ **Actionable Insights**: Generated specific recommendations for improvement
+#
+# **Next Steps:**
+# - **Deploy to Production**: Use these patterns in your real applications
+# - **Collect Human Feedback**: Set up feedback loops for continuous improvement
+# - **Build Custom Scorers**: Create domain-specific quality and safety checks
+# - **Monitor Trends**: Track quality metrics over time in the Weave UI
+#
+# **Key Takeaways:**
+# - Production monitoring requires both guardrails (blocking) and monitors (tracking)
+# - Scorers can be applied in real-time to any Weave-traced function call
+# - Quality assessment should be comprehensive: completeness, accuracy, consistency
+# - All scorer results are automatically tracked and visualized in Weave
+#
+# **Production Checklist:**
+# - ✅ Content moderation for safety
+# - ✅ Quality scoring for reliability
+# - ✅ Performance monitoring for SLAs
+# - ✅ Error handling and graceful degradation
+# - ✅ Comprehensive logging and observability

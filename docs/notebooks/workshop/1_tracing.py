@@ -1,21 +1,22 @@
 # %% [markdown]
-# # 🐝 Weave Workshop: Build, Track, and Evaluate LLM Applications
+# # Part 1: Tracing & Debugging with Weave
 #
 # <img src="http://wandb.me/logo-im-png" width="400" alt="Weights & Biases" />
 #
-# Welcome to the Weave workshop! In this hands-on session, you'll learn how to use Weave to develop, debug, and evaluate AI-powered applications.
+# Learn how to use Weave's automatic tracing capabilities to debug and monitor LLM applications.
 #
-# **What you'll learn:**
-# - 🔍 **Trace & Debug**: Track every LLM call, see inputs/outputs, and debug issues
-# - 📊 **Evaluate**: Build rigorous evaluations with multiple scoring functions
-# - 🏃 **Compare**: Run A/B tests and compare different approaches
-# - 📈 **Monitor**: Track costs, latency, and performance metrics
-# - 🎯 **Iterate**: Use data-driven insights to improve your application
+# **In this section:**
+# - 🔍 **Function Tracing**: Automatically track function calls with `@weave.op`
+# - 🐛 **Nested Debugging**: Debug complex pipelines with call traces
+# - ⚠️ **Exception Tracking**: Monitor and debug failures
+# - 🖼️ **Media Support**: Trace multimodal applications with images and audio
+# - 🔒 **Custom Serialization**: Control what data gets logged
+# - 🔗 **OpenTelemetry**: Integrate with existing observability tools
 
 # %% [markdown]
-# ## 🔑 Prerequisites
+# ## Setup
 #
-# Before we begin, let's set up your environment.
+# Install dependencies and configure API keys.
 
 # %%
 # Install dependencies
@@ -350,13 +351,6 @@ sample_audio = generate_sample_audio(
 )
 print("✅ Generated audio file")
 
-# Test video creation (if moviepy is available)
-print("\n🎬 Creating video...")
-sample_video = create_sample_video()
-if isinstance(sample_video, str):
-    print(f"⚠️ {sample_video}")
-else:
-    print("✅ Generated video clip")
 
 print("\n💡 Check the Weave UI to see:")
 print("  - 📸 Images displayed with thumbnails and full-size view")
@@ -636,3 +630,26 @@ def otel_function(tracer, data: str) -> str:
 
 tracer = setup_otel_for_weave()
 otel_function(tracer, "Hello from OTEL")
+
+# %% [markdown]
+# ## Summary
+#
+# You've learned how to use Weave's tracing capabilities:
+#
+# - ✅ **Function Tracing**: Use `@weave.op` to automatically track function calls
+# - ✅ **Nested Debugging**: Debug complex pipelines with automatic call traces
+# - ✅ **Exception Tracking**: Monitor failures with full context preservation
+# - ✅ **Media Support**: Trace multimodal applications with automatic media logging
+# - ✅ **Custom Serialization**: Control data logging with preprocessing functions
+# - ✅ **OpenTelemetry**: Integrate with existing observability infrastructure
+#
+# **Next Steps:**
+# - **Continue to Part 2: Evaluations** to learn systematic testing and model comparison
+# - Check the Weave UI to explore your traces and debug your applications
+# - Try tracing your own LLM applications with `@weave.op`
+#
+# **Key Takeaways:**
+# - Tracing is automatic with `@weave.op` - no manual logging required
+# - Weave integrates with 20+ popular AI libraries out of the box
+# - Rich debugging context helps you understand exactly what happened
+# - Production-ready features like PII redaction and custom serialization
