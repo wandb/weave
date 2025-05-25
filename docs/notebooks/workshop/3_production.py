@@ -20,7 +20,7 @@
 
 # %%
 # Install dependencies
-# %pip install wandb weave openai pydantic nest_asyncio -qqq
+# %pip install wandb weave openai pydantic nest_asyncio ipywidgets -qqq
 
 import asyncio
 import os
@@ -28,6 +28,9 @@ import random
 from datetime import datetime
 from getpass import getpass
 from typing import Any, Optional
+
+from openai import OpenAI
+from pydantic import BaseModel, Field
 
 import weave
 from weave import Scorer
@@ -52,7 +55,101 @@ weave_client = weave.init("weave-workshop")
 # - **Monitors**: Track quality metrics without blocking
 
 # %%
-from datetime import datetime
+# Define our data structure
+class CustomerEmail(BaseModel):
+    customer_name: str
+    product: str
+    issue: str
+    sentiment: str = Field(description="positive, neutral, or negative")
+
+
+# 🐝 Track functions with @weave.op
+@weave.op
+def analyze_customer_email(email: str) -> CustomerEmail:
+    """Analyze a customer support email and extract key information."""
+    client = OpenAI()
+
+    # 🎯 Note: OpenAI calls are automatically traced by Weave!
+    # Weave automatically integrates with dozens of popular libraries including:
+    # OpenAI, Anthropic, LangChain, LlamaIndex, HuggingFace, and more
+    # See full list: https://weave-docs.wandb.ai/guides/integrations/
+    response = client.beta.chat.completions.parse(
+        model="gpt-4o-mini",  # Using mini model for cost efficiency
+        messages=[
+            {
+                "role": "system",
+                "content": "Extract customer name, product, issue, and sentiment.",
+            },
+            {
+                "role": "user",
+                "content": email,
+            },
+        ],
+        response_format=CustomerEmail,
+    )
+
+    return response.choices[0].message.parsed
+
+
+@weave.op
+def classify_urgency(email: str, sentiment: str) -> str:
+    """Determine urgency level based on content and sentiment."""
+    urgent_keywords = [
+        "urgent",
+        "asap",
+        "immediately",
+        "frustrated",
+        "broken",
+        "stopped working",
+    ]
+
+    # Check for urgent keywords
+    email_lower = email.lower()
+    has_urgent_keywords = any(keyword in email_lower for keyword in urgent_keywords)
+
+    if sentiment == "negative" and has_urgent_keywords:
+        return "high"
+    elif sentiment == "negative" or has_urgent_keywords:
+        return "medium"
+    else:
+        return "low"
+
+
+
+# Define our data structure
+class CustomerEmail(BaseModel):
+    customer_name: str
+    product: str
+    issue: str
+    sentiment: str = Field(description="positive, neutral, or negative")
+
+
+# 🐝 Track functions with @weave.op
+@weave.op
+def analyze_customer_email(email: str) -> CustomerEmail:
+    """Analyze a customer support email and extract key information."""
+    client = OpenAI()
+
+    # 🎯 Note: OpenAI calls are automatically traced by Weave!
+    # Weave automatically integrates with dozens of popular libraries including:
+    # OpenAI, Anthropic, LangChain, LlamaIndex, HuggingFace, and more
+    # See full list: https://weave-docs.wandb.ai/guides/integrations/
+    response = client.beta.chat.completions.parse(
+        model="gpt-4o-mini",  # Using mini model for cost efficiency
+        messages=[
+            {
+                "role": "system",
+                "content": "Extract customer name, product, issue, and sentiment.",
+            },
+            {
+                "role": "user",
+                "content": email,
+            },
+        ],
+        response_format=CustomerEmail,
+    )
+
+    return response.choices[0].message.parsed
 
 
 # Define more realistic production scorers
@@ -485,16 +582,257 @@ print("   - All scorer results are tracked in Weave for analysis")
 print("\n✅ Check the Weave UI to see detailed scorer results and traces!")
 
 # %% [markdown]
-# ### 🔄 Part 3.1: Human Feedback & Data Collection
-# # Learn how to collect human feedback and build datasets from production data.
+# ## 3.1: Human Feedback & Data Collection
+#
+# Learn how to collect human feedback and build datasets from production data.
 # This creates a feedback loop for continuous model improvement.
-# TODO: New Cell: Here, we are going to make an interactive "app" that renders in the cell so that the user can directly interact with the model. This will then generate calls in the UI and we can see calls coming into the application. From there we can setup a human feedback column interactively, collect examples, narrow down to the hard cases, and add to a dataset, which can then be used for the next round of evaluations:
-#   1. Create an interactive output that allows for form-fill-style querying of the model
-#   2. Add feedback so that the user can mark the reponse as good or bad (use the API to send this feedback)
-#       * (Show in the UI that you can configure custom columns and form fill directly in the app if you have experts on your side)
-#   3. (UI) Query for the bad results in the UI
-#   4. (UI) Add the bad results to a dataset
-#   5. (Optional) Next cell: create a new evaluation using the new dataset - presumably the models have a harder time... or just say that it is possible
+
+# %%
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+import uuid
+
+# Create an interactive feedback collection interface
+class EmailAnalyzerFeedbackApp:
+    def __init__(self):
+        self.current_call = None
+        self.setup_ui()
+    
+    def setup_ui(self):
+        """Create the interactive UI components."""
+        # Input area
+        self.email_input = widgets.Textarea(
+            value="Hi Support,\n\nI'm having issues with my CloudSync Pro. It keeps crashing when I try to sync large files. This is really frustrating!\n\nThanks,\nJohn Smith",
+            placeholder="Enter a customer email to analyze...",
+            description="Email:",
+            layout=widgets.Layout(width='100%', height='120px')
+        )
+        
+        # Analyze button
+        self.analyze_button = widgets.Button(
+            description="Analyze Email",
+            button_style='primary',
+            layout=widgets.Layout(width='150px')
+        )
+        self.analyze_button.on_click(self.analyze_email)
+        
+        # Output area
+        self.output_area = widgets.Output()
+        
+        # Feedback buttons (initially hidden)
+        self.feedback_area = widgets.VBox([])
+        
+        # Main layout
+        self.app = widgets.VBox([
+            widgets.HTML("<h3>🔄 Interactive Email Analyzer with Feedback</h3>"),
+            widgets.HTML("<p>Enter an email below, analyze it, and provide feedback to improve the model:</p>"),
+            self.email_input,
+            self.analyze_button,
+            self.output_area,
+            self.feedback_area
+        ])
+    
+    def analyze_email(self, button):
+        """Analyze the email and show results."""
+        with self.output_area:
+            clear_output()
+            print("🔄 Analyzing email...")
+        
+        try:
+            # Use the .call() method to get both result and call object
+            email_text = self.email_input.value.strip()
+            if not email_text:
+                with self.output_area:
+                    clear_output()
+                    print("❌ Please enter an email to analyze.")
+                return
+            
+            # Add session attributes for tracking
+            with weave.attributes({"session": str(uuid.uuid4()), "env": "workshop_demo"}):
+                result, call = production_email_handler.call(email_text)
+            
+            self.current_call = call
+            
+            # Display results
+            with self.output_area:
+                clear_output()
+                if result["status"] == "success":
+                    analysis = result["analysis"]
+                    print("✅ Analysis Complete!")
+                    print(f"📧 Customer: {analysis['customer_name']}")
+                    print(f"🏷️  Product: {analysis['product']}")
+                    print(f"📝 Issue: {analysis['issue']}")
+                    print(f"😊 Sentiment: {analysis['sentiment']}")
+                    print(f"⚡ Urgency: {result['urgency']}")
+                else:
+                    print(f"❌ Error: {result.get('error', 'Unknown error')}")
+            
+            # Show feedback buttons
+            self.show_feedback_buttons()
+            
+        except Exception as e:
+            with self.output_area:
+                clear_output()
+                print(f"❌ Error analyzing email: {str(e)}")
+    
+    def show_feedback_buttons(self):
+        """Display feedback buttons after analysis."""
+        if not self.current_call:
+            return
+        
+        # Feedback buttons
+        thumbs_up = widgets.Button(
+            description="👍 Good",
+            button_style='success',
+            layout=widgets.Layout(width='100px')
+        )
+        thumbs_down = widgets.Button(
+            description="👎 Bad", 
+            button_style='danger',
+            layout=widgets.Layout(width='100px')
+        )
+        
+        # Text feedback
+        feedback_text = widgets.Textarea(
+            placeholder="Optional: Explain what was good or bad about this analysis...",
+            description="Comments:",
+            layout=widgets.Layout(width='100%', height='80px')
+        )
+        
+        submit_feedback = widgets.Button(
+            description="Submit Feedback",
+            button_style='info',
+            layout=widgets.Layout(width='150px')
+        )
+        
+        # Feedback status
+        feedback_status = widgets.Output()
+        
+        # Event handlers
+        def on_thumbs_up(button):
+            self.add_feedback("👍", feedback_text.value, feedback_status)
+        
+        def on_thumbs_down(button):
+            self.add_feedback("👎", feedback_text.value, feedback_status)
+        
+        def on_submit_feedback(button):
+            if feedback_text.value.strip():
+                self.add_feedback(None, feedback_text.value, feedback_status)
+            else:
+                with feedback_status:
+                    clear_output()
+                    print("⚠️ Please enter some feedback text.")
+        
+        thumbs_up.on_click(on_thumbs_up)
+        thumbs_down.on_click(on_thumbs_down)
+        submit_feedback.on_click(on_submit_feedback)
+        
+        # Layout feedback area
+        self.feedback_area.children = [
+            widgets.HTML("<hr><h4>📝 Provide Feedback</h4>"),
+            widgets.HTML("<p>Help improve the model by rating this analysis:</p>"),
+            widgets.HBox([thumbs_up, thumbs_down], layout=widgets.Layout(margin='10px 0')),
+            feedback_text,
+            submit_feedback,
+            feedback_status
+        ]
+    
+    def add_feedback(self, reaction, note, status_output):
+        """Add feedback to the current call."""
+        if not self.current_call:
+            with status_output:
+                clear_output()
+                print("❌ No call to add feedback to.")
+            return
+        
+        try:
+            # Add reaction if provided
+            if reaction:
+                self.current_call.feedback.add_reaction(reaction)
+            
+            # Add note if provided
+            if note and note.strip():
+                self.current_call.feedback.add_note(note.strip())
+            
+            with status_output:
+                clear_output()
+                feedback_parts = []
+                if reaction:
+                    feedback_parts.append(f"reaction ({reaction})")
+                if note and note.strip():
+                    feedback_parts.append("comment")
+                
+                feedback_desc = " and ".join(feedback_parts)
+                print(f"✅ Feedback submitted: {feedback_desc}")
+                print("🔍 Check the Weave UI to see your feedback attached to the call!")
+                
+        except Exception as e:
+            with status_output:
+                clear_output()
+                print(f"❌ Error submitting feedback: {str(e)}")
+    
+    def display(self):
+        """Display the app."""
+        display(self.app)
+
+# Create and display the feedback app
+print("🚀 Starting Interactive Email Analyzer with Feedback Collection...")
+feedback_app = EmailAnalyzerFeedbackApp()
+feedback_app.display()
+
+# %% [markdown]
+# ### 📊 Analyzing Feedback Data
+#
+# Once you've collected feedback, you can query and analyze it programmatically.
+
+# %%
+# Query feedback from the project
+print("📊 Querying feedback data from your project...")
+
+try:
+    # Get all feedback in the project
+    all_feedback = weave_client.get_feedback()
+    
+    if all_feedback:
+        print(f"\n📈 Found {len(all_feedback)} feedback items:")
+        
+        # Analyze feedback by type
+        reactions = {}
+        notes = []
+        
+        for feedback in all_feedback:
+            if feedback.feedback_type == "reaction":
+                reaction = feedback.payload.get("emoji", "unknown")
+                reactions[reaction] = reactions.get(reaction, 0) + 1
+            elif feedback.feedback_type == "note":
+                notes.append(feedback.payload.get("note", ""))
+        
+        # Show reaction summary
+        if reactions:
+            print("\n👍👎 Reaction Summary:")
+            for reaction, count in reactions.items():
+                print(f"  {reaction}: {count}")
+        
+        # Show recent notes
+        if notes:
+            print(f"\n💬 Recent Comments ({len(notes)} total):")
+            for i, note in enumerate(notes[-3:], 1):  # Show last 3
+                print(f"  {i}. {note[:100]}{'...' if len(note) > 100 else ''}")
+        
+        # Show feedback details
+        print(f"\n🔍 Feedback Details:")
+        for i, feedback in enumerate(all_feedback[-3:], 1):  # Show last 3
+            print(f"  {i}. Type: {feedback.feedback_type}")
+            print(f"     Created: {feedback.created_at}")
+            print(f"     Payload: {feedback.payload}")
+            print()
+    
+    else:
+        print("📭 No feedback found yet. Try using the interactive app above!")
+        
+except Exception as e:
+    print(f"❌ Error querying feedback: {str(e)}")
+    print("💡 Make sure you've submitted some feedback using the app above.")
 
 
 # %% [markdown]
