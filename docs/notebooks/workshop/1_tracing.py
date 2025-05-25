@@ -244,8 +244,6 @@ print(f"✅ Successful: {len(result['successful'])}")
 print(f"❌ Failed: {len(result['failed'])}")
 
 
-
-
 # %% [markdown]
 # ### 🎬 Part 1.3: Media Support & Multimodal Tracing
 #
@@ -254,17 +252,19 @@ print(f"❌ Failed: {len(result['failed'])}")
 
 # %%
 # Let's demonstrate media support with different types
+import base64
+import wave
+
 import requests
 from PIL import Image
-import wave
-import base64
+
 
 # 📸 Image Support - Weave automatically logs PIL.Image objects
 @weave.op
 def generate_sample_image() -> Image.Image:
     """Generate a sample image using OpenAI DALL-E API."""
     client = OpenAI()
-    
+
     response = client.images.generate(
         model="dall-e-3",
         prompt="A cute robot learning about data science, digital art style",
@@ -272,43 +272,46 @@ def generate_sample_image() -> Image.Image:
         quality="standard",
         n=1,
     )
-    
+
     # Download and return as PIL Image - Weave will automatically log this!
     image_url = response.data[0].url
     image_response = requests.get(image_url, stream=True)
     image = Image.open(image_response.raw)
-    
+
     return image
 
-# 🎵 Audio Support - Weave automatically logs wave.Wave_read objects  
+
+# 🎵 Audio Support - Weave automatically logs wave.Wave_read objects
 @weave.op
 def generate_sample_audio(text: str) -> wave.Wave_read:
     """Generate audio using OpenAI's text-to-speech API."""
     client = OpenAI()
-    
+
     with client.audio.speech.with_streaming_response.create(
         model="tts-1",
-        voice="alloy", 
+        voice="alloy",
         input=text,
         response_format="wav",
     ) as response:
         response.stream_to_file("sample_audio.wav")
-    
+
     # Return wave file - Weave will automatically log this with audio player!
     return wave.open("sample_audio.wav", "rb")
+
 
 # 🖼️ Multimodal Analysis - Combining image and text
 @weave.op
 def analyze_image_with_gpt4_vision(image: Image.Image, question: str) -> str:
     """Analyze an image using GPT-4 Vision."""
     client = OpenAI()
-    
+
     # Convert PIL image to base64 for API
     import io
+
     buffer = io.BytesIO()
-    image.save(buffer, format='PNG')
-    image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-    
+    image.save(buffer, format="PNG")
+    image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
     response = client.chat.completions.create(
         model="gpt-4o-mini",  # Supports vision
         messages=[
@@ -318,16 +321,14 @@ def analyze_image_with_gpt4_vision(image: Image.Image, question: str) -> str:
                     {"type": "text", "text": question},
                     {
                         "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{image_base64}"
-                        }
-                    }
-                ]
+                        "image_url": {"url": f"data:image/png;base64,{image_base64}"},
+                    },
+                ],
             }
         ],
-        max_tokens=300
+        max_tokens=300,
     )
-    
+
     return response.choices[0].message.content
 
 
@@ -338,14 +339,15 @@ print(f"✅ Generated image: {sample_image.size}")
 
 print("\n🔍 Analyzing image with GPT-4 Vision...")
 analysis = analyze_image_with_gpt4_vision(
-    sample_image, 
-    "What do you see in this image? Describe it in one sentence."
+    sample_image, "What do you see in this image? Describe it in one sentence."
 )
 print(f"🤖 Analysis: {analysis}")
 
 # Test audio generation
 print("\n🎵 Generating audio...")
-sample_audio = generate_sample_audio("Welcome to the Weave workshop! This audio will be automatically logged.")
+sample_audio = generate_sample_audio(
+    "Welcome to the Weave workshop! This audio will be automatically logged."
+)
 print("✅ Generated audio file")
 
 # Test video creation (if moviepy is available)
@@ -381,46 +383,49 @@ print("  - Share results with team members through Weave UI")
 import re
 from typing import Any, Dict
 
+
 # 🔒 Example 1: PII Redaction
 def redact_pii_inputs(inputs: Dict[str, Any]) -> Dict[str, Any]:
     """Redact PII from inputs before logging."""
     processed = inputs.copy()
-    
+
     if "email_content" in processed:
         text = processed["email_content"]
         # Redact email addresses
-        text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '<EMAIL>', text)
+        text = re.sub(
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "<EMAIL>", text
+        )
         # Redact phone numbers
-        text = re.sub(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', '<PHONE>', text)
+        text = re.sub(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", "<PHONE>", text)
         # Redact SSN
-        text = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '<SSN>', text)
+        text = re.sub(r"\b\d{3}-\d{2}-\d{4}\b", "<SSN>", text)
         processed["email_content"] = text
-    
+
     return processed
+
 
 def redact_pii_output(output: Any) -> Any:
     """Redact PII from outputs before logging."""
-    if hasattr(output, 'customer_name'):
+    if hasattr(output, "customer_name"):
         # Create a copy and redact the name
-        output_dict = output.dict() if hasattr(output, 'dict') else output
-        if isinstance(output_dict, dict) and 'customer_name' in output_dict:
-            output_dict['customer_name'] = '<CUSTOMER_NAME>'
+        output_dict = output.dict() if hasattr(output, "dict") else output
+        if isinstance(output_dict, dict) and "customer_name" in output_dict:
+            output_dict["customer_name"] = "<CUSTOMER_NAME>"
         return output_dict
     return output
 
-@weave.op(
-    postprocess_inputs=redact_pii_inputs,
-    postprocess_output=redact_pii_output
-)
+
+@weave.op(postprocess_inputs=redact_pii_inputs, postprocess_output=redact_pii_output)
 def analyze_sensitive_email(email_content: str) -> CustomerEmail:
     """Analyze email while protecting PII in logs."""
     return analyze_customer_email(email_content)
+
 
 # 📦 Example 2: Large Object Handling
 def summarize_large_inputs(inputs: Dict[str, Any]) -> Dict[str, Any]:
     """Summarize large objects to avoid logging huge data."""
     processed = inputs.copy()
-    
+
     for key, value in processed.items():
         if isinstance(value, (list, tuple)) and len(value) > 10:
             # Only log first/last few items for large lists
@@ -429,7 +434,7 @@ def summarize_large_inputs(inputs: Dict[str, Any]) -> Dict[str, Any]:
                 "length": len(value),
                 "sample_start": value[:3],
                 "sample_end": value[-3:],
-                "note": "Large object truncated for logging"
+                "note": "Large object truncated for logging",
             }
         elif isinstance(value, str) and len(value) > 1000:
             # Truncate very long strings
@@ -437,10 +442,11 @@ def summarize_large_inputs(inputs: Dict[str, Any]) -> Dict[str, Any]:
                 "type": "string",
                 "length": len(value),
                 "preview": value[:200] + "...",
-                "note": "Long string truncated for logging"
+                "note": "Long string truncated for logging",
             }
-    
+
     return processed
+
 
 @weave.op(postprocess_inputs=summarize_large_inputs)
 def process_large_dataset(data_list: list, metadata: str) -> dict:
@@ -448,51 +454,55 @@ def process_large_dataset(data_list: list, metadata: str) -> dict:
     return {
         "processed_count": len(data_list),
         "metadata_length": len(metadata),
-        "summary": f"Processed {len(data_list)} items"
+        "summary": f"Processed {len(data_list)} items",
     }
+
 
 # 🎯 Example 3: Sensitive Configuration Filtering
 def filter_sensitive_config(inputs: Dict[str, Any]) -> Dict[str, Any]:
     """Remove sensitive configuration from logs."""
     processed = inputs.copy()
-    
+
     # List of sensitive keys to redact
-    sensitive_keys = ['api_key', 'password', 'secret', 'token', 'private_key']
-    
+    sensitive_keys = ["api_key", "password", "secret", "token", "private_key"]
+
     for key in list(processed.keys()):
         if any(sensitive in key.lower() for sensitive in sensitive_keys):
-            processed[key] = '<REDACTED>'
+            processed[key] = "<REDACTED>"
         elif isinstance(processed[key], dict):
             # Recursively filter nested dictionaries
-            processed[key] = filter_sensitive_config({'nested': processed[key]})['nested']
-    
+            processed[key] = filter_sensitive_config({"nested": processed[key]})[
+                "nested"
+            ]
+
     return processed
+
 
 @weave.op(postprocess_inputs=filter_sensitive_config)
 def configure_api_client(api_key: str, endpoint: str, secret_token: str) -> dict:
     """Configure API client while hiding sensitive data in logs."""
-    return {
-        "endpoint": endpoint,
-        "configured": True,
-        "auth_method": "token"
-    }
+    return {"endpoint": endpoint, "configured": True, "auth_method": "token"}
+
 
 # 🔄 Example 4: Data Transformation for Logging
 def transform_for_logging(inputs: Dict[str, Any]) -> Dict[str, Any]:
     """Transform data to a more readable format for logs."""
     processed = inputs.copy()
-    
+
     # Convert complex objects to readable summaries
     for key, value in processed.items():
-        if hasattr(value, '__dict__'):
+        if hasattr(value, "__dict__"):
             # Convert objects to their string representation
             processed[key] = {
                 "type": type(value).__name__,
                 "summary": str(value)[:100],
-                "attributes": list(vars(value).keys()) if hasattr(value, '__dict__') else []
+                "attributes": list(vars(value).keys())
+                if hasattr(value, "__dict__")
+                else [],
             }
-    
+
     return processed
+
 
 def enhance_output_logging(output: Any) -> Any:
     """Add metadata to output for better logging."""
@@ -503,17 +513,18 @@ def enhance_output_logging(output: Any) -> Any:
         return enhanced
     return output
 
+
 @weave.op(
-    postprocess_inputs=transform_for_logging,
-    postprocess_output=enhance_output_logging
+    postprocess_inputs=transform_for_logging, postprocess_output=enhance_output_logging
 )
 def complex_data_processor(user_object: Any, config: dict) -> dict:
     """Process complex data with enhanced logging."""
     return {
         "status": "completed",
         "config_keys": list(config.keys()) if isinstance(config, dict) else [],
-        "user_data_processed": True
+        "user_data_processed": True,
     }
+
 
 # 🧪 Let's test all the serialization controls!
 print("🔒 Testing custom serialization and privacy controls...")
@@ -530,7 +541,7 @@ Please help with my ProWidget issue!
 result1 = analyze_sensitive_email(sensitive_email)
 print("✅ PII redacted in logs (check Weave UI)")
 
-# Test 2: Large Object Handling  
+# Test 2: Large Object Handling
 print("\n📦 Testing large object handling...")
 large_data = list(range(1000))  # Large list
 long_text = "This is a very long string. " * 100  # Long string
@@ -543,16 +554,19 @@ print("\n🔐 Testing sensitive config filtering...")
 result3 = configure_api_client(
     api_key="secret_key_12345",
     endpoint="https://api.example.com",
-    secret_token="super_secret_token"
+    secret_token="super_secret_token",
 )
 print(f"✅ Sensitive config filtered: {result3}")
 
 # Test 4: Data Transformation
 print("\n🔄 Testing data transformation...")
+
+
 class SampleObject:
     def __init__(self):
         self.name = "test"
         self.value = 42
+
 
 sample_obj = SampleObject()
 sample_config = {"debug": True, "timeout": 30}
@@ -569,53 +583,56 @@ print(f"✅ Data transformed for logging: {result4}")
 
 # %%
 import base64
+
 from opentelemetry import trace
-from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 ENTITY = ...
 
+
 # 🔗 Configure OTEL to send traces to Weave
 def setup_otel_for_weave(project_name: str = "weave-workshop"):
     """Set up OpenTelemetry to send traces to Weave."""
-    
     # Weave OTEL endpoint
     PROJECT_ID = f"{ENTITY}/{project_name}"  # Replace with your entity
     OTEL_ENDPOINT = "https://trace.wandb.ai/otel/v1/traces"
-    
+
     # Authentication (in real usage, get from environment)
     WANDB_API_KEY = os.environ.get("WANDB_API_KEY", "your-api-key")
     auth = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
-    
+
     headers = {
         "Authorization": f"Basic {auth}",
         "project_id": PROJECT_ID,
     }
-    
+
     # Create tracer provider
     tracer_provider = trace_sdk.TracerProvider()
-    
+
     # Configure OTLP exporter for Weave
     exporter = OTLPSpanExporter(
         endpoint=OTEL_ENDPOINT,
         headers=headers,
     )
-    
+
     tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
     trace.set_tracer_provider(tracer_provider)
-    
+
     return trace.get_tracer(__name__)
+
 
 def otel_function(tracer, data: str) -> str:
     """A function traced by OpenTelemetry."""
     with tracer.start_as_current_span("otel_processing") as span:
         span.set_attribute("input.data", data)
         span.set_attribute("processing.type", "otel")
-        
+
         result = f"OTEL processed: {data}"
         span.set_attribute("output.result", result)
         return result
+
 
 tracer = setup_otel_for_weave()
 otel_function(tracer, "Hello from OTEL")

@@ -19,7 +19,7 @@
 
 # %%
 # Install dependencies
-# %pip install wandb weave openai pydantic nest_asyncio -qqq
+# %pip install wandb weave openai pydantic nest_asyncio 'weave[scorers]' -qqq
 
 import asyncio
 import os
@@ -326,7 +326,7 @@ def extraction_quality(email: str, output: CustomerEmail) -> dict[str, Any]:
 evaluation = Evaluation(
     dataset=support_dataset,
     scorers=[name_accuracy, sentiment_accuracy, extraction_quality],
-    trails=3,
+    trials=3,
 )
 
 print("🏃 Running evaluation...")
@@ -351,152 +351,250 @@ print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 
 # %%
 # Import pre-built scorers
-try:
-    from weave.scorers import (
-        EmbeddingSimilarityScorer,
-        OpenAIModerationScorer,
-        PydanticScorer,
-        ValidJSONScorer,
-    )
-
-    SCORERS_AVAILABLE = True
-except ImportError:
-    SCORERS_AVAILABLE = False
-    print("⚠️ Pre-built scorers not available. Install with: pip install weave[scorers]")
+from weave.scorers import (
+    EmbeddingSimilarityScorer,
+    OpenAIModerationScorer,
+    PydanticScorer,
+    ValidJSONScorer,
+)
 
 # Example 1: ValidJSONScorer - Check if output is valid JSON
-if SCORERS_AVAILABLE:
+json_scorer = ValidJSONScorer()
 
-    @weave.op
-    def generate_user_data(request: str) -> str:
-        """Generate user data in JSON format."""
-        if "valid" in request.lower():
-            return '{"name": "John Doe", "age": 30, "email": "john@example.com"}'
-        elif "invalid" in request.lower():
-            return '{"name": "Jane Doe", "age": 25, "email"'  # Invalid JSON
-        else:
-            return "This is not JSON at all"
+print("🎯 Example 1: ValidJSONScorer")
+# Test with valid JSON
+valid_json = '{"name": "John Doe", "age": 30, "email": "john@example.com"}'
+json_result = asyncio.run(json_scorer.score(output=valid_json))
+print(f"  Valid JSON: {json_result['json_valid']}")
 
-    # Create a dataset
-    json_dataset = Dataset(
-        name="json_validation_test",
-        rows=[
-            {"request": "Generate valid user JSON"},
-            {"request": "Generate invalid JSON"},
-            {"request": "Generate plain text"},
-        ],
-    )
-
-    # Use the ValidJSONScorer
-    json_scorer = ValidJSONScorer()
-
-    print("🎯 Example 1: ValidJSONScorer")
-    # Quick test
-    test_output = generate_user_data("Generate valid user JSON")
-    json_result = asyncio.run(json_scorer.score(output=test_output))
-    print(f"  Valid JSON? {json_result['json_valid']}")
+# Test with invalid JSON
+invalid_json = (
+    '{"name": "Jane Doe", "age": 25, "email"'  # Missing closing quote and brace
+)
+invalid_result = asyncio.run(json_scorer.score(output=invalid_json))
+print(f"  Invalid JSON: {invalid_result['json_valid']}")
 
 # Example 2: PydanticScorer - Validate against a schema
-if SCORERS_AVAILABLE:
-    from pydantic import EmailStr
+from pydantic import EmailStr
 
-    class UserData(BaseModel):
-        name: str
-        age: int
-        email: EmailStr
 
-    @weave.op
-    def generate_structured_data(request: str) -> str:
-        """Generate data that should match UserData schema."""
-        if "correct" in request.lower():
-            return '{"name": "Alice Smith", "age": 28, "email": "alice@example.com"}'
-        else:
-            return '{"name": "Bob", "age": "twenty-five", "email": "not-an-email"}'
+class UserData(BaseModel):
+    name: str
+    age: int
+    email: EmailStr
 
-    # Use PydanticScorer with our schema
-    pydantic_scorer = PydanticScorer(model=UserData)
 
-    print("\n🎯 Example 2: PydanticScorer")
-    test_output = generate_structured_data("Generate correct data")
-    pydantic_result = asyncio.run(pydantic_scorer.score(output=test_output))
-    print(f"  Valid schema? {pydantic_result['pydantic_valid']}")
+# Use PydanticScorer with our schema
+pydantic_scorer = PydanticScorer(model=UserData)
+
+print("\n🎯 Example 2: PydanticScorer")
+# Test with valid data
+valid_data = '{"name": "Alice Smith", "age": 28, "email": "alice@example.com"}'
+pydantic_result = asyncio.run(pydantic_scorer.score(output=valid_data))
+print(f"  Valid schema: {pydantic_result['pydantic_valid']}")
+
+# Test with invalid data
+invalid_data = '{"name": "Bob", "age": "twenty-five", "email": "not-an-email"}'
+invalid_pydantic_result = asyncio.run(pydantic_scorer.score(output=invalid_data))
+print(f"  Invalid schema: {invalid_pydantic_result['pydantic_valid']}")
 
 # Example 3: EmbeddingSimilarityScorer - Semantic similarity
-if SCORERS_AVAILABLE:
-    similarity_dataset = Dataset(
-        name="similarity_test",
-        rows=[
-            {
-                "input": "What's the weather like?",
-                "target": "How is the weather today?",  # Similar meaning
-            },
-            {
-                "input": "Tell me about dogs",
-                "target": "Explain quantum physics",  # Very different
-            },
-        ],
-    )
+# Use EmbeddingSimilarityScorer (requires OpenAI API key)
+similarity_scorer = EmbeddingSimilarityScorer(
+    model_id="openai/text-embedding-3-small",
+    threshold=0.7,  # Cosine similarity threshold
+)
 
-    @weave.op
-    def paraphrase_model(input: str) -> str:
-        """A model that attempts to paraphrase."""
-        # In reality, this would use an LLM
-        if "weather" in input.lower():
-            return "What are the weather conditions?"
-        else:
-            return "Something completely different"
+print("\n🎯 Example 3: EmbeddingSimilarityScorer")
+# Test semantic similarity between two similar phrases
+output = "What are the weather conditions today?"
+target = "How is the weather right now?"
 
-    # Use EmbeddingSimilarityScorer (requires OpenAI API key)
-    similarity_scorer = EmbeddingSimilarityScorer(
-        model_id="openai/text-embedding-3-small",
-        threshold=0.7,  # Cosine similarity threshold
-    )
-
-    print("\n🎯 Example 3: EmbeddingSimilarityScorer")
-    print("  (Compares semantic similarity between outputs and targets)")
+similarity_result = asyncio.run(similarity_scorer.score(output=output, target=target))
+print(f"  Similarity score: {similarity_result['similarity_score']:.3f}")
+print(f"  Above threshold: {similarity_result['similarity_above_threshold']}")
 
 # Example 4: OpenAIModerationScorer - Content safety
-if SCORERS_AVAILABLE:
+# Use OpenAIModerationScorer
+moderation_scorer = OpenAIModerationScorer()
 
-    @weave.op
-    def user_content_generator(prompt: str) -> str:
-        """Generate user content based on prompt."""
-        if "angry" in prompt.lower():
-            return "I'm so frustrated with this terrible service!"
-        else:
-            return "Thank you for the wonderful support!"
+print("\n🎯 Example 4: OpenAIModerationScorer")
+# Test content moderation on potentially problematic text
+test_content = "I'm so frustrated with this terrible service!"
 
-    moderation_dataset = Dataset(
-        name="moderation_test",
-        rows=[
-            {"prompt": "Write an angry review"},
-            {"prompt": "Write a positive review"},
-        ],
-    )
+moderation_result = asyncio.run(moderation_scorer.score(output=test_content))
+print(f"  Flagged: {moderation_result['flagged']}")
+print(f"  Categories: {moderation_result['categories']}")
 
-    # Use OpenAIModerationScorer
-    moderation_scorer = OpenAIModerationScorer()
-
-    print("\n🎯 Example 4: OpenAIModerationScorer")
-    print("  (Checks for potentially harmful content)")
-
-# Show all available pre-built scorers
-print("\n📚 Available Pre-built Scorers in Weave:")
-print("  ✅ ValidJSONScorer - Validate JSON output")
-print("  ✅ ValidXMLScorer - Validate XML output")
-print("  ✅ PydanticScorer - Validate against Pydantic models")
-print("  ✅ EmbeddingSimilarityScorer - Semantic similarity")
-print("  ✅ OpenAIModerationScorer - Content moderation")
-print("  ✅ HallucinationFreeScorer - Check for hallucinations")
-print("  ✅ SummarizationScorer - Evaluate summaries")
-print("  ✅ ContextEntityRecallScorer - RAGAS entity recall")
-print("  ✅ ContextRelevancyScorer - RAGAS relevancy")
-print("\n💡 Install with: pip install weave[scorers]")
-print("📖 Full docs: https://docs.wandb.ai/guides/weave/evaluation/builtin_scorers")
+# Test with safe content
+safe_content = "Thank you for the wonderful support!"
+safe_result = asyncio.run(moderation_scorer.score(output=safe_content))
+print(f"  Safe content flagged: {safe_result['flagged']}")
 
 # %% [markdown]
 # ### 📝 Part 2.2: Pairwise Scoring
-# TODO: (New Cell) - Let's add a cell specifically to showcase pairwise scoring (Human to link to content here.)
+#
+# Pairwise evaluation compares outputs from two models by ranking them relative to each other.
+# This is particularly useful for subjective tasks where absolute scoring is difficult.
+
+# %%
+from weave.flow.model import ApplyModelError, apply_model_async
+
+
+# Create two different email analysis models for comparison
+class BasicEmailModel(Model):
+    """A basic email analyzer with simple prompts."""
+
+    @weave.op
+    def predict(self, email: str) -> CustomerEmail:
+        client = OpenAI()
+        response = client.beta.chat.completions.parse(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Extract customer info from email."},
+                {"role": "user", "content": email},
+            ],
+            response_format=CustomerEmail,
+            temperature=0.7,
+        )
+        return response.choices[0].message.parsed
+
+
+class AdvancedEmailModel(Model):
+    """An advanced email analyzer with detailed prompts."""
+
+    @weave.op
+    def predict(self, email: str) -> CustomerEmail:
+        client = OpenAI()
+        response = client.beta.chat.completions.parse(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """You are an expert customer support analyst. Extract information carefully:
+                    - Customer name: The person WRITING the email (check signatures)
+                    - Product: The specific product with issues
+                    - Issue: Brief description of the problem
+                    - Sentiment: Overall emotional tone""",
+                },
+                {"role": "user", "content": email},
+            ],
+            response_format=CustomerEmail,
+            temperature=0.1,
+        )
+        return response.choices[0].message.parsed
+
+
+class EmailPreferenceScorer(weave.Scorer):
+    """Compare two email analysis models and determine which performs better."""
+
+    def __init__(self, other_model: Model):
+        self.other_model = other_model
+
+    @weave.op
+    async def _get_other_model_output(self, example: dict) -> Any:
+        """Get output from the comparison model."""
+        try:
+            other_model_result = await apply_model_async(
+                self.other_model,
+                example,
+                None,
+            )
+
+            if isinstance(other_model_result, ApplyModelError):
+                return None
+
+            return other_model_result.model_output
+        except Exception:
+            return None
+
+    @weave.op
+    async def score(
+        self,
+        output: CustomerEmail,
+        email: str,
+        expected_name: str,
+        expected_sentiment: str,
+    ) -> dict:
+        """Compare primary model output with other model output."""
+        other_output = await self._get_other_model_output({"email": email})
+
+        if other_output is None:
+            return {
+                "primary_is_better": False,
+                "reason": "Comparison model failed",
+                "primary_score": 0,
+                "other_score": 0,
+            }
+
+        # Score both models on accuracy
+        primary_score = 0
+        other_score = 0
+
+        # Check name accuracy
+        if output.customer_name.lower() == expected_name.lower():
+            primary_score += 1
+        if other_output.customer_name.lower() == expected_name.lower():
+            other_score += 1
+
+        # Check sentiment accuracy
+        if output.sentiment.lower() == expected_sentiment.lower():
+            primary_score += 1
+        if other_output.sentiment.lower() == expected_sentiment.lower():
+            other_score += 1
+
+        primary_is_better = primary_score > other_score
+
+        if primary_score == other_score:
+            reason = f"Tie: Both models scored {primary_score}/2"
+        else:
+            winner = "Primary" if primary_is_better else "Other"
+            reason = f"{winner} model more accurate ({primary_score} vs {other_score})"
+
+        return {
+            "primary_is_better": primary_is_better,
+            "reason": reason,
+            "primary_score": primary_score,
+            "other_score": other_score,
+        }
+
+
+# Create test dataset for pairwise comparison
+pairwise_examples = [
+    {
+        "email": "Hi, I'm Sarah Johnson and my ProWidget 3000 is broken. Very frustrated!",
+        "expected_name": "Sarah Johnson",
+        "expected_sentiment": "negative",
+    },
+    {
+        "email": "Thanks for the help! The DataSync tool works perfectly now. - Mike Chen",
+        "expected_name": "Mike Chen",
+        "expected_sentiment": "positive",
+    },
+    {
+        "email": "My assistant will call about the CloudVault issue. Regards, Dr. Patel",
+        "expected_name": "Dr. Patel",
+        "expected_sentiment": "neutral",
+    },
+]
+
+pairwise_dataset = Dataset(name="pairwise_comparison", rows=pairwise_examples)
+
+# Set up models and scorer
+basic_model = BasicEmailModel()
+advanced_model = AdvancedEmailModel()
+
+# Create preference scorer that compares basic model (primary) vs advanced model (other)
+preference_scorer = EmailPreferenceScorer(other_model=advanced_model)
+
+# Run pairwise evaluation
+pairwise_evaluation = Evaluation(
+    name="email_model_pairwise", dataset=pairwise_dataset, scorers=[preference_scorer]
+)
+
+print("🥊 Running pairwise evaluation: Basic vs Advanced model...")
+pairwise_results = asyncio.run(pairwise_evaluation.evaluate(basic_model))
+print("✅ Pairwise evaluation complete! Check Weave UI for detailed comparisons.")
 
 # %% [markdown]
 # ### 📝 Part 2.3: Using EvaluationLogger
@@ -676,16 +774,17 @@ balanced_model = EmailAnalyzerModel(
 
 
 # %%
-async def compare_models(models: list[Model], dataset: Dataset) -> dict[str, Any]:
+# Create a single evaluation definition that will be used for all models
+evaluation = Evaluation(
+    name="email_analyzer_comparison",  # Same eval for all models
+    dataset=support_dataset,
+    scorers=[name_accuracy, sentiment_accuracy, extraction_quality],
+)
+
+
+async def compare_models(models: list[Model]) -> dict[str, Any]:
     """Run A/B comparison of multiple models."""
     results = {}
-
-    # Create a single evaluation definition that will be used for all models
-    evaluation = Evaluation(
-        name="email_analyzer_comparison",  # Same eval for all models
-        dataset=dataset,
-        scorers=[name_accuracy, sentiment_accuracy, extraction_quality],
-    )
 
     for model in models:
         print(f"\n📊 Evaluating {model.label}...")
@@ -707,14 +806,167 @@ print("🏁 Starting model comparison...")
 # For notebooks: comparison_results = await compare_models(...)
 # For scripts:
 comparison_results = asyncio.run(
-    compare_models([basic_model, detailed_model, balanced_model], support_dataset)
+    compare_models([basic_model, detailed_model, balanced_model])
 )
 print("\n🎉 Comparison complete! View the results in the Weave UI.")
 
 
 # %% [markdown]
 # ### 🎯 Part 2.6: Leaderboard Competition
-# TODO: Interactive challenge time. (leaderboard competition)
-# Now we are going to see who can creat the best model
-# TODO: setup the leaderboard (either interactively in the UI, or add a cell below)
-# Invite students to iterate on the prompt / model to get higher performance (which we will track in the leaderboard!)
+#
+# Now it's time for a friendly competition! We'll use Weave's leaderboard feature to track
+# who can create the best email analysis model. Everyone will use the same evaluation
+# (`email_analyzer_comparison`) so results are directly comparable.
+#
+# **Your challenge**: Improve the prompt/model to get the highest scores on:
+# - Name accuracy
+# - Sentiment accuracy
+# - Overall extraction quality
+#
+# **Leaderboard Setup**: We can create a leaderboard to track all submissions using the
+# same evaluation definition. This ensures fair comparison across all participants.
+
+# %%
+from weave.flow import leaderboard
+from weave.trace.ref_util import get_ref
+
+# Create a leaderboard for the workshop competition
+leaderboard_spec = leaderboard.Leaderboard(
+    name="Email Analysis Workshop Competition",
+    description="""
+This leaderboard tracks the best email analysis models from workshop participants.
+
+### Scoring Metrics
+
+1. **Name Accuracy**: Fraction of emails where the customer name was correctly extracted
+2. **Sentiment Accuracy**: Fraction of emails where the sentiment was correctly identified  
+3. **Extraction Quality**: Overall quality score for extracting all required fields
+
+### Tips for Success
+- Focus on clear, specific prompts
+- Handle edge cases (names in signatures, multiple products mentioned)
+- Consider the context and nuances in sentiment analysis
+""",
+    columns=[
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluation).uri(),
+            scorer_name="name_accuracy",
+            summary_metric_path="score.mean",
+        ),
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluation).uri(),
+            scorer_name="sentiment_accuracy",
+            summary_metric_path="score.mean",
+        ),
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluation).uri(),
+            scorer_name="extraction_quality",
+            summary_metric_path="score.mean",
+        ),
+    ],
+)
+
+# Publish the leaderboard
+leaderboard_ref = weave.publish(leaderboard_spec)
+print("🏆 Leaderboard created! View it in the Weave UI")
+print(f"📊 All participants will use the same evaluation: {evaluation.name}")
+
+# %% [markdown]
+# ### 🚀 Your Turn: Create Your Best Model
+#
+# **Instructions:**
+# 1. Modify the system prompt below to improve performance
+# 2. Run the evaluation to see your scores
+# 3. Iterate and improve!
+# 4. Your results will automatically appear on the leaderboard
+#
+# **Pro Tips:**
+# - Study the challenging examples in the dataset
+# - Be specific about edge cases (signatures, multiple names, etc.)
+# - Consider temperature settings (lower = more consistent)
+
+
+# %%
+class MyEmailModel(Model):
+    """Your custom email analysis model - modify the prompt to improve performance!"""
+
+    # TODO: Modify this prompt to get better results!
+    system_prompt: str = """You are an expert customer support analyst. Extract information from emails:
+
+1. Customer name: The person WRITING the email (check signatures and sign-offs)
+2. Product: The specific product mentioned that has issues
+3. Issue: Brief description of the problem
+4. Sentiment: positive, negative, or neutral based on overall tone
+
+Be careful with edge cases and ambiguous information."""
+
+    temperature: float = 0.1  # You can adjust this too!
+
+    @weave.op
+    def predict(self, email: str) -> CustomerEmail:
+        client = OpenAI()
+
+        response = client.beta.chat.completions.parse(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": f"Analyze this email:\n\n{email}"},
+            ],
+            response_format=CustomerEmail,
+            temperature=self.temperature,
+        )
+
+        return response.choices[0].message.parsed
+
+
+# Create your model instance
+my_model = MyEmailModel()
+
+# Test on a single example first
+test_result = my_model.predict(eval_examples[0]["email"])
+print("🧪 Test result:")
+print(f"  Name: {test_result.customer_name}")
+print(f"  Product: {test_result.product}")
+print(f"  Sentiment: {test_result.sentiment}")
+
+# %% [markdown]
+# ### 🏃 Submit to Leaderboard
+#
+# Run this cell to evaluate your model and submit to the leaderboard!
+
+# %%
+# Run your model on the full evaluation
+print("🏃 Running your model on the competition dataset...")
+print("⏱️  This may take a minute...")
+
+my_results = asyncio.run(
+    evaluation.evaluate(
+        my_model,
+        __weave={
+            "display_name": "email_analyzer_comparison - MyModel"
+        },  # You can customize this name
+    )
+)
+
+print("✅ Evaluation complete!")
+print("🏆 Check the leaderboard in the Weave UI to see how you rank!")
+print(
+    "💡 Tip: Iterate on your prompt above and run this cell again to improve your score"
+)
+
+# %% [markdown]
+# ## Summary
+#
+# You've learned how to use Weave's evaluation framework:
+#
+# - ✅ **Dataset Creation**: Built challenging evaluation datasets
+# - ✅ **Custom Scorers**: Created scoring functions for specific metrics
+# - ✅ **Pre-built Scorers**: Used Weave's built-in evaluation tools
+# - ✅ **Pairwise Evaluation**: Compared models head-to-head
+# - ✅ **Model Comparison**: Ran systematic A/B tests
+# - ✅ **Leaderboards**: Tracked performance across participants
+#
+# **Next Steps:**
+# - Continue to Part 3: Production Monitoring
+# - Experiment with different prompts and models
+# - Try the evaluation framework on your own use cases
