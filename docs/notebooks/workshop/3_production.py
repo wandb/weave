@@ -17,28 +17,32 @@
 # ## Setup
 #
 # Install dependencies and configure API keys.
+#
+# OpenAI API key can be found at https://platform.openai.com/api-keys
 
 # %%
 # Install dependencies
-# %pip install wandb weave openai pydantic nest_asyncio ipywidgets -qqq
+# %pip install wandb weave openai pydantic nest_asyncio ipywidgets set-env-colab-kaggle-dotenv -qqq
 
 import asyncio
 import os
 import random
 from datetime import datetime
-from getpass import getpass
 from typing import Any, Optional
 
+# For notebooks, use nest_asyncio to handle async properly
+import nest_asyncio
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from set_env import set_env
 
 import weave
 from weave import Scorer
 
+nest_asyncio.apply()
+
 # Setup API keys
-if not os.environ.get("OPENAI_API_KEY"):
-    print("Get your OpenAI API key: https://platform.openai.com/api-keys")
-    os.environ["OPENAI_API_KEY"] = getpass("Enter your OpenAI API key: ")
+os.environ["OPENAI_API_KEY"] = set_env("OPENAI_API_KEY")
 
 # Initialize Weave
 weave_client = weave.init("weave-workshop")
@@ -531,24 +535,33 @@ class EmailAnalyzerFeedbackApp:
     def __init__(self):
         self.current_call = None
         self.setup_ui()
+        # Generate initial challenging email
+        self.generate_challenging_email()
 
     def setup_ui(self):
         """Create the interactive UI components."""
         # Input area
         self.email_input = widgets.Textarea(
-            value="Hi Support,\n\nI'm having issues with my CloudSync Pro. It keeps crashing when I try to sync large files. This is really frustrating!\n\nThanks,\nJohn Smith",
+            value="",  # Will be populated by generate_challenging_email()
             placeholder="Enter a customer email to analyze...",
             description="Email:",
             layout=widgets.Layout(width="100%", height="120px"),
         )
 
-        # Analyze button
+        # Action buttons
         self.analyze_button = widgets.Button(
             description="Analyze Email",
             button_style="primary",
             layout=widgets.Layout(width="150px"),
         )
         self.analyze_button.on_click(self.analyze_email)
+
+        self.generate_button = widgets.Button(
+            description="Generate New Email",
+            button_style="info",
+            layout=widgets.Layout(width="150px"),
+        )
+        self.generate_button.on_click(self.on_generate_email)
 
         # Output area
         self.output_area = widgets.Output()
@@ -561,10 +574,13 @@ class EmailAnalyzerFeedbackApp:
             [
                 widgets.HTML("<h3>🔄 Interactive Email Analyzer with Feedback</h3>"),
                 widgets.HTML(
-                    "<p>Enter an email below, analyze it, and provide feedback to improve the model:</p>"
+                    "<p>Analyze challenging emails and provide feedback to improve the model:</p>"
                 ),
                 self.email_input,
-                self.analyze_button,
+                widgets.HBox(
+                    [self.analyze_button, self.generate_button],
+                    layout=widgets.Layout(margin="10px 0"),
+                ),
                 self.output_area,
                 self.feedback_area,
             ]
@@ -615,105 +631,172 @@ class EmailAnalyzerFeedbackApp:
                 clear_output()
                 print(f"❌ Error analyzing email: {str(e)}")
 
+    def on_generate_email(self, button):
+        """Generate a new challenging email example."""
+        self.generate_challenging_email()
+        # Clear any previous analysis and feedback
+        with self.output_area:
+            clear_output()
+            print(
+                "🎲 New challenging email generated! Click 'Analyze Email' to test it."
+            )
+        self.feedback_area.children = []
+
     def show_feedback_buttons(self):
         """Display feedback buttons after analysis."""
         if not self.current_call:
             return
 
-        # Feedback buttons
-        thumbs_up = widgets.Button(
-            description="👍 Good",
-            button_style="success",
-            layout=widgets.Layout(width="100px"),
-        )
-        thumbs_down = widgets.Button(
-            description="👎 Bad",
-            button_style="danger",
-            layout=widgets.Layout(width="100px"),
+        # Rating slider (0-5)
+        self.rating_slider = widgets.IntSlider(
+            value=3,
+            min=0,
+            max=5,
+            step=1,
+            description="Rating:",
+            style={"description_width": "initial"},
+            layout=widgets.Layout(width="300px"),
         )
 
         # Text feedback
-        feedback_text = widgets.Textarea(
-            placeholder="Optional: Explain what was good or bad about this analysis...",
+        self.feedback_text = widgets.Textarea(
+            placeholder="Optional comments about this analysis...",
             description="Comments:",
             layout=widgets.Layout(width="100%", height="80px"),
         )
 
+        # Action buttons
         submit_feedback = widgets.Button(
             description="Submit Feedback",
-            button_style="info",
+            button_style="primary",
             layout=widgets.Layout(width="150px"),
         )
 
+        clear_feedback = widgets.Button(
+            description="Clear",
+            button_style="",
+            layout=widgets.Layout(width="100px"),
+        )
+
         # Feedback status
-        feedback_status = widgets.Output()
+        self.feedback_status = widgets.Output()
 
         # Event handlers
-        def on_thumbs_up(button):
-            self.add_feedback("👍", feedback_text.value, feedback_status)
-
-        def on_thumbs_down(button):
-            self.add_feedback("👎", feedback_text.value, feedback_status)
-
         def on_submit_feedback(button):
-            if feedback_text.value.strip():
-                self.add_feedback(None, feedback_text.value, feedback_status)
-            else:
-                with feedback_status:
-                    clear_output()
-                    print("⚠️ Please enter some feedback text.")
+            self.submit_rating_feedback()
 
-        thumbs_up.on_click(on_thumbs_up)
-        thumbs_down.on_click(on_thumbs_down)
+        def on_clear_feedback(button):
+            self.clear_feedback_form()
+
         submit_feedback.on_click(on_submit_feedback)
+        clear_feedback.on_click(on_clear_feedback)
 
         # Layout feedback area
         self.feedback_area.children = [
             widgets.HTML("<hr><h4>📝 Provide Feedback</h4>"),
-            widgets.HTML("<p>Help improve the model by rating this analysis:</p>"),
+            self.rating_slider,
+            self.feedback_text,
             widgets.HBox(
-                [thumbs_up, thumbs_down], layout=widgets.Layout(margin="10px 0")
+                [submit_feedback, clear_feedback],
+                layout=widgets.Layout(margin="10px 0"),
             ),
-            feedback_text,
-            submit_feedback,
-            feedback_status,
+            self.feedback_status,
         ]
 
-    def add_feedback(self, reaction, note, status_output):
-        """Add feedback to the current call."""
+    def submit_rating_feedback(self):
+        """Submit rating and comment feedback using the lower-level add method."""
         if not self.current_call:
-            with status_output:
+            with self.feedback_status:
                 clear_output()
                 print("❌ No call to add feedback to.")
             return
 
         try:
-            # Add reaction if provided
-            if reaction:
-                self.current_call.feedback.add_reaction(reaction)
+            rating = self.rating_slider.value
+            comment = self.feedback_text.value.strip()
 
-            # Add note if provided
-            if note and note.strip():
-                self.current_call.feedback.add_note(note.strip())
+            # Use the lower-level add method for custom feedback type
+            feedback_payload = {"rating": rating}
+            if comment:
+                feedback_payload["comment"] = comment
 
-            with status_output:
+            self.current_call.feedback.add(
+                feedback_type="user_rating",
+                payload=feedback_payload,
+            )
+
+            with self.feedback_status:
                 clear_output()
-                feedback_parts = []
-                if reaction:
-                    feedback_parts.append(f"reaction ({reaction})")
-                if note and note.strip():
-                    feedback_parts.append("comment")
-
-                feedback_desc = " and ".join(feedback_parts)
+                feedback_desc = f"rating ({rating}/5)"
+                if comment:
+                    feedback_desc += " with comment"
                 print(f"✅ Feedback submitted: {feedback_desc}")
-                print(
-                    "🔍 Check the Weave UI to see your feedback attached to the call!"
-                )
 
         except Exception as e:
-            with status_output:
+            with self.feedback_status:
                 clear_output()
                 print(f"❌ Error submitting feedback: {str(e)}")
+
+    def generate_challenging_email(self):
+        """Generate a challenging customer email using LLM."""
+        try:
+            client = OpenAI()
+
+            # Generate a challenging email scenario
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """Generate a realistic but challenging customer support email that tests edge cases for extraction:
+
+REQUIREMENTS:
+- Include a clear customer name (but maybe in an unusual place like signature)
+- Mention a specific product with version/model if possible
+- Have a clear issue description
+- Include sentiment (positive/negative/neutral)
+- Make it challenging by including:
+  * Multiple people mentioned (but only one is the actual sender)
+  * Multiple products mentioned (but focus on one with issues)
+  * Names that could be confused with products or vice versa
+  * Sarcasm, mixed emotions, or subtle sentiment
+  * Professional signatures, forwarded emails, or unusual formatting
+
+Keep it realistic and professional. Length: 2-4 sentences plus signature.""",
+                    },
+                    {
+                        "role": "user",
+                        "content": "Generate a challenging customer support email:",
+                    },
+                ],
+                temperature=0.8,  # Higher temperature for variety
+                max_tokens=200,
+            )
+
+            generated_email = response.choices[0].message.content.strip()
+            self.email_input.value = generated_email
+
+        except Exception as e:
+            # Fallback to a predefined challenging example if LLM fails
+            fallback_emails = [
+                "Hi Support,\n\nSpoke with Jennifer about the CloudSync issue. Still having problems with WorkflowMax Pro v2.1 crashing during exports. Very frustrating!\n\nMike O'Brien\nCEO, TechStart Inc",
+                "RE: Ticket #5678\n\nCustomer María García called about DataVault. She says the backup feature in ArchiveMax Enterprise is working great now, but I'm still having sync issues.\n\nBest regards,\nDr. Rajesh Patel",
+                "Johnson recommended your software. Smith loves CloudProcessor. But I'm having terrible issues with it constantly freezing.\n\n—James Wilson\nSenior Developer",
+                "Great product overall! Though the InvoiceGen module crashes sometimes when processing large files. Still recommend it to others.\n\nAnna Larsson\nStockholm Office",
+            ]
+            import random
+
+            self.email_input.value = random.choice(fallback_emails)
+
+    def clear_feedback_form(self):
+        """Clear the feedback form and reset to defaults."""
+        self.rating_slider.value = 3
+        self.feedback_text.value = ""
+        # Also clear the email input and generate a new challenging example
+        self.generate_challenging_email()
+        with self.feedback_status:
+            clear_output()
+            print("🔄 Form cleared and new example generated")
 
     def display(self):
         """Display the app."""
@@ -724,66 +807,6 @@ class EmailAnalyzerFeedbackApp:
 print("🚀 Starting Interactive Email Analyzer with Feedback Collection...")
 feedback_app = EmailAnalyzerFeedbackApp()
 feedback_app.display()
-
-# %% [markdown]
-# ### 📊 Analyzing Feedback Data
-#
-# Once you've collected feedback, you can query and analyze it programmatically.
-
-# %%
-# Query feedback from the project
-print("📊 Querying feedback data from your project...")
-
-try:
-    # Get all feedback in the project
-    all_feedback = weave_client.get_feedback()
-
-    if all_feedback:
-        print(f"\n📈 Found {len(all_feedback)} feedback items:")
-
-        # Analyze feedback by type
-        reactions = {}
-        notes = []
-
-        for feedback in all_feedback:
-            if feedback.feedback_type == "reaction":
-                reaction = feedback.payload.get("emoji", "unknown")
-                reactions[reaction] = reactions.get(reaction, 0) + 1
-            elif feedback.feedback_type == "note":
-                notes.append(feedback.payload.get("note", ""))
-
-        # Show reaction summary
-        if reactions:
-            print("\n👍👎 Reaction Summary:")
-            for reaction, count in reactions.items():
-                print(f"  {reaction}: {count}")
-
-        # Show recent notes
-        if notes:
-            print(f"\n💬 Recent Comments ({len(notes)} total):")
-            for i, note in enumerate(notes[-3:], 1):  # Show last 3
-                print(f"  {i}. {note[:100]}{'...' if len(note) > 100 else ''}")
-
-        # Show feedback details
-        print("\n🔍 Feedback Details:")
-        for i, feedback in enumerate(all_feedback[-3:], 1):  # Show last 3
-            print(f"  {i}. Type: {feedback.feedback_type}")
-            print(f"     Created: {feedback.created_at}")
-            print(f"     Payload: {feedback.payload}")
-            print()
-
-    else:
-        print("📭 No feedback found yet. Try using the interactive app above!")
-
-except Exception as e:
-    print(f"❌ Error querying feedback: {str(e)}")
-    print("💡 Make sure you've submitted some feedback using the app above.")
-
-print("\n💡 Pro Tips for Production Feedback:")
-print("  - Set up automated feedback collection in your production app")
-print("  - Use feedback to identify problematic cases for your evaluation datasets")
-print("  - Track feedback trends over time to monitor model performance")
-print("  - Filter calls by feedback type to find specific issues")
 
 # %% [markdown]
 # ## Summary

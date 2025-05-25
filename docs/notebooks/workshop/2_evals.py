@@ -17,27 +17,27 @@
 # ## Setup
 #
 # Install dependencies and configure API keys.
+#
+# OpenAI API key can be found at https://platform.openai.com/api-keys
 
 # %%
 # Install dependencies
-# %pip install wandb weave openai pydantic nest_asyncio 'weave[scorers]' 'pydantic[email]' -qqq
+# %pip install wandb weave openai pydantic nest_asyncio 'weave[scorers]' 'pydantic[email]' set-env-colab-kaggle-dotenv -qqq
 
 import asyncio
 import os
 from datetime import datetime
-from getpass import getpass
 from typing import Any
 
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from set_env import set_env
 
 import weave
 from weave import Dataset, Evaluation, EvaluationLogger, Model
 
 # Setup API keys
-if not os.environ.get("OPENAI_API_KEY"):
-    print("Get your OpenAI API key: https://platform.openai.com/api-keys")
-    os.environ["OPENAI_API_KEY"] = getpass("Enter your OpenAI API key: ")
+os.environ["OPENAI_API_KEY"] = set_env("OPENAI_API_KEY")
 
 # Initialize Weave
 weave_client = weave.init("weave-workshop")
@@ -407,7 +407,7 @@ class BasicEmailModel(Model):
         response = client.beta.chat.completions.parse(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Extract customer info from email."},
+                {"role": "system", "content": "Extract."},
                 {"role": "user", "content": email},
             ],
             response_format=CustomerEmail,
@@ -431,7 +431,7 @@ class AdvancedEmailModel(Model):
                     - Customer name: The person WRITING the email (check signatures)
                     - Product: The specific product with issues
                     - Issue: Brief description of the problem
-                    - Sentiment: Overall emotional tone""",
+                    - Sentiment: Overall emotional tone (and customer perception based on thread)""",
                 },
                 {"role": "user", "content": email},
             ],
@@ -522,14 +522,14 @@ pairwise_examples = [
         "expected_sentiment": "negative",
     },
     {
-        "email": "Thanks for the help! The DataSync tool works perfectly now. - Mike Chen",
-        "expected_name": "Mike Chen",
-        "expected_sentiment": "positive",
+        "email": "Re: Jackson's complaint\n\nI disagree with Jackson. The Scheduler App works fine for me.\n\nBest,\nPriya Sharma\nHead of IT",
+        "expected_name": "Priya Sharma",  # NOT Jackson
+        "expected_sentiment": "positive",  # Disagrees with complaint
     },
     {
-        "email": "My assistant will call about the CloudVault issue. Regards, Dr. Patel",
-        "expected_name": "Dr. Patel",
-        "expected_sentiment": "neutral",
+        "email": "This is regarding the issue with CloudBackup Pro v3.2.1 that Jennifer Chen reported. I'm her manager, David Kim, following up.",
+        "expected_name": "David Kim",  # The sender, not Jennifer
+        "expected_sentiment": "negative",  # Following up on an issue
     },
 ]
 
@@ -858,7 +858,7 @@ Be careful with edge cases and ambiguous information."""
 
 
 # Create your model instance
-my_model = MyEmailModel()
+my_model = MyEmailModel(name="NAME_YOUR_MODEL")
 
 # Test on a single example first
 test_result = my_model.predict(eval_examples[0]["email"])
@@ -882,7 +882,7 @@ my_results = asyncio.run(
         my_model,
         __weave={
             "display_name": "email_analyzer_comparison - MyModel"
-        },  # You can customize this name
+        },  # You can customize this name  (if you want)
     )
 )
 

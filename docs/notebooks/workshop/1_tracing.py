@@ -17,24 +17,24 @@
 # ## Setup
 #
 # Install dependencies and configure API keys.
+#
+# OpenAI API key can be found at https://platform.openai.com/api-keys
 
 # %%
 # Install dependencies
-# %pip install wandb weave openai pydantic nest_asyncio opentelemetry-exporter-otlp 'weave[video_support]' -qqq
+# %pip install wandb weave openai pydantic nest_asyncio opentelemetry-exporter-otlp 'weave[video_support]' set-env-colab-kaggle-dotenv -qqq
 
 import os
-from getpass import getpass
 from typing import Any
 
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from set_env import set_env
 
 import weave
 
 # Setup API keys
-if not os.environ.get("OPENAI_API_KEY"):
-    print("Get your OpenAI API key: https://platform.openai.com/api-keys")
-    os.environ["OPENAI_API_KEY"] = getpass("Enter your OpenAI API key: ")
+os.environ["OPENAI_API_KEY"] = set_env("OPENAI_API_KEY")
 
 # Initialize Weave - this creates your project and starts tracing
 weave_client = weave.init("weave-workshop")
@@ -349,7 +349,7 @@ def redact_pii_output(output: Any) -> Any:
     """Redact PII from outputs before logging."""
     if hasattr(output, "customer_name"):
         # Create a copy and redact the name
-        output_dict = output.dict() if hasattr(output, "dict") else output
+        output_dict = output.model_dump() if hasattr(output, "dict") else output
         if isinstance(output_dict, dict) and "customer_name" in output_dict:
             output_dict["customer_name"] = "<CUSTOMER_NAME>"
         return output_dict
@@ -462,27 +462,32 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 
 # 🔧 Configure OTEL to send traces to Weave
-def setup_otel_for_weave(project_name: str = "weave-workshop"):
+def setup_otel_for_weave(
+    entity: str,
+    project: str,
+    api_key,
+    endpoint: str = "https://trace.wandb.ai/otel/v1/traces",
+):
     """Set up OpenTelemetry to send traces to Weave."""
-    # Note: Replace ENTITY with your actual W&B entity
-    ENTITY = "your-entity"  # Replace with your W&B entity
-    PROJECT_ID = f"{ENTITY}/{project_name}"
-    OTEL_ENDPOINT = "https://trace.wandb.ai/otel/v1/traces"
+    if not entity:
+        raise ValueError("Entity is required")
+    if not project:
+        raise ValueError("Project is required")
+    if not api_key:
+        raise ValueError("API key is required")
 
-    # Authentication (get from environment in real usage)
-    WANDB_API_KEY = os.environ.get("WANDB_API_KEY", "your-api-key")
-    auth = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
+    auth = base64.b64encode(f"api:{api_key}".encode()).decode()
 
     headers = {
         "Authorization": f"Basic {auth}",
-        "project_id": PROJECT_ID,
+        "project_id": f"{entity}/{project}",
     }
 
     # Create tracer provider
     tracer_provider = trace_sdk.TracerProvider()
 
     # Configure OTLP exporter for Weave
-    exporter = OTLPSpanExporter(endpoint=OTEL_ENDPOINT, headers=headers)
+    exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
     tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
     trace.set_tracer_provider(tracer_provider)
 
@@ -499,9 +504,11 @@ def otel_function(tracer, data: str) -> str:
         return result
 
 
-# Example OTEL integration (commented out to avoid auth issues in demo)
-# tracer = setup_otel_for_weave()
-# otel_function(tracer, "Hello from OTEL")
+# Example OTEL integration
+api_key = set_env("WANDB_API_KEY")
+# FILL OUT ENTITY BELOW
+tracer = setup_otel_for_weave(entity="", project="weave-workshop", api_key=api_key)
+otel_function(tracer, "Hello from OTEL")
 
 print("🔗 OpenTelemetry integration example completed")
 
