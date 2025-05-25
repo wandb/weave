@@ -129,6 +129,7 @@ print("\n🔍 Check the Weave UI to see the trace!")
 #
 # Weave tracks nested function calls, making debugging easy. Let's build a more complex example.
 
+
 # %%
 @weave.op
 def preprocess_email(email: str) -> str:
@@ -205,6 +206,7 @@ print(f"Needs immediate attention: {ticket['needs_immediate_attention']}")
 # ### 🔧 Part 1.2b: Simple Exception Examples
 #
 # Here are some simpler examples of how Weave tracks exceptions and failures.
+
 
 # %%
 # Define a stricter data structure that's more likely to fail
@@ -352,6 +354,7 @@ for i, response in enumerate(test_responses):
 
 # TODO: Also, this section is pretty verbose just to highlight error tracking - if we can make it simpler so that the student has less to read through and understand, that would be great.
 
+
 # %%
 @weave.op
 def problematic_analyzer(email: str) -> Optional[CustomerEmail]:
@@ -407,8 +410,6 @@ print("  - Timing information for slow calls")
 #       * Video Support (Using the new annotations pattern)
 #       * Audio support
 #       * PDFs
-
-
 
 
 # %% [markdown]
@@ -1046,9 +1047,9 @@ print("\n🎉 Comparison complete! View the results in the Weave UI.")
 # %% [markdown]
 # ### 🎯 Part 2.6: Leaderboard Competition
 # TODO: Interactive challenge time. (leaderboard competition)
-    # Now we are going to see who can creat the best model 
-    # TODO: setup the leaderboard (either interactively in the UI, or add a cell below)
-    # Invite students to iterate on the prompt / model to get higher performance (which we will track in the leaderboard!)
+# Now we are going to see who can creat the best model
+# TODO: setup the leaderboard (either interactively in the UI, or add a cell below)
+# Invite students to iterate on the prompt / model to get higher performance (which we will track in the leaderboard!)
 
 
 # %% [markdown]
@@ -1063,6 +1064,7 @@ print("\n🎉 Comparison complete! View the results in the Weave UI.")
 
 # %%
 from datetime import datetime
+
 
 # Define more realistic production scorers
 class ContentModerationScorer(Scorer):
@@ -1275,7 +1277,6 @@ def production_email_handler(
         # Calculate urgency based on the analysis
         urgency = classify_urgency(email, analysis.sentiment)
 
-
         # Return structured result that scorers expect
         return {
             "request_id": request_id,
@@ -1345,7 +1346,6 @@ async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
 
         if quality_check.result["recommendations"]:
             print(f"💡 Recommendations: {quality_check.result['recommendations']}")
-
 
     return result
 
@@ -1508,8 +1508,6 @@ print("\n✅ Check the Weave UI to see detailed scorer results and traces!")
 #   3. (UI) Query for the bad results in the UI
 #   4. (UI) Add the bad results to a dataset
 #   5. (Optional) Next cell: create a new evaluation using the new dataset - presumably the models have a harder time... or just say that it is possible
-
-
 
 
 # %% [markdown]
