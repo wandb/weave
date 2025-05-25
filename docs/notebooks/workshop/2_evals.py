@@ -20,7 +20,7 @@
 
 # %%
 # Install dependencies
-# %pip install wandb weave openai pydantic nest_asyncio 'weave[scorers]' -qqq
+# %pip install wandb weave openai pydantic nest_asyncio 'weave[scorers]' 'pydantic[email]' -qqq
 
 import asyncio
 import os
@@ -328,7 +328,6 @@ print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 # Import pre-built scorers
 from weave.scorers import (
     EmbeddingSimilarityScorer,
-    OpenAIModerationScorer,
     PydanticScorer,
     ValidJSONScorer,
 )
@@ -339,14 +338,14 @@ json_scorer = ValidJSONScorer()
 print("🎯 Example 1: ValidJSONScorer")
 # Test with valid JSON
 valid_json = '{"name": "John Doe", "age": 30, "email": "john@example.com"}'
-json_result = asyncio.run(json_scorer.score(output=valid_json))
+json_result = json_scorer.score(output=valid_json)
 print(f"  Valid JSON: {json_result['json_valid']}")
 
 # Test with invalid JSON
 invalid_json = (
     '{"name": "Jane Doe", "age": 25, "email"'  # Missing closing quote and brace
 )
-invalid_result = asyncio.run(json_scorer.score(output=invalid_json))
+invalid_result = json_scorer.score(output=invalid_json)
 print(f"  Invalid JSON: {invalid_result['json_valid']}")
 
 # Example 2: PydanticScorer - Validate against a schema
@@ -365,13 +364,13 @@ pydantic_scorer = PydanticScorer(model=UserData)
 print("\n🎯 Example 2: PydanticScorer")
 # Test with valid data
 valid_data = '{"name": "Alice Smith", "age": 28, "email": "alice@example.com"}'
-pydantic_result = asyncio.run(pydantic_scorer.score(output=valid_data))
-print(f"  Valid schema: {pydantic_result['pydantic_valid']}")
+pydantic_result = pydantic_scorer.score(output=valid_data)
+print(f"  Valid schema: {pydantic_result['valid_pydantic']}")
 
 # Test with invalid data
 invalid_data = '{"name": "Bob", "age": "twenty-five", "email": "not-an-email"}'
-invalid_pydantic_result = asyncio.run(pydantic_scorer.score(output=invalid_data))
-print(f"  Invalid schema: {invalid_pydantic_result['pydantic_valid']}")
+invalid_pydantic_result = pydantic_scorer.score(output=invalid_data)
+print(f"  Invalid schema: {invalid_pydantic_result['valid_pydantic']}")
 
 # Example 3: EmbeddingSimilarityScorer - Semantic similarity
 # Use EmbeddingSimilarityScorer (requires OpenAI API key)
@@ -387,23 +386,6 @@ target = "How is the weather right now?"
 
 similarity_result = asyncio.run(similarity_scorer.score(output=output, target=target))
 print(f"  Similarity score: {similarity_result['similarity_score']:.3f}")
-print(f"  Above threshold: {similarity_result['similarity_above_threshold']}")
-
-# Example 4: OpenAIModerationScorer - Content safety
-# Use OpenAIModerationScorer
-moderation_scorer = OpenAIModerationScorer()
-
-print("\n🎯 Example 4: OpenAIModerationScorer")
-# Test content moderation on potentially problematic text
-test_content = "I'm so frustrated with this terrible service!"
-moderation_result = asyncio.run(moderation_scorer.score(output=test_content))
-print(f"  Flagged: {moderation_result['flagged']}")
-print(f"  Categories: {moderation_result['categories']}")
-
-# Test with safe content
-safe_content = "Thank you for the wonderful support!"
-safe_result = asyncio.run(moderation_scorer.score(output=safe_content))
-print(f"  Safe content flagged: {safe_result['flagged']}")
 
 # %% [markdown]
 # ### 📝 Part 2.2: Pairwise Evaluation
@@ -462,8 +444,7 @@ class AdvancedEmailModel(Model):
 class EmailPreferenceScorer(weave.Scorer):
     """Compare two email analysis models and determine which performs better."""
 
-    def __init__(self, other_model: Model):
-        self.other_model = other_model
+    other_model: Model
 
     @weave.op
     async def _get_other_model_output(self, example: dict) -> Any:
