@@ -1,6 +1,6 @@
 import datetime
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
@@ -13,6 +13,12 @@ from weave.trace_server.llm_completion import get_custom_provider_info
 from weave.trace_server.secret_fetcher_context import (
     _secret_fetcher_context,
 )
+
+
+class MockObjectReadError(Exception):
+    """Custom exception for mock object read failures."""
+
+    pass
 
 
 class TestGetCustomProviderInfo(unittest.TestCase):
@@ -557,7 +563,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
                     return tsi.ObjReadRes(obj=mock_provider)
                 elif req.object_id == "custom-provider-model":
                     return tsi.ObjReadRes(obj=mock_model)
-                raise Exception(f"Unknown object_id: {req.object_id}")
+                raise MockObjectReadError(f"Unknown object_id: {req.object_id}")
 
             mock_obj_read.side_effect = mock_obj_read_func
 

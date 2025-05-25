@@ -1,4 +1,5 @@
-from typing import Callable, Optional, Iterator, Any
+from collections.abc import Iterator
+from typing import Any, Callable, Optional
 
 from pydantic import BaseModel
 
@@ -313,7 +314,6 @@ def lite_llm_completion_stream(
     follows the non-streaming version: any exception is surfaced to the caller
     as a single error chunk and the iterator terminates.
     """
-
     aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
     azure_api_base, azure_api_version = None, None
 

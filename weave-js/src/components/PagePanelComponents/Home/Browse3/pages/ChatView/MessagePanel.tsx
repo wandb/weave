@@ -50,35 +50,6 @@ export const MessagePanel = ({
     }
   }, [message.content, contentRef?.current?.scrollHeight]);
 
-  const debouncedScroll = useRef(
-    _.debounce((element: HTMLElement) => {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'end',
-      });
-    }, 10)
-  ).current;
-
-  useEffect(() => {
-    if (
-      isPlayground &&
-      contentRef.current &&
-      message.content &&
-      isStreaming &&
-      isLast
-    ) {
-      debouncedScroll(contentRef.current);
-    }
-  }, [
-    message.content,
-    isPlayground,
-    isStreaming,
-    debouncedScroll,
-    isLast,
-    isShowingMore,
-    isOverflowing,
-  ]);
-
   // Set isShowingMore to true when editor is opened
   useEffect(() => {
     if (editorHeight !== null && !isShowingMore) {
@@ -91,6 +62,30 @@ export const MessagePanel = ({
       setIsShowingMore(true);
     }
   }, [isLast, isShowingMore, isOverflowing, isPlayground]);
+
+  // Auto-scroll message panel into view during streaming
+  // This will scroll for the first couple paragraphs of the message
+  // Making it scroll to the end of the message always makes the first part unreadable, too quickly
+  // and you end up scrolling back up to start reading the beginning of the message
+  // could update this if users want a different behavior (this is the behavior currently of chatgpt)
+  useEffect(() => {
+    if (
+      isPlayground &&
+      isStreaming &&
+      isLast &&
+      contentRef?.current &&
+      (message.content || (message.tool_calls && message.tool_calls.length > 0))
+    ) {
+      // Find the closest scrollable parent and scroll to this message
+      const messageElement = contentRef.current.closest('.group');
+      if (messageElement) {
+        messageElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'end',
+        });
+      }
+    }
+  }, [isPlayground, isStreaming, isLast, message.content, message.tool_calls]);
 
   const isUser = message.role === 'user';
   const isSystemPrompt = message.role === 'system';

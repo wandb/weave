@@ -1,9 +1,14 @@
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
+
+
+class MockObjectReadError(Exception):
+    """Custom exception for mock object read failures."""
+
+    pass
 
 
 def test_clickhouse_storage_size_query_generation():
@@ -118,9 +123,10 @@ def test_clickhouse_storage_size_null_handling():
 def test_completions_create_stream_custom_provider():
     """Test completions_create_stream for a custom provider (no call tracking)."""
     import datetime
-    from unittest.mock import patch, MagicMock
-    from weave.trace_server import trace_server_interface as tsi
+    from unittest.mock import MagicMock, patch
+
     from weave.trace_server import clickhouse_trace_server_batched as chts
+    from weave.trace_server import trace_server_interface as tsi
     from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
     # Mock chunks to be returned by the stream
@@ -210,7 +216,7 @@ def test_completions_create_stream_custom_provider():
                 return tsi.ObjReadRes(obj=mock_provider)
             elif req.object_id == "custom-provider-model":
                 return tsi.ObjReadRes(obj=mock_model)
-            raise Exception(f"Unknown object_id: {req.object_id}")
+            raise MockObjectReadError(f"Unknown object_id: {req.object_id}")
 
         mock_obj_read.side_effect = mock_obj_read_func
 
@@ -256,9 +262,10 @@ def test_completions_create_stream_custom_provider():
 def test_completions_create_stream_custom_provider_with_tracking():
     """Test completions_create_stream for a custom provider with call tracking enabled."""
     import datetime
-    from unittest.mock import patch, MagicMock
-    from weave.trace_server import trace_server_interface as tsi
+    from unittest.mock import MagicMock, patch
+
     from weave.trace_server import clickhouse_trace_server_batched as chts
+    from weave.trace_server import trace_server_interface as tsi
     from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
     # Mock chunks to be returned by the stream
@@ -349,7 +356,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
                 return tsi.ObjReadRes(obj=mock_provider)
             elif req.object_id == "custom-provider-model":
                 return tsi.ObjReadRes(obj=mock_model)
-            raise Exception(f"Unknown object_id: {req.object_id}")
+            raise MockObjectReadError(f"Unknown object_id: {req.object_id}")
 
         mock_obj_read.side_effect = mock_obj_read_func
 

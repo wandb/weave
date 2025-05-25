@@ -12,6 +12,90 @@ import {getInputFromPlaygroundState} from '../usePlaygroundState';
 import {clearTraceCall} from './useChatFunctions';
 import {SetPlaygroundStateFieldFunctionType} from './useChatFunctions';
 
+// Helper functions for tool call processing
+const mergeToolCallDelta = (toolCalls: any[], toolCallDelta: any[]) => {
+  toolCallDelta.forEach((toolCall: any) => {
+    // Find existing tool call by index if ID is null
+    const existingToolCall = toolCalls.find(
+      (t: any) =>
+        (toolCall.id && t.id === toolCall.id) ||
+        (!toolCall.id && t.index === toolCall.index)
+    );
+
+    if (existingToolCall) {
+      // Update existing tool call
+      if (toolCall.id) existingToolCall.id = toolCall.id;
+      if (toolCall.function?.name) {
+        existingToolCall.function = existingToolCall.function || {};
+        existingToolCall.function.name = toolCall.function.name;
+      }
+      if (toolCall.function?.arguments) {
+        existingToolCall.function = existingToolCall.function || {};
+        existingToolCall.function.arguments =
+          (existingToolCall.function.arguments || '') +
+          toolCall.function.arguments;
+      }
+    } else {
+      // Add new tool call
+      const newToolCall = {
+        id: toolCall.id || null,
+        type: toolCall.type || 'function',
+        index: toolCall.index,
+        function: {
+          name: toolCall.function?.name || '',
+          arguments: toolCall.function?.arguments || '',
+        },
+      };
+      toolCalls.push(newToolCall);
+    }
+  });
+};
+
+const hasValidToolCalls = (toolCalls: any[]): boolean => {
+  return toolCalls.some((tc: any) => {
+    if (!tc.id || !tc.function?.name || !tc.function?.arguments) return false;
+    try {
+      JSON.parse(tc.function.arguments);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+};
+
+const createFinalResponse = (
+  aggregatedRes: any,
+  weaveCallId?: string
+): CompletionsCreateRes => {
+  return {
+    response: {
+      ...aggregatedRes,
+      choices: [
+        {
+          ...aggregatedRes.choices[0],
+          message: {
+            ...aggregatedRes.choices[0].message,
+            tool_calls: aggregatedRes.choices[0].message.tool_calls || [],
+          },
+        },
+      ],
+    },
+    weave_call_id: weaveCallId,
+  } as CompletionsCreateRes;
+};
+
+const createAggregatedResponse = () => ({
+  choices: [
+    {
+      message: {
+        role: 'assistant',
+        content: '',
+        tool_calls: [],
+      },
+    },
+  ],
+});
+
 export const useChatCompletionFunctions = (
   setPlaygroundStates: Dispatch<SetStateAction<PlaygroundState[]>>,
   setPlaygroundStateField: SetPlaygroundStateFieldFunctionType,
@@ -174,9 +258,7 @@ export const useChatCompletionFunctions = (
 
       const streamPromises = chatsToUpdate.map(idx => {
         // Aggregate content incrementally per chat
-        let aggregatedRes: any = {
-          choices: [{message: {role: 'assistant', content: ''}}],
-        };
+        let aggregatedRes: any = createAggregatedResponse();
 
         // Frequent per-token setState calls from multiple parallel streams can
         // saturate React's render queue, making later streams appear to start
@@ -187,13 +269,33 @@ export const useChatCompletionFunctions = (
           setPlaygroundStates(prev => {
             const next = [...prev];
             const tgt = next[idx];
-            tgt.traceCall = {...tgt.traceCall, output: aggregatedRes} as any;
+            // Preserve existing tool calls when updating state
+            const existingToolCalls =
+              (tgt.traceCall?.output as any)?.choices?.[0]?.message
+                ?.tool_calls || [];
+            const currentToolCalls =
+              aggregatedRes.choices[0].message.tool_calls || [];
+            tgt.traceCall = {
+              ...tgt.traceCall,
+              output: {
+                ...aggregatedRes,
+                choices: [
+                  {
+                    ...aggregatedRes.choices[0],
+                    message: {
+                      ...aggregatedRes.choices[0].message,
+                      tool_calls:
+                        currentToolCalls.length > 0
+                          ? currentToolCalls
+                          : existingToolCalls,
+                    },
+                  },
+                ],
+              },
+            } as any;
             return next;
           });
         }, 80); // 80-ms cadence feels responsive without blocking
-
-        // Need to fix usage
-        // Need to fix stop reason
 
         return makeCompletionStreamRequest(idx, updatedStates, chunk => {
           const delta = chunk.choices?.[0]?.delta;
@@ -201,12 +303,31 @@ export const useChatCompletionFunctions = (
             aggregatedRes.choices[0].message.content += delta.content;
             throttledUpdate(delta.content);
           }
+          // Handle tool calls
+          if (delta?.tool_calls) {
+            if (!aggregatedRes.choices[0].message.tool_calls) {
+              aggregatedRes.choices[0].message.tool_calls = [];
+            }
+            // Merge tool calls from delta into existing tool calls
+            mergeToolCallDelta(
+              aggregatedRes.choices[0].message.tool_calls,
+              delta.tool_calls
+            );
+            // Only update UI if we have complete tool calls with valid JSON arguments
+            const toolCallsAreValid = hasValidToolCalls(
+              aggregatedRes.choices[0].message.tool_calls
+            );
+
+            if (toolCallsAreValid) {
+              throttledUpdate(''); // Trigger update to show tool calls
+            }
+          }
         })
           .then(res => {
-            const finalResponse = {
-              response: aggregatedRes,
-              weave_call_id: res?.weave_call_id,
-            } as CompletionsCreateRes;
+            const finalResponse = createFinalResponse(
+              aggregatedRes,
+              res?.weave_call_id
+            );
 
             return handleErrorsAndUpdate(finalResponse, idx).then(() => {
               setPlaygroundStateField(idx, 'loading', false);
@@ -305,9 +426,7 @@ export const useChatCompletionFunctions = (
       );
 
       // Accumulate chunks into a single response object while streaming
-      let aggregatedRes: any = {
-        choices: [{message: {role: 'assistant', content: ''}}],
-      };
+      let aggregatedRes: any = createAggregatedResponse();
 
       // Kick off streaming request
       const res = await makeCompletionStreamRequest(
@@ -319,22 +438,82 @@ export const useChatCompletionFunctions = (
             aggregatedRes.choices[0].message.content += delta.content;
             // Live update UI
             setPlaygroundStates(prev => {
-              const newState = [...prev];
-              const tgt = newState[callIndex];
+              const next = [...prev];
+              const tgt = next[callIndex];
+              // Preserve existing tool calls when updating state
+              const existingToolCalls =
+                (tgt.traceCall?.output as any)?.choices?.[0]?.message
+                  ?.tool_calls || [];
+              const currentToolCalls =
+                aggregatedRes.choices[0].message.tool_calls || [];
               tgt.traceCall = {
                 ...tgt.traceCall,
-                output: aggregatedRes,
+                output: {
+                  ...aggregatedRes,
+                  choices: [
+                    {
+                      ...aggregatedRes.choices[0],
+                      message: {
+                        ...aggregatedRes.choices[0].message,
+                        tool_calls:
+                          currentToolCalls.length > 0
+                            ? currentToolCalls
+                            : existingToolCalls,
+                      },
+                    },
+                  ],
+                },
               } as any;
-              return newState;
+              return next;
             });
+          }
+          // Handle tool calls
+          if (delta?.tool_calls) {
+            if (!aggregatedRes.choices[0].message.tool_calls) {
+              aggregatedRes.choices[0].message.tool_calls = [];
+            }
+            // Merge tool calls from delta into existing tool calls
+            mergeToolCallDelta(
+              aggregatedRes.choices[0].message.tool_calls,
+              delta.tool_calls
+            );
+            // Only update UI if we have complete tool calls with valid JSON arguments
+            const toolCallsAreValid = hasValidToolCalls(
+              aggregatedRes.choices[0].message.tool_calls
+            );
+
+            if (toolCallsAreValid) {
+              // Live update UI
+              setPlaygroundStates(prev => {
+                const next = [...prev];
+                const tgt = next[callIndex];
+                tgt.traceCall = {
+                  ...tgt.traceCall,
+                  output: {
+                    ...aggregatedRes,
+                    choices: [
+                      {
+                        ...aggregatedRes.choices[0],
+                        message: {
+                          ...aggregatedRes.choices[0].message,
+                          tool_calls:
+                            aggregatedRes.choices[0].message.tool_calls || [],
+                        },
+                      },
+                    ],
+                  },
+                } as any;
+                return next;
+              });
+            }
           }
         }
       );
 
-      const finalResponse = {
-        response: aggregatedRes,
-        weave_call_id: res?.weave_call_id,
-      } as CompletionsCreateRes;
+      const finalResponse = createFinalResponse(
+        aggregatedRes,
+        res?.weave_call_id
+      );
 
       const success = await handleErrorsAndUpdate(finalResponse, callIndex);
       if (!success) {

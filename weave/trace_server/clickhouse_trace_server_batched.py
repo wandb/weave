@@ -1992,7 +1992,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ``track_llm_call`` is True we emit a call_start record immediately and
         a call_end record once the stream finishes (successfully or not).
         """
-
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_name = req.inputs.model
         api_key = None
@@ -2042,7 +2041,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             except Exception as e:
                 # Yield error as single chunk then stop.
-                def _single_error_iter(e):
+                def _single_error_iter(e: Exception) -> Iterator[dict[str, str]]:
                     yield {"error": str(e)}
 
                 return _single_error_iter(e)
@@ -2091,24 +2090,42 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         def _stream_wrapper() -> Iterator[dict[str, Any]]:
             # (1) send meta chunk first so clients can associate stream
-            yield {"_meta": {"weave_call_id": start_call.id}}
+            if start_call is not None:
+                yield {"_meta": {"weave_call_id": start_call.id}}
 
             # Used to build final output/usage for call_end summary
             aggregated_output: dict[str, Any] | None = None
             # For OpenAI-style chat completions we gradually build up assistant
             # content to mirror what the client does.
             assistant_acc: list[str] = []
-            usage_block: Any = None
             last_chunk: dict[str, Any] | None = None
+            tool_calls: list[dict[str, Any]] = []
+            aggregated_metadata: dict[str, Any] = {}
 
             try:
                 for chunk in chunk_iter:
-                    print(
-                        f"DEBUG: Chunk type: {type(chunk)}, Content: {chunk}"
-                    )  # Debug the chunk
                     last_chunk = chunk
                     # Yield to client immediately
                     yield chunk
+
+                    # Accumulate metadata from chunks
+                    if isinstance(chunk, dict):
+                        if "id" not in aggregated_metadata:
+                            aggregated_metadata["id"] = chunk.get("id", "")
+                        if "created" not in aggregated_metadata:
+                            aggregated_metadata["created"] = chunk.get("created", 0)
+                        if "model" not in aggregated_metadata:
+                            aggregated_metadata["model"] = chunk.get("model", "")
+                        if "system_fingerprint" not in aggregated_metadata:
+                            aggregated_metadata["system_fingerprint"] = chunk.get(
+                                "system_fingerprint", ""
+                            )
+                        if "service_tier" not in aggregated_metadata:
+                            aggregated_metadata["service_tier"] = chunk.get(
+                                "service_tier", "default"
+                            )
+                        if "usage" in chunk:
+                            aggregated_metadata["usage"] = chunk["usage"]
 
                     # Accumulate assistant content if present
                     choices = chunk.get("choices") if isinstance(chunk, dict) else None
@@ -2119,54 +2136,169 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             if content_piece:
                                 assistant_acc.append(content_piece)
 
-                    # Capture usage if provided (may come in final chunk).
-                    if "usage" in chunk:
-                        print(
-                            f"DEBUG: Found usage in chunk: {chunk['usage']}"
-                        )  # Debug usage
-                        if "choices" in chunk and isinstance(chunk["choices"], list):
-                            usage_block = chunk["usage"]
-            finally:
-                print(
-                    f"DEBUG: Final usage block before summary: {usage_block}"
-                )  # Debug final usage
-                # Build aggregated output if we captured pieces
-                if assistant_acc:
+                            # Handle tool calls
+                            tool_call_delta = delta.get("tool_calls")
+                            if tool_call_delta:
+                                for tool_call in tool_call_delta:
+                                    tool_call_index = tool_call.get("index", 0)
+
+                                    # Ensure we have enough tool calls in our list
+                                    while len(tool_calls) <= tool_call_index:
+                                        tool_calls.append(
+                                            {
+                                                "id": None,
+                                                "type": "function",
+                                                "function": {
+                                                    "name": "",
+                                                    "arguments": "",
+                                                },
+                                            }
+                                        )
+
+                                    existing_tool_call = tool_calls[tool_call_index]
+
+                                    # Update existing tool call
+                                    if "id" in tool_call and tool_call["id"]:
+                                        existing_tool_call["id"] = tool_call["id"]
+                                    if "type" in tool_call and tool_call["type"]:
+                                        existing_tool_call["type"] = tool_call["type"]
+                                    if "function" in tool_call:
+                                        if (
+                                            "name" in tool_call["function"]
+                                            and tool_call["function"]["name"]
+                                        ):
+                                            existing_tool_call["function"]["name"] = (
+                                                tool_call["function"]["name"]
+                                            )
+                                        if "arguments" in tool_call["function"]:
+                                            existing_tool_call["function"][
+                                                "arguments"
+                                            ] += tool_call["function"]["arguments"]
+
+                    # Update the aggregated output with metadata
+                    # Get the current finish_reason from the chunk, preserving any existing non-null value
+                    current_finish_reason = chunk.get("choices", [{}])[0].get(
+                        "finish_reason"
+                    )
+                    existing_finish_reason = None
+                    if aggregated_output and "choices" in aggregated_output:
+                        existing_finish_reason = aggregated_output["choices"][0].get(
+                            "finish_reason"
+                        )
+
+                    # Use current if it's not null, otherwise preserve existing, default to None
+                    final_finish_reason = (
+                        current_finish_reason
+                        if current_finish_reason is not None
+                        else existing_finish_reason
+                    )
+
+                    # Clean up tool_calls - remove incomplete ones and ensure proper format
+                    cleaned_tool_calls = []
+                    for tool_call in tool_calls:
+                        if tool_call.get("id") and tool_call.get("function", {}).get(
+                            "name"
+                        ):
+                            cleaned_tool_call = {
+                                "function": {
+                                    "arguments": tool_call["function"]["arguments"],
+                                    "name": tool_call["function"]["name"],
+                                },
+                                "id": tool_call["id"],
+                                "type": "function",
+                            }
+                            cleaned_tool_calls.append(cleaned_tool_call)
+
                     aggregated_output = {
+                        "id": aggregated_metadata.get("id", ""),
+                        "created": aggregated_metadata.get("created", 0),
+                        "model": aggregated_metadata.get("model", ""),
+                        "object": "chat.completion",
+                        "system_fingerprint": aggregated_metadata.get(
+                            "system_fingerprint", ""
+                        ),
                         "choices": [
                             {
+                                "finish_reason": final_finish_reason,
+                                "index": 0,
                                 "message": {
+                                    "content": (
+                                        "".join(assistant_acc)
+                                        if assistant_acc
+                                        else (None if cleaned_tool_calls else "")
+                                    ),
                                     "role": "assistant",
-                                    "content": "".join(assistant_acc),
-                                }
+                                    "tool_calls": (
+                                        cleaned_tool_calls
+                                        if cleaned_tool_calls
+                                        else None
+                                    ),
+                                    "function_call": None,
+                                },
                             }
-                        ]
+                        ],
+                        "usage": aggregated_metadata.get("usage", {}),
+                        "service_tier": aggregated_metadata.get(
+                            "service_tier", "default"
+                        ),
                     }
-                # Fallback: if last_chunk looks like a full completion include it
-                elif last_chunk and "choices" in last_chunk and "usage" in last_chunk:
-                    aggregated_output = last_chunk
 
-                # Prepare summary
+            finally:
+                # Use the complete aggregated output that was built during streaming
+                # If we don't have a complete aggregated output, build one from the pieces
+                if aggregated_output is None:
+                    if assistant_acc or tool_calls:
+                        # Clean up tool_calls for fallback case too
+                        cleaned_tool_calls = []
+                        for tool_call in tool_calls:
+                            if tool_call.get("id") and tool_call.get(
+                                "function", {}
+                            ).get("name"):
+                                cleaned_tool_call = {
+                                    "function": {
+                                        "arguments": tool_call["function"]["arguments"],
+                                        "name": tool_call["function"]["name"],
+                                    },
+                                    "id": tool_call["id"],
+                                    "type": "function",
+                                }
+                                cleaned_tool_calls.append(cleaned_tool_call)
+
+                        aggregated_output = {
+                            "choices": [
+                                {
+                                    "message": {
+                                        "role": "assistant",
+                                        "content": (
+                                            "".join(assistant_acc)
+                                            if assistant_acc
+                                            else (None if cleaned_tool_calls else "")
+                                        ),
+                                        "tool_calls": (
+                                            cleaned_tool_calls
+                                            if cleaned_tool_calls
+                                            else None
+                                        ),
+                                    }
+                                }
+                            ]
+                        }
+
+                # Prepare summary - use usage from aggregated_output if available
                 summary: dict[str, Any] = {}
-                if usage_block is not None:
-                    print(
-                        f"DEBUG: Adding usage to summary: {usage_block}"
-                    )  # Debug summary usage
-                    summary["usage"] = {model_name: usage_block}
-                else:
-                    print(
-                        "DEBUG: No usage block found for summary"
-                    )  # Debug missing usage
+                if aggregated_output and "usage" in aggregated_output:
+                    summary["usage"] = {model_name: aggregated_output["usage"]}
 
-                end = tsi.EndedCallSchemaForInsert(
-                    project_id=req.project_id,
-                    id=start_call.id,
-                    ended_at=datetime.datetime.now(),
-                    output=aggregated_output,
-                    summary=summary,
-                )
-                end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
-                self._insert_call(end_call)
+                if start_call is not None:
+                    end = tsi.EndedCallSchemaForInsert(
+                        project_id=req.project_id,
+                        id=start_call.id,
+                        ended_at=datetime.datetime.now(),
+                        output=aggregated_output,
+                        summary=summary,
+                    )
+                    end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+                    self._insert_call(end_call)
 
         return _stream_wrapper()
 
