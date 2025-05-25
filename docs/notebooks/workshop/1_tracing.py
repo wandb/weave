@@ -19,7 +19,7 @@
 
 # %%
 # Install dependencies
-# %pip install wandb weave openai pydantic nest_asyncio -qqq
+# %pip install wandb weave openai pydantic nest_asyncio opentelemetry-exporter-otlp 'weave[video_support]' -qqq
 
 import os
 from getpass import getpass
@@ -243,11 +243,6 @@ print("\n📊 Results:")
 print(f"✅ Successful: {len(result['successful'])}")
 print(f"❌ Failed: {len(result['failed'])}")
 
-print("\n💡 Check the Weave UI to see:")
-print("  - Parent operation (safe_processor) shows all child calls")
-print("  - Failed child operations (risky_operation) are highlighted in red")
-print("  - Full exception details and stack traces")
-print("  - How exceptions flow from child to parent operations")
 
 
 
@@ -302,32 +297,6 @@ def generate_sample_audio(text: str) -> wave.Wave_read:
     # Return wave file - Weave will automatically log this with audio player!
     return wave.open("sample_audio.wav", "rb")
 
-# 🎬 Video Support - Weave automatically logs moviepy video clips
-@weave.op  
-def create_sample_video():
-    """Create a simple video clip using moviepy."""
-    try:
-        from moviepy.editor import ColorClip, TextClip, CompositeVideoClip
-        
-        # Create a simple video: colored background with text
-        background = ColorClip(size=(640, 480), color=(100, 150, 200), duration=3)
-        
-        # Add text overlay
-        text_clip = TextClip("Hello from Weave!", 
-                           fontsize=50, 
-                           color='white',
-                           font='Arial-Bold').set_duration(3).set_position('center')
-        
-        # Composite the video
-        video = CompositeVideoClip([background, text_clip])
-        
-        # Return video clip - Weave will automatically log this!
-        return video
-        
-    except ImportError:
-        print("📹 MoviePy not installed. Install with: pip install moviepy")
-        return "Video creation skipped - moviepy not available"
-
 # 🖼️ Multimodal Analysis - Combining image and text
 @weave.op
 def analyze_image_with_gpt4_vision(image: Image.Image, question: str) -> str:
@@ -361,8 +330,6 @@ def analyze_image_with_gpt4_vision(image: Image.Image, question: str) -> str:
     
     return response.choices[0].message.content
 
-# 🎯 Let's test the media support!
-print("🎬 Testing Weave's media support...")
 
 # Test image generation and analysis
 print("\n📸 Generating image...")
@@ -593,20 +560,6 @@ sample_config = {"debug": True, "timeout": 30}
 result4 = complex_data_processor(sample_obj, sample_config)
 print(f"✅ Data transformed for logging: {result4}")
 
-print("\n💡 Check the Weave UI to see:")
-print("  - 🔒 PII automatically redacted in input/output logs")
-print("  - 📦 Large objects summarized instead of fully logged")
-print("  - 🔐 Sensitive configuration keys hidden")
-print("  - 🔄 Complex objects transformed to readable summaries")
-print("  - 📊 Enhanced metadata added to outputs")
-
-print("\n🎯 Key Benefits:")
-print("  - Protect sensitive data while maintaining observability")
-print("  - Keep logs manageable by summarizing large objects")
-print("  - Customize logging format for better readability")
-print("  - Maintain compliance with privacy regulations")
-print("  - Debug effectively without exposing secrets")
-
 
 # %% [markdown]
 # ### 🔗 Part 1.5: OpenTelemetry Integration
@@ -621,14 +574,15 @@ from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
+ENTITY = ...
+
 # 🔗 Configure OTEL to send traces to Weave
 def setup_otel_for_weave(project_name: str = "weave-workshop"):
     """Set up OpenTelemetry to send traces to Weave."""
     
     # Weave OTEL endpoint
-    WANDB_BASE_URL = "https://trace.wandb.ai"
-    PROJECT_ID = f"your-entity/{project_name}"  # Replace with your entity
-    OTEL_ENDPOINT = f"{WANDB_BASE_URL}/otel/v1/traces"
+    PROJECT_ID = f"{ENTITY}/{project_name}"  # Replace with your entity
+    OTEL_ENDPOINT = "https://trace.wandb.ai/otel/v1/traces"
     
     # Authentication (in real usage, get from environment)
     WANDB_API_KEY = os.environ.get("WANDB_API_KEY", "your-api-key")
@@ -653,12 +607,6 @@ def setup_otel_for_weave(project_name: str = "weave-workshop"):
     
     return trace.get_tracer(__name__)
 
-# 🎯 Example: Mixed Weave + OTEL tracing
-@weave.op
-def weave_function(data: str) -> str:
-    """A function traced by Weave."""
-    return f"Weave processed: {data}"
-
 def otel_function(tracer, data: str) -> str:
     """A function traced by OpenTelemetry."""
     with tracer.start_as_current_span("otel_processing") as span:
@@ -669,29 +617,5 @@ def otel_function(tracer, data: str) -> str:
         span.set_attribute("output.result", result)
         return result
 
-# 🧪 Demo: Combining Weave and OTEL traces
-print("🔗 Testing OpenTelemetry integration with Weave...")
-
-# Note: In a real workshop, you'd configure with actual credentials
-print("📝 OTEL Setup (demo mode - would need real credentials):")
-print("  - Endpoint: https://trace.wandb.ai/otel/v1/traces")
-print("  - Headers: Authorization + project_id")
-print("  - Format: OTLP (OpenTelemetry Protocol)")
-
-# Simulate the integration
-print("\n🎯 Benefits of OTEL + Weave:")
-print("  - 📊 Unified observability across your entire stack")
-print("  - 🔄 Correlate Weave AI traces with infrastructure traces")
-print("  - 🏢 Enterprise-ready observability standards")
-print("  - 🔗 Connect with existing monitoring tools (Jaeger, Zipkin, etc.)")
-
-# Example of what you'd see
-test_data = "workshop example"
-weave_result = weave_function(test_data)
-print(f"\n✅ Weave trace: {weave_result}")
-
-print("\n💡 In the Weave UI, you would see:")
-print("  - Native Weave traces with full AI context")
-print("  - OTEL traces with custom spans and attributes") 
-print("  - Unified timeline showing both trace types")
-print("  - Ability to correlate AI operations with system performance")
+tracer = setup_otel_for_weave()
+otel_function(tracer, "Hello from OTEL")
