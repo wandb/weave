@@ -18,31 +18,21 @@ NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
 
 def lite_llm_completion(
-    api_key: str,
+    api_key: Optional[str],
     inputs: tsi.CompletionsCreateRequestInputs,
     provider: Optional[str] = None,
     base_url: Optional[str] = None,
     extra_headers: Optional[dict[str, str]] = None,
     return_type: Optional[str] = None,
 ) -> tsi.CompletionsCreateRes:
-    aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
-    azure_api_base, azure_api_version = None, None
-    if provider == "bedrock" or provider == "bedrock_converse":
-        aws_access_key_id, aws_secret_access_key, aws_region_name = (
-            get_bedrock_credentials(inputs.model)
-        )
-        # Nova models need the region in the model name
-        if any(x in inputs.model for x in NOVA_MODELS) and aws_region_name:
-            aws_inference_region = aws_region_name.split("-")[0]
-            inputs.model = "bedrock/" + aws_inference_region + "." + inputs.model
-    # XAI models don't support response_format
-    elif provider == "xai":
-        inputs.response_format = None
-        if "grok-3-mini" in inputs.model:
-            inputs.presence_penalty = None
-            inputs.frequency_penalty = None
-    elif provider == "azure" or provider == "azure_ai":
-        azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
+    # Setup provider-specific credentials and model modifications
+    (
+        aws_access_key_id,
+        aws_secret_access_key,
+        aws_region_name,
+        azure_api_base,
+        azure_api_version,
+    ) = _setup_provider_credentials_and_model(inputs, provider)
 
     import litellm
 
@@ -170,6 +160,43 @@ def get_azure_credentials(model_name: str) -> tuple[str, str]:
         )
 
     return azure_api_base, azure_api_version
+
+
+def _setup_provider_credentials_and_model(
+    inputs: tsi.CompletionsCreateRequestInputs,
+    provider: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
+    """Setup provider-specific credentials and model modifications.
+
+    Returns: (aws_access_key_id, aws_secret_access_key, aws_region_name, azure_api_base, azure_api_version)
+    """
+    aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
+    azure_api_base, azure_api_version = None, None
+
+    if provider == "bedrock" or provider == "bedrock_converse":
+        aws_access_key_id, aws_secret_access_key, aws_region_name = (
+            get_bedrock_credentials(inputs.model)
+        )
+        # Nova models need the region in the model name
+        if any(x in inputs.model for x in NOVA_MODELS) and aws_region_name:
+            aws_inference_region = aws_region_name.split("-")[0]
+            inputs.model = "bedrock/" + aws_inference_region + "." + inputs.model
+    # XAI models don't support response_format
+    elif provider == "xai":
+        inputs.response_format = None
+        if "grok-3-mini" in inputs.model:
+            inputs.presence_penalty = None
+            inputs.frequency_penalty = None
+    elif provider == "azure" or provider == "azure_ai":
+        azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
+
+    return (
+        aws_access_key_id,
+        aws_secret_access_key,
+        aws_region_name,
+        azure_api_base,
+        azure_api_version,
+    )
 
 
 class CustomProviderInfo(BaseModel):
@@ -300,7 +327,7 @@ def get_custom_provider_info(
 
 
 def lite_llm_completion_stream(
-    api_key: str,
+    api_key: Optional[str],
     inputs: tsi.CompletionsCreateRequestInputs,
     provider: Optional[str] = None,
     base_url: Optional[str] = None,
@@ -314,24 +341,14 @@ def lite_llm_completion_stream(
     follows the non-streaming version: any exception is surfaced to the caller
     as a single error chunk and the iterator terminates.
     """
-    aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
-    azure_api_base, azure_api_version = None, None
-
-    if provider == "bedrock" or provider == "bedrock_converse":
-        aws_access_key_id, aws_secret_access_key, aws_region_name = (
-            get_bedrock_credentials(inputs.model)
-        )
-        # Nova models need the region in the model name
-        if any(x in inputs.model for x in NOVA_MODELS) and aws_region_name:
-            aws_inference_region = aws_region_name.split("-")[0]
-            inputs.model = "bedrock/" + aws_inference_region + "." + inputs.model
-    elif provider == "xai":
-        inputs.response_format = None
-        if "grok-3-mini" in inputs.model:
-            inputs.presence_penalty = None
-            inputs.frequency_penalty = None
-    elif provider == "azure" or provider == "azure_ai":
-        azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
+    # Setup provider-specific credentials and model modifications
+    (
+        aws_access_key_id,
+        aws_secret_access_key,
+        aws_region_name,
+        azure_api_base,
+        azure_api_version,
+    ) = _setup_provider_credentials_and_model(inputs, provider)
 
     import litellm
 

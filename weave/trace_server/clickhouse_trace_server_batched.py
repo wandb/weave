@@ -1847,81 +1847,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        # Required fields
-        model_name = req.inputs.model
-        api_key = None
-        provider = None
-
-        # Custom model fields
-        base_url: Optional[str] = None
-        extra_headers: dict[str, str] = {}
-        return_type: Optional[str] = None
-
-        # For custom and standard models, we fetch the fields differently
-        #  1. Standard models: All of the information comes from the model_to_provider_info_map
-        #  2. Custom models: We fetch the provider object and provider model object
-
-        # First we try to see if the model name is a custom model
-        model_info = self._model_to_provider_info_map.get(model_name)
-
-        if model_info:
-            # Handle standard model case
-            # 1. We get the model info from the map
-            # 2. We fetch the API key, with the secret fetcher
-            # 3. We set the provider, to the litellm provider
-            # 4. If no api key, we raise an error, except for bedrock and bedrock_converse (we fetch bedrock credentials, in lite_llm_completion)
-
-            secret_name = model_info.get("api_key_name")
-            if not secret_name:
-                raise InvalidRequest(f"No secret name found for model {model_name}")
-
-            secret_fetcher = _secret_fetcher_context.get()
-            if not secret_fetcher:
-                raise InvalidRequest(
-                    f"No secret fetcher found, cannot fetch API key for model {model_name}"
-                )
-
-            api_key = (
-                secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        # Use shared setup logic
+        try:
+            model_name, api_key, provider, base_url, extra_headers, return_type = (
+                self._setup_completion_model_info(req)
             )
-            provider = model_info.get("litellm_provider", "openai")
-
-            # We fetch bedrock credentials, in lite_llm_completion, later
-            if not api_key and provider != "bedrock" and provider != "bedrock_converse":
-                raise MissingLLMApiKeyError(
-                    f"No API key {secret_name} found for model {model_name}",
-                    api_key_name=secret_name,
-                )
-
-        else:
-            # If we don't have model info, we assume it is a custom model
-            # Handle custom provider case
-            # We fetch the provider object and provider model object
-            try:
-                custom_provider_info = get_custom_provider_info(
-                    project_id=req.project_id,
-                    model_name=model_name,
-                    obj_read_func=self.obj_read,
-                )
-
-                base_url = custom_provider_info.base_url
-                api_key = custom_provider_info.api_key
-                extra_headers = custom_provider_info.extra_headers
-                return_type = custom_provider_info.return_type
-                actual_model_name = custom_provider_info.actual_model_name
-
-            except Exception as e:
-                return tsi.CompletionsCreateRes(response={"error": str(e)})
-
-            # Always use "custom" as the provider for litellm
-            provider = "custom"
-            # Update the model name for the API call
-            # If the model name is ollama, we need to add the ollama/ prefix
-            req.inputs.model = (
-                "ollama/" + actual_model_name
-                if "ollama" in model_name
-                else actual_model_name
-            )
+        except Exception as e:
+            return tsi.CompletionsCreateRes(response={"error": str(e)})
 
         # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
@@ -1983,20 +1915,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # Streaming variant
     # -------------------------------------------------------------------
 
-    def completions_create_stream(
+    def _setup_completion_model_info(
         self, req: tsi.CompletionsCreateReq
-    ) -> Iterator[dict[str, Any]]:
-        """Stream LLM completion chunks.
+    ) -> tuple[str, Optional[str], str, Optional[str], dict[str, str], Optional[str]]:
+        """Extract model setup logic shared between completions_create and completions_create_stream.
 
-        Mirrors ``completions_create`` but with streaming enabled.  If
-        ``track_llm_call`` is True we emit a call_start record immediately and
-        a call_end record once the stream finishes (successfully or not).
+        Returns: (model_name, api_key, provider, base_url, extra_headers, return_type)
+        Note: api_key can be None for bedrock providers since they use AWS credentials instead.
         """
-        # --- Shared setup logic (copy of completions_create up to litellm call)
         model_name = req.inputs.model
         api_key = None
         provider = None
-
         base_url: Optional[str] = None
         extra_headers: dict[str, str] = {}
         return_type: Optional[str] = None
@@ -2026,25 +1955,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
         else:
             # Custom provider path
-            try:
-                custom_provider_info = get_custom_provider_info(
-                    project_id=req.project_id,
-                    model_name=model_name,
-                    obj_read_func=self.obj_read,
-                )
+            custom_provider_info = get_custom_provider_info(
+                project_id=req.project_id,
+                model_name=model_name,
+                obj_read_func=self.obj_read,
+            )
 
-                base_url = custom_provider_info.base_url
-                api_key = custom_provider_info.api_key
-                extra_headers = custom_provider_info.extra_headers
-                return_type = custom_provider_info.return_type
-                actual_model_name = custom_provider_info.actual_model_name
-
-            except Exception as e:
-                # Yield error as single chunk then stop.
-                def _single_error_iter(e: Exception) -> Iterator[dict[str, str]]:
-                    yield {"error": str(e)}
-
-                return _single_error_iter(e)
+            base_url = custom_provider_info.base_url
+            api_key = custom_provider_info.api_key
+            extra_headers = custom_provider_info.extra_headers
+            return_type = custom_provider_info.return_type
+            actual_model_name = custom_provider_info.actual_model_name
 
             provider = "custom"
             req.inputs.model = (
@@ -2052,6 +1973,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if "ollama" in model_name
                 else actual_model_name
             )
+
+        return model_name, api_key, provider, base_url, extra_headers, return_type
+
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        """Stream LLM completion chunks.
+
+        Mirrors ``completions_create`` but with streaming enabled.  If
+        ``track_llm_call`` is True we emit a call_start record immediately and
+        a call_end record once the stream finishes (successfully or not).
+        """
+        # --- Shared setup logic (copy of completions_create up to litellm call)
+        try:
+            model_name, api_key, provider, base_url, extra_headers, return_type = (
+                self._setup_completion_model_info(req)
+            )
+        except Exception as e:
+            # Yield error as single chunk then stop.
+            def _single_error_iter(e: Exception) -> Iterator[dict[str, str]]:
+                yield {"error": str(e)}
+
+            return _single_error_iter(e)
 
         # Track start call if requested
         start_call: Optional[CallStartCHInsertable] = None
@@ -2082,56 +2026,157 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not req.track_llm_call or start_call is None:
             return chunk_iter
 
-        # Otherwise, wrap the iterator:
-        #   1. Emit a leading metadata chunk with the generated weave_call_id so
-        #      clients can link the live stream to the stored Call record.
-        #   2. Proxy provider chunks through to the caller.
-        #   3. On normal completion or error, write the `call_end` record.
+        # Otherwise, wrap the iterator with tracking
+        return self._create_tracked_stream_wrapper(
+            chunk_iter, start_call, model_name, req.project_id
+        )
+
+    def _update_metadata_from_chunk(
+        self, chunk: dict[str, Any], aggregated_metadata: dict[str, Any]
+    ) -> None:
+        """Update aggregated metadata from a chunk."""
+        metadata_fields = [
+            "id",
+            "created",
+            "model",
+            "system_fingerprint",
+            "service_tier",
+            "usage",
+        ]
+
+        for field in metadata_fields:
+            if field in chunk and field not in aggregated_metadata:
+                if field == "service_tier":
+                    aggregated_metadata[field] = chunk.get(field, "default")
+                else:
+                    aggregated_metadata[field] = chunk[field]
+
+    def _process_tool_call_delta(
+        self, tool_call_delta: list, tool_calls: list[dict[str, Any]]
+    ) -> None:
+        """Process tool call delta and update tool_calls list."""
+        for tool_call in tool_call_delta:
+            tool_call_index = tool_call.get("index", 0)
+
+            # Ensure we have enough tool calls in our list
+            while len(tool_calls) <= tool_call_index:
+                tool_calls.append(
+                    {
+                        "id": None,
+                        "type": "function",
+                        "function": {"name": "", "arguments": ""},
+                    }
+                )
+
+            existing_tool_call = tool_calls[tool_call_index]
+
+            # Update existing tool call fields
+            if tool_call.get("id"):
+                existing_tool_call["id"] = tool_call["id"]
+            if tool_call.get("type"):
+                existing_tool_call["type"] = tool_call["type"]
+
+            if "function" in tool_call:
+                function_data = tool_call["function"]
+                if function_data.get("name"):
+                    existing_tool_call["function"]["name"] = function_data["name"]
+                if "arguments" in function_data:
+                    existing_tool_call["function"]["arguments"] += function_data[
+                        "arguments"
+                    ]
+
+    def _clean_tool_calls(
+        self, tool_calls: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Clean up tool_calls - remove incomplete ones and ensure proper format."""
+        cleaned_tool_calls = []
+        for tool_call in tool_calls:
+            if tool_call.get("id") and tool_call.get("function", {}).get("name"):
+                cleaned_tool_call = {
+                    "function": {
+                        "arguments": tool_call["function"]["arguments"],
+                        "name": tool_call["function"]["name"],
+                    },
+                    "id": tool_call["id"],
+                    "type": "function",
+                }
+                cleaned_tool_calls.append(cleaned_tool_call)
+        return cleaned_tool_calls
+
+    def _build_aggregated_output(
+        self,
+        aggregated_metadata: dict[str, Any],
+        assistant_acc: list[str],
+        tool_calls: list[dict[str, Any]],
+        chunk: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Build the aggregated output from accumulated data."""
+        current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
+        cleaned_tool_calls = self._clean_tool_calls(tool_calls)
+
+        return {
+            "id": aggregated_metadata.get("id", ""),
+            "created": aggregated_metadata.get("created", 0),
+            "model": aggregated_metadata.get("model", ""),
+            "object": "chat.completion",
+            "system_fingerprint": aggregated_metadata.get("system_fingerprint", ""),
+            "choices": [
+                {
+                    "finish_reason": current_finish_reason,
+                    "index": 0,
+                    "message": {
+                        "content": (
+                            "".join(assistant_acc)
+                            if assistant_acc
+                            else (None if cleaned_tool_calls else "")
+                        ),
+                        "role": "assistant",
+                        "tool_calls": (
+                            cleaned_tool_calls if cleaned_tool_calls else None
+                        ),
+                        "function_call": None,
+                    },
+                }
+            ],
+            "usage": aggregated_metadata.get("usage", {}),
+            "service_tier": aggregated_metadata.get("service_tier", "default"),
+        }
+
+    def _create_tracked_stream_wrapper(
+        self,
+        chunk_iter: Iterator[dict[str, Any]],
+        start_call: CallStartCHInsertable,
+        model_name: str,
+        project_id: str,
+    ) -> Iterator[dict[str, Any]]:
+        """Create a wrapper that tracks streaming completion and emits call records."""
 
         def _stream_wrapper() -> Iterator[dict[str, Any]]:
             # (1) send meta chunk first so clients can associate stream
-            if start_call is not None:
-                yield {"_meta": {"weave_call_id": start_call.id}}
+            yield {"_meta": {"weave_call_id": start_call.id}}
 
-            # Used to build final output/usage for call_end summary
+            # Initialize accumulation variables
             aggregated_output: dict[str, Any] | None = None
-            # For OpenAI-style chat completions we gradually build up assistant
-            # content to mirror what the client does.
             assistant_acc: list[str] = []
-            last_chunk: dict[str, Any] | None = None
             tool_calls: list[dict[str, Any]] = []
             aggregated_metadata: dict[str, Any] = {}
 
             try:
                 for chunk in chunk_iter:
-                    last_chunk = chunk
-                    # Yield to client immediately
-                    yield chunk
+                    yield chunk  # Yield to client immediately
+
+                    if not isinstance(chunk, dict):
+                        continue
 
                     # Accumulate metadata from chunks
-                    if isinstance(chunk, dict):
-                        if "id" not in aggregated_metadata:
-                            aggregated_metadata["id"] = chunk.get("id", "")
-                        if "created" not in aggregated_metadata:
-                            aggregated_metadata["created"] = chunk.get("created", 0)
-                        if "model" not in aggregated_metadata:
-                            aggregated_metadata["model"] = chunk.get("model", "")
-                        if "system_fingerprint" not in aggregated_metadata:
-                            aggregated_metadata["system_fingerprint"] = chunk.get(
-                                "system_fingerprint", ""
-                            )
-                        if "service_tier" not in aggregated_metadata:
-                            aggregated_metadata["service_tier"] = chunk.get(
-                                "service_tier", "default"
-                            )
-                        if "usage" in chunk:
-                            aggregated_metadata["usage"] = chunk["usage"]
+                    self._update_metadata_from_chunk(chunk, aggregated_metadata)
 
-                    # Accumulate assistant content if present
-                    choices = chunk.get("choices") if isinstance(chunk, dict) else None
+                    # Process assistant content and tool calls
+                    choices = chunk.get("choices")
                     if choices:
-                        delta = choices[0].get("delta") if choices else None
+                        delta = choices[0].get("delta")
                         if delta and isinstance(delta, dict):
+                            # Accumulate assistant content
                             content_piece = delta.get("content")
                             if content_piece:
                                 assistant_acc.append(content_piece)
@@ -2139,166 +2184,53 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             # Handle tool calls
                             tool_call_delta = delta.get("tool_calls")
                             if tool_call_delta:
-                                for tool_call in tool_call_delta:
-                                    tool_call_index = tool_call.get("index", 0)
+                                self._process_tool_call_delta(
+                                    tool_call_delta, tool_calls
+                                )
 
-                                    # Ensure we have enough tool calls in our list
-                                    while len(tool_calls) <= tool_call_index:
-                                        tool_calls.append(
-                                            {
-                                                "id": None,
-                                                "type": "function",
-                                                "function": {
-                                                    "name": "",
-                                                    "arguments": "",
-                                                },
-                                            }
-                                        )
-
-                                    existing_tool_call = tool_calls[tool_call_index]
-
-                                    # Update existing tool call
-                                    if "id" in tool_call and tool_call["id"]:
-                                        existing_tool_call["id"] = tool_call["id"]
-                                    if "type" in tool_call and tool_call["type"]:
-                                        existing_tool_call["type"] = tool_call["type"]
-                                    if "function" in tool_call:
-                                        if (
-                                            "name" in tool_call["function"]
-                                            and tool_call["function"]["name"]
-                                        ):
-                                            existing_tool_call["function"]["name"] = (
-                                                tool_call["function"]["name"]
-                                            )
-                                        if "arguments" in tool_call["function"]:
-                                            existing_tool_call["function"][
-                                                "arguments"
-                                            ] += tool_call["function"]["arguments"]
-
-                    # Update the aggregated output with metadata
-                    # Get the current finish_reason from the chunk, preserving any existing non-null value
-                    current_finish_reason = chunk.get("choices", [{}])[0].get(
-                        "finish_reason"
-                    )
-                    existing_finish_reason = None
-                    if aggregated_output and "choices" in aggregated_output:
-                        existing_finish_reason = aggregated_output["choices"][0].get(
-                            "finish_reason"
-                        )
-
-                    # Use current if it's not null, otherwise preserve existing, default to None
-                    final_finish_reason = (
-                        current_finish_reason
-                        if current_finish_reason is not None
-                        else existing_finish_reason
+                    # Build aggregated output
+                    aggregated_output = self._build_aggregated_output(
+                        aggregated_metadata, assistant_acc, tool_calls, chunk
                     )
 
-                    # Clean up tool_calls - remove incomplete ones and ensure proper format
-                    cleaned_tool_calls = []
-                    for tool_call in tool_calls:
-                        if tool_call.get("id") and tool_call.get("function", {}).get(
-                            "name"
-                        ):
-                            cleaned_tool_call = {
-                                "function": {
-                                    "arguments": tool_call["function"]["arguments"],
-                                    "name": tool_call["function"]["name"],
-                                },
-                                "id": tool_call["id"],
-                                "type": "function",
-                            }
-                            cleaned_tool_calls.append(cleaned_tool_call)
-
+            finally:
+                # Handle fallback case for aggregated output
+                if aggregated_output is None and (assistant_acc or tool_calls):
+                    cleaned_tool_calls = self._clean_tool_calls(tool_calls)
                     aggregated_output = {
-                        "id": aggregated_metadata.get("id", ""),
-                        "created": aggregated_metadata.get("created", 0),
-                        "model": aggregated_metadata.get("model", ""),
-                        "object": "chat.completion",
-                        "system_fingerprint": aggregated_metadata.get(
-                            "system_fingerprint", ""
-                        ),
                         "choices": [
                             {
-                                "finish_reason": final_finish_reason,
-                                "index": 0,
                                 "message": {
+                                    "role": "assistant",
                                     "content": (
                                         "".join(assistant_acc)
                                         if assistant_acc
                                         else (None if cleaned_tool_calls else "")
                                     ),
-                                    "role": "assistant",
                                     "tool_calls": (
                                         cleaned_tool_calls
                                         if cleaned_tool_calls
                                         else None
                                     ),
-                                    "function_call": None,
-                                },
+                                }
                             }
-                        ],
-                        "usage": aggregated_metadata.get("usage", {}),
-                        "service_tier": aggregated_metadata.get(
-                            "service_tier", "default"
-                        ),
+                        ]
                     }
 
-            finally:
-                # Use the complete aggregated output that was built during streaming
-                # If we don't have a complete aggregated output, build one from the pieces
-                if aggregated_output is None:
-                    if assistant_acc or tool_calls:
-                        # Clean up tool_calls for fallback case too
-                        cleaned_tool_calls = []
-                        for tool_call in tool_calls:
-                            if tool_call.get("id") and tool_call.get(
-                                "function", {}
-                            ).get("name"):
-                                cleaned_tool_call = {
-                                    "function": {
-                                        "arguments": tool_call["function"]["arguments"],
-                                        "name": tool_call["function"]["name"],
-                                    },
-                                    "id": tool_call["id"],
-                                    "type": "function",
-                                }
-                                cleaned_tool_calls.append(cleaned_tool_call)
-
-                        aggregated_output = {
-                            "choices": [
-                                {
-                                    "message": {
-                                        "role": "assistant",
-                                        "content": (
-                                            "".join(assistant_acc)
-                                            if assistant_acc
-                                            else (None if cleaned_tool_calls else "")
-                                        ),
-                                        "tool_calls": (
-                                            cleaned_tool_calls
-                                            if cleaned_tool_calls
-                                            else None
-                                        ),
-                                    }
-                                }
-                            ]
-                        }
-
-                # Prepare summary - use usage from aggregated_output if available
+                # Prepare summary and end call
                 summary: dict[str, Any] = {}
                 if aggregated_output and "usage" in aggregated_output:
                     summary["usage"] = {model_name: aggregated_output["usage"]}
 
-                if start_call is not None:
-                    end = tsi.EndedCallSchemaForInsert(
-                        project_id=req.project_id,
-                        id=start_call.id,
-                        ended_at=datetime.datetime.now(),
-                        output=aggregated_output,
-                        summary=summary,
-                    )
-                    end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
-                    self._insert_call(end_call)
+                end = tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=start_call.id,
+                    ended_at=datetime.datetime.now(),
+                    output=aggregated_output,
+                    summary=summary,
+                )
+                end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+                self._insert_call(end_call)
 
         return _stream_wrapper()
 
