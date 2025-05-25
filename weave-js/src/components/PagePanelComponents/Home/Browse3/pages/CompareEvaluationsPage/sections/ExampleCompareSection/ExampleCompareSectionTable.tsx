@@ -957,26 +957,29 @@ const inputFields = (
       );
     },
   },
-  ...inputSubFields.map(key => ({
-    field: `inputs.${key}`,
-    headerName: key,
-    sortable: false,
-    filterable: false,
-    width: columnWidths[key],
-    maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
-    valueGetter: (value: any, row: RowData) => {
-      return row.inputDigest;
-    },
-    renderCell: (params: GridRenderCellParams<RowData>) => {
-      return (
-        <DatasetRowItemRenderer
-          digest={params.row.inputDigest}
-          inputKey={key}
-          lineClamp={lineClamp}
-        />
-      );
-    },
-  } as GridColDef<RowData>)),
+  ...inputSubFields.map(
+    key =>
+      ({
+        field: `inputs.${key}`,
+        headerName: key,
+        sortable: false,
+        filterable: false,
+        width: columnWidths[key],
+        maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+        valueGetter: (value: any, row: RowData) => {
+          return row.inputDigest;
+        },
+        renderCell: (params: GridRenderCellParams<RowData>) => {
+          return (
+            <DatasetRowItemRenderer
+              digest={params.row.inputDigest}
+              inputKey={key}
+              lineClamp={lineClamp}
+            />
+          );
+        },
+      } as GridColDef<RowData>)
+  ),
 ];
 
 const expansionField = (
@@ -1322,41 +1325,46 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
           return null;
         },
       },
-      ...outputColumnKeys.map(key => ({
-        field: `output.${key}`,
-        headerName: key,
-        renderHeader: () => removePrefix(key, 'output.'),
-        width: outputWidths[key],
-        maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
-        ...DISABLED_ROW_SPANNING,
-        disableReorder: true,
-        valueGetter: (value: any, row: RowData) => {
-          if (row._pivot === 'modelsAsColumns') {
-            return null;
-          }
-          return row.output[key]?.[row.evaluationCallId];
-        },
-        renderCell: (params: GridRenderCellParams<RowData>) => {
-          if (params.row._pivot === 'modelsAsColumns') {
-            return null;
-          }
-          if (params.row._type === 'summary') {
-            // TODO: Should we indicate that this is just the first trial?
-            return (
-              <DenseCellValue
-                value={params.row.output[key]?.[params.row.evaluationCallId]}
-                lineClamp={props.lineClamp}
-              />
-            );
-          }
-          return (
-            <DenseCellValue
-              value={params.row.output[key]?.[params.row.evaluationCallId]}
-              lineClamp={props.lineClamp}
-            />
-          );
-        },
-      } as GridColDef<RowData>)),
+      ...outputColumnKeys.map(
+        key =>
+          ({
+            field: `output.${key}`,
+            headerName: key,
+            renderHeader: () => removePrefix(key, 'output.'),
+            width: outputWidths[key],
+            maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+            ...DISABLED_ROW_SPANNING,
+            disableReorder: true,
+            valueGetter: (value: any, row: RowData) => {
+              if (row._pivot === 'modelsAsColumns') {
+                return null;
+              }
+              return row.output[key]?.[row.evaluationCallId];
+            },
+            renderCell: (params: GridRenderCellParams<RowData>) => {
+              if (params.row._pivot === 'modelsAsColumns') {
+                return null;
+              }
+              if (params.row._type === 'summary') {
+                // TODO: Should we indicate that this is just the first trial?
+                return (
+                  <DenseCellValue
+                    value={
+                      params.row.output[key]?.[params.row.evaluationCallId]
+                    }
+                    lineClamp={props.lineClamp}
+                  />
+                );
+              }
+              return (
+                <DenseCellValue
+                  value={params.row.output[key]?.[params.row.evaluationCallId]}
+                  lineClamp={props.lineClamp}
+                />
+              );
+            },
+          } as GridColDef<RowData>)
+      ),
       ...Object.entries(compositeMetrics).flatMap(
         ([metricGroupKey, metricGroupDef]) => {
           return Object.entries(metricGroupDef.metrics).map(
@@ -1610,81 +1618,90 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
           ]
         : []),
       // Add predict call columns for each evaluation
-      ...props.state.evaluationCallIdsOrdered.map(evaluationCallId => ({
-        field: `predictCall.${evaluationCallId}`,
-        headerName: 'Call',
-        width: 100,
-        maxWidth: 150,
-        resizable: true,
-        disableColumnMenu: false,
-        disableReorder: true,
-        sortable: false,
-        filterable: false,
-        headerAlign: 'center',
-        cellClassName: 'call-id-cell',
-        ...DISABLED_ROW_SPANNING,
-        renderHeader: (params: GridColumnHeaderParams<RowData>) => {
-          return (
-            <EvaluationModelLink
-              callId={evaluationCallId}
-              state={props.state}
-            />
-          );
-        },
-        renderCell: (params: GridRenderCellParams<RowData>) => {
-          // Find the corresponding filtered row
-          const correspondingFilteredRow = filteredRows.find(
-            fr => fr.inputDigest === params.row.inputDigest
-          );
-          if (correspondingFilteredRow) {
-            const trial =
-              params.row._type === 'trial'
-                ? correspondingFilteredRow.originalRows.filter(
-                    row => row.evaluationCallId === evaluationCallId
-                  )[params.row._trialNdx]
-                : correspondingFilteredRow.originalRows.find(
-                    row => row.evaluationCallId === evaluationCallId
-                  );
+      ...props.state.evaluationCallIdsOrdered.map(
+        evaluationCallId =>
+          ({
+            field: `predictCall.${evaluationCallId}`,
+            headerName: 'Call',
+            width: 100,
+            maxWidth: 150,
+            resizable: true,
+            disableColumnMenu: false,
+            disableReorder: true,
+            sortable: false,
+            filterable: false,
+            headerAlign: 'center',
+            cellClassName: 'call-id-cell',
+            ...DISABLED_ROW_SPANNING,
+            renderHeader: (params: GridColumnHeaderParams<RowData>) => {
+              return (
+                <EvaluationModelLink
+                  callId={evaluationCallId}
+                  state={props.state}
+                />
+              );
+            },
+            renderCell: (params: GridRenderCellParams<RowData>) => {
+              // Find the corresponding filtered row
+              const correspondingFilteredRow = filteredRows.find(
+                fr => fr.inputDigest === params.row.inputDigest
+              );
+              if (correspondingFilteredRow) {
+                const trial =
+                  params.row._type === 'trial'
+                    ? correspondingFilteredRow.originalRows.filter(
+                        row => row.evaluationCallId === evaluationCallId
+                      )[params.row._trialNdx]
+                    : correspondingFilteredRow.originalRows.find(
+                        row => row.evaluationCallId === evaluationCallId
+                      );
 
-            if (trial) {
-              const trialPredict = trial.predictAndScore._rawPredictTraceData;
-              const [trialEntity, trialProject] =
-                trialPredict?.project_id.split('/') ?? [];
-              const trialOpName = parseRefMaybe(
-                trialPredict?.op_name ?? ''
-              )?.artifactName;
-              const trialCallId = trial.predictAndScore.callId;
+                if (trial) {
+                  const trialPredict =
+                    trial.predictAndScore._rawPredictTraceData;
+                  const [trialEntity, trialProject] =
+                    trialPredict?.project_id.split('/') ?? [];
+                  const trialOpName = parseRefMaybe(
+                    trialPredict?.op_name ?? ''
+                  )?.artifactName;
+                  const trialCallId = trial.predictAndScore.callId;
 
-              if (trialEntity && trialProject && trialOpName && trialCallId) {
-                return (
-                  <Box
-                    style={{
-                      overflow: 'hidden',
-                      height: '100%',
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                    }}
-                    onClick={() =>
-                      navigateToCall(trialEntity, trialProject, trialCallId)
-                    }>
-                    <CallLink
-                      entityName={trialEntity}
-                      projectName={trialProject}
-                      opName={trialOpName}
-                      callId={trialCallId}
-                      noName
-                    />
-                  </Box>
-                );
+                  if (
+                    trialEntity &&
+                    trialProject &&
+                    trialOpName &&
+                    trialCallId
+                  ) {
+                    return (
+                      <Box
+                        style={{
+                          overflow: 'hidden',
+                          height: '100%',
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() =>
+                          navigateToCall(trialEntity, trialProject, trialCallId)
+                        }>
+                        <CallLink
+                          entityName={trialEntity}
+                          projectName={trialProject}
+                          opName={trialOpName}
+                          callId={trialCallId}
+                          noName
+                        />
+                      </Box>
+                    );
+                  }
+                }
               }
-            }
-          }
-          return null;
-        },
-      } as GridColDef<RowData>)),
+              return null;
+            },
+          } as GridColDef<RowData>)
+      ),
       ...outputColumnKeys.flatMap(key => {
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
