@@ -83,9 +83,10 @@ def analyze_customer_email(email: str) -> CustomerEmail:
     """Analyze a customer support email and extract key information."""
     client = OpenAI()
 
-    # TODO: (Requires human) Verify that the "open in playground" works for client.beta.chat.completions.parse calls with a response format
-    # TODO: Add a note tellng the student that `client.beta.chat.completions.parse` is automatically
-    #       traced (along with dozens of other standard libraries and frameworks - with a link)
+    # 🎯 Note: OpenAI calls are automatically traced by Weave!
+    # Weave automatically integrates with dozens of popular libraries including:
+    # OpenAI, Anthropic, LangChain, LlamaIndex, HuggingFace, and more
+    # See full list: https://weave-docs.wandb.ai/guides/integrations/
     response = client.beta.chat.completions.parse(
         model="gpt-4o-mini",  # Using mini model for cost efficiency
         messages=[
@@ -122,23 +123,11 @@ print(f"Customer: {result.customer_name}")
 print(f"Sentiment: {result.sentiment}")
 print("\n🔍 Check the Weave UI to see the trace!")
 
-# TODO: Lecture note: UI elements to touch on: 
-#   # Call Detail Page:
-#       * Trace View (3 sub views + sliders), 
-#       * Inputs/Outputs (different render modes), 
-#       * Code Tracking, 
-#       * Summary (Tokens, Cost, Latency, Metadata)
-#   # Playground
-#       * For the nested OpenAI call, show the "open in playground" button - Open it!
-#       * Features: Edit previous messages, tweek settings, compare models, save model
-#       * Talk about custom model support
 
 # %% [markdown]
-# ## 🐛 Part 2: Debugging with Call Traces
+# ### 🐛 Part 1.1: Debugging with Call Traces
 #
 # Weave tracks nested function calls, making debugging easy. Let's build a more complex example.
-
-# TODO: This doesn't seem like "part 2" - this seems like a subset of part 1
 
 # %%
 @weave.op
@@ -204,11 +193,212 @@ print("\n🎫 Ticket processed!")
 print(f"Urgency: {ticket['urgency']}")
 print(f"Needs immediate attention: {ticket['needs_immediate_attention']}")
 
-# TODO: Lecture note: 
-#   * Highlight the code view in the trace table
-#   * Highlight the ability to filter / sort in the Trace Table
-#   * Highlight the ability to save pre-configured views
 
+# %% [markdown]
+# ### 🐞 Part 1.2: Exception Tracking
+#
+# Weave makes it easy to debug when things go wrong.
+
+# TODO: Also, this section is pretty verbose just to highlight error tracking - if we can make it simpler so that the student has less to read through and understand, that would be great.
+
+# %% [markdown]
+# ### 🔧 Part 1.2b: Simple Exception Examples
+#
+# Here are some simpler examples of how Weave tracks exceptions and failures.
+
+# %%
+# Define a stricter data structure that's more likely to fail
+class DetailedCustomerEmail(BaseModel):
+    customer_name: str = Field(description="Full name of the customer")
+    customer_title: Optional[str] = Field(description="Job title if mentioned")
+    company: Optional[str] = Field(description="Company name if mentioned")
+    product: str = Field(description="Product name including version")
+    product_version: Optional[str] = Field(description="Specific version number")
+    issue: str = Field(description="Detailed issue description")
+    severity: str = Field(description="critical, high, medium, or low")
+    sentiment: str = Field(description="positive, neutral, or negative")
+
+
+@weave.op
+def analyze_detailed_email(email: str) -> DetailedCustomerEmail:
+    """Analyze email with strict schema - more likely to fail."""
+    client = OpenAI()
+
+    # Use a less capable model without structured outputs
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",  # Older model, no structured outputs
+        messages=[
+            {
+                "role": "system",
+                "content": """Extract ALL fields from the email and return as JSON:
+                {
+                    "customer_name": "full name",
+                    "customer_title": "job title or null",
+                    "company": "company name or null", 
+                    "product": "product name with version",
+                    "product_version": "version number or null",
+                    "issue": "detailed issue description",
+                    "severity": "critical/high/medium/low",
+                    "sentiment": "positive/neutral/negative"
+                }
+                Use null for missing optional fields. All fields are required.""",
+            },
+            {
+                "role": "user",
+                "content": email,
+            },
+        ],
+        temperature=0.9,  # High temperature = more unpredictable
+    )
+
+    # Manual JSON parsing - prone to errors!
+    try:
+        # Extract JSON from response (model might add extra text)
+        response_text = response.choices[0].message.content
+
+        # Try to find JSON in the response (brittle!)
+        json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+        if not json_match:
+            raise ValueError("No JSON found in response")
+
+        json_str = json_match.group(0)
+        data = json.loads(json_str)
+
+        # Manual validation and construction (many failure points!)
+        return DetailedCustomerEmail(
+            customer_name=data["customer_name"],
+            customer_title=data.get("customer_title"),
+            company=data.get("company"),
+            product=data["product"],
+            product_version=data.get("product_version"),
+            issue=data["issue"],
+            severity=data["severity"],
+            sentiment=data["sentiment"],
+        )
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        # Re-raise with more context
+        raise ValueError(
+            f"Failed to parse model response: {str(e)}. Response was: {response_text[:200]}..."
+        )
+
+
+# Test with various emails to see exceptions
+test_emails_for_errors = [
+    "Fix this NOW!",  # Too short, missing almost everything
+    "The thing is broken - Anonymous",  # Missing key details
+    "My product isn't working",  # No name, no specific product
+    "😡😡😡",  # Just emojis
+    "Contact: J. Smith\nProduct: Version 2.0\nIssue: Yes",  # Ambiguous/incomplete
+    "HELP! Everything is on fire! Call 911!",  # Panic mode, no real info
+    test_email,  # This one might work
+    "I am very satisfied with your service. Thank you! -A Customer",  # Positive but missing product
+]
+
+print("🐞 Testing exception tracking with challenging emails...")
+print("=" * 60)
+for i, email in enumerate(test_emails_for_errors):
+    print(f"\n📧 Test {i+1}: '{email[:50]}{'...' if len(email) > 50 else ''}'")
+    try:
+        result = analyze_detailed_email(email)
+        print(f"✅ Success: {result.customer_name} - {result.product}")
+        print(f"   Severity: {result.severity}, Sentiment: {result.sentiment}")
+    except ValueError as e:
+        print(f"❌ Parsing Error: {str(e)[:100]}...")
+    except Exception as e:
+        print(f"❌ {type(e).__name__}: {str(e)[:100]}...")
+    print("   → Check Weave UI for full trace!")
+
+
+# Demonstrate JSON parsing errors
+@weave.op
+def parse_customer_response(response_text: str) -> dict:
+    """Parse a JSON response - demonstrates parsing errors."""
+    # This will fail if response_text is not valid JSON
+    data = json.loads(response_text)
+
+    # This will fail if required fields are missing
+    return {
+        "name": data["customer"]["name"],  # Nested field access
+        "issue": data["issue"]["description"],
+        "priority": data["priority"],
+    }
+
+
+# Test parsing errors
+test_responses = [
+    '{"customer": {"name": "John"}, "issue": {"description": "Bug"}, "priority": "high"}',  # Valid
+    '{"name": "Jane", "issue": "Problem"}',  # Missing nested structure
+    "Not JSON at all!",  # Invalid JSON
+]
+
+print("\n\n🔍 Testing JSON parsing errors...")
+for i, response in enumerate(test_responses):
+    print(f"\n📄 Test {i+1}:")
+    try:
+        result = parse_customer_response(response)
+        print(f"✅ Parsed successfully: {result}")
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON Error: {e}")
+    except KeyError as e:
+        print(f"❌ Missing field: {e}")
+    except Exception as e:
+        print(f"❌ Unexpected error: {type(e).__name__}: {e}")
+
+
+# %% [markdown]
+# ### 🐞 Part 1.2: Exception Tracking
+#
+# Weave makes it easy to debug when things go wrong.
+
+# TODO: Also, this section is pretty verbose just to highlight error tracking - if we can make it simpler so that the student has less to read through and understand, that would be great.
+
+# %%
+@weave.op
+def problematic_analyzer(email: str) -> Optional[CustomerEmail]:
+    """An analyzer that might fail - perfect for debugging!"""
+    if "error" in email.lower():
+        raise ValueError("Email contains error keyword!")
+    if len(email) < 20:
+        print("⚠️ Email too short, returning None")
+        return None
+    if "urgent" in email.lower():
+        # Simulate a timeout
+        import time
+
+        time.sleep(0.1)  # In real scenarios, this might be a network timeout
+
+    return analyze_customer_email(email)
+
+
+# Test with problematic inputs
+debug_test_emails = [
+    "Error in system",  # Will raise exception
+    "Too short",  # Will return None
+    "URGENT: Normal email from Alice about ProductX not working properly",  # Will be slow
+]
+
+print("🔍 Testing problematic analyzer...")
+for email in debug_test_emails:
+    print(f"\n📧 Testing: {email}")
+    try:
+        result = problematic_analyzer(email)
+        if result:
+            print(f"✅ Success: {result.customer_name}")
+        else:
+            print("⚠️ Returned None")
+    except Exception as e:
+        print(f"❌ Exception: {type(e).__name__}: {e}")
+
+print("\n💡 Check the Weave UI to see:")
+print("  - Red highlighted failed calls")
+print("  - Full stack traces for exceptions")
+print("  - Timing information for slow calls")
+
+# %% [markdown]
+# ### 🎬 Part 1.3: Media Support & Multimodal Tracing
+#
+# Weave can automatically trace and log various media types including images, videos, audio, and PDFs.
+# This is especially useful for multimodal AI applications.
 # TODO: (NEW CELL still focused on basic tracing) I would like to add another cell on tracing here that showcases Media Classes
 #   * Media Classes
 #       * Image support
@@ -218,22 +408,35 @@ print(f"Needs immediate attention: {ticket['needs_immediate_attention']}")
 #       * Audio support
 #       * PDFs
 
+
+
+
+# %% [markdown]
+# ### 🔒 Part 1.4: Custom Serialization & Privacy Controls
+#
+# Control what gets logged and how with Weave's serialization features.
+# Perfect for handling large objects, PII redaction, and privacy controls.
 # TODO: (NEW CELL still focused on basic tracing) I would like to add another cell on tracing here that showcases pre- and post- processing to control what gets serialized
 
 
+# %% [markdown]
+# ### 🌊 Part 1.5: Streaming & Generators
+#
+# Weave can trace iterators, generators, and streaming data patterns.
+# Essential for real-time applications and memory-efficient processing.
 # TODO: (NEW CELL still focused on basic tracing) We should show that different forms of generators / iterators can be traced as well.
 
 # %% [markdown]
-# ## 📊 Part 3: Building Evaluations
+# ## 📊 Part 2: Building Evaluations
 #
 # Now let's evaluate our email analyzer using Weave's evaluation framework.
 # We'll use a more challenging dataset to expose model weaknesses.
 
-# TODO: Take this opprtunity to describe the data model a bit:
-# 1. An "evaluation" is the pairing of a dataset and a set of scorers (think of it like a test suite for a specific task) (dataset, scorers)
-# 2. An "evluation run" is the result of running an evaluation against a specific model (evaluation, model)
-# 3. Within an evaluation run, there are N "predict_and_score" blocks which contain the prediction calls and the scoring calls for a single row of the dataset (evaluation run, (prediction, scores))
-# 4. Scores are stored within the predict_and_score output, but also adirectly on the prediction call itself.
+# **Understanding Weave's Evaluation Data Model:**
+# 1. An **evaluation** is the pairing of a dataset and a set of scorers (think of it like a test suite for a specific task)
+# 2. An **evaluation run** is the result of running an evaluation against a specific model
+# 3. Within an evaluation run, there are (num_rows * num_trials) **predict_and_score** blocks which contain the prediction calls and the scoring calls for a single row of the dataset
+# 4. Scores are stored within the predict_and_score output, but also directly on the prediction call itself
 
 # %%
 # Create a challenging evaluation dataset with tricky examples
@@ -451,10 +654,10 @@ def extraction_quality(email: str, output: CustomerEmail) -> dict[str, Any]:
 
 
 # 🚀 Run the evaluation (notebook-friendly version)
-# TODO: (consider using the `trails` param of Evaluation set to 3 to discuss how trials work (they run the same row `trails` times and the analytics are now aggregated over those trials - helps with randomness))
 evaluation = Evaluation(
     dataset=support_dataset,
     scorers=[name_accuracy, sentiment_accuracy, extraction_quality],
+    trails=3,
 )
 
 print("🏃 Running evaluation...")
@@ -468,13 +671,9 @@ nest_asyncio.apply()
 eval_results = asyncio.run(evaluation.evaluate(analyze_customer_email))
 print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 
-# TODO: Lecture note: 
-#   * in the UI, showcase the eval tab (list view), the eval detail view, and the predict and score table. (primary flow for a single eval)
-
-# TODO: (New Cell) - Let's add a cell specifically to showcase pairwise scoring (Human to link to content here.)
 
 # %% [markdown]
-# ## 🎯 Part 3b: Using Pre-built Scorers
+# ### 🎯 Part 2.1: Using Pre-built Scorers
 #
 # Weave provides many pre-built scorers for common evaluation tasks!
 # No need to reinvent the wheel for standard metrics.
@@ -627,7 +826,11 @@ print("\n💡 Install with: pip install weave[scorers]")
 print("📖 Full docs: https://docs.wandb.ai/guides/weave/evaluation/builtin_scorers")
 
 # %% [markdown]
-# ## 📝 Part 3c: Using EvaluationLogger
+# ### 📝 Part 2.2: Pairwise Scoring
+# TODO: (New Cell) - Let's add a cell specifically to showcase pairwise scoring (Human to link to content here.)
+
+# %% [markdown]
+# ### 📝 Part 2.3: Using EvaluationLogger
 #
 # The `EvaluationLogger` provides a flexible way to log evaluation data incrementally.
 # This is perfect when you don't have all your data upfront or want more control.
@@ -718,7 +921,7 @@ print("✅ EvaluationLogger demo complete! Check the Weave UI.")
 print("💡 Tip: The rich metadata makes it easy to filter and compare evaluations!")
 
 # %% [markdown]
-# ## 🏆 Part 4: Model Comparison
+# ### 🏆 Part 2.4: Model Comparison
 #
 # Let's compare different approaches using Weave's Model class.
 # We'll create models with varying quality to see clear differences.
@@ -795,14 +998,13 @@ balanced_model = EmailAnalyzerModel(
 )
 
 # %% [markdown]
-# ## 🔄 Part 5: A/B Testing Models
+# ### 🔄 Part 2.5: A/B Testing Models
 #
 # **Important Concept**: When comparing models, we use the SAME evaluation definition
 # (same dataset + scorers) for all models. This ensures fair comparison and allows
 # everyone in the workshop to see aggregated results. Each evaluation run gets a
 # unique ID automatically, but the evaluation definition stays consistent.
 
-# TODO: This is not really "Part 5" - it is more of a continuation of Part 4.
 
 # %%
 async def compare_models(models: list[Model], dataset: Dataset) -> dict[str, Any]:
@@ -840,233 +1042,17 @@ comparison_results = asyncio.run(
 )
 print("\n🎉 Comparison complete! View the results in the Weave UI.")
 
-# TODO: Lecture note: 
-#   * Show the table view
-#   * Compare 2 models
-#   * Show the comparison view
-#       * Summary Plots
-#       * Scorecard (diff view, + linkable sources)
-#       * Results tab
-#           * interactive regression filter
-#           * pivoted result viewer
-#           * model comparison detail view (everything linkable)
 
+# %% [markdown]
+# ### 🎯 Part 2.6: Leaderboard Competition
 # TODO: Interactive challenge time. (leaderboard competition)
     # Now we are going to see who can creat the best model 
     # TODO: setup the leaderboard (either interactively in the UI, or add a cell below)
     # Invite students to iterate on the prompt / model to get higher performance (which we will track in the leaderboard!)
 
-# %% [markdown]
-# ## 🐞 Part 6: Exception Tracking
-#
-# Weave automatically tracks exceptions, helping you debug failures in production.
-# This is especially useful when dealing with structured outputs.
-#
-# **Workshop Note**: We intentionally use an older model (gpt-3.5-turbo) without
-# structured output support to demonstrate real-world parsing challenges and exceptions.
-
-# TODO: Let's move this block up to the tracing section - it belongs there as we are showing students how errors are tracked at a basic level.
-# TODO: Also, this section is pretty verbose jsut to highlight error tracking - if we can make it simplier so that the student has less to read through and undersand, that would be great.
-
-# %%
-# Define a stricter data structure that's more likely to fail
-class DetailedCustomerEmail(BaseModel):
-    customer_name: str = Field(description="Full name of the customer")
-    customer_title: Optional[str] = Field(description="Job title if mentioned")
-    company: Optional[str] = Field(description="Company name if mentioned")
-    product: str = Field(description="Product name including version")
-    product_version: Optional[str] = Field(description="Specific version number")
-    issue: str = Field(description="Detailed issue description")
-    severity: str = Field(description="critical, high, medium, or low")
-    sentiment: str = Field(description="positive, neutral, or negative")
-
-
-@weave.op
-def analyze_detailed_email(email: str) -> DetailedCustomerEmail:
-    """Analyze email with strict schema - more likely to fail."""
-    client = OpenAI()
-
-    # Use a less capable model without structured outputs
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",  # Older model, no structured outputs
-        messages=[
-            {
-                "role": "system",
-                "content": """Extract ALL fields from the email and return as JSON:
-                {
-                    "customer_name": "full name",
-                    "customer_title": "job title or null",
-                    "company": "company name or null", 
-                    "product": "product name with version",
-                    "product_version": "version number or null",
-                    "issue": "detailed issue description",
-                    "severity": "critical/high/medium/low",
-                    "sentiment": "positive/neutral/negative"
-                }
-                Use null for missing optional fields. All fields are required.""",
-            },
-            {
-                "role": "user",
-                "content": email,
-            },
-        ],
-        temperature=0.9,  # High temperature = more unpredictable
-    )
-
-    # Manual JSON parsing - prone to errors!
-    try:
-        # Extract JSON from response (model might add extra text)
-        response_text = response.choices[0].message.content
-
-        # Try to find JSON in the response (brittle!)
-        json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-        if not json_match:
-            raise ValueError("No JSON found in response")
-
-        json_str = json_match.group(0)
-        data = json.loads(json_str)
-
-        # Manual validation and construction (many failure points!)
-        return DetailedCustomerEmail(
-            customer_name=data["customer_name"],
-            customer_title=data.get("customer_title"),
-            company=data.get("company"),
-            product=data["product"],
-            product_version=data.get("product_version"),
-            issue=data["issue"],
-            severity=data["severity"],
-            sentiment=data["sentiment"],
-        )
-    except (json.JSONDecodeError, KeyError, ValueError) as e:
-        # Re-raise with more context
-        raise ValueError(
-            f"Failed to parse model response: {str(e)}. Response was: {response_text[:200]}..."
-        )
-
-
-# Test with various emails to see exceptions
-test_emails_for_errors = [
-    "Fix this NOW!",  # Too short, missing almost everything
-    "The thing is broken - Anonymous",  # Missing key details
-    "My product isn't working",  # No name, no specific product
-    "😡😡😡",  # Just emojis
-    "Contact: J. Smith\nProduct: Version 2.0\nIssue: Yes",  # Ambiguous/incomplete
-    "HELP! Everything is on fire! Call 911!",  # Panic mode, no real info
-    test_email,  # This one might work
-    "I am very satisfied with your service. Thank you! -A Customer",  # Positive but missing product
-]
-
-print("🐞 Testing exception tracking with challenging emails...")
-print("=" * 60)
-for i, email in enumerate(test_emails_for_errors):
-    print(f"\n📧 Test {i+1}: '{email[:50]}{'...' if len(email) > 50 else ''}'")
-    try:
-        result = analyze_detailed_email(email)
-        print(f"✅ Success: {result.customer_name} - {result.product}")
-        print(f"   Severity: {result.severity}, Sentiment: {result.sentiment}")
-    except ValueError as e:
-        print(f"❌ Parsing Error: {str(e)[:100]}...")
-    except Exception as e:
-        print(f"❌ {type(e).__name__}: {str(e)[:100]}...")
-    print("   → Check Weave UI for full trace!")
-
-
-# Demonstrate JSON parsing errors
-@weave.op
-def parse_customer_response(response_text: str) -> dict:
-    """Parse a JSON response - demonstrates parsing errors."""
-    # This will fail if response_text is not valid JSON
-    data = json.loads(response_text)
-
-    # This will fail if required fields are missing
-    return {
-        "name": data["customer"]["name"],  # Nested field access
-        "issue": data["issue"]["description"],
-        "priority": data["priority"],
-    }
-
-
-# Test parsing errors
-test_responses = [
-    '{"customer": {"name": "John"}, "issue": {"description": "Bug"}, "priority": "high"}',  # Valid
-    '{"name": "Jane", "issue": "Problem"}',  # Missing nested structure
-    "Not JSON at all!",  # Invalid JSON
-]
-
-print("\n\n🔍 Testing JSON parsing errors...")
-for i, response in enumerate(test_responses):
-    print(f"\n📄 Test {i+1}:")
-    try:
-        result = parse_customer_response(response)
-        print(f"✅ Parsed successfully: {result}")
-    except json.JSONDecodeError as e:
-        print(f"❌ JSON Error: {e}")
-    except KeyError as e:
-        print(f"❌ Missing field: {e}")
-    except Exception as e:
-        print(f"❌ Unexpected error: {type(e).__name__}: {e}")
 
 # %% [markdown]
-# ## 📈 Part 7: Cost & Performance Tracking
-#
-# Weave automatically tracks metrics like latency and token usage. Let's explore these features.
-
-# TODO: We can remove this section completely - nearly every cell above will produce calls with costs and latency, it will naturally be covered above.
-
-
-# %%
-@weave.op
-def analyze_with_fallback(
-    email: str,
-    primary_model: str = "gpt-4o",
-    fallback_model: str = "gpt-4o-mini",
-) -> CustomerEmail:
-    """Analyze email with automatic fallback on error."""
-    client = OpenAI()
-    try:
-        response = client.beta.chat.completions.parse(
-            model=primary_model,
-            messages=[
-                {"role": "system", "content": "Extract customer info from email."},
-                {"role": "user", "content": email},
-            ],
-            response_format=CustomerEmail,
-        )
-        print(f"✅ Used primary model: {primary_model}")
-        return response.choices[0].message.parsed
-    except Exception as e:
-        print(f"⚠️ Primary model failed: {e}")
-        print(f"🔄 Falling back to {fallback_model}")
-        response = client.beta.chat.completions.parse(
-            model=fallback_model,
-            messages=[
-                {"role": "system", "content": "Extract customer info from email."},
-                {"role": "user", "content": email},
-            ],
-            response_format=CustomerEmail,
-        )
-        return response.choices[0].message.parsed
-
-
-# Test the fallback mechanism
-test_emails = [
-    "Hi, I'm Alice Brown. My UltraPhone is overheating constantly!",
-    "Bob Green here. The MegaTablet screen is cracked after dropping it.",
-    "Carol White needs help with CloudBackup not syncing properly.",
-]
-
-print("🔄 Testing fallback mechanism...")
-for email in test_emails:
-    result = analyze_with_fallback(email)
-    print(f"  Processed: {result.customer_name} - {result.sentiment}")
-
-print("\n💰 Check the Weave UI to see:")
-print("  - Token usage for each call")
-print("  - Latency comparisons")
-print("  - Cost tracking (when available)")
-
-# %% [markdown]
-# ## 🎯 Part 8: Production Monitoring with Scorers
+# ## 🎯 Part 3: Production Monitoring with Scorers
 #
 # Use Weave's scorer system for real-time guardrails and quality monitoring.
 # This demonstrates the apply_scorer pattern for production use.
@@ -1077,8 +1063,6 @@ print("  - Cost tracking (when available)")
 
 # %%
 from datetime import datetime
-
-# TODO: In general, scorers work best if emitting boolean or numeric values. while you can include additional information to help contenxtualize the scores, focus on bools and numbers (for example: severity should be a quantity)
 
 # Define more realistic production scorers
 class ContentModerationScorer(Scorer):
@@ -1272,25 +1256,6 @@ class ExtractionQualityScorer(Scorer):
             ),
         }
 
-# TODO: This response time seems a bit overkill - let's remove it completely.
-
-class ResponseTimeScorer(Scorer):
-    """Monitor response time SLAs."""
-
-    @weave.op
-    def score(self, output: dict, processing_time_ms: float) -> dict:
-        """Check if response time meets SLA."""
-        sla_ms = 1000  # 1 second SLA
-
-        return {
-            "processing_time_ms": processing_time_ms,
-            "sla_met": processing_time_ms <= sla_ms,
-            "sla_margin_ms": sla_ms - processing_time_ms,
-            "performance_grade": "fast"
-            if processing_time_ms < 500
-            else ("normal" if processing_time_ms < 1000 else "slow"),
-        }
-
 
 @weave.op
 def production_email_handler(
@@ -1310,8 +1275,6 @@ def production_email_handler(
         # Calculate urgency based on the analysis
         urgency = classify_urgency(email, analysis.sentiment)
 
-        # Calculate processing time
-        processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
 
         # Return structured result that scorers expect
         return {
@@ -1324,18 +1287,15 @@ def production_email_handler(
                 "sentiment": analysis.sentiment,
             },
             "urgency": urgency,
-            "processing_time_ms": processing_time_ms,
             "timestamp": datetime.now().isoformat(),
         }
 
     except Exception as e:
         # Log error and return error response
-        processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
         return {
             "request_id": request_id,
             "status": "error",
             "error": str(e),
-            "processing_time_ms": processing_time_ms,
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -1343,21 +1303,12 @@ def production_email_handler(
 # Initialize scorers
 content_moderation_scorer = ContentModerationScorer()
 quality_scorer = ExtractionQualityScorer()
-response_time_scorer = ResponseTimeScorer()
 
 
 async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
     """Handle email with production monitoring and guardrails."""
     # Process the email and get the Call object
     result, call = production_email_handler.call(email)
-
-    # Always apply response time scorer
-    time_score = await call.apply_scorer(
-        response_time_scorer,
-        additional_scorer_kwargs={
-            "processing_time_ms": result.get("processing_time_ms", 0)
-        },
-    )
 
     if result["status"] == "success":
         # Apply content moderation (guardrail)
@@ -1395,11 +1346,6 @@ async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
         if quality_check.result["recommendations"]:
             print(f"💡 Recommendations: {quality_check.result['recommendations']}")
 
-    # Add performance metrics
-    result["performance"] = {
-        "sla_met": time_score.result["sla_met"],
-        "grade": time_score.result["performance_grade"],
-    }
 
     return result
 
@@ -1549,13 +1495,12 @@ print("   - Guardrails (block/review) vs Monitors (quality/performance)")
 print("   - All scorer results are tracked in Weave for analysis")
 print("\n✅ Check the Weave UI to see detailed scorer results and traces!")
 
-# TODO: Lecture Notes: here the main teaching moments are:
-# 1. Use `call.apply_scorer` to apply a score to a call
-# 2. Operate on the results to impact control flow
-# 3. In the UI, these are automatically tracked under the call's Scores
-# 4. you can filter/sort to find the best/worst cases
-# 5. From there, you can build derivitive dataset
 
+# %% [markdown]
+# ### 👥 Part 3.1: Human Feedback & Dataset Building
+#
+# Learn how to collect human feedback and build datasets from production data.
+# This creates a feedback loop for continuous model improvement.
 # TODO: New Cell: Here, we are going to make an interactive "app" that renders in the cell so that the user can directly interact with the model. This will then generate calls in the UI and we can see calls coming into the application. From there we can setup a human feedback column interactively, collect examples, narrow down to the hard cases, and add to a dataset, which can then be used for the next round of evaluations:
 #   1. Create an interactive output that allows for form-fill-style querying of the model
 #   2. Add feedback so that the user can mark the reponse as good or bad (use the API to send this feedback)
@@ -1564,55 +1509,14 @@ print("\n✅ Check the Weave UI to see detailed scorer results and traces!")
 #   4. (UI) Add the bad results to a dataset
 #   5. (Optional) Next cell: create a new evaluation using the new dataset - presumably the models have a harder time... or just say that it is possible
 
+
+
+
 # %% [markdown]
-# ## 🐛 Part 9: Debugging Failed Calls
+# ### 🔗 Part 3.2: OpenTelemetry Integration
 #
-# Weave makes it easy to debug when things go wrong.
-
-# TODO: This is a much better error tracking example than the one above. merge them and put them in the tracing section.
-
-# %%
-@weave.op
-def problematic_analyzer(email: str) -> Optional[CustomerEmail]:
-    """An analyzer that might fail - perfect for debugging!"""
-    if "error" in email.lower():
-        raise ValueError("Email contains error keyword!")
-    if len(email) < 20:
-        print("⚠️ Email too short, returning None")
-        return None
-    if "urgent" in email.lower():
-        # Simulate a timeout
-        import time
-
-        time.sleep(0.1)  # In real scenarios, this might be a network timeout
-
-    return analyze_customer_email(email)
-
-
-# Test with problematic inputs
-debug_test_emails = [
-    "Error in system",  # Will raise exception
-    "Too short",  # Will return None
-    "URGENT: Normal email from Alice about ProductX not working properly",  # Will be slow
-]
-
-print("🔍 Testing problematic analyzer...")
-for email in debug_test_emails:
-    print(f"\n📧 Testing: {email}")
-    try:
-        result = problematic_analyzer(email)
-        if result:
-            print(f"✅ Success: {result.customer_name}")
-        else:
-            print("⚠️ Returned None")
-    except Exception as e:
-        print(f"❌ Exception: {type(e).__name__}: {e}")
-
-print("\n💡 Check the Weave UI to see:")
-print("  - Red highlighted failed calls")
-print("  - Full stack traces for exceptions")
-print("  - Timing information for slow calls")
-
+# Learn how Weave integrates with OpenTelemetry for enterprise observability.
+# Perfect for connecting Weave traces with your existing monitoring infrastructure.
 # TODO: (New cell) Let's showcase OTEL support and how that works at the end here
 
 # %% [markdown]

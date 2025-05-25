@@ -515,3 +515,45 @@ Workshop materials: [link]
 Recording: [available soon]
 
 Happy building! 🚀" 
+
+---
+
+# TODO: Lecture note: UI elements to touch on: 
+#   # Call Detail Page:
+#       * Trace View (3 sub views + sliders), 
+#       * Inputs/Outputs (different render modes), 
+#       * Code Tracking, 
+#       * Summary (Tokens, Cost, Latency, Metadata)
+#   # Playground
+#       * For the nested OpenAI call, show the "open in playground" button - Open it!
+#       * Features: Edit previous messages, tweek settings, compare models, save model
+#       * Talk about custom model support
+
+
+# TODO: Lecture note: 
+#   * Highlight the code view in the trace table
+#   * Highlight the ability to filter / sort in the Trace Table
+#   * Highlight the ability to save pre-configured views
+
+
+# TODO: Lecture note: 
+#   * in the UI, showcase the eval tab (list view), the eval detail view, and the predict and score table. (primary flow for a single eval)
+
+# TODO: Lecture note: 
+#   * Show the table view
+#   * Compare 2 models
+#   * Show the comparison view
+#       * Summary Plots
+#       * Scorecard (diff view, + linkable sources)
+#       * Results tab
+#           * interactive regression filter
+#           * pivoted result viewer
+#           * model comparison detail view (everything linkable)
+
+
+# TODO: Lecture Notes: here the main teaching moments are:
+# 1. Use `call.apply_scorer` to apply a score to a call
+# 2. Operate on the results to impact control flow
+# 3. In the UI, these are automatically tracked under the call's Scores
+# 4. you can filter/sort to find the best/worst cases
+# 5. From there, you can build derivitive dataset
