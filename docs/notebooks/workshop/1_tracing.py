@@ -44,6 +44,7 @@ weave_client = weave.init("weave-workshop")
 #
 # Let's start by building a simple LLM application and see how Weave automatically tracks everything.
 
+
 # %%
 # Define our data structure
 class CustomerEmail(BaseModel):
@@ -60,7 +61,7 @@ def analyze_customer_email(email: str) -> CustomerEmail:
     client = OpenAI()
 
     # 🔥 OpenAI calls are automatically traced by Weave!
-    # Weave integrates with 20+ popular AI libraries out of the box
+    # Weave integrates with dozens of popular AI libraries out of the box
     response = client.beta.chat.completions.parse(
         model="gpt-4o-mini",  # Using mini model for cost efficiency
         messages=[
@@ -101,6 +102,7 @@ print("✅ Check the Weave UI to see the trace!")
 #
 # Weave tracks nested function calls, making debugging easy. Let's build a more complex pipeline.
 
+
 # %%
 @weave.op
 def preprocess_email(email: str) -> str:
@@ -140,10 +142,10 @@ def process_support_ticket(email: str) -> dict[str, Any]:
     """Complete support ticket processing pipeline."""
     # Step 1: Clean the email
     cleaned_email = preprocess_email(email)
-    
+
     # Step 2: Analyze the email content
     analysis = analyze_customer_email(cleaned_email)
-    
+
     # Step 3: Determine urgency level
     urgency = classify_urgency(cleaned_email, analysis.sentiment)
 
@@ -167,6 +169,7 @@ print(f"Needs immediate attention: {ticket['needs_immediate_attention']}")
 # ### ⚠️ Part 1.2: Exception Tracking
 #
 # Weave automatically tracks exceptions in nested function calls, making debugging easy.
+
 
 # %%
 @weave.op
@@ -219,6 +222,7 @@ print(f"❌ Failed: {len(result['failed'])}")
 # %%
 import base64
 import wave
+
 import requests
 from PIL import Image
 
@@ -271,6 +275,7 @@ def analyze_image_with_gpt4_vision(image: Image.Image, question: str) -> str:
 
     # Convert PIL image to base64 for API
     import io
+
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
@@ -449,6 +454,7 @@ print("✅ Sensitive config filtered")
 
 # %%
 import base64
+
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk import trace as trace_sdk
@@ -474,7 +480,7 @@ def setup_otel_for_weave(project_name: str = "weave-workshop"):
 
     # Create tracer provider
     tracer_provider = trace_sdk.TracerProvider()
-    
+
     # Configure OTLP exporter for Weave
     exporter = OTLPSpanExporter(endpoint=OTEL_ENDPOINT, headers=headers)
     tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))

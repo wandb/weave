@@ -53,6 +53,7 @@ weave_client = weave.init("weave-workshop")
 # 3. Within an evaluation run, there are **predict_and_score** blocks for each dataset row
 # 4. Scores are stored in the predict_and_score output and on the prediction call
 
+
 # %%
 # Define our data structure
 class CustomerEmail(BaseModel):
@@ -204,6 +205,7 @@ eval_examples = [
         "expected_product": "ChromaEdit tool",
         "expected_sentiment": "neutral",  # Apathetic, not negative or positive
     },
+    # Multiple products mentioned
     {
         "email": "Upgraded from TaskMaster to ProjectPro. Having issues with ProjectPro's gantt charts. Anne-Marie Rousseau",
         "expected_name": "Anne-Marie Rousseau",
@@ -216,6 +218,7 @@ eval_examples = [
         "expected_product": "AudioEdit",  # The one especially mentioned
         "expected_sentiment": "positive",
     },
+    # Edge cases
     {
         "email": "Yo! Sup? Ur SystemMonitor thing is broke af. fix it asap!!!! - xXx_Dmitri_xXx",
         "expected_name": "Dmitri",  # Extract from gamertag
@@ -250,6 +253,7 @@ eval_examples = [
 
 # Create a Weave Dataset
 support_dataset = Dataset(name="support_emails", rows=eval_examples)
+
 
 # 🎯 Define scoring functions
 @weave.op
@@ -307,6 +311,7 @@ evaluation = Evaluation(
 
 # For notebooks, use nest_asyncio to handle async properly
 import nest_asyncio
+
 nest_asyncio.apply()
 eval_results = asyncio.run(evaluation.evaluate(analyze_customer_email))
 print("✅ Evaluation complete! Check the Weave UI for detailed results.")
@@ -338,17 +343,21 @@ json_result = asyncio.run(json_scorer.score(output=valid_json))
 print(f"  Valid JSON: {json_result['json_valid']}")
 
 # Test with invalid JSON
-invalid_json = '{"name": "Jane Doe", "age": 25, "email"'  # Missing closing quote and brace
+invalid_json = (
+    '{"name": "Jane Doe", "age": 25, "email"'  # Missing closing quote and brace
+)
 invalid_result = asyncio.run(json_scorer.score(output=invalid_json))
 print(f"  Invalid JSON: {invalid_result['json_valid']}")
 
 # Example 2: PydanticScorer - Validate against a schema
 from pydantic import EmailStr
 
+
 class UserData(BaseModel):
     name: str
     age: int
     email: EmailStr
+
 
 # Use PydanticScorer with our schema
 pydantic_scorer = PydanticScorer(model=UserData)
@@ -404,6 +413,7 @@ print(f"  Safe content flagged: {safe_result['flagged']}")
 
 # %%
 from weave.flow.model import ApplyModelError, apply_model_async
+
 
 # Create two different email analysis models for comparison
 class BasicEmailModel(Model):
@@ -646,6 +656,7 @@ print("💡 Tip: The rich metadata makes it easy to filter and compare evaluatio
 # Compare different approaches using Weave's Model class with varying quality levels.
 # We'll create models with different quality to see clear differences.
 
+
 # %%
 # Define different model variants
 class EmailAnalyzerModel(Model):
@@ -731,6 +742,7 @@ evaluation = Evaluation(
     scorers=[name_accuracy, sentiment_accuracy, extraction_quality],
 )
 
+
 async def compare_models(models: list[Model]) -> dict[str, Any]:
     """Run A/B comparison of multiple models."""
     results = {}
@@ -748,6 +760,7 @@ async def compare_models(models: list[Model]) -> dict[str, Any]:
         print(f"✅ {model.label} evaluation complete!")
 
     return results
+
 
 # Run the comparison
 print("🏁 Starting model comparison...")
@@ -767,7 +780,7 @@ print("\n🎉 Comparison complete! View the results in the Weave UI.")
 #
 # **Your challenge**: Improve the prompt/model to get the highest scores on:
 # - Name accuracy
-# - Sentiment accuracy  
+# - Sentiment accuracy
 # - Overall extraction quality
 
 # %%
@@ -828,6 +841,7 @@ print(f"📊 All participants will use the same evaluation: {evaluation.name}")
 # - Study the challenging examples in the dataset
 # - Be specific about edge cases (signatures, multiple names, etc.)
 # - Consider temperature settings (lower = more consistent)
+
 
 # %%
 class MyEmailModel(Model):
