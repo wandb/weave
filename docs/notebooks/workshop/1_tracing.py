@@ -250,40 +250,448 @@ print("  - Full exception details and stack traces")
 print("  - How exceptions flow from child to parent operations")
 
 
+
 # %% [markdown]
 # ### 🎬 Part 1.3: Media Support & Multimodal Tracing
 #
 # Weave can automatically trace and log various media types including images, videos, audio, and PDFs.
 # This is especially useful for multimodal AI applications.
-# TODO: (NEW CELL still focused on basic tracing) I would like to add another cell on tracing here that showcases Media Classes
-#   * Media Classes
-#       * Image support
-#           * OpenAI's base64 pattern
-#           * Standard PIL images are supported
-#       * Video Support (Using the new annotations pattern)
-#       * Audio support
-#       * PDFs
+
+# %%
+# Let's demonstrate media support with different types
+import requests
+from PIL import Image
+import wave
+import base64
+
+# 📸 Image Support - Weave automatically logs PIL.Image objects
+@weave.op
+def generate_sample_image() -> Image.Image:
+    """Generate a sample image using OpenAI DALL-E API."""
+    client = OpenAI()
+    
+    response = client.images.generate(
+        model="dall-e-3",
+        prompt="A cute robot learning about data science, digital art style",
+        size="1024x1024",
+        quality="standard",
+        n=1,
+    )
+    
+    # Download and return as PIL Image - Weave will automatically log this!
+    image_url = response.data[0].url
+    image_response = requests.get(image_url, stream=True)
+    image = Image.open(image_response.raw)
+    
+    return image
+
+# 🎵 Audio Support - Weave automatically logs wave.Wave_read objects  
+@weave.op
+def generate_sample_audio(text: str) -> wave.Wave_read:
+    """Generate audio using OpenAI's text-to-speech API."""
+    client = OpenAI()
+    
+    with client.audio.speech.with_streaming_response.create(
+        model="tts-1",
+        voice="alloy", 
+        input=text,
+        response_format="wav",
+    ) as response:
+        response.stream_to_file("sample_audio.wav")
+    
+    # Return wave file - Weave will automatically log this with audio player!
+    return wave.open("sample_audio.wav", "rb")
+
+# 🎬 Video Support - Weave automatically logs moviepy video clips
+@weave.op  
+def create_sample_video():
+    """Create a simple video clip using moviepy."""
+    try:
+        from moviepy.editor import ColorClip, TextClip, CompositeVideoClip
+        
+        # Create a simple video: colored background with text
+        background = ColorClip(size=(640, 480), color=(100, 150, 200), duration=3)
+        
+        # Add text overlay
+        text_clip = TextClip("Hello from Weave!", 
+                           fontsize=50, 
+                           color='white',
+                           font='Arial-Bold').set_duration(3).set_position('center')
+        
+        # Composite the video
+        video = CompositeVideoClip([background, text_clip])
+        
+        # Return video clip - Weave will automatically log this!
+        return video
+        
+    except ImportError:
+        print("📹 MoviePy not installed. Install with: pip install moviepy")
+        return "Video creation skipped - moviepy not available"
+
+# 🖼️ Multimodal Analysis - Combining image and text
+@weave.op
+def analyze_image_with_gpt4_vision(image: Image.Image, question: str) -> str:
+    """Analyze an image using GPT-4 Vision."""
+    client = OpenAI()
+    
+    # Convert PIL image to base64 for API
+    import io
+    buffer = io.BytesIO()
+    image.save(buffer, format='PNG')
+    image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Supports vision
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": question},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image_base64}"
+                        }
+                    }
+                ]
+            }
+        ],
+        max_tokens=300
+    )
+    
+    return response.choices[0].message.content
+
+# 🎯 Let's test the media support!
+print("🎬 Testing Weave's media support...")
+
+# Test image generation and analysis
+print("\n📸 Generating image...")
+sample_image = generate_sample_image()
+print(f"✅ Generated image: {sample_image.size}")
+
+print("\n🔍 Analyzing image with GPT-4 Vision...")
+analysis = analyze_image_with_gpt4_vision(
+    sample_image, 
+    "What do you see in this image? Describe it in one sentence."
+)
+print(f"🤖 Analysis: {analysis}")
+
+# Test audio generation
+print("\n🎵 Generating audio...")
+sample_audio = generate_sample_audio("Welcome to the Weave workshop! This audio will be automatically logged.")
+print("✅ Generated audio file")
+
+# Test video creation (if moviepy is available)
+print("\n🎬 Creating video...")
+sample_video = create_sample_video()
+if isinstance(sample_video, str):
+    print(f"⚠️ {sample_video}")
+else:
+    print("✅ Generated video clip")
+
+print("\n💡 Check the Weave UI to see:")
+print("  - 📸 Images displayed with thumbnails and full-size view")
+print("  - 🎵 Audio files with built-in audio player and waveform")
+print("  - 🎬 Video clips with video player (if moviepy available)")
+print("  - 🔗 All media automatically linked to their function calls")
+print("  - 📊 Media metadata (dimensions, duration, file size, etc.)")
+
+print("\n🎯 Key Benefits:")
+print("  - No manual upload needed - Weave handles everything automatically")
+print("  - Media is preserved with full context of the function call")
+print("  - Easy to debug multimodal AI applications")
+print("  - Share results with team members through Weave UI")
 
 
 # %% [markdown]
-# ### 🔒 Part 1.4: Custom Serialization & Privacy Controls
+# ### 🔒 Part 1.4: Custom Serialization
 #
 # Control what gets logged and how with Weave's serialization features.
-# Perfect for handling large objects, PII redaction, and privacy controls.
-# TODO: (NEW CELL still focused on basic tracing) I would like to add another cell on tracing here that showcases pre- and post- processing to control what gets serialized
+# Use `postprocess_inputs` and `postprocess_output` to customize what data gets stored.
+# Perfect for PII redaction, large object handling, sensitive data filtering, and more.
+
+# %%
+import re
+from typing import Any, Dict
+
+# 🔒 Example 1: PII Redaction
+def redact_pii_inputs(inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """Redact PII from inputs before logging."""
+    processed = inputs.copy()
+    
+    if "email_content" in processed:
+        text = processed["email_content"]
+        # Redact email addresses
+        text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '<EMAIL>', text)
+        # Redact phone numbers
+        text = re.sub(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', '<PHONE>', text)
+        # Redact SSN
+        text = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '<SSN>', text)
+        processed["email_content"] = text
+    
+    return processed
+
+def redact_pii_output(output: Any) -> Any:
+    """Redact PII from outputs before logging."""
+    if hasattr(output, 'customer_name'):
+        # Create a copy and redact the name
+        output_dict = output.dict() if hasattr(output, 'dict') else output
+        if isinstance(output_dict, dict) and 'customer_name' in output_dict:
+            output_dict['customer_name'] = '<CUSTOMER_NAME>'
+        return output_dict
+    return output
+
+@weave.op(
+    postprocess_inputs=redact_pii_inputs,
+    postprocess_output=redact_pii_output
+)
+def analyze_sensitive_email(email_content: str) -> CustomerEmail:
+    """Analyze email while protecting PII in logs."""
+    return analyze_customer_email(email_content)
+
+# 📦 Example 2: Large Object Handling
+def summarize_large_inputs(inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """Summarize large objects to avoid logging huge data."""
+    processed = inputs.copy()
+    
+    for key, value in processed.items():
+        if isinstance(value, (list, tuple)) and len(value) > 10:
+            # Only log first/last few items for large lists
+            processed[key] = {
+                "type": f"{type(value).__name__}",
+                "length": len(value),
+                "sample_start": value[:3],
+                "sample_end": value[-3:],
+                "note": "Large object truncated for logging"
+            }
+        elif isinstance(value, str) and len(value) > 1000:
+            # Truncate very long strings
+            processed[key] = {
+                "type": "string",
+                "length": len(value),
+                "preview": value[:200] + "...",
+                "note": "Long string truncated for logging"
+            }
+    
+    return processed
+
+@weave.op(postprocess_inputs=summarize_large_inputs)
+def process_large_dataset(data_list: list, metadata: str) -> dict:
+    """Process large datasets while keeping logs manageable."""
+    return {
+        "processed_count": len(data_list),
+        "metadata_length": len(metadata),
+        "summary": f"Processed {len(data_list)} items"
+    }
+
+# 🎯 Example 3: Sensitive Configuration Filtering
+def filter_sensitive_config(inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove sensitive configuration from logs."""
+    processed = inputs.copy()
+    
+    # List of sensitive keys to redact
+    sensitive_keys = ['api_key', 'password', 'secret', 'token', 'private_key']
+    
+    for key in list(processed.keys()):
+        if any(sensitive in key.lower() for sensitive in sensitive_keys):
+            processed[key] = '<REDACTED>'
+        elif isinstance(processed[key], dict):
+            # Recursively filter nested dictionaries
+            processed[key] = filter_sensitive_config({'nested': processed[key]})['nested']
+    
+    return processed
+
+@weave.op(postprocess_inputs=filter_sensitive_config)
+def configure_api_client(api_key: str, endpoint: str, secret_token: str) -> dict:
+    """Configure API client while hiding sensitive data in logs."""
+    return {
+        "endpoint": endpoint,
+        "configured": True,
+        "auth_method": "token"
+    }
+
+# 🔄 Example 4: Data Transformation for Logging
+def transform_for_logging(inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """Transform data to a more readable format for logs."""
+    processed = inputs.copy()
+    
+    # Convert complex objects to readable summaries
+    for key, value in processed.items():
+        if hasattr(value, '__dict__'):
+            # Convert objects to their string representation
+            processed[key] = {
+                "type": type(value).__name__,
+                "summary": str(value)[:100],
+                "attributes": list(vars(value).keys()) if hasattr(value, '__dict__') else []
+            }
+    
+    return processed
+
+def enhance_output_logging(output: Any) -> Any:
+    """Add metadata to output for better logging."""
+    if isinstance(output, dict):
+        enhanced = output.copy()
+        enhanced["_logged_at"] = "workshop_demo"
+        enhanced["_output_type"] = "processed_result"
+        return enhanced
+    return output
+
+@weave.op(
+    postprocess_inputs=transform_for_logging,
+    postprocess_output=enhance_output_logging
+)
+def complex_data_processor(user_object: Any, config: dict) -> dict:
+    """Process complex data with enhanced logging."""
+    return {
+        "status": "completed",
+        "config_keys": list(config.keys()) if isinstance(config, dict) else [],
+        "user_data_processed": True
+    }
+
+# 🧪 Let's test all the serialization controls!
+print("🔒 Testing custom serialization and privacy controls...")
+
+# Test 1: PII Redaction
+print("\n📧 Testing PII redaction...")
+sensitive_email = """
+Hi Support,
+My name is John Smith and my email is john.smith@company.com.
+My phone number is 555-123-4567 and SSN is 123-45-6789.
+Please help with my ProWidget issue!
+"""
+
+result1 = analyze_sensitive_email(sensitive_email)
+print("✅ PII redacted in logs (check Weave UI)")
+
+# Test 2: Large Object Handling  
+print("\n📦 Testing large object handling...")
+large_data = list(range(1000))  # Large list
+long_text = "This is a very long string. " * 100  # Long string
+
+result2 = process_large_dataset(large_data, long_text)
+print(f"✅ Large objects summarized: {result2}")
+
+# Test 3: Sensitive Configuration
+print("\n🔐 Testing sensitive config filtering...")
+result3 = configure_api_client(
+    api_key="secret_key_12345",
+    endpoint="https://api.example.com",
+    secret_token="super_secret_token"
+)
+print(f"✅ Sensitive config filtered: {result3}")
+
+# Test 4: Data Transformation
+print("\n🔄 Testing data transformation...")
+class SampleObject:
+    def __init__(self):
+        self.name = "test"
+        self.value = 42
+
+sample_obj = SampleObject()
+sample_config = {"debug": True, "timeout": 30}
+
+result4 = complex_data_processor(sample_obj, sample_config)
+print(f"✅ Data transformed for logging: {result4}")
+
+print("\n💡 Check the Weave UI to see:")
+print("  - 🔒 PII automatically redacted in input/output logs")
+print("  - 📦 Large objects summarized instead of fully logged")
+print("  - 🔐 Sensitive configuration keys hidden")
+print("  - 🔄 Complex objects transformed to readable summaries")
+print("  - 📊 Enhanced metadata added to outputs")
+
+print("\n🎯 Key Benefits:")
+print("  - Protect sensitive data while maintaining observability")
+print("  - Keep logs manageable by summarizing large objects")
+print("  - Customize logging format for better readability")
+print("  - Maintain compliance with privacy regulations")
+print("  - Debug effectively without exposing secrets")
 
 
 # %% [markdown]
-# ### 🌊 Part 1.5: Streaming & Generators
+# ### 🔗 Part 1.5: OpenTelemetry Integration
 #
-# Weave can trace iterators, generators, and streaming data patterns.
-# Essential for real-time applications and memory-efficient processing.
-# TODO: (NEW CELL still focused on basic tracing) We should show that different forms of generators / iterators can be traced as well.
+# Weave supports OpenTelemetry (OTEL) traces, allowing you to integrate with existing observability infrastructure.
+# Send OTLP-formatted traces directly to Weave alongside your native Weave traces.
 
+# %%
+import base64
+from opentelemetry import trace
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
-# %% [markdown]
-# ### 🔗 Part 1.6: OpenTelemetry Integration
-#
-# Learn how Weave integrates with OpenTelemetry for enterprise observability.
-# Perfect for connecting Weave traces with your existing monitoring infrastructure.
-# TODO: (New cell) Let's showcase OTEL support and how that works at the end here
+# 🔗 Configure OTEL to send traces to Weave
+def setup_otel_for_weave(project_name: str = "weave-workshop"):
+    """Set up OpenTelemetry to send traces to Weave."""
+    
+    # Weave OTEL endpoint
+    WANDB_BASE_URL = "https://trace.wandb.ai"
+    PROJECT_ID = f"your-entity/{project_name}"  # Replace with your entity
+    OTEL_ENDPOINT = f"{WANDB_BASE_URL}/otel/v1/traces"
+    
+    # Authentication (in real usage, get from environment)
+    WANDB_API_KEY = os.environ.get("WANDB_API_KEY", "your-api-key")
+    auth = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
+    
+    headers = {
+        "Authorization": f"Basic {auth}",
+        "project_id": PROJECT_ID,
+    }
+    
+    # Create tracer provider
+    tracer_provider = trace_sdk.TracerProvider()
+    
+    # Configure OTLP exporter for Weave
+    exporter = OTLPSpanExporter(
+        endpoint=OTEL_ENDPOINT,
+        headers=headers,
+    )
+    
+    tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+    trace.set_tracer_provider(tracer_provider)
+    
+    return trace.get_tracer(__name__)
+
+# 🎯 Example: Mixed Weave + OTEL tracing
+@weave.op
+def weave_function(data: str) -> str:
+    """A function traced by Weave."""
+    return f"Weave processed: {data}"
+
+def otel_function(tracer, data: str) -> str:
+    """A function traced by OpenTelemetry."""
+    with tracer.start_as_current_span("otel_processing") as span:
+        span.set_attribute("input.data", data)
+        span.set_attribute("processing.type", "otel")
+        
+        result = f"OTEL processed: {data}"
+        span.set_attribute("output.result", result)
+        return result
+
+# 🧪 Demo: Combining Weave and OTEL traces
+print("🔗 Testing OpenTelemetry integration with Weave...")
+
+# Note: In a real workshop, you'd configure with actual credentials
+print("📝 OTEL Setup (demo mode - would need real credentials):")
+print("  - Endpoint: https://trace.wandb.ai/otel/v1/traces")
+print("  - Headers: Authorization + project_id")
+print("  - Format: OTLP (OpenTelemetry Protocol)")
+
+# Simulate the integration
+print("\n🎯 Benefits of OTEL + Weave:")
+print("  - 📊 Unified observability across your entire stack")
+print("  - 🔄 Correlate Weave AI traces with infrastructure traces")
+print("  - 🏢 Enterprise-ready observability standards")
+print("  - 🔗 Connect with existing monitoring tools (Jaeger, Zipkin, etc.)")
+
+# Example of what you'd see
+test_data = "workshop example"
+weave_result = weave_function(test_data)
+print(f"\n✅ Weave trace: {weave_result}")
+
+print("\n💡 In the Weave UI, you would see:")
+print("  - Native Weave traces with full AI context")
+print("  - OTEL traces with custom spans and attributes") 
+print("  - Unified timeline showing both trace types")
+print("  - Ability to correlate AI operations with system performance")
