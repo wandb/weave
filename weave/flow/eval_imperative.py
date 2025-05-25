@@ -442,8 +442,6 @@ class EvaluationLogger(BaseModel):
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
         assert self._evaluate_call is not None
-        # Don't push the evaluation call to the global context to prevent nesting
-        # We'll use set_call_stack when needed instead
 
     def _cleanup_predictions(self) -> None:
         if self._is_finalized:
