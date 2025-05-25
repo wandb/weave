@@ -43,9 +43,8 @@ if not os.environ.get("OPENAI_API_KEY"):
 # Initialize Weave
 weave_client = weave.init("weave-workshop")
 
-
 # %% [markdown]
-# ## 🎯 Part 3: Production Monitoring with Scorers
+# ## 🎯 Part 3: Production Monitoring
 #
 # Use Weave's scorer system for real-time guardrails and quality monitoring.
 # This demonstrates the apply_scorer pattern for production use.
@@ -63,16 +62,13 @@ class CustomerEmail(BaseModel):
     sentiment: str = Field(description="positive, neutral, or negative")
 
 
-# 🐝 Track functions with @weave.op
+# 🎯 Track functions with @weave.op
 @weave.op
 def analyze_customer_email(email: str) -> CustomerEmail:
     """Analyze a customer support email and extract key information."""
     client = OpenAI()
 
-    # 🎯 Note: OpenAI calls are automatically traced by Weave!
-    # Weave automatically integrates with dozens of popular libraries including:
-    # OpenAI, Anthropic, LangChain, LlamaIndex, HuggingFace, and more
-    # See full list: https://weave-docs.wandb.ai/guides/integrations/
+    # 🔥 OpenAI calls are automatically traced by Weave!
     response = client.beta.chat.completions.parse(
         model="gpt-4o-mini",  # Using mini model for cost efficiency
         messages=[
@@ -107,6 +103,7 @@ def classify_urgency(email: str, sentiment: str) -> str:
     email_lower = email.lower()
     has_urgent_keywords = any(keyword in email_lower for keyword in urgent_keywords)
 
+    # Combine sentiment and keywords to determine urgency
     if sentiment == "negative" and has_urgent_keywords:
         return "high"
     elif sentiment == "negative" or has_urgent_keywords:
@@ -115,44 +112,7 @@ def classify_urgency(email: str, sentiment: str) -> str:
         return "low"
 
 
-
-# Define our data structure
-class CustomerEmail(BaseModel):
-    customer_name: str
-    product: str
-    issue: str
-    sentiment: str = Field(description="positive, neutral, or negative")
-
-
-# 🐝 Track functions with @weave.op
-@weave.op
-def analyze_customer_email(email: str) -> CustomerEmail:
-    """Analyze a customer support email and extract key information."""
-    client = OpenAI()
-
-    # 🎯 Note: OpenAI calls are automatically traced by Weave!
-    # Weave automatically integrates with dozens of popular libraries including:
-    # OpenAI, Anthropic, LangChain, LlamaIndex, HuggingFace, and more
-    # See full list: https://weave-docs.wandb.ai/guides/integrations/
-    response = client.beta.chat.completions.parse(
-        model="gpt-4o-mini",  # Using mini model for cost efficiency
-        messages=[
-            {
-                "role": "system",
-                "content": "Extract customer name, product, issue, and sentiment.",
-            },
-            {
-                "role": "user",
-                "content": email,
-            },
-        ],
-        response_format=CustomerEmail,
-    )
-
-    return response.choices[0].message.parsed
-
-
-# Define more realistic production scorers
+# 🛡️ Define production scorers
 class ContentModerationScorer(Scorer):
     """Production-ready content moderation scorer."""
 
@@ -350,8 +310,6 @@ def production_email_handler(
     email: str, request_id: Optional[str] = None
 ) -> dict[str, Any]:
     """Production-ready email handler that returns structured analysis results."""
-    start_time = datetime.now()
-
     # Generate request ID if not provided
     if not request_id:
         request_id = f"req_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{random.randint(1000, 9999)}"
@@ -359,7 +317,7 @@ def production_email_handler(
     try:
         # Process the email using our existing analyzer
         analysis = analyze_customer_email(email)
-
+        
         # Calculate urgency based on the analysis
         urgency = classify_urgency(email, analysis.sentiment)
 
@@ -414,9 +372,7 @@ async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
                 result["blocked"] = True
                 result["block_reason"] = moderation_check.result["flags"]
             elif action == "review":
-                print(
-                    f"⚠️ Content flagged for review: {moderation_check.result['flags']}"
-                )
+                print(f"⚠️ Content flagged for review: {moderation_check.result['flags']}")
                 result["needs_review"] = True
                 result["review_reason"] = moderation_check.result["flags"]
 
@@ -427,6 +383,7 @@ async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
             "passed": quality_check.result["passed"],
         }
 
+        # Show quality issues and recommendations
         if quality_check.result["issues"]:
             print(f"📊 Quality issues: {quality_check.result['issues']}")
 
@@ -436,7 +393,7 @@ async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
     return result
 
 
-# Test with varied examples showing both success and failure cases
+# 🧪 Test production monitoring with realistic scenarios
 print("🏭 Testing production monitoring with realistic scenarios...")
 print("=" * 70)
 
@@ -466,28 +423,13 @@ production_test_emails = [
         "email": "Mike Wilson here. Your EmailPro system really sucks compared to what was promised, but I guess it's still better than the competition. Can you help me configure the spam filter? It's blocking legitimate emails.",
         "expected": "⚠️ Should flag for review - mild profanity",
     },
-    # Excellent quality - should get high scores
-    {
-        "email": "Hi there,\n\nI'm Lisa Chen from GlobalTech Solutions. I wanted to thank you for the excellent support on our CloudBackup Enterprise v4.2 deployment. Everything is working perfectly and the performance improvements are fantastic!\n\nBest,\nLisa Chen\nVP of Engineering",
-        "expected": "✅ Excellent quality with positive sentiment",
-    },
-    # Missing critical info - should fail quality check
-    {
-        "email": "Your system crashed and we lost everything! This is unacceptable! Fix this immediately!!!",
-        "expected": "❌ Should fail quality - missing customer/product info",
-    },
-    # Edge case - urgent but positive
-    {
-        "email": "Urgent: I'm Alex Kumar and I love your RapidDeploy tool! Need to purchase 50 more licenses ASAP for our new team starting Monday. Please expedite!\n\nAlex Kumar\nProcurement Manager",
-        "expected": "📊 Unusual case - urgent but positive sentiment",
-    },
 ]
 
 for i, test_case in enumerate(production_test_emails):
     print(f"\n{'='*60}")
-    print(f"📧 Test {i+1}/8: {test_case['expected']}")
+    print(f"📧 Test {i+1}/5: {test_case['expected']}")
     print(f"{'='*60}")
-
+    
     # Show email preview
     email_lines = test_case["email"].split("\n")
     print("📝 Email Content:")
@@ -496,19 +438,17 @@ for i, test_case in enumerate(production_test_emails):
             print(f"   {line[:70]}{'...' if len(line) > 70 else ''}")
     if len(email_lines) > 3:
         print(f"   ... ({len(email_lines)-3} more lines)")
-
+    
     # Process with monitoring
     result = asyncio.run(handle_email_with_monitoring(test_case["email"]))
-
+    
     # Show extraction results
     print("\n🔍 Extraction Results:")
     if result["status"] == "success":
         analysis = result["analysis"]
         print(f"   Customer: {analysis.get('customer_name', 'Unknown')}")
         print(f"   Product: {analysis.get('product', 'Unknown')}")
-        print(
-            f"   Issue: {analysis.get('issue', 'Unknown')[:50]}{'...' if len(analysis.get('issue', '')) > 50 else ''}"
-        )
+        print(f"   Issue: {analysis.get('issue', 'Unknown')[:50]}{'...' if len(analysis.get('issue', '')) > 50 else ''}")
         print(f"   Sentiment: {analysis.get('sentiment', 'Unknown')}")
         print(f"   Urgency: {result.get('urgency', 'Unknown')}")
     else:
@@ -516,47 +456,32 @@ for i, test_case in enumerate(production_test_emails):
 
     # Show scorer results
     print("\n📊 Scorer Results:")
-
-    # 1. Performance
-    perf = result.get("performance", {})
-    print(
-        f"   ⏱️  Response Time: {perf.get('grade', 'unknown')} ({result.get('processing_time_ms', 0):.0f}ms)"
-    )
-    print(
-        f"      SLA Status: {'✅ Met' if perf.get('sla_met', False) else '❌ Exceeded'}"
-    )
-
-    # 2. Content Moderation
+    
+    # Content Moderation
     if result["status"] == "success":
         if result.get("blocked"):
             print("   🚫 Content Moderation: BLOCKED")
             print(f"      Reason: {result['block_reason']}")
         elif result.get("needs_review"):
-            print("   ⚠️  Content Moderation: REVIEW NEEDED")
+            print("   ⚠️ Content Moderation: REVIEW NEEDED")
             print(f"      Flags: {result['review_reason']}")
         else:
             print("   ✅ Content Moderation: PASSED")
 
-    # 3. Quality Assessment
+    # Quality Assessment
     if result["status"] == "success":
         quality = result.get("quality_metrics", {})
-        print(
-            f"   📏 Quality Assessment: Grade {quality.get('grade', 'F')} (Score: {quality.get('score', 0):.2f})"
-        )
-
+        print(f"   📏 Quality Assessment: Grade {quality.get('grade', 'F')} (Score: {quality.get('score', 0):.2f})")
+        
         # Show what contributed to the score
         if quality.get("score", 0) < 0.6:
-            print(
-                f"      Status: {'⚠️ Below threshold' if quality.get('passed', False) else '❌ Failed'}"
-            )
-            # The actual issues are logged by the scorers and visible in Weave UI
+            print(f"      Status: {'⚠️ Below threshold' if quality.get('passed', False) else '❌ Failed'}")
 
 print("\n" + "=" * 70)
 print("\n🎯 Summary of Production Monitoring Demonstration:")
-print("\n1. **Successful Cases** (Tests 1, 4, 6):")
+print("\n1. **Successful Cases** (Tests 1, 4):")
 print("   - High-quality extractions with version numbers")
 print("   - All required fields present and accurate")
-print("   - Fast response times meeting SLA")
 
 print("\n2. **Blocked Content** (Test 2):")
 print("   - Multiple profanity words + legal threats = automatic block")
@@ -566,14 +491,10 @@ print("\n3. **Review Required** (Test 5):")
 print("   - Mild profanity triggers review flag")
 print("   - Human can decide if response is appropriate")
 
-print("\n4. **Quality Issues** (Tests 3, 7):")
+print("\n4. **Quality Issues** (Test 3):")
 print("   - Missing customer name or product details")
 print("   - Too brief to be actionable")
 print("   - Would need human intervention")
-
-print("\n5. **Edge Cases** (Test 8):")
-print("   - Urgent + positive sentiment (unusual combination)")
-print("   - System handles it correctly")
 
 print("\n💡 Key Insights:")
 print("   - Different scorers serve different purposes")
@@ -660,7 +581,7 @@ class EmailAnalyzerFeedbackApp:
                     analysis = result["analysis"]
                     print("✅ Analysis Complete!")
                     print(f"📧 Customer: {analysis['customer_name']}")
-                    print(f"🏷️  Product: {analysis['product']}")
+                    print(f"🏷️ Product: {analysis['product']}")
                     print(f"📝 Issue: {analysis['issue']}")
                     print(f"😊 Sentiment: {analysis['sentiment']}")
                     print(f"⚡ Urgency: {result['urgency']}")
@@ -834,6 +755,11 @@ except Exception as e:
     print(f"❌ Error querying feedback: {str(e)}")
     print("💡 Make sure you've submitted some feedback using the app above.")
 
+print("\n💡 Pro Tips for Production Feedback:")
+print("  - Set up automated feedback collection in your production app")
+print("  - Use feedback to identify problematic cases for your evaluation datasets")
+print("  - Track feedback trends over time to monitor model performance")
+print("  - Filter calls by feedback type to find specific issues")
 
 # %% [markdown]
 # ## Summary
@@ -844,23 +770,17 @@ except Exception as e:
 # - ✅ **Quality Monitoring**: Built comprehensive quality assessment scorers
 # - ✅ **Real-time Scoring**: Applied scorers to production calls with `call.apply_scorer()`
 # - ✅ **Production Patterns**: Handled errors, edge cases, and performance monitoring
-# - ✅ **Actionable Insights**: Generated specific recommendations for improvement
+# - ✅ **Human Feedback**: Created interactive feedback collection systems
 #
 # **Next Steps:**
-# - **Deploy to Production**: Use these patterns in your real applications
-# - **Collect Human Feedback**: Set up feedback loops for continuous improvement
-# - **Build Custom Scorers**: Create domain-specific quality and safety checks
-# - **Monitor Trends**: Track quality metrics over time in the Weave UI
+# - Deploy these patterns in your real applications
+# - Set up automated feedback collection in production
+# - Build custom scorers for domain-specific quality checks
+# - Monitor quality metrics over time in the Weave UI
 #
 # **Key Takeaways:**
 # - Production monitoring requires both guardrails (blocking) and monitors (tracking)
 # - Scorers can be applied in real-time to any Weave-traced function call
 # - Quality assessment should be comprehensive: completeness, accuracy, consistency
-# - All scorer results are automatically tracked and visualized in Weave
-#
-# **Production Checklist:**
-# - ✅ Content moderation for safety
-# - ✅ Quality scoring for reliability
-# - ✅ Performance monitoring for SLAs
-# - ✅ Error handling and graceful degradation
-# - ✅ Comprehensive logging and observability
+# - Human feedback creates a continuous improvement loop for model development
+# - All scorer results and feedback are automatically tracked and visualized in Weave

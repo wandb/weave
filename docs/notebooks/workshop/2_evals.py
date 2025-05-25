@@ -42,19 +42,16 @@ if not os.environ.get("OPENAI_API_KEY"):
 # Initialize Weave
 weave_client = weave.init("weave-workshop")
 
-
 # %% [markdown]
 # ## 📊 Part 2: Building Evaluations
 #
-# Now let's evaluate our email analyzer using Weave's evaluation framework.
-# We'll use a more challenging dataset to expose model weaknesses.
-
+# Let's evaluate our email analyzer using Weave's evaluation framework with a challenging dataset.
+#
 # **Understanding Weave's Evaluation Data Model:**
-# 1. An **evaluation** is the pairing of a dataset and a set of scorers (think of it like a test suite for a specific task)
+# 1. An **evaluation** is the pairing of a dataset and a set of scorers
 # 2. An **evaluation run** is the result of running an evaluation against a specific model
-# 3. Within an evaluation run, there are (num_rows * num_trials) **predict_and_score** blocks which contain the prediction calls and the scoring calls for a single row of the dataset
-# 4. Scores are stored within the predict_and_score output, but also directly on the prediction call itself
-
+# 3. Within an evaluation run, there are **predict_and_score** blocks for each dataset row
+# 4. Scores are stored in the predict_and_score output and on the prediction call
 
 # %%
 # Define our data structure
@@ -65,16 +62,13 @@ class CustomerEmail(BaseModel):
     sentiment: str = Field(description="positive, neutral, or negative")
 
 
-# 🐝 Track functions with @weave.op
+# 🎯 Track functions with @weave.op
 @weave.op
 def analyze_customer_email(email: str) -> CustomerEmail:
     """Analyze a customer support email and extract key information."""
     client = OpenAI()
 
-    # 🎯 Note: OpenAI calls are automatically traced by Weave!
-    # Weave automatically integrates with dozens of popular libraries including:
-    # OpenAI, Anthropic, LangChain, LlamaIndex, HuggingFace, and more
-    # See full list: https://weave-docs.wandb.ai/guides/integrations/
+    # 🔥 OpenAI calls are automatically traced by Weave!
     response = client.beta.chat.completions.parse(
         model="gpt-4o-mini",  # Using mini model for cost efficiency
         messages=[
@@ -95,7 +89,7 @@ def analyze_customer_email(email: str) -> CustomerEmail:
 
 # Create a challenging evaluation dataset with tricky examples
 eval_examples = [
-    # Easy examples (even basic model should get these)
+    # Easy examples (even basic models should get these)
     {
         "email": "Hi Support, I'm John Smith and my DataProcessor-Pro v2.5 isn't working correctly. The data export feature is producing corrupted files. Very frustrated!",
         "expected_name": "John Smith",
@@ -118,7 +112,7 @@ eval_examples = [
     {
         "email": "My SmartHub won't connect to anything. Super annoying. - Bob Wilson\nSenior Manager\nTech Solutions Inc",
         "expected_name": "Bob Wilson",
-        "expected_product": "SmartHub",  # Model info missing
+        "expected_product": "SmartHub",
         "expected_sentiment": "negative",
     },
     {
@@ -142,7 +136,7 @@ eval_examples = [
     },
     {
         "email": "My assistant Jennifer will send the logs. The actual problem is with DataMiner Pro, not the viewer. -Raj (Dr. Rajesh Patel)",
-        "expected_name": "Dr. Rajesh Patel",  # NOT Jennifer, and full name from signature
+        "expected_name": "Dr. Rajesh Patel",  # NOT Jennifer, full name from signature
         "expected_product": "DataMiner Pro",  # NOT the viewer
         "expected_sentiment": "neutral",  # Matter-of-fact, not emotional
     },
@@ -159,18 +153,18 @@ eval_examples = [
         "expected_product": "InvoiceGen module",
         "expected_sentiment": "positive",  # Overall positive despite crashes
     },
+    # Additional challenging examples
     {
         "email": "Update on case by Thompson: Lee's WorkStation Pro still showing error 0x80004005. Previous tech couldn't resolve.",
         "expected_name": "Lee",  # NOT Thompson
         "expected_product": "WorkStation Pro",
         "expected_sentiment": "negative",
     },
-    # Extremely hard - complex scenarios
     {
         "email": "Hi, chatted with your colleague Emma (super helpful!). Anyway, ReportBuilder works ok but takes forever. —Samantha Park, CTO",
         "expected_name": "Samantha Park",  # NOT Emma
         "expected_product": "ReportBuilder",
-        "expected_sentiment": "neutral",  # "works ok" but slow - not fully negative
+        "expected_sentiment": "neutral",  # "works ok" but slow
     },
     {
         "email": "FYI - Customer called: Pierre-Alexandre Dubois mentioned the API-Gateway is fantastic, just needs better docs. Direct quote.",
@@ -197,7 +191,7 @@ eval_examples = [
         "expected_product": "Morgan Analytics Suite",  # Morgan is part of product name
         "expected_sentiment": "positive",
     },
-    # Ambiguous sentiment
+    # Edge cases and complex scenarios
     {
         "email": "DataFlow Pro is exactly what I expected from your company. Classic experience. João Silva, Product Manager",
         "expected_name": "João Silva",
@@ -210,7 +204,6 @@ eval_examples = [
         "expected_product": "ChromaEdit tool",
         "expected_sentiment": "neutral",  # Apathetic, not negative or positive
     },
-    # Multiple products mentioned
     {
         "email": "Upgraded from TaskMaster to ProjectPro. Having issues with ProjectPro's gantt charts. Anne-Marie Rousseau",
         "expected_name": "Anne-Marie Rousseau",
@@ -223,7 +216,6 @@ eval_examples = [
         "expected_product": "AudioEdit",  # The one especially mentioned
         "expected_sentiment": "positive",
     },
-    # Edge cases
     {
         "email": "Yo! Sup? Ur SystemMonitor thing is broke af. fix it asap!!!! - xXx_Dmitri_xXx",
         "expected_name": "Dmitri",  # Extract from gamertag
@@ -258,7 +250,6 @@ eval_examples = [
 
 # Create a Weave Dataset
 support_dataset = Dataset(name="support_emails", rows=eval_examples)
-
 
 # 🎯 Define scoring functions
 @weave.op
@@ -307,30 +298,24 @@ def extraction_quality(email: str, output: CustomerEmail) -> dict[str, Any]:
     }
 
 
-# 🚀 Run the evaluation (notebook-friendly version)
+# 🚀 Run the evaluation
 evaluation = Evaluation(
     dataset=support_dataset,
     scorers=[name_accuracy, sentiment_accuracy, extraction_quality],
-    trials=3,
+    trials=3,  # Run each example 3 times to check consistency
 )
 
-print("🏃 Running evaluation...")
-# For notebooks, use await instead of asyncio.run
-# In Jupyter/IPython notebooks, you can use await directly
-# eval_results = await evaluation.evaluate(analyze_customer_email)
-# For Python scripts, use:
+# For notebooks, use nest_asyncio to handle async properly
 import nest_asyncio
-
 nest_asyncio.apply()
 eval_results = asyncio.run(evaluation.evaluate(analyze_customer_email))
 print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 
-
 # %% [markdown]
-# ### 🎯 Part 2.1: Using Pre-built Scorers
+# ### 🎯 Part 2.1: Pre-built Scorers
 #
-# Weave provides many pre-built scorers for common evaluation tasks!
-# No need to reinvent the wheel for standard metrics.
+# Weave provides many pre-built scorers for common evaluation tasks.
+# No need to reinvent the wheel for standard metrics!
 #
 # **Note**: To use pre-built scorers, install with: `pip install weave[scorers]`
 
@@ -353,21 +338,17 @@ json_result = asyncio.run(json_scorer.score(output=valid_json))
 print(f"  Valid JSON: {json_result['json_valid']}")
 
 # Test with invalid JSON
-invalid_json = (
-    '{"name": "Jane Doe", "age": 25, "email"'  # Missing closing quote and brace
-)
+invalid_json = '{"name": "Jane Doe", "age": 25, "email"'  # Missing closing quote and brace
 invalid_result = asyncio.run(json_scorer.score(output=invalid_json))
 print(f"  Invalid JSON: {invalid_result['json_valid']}")
 
 # Example 2: PydanticScorer - Validate against a schema
 from pydantic import EmailStr
 
-
 class UserData(BaseModel):
     name: str
     age: int
     email: EmailStr
-
 
 # Use PydanticScorer with our schema
 pydantic_scorer = PydanticScorer(model=UserData)
@@ -406,7 +387,6 @@ moderation_scorer = OpenAIModerationScorer()
 print("\n🎯 Example 4: OpenAIModerationScorer")
 # Test content moderation on potentially problematic text
 test_content = "I'm so frustrated with this terrible service!"
-
 moderation_result = asyncio.run(moderation_scorer.score(output=test_content))
 print(f"  Flagged: {moderation_result['flagged']}")
 print(f"  Categories: {moderation_result['categories']}")
@@ -417,14 +397,13 @@ safe_result = asyncio.run(moderation_scorer.score(output=safe_content))
 print(f"  Safe content flagged: {safe_result['flagged']}")
 
 # %% [markdown]
-# ### 📝 Part 2.2: Pairwise Scoring
+# ### 📝 Part 2.2: Pairwise Evaluation
 #
-# Pairwise evaluation compares outputs from two models by ranking them relative to each other.
+# Compare outputs from two models by ranking them relative to each other.
 # This is particularly useful for subjective tasks where absolute scoring is difficult.
 
 # %%
 from weave.flow.model import ApplyModelError, apply_model_async
-
 
 # Create two different email analysis models for comparison
 class BasicEmailModel(Model):
@@ -440,7 +419,7 @@ class BasicEmailModel(Model):
                 {"role": "user", "content": email},
             ],
             response_format=CustomerEmail,
-            temperature=0.7,
+            temperature=0.7,  # Higher temperature for more variation
         )
         return response.choices[0].message.parsed
 
@@ -465,7 +444,7 @@ class AdvancedEmailModel(Model):
                 {"role": "user", "content": email},
             ],
             response_format=CustomerEmail,
-            temperature=0.1,
+            temperature=0.1,  # Lower temperature for consistency
         )
         return response.choices[0].message.parsed
 
@@ -582,27 +561,18 @@ pairwise_results = asyncio.run(pairwise_evaluation.evaluate(basic_model))
 print("✅ Pairwise evaluation complete! Check Weave UI for detailed comparisons.")
 
 # %% [markdown]
-# ### 📝 Part 2.3: Using EvaluationLogger
+# ### 📝 Part 2.3: EvaluationLogger
 #
-# The `EvaluationLogger` provides a flexible way to log evaluation data incrementally.
+# The `EvaluationLogger` provides flexible evaluation logging for custom workflows.
 # This is perfect when you don't have all your data upfront or want more control.
 #
 # **Important**: Since EvaluationLogger doesn't use Model/Dataset objects, the `model`
 # and `dataset` parameters are crucial for identification.
-# - `model`: Can be a string OR dictionary (for rich metadata)
-# - `dataset`: Must be a string
 
 # %%
-# Example using EvaluationLogger for custom evaluation flow
-# You can use simple strings for identification (commented out on purpose)
-# eval_logger = EvaluationLogger(
-#     model="email_analyzer_gpt35",  # Model name/version
-#     dataset="support_emails",  # Dataset name (must be string)
-# )
-
+# Create evaluation logger with rich metadata
 # Model can use dictionaries for richer identification (recommended!)
-# Dataset must be a string
-eval_logger_rich = EvaluationLogger(
+eval_logger = EvaluationLogger(
     model={
         "name": "email_analyzer",
         "version": "v1.2",
@@ -613,17 +583,15 @@ eval_logger_rich = EvaluationLogger(
     dataset="support_emails_2024Q1",  # Dataset must be string
 )
 
-# Let's use the rich logger for our demo
 print("📊 Using EvaluationLogger with rich metadata...")
 
-# Process each example with more control
-for i, example in enumerate(eval_examples[:3]):  # Just first 3 for demo
-    # Analyze the email
+# Process examples with custom logging - more control than standard Evaluation
+for i, example in enumerate(eval_examples[:3]):  # First 3 for demo
     try:
         output = analyze_customer_email(example["email"])
 
         # Log the prediction
-        pred_logger = eval_logger_rich.log_prediction(
+        pred_logger = eval_logger.log_prediction(
             inputs={"email": example["email"]}, output=output.model_dump()
         )
 
@@ -653,14 +621,14 @@ for i, example in enumerate(eval_examples[:3]):  # Just first 3 for demo
     except Exception as e:
         print(f"Error processing example {i+1}: {e}")
         # You can still log failed predictions
-        pred_logger = eval_logger_rich.log_prediction(
+        pred_logger = eval_logger.log_prediction(
             inputs={"email": example["email"]}, output={"error": str(e)}
         )
         pred_logger.log_score(scorer="success", score=0.0)
         pred_logger.finish()
 
 # Log summary statistics
-eval_logger_rich.log_summary(
+eval_logger.log_summary(
     {
         "total_examples": 3,
         "evaluation_type": "manual",
@@ -675,9 +643,8 @@ print("💡 Tip: The rich metadata makes it easy to filter and compare evaluatio
 # %% [markdown]
 # ### 🏆 Part 2.4: Model Comparison
 #
-# Let's compare different approaches using Weave's Model class.
-# We'll create models with varying quality to see clear differences.
-
+# Compare different approaches using Weave's Model class with varying quality levels.
+# We'll create models with different quality to see clear differences.
 
 # %%
 # Define different model variants
@@ -754,9 +721,7 @@ balanced_model = EmailAnalyzerModel(
 #
 # **Important Concept**: When comparing models, we use the SAME evaluation definition
 # (same dataset + scorers) for all models. This ensures fair comparison and allows
-# everyone in the workshop to see aggregated results. Each evaluation run gets a
-# unique ID automatically, but the evaluation definition stays consistent.
-
+# everyone in the workshop to see aggregated results.
 
 # %%
 # Create a single evaluation definition that will be used for all models
@@ -765,7 +730,6 @@ evaluation = Evaluation(
     dataset=support_dataset,
     scorers=[name_accuracy, sentiment_accuracy, extraction_quality],
 )
-
 
 async def compare_models(models: list[Model]) -> dict[str, Any]:
     """Run A/B comparison of multiple models."""
@@ -785,7 +749,6 @@ async def compare_models(models: list[Model]) -> dict[str, Any]:
 
     return results
 
-
 # Run the comparison
 print("🏁 Starting model comparison...")
 # For notebooks: comparison_results = await compare_models(...)
@@ -794,7 +757,6 @@ comparison_results = asyncio.run(
     compare_models([basic_model, detailed_model, balanced_model])
 )
 print("\n🎉 Comparison complete! View the results in the Weave UI.")
-
 
 # %% [markdown]
 # ### 🎯 Part 2.6: Leaderboard Competition
@@ -805,11 +767,8 @@ print("\n🎉 Comparison complete! View the results in the Weave UI.")
 #
 # **Your challenge**: Improve the prompt/model to get the highest scores on:
 # - Name accuracy
-# - Sentiment accuracy
+# - Sentiment accuracy  
 # - Overall extraction quality
-#
-# **Leaderboard Setup**: We can create a leaderboard to track all submissions using the
-# same evaluation definition. This ensures fair comparison across all participants.
 
 # %%
 from weave.flow import leaderboard
@@ -869,7 +828,6 @@ print(f"📊 All participants will use the same evaluation: {evaluation.name}")
 # - Study the challenging examples in the dataset
 # - Be specific about edge cases (signatures, multiple names, etc.)
 # - Consider temperature settings (lower = more consistent)
-
 
 # %%
 class MyEmailModel(Model):
@@ -955,3 +913,9 @@ print(
 # - Continue to Part 3: Production Monitoring
 # - Experiment with different prompts and models
 # - Try the evaluation framework on your own use cases
+#
+# **Key Takeaways:**
+# - Systematic evaluation reveals model strengths and weaknesses
+# - Challenging datasets expose edge cases and failure modes
+# - Leaderboards encourage continuous improvement and collaboration
+# - Weave makes it easy to compare models and track progress over time
