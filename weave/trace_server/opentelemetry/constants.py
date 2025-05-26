@@ -71,6 +71,7 @@ OUTPUT_KEYS = [
     "gcp.vertex.agent.tool_response",  # From Google's Vertex AI
     "gcp.vertex.agent.llm_response",  # From Google's Vertex AI
     "output",  # Generic fallback for Pydantic models - lowest priority
+    "outputs",
 ]
 
 # USAGE_KEYS: Maps internal Weave usage metric names to their equivalent keys in
