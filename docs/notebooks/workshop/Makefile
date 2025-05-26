@@ -10,11 +10,9 @@ help:
 
 notebooks: check-deps
 	@echo "Converting Python files to Jupyter notebooks..."
-	jupytext --to notebook weave_features_workshop.py workshop_evaluation_examples.py 1_tracing.py 2_evals.py 3_production.py
+	jupytext --to notebook 1_tracing.py 2_evals.py 3_production.py
 	@echo "✅ Conversion complete!"
 	@echo "Generated files:"
-	@echo "  - weave_features_workshop.ipynb"
-	@echo "  - workshop_evaluation_examples.ipynb"
 	@echo "  - 1_tracing.ipynb"
 	@echo "  - 2_evals.ipynb"
 	@echo "  - 3_production.ipynb"

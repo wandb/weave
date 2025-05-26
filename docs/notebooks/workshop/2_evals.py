@@ -264,6 +264,13 @@ def name_accuracy(expected_name: str, output: CustomerEmail) -> dict[str, Any]:
 
 
 @weave.op
+def product_accuracy(expected_product: str, output: CustomerEmail) -> dict[str, Any]:
+    """Check if the extracted product matches."""
+    is_correct = expected_product.lower() == output.product.lower()
+    return {"correct": is_correct, "score": 1.0 if is_correct else 0.0}
+
+
+@weave.op
 def sentiment_accuracy(
     expected_sentiment: str, output: CustomerEmail
 ) -> dict[str, Any]:
@@ -305,7 +312,7 @@ def extraction_quality(email: str, output: CustomerEmail) -> dict[str, Any]:
 # 🚀 Run the evaluation
 evaluation = Evaluation(
     dataset=support_dataset,
-    scorers=[name_accuracy, sentiment_accuracy, extraction_quality],
+    scorers=[name_accuracy, product_accuracy, sentiment_accuracy, extraction_quality],
     trials=3,  # Run each example 3 times to check consistency
 )
 
@@ -469,6 +476,7 @@ class EmailPreferenceScorer(weave.Scorer):
         output: CustomerEmail,
         email: str,
         expected_name: str,
+        expected_product: str,
         expected_sentiment: str,
     ) -> dict:
         """Compare primary model output with other model output."""
@@ -492,6 +500,12 @@ class EmailPreferenceScorer(weave.Scorer):
         if other_output.customer_name.lower() == expected_name.lower():
             other_score += 1
 
+        # Check product accuracy
+        if output.product.lower() == expected_product.lower():
+            primary_score += 1
+        if other_output.product.lower() == expected_product.lower():
+            other_score += 1
+
         # Check sentiment accuracy
         if output.sentiment.lower() == expected_sentiment.lower():
             primary_score += 1
@@ -501,7 +515,7 @@ class EmailPreferenceScorer(weave.Scorer):
         primary_is_better = primary_score > other_score
 
         if primary_score == other_score:
-            reason = f"Tie: Both models scored {primary_score}/2"
+            reason = f"Tie: Both models scored {primary_score}/3"
         else:
             winner = "Primary" if primary_is_better else "Other"
             reason = f"{winner} model more accurate ({primary_score} vs {other_score})"
@@ -519,16 +533,19 @@ pairwise_examples = [
     {
         "email": "Hi, I'm Sarah Johnson and my ProWidget 3000 is broken. Very frustrated!",
         "expected_name": "Sarah Johnson",
+        "expected_product": "ProWidget 3000",
         "expected_sentiment": "negative",
     },
     {
         "email": "Re: Jackson's complaint\n\nI disagree with Jackson. The Scheduler App works fine for me.\n\nBest,\nPriya Sharma\nHead of IT",
         "expected_name": "Priya Sharma",  # NOT Jackson
+        "expected_product": "Scheduler App",
         "expected_sentiment": "positive",  # Disagrees with complaint
     },
     {
         "email": "This is regarding the issue with CloudBackup Pro v3.2.1 that Jennifer Chen reported. I'm her manager, David Kim, following up.",
         "expected_name": "David Kim",  # The sender, not Jennifer
+        "expected_product": "CloudBackup Pro v3.2.1",
         "expected_sentiment": "negative",  # Following up on an issue
     },
 ]
@@ -590,6 +607,12 @@ for i, example in enumerate(eval_examples[:3]):  # First 3 for demo
         # Check name accuracy
         name_match = example["expected_name"].lower() == output.customer_name.lower()
         pred_logger.log_score(scorer="name_accuracy", score=1.0 if name_match else 0.0)
+
+        # Check product accuracy
+        product_match = example["expected_product"].lower() == output.product.lower()
+        pred_logger.log_score(
+            scorer="product_accuracy", score=1.0 if product_match else 0.0
+        )
 
         # Check sentiment
         sentiment_match = example["expected_sentiment"] == output.sentiment
@@ -777,18 +800,25 @@ This leaderboard tracks the best email analysis models from workshop participant
 ### Scoring Metrics
 
 1. **Name Accuracy**: Fraction of emails where the customer name was correctly extracted
-2. **Sentiment Accuracy**: Fraction of emails where the sentiment was correctly identified  
-3. **Extraction Quality**: Overall quality score for extracting all required fields
+2. **Product Accuracy**: Fraction of emails where the product was correctly identified
+3. **Sentiment Accuracy**: Fraction of emails where the sentiment was correctly identified  
+4. **Extraction Quality**: Overall quality score for extracting all required fields
 
 ### Tips for Success
 - Focus on clear, specific prompts
 - Handle edge cases (names in signatures, multiple products mentioned)
+- Distinguish between the actual problematic product vs. other products mentioned
 - Consider the context and nuances in sentiment analysis
 """,
     columns=[
         leaderboard.LeaderboardColumn(
             evaluation_object_ref=get_ref(evaluation).uri(),
             scorer_name="name_accuracy",
+            summary_metric_path="score.mean",
+        ),
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluation).uri(),
+            scorer_name="product_accuracy",
             summary_metric_path="score.mean",
         ),
         leaderboard.LeaderboardColumn(
