@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shutil
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from weave.trace.serialization import serializer
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     )
 
 
-class VideoFormat(str, Enum):
+class VideoFormat(StrEnum):
     """
     These are NOT the list of formats we accept from the user
     Rather, these are the list of formats we can save to weave servers
@@ -75,7 +75,12 @@ def write_video(fp: str, clip: VideoClip) -> None:
     Takes a filepath and a VideoClip and writes the video to the file.
     errors if the file does not end in a supported video extension.
     """
-    fps = clip.fps or None
+    print('writing file')
+    try:
+        fps = clip.fps
+    except Exception as _:
+        fps = 24
+
     audio = clip.audio
     fmt_str = get_format_from_filename(fp)
     fmt = VideoFormat(fmt_str)
@@ -182,7 +187,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
     raise ValueError("No video or found for artifact")
 
 
-def is_video_clip_instance(obj: Any) -> bool:
+def is_instance(obj: Any) -> bool:
     """Check if the object is any subclass of VideoClip."""
     return isinstance(obj, VideoClip)
 
@@ -190,4 +195,4 @@ def is_video_clip_instance(obj: Any) -> bool:
 def register() -> None:
     """Register the video type handler with the serializer."""
     if dependencies_met:
-        serializer.register_serializer(VideoClip, save, load, is_video_clip_instance)
+        serializer.register_serializer(VideoClip, save, load, is_instance)
