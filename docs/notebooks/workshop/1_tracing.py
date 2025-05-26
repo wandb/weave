@@ -549,7 +549,7 @@ def setup_otel_for_weave(
 
 api_key = set_env("WANDB_API_KEY")
 # FILL OUT ENTITY BELOW
-tracer = setup_otel_for_weave(entity="", project="weave-workshop", api_key=api_key)
+tracer = setup_otel_for_weave(entity="", project="weave-product-tour", api_key=api_key)
 
 
 # %%
