@@ -75,9 +75,8 @@ def write_video(fp: str, clip: VideoClip) -> None:
     Takes a filepath and a VideoClip and writes the video to the file.
     errors if the file does not end in a supported video extension.
     """
-    print('writing file')
     try:
-        fps = clip.fps
+        fps = clip.fps or 24
     except Exception as _:
         fps = 24
 
