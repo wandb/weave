@@ -349,6 +349,10 @@ const filterToClause = (item: Filter): Record<string, any> => {
         },
       ],
     };
+  } else if (item.operator === '(emoji): is') {
+    return {
+      $eq: [{$getField: item.field}, {$literal: item.value}],
+    };
   }
   throw new Error(`Unsupported operator: ${item.operator}`);
 };

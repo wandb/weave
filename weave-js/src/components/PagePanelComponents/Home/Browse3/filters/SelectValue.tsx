@@ -2,6 +2,7 @@
  * Select the value for a filter. Depends on the operator.
  */
 
+import {Select} from '@wandb/weave/components/Form/Select';
 import React from 'react';
 
 import {parseRef} from '../../../../../react';
@@ -97,6 +98,21 @@ export const SelectValue = ({
           isActive={shouldBeActive}
         />
       </div>
+    );
+  }
+
+  if (fieldType === 'emoji') {
+    return (
+      <Select<{emoji: string; detonedAlias: string}>
+        placeholder="Select a reaction..."
+        options={[
+          {emoji: '👍', detonedAlias: ':thumbs_up:'},
+          {emoji: '👎', detonedAlias: ':thumbs_down:'},
+        ]}
+        formatOptionLabel={option => <>{option.emoji}</>}
+        value={value}
+        onChange={v => onSetValue(v?.detonedAlias ?? '')}
+      />
     );
   }
 

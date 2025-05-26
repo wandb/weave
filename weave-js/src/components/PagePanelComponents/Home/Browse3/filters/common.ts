@@ -32,7 +32,7 @@ export type FilterId = number | string | undefined;
 // These are columns we won't allow the user to filter on.
 // For most of these it would be great if we could enable filtering in the future.
 export const UNFILTERABLE_FIELDS = [
-  'feedback',
+  //'feedback',
   'summary.weave.latency_ms',
   'tokens',
   'cost',
@@ -45,6 +45,9 @@ export type ColumnInfo = {
   colGroupingModel: GridColumnGroupingModel;
 };
 
+export const FEEDBACK_EMOJI_FIELD: string =
+  'feedback.[wandb.reaction.1].payload.detoned_alias';
+
 export const FIELD_LABELS: Record<string, string> = {
   id: 'Call ID',
   'summary.weave.status': 'Status',
@@ -52,6 +55,7 @@ export const FIELD_LABELS: Record<string, string> = {
   started_at: 'Called',
   wb_run_id: 'Run',
   wb_user_id: 'User',
+  [FEEDBACK_EMOJI_FIELD]: 'Feedback',
 };
 
 export const getFieldLabel = (field: string): string => {
@@ -81,13 +85,21 @@ export const FIELD_TYPE: Record<string, string> = {
   wb_run_id: 'run',
   wb_user_id: 'user',
   started_at: 'datetime',
+  [FEEDBACK_EMOJI_FIELD]: 'emoji',
 };
 
 export const getFieldType = (field: string): string => {
   return FIELD_TYPE[field] ?? 'text';
 };
 
-export type OperatorGroup = 'string' | 'number' | 'boolean' | 'date' | 'any';
+export type OperatorGroup =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'any'
+  | 'emoji';
+
 export type SelectOperatorOption = {
   label: string;
   value: string;
@@ -199,6 +211,7 @@ const GROUP_LABELS: Record<OperatorGroup, string> = {
   boolean: 'Boolean',
   date: 'Date',
   any: 'Other',
+  emoji: 'Emoji',
 };
 
 export function getGroupedOperatorOptions(
@@ -308,6 +321,15 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
         value: '(string): equals',
         label: 'equals',
         group: 'string',
+      },
+    ];
+  }
+  if ('emoji' === fieldType) {
+    return [
+      {
+        value: '(emoji): is',
+        label: 'is',
+        group: 'emoji',
       },
     ];
   }

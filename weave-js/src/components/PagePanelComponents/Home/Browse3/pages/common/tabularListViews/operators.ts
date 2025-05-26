@@ -137,6 +137,10 @@ export const operationConverter = (
         },
       ],
     };
+  } else if (item.operator === '(emoji): is') {
+    return {
+      $eq: [{$getField: item.field}, {$literal: item.value}],
+    };
   } else {
     throw new Error(`Unsupported operator: ${item.operator}`);
   }

@@ -17,6 +17,7 @@ import {
 } from '../feedback/HumanFeedback/tsHumanFeedback';
 import {ColumnInfo} from '../types';
 import {
+  FEEDBACK_EMOJI_FIELD,
   FIELD_DESCRIPTIONS,
   FIELD_LABELS,
   FilterId,
@@ -133,6 +134,11 @@ export const FilterBar = ({
       (options[2] as GroupedOption).options.push({
         value: col.field,
         label: col.headerName ?? col.field,
+      });
+    } else if (col.field === 'feedback') {
+      (options[0] as GroupedOption).options.push({
+        value: FEEDBACK_EMOJI_FIELD,
+        label: 'Feedback',
       });
     } else if (col.field.startsWith('output.')) {
       (options[2] as GroupedOption).options.push({
