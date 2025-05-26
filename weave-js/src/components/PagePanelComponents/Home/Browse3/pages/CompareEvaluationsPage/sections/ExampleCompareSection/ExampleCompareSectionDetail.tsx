@@ -42,6 +42,7 @@ import {
 } from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
 import {HorizontalBox, VerticalBox} from '../../Layout';
+import { EvaluationCallLink } from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
   ComparisonPill,
   SCORER_VARIATION_WARNING_EXPLANATION,
@@ -499,10 +500,11 @@ export const ExampleCompareSectionDetail: React.FC<{
     const evaluationCall = props.state.summary.evaluationCalls[currEvalCallId];
     if (trialEntity && trialProject && trialOpName && trialCallId) {
       return (
-        <Box
+        <HorizontalBox
           style={{
             overflow: 'hidden',
           }}>
+          <EvaluationCallLink callId={currEvalCallId} state={props.state} />|
           <CallLink
             entityName={trialEntity}
             projectName={trialProject}
@@ -511,7 +513,7 @@ export const ExampleCompareSectionDetail: React.FC<{
             icon={<Icon name="filled-circle" color={evaluationCall.color} />}
             color={MOON_800}
           />
-        </Box>
+        </HorizontalBox>
       );
     }
     return null;
