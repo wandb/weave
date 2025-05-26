@@ -481,22 +481,22 @@ class AdvancedEmailModel(Model):
 class EmailPreferenceScorer(weave.Scorer):
     """Compare two email analysis models and determine which performs better."""
 
-    other_model: Model
+    baseline_model: Model
 
     @weave.op
-    async def _get_other_model_output(self, example: dict) -> Any:
+    async def _get_baseline_model_output(self, example: dict) -> Any:
         """Get output from the comparison model."""
         try:
-            other_model_result = await apply_model_async(
-                self.other_model,
+            baseline_model_result = await apply_model_async(
+                self.baseline_model,
                 example,
                 None,
             )
 
-            if isinstance(other_model_result, ApplyModelError):
+            if isinstance(baseline_model_result, ApplyModelError):
                 return None
 
-            return other_model_result.model_output
+            return baseline_model_result.model_output
         except Exception:
             return None
 
@@ -509,52 +509,54 @@ class EmailPreferenceScorer(weave.Scorer):
         expected_product: str,
         expected_sentiment: str,
     ) -> dict:
-        """Compare primary model output with other model output."""
-        other_output = await self._get_other_model_output({"email": email})
+        """Compare candidate model output with other model output."""
+        other_output = await self._get_baseline_model_output({"email": email})
 
         if other_output is None:
             return {
-                "primary_is_better": False,
+                "candidate_is_better": True,
                 "reason": "Comparison model failed",
-                "primary_score": 0,
-                "other_score": 0,
+                "candidate_score": 0,
+                "baseline_score": 0,
             }
 
         # Score both models on accuracy
-        primary_score = 0
-        other_score = 0
+        candidate_score = 0
+        baseline_score = 0
 
         # Check name accuracy
         if output.customer_name.lower() == expected_name.lower():
-            primary_score += 1
+            candidate_score += 1
         if other_output.customer_name.lower() == expected_name.lower():
-            other_score += 1
+            baseline_score += 1
 
         # Check product accuracy
         if output.product.lower() == expected_product.lower():
-            primary_score += 1
+            candidate_score += 1
         if other_output.product.lower() == expected_product.lower():
-            other_score += 1
+            baseline_score += 1
 
         # Check sentiment accuracy
         if output.sentiment.lower() == expected_sentiment.lower():
-            primary_score += 1
+            candidate_score += 1
         if other_output.sentiment.lower() == expected_sentiment.lower():
-            other_score += 1
+            baseline_score += 1
 
-        primary_is_better = primary_score > other_score
+        candidate_is_better = candidate_score > baseline_score
 
-        if primary_score == other_score:
-            reason = f"Tie: Both models scored {primary_score}/3"
+        if candidate_score == baseline_score:
+            reason = f"Tie: Both models scored {candidate_score}/3"
         else:
-            winner = "Primary" if primary_is_better else "Other"
-            reason = f"{winner} model more accurate ({primary_score} vs {other_score})"
+            winner = "Candidate" if candidate_is_better else "Baseline"
+            reason = (
+                f"{winner} model more accurate ({candidate_score} vs {baseline_score})"
+            )
 
         return {
-            "primary_is_better": primary_is_better,
+            "candidate_is_better": candidate_is_better,
             "reason": reason,
-            "primary_score": primary_score,
-            "other_score": other_score,
+            "candidate_score": candidate_score,
+            "baseline_score": baseline_score,
         }
 
 
@@ -586,8 +588,8 @@ pairwise_dataset = Dataset(name="pairwise_comparison", rows=pairwise_examples)
 basic_model = BasicEmailModel()
 advanced_model = AdvancedEmailModel()
 
-# Create preference scorer that compares basic model (primary) vs advanced model (other)
-preference_scorer = EmailPreferenceScorer(other_model=basic_model)
+# Create preference scorer that compares basic model (basline) vs advanced model (candidate)
+preference_scorer = EmailPreferenceScorer(baseline_model=basic_model)
 
 # Run pairwise evaluation
 pairwise_evaluation = Evaluation(
