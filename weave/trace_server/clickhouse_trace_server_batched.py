@@ -2156,7 +2156,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             yield {"_meta": {"weave_call_id": start_call.id}}
 
             # Initialize accumulation variables
-            aggregated_output: dict[str, Any] | None = None
+            aggregated_output: Optional[dict[str, Any]] = None
             assistant_acc: list[str] = []
             tool_calls: list[dict[str, Any]] = []
             aggregated_metadata: dict[str, Any] = {}
