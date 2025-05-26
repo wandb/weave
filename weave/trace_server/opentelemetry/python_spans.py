@@ -10,7 +10,7 @@ from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
@@ -289,12 +289,17 @@ class Span:
         usage = get_weave_usage(self.attributes) or {}
 
         inputs = get_weave_inputs(events, self.attributes) or {}
-        if inputs.get('inputs', None) is not None and not isinstance(inputs.get('inputs'), str):
-            inputs = inputs.get('inputs')
+        nested_top_level_input = inputs.get('inputs') or inputs.get('input')
+        if nested_top_level_input is not None and isinstance(nested_top_level_input, (dict, list)):
+            if isinstance(nested_top_level_input, dict):
+                # For type checker
+                nested_top_level_input = cast(dict[str, Any], nested_top_level_input)
+            inputs = to_json_serializable(nested_top_level_input)
 
         outputs = get_weave_outputs(events, self.attributes) or {}
-        if outputs.get('outputs', None) is not None:
-            outputs = outputs.get('outputs')
+        nested_top_level_output = outputs.get('outputs') or outputs.get('output')
+        if nested_top_level_output is not None:
+            outputs = to_json_serializable(nested_top_level_output)
 
         attributes = get_weave_attributes(self.attributes) or {}
         wandb_attributes = get_wandb_attributes(self.attributes) or {}
@@ -324,7 +329,8 @@ class Span:
 
         has_attributes = len(attributes) > 0
         has_inputs = len(inputs) > 0
-        has_outputs = len(outputs) > 0
+        # Ouputs might be str, int, bytes
+        has_outputs = isinstance(outputs, int) or len(outputs) > 0
         has_usage = len(usage) > 0
 
         # We failed to load any of the Weave attributes, dump all attributes
