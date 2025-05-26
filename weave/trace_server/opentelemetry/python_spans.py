@@ -289,19 +289,24 @@ class Span:
         usage = get_weave_usage(self.attributes) or {}
 
         inputs = get_weave_inputs(events, self.attributes) or {}
-        nested_top_level_input = inputs.get("inputs") or inputs.get("input")
-        if nested_top_level_input is not None and isinstance(
-            nested_top_level_input, (dict, list)
-        ):
-            if isinstance(nested_top_level_input, dict):
-                # For type checker
-                nested_top_level_input = cast(dict[str, Any], nested_top_level_input)
-            inputs = to_json_serializable(nested_top_level_input)
+        # Only de-nest if we have one key
+        if len(inputs) == 1:
+            nested_top_level_input = inputs.get("inputs") or inputs.get("input")
+            if nested_top_level_input is not None and isinstance(
+                nested_top_level_input, (dict, list)
+            ):
+                if isinstance(nested_top_level_input, dict):
+                    # For type checker
+                    nested_top_level_input = cast(dict[str, Any], nested_top_level_input)
+                inputs = to_json_serializable(nested_top_level_input)
+
 
         outputs = get_weave_outputs(events, self.attributes) or {}
-        nested_top_level_output = outputs.get("outputs") or outputs.get("output")
-        if nested_top_level_output is not None:
-            outputs = to_json_serializable(nested_top_level_output)
+        # Only de-nest if we have one key
+        if len(outputs) == 1:
+            nested_top_level_output = outputs.get("outputs") or outputs.get("output")
+            if nested_top_level_output is not None and len(outputs) == 1:
+                outputs = to_json_serializable(nested_top_level_output)
 
         attributes = get_weave_attributes(self.attributes) or {}
         wandb_attributes = get_wandb_attributes(self.attributes) or {}
