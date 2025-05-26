@@ -29,6 +29,8 @@ import os
 from datetime import datetime
 from typing import Any
 
+# For notebooks, use nest_asyncio to handle async properly
+import nest_asyncio
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from set_env import set_env
@@ -36,11 +38,13 @@ from set_env import set_env
 import weave
 from weave import Dataset, Evaluation, EvaluationLogger, Model
 
+nest_asyncio.apply()
+
 # Setup API keys
 os.environ["OPENAI_API_KEY"] = set_env("OPENAI_API_KEY")
 
 # Initialize Weave
-weave_client = weave.init("weave-workshop")
+weave_client = weave.init("weave-product-tour")
 
 # %% [markdown]
 # ## 📊 Part 2: Building Evaluations
@@ -88,6 +92,12 @@ def analyze_customer_email(email: str) -> CustomerEmail:
     return response.choices[0].message.parsed
 
 
+# %% [markdown]
+# #### 📊 Create Challenging Evaluation Dataset
+#
+# We'll create a dataset with tricky examples that test edge cases in email analysis.
+
+# %%
 # Create a challenging evaluation dataset with tricky examples
 eval_examples = [
     # Challenging examples - names buried in complex contexts
@@ -251,10 +261,15 @@ eval_examples = [
     },
 ]
 
+# %% [markdown]
+# #### 📊 Create Dataset and Scoring Functions
+
+# %%
 # Create a Weave Dataset
 support_dataset = Dataset(name="support_emails", rows=eval_examples)
 
 
+# %%
 # 🎯 Define scoring functions
 @weave.op
 def name_accuracy(expected_name: str, output: CustomerEmail) -> dict[str, Any]:
@@ -309,17 +324,19 @@ def extraction_quality(email: str, output: CustomerEmail) -> dict[str, Any]:
     }
 
 
-# 🚀 Run the evaluation
+# %% [markdown]
+# #### 🚀 Run the Evaluation
+
+# %%
+# 📝 Define the evaluation
 evaluation = Evaluation(
     dataset=support_dataset,
     scorers=[name_accuracy, product_accuracy, sentiment_accuracy, extraction_quality],
     trials=3,  # Run each example 3 times to check consistency
 )
 
-# For notebooks, use nest_asyncio to handle async properly
-import nest_asyncio
-
-nest_asyncio.apply()
+# %%
+# 🚀 Run the evaluation
 eval_results = asyncio.run(evaluation.evaluate(analyze_customer_email))
 print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 
@@ -333,7 +350,6 @@ print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 
 # %%
 # %pip install 'weave[scorers]' -qqq
-
 # Import pre-built scorers
 from weave.scorers import (
     EmbeddingSimilarityScorer,
@@ -341,6 +357,10 @@ from weave.scorers import (
     ValidJSONScorer,
 )
 
+# %% [markdown]
+# #### 🎯 Example 1: ValidJSONScorer
+
+# %%
 # Example 1: ValidJSONScorer - Check if output is valid JSON
 json_scorer = ValidJSONScorer()
 
@@ -357,6 +377,10 @@ invalid_json = (
 invalid_result = json_scorer.score(output=invalid_json)
 print(f"  Invalid JSON: {invalid_result['json_valid']}")
 
+# %% [markdown]
+# #### 🎯 Example 2: PydanticScorer
+
+# %%
 # Example 2: PydanticScorer - Validate against a schema
 from pydantic import EmailStr
 
@@ -370,7 +394,7 @@ class UserData(BaseModel):
 # Use PydanticScorer with our schema
 pydantic_scorer = PydanticScorer(model=UserData)
 
-print("\n🎯 Example 2: PydanticScorer")
+print("🎯 Example 2: PydanticScorer")
 # Test with valid data
 valid_data = '{"name": "Alice Smith", "age": 28, "email": "alice@example.com"}'
 pydantic_result = pydantic_scorer.score(output=valid_data)
@@ -381,6 +405,10 @@ invalid_data = '{"name": "Bob", "age": "twenty-five", "email": "not-an-email"}'
 invalid_pydantic_result = pydantic_scorer.score(output=invalid_data)
 print(f"  Invalid schema: {invalid_pydantic_result['valid_pydantic']}")
 
+# %% [markdown]
+# #### 🎯 Example 3: EmbeddingSimilarityScorer
+
+# %%
 # Example 3: EmbeddingSimilarityScorer - Semantic similarity
 # Use EmbeddingSimilarityScorer (requires OpenAI API key)
 similarity_scorer = EmbeddingSimilarityScorer(
@@ -388,7 +416,7 @@ similarity_scorer = EmbeddingSimilarityScorer(
     threshold=0.7,  # Cosine similarity threshold
 )
 
-print("\n🎯 Example 3: EmbeddingSimilarityScorer")
+print("🎯 Example 3: EmbeddingSimilarityScorer")
 # Test semantic similarity between two similar phrases
 output = "What are the weather conditions today?"
 target = "How is the weather right now?"
@@ -559,7 +587,7 @@ basic_model = BasicEmailModel()
 advanced_model = AdvancedEmailModel()
 
 # Create preference scorer that compares basic model (primary) vs advanced model (other)
-preference_scorer = EmailPreferenceScorer(other_model=advanced_model)
+preference_scorer = EmailPreferenceScorer(other_model=basic_model)
 
 # Run pairwise evaluation
 pairwise_evaluation = Evaluation(
@@ -567,7 +595,7 @@ pairwise_evaluation = Evaluation(
 )
 
 print("🥊 Running pairwise evaluation: Basic vs Advanced model...")
-pairwise_results = asyncio.run(pairwise_evaluation.evaluate(basic_model))
+pairwise_results = asyncio.run(pairwise_evaluation.evaluate(advanced_model))
 print("✅ Pairwise evaluation complete! Check Weave UI for detailed comparisons.")
 
 # %% [markdown]

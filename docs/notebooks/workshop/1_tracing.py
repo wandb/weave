@@ -37,7 +37,7 @@ import weave
 os.environ["OPENAI_API_KEY"] = set_env("OPENAI_API_KEY")
 
 # Initialize Weave - this creates your project and starts tracing
-weave_client = weave.init("weave-workshop")
+weave_client = weave.init("weave-product-tour")
 
 # %% [markdown]
 # ## 🔍 Part 1: Function Tracing
@@ -227,6 +227,7 @@ import requests
 from PIL import Image
 
 
+# %%
 # 📸 Image Support - Weave automatically logs PIL.Image objects
 @weave.op
 def generate_sample_image() -> Image.Image:
@@ -249,6 +250,51 @@ def generate_sample_image() -> Image.Image:
     return image
 
 
+sample_image = generate_sample_image()
+print(f"📸 Generated image: {sample_image.size}")
+
+
+# %%
+# 🔍 Multimodal Analysis - Support Base64 Encoding
+@weave.op
+def analyze_image_with_gpt4_vision(image: Image.Image, question: str) -> str:
+    """Analyze an image using GPT-4 Vision."""
+    client = OpenAI()
+
+    # Convert PIL image to base64 for API
+    import io
+
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Supports vision
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": question},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{image_base64}"},
+                    },
+                ],
+            }
+        ],
+        max_tokens=300,
+    )
+
+    return response.choices[0].message.content
+
+
+analysis = analyze_image_with_gpt4_vision(
+    sample_image, "What do you see in this image? Describe it in one sentence."
+)
+print(f"🤖 Analysis: {analysis}")
+
+
+# %%
 # 🎵 Audio Support - Weave automatically logs wave.Wave_read objects
 @weave.op
 def generate_sample_audio(text: str) -> wave.Wave_read:
@@ -267,6 +313,13 @@ def generate_sample_audio(text: str) -> wave.Wave_read:
     return wave.open("sample_audio.wav", "rb")
 
 
+sample_audio = generate_sample_audio(
+    "Welcome to the Weave workshop! This audio will be automatically logged."
+)
+print("🎵 Generated audio file")
+
+
+# %%
 # 🎬 Video Support - Weave automatically logs moviepy video clips
 @weave.op
 def create_sample_video():
@@ -305,55 +358,9 @@ def create_sample_video():
         return "Video creation skipped - error occurred"
 
 
-# 🔍 Multimodal Analysis - Combining image and text
-@weave.op
-def analyze_image_with_gpt4_vision(image: Image.Image, question: str) -> str:
-    """Analyze an image using GPT-4 Vision."""
-    client = OpenAI()
-
-    # Convert PIL image to base64 for API
-    import io
-
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
-    image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Supports vision
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": question},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{image_base64}"},
-                    },
-                ],
-            }
-        ],
-        max_tokens=300,
-    )
-
-    return response.choices[0].message.content
-
-
-# Generate and analyze media
-sample_image = generate_sample_image()
-print(f"📸 Generated image: {sample_image.size}")
-
-analysis = analyze_image_with_gpt4_vision(
-    sample_image, "What do you see in this image? Describe it in one sentence."
-)
-print(f"🤖 Analysis: {analysis}")
-
-sample_audio = generate_sample_audio(
-    "Welcome to the Weave workshop! This audio will be automatically logged."
-)
-print("🎵 Generated audio file")
-
 sample_video = create_sample_video()
 print("🎬 Generated video clip")
+
 
 # %% [markdown]
 # ### 🔒 Part 1.4: Custom Serialization
@@ -366,6 +373,7 @@ import re
 from typing import Any, Dict
 
 
+# %%
 # 🔐 Example 1: PII Redaction
 def redact_pii_inputs(inputs: Dict[str, Any]) -> Dict[str, Any]:
     """Redact PII from inputs before logging."""
@@ -403,6 +411,18 @@ def analyze_sensitive_email(email_content: str) -> CustomerEmail:
     return analyze_customer_email(email_content)
 
 
+sensitive_email = """
+Hi Support,
+My name is John Smith and my email is john.smith@company.com.
+My phone number is 555-123-4567 and SSN is 123-45-6789.
+Please help with my ProWidget issue!
+"""
+
+result1 = analyze_sensitive_email(sensitive_email)
+print("✅ PII redacted in logs (check Weave UI)")
+
+
+# %%
 # 📦 Example 2: Large Object Handling
 def summarize_large_inputs(inputs: Dict[str, Any]) -> Dict[str, Any]:
     """Summarize large objects to avoid logging huge data."""
@@ -440,6 +460,13 @@ def process_large_dataset(data_list: list, metadata: str) -> dict:
     }
 
 
+large_data = list(range(1000))  # Large list
+long_text = "This is a very long string. " * 100  # Long string
+result2 = process_large_dataset(large_data, long_text)
+print("✅ Large objects summarized")
+
+
+# %%
 # 🔑 Example 3: Sensitive Configuration Filtering
 def filter_sensitive_config(inputs: Dict[str, Any]) -> Dict[str, Any]:
     """Remove sensitive configuration from logs."""
@@ -465,22 +492,6 @@ def configure_api_client(api_key: str, endpoint: str, secret_token: str) -> dict
     return {"endpoint": endpoint, "configured": True, "auth_method": "token"}
 
 
-# 🧪 Test serialization controls
-sensitive_email = """
-Hi Support,
-My name is John Smith and my email is john.smith@company.com.
-My phone number is 555-123-4567 and SSN is 123-45-6789.
-Please help with my ProWidget issue!
-"""
-
-result1 = analyze_sensitive_email(sensitive_email)
-print("✅ PII redacted in logs (check Weave UI)")
-
-large_data = list(range(1000))  # Large list
-long_text = "This is a very long string. " * 100  # Long string
-result2 = process_large_dataset(large_data, long_text)
-print("✅ Large objects summarized")
-
 result3 = configure_api_client(
     api_key="secret_key_12345",
     endpoint="https://api.example.com",
@@ -502,6 +513,7 @@ from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 
+# %%
 # 🔧 Configure OTEL to send traces to Weave
 def setup_otel_for_weave(
     entity: str,
@@ -535,6 +547,12 @@ def setup_otel_for_weave(
     return trace.get_tracer(__name__)
 
 
+api_key = set_env("WANDB_API_KEY")
+# FILL OUT ENTITY BELOW
+tracer = setup_otel_for_weave(entity="", project="weave-workshop", api_key=api_key)
+
+
+# %%
 def otel_function(tracer, data: str) -> str:
     """A function traced by OpenTelemetry."""
     with tracer.start_as_current_span("otel_processing") as span:
@@ -545,12 +563,7 @@ def otel_function(tracer, data: str) -> str:
         return result
 
 
-# Example OTEL integration
-api_key = set_env("WANDB_API_KEY")
-# FILL OUT ENTITY BELOW
-tracer = setup_otel_for_weave(entity="", project="weave-workshop", api_key=api_key)
 otel_function(tracer, "Hello from OTEL")
-
 print("🔗 OpenTelemetry integration example completed")
 
 # %% [markdown]

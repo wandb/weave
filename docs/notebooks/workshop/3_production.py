@@ -45,7 +45,7 @@ nest_asyncio.apply()
 os.environ["OPENAI_API_KEY"] = set_env("OPENAI_API_KEY")
 
 # Initialize Weave
-weave_client = weave.init("weave-workshop")
+weave_client = weave.init("weave-product-tour")
 
 # %% [markdown]
 # ## 🎯 Part 3: Production Monitoring
@@ -117,6 +117,11 @@ def classify_urgency(email: str, sentiment: str) -> str:
         return "low"
 
 
+# %% [markdown]
+# #### 🛡️ Content Moderation Scorer
+
+
+# %%
 # 🛡️ Define production scorers
 class ContentModerationScorer(Scorer):
     """Production-ready content moderation scorer."""
@@ -183,6 +188,11 @@ class ContentModerationScorer(Scorer):
         }
 
 
+# %% [markdown]
+# #### 📊 Quality Assessment Scorer
+
+
+# %%
 class ExtractionQualityScorer(Scorer):
     """Monitor extraction quality and completeness."""
 
@@ -310,6 +320,11 @@ class ExtractionQualityScorer(Scorer):
         }
 
 
+# %% [markdown]
+# #### 🏭 Production Email Handler
+
+
+# %%
 @weave.op
 def production_email_handler(
     email: str, request_id: Optional[str] = None
@@ -350,11 +365,16 @@ def production_email_handler(
         }
 
 
+# %% [markdown]
+# #### 🔧 Initialize Scorers and Monitoring Function
+
+# %%
 # Initialize scorers
 content_moderation_scorer = ContentModerationScorer()
 quality_scorer = ExtractionQualityScorer()
 
 
+# %%
 async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
     """Handle email with production monitoring and guardrails."""
     # Process the email and get the Call object
@@ -400,6 +420,10 @@ async def handle_email_with_monitoring(email: str) -> dict[str, Any]:
     return result
 
 
+# %% [markdown]
+# #### 🧪 Test Production Monitoring
+
+# %%
 # 🧪 Test production monitoring with realistic scenarios
 print("🏭 Testing production monitoring with realistic scenarios...")
 print("=" * 70)
@@ -492,31 +516,6 @@ for i, test_case in enumerate(production_test_emails):
                 f"      Status: {'⚠️ Below threshold' if quality.get('passed', False) else '❌ Failed'}"
             )
 
-print("\n" + "=" * 70)
-print("\n🎯 Summary of Production Monitoring Demonstration:")
-print("\n1. **Successful Cases** (Tests 1, 4):")
-print("   - High-quality extractions with version numbers")
-print("   - All required fields present and accurate")
-
-print("\n2. **Blocked Content** (Test 2):")
-print("   - Multiple profanity words + legal threats = automatic block")
-print("   - Protects support agents from abusive content")
-
-print("\n3. **Review Required** (Test 5):")
-print("   - Mild profanity triggers review flag")
-print("   - Human can decide if response is appropriate")
-
-print("\n4. **Quality Issues** (Test 3):")
-print("   - Missing customer name or product details")
-print("   - Too brief to be actionable")
-print("   - Would need human intervention")
-
-print("\n💡 Key Insights:")
-print("   - Different scorers serve different purposes")
-print("   - Guardrails (block/review) vs Monitors (quality/performance)")
-print("   - All scorer results are tracked in Weave for analysis")
-print("\n✅ Check the Weave UI to see detailed scorer results and traces!")
-
 # %% [markdown]
 # ## 3.1: Human Feedback & Data Collection
 #
@@ -529,7 +528,11 @@ import uuid
 import ipywidgets as widgets
 from IPython.display import clear_output, display
 
+# %% [markdown]
+# #### 🔄 Interactive Feedback Collection App
 
+
+# %%
 # Create an interactive feedback collection interface
 class EmailAnalyzerFeedbackApp:
     def __init__(self):
@@ -811,6 +814,10 @@ Keep it realistic and professional. Length: 2-4 sentences plus signature.""",
         display(self.app)
 
 
+# %% [markdown]
+# #### 🚀 Launch the Feedback App
+
+# %%
 # Create and display the feedback app
 print("🚀 Starting Interactive Email Analyzer with Feedback Collection...")
 feedback_app = EmailAnalyzerFeedbackApp()
