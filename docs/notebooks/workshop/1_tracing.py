@@ -23,7 +23,6 @@
 # %%
 # Install dependencies
 # %pip install wandb weave openai pydantic nest_asyncio opentelemetry-exporter-otlp 'weave[video_support]' set-env-colab-kaggle-dotenv -qqq
-# %apt install imagemagick
 
 import os
 from typing import Any
@@ -271,29 +270,39 @@ def generate_sample_audio(text: str) -> wave.Wave_read:
 # 🎬 Video Support - Weave automatically logs moviepy video clips
 @weave.op
 def create_sample_video():
-    """Create a simple video clip using moviepy."""
+    """Create a simple color-changing video using moviepy."""
     try:
-        from moviepy.editor import ColorClip, CompositeVideoClip, TextClip
+        from moviepy.editor import ColorClip, VideoFileClip, concatenate_videoclips
 
-        # Create a simple video: colored background with text
-        background = ColorClip(size=(640, 480), color=(100, 150, 200), duration=3)
+        # Create a sequence of colored clips that change over time
+        colors = [
+            (255, 100, 100),  # Red
+            (100, 255, 100),  # Green
+            (100, 100, 255),  # Blue
+            (255, 255, 100),  # Yellow
+            (255, 100, 255),  # Magenta
+        ]
 
-        # Add text overlay
-        text_clip = (
-            TextClip("Hello from Weave!", fontsize=50, color="white", font="Arial-Bold")
-            .set_duration(3)
-            .set_position("center")
-        )
+        # Create individual color clips (each 0.6 seconds)
+        clips = []
+        for color in colors:
+            clip = ColorClip(size=(640, 480), color=color, duration=0.6)
+            clips.append(clip)
 
-        # Composite the video
-        video = CompositeVideoClip([background, text_clip])
+        # Concatenate all clips into one video
+        video = concatenate_videoclips(clips)
 
         # Return video clip - Weave will automatically log this!
-        return video
+        video_path = "./sample_video.mp4"
+        video.write_videofile(video_path, fps=24)
+        return VideoFileClip(video_path, has_mask=False, audio=True)
 
     except ImportError:
         print("📹 MoviePy not installed. Install with: pip install moviepy")
         return "Video creation skipped - moviepy not available"
+    except Exception as e:
+        print(f"📹 Video creation failed: {str(e)}")
+        return "Video creation skipped - error occurred"
 
 
 # 🔍 Multimodal Analysis - Combining image and text
