@@ -23,6 +23,7 @@
 # %%
 # Install dependencies
 # %pip install wandb weave openai pydantic nest_asyncio opentelemetry-exporter-otlp 'weave[video_support]' set-env-colab-kaggle-dotenv -qqq
+# %apt install imagemagick
 
 import os
 from typing import Any
@@ -267,6 +268,34 @@ def generate_sample_audio(text: str) -> wave.Wave_read:
     return wave.open("sample_audio.wav", "rb")
 
 
+# 🎬 Video Support - Weave automatically logs moviepy video clips
+@weave.op
+def create_sample_video():
+    """Create a simple video clip using moviepy."""
+    try:
+        from moviepy.editor import ColorClip, CompositeVideoClip, TextClip
+
+        # Create a simple video: colored background with text
+        background = ColorClip(size=(640, 480), color=(100, 150, 200), duration=3)
+
+        # Add text overlay
+        text_clip = (
+            TextClip("Hello from Weave!", fontsize=50, color="white", font="Arial-Bold")
+            .set_duration(3)
+            .set_position("center")
+        )
+
+        # Composite the video
+        video = CompositeVideoClip([background, text_clip])
+
+        # Return video clip - Weave will automatically log this!
+        return video
+
+    except ImportError:
+        print("📹 MoviePy not installed. Install with: pip install moviepy")
+        return "Video creation skipped - moviepy not available"
+
+
 # 🔍 Multimodal Analysis - Combining image and text
 @weave.op
 def analyze_image_with_gpt4_vision(image: Image.Image, question: str) -> str:
@@ -313,6 +342,9 @@ sample_audio = generate_sample_audio(
     "Welcome to the Weave workshop! This audio will be automatically logged."
 )
 print("🎵 Generated audio file")
+
+sample_video = create_sample_video()
+print("🎬 Generated video clip")
 
 # %% [markdown]
 # ### 🔒 Part 1.4: Custom Serialization
