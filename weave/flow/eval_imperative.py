@@ -463,9 +463,9 @@ class EvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert self._evaluate_call is not None, (
-            "Evaluation call should exist for finalization"
-        )
+        assert (
+            self._evaluate_call is not None
+        ), "Evaluation call should exist for finalization"
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -547,9 +547,9 @@ class EvaluationLogger(BaseModel):
             final_summary = {**final_summary, **summary}
 
         # Call the summarize op
-        assert self._evaluate_call is not None, (
-            "Evaluation call should exist for summary"
-        )
+        assert (
+            self._evaluate_call is not None
+        ), "Evaluation call should exist for summary"
 
         # Use set_call_stack to temporarily set the evaluation as the parent
         with call_context.set_call_stack([self._evaluate_call]):
