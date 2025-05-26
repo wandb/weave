@@ -725,6 +725,14 @@ class EmailAnalyzerFeedbackApp:
                 payload=feedback_payload,
             )
 
+            # Little hack to submit a score that can be operated on - will
+            # not need this in the future.
+            @weave.op()
+            def user_rating(output):
+                return feedback_payload
+
+            asyncio.run(self.current_call.apply_scorer(user_rating))
+
             with self.feedback_status:
                 clear_output()
                 feedback_desc = f"rating ({rating}/5)"

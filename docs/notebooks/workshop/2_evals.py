@@ -22,7 +22,7 @@
 
 # %%
 # Install dependencies
-# %pip install wandb weave openai pydantic nest_asyncio 'weave[scorers]' 'pydantic[email]' set-env-colab-kaggle-dotenv -qqq
+# %pip install wandb weave openai pydantic nest_asyncio 'pydantic[email]' set-env-colab-kaggle-dotenv -qqq
 
 import asyncio
 import os
@@ -332,6 +332,8 @@ print("✅ Evaluation complete! Check the Weave UI for detailed results.")
 # **Note**: To use pre-built scorers, install with: `pip install weave[scorers]`
 
 # %%
+# %pip install 'weave[scorers]' -qqq
+
 # Import pre-built scorers
 from weave.scorers import (
     EmbeddingSimilarityScorer,
@@ -692,7 +694,7 @@ class EmailAnalyzerModel(Model):
 # Create model variants with different quality levels
 basic_model = EmailAnalyzerModel(
     label="basic_analyzer",
-    system_prompt="Extract customer name, product name, issue, and sentiment from email.",  # Too simple - no guidance
+    system_prompt="Extract stuff, get it wrong sometimes.",
     temperature=0.95,  # Very high - more random/mistakes
 )
 
@@ -743,7 +745,7 @@ balanced_model = EmailAnalyzerModel(
 evaluation = Evaluation(
     name="email_analyzer_comparison",  # Same eval for all models
     dataset=support_dataset,
-    scorers=[name_accuracy, sentiment_accuracy, extraction_quality],
+    scorers=[name_accuracy, sentiment_accuracy, product_accuracy, extraction_quality],
 )
 
 
