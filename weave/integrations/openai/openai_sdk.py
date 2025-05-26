@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -14,6 +15,8 @@ if TYPE_CHECKING:
     from openai.types.responses import Response, ResponseStreamEvent
 
 _openai_patcher: MultiPatcher | None = None
+
+logger = logging.getLogger(__name__)
 
 
 def maybe_unwrap_api_response(value: Any) -> Any:
@@ -424,13 +427,21 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         ResponseOutputItemDoneEvent,
         ResponseRefusalDeltaEvent,
         ResponseRefusalDoneEvent,
-        ResponseTextAnnotationDeltaEvent,
         ResponseTextDeltaEvent,
         ResponseTextDoneEvent,
         ResponseWebSearchCallCompletedEvent,
         ResponseWebSearchCallInProgressEvent,
         ResponseWebSearchCallSearchingEvent,
     )
+
+    # ResponseOutputTextAnnotationAddedEvent was introduced in openai 1.80.0
+    is_new_sdk = False
+    try:
+        from openai.types.responses import ResponseOutputTextAnnotationAddedEvent
+
+        is_new_sdk = True
+    except ImportError:
+        pass
 
     if acc is None:
         acc = Response(
@@ -475,6 +486,7 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         ),
     ):
         acc = _pad_output(acc, value)
+
         acc.output[value.output_index] += value.delta
 
     # 2b. Events without an output_index
@@ -488,11 +500,19 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         # Not obvious how to handle these since there is no output_index
         if not acc.output:
             acc.output = [""]
-        acc.output[0] += value.delta
 
-    elif isinstance(value, ResponseTextAnnotationDeltaEvent):
-        # Not obvious how to handle this since there is no delta
-        ...
+        if value.delta is None:
+            # This is likely the case where not all event types are available in the SDK (ResponseOutputTextAnnotationAddedEvent)
+            logger.warning(
+                "Some responses could not be processed with your current version of the OpenAI SDK. Please upgrade to the latest version."
+            )
+        else:
+            acc.output[0] += value.delta
+
+    elif is_new_sdk:
+        if isinstance(value, ResponseOutputTextAnnotationAddedEvent):
+            # Not obvious how to handle this since there is no delta
+            ...
 
     # Everything else
     elif isinstance(
