@@ -287,8 +287,15 @@ class Span:
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
         events = [SpanEvent(e.as_dict()) for e in self.events]
         usage = get_weave_usage(self.attributes) or {}
+
         inputs = get_weave_inputs(events, self.attributes) or {}
+        if inputs.get('inputs', None) is not None and not isinstance(inputs.get('inputs'), str):
+            inputs = inputs.get('inputs')
+
         outputs = get_weave_outputs(events, self.attributes) or {}
+        if outputs.get('outputs', None) is not None:
+            outputs = outputs.get('outputs')
+
         attributes = get_weave_attributes(self.attributes) or {}
         wandb_attributes = get_wandb_attributes(self.attributes) or {}
         overrides = get_span_overrides(self.attributes) or {}
