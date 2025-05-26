@@ -134,9 +134,11 @@ export const isMessage = (message: any): boolean => {
     return false;
   }
   if (!hasStringProp(message, 'role')) {
+    console.log('no role')
     return false;
   }
   if (!('content' in message) && !('tool_calls' in message)) {
+    console.log('no content')
     return false;
   }
   if (
@@ -144,6 +146,7 @@ export const isMessage = (message: any): boolean => {
     message.content !== null &&
     !isMessageContent(message.content)
   ) {
+    console.log('message not conform')
     return false;
   }
   if ('tool_calls' in message && !isToolCalls(message.tool_calls)) {

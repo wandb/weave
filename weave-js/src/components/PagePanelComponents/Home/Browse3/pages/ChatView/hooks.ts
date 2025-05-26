@@ -25,7 +25,10 @@ import {
   isTraceCallChatFormatMistral,
   normalizeMistralChatCompletion,
 } from './ChatFormats/mistral';
-import {isTraceCallChatFormatOpenAI} from './ChatFormats/openai';
+import {
+  isTraceCallChatFormatOpenAI,
+  isTraceCallChatFormatOAIResponses
+} from './ChatFormats/openai';
 import {
   isTraceCallChatFormatOTEL,
   normalizeOTELChatCompletion,
@@ -72,6 +75,9 @@ export const isCallChat = (call: CallSchema): boolean => {
 export const getChatFormat = (call: CallSchema): ChatFormat => {
   if (!('traceCall' in call) || !call.traceCall) {
     return ChatFormat.None;
+  }
+  if (isTraceCallChatFormatOAIResponses(call.traceCall)) {
+    return ChatFormat.OAIResponses;
   }
   if (isTraceCallChatFormatAnthropic(call.traceCall)) {
     return ChatFormat.Anthropic;
@@ -170,6 +176,7 @@ export const useCallAsChat = (
     } else {
       // Use standard handlers
       request = normalizeChatRequest(deref(call.inputs, refsMap));
+      console.log('here')
       result = call.output
         ? normalizeChatCompletion(request, deref(call.output, refsMap))
         : null;
