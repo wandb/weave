@@ -2,7 +2,7 @@ import _ from 'lodash';
 import { isArray } from 'util';
 
 import {KeyedDictType, TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
-import { Message, Usage, ChatCompletion, Choice } from '../types';
+import { Message, Usage, ChatCompletion, Choice, InternalMessage, ChatRequest } from '../types';
 import {hasStringProp, isMessage} from './utils';
 
 const isOAIReponseRequest = (value: KeyedDictType): value is OpenAIResponseRequest => {
@@ -10,7 +10,7 @@ const isOAIReponseRequest = (value: KeyedDictType): value is OpenAIResponseReque
   if (!hasAttributes) { return false }
 
   const input = value['input'];
-  return _.isString(value['input']) || (_.isArray(input) && input.every(isMessage));
+  return _.isString(value['input']) || (_.isArray(input));
 }
 
 interface OpenAIResponseRequest {
@@ -28,7 +28,7 @@ interface ResponseOutputMessage {
   id: string;
   content: ResponseOutputText[];
   role: string;
-  type: "message";
+  type: string;
 }
 
 interface OpenAIResponseResult {
@@ -41,34 +41,66 @@ interface OpenAIResponseResult {
 }
 
 export const responseOutputMessagesToChoices = (messages: ResponseOutputMessage[]): Choice[] => {
-  // const choice = messages[0]
-  // return [{
-  //   index: 0,
-  //   message: {
-  //     role: choice.role,
-  //     tool
-  //   },
-  //   finish_reason: 'stop'
-  // }]
+  let message = messages[0];
+  // TODO: We need a real mapping here. output_text is fine to assign to text but others may not be
+  message.content = message.content.map(content => {
+    let vals = content
+    vals['type'] = 'text'
+    return vals
+  })
+  return [{
+    index: 0,
+    message: message,
+    finish_reason: 'stop'
+  }]
 }
+
 export const normalizeOAIReponsesResult = (result: OpenAIResponseResult): ChatCompletion => {
-  const {id, model, created_at: created, usage} = result;
   const choices = responseOutputMessagesToChoices(result.output)
   return {
-    id,
-    model,
-    created,
-    usage,
+    id: result.id,
+    model: result.model,
+    created: result.created_at,
+    usage: result.usage,
     choices,
     system_fingerprint: "",
   }
 }
+export const normalizeOAIResponsesRequest = (request: any): ChatRequest => {
+  const messages: Message[] = request['input']
+  if ('instructions' in request) {
+    return {
+      messages: [
+        {
+          role: 'system',
+          content: request['instructions']
+        },
+        ...messages
+      ],
+      model: request['model'],
+    }
+  }
+  return {
+    messages,
+    model: request['model'],
+  }
+}
 export const isTraceCallChatFormatOAIResponses = (call: TraceCallSchema): boolean => {
-  const result = isOAIReponseRequest(call.inputs) && isMessage(call.output)
-  return result
+
+  return isTraceCallChatFormatOAIResponsesRequest(call.inputs);
+};
+
+export const isTraceCallChatFormatOAIResponsesResult= (result: any): boolean => {
+  return ('object' in result && result['object'] == 'response')
+};
+
+export const isTraceCallChatFormatOAIResponsesRequest= (request: any): boolean => {
+  return isOAIReponseRequest(request)
 };
 
 export const isTraceCallChatFormatOpenAI = (call: TraceCallSchema): boolean => {
+  // TODO: This is probably not a good enough check
+  // We should do legitimate schema validation on this
   if (!('messages' in call.inputs || 'input' in call.inputs)) {
     return false;
   }

@@ -14,7 +14,7 @@ export type ImageUrl = {
 };
 
 export type InternalMessage = {
-  type: 'text' | 'image_url' | 'tool_result' | 'tool_use';
+  type: string;
   text?: string;
   image_url?: ImageUrl;
   input?: Record<string, any>;

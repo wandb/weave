@@ -27,7 +27,11 @@ import {
 } from './ChatFormats/mistral';
 import {
   isTraceCallChatFormatOpenAI,
-  isTraceCallChatFormatOAIResponses
+  isTraceCallChatFormatOAIResponses,
+  isTraceCallChatFormatOAIResponsesRequest,
+  isTraceCallChatFormatOAIResponsesResult,
+  normalizeOAIResponsesRequest,
+  normalizeOAIReponsesResult,
 } from './ChatFormats/openai';
 import {
   isTraceCallChatFormatOTEL,
@@ -113,6 +117,9 @@ export const normalizeChatCompletion = (
   if (isTraceCallChatFormatOTEL(completion)) {
     return normalizeOTELChatCompletion(request, completion);
   }
+  if (isTraceCallChatFormatOAIResponsesResult(completion)) {
+    return normalizeOAIReponsesResult(completion);
+  }
   return completion as ChatCompletion;
 };
 
@@ -136,6 +143,9 @@ const isStructuredOutputCall = (call: TraceCallSchema): boolean => {
 export const normalizeChatRequest = (request: any): ChatRequest => {
   if (isGeminiRequestFormat(request)) {
     return normalizeGeminiChatRequest(request);
+  }
+  if (isTraceCallChatFormatOAIResponsesRequest(request)) {
+    return normalizeOAIResponsesRequest(request);
   }
   if (isAnthropicCompletionFormat(request)) {
     return normalizeAnthropicChatRequest(request);
@@ -176,7 +186,6 @@ export const useCallAsChat = (
     } else {
       // Use standard handlers
       request = normalizeChatRequest(deref(call.inputs, refsMap));
-      console.log('here')
       result = call.output
         ? normalizeChatCompletion(request, deref(call.output, refsMap))
         : null;
@@ -208,6 +217,7 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
   if (!traceCall.output || !traceCall.inputs) {
     return traceCall;
   }
+  console.log('normalizing')
 
   const {inputs, output, ...rest} = traceCall;
 
