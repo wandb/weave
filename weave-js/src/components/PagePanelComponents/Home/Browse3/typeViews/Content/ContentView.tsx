@@ -191,6 +191,7 @@ const ContentViewMetadataLoaded = ({
 
   const onClickDownload = isDownloading ? undefined : onDownloadCallback;
 
+  let tooltipPreview = null;
   let tooltipHint = 'Click button to download';
   let iconAndText = (
     <>
@@ -239,6 +240,15 @@ const ContentViewMetadataLoaded = ({
     const onClose = () => {
       setShowPreview(false);
     };
+    if (!contentUrl) {
+      tooltipPreview = <LoadingDots />
+    } else {
+      tooltipPreview = <VideoPreview
+        src={contentUrl}
+        videoRef={videoRef}
+        onClick={() => setShowPreview(true)}
+      />
+    }
     iconAndText = (
       <>
         <CustomLink
@@ -249,7 +259,7 @@ const ContentViewMetadataLoaded = ({
         />
         {showPreview && contentUrl && (
           <VideoPopup
-            url={contentUrl}
+            src={contentUrl}
             videoRef={videoRef}
             isOpen={true}
             onClose={onClose}
@@ -282,6 +292,11 @@ const ContentViewMetadataLoaded = ({
 
   const tooltip = (
     <TailwindContents>
+      {tooltipPreview && (
+        <div className="flex h-full w-full items-center justify-start">
+          {tooltipPreview}
+        </div>
+      )}
       <div className="grid grid-cols-[auto_auto] items-center gap-x-2 gap-y-1">
         <div className="text-right font-bold">Name</div>
         <div>{filename}</div>

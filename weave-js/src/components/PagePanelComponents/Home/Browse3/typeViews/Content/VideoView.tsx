@@ -6,35 +6,36 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 type VideoPreviewProps = {
-  blob: Blob;
-  containerHeight: number;
-  containerWidth: number;
+  src: Blob | string;
   videoRef: React.RefObject<HTMLVideoElement>;
-  onShowPopup: () => void;
+  onClick: () => void;
 };
 
 type VideoPopupProps = {
-  url: string;
+  src: Blob | string;
   videoRef: React.RefObject<HTMLVideoElement>;
   isOpen: boolean;
   onClose: () => void;
 };
 
 const VideoPreview: React.FC<VideoPreviewProps> = ({
-  blob,
-  containerHeight,
-  containerWidth,
+  src,
   videoRef,
-  onShowPopup,
+  onClick,
 }) => {
   const [url, setUrl] = useState<string>('');
 
   useEffect(() => {
-    const objectUrl = URL.createObjectURL(blob);
-    setUrl(objectUrl);
-
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [blob]);
+    if (src instanceof Blob) {
+      const objectUrl = URL.createObjectURL(src);
+      setUrl(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl);
+    }
+    else {
+      setUrl(src)
+      return
+    }
+  }, [src]);
 
   if (!url) {
     return <LoadingDots />;
@@ -45,9 +46,8 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({
       <div
         className="relative flex h-full w-full items-center justify-start"
         style={{cursor: 'pointer'}}
-        onClick={onShowPopup}>
+        onClick={onClick}>
         <div
-          style={{height: containerHeight, width: containerWidth}}
           className="relative">
           <div
             style={{
@@ -88,12 +88,28 @@ const VideoPreview: React.FC<VideoPreviewProps> = ({
 };
 
 const VideoPopup: React.FC<VideoPopupProps> = ({
-  url,
+  src,
   isOpen,
   videoRef,
   onClose,
 }) => {
-  console.log(videoRef)
+  const [url, setUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (src instanceof Blob) {
+      const objectUrl = URL.createObjectURL(src);
+      setUrl(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl);
+    }
+    else {
+      setUrl(src)
+      return
+    }
+  }, [src]);
+
+  if (!url) {
+    return <LoadingDots />;
+  }
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
