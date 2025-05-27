@@ -1,10 +1,8 @@
-import {foundations} from '@wandb/ui';
 import {WBIcon} from '@wandb/ui';
+import * as globals from '../css/globals.styles';
 import styled from 'styled-components';
 
 import type {WBMenuTheme} from './WBMenu';
-
-const {legacy} = foundations;
 
 type ContentProps = {
   width?: number;
@@ -19,7 +17,7 @@ export const Content = styled.div.attrs((props: ContentProps) => ({
   background: ${props =>
     props.backgroundColor ?? getBGForTheme(props.theme.main)};
   border-radius: 6px;
-  box-shadow: ${legacy.boxShadowDropdown};
+  box-shadow: ${globals.boxShadowDropdown};
 `;
 
 export const Item = styled.div<{
@@ -55,14 +53,14 @@ type Colors = {
 
 const THEME_COLORS: {[t in WBMenuTheme]: Colors} = {
   dark: {
-    background: legacy.darkerGray,
-    highlight: legacy.primary,
-    text: legacy.white,
+    background: globals.darkerGray,
+    highlight: globals.primary,
+    text: globals.white,
   },
   light: {
-    background: legacy.white,
-    highlight: legacy.gray100,
-    text: legacy.gray800,
+    background: globals.white,
+    highlight: globals.gray100,
+    text: globals.gray800,
   },
 };
 

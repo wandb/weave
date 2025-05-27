@@ -1,6 +1,4 @@
 import {CSSProperties} from '@material-ui/core/styles/withStyles';
-import {WBMenuOption} from '@wandb/ui';
-import {OptionRenderer} from '@wandb/ui';
 import EditableField from '@wandb/weave/common/components/EditableField';
 import ModifiedDropdown from '@wandb/weave/common/components/elements/ModifiedDropdown';
 import {INPUT_SLIDER_CLASS} from '@wandb/weave/common/components/elements/SliderInput';
@@ -19,10 +17,10 @@ import {
   opCount,
   voidNode,
 } from '@wandb/weave/core';
-import {TableState} from '@wandb/weave/index';
 import React, {useCallback, useContext, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
+import {OptionRenderer, WBMenuOption} from '../../../common/components/WBMenu';
 import {Item, ItemIcon} from '../../../common/components/WBMenu.styles';
 import {WBPopupMenuTrigger} from '../../../common/components/WBPopupMenuTrigger';
 import {useWeaveContext} from '../../../context';
@@ -73,7 +71,7 @@ const makeSortingMenuItems = (
     menuItems.push({
       value: 'sort-asc',
       name: 'Sort Asc',
-      icon: 'up-arrow',
+      icon: 'sort-ascending',
       onSelect: async () => {
         recordEvent('UPDATE_COLUMN_SORT_ASC');
         const newTableState = Table.enableSortByCol(
@@ -103,7 +101,7 @@ const makeSortingMenuItems = (
     menuItems.push({
       value: 'sort-desc',
       name: 'Sort Desc',
-      icon: 'down-arrow',
+      icon: 'sort-descending',
       onSelect: async () => {
         recordEvent('UPDATE_COLUMN_SORT_DESC');
         const newTableState = Table.enableSortByCol(
@@ -344,7 +342,7 @@ export const ColumnHeader: React.FC<{
     menuItems.push({
       value: 'settings',
       name: 'Edit cell expression',
-      icon: 'configuration',
+      icon: 'settings',
       onSelect: () => openColumnSettings(),
     });
     menuItems.push(makeMenuItemDivider('expression-div'));
@@ -365,7 +363,7 @@ export const ColumnHeader: React.FC<{
       menuItems.push({
         value: 'group',
         name: 'Group by',
-        icon: 'group-runs',
+        icon: 'group',
         onSelect: async () => {
           recordEvent('GROUP');
           let newTableState: Table.TableState | null = null;
@@ -402,7 +400,7 @@ export const ColumnHeader: React.FC<{
       menuItems.push({
         value: 'ungroup',
         name: 'Ungroup',
-        icon: 'group-runs',
+        icon: 'group',
         onSelect: doUngroup,
       });
     }
@@ -419,7 +417,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'insert-right',
           name: 'Insert 1 right',
-          icon: 'next',
+          icon: 'chevron-next',
           onSelect: () => {
             const newTableState = Table.insertColumnRight(
               tableState,
@@ -434,7 +432,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'insert-left',
           name: 'Insert 1 left',
-          icon: 'previous',
+          icon: 'chevron-back',
           onSelect: () => {
             const newTableState = Table.insertColumnLeft(
               tableState,
@@ -493,7 +491,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'remove-all-right',
           name: 'Remove to the right',
-          icon: 'next',
+          icon: 'chevron-next',
           onSelect: () => {
             const newTableState = Table.removeColumnsToRight(
               tableState,
@@ -507,7 +505,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'remove-all-left',
           name: 'Remove to the left',
-          icon: 'previous',
+          icon: 'chevron-back',
           onSelect: () => {
             const newTableState = Table.removeColumnsToLeft(
               tableState,
@@ -778,8 +776,8 @@ export const ColumnHeader: React.FC<{
                   )}
                   {isGroupCol && (
                     <S.ControlIcon
-                      name="group-runs"
-                      onClick={e => {
+                      name="group"
+                      onClick={() => {
                         recordEvent('REMOVE_COLUMN_GROUPING');
                         doUngroup();
                       }}
@@ -801,7 +799,7 @@ export const ColumnHeader: React.FC<{
                   <S.EllipsisIcon
                     ref={anchorRef}
                     data-test="column-options"
-                    name="overflow"
+                    name="overflow-vertical"
                     className="column-actions-trigger"
                     onClick={() => setOpen(o => !o)}
                   />
@@ -826,8 +824,8 @@ const SortStateToggle: React.FC<{
   if (colSortState && colSortState === 'desc') {
     return (
       <S.ControlIcon
-        name="down-arrow"
-        onClick={async e => {
+        name="sort-descending"
+        onClick={async () => {
           recordEvent('REMOVE_COLUMN_SORT');
           updateTableState(Table.disableSortByCol(tableState, colId));
         }}
@@ -836,8 +834,8 @@ const SortStateToggle: React.FC<{
   } else if (colSortState && colSortState === 'asc') {
     return (
       <S.ControlIcon
-        name="up-arrow"
-        onClick={async e => {
+        name="sort-ascending"
+        onClick={async () => {
           recordEvent('UPDATE_COLUMN_SORT_DESC');
           updateTableState(
             Table.enableSortByCol(Table.disableSort(tableState), colId, false)
@@ -873,10 +871,9 @@ const ColumnMenuOptionRenderer: OptionRenderer = ({
     data-test={option['data-test']}
     hovered={hovered}
     style={{justifyContent: 'flex-start'}}>
-    <ItemIcon
-      style={{marginRight: '8px', marginLeft: 0}}
-      name={option.icon ?? (selected && option.icon ? 'check' : 'blank')}
-    />
+    {option.icon && selected && (
+      <ItemIcon style={{marginRight: '8px', marginLeft: 0}} name="checkmark" />
+    )}
     {option.name ?? option.value}
   </Item>
 );

@@ -1,9 +1,7 @@
-import {foundations} from '@wandb/ui';
 import styled, {css} from 'styled-components';
 
+import * as globals from '../css/globals.styles';
 import AutoCompletingInput from './AutoCompletingInput';
-
-const {legacy} = foundations;
 
 export const CaretWrapper = styled.div`
   width: 24px;
@@ -44,10 +42,10 @@ export const TypeableWrapper = styled.div<{
     !props.inputFocused &&
     css`
       &:hover {
-        border: 1px solid ${legacy.border};
+        border: 1px solid ${globals.border};
         ${CaretWrapper} {
           background: #f1f1f1;
-          border-left: 1px solid ${legacy.border};
+          border-left: 1px solid ${globals.border};
         }
         .wbic-ic-next {
           color: black;
@@ -88,7 +86,7 @@ export const StyledAutoCompletingInput = styled(AutoCompletingInput)`
 `;
 
 export const DropdownArrow = styled.div`
-  border-top: 0.25em solid ${legacy.textPrimary};
+  border-top: 0.25em solid ${globals.textPrimary};
   border-left: 0.25em solid transparent;
   border-right: 0.25em solid transparent;
   position: relative;
