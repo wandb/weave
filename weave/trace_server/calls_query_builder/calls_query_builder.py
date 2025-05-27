@@ -780,13 +780,13 @@ class CallsQuery(BaseModel):
         id_mask_sql = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
             id_mask_sql = f"AND (calls_merged.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
-        # TODO: We should also pull out id-masks from the dynamic query
 
         feedback_join_sql = ""
         if needs_feedback:
             feedback_join_sql = f"""
             LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
+            ON feedback.project_id = {param_slot(project_param, "String")} 
+                AND feedback.call_id = calls_merged.id
             """
 
         storage_size_sql = ""
