@@ -230,6 +230,7 @@ const ContentViewMetadataLoaded = ({
   }
 
   if (mimetype.startsWith('video/')) {
+    let videoRef = useRef<HTMLVideoElement>(null)
     const onTextClick = () => {
       setShowPreview(true);
       if (!contentResult) {
@@ -239,7 +240,6 @@ const ContentViewMetadataLoaded = ({
     const onClose = () => {
       setShowPreview(false);
     };
-
     iconAndText = (
       <>
         <CustomLink
@@ -253,6 +253,7 @@ const ContentViewMetadataLoaded = ({
             src={contentUrl}
             isOpen={true}
             onClose={onClose}
+            videoRef={videoRef}
           />
         )}
       </>
