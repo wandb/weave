@@ -1,7 +1,7 @@
 import {WBIcon} from '@wandb/ui';
-import * as globals from '../css/globals.styles';
 import styled from 'styled-components';
 
+import * as globals from '../css/globals.styles';
 import type {WBMenuTheme} from './WBMenu';
 
 type ContentProps = {

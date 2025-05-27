@@ -71,7 +71,7 @@ const makeSortingMenuItems = (
     menuItems.push({
       value: 'sort-asc',
       name: 'Sort Asc',
-      icon: 'sort-ascending',
+      icon: 'up-arrow',
       onSelect: async () => {
         recordEvent('UPDATE_COLUMN_SORT_ASC');
         const newTableState = Table.enableSortByCol(
@@ -101,7 +101,7 @@ const makeSortingMenuItems = (
     menuItems.push({
       value: 'sort-desc',
       name: 'Sort Desc',
-      icon: 'sort-descending',
+      icon: 'down-arrow',
       onSelect: async () => {
         recordEvent('UPDATE_COLUMN_SORT_DESC');
         const newTableState = Table.enableSortByCol(
@@ -342,7 +342,7 @@ export const ColumnHeader: React.FC<{
     menuItems.push({
       value: 'settings',
       name: 'Edit cell expression',
-      icon: 'settings',
+      icon: 'configuration',
       onSelect: () => openColumnSettings(),
     });
     menuItems.push(makeMenuItemDivider('expression-div'));
@@ -363,7 +363,7 @@ export const ColumnHeader: React.FC<{
       menuItems.push({
         value: 'group',
         name: 'Group by',
-        icon: 'group',
+        icon: 'group-runs',
         onSelect: async () => {
           recordEvent('GROUP');
           let newTableState: Table.TableState | null = null;
@@ -400,7 +400,7 @@ export const ColumnHeader: React.FC<{
       menuItems.push({
         value: 'ungroup',
         name: 'Ungroup',
-        icon: 'group',
+        icon: 'group-runs',
         onSelect: doUngroup,
       });
     }
@@ -417,7 +417,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'insert-right',
           name: 'Insert 1 right',
-          icon: 'chevron-next',
+          icon: 'next',
           onSelect: () => {
             const newTableState = Table.insertColumnRight(
               tableState,
@@ -432,7 +432,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'insert-left',
           name: 'Insert 1 left',
-          icon: 'chevron-back',
+          icon: 'previous',
           onSelect: () => {
             const newTableState = Table.insertColumnLeft(
               tableState,
@@ -491,7 +491,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'remove-all-right',
           name: 'Remove to the right',
-          icon: 'chevron-next',
+          icon: 'next',
           onSelect: () => {
             const newTableState = Table.removeColumnsToRight(
               tableState,
@@ -505,7 +505,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'remove-all-left',
           name: 'Remove to the left',
-          icon: 'chevron-back',
+          icon: 'previous',
           onSelect: () => {
             const newTableState = Table.removeColumnsToLeft(
               tableState,
@@ -776,8 +776,8 @@ export const ColumnHeader: React.FC<{
                   )}
                   {isGroupCol && (
                     <S.ControlIcon
-                      name="group"
-                      onClick={() => {
+                      name="group-runs"
+                      onClick={e => {
                         recordEvent('REMOVE_COLUMN_GROUPING');
                         doUngroup();
                       }}
@@ -799,7 +799,7 @@ export const ColumnHeader: React.FC<{
                   <S.EllipsisIcon
                     ref={anchorRef}
                     data-test="column-options"
-                    name="overflow-vertical"
+                    name="overflow"
                     className="column-actions-trigger"
                     onClick={() => setOpen(o => !o)}
                   />
@@ -824,8 +824,8 @@ const SortStateToggle: React.FC<{
   if (colSortState && colSortState === 'desc') {
     return (
       <S.ControlIcon
-        name="sort-descending"
-        onClick={async () => {
+        name="down-arrow"
+        onClick={async e => {
           recordEvent('REMOVE_COLUMN_SORT');
           updateTableState(Table.disableSortByCol(tableState, colId));
         }}
@@ -834,8 +834,8 @@ const SortStateToggle: React.FC<{
   } else if (colSortState && colSortState === 'asc') {
     return (
       <S.ControlIcon
-        name="sort-ascending"
-        onClick={async () => {
+        name="up-arrow"
+        onClick={async e => {
           recordEvent('UPDATE_COLUMN_SORT_DESC');
           updateTableState(
             Table.enableSortByCol(Table.disableSort(tableState), colId, false)
@@ -871,9 +871,10 @@ const ColumnMenuOptionRenderer: OptionRenderer = ({
     data-test={option['data-test']}
     hovered={hovered}
     style={{justifyContent: 'flex-start'}}>
-    {option.icon && selected && (
-      <ItemIcon style={{marginRight: '8px', marginLeft: 0}} name="checkmark" />
-    )}
+    <ItemIcon
+      style={{marginRight: '8px', marginLeft: 0}}
+      name={option.icon ?? (selected && option.icon ? 'check' : 'blank')}
+    />
     {option.name ?? option.value}
   </Item>
 );
