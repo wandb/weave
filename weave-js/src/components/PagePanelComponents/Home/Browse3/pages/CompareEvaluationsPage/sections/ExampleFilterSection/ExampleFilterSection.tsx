@@ -1,6 +1,7 @@
-import {Box} from '@material-ui/core';
+import {Tooltip} from '@material-ui/core';
 import {FormControl} from '@material-ui/core';
-import {Alert, AlertTitle, Autocomplete, Button} from '@mui/material';
+import {Autocomplete} from '@mui/material';
+import {Icon} from '@wandb/weave/components/Icon/Icon';
 import _, {mean, sum} from 'lodash';
 import React, {useCallback, useMemo} from 'react';
 
@@ -32,8 +33,6 @@ const RESULT_FILTER_INSTRUCTIONS =
 export const ExampleFilterSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const [isExpanded, setIsExpanded] = React.useState(true);
-
   return (
     <VerticalBox
       sx={{
@@ -43,59 +42,36 @@ export const ExampleFilterSection: React.FC<{
       }}>
       <HorizontalBox
         sx={{
-          width: '100%',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          marginBottom: '8px',
-        }}>
-        <Box
-          sx={{
-            fontWeight: 'bold',
-          }}>
-          Example Filter
-        </Box>
-      </HorizontalBox>
-      <HorizontalBox
-        sx={{
+          paddingTop: STANDARD_PADDING,
           flex: '1 1 auto',
           width: '100%',
           flexWrap: 'wrap',
         }}>
         <SingleDimensionFilter {...props} dimensionIndex={0} />
-        <SingleDimensionFilter {...props} dimensionIndex={1} />
+        <SingleDimensionFilter {...props} dimensionIndex={1} showHelp />
       </HorizontalBox>
-      <Alert
-        severity="info"
-        action={
-          <Button
-            color="inherit"
-            size="small"
-            onClick={() => {
-              setIsExpanded(!isExpanded);
-            }}>
-            {isExpanded ? 'COLLAPSE' : 'EXPAND'}
-          </Button>
-        }
-        slotProps={{
-          closeIcon: {
-            name: '',
-          },
-        }}>
-        <AlertTitle
-          sx={{
-            marginBottom: isExpanded ? '5px' : '0px',
-          }}>
-          Plot Details
-        </AlertTitle>
-        {isExpanded ? RESULT_FILTER_INSTRUCTIONS : ''}
-      </Alert>
     </VerticalBox>
+  );
+};
+
+const HelpTooltip: React.FC = () => {
+  return (
+    <Tooltip title={RESULT_FILTER_INSTRUCTIONS}>
+      <div
+        style={{
+          width: '20px',
+          height: '20px',
+        }}>
+        <Icon name="help-alt" />
+      </div>
+    </Tooltip>
   );
 };
 
 const SingleDimensionFilter: React.FC<{
   state: EvaluationComparisonState;
   dimensionIndex: number;
+  showHelp?: boolean;
 }> = props => {
   const compositeMetricsMap = useMemo(() => {
     return buildCompositeMetricsMap(props.state.summary, 'score');
@@ -271,7 +247,14 @@ const SingleDimensionFilter: React.FC<{
         flex: '1 1 ' + PLOT_HEIGHT + 'px',
         width: PLOT_HEIGHT,
       }}>
-      <DimensionPicker {...props} dimensionIndex={props.dimensionIndex} />
+      <HorizontalBox
+        sx={{
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+        <DimensionPicker {...props} dimensionIndex={props.dimensionIndex} />
+        {props.showHelp && <HelpTooltip />}
+      </HorizontalBox>
       <PlotlyScatterPlot
         onRangeChange={onRangeChange}
         height={PLOT_HEIGHT}

@@ -703,11 +703,7 @@ export const ExampleCompareSectionDetail: React.FC<{
             onClick={() => {
               props.onExpandToggle();
             }}>
-            <Icon
-              name={
-                props.isExpanded ? 'expand-right' : 'full-screen-mode-expand'
-              }
-            />
+            <Icon name={props.isExpanded ? 'expand-right' : 'contract-left'} />
           </IconButton>
         </Tooltip>
         <Tooltip title="Close">
