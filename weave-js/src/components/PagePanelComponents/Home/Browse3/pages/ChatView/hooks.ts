@@ -217,7 +217,6 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
   if (!traceCall.output || !traceCall.inputs) {
     return traceCall;
   }
-  console.log('normalizing')
 
   const {inputs, output, ...rest} = traceCall;
 
