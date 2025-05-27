@@ -755,7 +755,7 @@ def make_client_call(
 def sum_dict_leaves(dicts: list[dict]) -> dict:
     nested_dicts: dict[str, list[dict]] = {}
     keys: set[str] = set()
-    result: dict[str, Any] = {}
+    result: dict[str, Any] = defaultdict(list)
 
     # First, collect all nested dictionaries by key
     for d in dicts:
