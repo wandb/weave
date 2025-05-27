@@ -38,7 +38,7 @@ import * as S from '../PanelTable.styles';
 import {WeaveFormatContext} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {defineColumnName, stripTag} from './util';
-import {Icon} from '../../Icon';
+import {Icon, type IconName} from '../../Icon';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -875,7 +875,8 @@ const ColumnMenuOptionRenderer: OptionRenderer = ({
     {option.icon && (
       <ItemIcon
         style={{marginRight: '8px', marginLeft: 0}}
-        name={selected ? 'checkmark' : option.icon}
+        // @todo: fix this type by updating wandb/ui local implementation
+        name={selected ? 'checkmark' : (option.icon as IconName)}
       />
     )}
     {option.name ?? option.value}
