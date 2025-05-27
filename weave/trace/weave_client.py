@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import json
 import logging
+import numbers
 import os
 import platform
 import re
@@ -752,15 +753,41 @@ def make_client_call(
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
-    # dicts is a list of dictionaries, that may or may not
-    # have nested dictionaries. Sum all the leaves that match
-    result: dict = {}
+    nested_dicts: dict[str, list[dict]] = {}
+    keys: set[str] = set()
+    result: dict[str, Any] = {}
+
+    # First, collect all nested dictionaries by key
     for d in dicts:
         for k, v in d.items():
             if isinstance(v, dict):
-                result[k] = sum_dict_leaves([result.get(k, {}), v])
+                keys.add(k)
+                if k not in result:
+                    result[k] = []
+                if k not in nested_dicts:
+                    nested_dicts[k] = []
+                nested_dicts[k].append(v)
             elif v is not None:
-                result[k] = result.get(k, 0) + v
+                keys.add(k)
+                if k not in result:
+                    result[k] = []
+                if isinstance(v, list):
+                    result[k].extend(v)
+                else:
+                    result[k].append(v)
+    # Sum those values that are numbers
+    for k in keys:
+        values = result[k]
+        if all(isinstance(v, numbers.Number) for v in values) and (
+            k not in nested_dicts
+        ):
+            result[k] = sum(values)
+
+    # Then recursively sum each collection of nested dictionaries
+    for k in keys:
+        if k in nested_dicts:
+            result[k] = sum_dict_leaves(nested_dicts[k])
+
     return result
 
 
