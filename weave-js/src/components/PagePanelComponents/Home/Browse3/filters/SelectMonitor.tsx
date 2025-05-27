@@ -3,9 +3,9 @@ import {IconNames} from '@wandb/weave/components/Icon';
 import React, {useMemo, useState} from 'react';
 
 import {SortBy} from '../pages/wfReactInterface/traceServerClientTypes';
+import {useRootObjectVersions} from '../pages/wfReactInterface/tsDataModelHooks';
 import {ObjectVersionFilter} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallRefIcon} from '../smallRef/SmallRefIcon';
-import {useRootObjectVersions} from '../pages/wfReactInterface/tsDataModelHooks';
 
 type SelectMonitorOption = {
   label: string;

@@ -15,13 +15,13 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {TailwindContents} from '../../../../Tailwind';
 import {useWeaveflowRouteContext} from '../context';
 import {Id} from '../pages/common/Id';
-import {KnownBaseObjectClassType} from '../pages/wfReactInterface/wfDataModelHooksInterface';
-import {SmallRefLoaded} from './SmallRefLoaded';
 import {
   useCall,
   useObjectVersion,
   useRootObjectVersions,
 } from '../pages/wfReactInterface/tsDataModelHooks';
+import {KnownBaseObjectClassType} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+import {SmallRefLoaded} from './SmallRefLoaded';
 
 export const objectRefDisplayName = (
   objRef: ObjectRef,
@@ -256,10 +256,6 @@ export const SmallObjectVersionsRef = ({
     objectVersions?.error ??
     (objectVersions.result?.length === 0 ? new Error('Not found') : null);
 
-  if (objectVersions.loading && !error) {
-    return <LoadingDots />;
-  }
-
   const objVersion = objectVersions.result?.[0] ?? {
     baseObjectClass: undefined,
     versionIndex: -1,
@@ -268,20 +264,22 @@ export const SmallObjectVersionsRef = ({
   const baseObjectClass =
     objVersion.baseObjectClass as KnownBaseObjectClassType;
 
-  const rootTypeName = baseObjectClass ?? 'Object';
-
-  const icon = ICON_MAP[rootTypeName] ?? IconNames.CubeContainer;
-
   const url = useMemo(
     () =>
       peekingRouter.objectVersionsUIUrl(objRef.entityName, objRef.projectName, {
         baseObjectClass,
         objectName: objRef.artifactName,
       }),
-    [objRef, peekingRouter]
+    [objRef, peekingRouter, baseObjectClass]
   );
 
-  return (
+  const rootTypeName = baseObjectClass ?? 'Object';
+
+  const icon = ICON_MAP[rootTypeName] ?? IconNames.CubeContainer;
+
+  return objectVersions.loading && !error ? (
+    <LoadingDots />
+  ) : (
     <TailwindContents>
       <SmallRefLoaded
         icon={icon}
