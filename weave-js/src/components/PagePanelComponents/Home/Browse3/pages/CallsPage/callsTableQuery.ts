@@ -96,6 +96,7 @@ export const useCallsForQuery = (
     filter: lowLevelFilter,
     query: filterBy,
     refetchOnDelete: true,
+    skip: true,
   });
 
   const callResults = useMemo(() => {
@@ -131,7 +132,7 @@ export const useCallsForQuery = (
     limit: effectiveLimit,
     columns: costCols,
     expandedRefColumns: expandedColumns,
-    skip: calls.loading || noCalls,
+    skip: true,
     includeCosts: true,
   });
 
@@ -145,7 +146,7 @@ export const useCallsForQuery = (
     limit: effectiveLimit,
     columns: storageSizeCols,
     expandedRefColumns: expandedColumns,
-    skip: calls.loading || noCalls || !options?.includeTotalStorageSize,
+    skip: true,
     includeTotalStorageSize: true,
   });
 

@@ -322,6 +322,9 @@ const useCallsNoExpansion = (
       sort_by: params.sortBy,
       query: params.query,
       columns: params.columns,
+      expand_columns: params.expandedRefColumns
+        ? Array.from(params.expandedRefColumns)
+        : undefined,
       include_costs: params.includeCosts,
       include_feedback: params.includeFeedback,
       ...(params.includeTotalStorageSize
@@ -337,6 +340,7 @@ const useCallsNoExpansion = (
     params.sortBy,
     params.query,
     params.columns,
+    params.expandedRefColumns,
     params.includeCosts,
     params.includeFeedback,
     params.includeTotalStorageSize,

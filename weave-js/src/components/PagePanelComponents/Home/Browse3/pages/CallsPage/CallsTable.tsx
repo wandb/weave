@@ -401,11 +401,26 @@ export const CallsTable: FC<{
             field,
             rowId
           );
-          if (expandedRef != null) {
-            value = expandedRef.value;
-            field = expandedRef.field;
-          }
           const op = operator ? operator : getDefaultOperatorForValue(value);
+          if (expandedRef != null) {
+            // special case, we need to add TWO values to the filter
+            // 1. the ref
+            // 2. the value of the ref
+            // This is because the ref is not a real column, and we need to filter by the
+            // value of the ref.
+            // filterModel.items.push({
+            //   field: expandedRef.field,
+            //   operator: op,
+            //   value: expandedRef.value,
+            // });
+            console.log('setting expanded ref cols', expandedRef.field);
+            setExpandedRefCols(prevState => {
+              const newSet = new Set(prevState);
+              newSet.delete('inputs.example');
+              newSet.add(expandedRef.field);
+              return newSet;
+            });
+          }
 
           // All values added to the filter model should be strings, we
           // only allow text-field input in the filter bar (even for numeric)

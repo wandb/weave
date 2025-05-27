@@ -226,6 +226,60 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         )
 
 
+class CallsMergedObjectJoinField(CallsMergedDynamicField):
+    expand_columns: list[str]
+
+    @classmethod
+    def from_dynamic_field(
+        cls, field: CallsMergedDynamicField, expand_columns: list[str]
+    ) -> "CallsMergedObjectJoinField":
+        assert field.field in {
+            "inputs_dump",
+            "output_dump",
+            "attributes_dump",
+        }
+        return cls(
+            field=field.field,
+            expand_columns=expand_columns,
+            extra_path=field.extra_path,
+            agg_fn=field.agg_fn,
+        )
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        use_agg_fn: bool = True,
+        object_table_alias: Optional[str] = None,
+        cast: Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        # we need to convert the name to the shortest string present in the call
+        # example:
+        # name = 'inputs.model.config.temperature'
+        # expand_columns = ['inputs.model', 'inputs.model.config']
+        # then return the json extract for the key to the first ref IN the join table
+
+        if not object_table_alias:
+            print(
+                "warning: object_table_alias is None for",
+                self.field,
+            )
+            return ""
+
+        subquery = f"IN (SELECT full_ref FROM {object_table_alias})"
+
+        root = self.field
+        print("ROOOOOT", root, "extra_path", self.extra_path)
+        key = self.extra_path[0]
+        field_sql = f"{table_alias}.{root}"
+        if use_agg_fn:
+            field_sql = f"any({field_sql})"
+        return f"JSON_VALUE({field_sql}, '$.{key}') {subquery}"
+
+    def is_heavy(self) -> bool:
+        return True
+
+
 class AggregatedDataSizeField(CallsMergedField):
     join_table_name: str
 
@@ -353,11 +407,19 @@ class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: Optional[list[CallsMergedField]] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        object_join_map: dict[str, str] = {},
+        expand_columns: list[str] = [],
+    ) -> str:
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
+            object_join_map=object_join_map,
+            expand_columns=expand_columns,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -381,6 +443,12 @@ class Condition(BaseModel):
     def is_feedback(self) -> bool:
         for field in self._get_consumed_fields():
             if isinstance(field, CallsMergedFeedbackPayloadField):
+                return True
+        return False
+
+    def is_object_join(self) -> bool:
+        for field in self._get_consumed_fields():
+            if isinstance(field, CallsMergedObjectJoinField):
                 return True
         return False
 
@@ -423,12 +491,15 @@ class CallsQuery(BaseModel):
     order_fields: list[OrderField] = Field(default_factory=list)
     limit: Optional[int] = None
     offset: Optional[int] = None
+    expand_columns: list[str] = Field(default_factory=list)
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
-        name = get_field_by_name(field)
+        if self.expand_columns:
+            print("adding field", field, "with expand_columns", self.expand_columns)
+        name = get_field_by_name(field, expand_columns=self.expand_columns)
         if name in self.select_fields:
             return self
         self.select_fields.append(name)
@@ -455,7 +526,10 @@ class CallsQuery(BaseModel):
             raise ValueError(f"Direction {direction} is not allowed")
         direction = cast(Literal["ASC", "DESC"], direction)
         self.order_fields.append(
-            OrderField(field=get_field_by_name(field), direction=direction)
+            OrderField(
+                field=get_field_by_name(field, expand_columns=self.expand_columns),
+                direction=direction,
+            )
         )
         return self
 
@@ -488,6 +562,10 @@ class CallsQuery(BaseModel):
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
         self.include_costs = include_costs
+        return self
+
+    def set_expand_columns(self, expand_columns: list[str]) -> "CallsQuery":
+        self.expand_columns = expand_columns
         return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
@@ -637,6 +715,61 @@ class CallsQuery(BaseModel):
         for field in self.select_fields:
             outer_query.select_fields.append(field)
 
+        # do object table joins if neccesary
+        has_object_select_or_order_joins = any(
+            isinstance(field, CallsMergedObjectJoinField)
+            for field in self.select_fields + self.order_fields
+        )
+        print(">>>>has_object_select_or_order_joins", has_object_select_or_order_joins)
+        # hack to force object_join_condition stuff
+        for c in self.query_conditions:
+            c._consumed_fields = []
+            c.as_sql(pb, "test", {}, expand_columns=self.expand_columns)
+
+        object_join_conditions = [
+            c for c in self.query_conditions if c.is_object_join()
+        ]
+        print(
+            ">>>>object_join_conditions 2",
+            object_join_conditions,
+            "expand_columns",
+            self.expand_columns,
+        )
+
+        if not object_join_conditions and self.expand_columns:
+            for c in self.query_conditions:
+                conditions = process_query_to_conditions(
+                    tsi_query.Query.model_validate({"$expr": {"$and": [c.operand]}}),
+                    pb,
+                    table_alias,
+                    object_join_map={},
+                    expand_columns=self.expand_columns,
+                )
+                fields_used = conditions.fields_used
+                print("fields_used", fields_used)
+                for field in fields_used:
+                    if isinstance(field, CallsMergedObjectJoinField):
+                        print("field is object join", field)
+                        object_join_conditions.append(c)
+
+        object_join_cte, field_to_object_join_alias_map = "", None
+        if has_object_select_or_order_joins or object_join_conditions:
+            object_join_cte, field_to_object_join_alias_map = (
+                build_object_ref_conditions(
+                    pb,
+                    self.project_id,
+                    table_alias,
+                    object_join_conditions,
+                    expand_columns=self.expand_columns,
+                )
+            )
+
+            print("----------- object_join_cte", object_join_cte)
+            print(
+                "----------- field_to_object_join_alias_map",
+                field_to_object_join_alias_map,
+            )
+
         # Query Conditions
         for condition in self.query_conditions:
             if condition.is_heavy():
@@ -660,8 +793,11 @@ class CallsQuery(BaseModel):
             outer_query.offset = self.offset
 
         raw_sql = f"""
-        WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
+        WITH filtered_calls AS ({filter_query._as_sql_base_format(
+            pb, table_alias, field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)})
         """
+        if object_join_cte:
+            raw_sql += f",\n{object_join_cte}"
 
         if self.include_costs:
             # TODO: We should unify the calls query order by fields to be orm sort by fields
@@ -673,13 +809,13 @@ class CallsQuery(BaseModel):
                 for sort_by in self.order_fields
             ]
             raw_sql += f""",
-            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
+            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}),
             {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
 
         else:
             raw_sql += f"""
-            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
+            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}
             """
 
         return safely_format_sql(raw_sql, logger)
@@ -689,6 +825,8 @@ class CallsQuery(BaseModel):
         pb: ParamBuilder,
         table_alias: str,
         id_subquery_name: Optional[str] = None,
+        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
+        expand_columns: list[str] = [],
     ) -> str:
         needs_feedback = False
         select_fields_sql = ", ".join(
@@ -698,10 +836,20 @@ class CallsQuery(BaseModel):
         having_filter_sql = ""
         having_conditions_sql: list[str] = []
         if len(self.query_conditions) > 0:
-            having_conditions_sql.extend(
-                c.as_sql(pb, table_alias) for c in self.query_conditions
-            )
             for query_condition in self.query_conditions:
+                query_condition_sql = query_condition.as_sql(
+                    pb,
+                    table_alias,
+                    object_join_map=field_to_object_join_alias_map or {},
+                    expand_columns=expand_columns,
+                )
+                print(
+                    "\n_________ query_condition_sql",
+                    query_condition_sql,
+                    "field_to_object_join_alias_map",
+                    field_to_object_join_alias_map,
+                )
+                having_conditions_sql.append(query_condition_sql)
                 if query_condition.is_feedback():
                     needs_feedback = True
         if self.hardcoded_filter is not None:
@@ -748,7 +896,8 @@ class CallsQuery(BaseModel):
         sortable_datetime_sql = (
             optimization_conditions.sortable_datetime_filters_sql or ""
         )
-        str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
+        # str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
+        str_filter_opt_sql = ""
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -874,25 +1023,54 @@ ALLOWED_CALL_FIELDS = {
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
 
-def get_field_by_name(name: str) -> CallsMergedField:
+def _column_requires_object_join(name: str, expand_columns: list[str]) -> bool:
+    """
+    Returns True if the column requires an object join.
+
+    name = 'inputs.model.config.temperature'
+    expand_columns = ['inputs.model', 'inputs.model.config']
+    """
+    print("_column_requires_object_join. name", name, "expand_columns", expand_columns)
+    for col in expand_columns:
+        if name.startswith(col):
+            print("name.startswith(col)", name, col)
+            return True
+    return False
+
+
+def convert_to_object_join_field(
+    field: CallsMergedDynamicField,
+    expand_columns: list[str],
+) -> CallsMergedObjectJoinField:
+    print("convert_to_object_join_field", field, "expand_columns", expand_columns)
+    return CallsMergedObjectJoinField.from_dynamic_field(
+        field, expand_columns=expand_columns
+    )
+
+
+def get_field_by_name(name: str, expand_columns: list[str] = []) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
         if name.startswith("feedback."):
             return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])
-        elif name.startswith("summary.weave."):
+        if name.startswith("summary.weave."):
             # Handle summary.weave.* fields
             summary_field = name[len("summary.weave.") :]
             return CallsMergedSummaryField(field=name, summary_field=summary_field)
-        else:
-            field_parts = name.split(".")
-            start_part = field_parts[0]
-            dumped_start_part = start_part + "_dump"
-            if dumped_start_part in ALLOWED_CALL_FIELDS:
-                field = ALLOWED_CALL_FIELDS[dumped_start_part]
-                if isinstance(field, CallsMergedDynamicField):
-                    if len(field_parts) > 1:
-                        return field.with_path(field_parts[1:])
-                return field
-            raise InvalidFieldError(f"Field {name} is not allowed")
+        field_parts = name.split(".")
+        start_part = field_parts[0]
+        dumped_start_part = start_part + "_dump"
+        if dumped_start_part in ALLOWED_CALL_FIELDS:
+            field = ALLOWED_CALL_FIELDS[dumped_start_part]
+            if isinstance(field, CallsMergedDynamicField):
+                if len(field_parts) > 1:
+                    merged_dynamic_field = field.with_path(field_parts[1:])
+                    if _column_requires_object_join(name, expand_columns):
+                        return convert_to_object_join_field(
+                            merged_dynamic_field, expand_columns=expand_columns
+                        )
+                    return merged_dynamic_field
+            return field
+        raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
 
 
@@ -978,6 +1156,8 @@ def process_query_to_conditions(
     param_builder: ParamBuilder,
     table_alias: str,
     use_agg_fn: bool = True,
+    object_join_map: dict[str, str] = {},
+    expand_columns: list[str] = [],
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -991,21 +1171,23 @@ def process_query_to_conditions(
             if len(operation.and_) == 0:
                 raise ValueError("Empty AND operation")
             elif len(operation.and_) == 1:
-                return process_operand(operation.and_[0])
-            parts = [process_operand(op) for op in operation.and_]
+                return process_operand(operation.and_[0])[0]
+            parts = [process_operand(op)[0] for op in operation.and_]
             cond = f"({' AND '.join(parts)})"
         elif isinstance(operation, tsi_query.OrOperation):
             if len(operation.or_) == 0:
                 raise ValueError("Empty OR operation")
             elif len(operation.or_) == 1:
-                return process_operand(operation.or_[0])
-            parts = [process_operand(op) for op in operation.or_]
+                return process_operand(operation.or_[0])[0]
+            parts = [process_operand(op)[0] for op in operation.or_]
             cond = f"({' OR '.join(parts)})"
         elif isinstance(operation, tsi_query.NotOperation):
-            operand_part = process_operand(operation.not_[0])
+            operand_part = process_operand(operation.not_[0])[0]
             cond = f"(NOT ({operand_part}))"
         elif isinstance(operation, tsi_query.EqOperation):
-            lhs_part = process_operand(operation.eq_[0])
+            lhs_part, is_complete = process_operand(operation.eq_[0])
+            if is_complete:
+                return lhs_part
             if (
                 isinstance(operation.eq_[1], tsi_query.LiteralOperation)
                 and operation.eq_[1].literal_ is None
@@ -1015,20 +1197,26 @@ def process_query_to_conditions(
                 rhs_part = process_operand(operation.eq_[1])
                 cond = f"({lhs_part} = {rhs_part})"
         elif isinstance(operation, tsi_query.GtOperation):
-            lhs_part = process_operand(operation.gt_[0])
-            rhs_part = process_operand(operation.gt_[1])
+            lhs_part, is_complete = process_operand(operation.gt_[0])
+            if is_complete:
+                return lhs_part
+            rhs_part = process_operand(operation.gt_[1])[0]
             cond = f"({lhs_part} > {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
-            lhs_part = process_operand(operation.gte_[0])
-            rhs_part = process_operand(operation.gte_[1])
+            lhs_part, is_complete = process_operand(operation.gte_[0])
+            if is_complete:
+                return lhs_part
+            rhs_part = process_operand(operation.gte_[1])[0]
             cond = f"({lhs_part} >= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
-            lhs_part = process_operand(operation.in_[0])
-            rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
+            lhs_part = process_operand(operation.in_[0])[0]
+            rhs_part = ",".join(process_operand(op)[0] for op in operation.in_[1])
             cond = f"({lhs_part} IN ({rhs_part}))"
         elif isinstance(operation, tsi_query.ContainsOperation):
-            lhs_part = process_operand(operation.contains_.input)
-            rhs_part = process_operand(operation.contains_.substr)
+            lhs_part, is_complete = process_operand(operation.contains_.input)
+            if is_complete:
+                return lhs_part
+            rhs_part = process_operand(operation.contains_.substr)[0]
             position_operation = "position"
             if operation.contains_.case_insensitive:
                 position_operation = "positionCaseInsensitive"
@@ -1038,29 +1226,49 @@ def process_query_to_conditions(
 
         return cond
 
-    def process_operand(operand: "tsi_query.Operand") -> str:
+    def process_operand(operand: "tsi_query.Operand") -> tuple[str, bool]:
         if isinstance(operand, tsi_query.LiteralOperation):
-            return param_slot(
-                param_builder.add_param(operand.literal_),  # type: ignore
-                python_value_to_ch_type(operand.literal_),
+            return (
+                param_slot(
+                    param_builder.add_param(operand.literal_),  # type: ignore
+                    python_value_to_ch_type(operand.literal_),
+                ),
+                False,
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
                 raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
 
-            structured_field = get_field_by_name(operand.get_field_)
+            structured_field = get_field_by_name(
+                operand.get_field_, expand_columns=expand_columns
+            )
+            print("structured_field", structured_field)
 
-            if isinstance(structured_field, CallsMergedDynamicField):
+            if isinstance(structured_field, CallsMergedObjectJoinField):
+                full_path = (
+                    structured_field.field.replace("_dump", "")
+                    + "."
+                    + ".".join(structured_field.extra_path or [])
+                )
                 field = structured_field.as_sql(
-                    param_builder, table_alias, use_agg_fn=use_agg_fn
+                    param_builder,
+                    table_alias,
+                    use_agg_fn=use_agg_fn,
+                    object_table_alias=object_join_map.get(full_path),
+                )
+            elif isinstance(structured_field, CallsMergedDynamicField):
+                field = structured_field.as_sql(
+                    param_builder,
+                    table_alias,
+                    use_agg_fn=use_agg_fn,
                 )
             else:
                 field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
-            return field
+            return field, isinstance(structured_field, CallsMergedObjectJoinField)
         elif isinstance(operand, tsi_query.ConvertOperation):
-            field = process_operand(operand.convert_.input)
-            return clickhouse_cast(field, operand.convert_.to)
+            field = process_operand(operand.convert_.input)[0]
+            return clickhouse_cast(field, operand.convert_.to), False
         elif isinstance(
             operand,
             (
@@ -1074,7 +1282,7 @@ def process_query_to_conditions(
                 tsi_query.ContainsOperation,
             ),
         ):
-            return process_operation(operand)
+            return process_operation(operand), False
         else:
             raise TypeError(f"Unknown operand type: {operand}")
 
@@ -1310,7 +1518,7 @@ def build_calls_query_stats_query(
 ) -> tuple[str, KeysView[str]]:
     cq = CallsQuery(
         project_id=req.project_id,
-        include_total_storage_size=req.include_total_storage_size,
+        include_total_storage_size=bool(req.include_total_storage_size),
     )
 
     cq.add_field("id")
@@ -1332,3 +1540,156 @@ def build_calls_query_stats_query(
     calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
     return (calls_query_sql, aggregated_columns.keys())
+
+
+def build_object_ref_conditions(
+    pb: "ParamBuilder",
+    project_id: str,
+    table_alias: str,
+    object_join_conditions: list[Condition],
+    expand_columns: list[str],
+) -> tuple[str, dict[str, str]]:
+    """
+    Builds SQL components for filtering based on object references.
+    This function processes various condition types (eq, contains, gt, gte)
+    and creates the appropriate SQL for filtering object references.
+    Args:
+        pb: ParamBuilder for parameter management
+        project_id: Project ID for the query
+        table_alias: The alias of the table being queried
+        object_mapping: A mapping from field path to condition objects
+                        e.g. {"inputs.model.name.str": Condition}
+        expand_columns: List of column paths that should be treated as references
+                        to the objects table, e.g. ["inputs.model", "output.values"]
+    Returns:
+        Dictionary with cte_parts
+    """
+    print("building object ref conditions", object_join_conditions)
+    project_param = pb.add_param(project_id)
+    if not object_join_conditions:
+        print("no object join conditions")
+        return "", {}
+
+    # Start building the CTEs from the deepest leaf values
+    cte_parts = []
+    field_to_object_join_alias_map = {}
+
+    # Process object mapping conditions
+    for i, condition in enumerate(object_join_conditions):
+        print(f"Processing object join condition {i}: {condition}")
+
+        # Process the operation based on its type
+        operation = condition.operand
+        operation_type = type(operation)
+
+        op_str, get_field, val = None, None, None
+        if isinstance(operation, tsi_query.EqOperation):
+            op_str = "="
+            get_field = operation.eq_[0]
+            val = operation.eq_[1].literal_
+        elif isinstance(operation, tsi_query.ContainsOperation):
+            op_str = "LIKE"
+            get_field = operation.contains_.input
+            val = f"%{operation.contains_.substr.literal_}%"
+        elif isinstance(operation, tsi_query.GtOperation):
+            op_str = ">"
+            get_field = operation.gt_[0]
+            val = operation.gt_[1].literal_
+        elif isinstance(operation, tsi_query.GteOperation):
+            op_str = ">="
+            get_field = operation.gte_[0]
+            val = operation.gte_[1].literal_
+        else:
+            print(f"Skipping {operation} because of {type(operation)}")
+            continue
+
+        print("op_str", op_str, "get_field", get_field, "val", val)
+
+        full_field = get_field.get_field_
+        property_path = full_field.split(".")
+        root_field = get_field_by_name(full_field, expand_columns=[]).field
+        print("root_field", root_field, "property_path", property_path)
+
+        # Convert filter value to appropriate parameter
+        from weave.trace_server.orm import python_value_to_ch_type
+
+        filter_param = pb.add_param(val)
+        filter_type = python_value_to_ch_type(val)
+
+        # Simple case: direct field in the table (inputs.model = value)
+        if len(property_path) == 1:
+            print(f">>>>> skipping because property path is 1 {property_path}")
+            continue
+
+        # Complex case: requires object table joins
+        cte_name = f"obj_filter_{i}"
+
+        # find matching expand column
+        expand_column_match = None
+        for col in sorted(expand_columns, key=lambda x: len(x)):
+            if full_field.startswith(col):
+                expand_column_match = col
+                break
+
+        print("----------------- sexpand_column_match", expand_column_match)
+
+        # remove up to the expand_column path
+        object_property_path = full_field.replace(f"{expand_column_match}.", "")
+        property_path = object_property_path.split(".")
+
+        # The leaf level query directly checks the property value
+        leaf_property = property_path.pop(-1)
+        val_dump_select = ""
+        # val_dump_select = "val_dump," if is_object_order_by else ""
+        val_dump_condition = f"JSON_VALUE(val_dump, '$.{leaf_property}') {op_str} {param_slot(filter_param, filter_type)}"
+        # if is_object_order_by:
+        #     val_dump_condition = (
+        #         f"JSONType(JSON_VALUE(val_dump, '$.{leaf_property}')) != 'Null'"
+        #     )
+
+        leaf_cte = f"""
+        {cte_name} AS (
+            SELECT
+                object_id,
+                digest,
+                {val_dump_select}
+                concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+            FROM object_versions
+            WHERE project_id = {param_slot(project_param, "String")}
+                AND {val_dump_condition}
+            GROUP BY project_id, object_id, digest)
+        """
+        cte_parts.append(leaf_cte)
+
+        # If we have more than two levels of nesting, we need intermediate CTEs
+        current_cte_name = cte_name
+        if len(property_path):
+            properties = list(reversed(property_path))
+            print("PROPERTIES", properties)
+            for j, prop in enumerate(properties):
+                intermediate_cte_name = f"{cte_name}_level_{j}"
+                intermediate_cte = f"""
+                {intermediate_cte_name} AS (
+                    SELECT 
+                        ov.object_id, 
+                        ov.digest,
+                        concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS full_ref
+                    FROM object_versions ov
+                    WHERE ov.project_id = {param_slot(project_param, "String")}
+                    AND JSON_VALUE(ov.val_dump, '$.{prop}') IN (
+                        SELECT full_ref 
+                        FROM {current_cte_name}
+                    )
+                    GROUP BY ov.project_id, ov.object_id, ov.digest
+                )"""
+                cte_parts.append(intermediate_cte)
+                current_cte_name = intermediate_cte_name
+
+    field_to_object_join_alias_map[full_field] = current_cte_name
+
+    # Return the CTEs and filter condition
+    if not cte_parts:
+        return "", {}
+
+    # Return components separately
+    return ",".join(cte_parts), field_to_object_join_alias_map
