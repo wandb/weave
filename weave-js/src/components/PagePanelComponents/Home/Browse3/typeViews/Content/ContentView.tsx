@@ -1,6 +1,6 @@
 import {Button} from '@wandb/weave/components/Button';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 
 import {convertBytes} from '../../../../../../util';
 import {Icon, IconName, IconNames} from '../../../../../Icon';
@@ -10,6 +10,7 @@ import {CustomLink} from '../../pages/common/Links';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 import {PDFView} from './PDFView';
+import {VideoPopup, VideoPreview} from './VideoView';
 
 const ICON_MAP: Record<string, IconName> = {
   'application/json': IconNames.JobProgramCode,
@@ -126,6 +127,8 @@ const ContentViewMetadataLoaded = ({
   const [contentResult, setContentResult] = useState<Blob | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [contentUrl, setContentUrl] = useState<string>('');
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const {useFileContent} = useWFHooks();
   const {filename, size, mimetype} = metadata;
@@ -154,8 +157,19 @@ const ContentViewMetadataLoaded = ({
 
       setContentResult(blob);
       setIsDownloading(false);
+      const url = URL.createObjectURL(blob);
+      setContentUrl(url);
     }
   }, [contentContent.result, mimetype]);
+
+  // Cleanup content URL on unmount
+  useEffect(() => {
+    return () => {
+      if (contentUrl) {
+        URL.revokeObjectURL(contentUrl);
+      }
+    };
+  }, [contentUrl]);
 
   const doSave = useCallback(() => {
     if (!contentResult) {
@@ -215,16 +229,48 @@ const ContentViewMetadataLoaded = ({
     tooltipHint = 'Click icon or filename to preview, button to download';
   }
 
+  if (mimetype.startsWith('video/')) {
+    const onTextClick = () => {
+      setShowPreview(true);
+      if (!contentResult) {
+        setIsDownloading(true);
+      }
+    };
+    const onClose = () => {
+      setShowPreview(false);
+    };
+    iconAndText = (
+      <>
+        <CustomLink
+          variant="secondary"
+          icon={iconStart}
+          onClick={onTextClick}
+          text={filename}
+        />
+        {showPreview && contentUrl && (
+          <VideoPopup
+            url={contentUrl}
+            videoRef={videoRef}
+            isOpen={true}
+            onClose={onClose}
+          />
+        )}
+      </>
+    );
+    tooltipHint = 'Click icon or filename to preview, button to download';
+  }
   const body = (
     <TailwindContents>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 group">
         {iconAndText}
-        <Button
-          icon={isDownloading ? 'loading' : 'download'}
-          variant="ghost"
-          size="small"
-          onClick={onClickDownload}
-        />
+          <div className="opacity-0 group-hover:opacity-100">
+            <Button
+              icon={isDownloading ? 'loading' : 'download'}
+              variant="ghost"
+              size="small"
+              onClick={onClickDownload}
+            />
+        </div>
       </div>
     </TailwindContents>
   );
