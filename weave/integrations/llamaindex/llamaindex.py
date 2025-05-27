@@ -355,12 +355,10 @@ class LLamaIndexPatcher(Patcher):
             import llama_index.core.instrumentation as instrument
 
             gc = get_weave_client()
-            if _global_root_call is None:
-                script_name = self._get_script_name()
-                _global_root_call = gc.create_call(
-                    "llama_index.session",
-                    inputs={"script": script_name, "status": "patched"},
-                )
+            # Removed creation of the dummy "llama_index.session" root call. We no longer
+            # create a global session-level Weave call for the patcher; individual span/event
+            # calls will now stand on their own (or inherit whatever parent the caller
+            # provides), eliminating the extra "llama_index.session" node in the UI.
 
             self.dispatcher = instrument.get_dispatcher()
             self._original_event_handlers = list(self.dispatcher.event_handlers)
