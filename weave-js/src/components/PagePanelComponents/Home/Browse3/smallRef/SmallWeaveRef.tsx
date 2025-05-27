@@ -2,7 +2,7 @@
  * Display a link to a Weave object.
  */
 
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {
   isWandbArtifactRef,
@@ -15,9 +15,13 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {TailwindContents} from '../../../../Tailwind';
 import {useWeaveflowRouteContext} from '../context';
 import {Id} from '../pages/common/Id';
-import {useWFHooks} from '../pages/wfReactInterface/context';
 import {KnownBaseObjectClassType} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallRefLoaded} from './SmallRefLoaded';
+import {
+  useCall,
+  useObjectVersion,
+  useRootObjectVersions,
+} from '../pages/wfReactInterface/tsDataModelHooks';
 
 export const objectRefDisplayName = (
   objRef: ObjectRef,
@@ -123,7 +127,7 @@ export const SmallWeaveObjectRef = ({
   noLink = false,
 }: SmallWeaveRefProps) => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const {useObjectVersion} = useWFHooks();
+
   const objectVersion = useObjectVersion({
     key: {
       scheme: 'weave',
@@ -181,7 +185,6 @@ export const SmallWeaveCallRef = ({
   noLink = false,
 }: SmallWeaveRefProps) => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const {useCall} = useWFHooks();
 
   const callKey = {
     entity: objRef.entityName,
@@ -241,8 +244,8 @@ export const SmallObjectVersionsRef = ({
   iconOnly,
   noLink,
 }: SmallWeaveRefProps) => {
-  const {useRootObjectVersions} = useWFHooks();
   const {peekingRouter} = useWeaveflowRouteContext();
+
   const objectVersions = useRootObjectVersions({
     entity: objRef.entityName,
     project: objRef.projectName,
@@ -252,6 +255,7 @@ export const SmallObjectVersionsRef = ({
   const error =
     objectVersions?.error ??
     (objectVersions.result?.length === 0 ? new Error('Not found') : null);
+
   if (objectVersions.loading && !error) {
     return <LoadingDots />;
   }
@@ -260,17 +264,23 @@ export const SmallObjectVersionsRef = ({
     baseObjectClass: undefined,
     versionIndex: -1,
   };
+
   const baseObjectClass =
     objVersion.baseObjectClass as KnownBaseObjectClassType;
+
   const rootTypeName = baseObjectClass ?? 'Object';
 
   const icon = ICON_MAP[rootTypeName] ?? IconNames.CubeContainer;
 
-  const url = peekingRouter.objectVersionsUIUrl(
-    objRef.entityName,
-    objRef.projectName,
-    {baseObjectClass, objectName: objRef.artifactName}
+  const url = useMemo(
+    () =>
+      peekingRouter.objectVersionsUIUrl(objRef.entityName, objRef.projectName, {
+        baseObjectClass,
+        objectName: objRef.artifactName,
+      }),
+    [objRef, peekingRouter]
   );
+
   return (
     <TailwindContents>
       <SmallRefLoaded

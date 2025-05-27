@@ -489,9 +489,7 @@ export const FilterableObjectVersionsTable: React.FC<{
         objectTitle={props.objectTitle}
         hidePropsAsColumns={!!effectivelyLatestOnly}
         hidePeerVersionsColumn={
-          props.hidePeerVersionsColumn !== undefined
-            ? props.hidePeerVersionsColumn
-            : !effectivelyLatestOnly
+          props.hidePeerVersionsColumn ?? !effectivelyLatestOnly
         }
         hideCategoryColumn={props.hideCategoryColumn}
         hideCreatedAtColumn={props.hideCreatedAtColumn}

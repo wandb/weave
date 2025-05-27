@@ -2,10 +2,10 @@ import {Select} from '@wandb/weave/components/Form/Select';
 import {IconNames} from '@wandb/weave/components/Icon';
 import React, {useMemo, useState} from 'react';
 
-import {useWFHooks} from '../pages/wfReactInterface/context';
 import {SortBy} from '../pages/wfReactInterface/traceServerClientTypes';
 import {ObjectVersionFilter} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallRefIcon} from '../smallRef/SmallRefIcon';
+import {useRootObjectVersions} from '../pages/wfReactInterface/tsDataModelHooks';
 
 type SelectMonitorOption = {
   label: string;
@@ -46,7 +46,6 @@ export const SelectMonitor = ({
     []
   );
   const [loading, setLoading] = useState(true);
-  const {useRootObjectVersions} = useWFHooks();
 
   const monitorsResult = useRootObjectVersions({
     entity,

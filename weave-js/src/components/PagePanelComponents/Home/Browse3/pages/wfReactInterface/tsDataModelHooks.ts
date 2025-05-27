@@ -182,7 +182,7 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
+export const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
 
@@ -995,7 +995,7 @@ const useFileContent = (
   }, [fileContentRes, params.skip, error]);
 };
 
-const useObjectVersion = (
+export const useObjectVersion = (
   params: UseObjectVersionParams
 ): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1138,7 +1138,7 @@ export const convertTraceServerObjectVersionToSchema = <
   };
 };
 
-const useRootObjectVersions = (
+export const useRootObjectVersions = (
   params: UseRootObjectVersionsParams
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
