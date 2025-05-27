@@ -1,6 +1,6 @@
 import {Button} from '@wandb/weave/components/Button';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {Ref, RefObject, useCallback, useEffect, useRef, useState} from 'react';
 
 import {convertBytes} from '../../../../../../util';
 import {Icon, IconName, IconNames} from '../../../../../Icon';
@@ -128,7 +128,6 @@ const ContentViewMetadataLoaded = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [contentUrl, setContentUrl] = useState<string>('');
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   const {useFileContent} = useWFHooks();
   const {filename, size, mimetype} = metadata;
@@ -240,6 +239,7 @@ const ContentViewMetadataLoaded = ({
     const onClose = () => {
       setShowPreview(false);
     };
+
     iconAndText = (
       <>
         <CustomLink
@@ -251,7 +251,6 @@ const ContentViewMetadataLoaded = ({
         {showPreview && contentUrl && (
           <VideoPopup
             src={contentUrl}
-            videoRef={videoRef}
             isOpen={true}
             onClose={onClose}
           />

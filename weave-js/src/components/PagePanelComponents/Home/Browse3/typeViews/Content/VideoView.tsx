@@ -7,7 +7,6 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 type VideoProps = {
   src: Blob | string;
-  videoRef: React.RefObject<HTMLVideoElement>;
 }
 type VideoContentProps = {
   isThumbnail: boolean;
@@ -25,7 +24,6 @@ type VideoPopupProps = {
 const VideoContent: React.FC<VideoContentProps> = ({
   src,
   isThumbnail,
-  videoRef,
   autoplay
 }) => {
   const [url, setUrl] = useState<string>('');
@@ -83,7 +81,6 @@ const VideoContent: React.FC<VideoContentProps> = ({
 
 const VideoPopup: React.FC<VideoPopupProps> = ({
   src,
-  videoRef,
   isOpen,
   onClose
 }) => {
@@ -94,7 +91,6 @@ const VideoPopup: React.FC<VideoPopupProps> = ({
         <Dialog.Content className="h-[60vh] w-[60vw] p-0">
           <VideoContent
             src={src}
-            videoRef={videoRef}
             isThumbnail={false}
             autoplay={false}
           />
@@ -105,7 +101,6 @@ const VideoPopup: React.FC<VideoPopupProps> = ({
 }
 const VideoThumbnail: React.FC<VideoPreviewProps> = ({
   src,
-  videoRef,
 }) => {
   const [showPopup, setShowPopup] = useState<boolean>(false);
   const thumbnailHeight = Math.min(38); // Default height of the cell row
@@ -120,7 +115,7 @@ const VideoThumbnail: React.FC<VideoPreviewProps> = ({
           <div
             style={{height: thumbnailHeight, width: thumbnailWidth}}
             className="relative">
-            <VideoContent src={src} videoRef={useRef<HTMLVideoElement>(null)} isThumbnail={true}/>
+            <VideoContent src={src} isThumbnail={true}/>
             <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 transition-all duration-200 hover:bg-oblivion/10">
               <IconPlay className="text-white" />
             </div>
@@ -128,7 +123,7 @@ const VideoThumbnail: React.FC<VideoPreviewProps> = ({
         </div>
       }
       {showPopup &&
-        <VideoPopup src={src} videoRef={videoRef} isOpen={true} onClose={()=> {setShowPopup(false)}}/>
+        <VideoPopup src={src} isOpen={true} onClose={()=> {setShowPopup(false)}}/>
       }
     </Tailwind>
   );
