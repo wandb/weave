@@ -1,8 +1,8 @@
 import {foundations} from '@wandb/ui';
 import styled from 'styled-components';
 
-import type {WBMenuTheme} from './WBMenu';
 import {Icon} from '../../components/Icon';
+import type {WBMenuTheme} from './WBMenu';
 
 const {legacy} = foundations;
 

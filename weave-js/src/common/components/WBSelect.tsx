@@ -1,6 +1,7 @@
 import {WBPopup} from '@wandb/ui';
 import React from 'react';
 
+import {Icon} from '../../components/Icon';
 import {useOnMouseDownOutside} from '../util/dom';
 import {
   getOptionDisplayName,
@@ -10,7 +11,6 @@ import {
   WBMenuTheme,
 } from './WBMenu';
 import * as S from './WBSelect.styles';
-import {Icon} from '../../components/Icon';
 
 export type WBSelectProps = {
   className?: string;
