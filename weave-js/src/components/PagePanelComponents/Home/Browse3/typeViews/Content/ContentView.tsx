@@ -10,7 +10,7 @@ import {CustomLink} from '../../pages/common/Links';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 import {PDFView} from './PDFView';
-import {VideoPopup, VideoPreview} from './VideoView';
+import {VideoPopup, VideoThumbnail} from './VideoView';
 
 const ICON_MAP: Record<string, IconName> = {
   'application/json': IconNames.JobProgramCode,
@@ -240,15 +240,6 @@ const ContentViewMetadataLoaded = ({
     const onClose = () => {
       setShowPreview(false);
     };
-    if (!contentUrl) {
-      tooltipPreview = <LoadingDots />
-    } else {
-      tooltipPreview = <VideoPreview
-        src={contentUrl}
-        videoRef={videoRef}
-        onClick={() => setShowPreview(true)}
-      />
-    }
     iconAndText = (
       <>
         <CustomLink
