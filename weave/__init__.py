@@ -19,7 +19,6 @@ from weave.flow.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringP
 from weave.flow.saved_view import SavedView
 from weave.flow.scorer import Scorer
 from weave.initialization import *
-from weave.trace.term import configure_logger
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 from weave.type_handlers.Audio.audio import Audio
@@ -28,8 +27,6 @@ from weave.type_handlers.Markdown.markdown import Markdown
 
 # Alias for succinct code
 P = EasyPrompt
-
-configure_logger()
 
 # Special object informing doc generation tooling which symbols
 # to document & to associate with this module.
@@ -60,4 +57,34 @@ __docspec__ = [
     Monitor,
     SavedView,
     Audio,
+]
+
+__all__ = [
+    "Agent",
+    "AgentState",
+    "AnnotationSpec",
+    "Audio",
+    "attributes",
+    "Dataset",
+    "EasyPrompt",
+    "Evaluation",
+    "EvaluationLogger",
+    "File",
+    "finish",
+    "get",
+    "get_current_call",
+    "init",
+    "Markdown",
+    "MessagesPrompt",
+    "Model",
+    "Monitor",
+    "Object",
+    "op",
+    "Prompt",
+    "publish",
+    "ref",
+    "require_current_call",
+    "SavedView",
+    "Scorer",
+    "StringPrompt",
 ]

@@ -195,7 +195,7 @@ class Evaluation(Object):
     async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
-        eval_rows = []
+        eval_rows: list[tuple[int, dict]] = []
 
         async def eval_example(example: dict) -> dict:
             try:
@@ -214,7 +214,7 @@ class Evaluation(Object):
         num_rows = len(_rows) * self.trials
 
         trial_rows = chain.from_iterable(repeat(_rows, self.trials))
-        async for example, eval_row in util.async_foreach(
+        async for index, example, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
@@ -229,8 +229,10 @@ class Evaluation(Object):
                     scorer_name = scorer_attributes.scorer_name
                     if scorer_name not in eval_row["scores"]:
                         eval_row["scores"][scorer_name] = {}
-            eval_rows.append(eval_row)
-        return EvaluationResults(rows=weave.Table(eval_rows))
+            eval_rows.append((index, eval_row))
+        eval_rows.sort(key=lambda x: x[0])
+        table_rows = [eval_row for _, eval_row in eval_rows]
+        return EvaluationResults(rows=weave.Table(table_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
     async def evaluate(self, model: Union[Op, Model]) -> dict:

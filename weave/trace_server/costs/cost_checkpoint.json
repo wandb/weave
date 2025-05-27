@@ -5671,6 +5671,12 @@
       "input": 4e-07,
       "output": 8e-07,
       "created_at": "2025-01-13 16:54:01"
+    },
+    {
+      "provider": "sambanova",
+      "input": 4e-08,
+      "output": 8e-08,
+      "created_at": "2025-05-23 11:53:31"
     }
   ],
   "sambanova/Meta-Llama-3.2-3B-Instruct": [
@@ -5679,6 +5685,12 @@
       "input": 8e-07,
       "output": 1.6e-06,
       "created_at": "2025-01-13 16:54:01"
+    },
+    {
+      "provider": "sambanova",
+      "input": 8e-08,
+      "output": 1.6e-07,
+      "created_at": "2025-05-23 11:53:31"
     }
   ],
   "sambanova/Qwen2.5-Coder-32B-Instruct": [
@@ -6635,6 +6647,12 @@
       "input": 2.5e-06,
       "output": 0.00017857,
       "created_at": "2025-04-04 09:04:12"
+    },
+    {
+      "provider": "databricks",
+      "input": 2.5e-06,
+      "output": 1.7857e-05,
+      "created_at": "2025-05-23 11:53:31"
     }
   ],
   "databricks/databricks-meta-llama-3-3-70b-instruct": [
@@ -7171,6 +7189,470 @@
       "input": 9e-07,
       "output": 9e-07,
       "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "azure/gpt-4o-mini-tts": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "azure_ai/deepseek-v3-0324": [
+    {
+      "provider": "azure_ai",
+      "input": 1.14e-06,
+      "output": 4.56e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "azure_ai/mistral-medium-2505": [
+    {
+      "provider": "azure_ai",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "azure_ai/Llama-4-Scout-17B-16E-Instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 2e-07,
+      "output": 7.8e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "azure_ai/Llama-4-Maverick-17B-128E-Instruct-FP8": [
+    {
+      "provider": "azure_ai",
+      "input": 1.41e-06,
+      "output": 3.5e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "azure_ai/embed-v-4-0": [
+    {
+      "provider": "azure_ai",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "xai/grok-3": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "groq/llama-guard-3-8b": [
+    {
+      "provider": "groq",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "groq/meta-llama/llama-4-scout-17b-16e-instruct": [
+    {
+      "provider": "groq",
+      "input": 1.1e-07,
+      "output": 3.4e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "groq/meta-llama/llama-4-maverick-17b-128e-instruct": [
+    {
+      "provider": "groq",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "groq/mistral-saba-24b": [
+    {
+      "provider": "groq",
+      "input": 7.9e-07,
+      "output": 7.9e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "groq/qwen-qwq-32b": [
+    {
+      "provider": "groq",
+      "input": 2.9e-07,
+      "output": 3.9e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "cerebras/llama-3.3-70b": [
+    {
+      "provider": "cerebras",
+      "input": 8.5e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "claude-opus-4-20250514": [
+    {
+      "provider": "anthropic",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "claude-sonnet-4-20250514": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini/gemini-2.5-flash-preview-tts": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini/gemini-2.5-flash-preview-05-20": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini-2.5-flash-preview-05-20": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini-2.0-flash-preview-image-generation": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini-2.5-pro-preview-tts": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini/gemini-2.0-flash-preview-image-generation": [
+    {
+      "provider": "gemini",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini/gemini-2.5-pro-preview-tts": [
+    {
+      "provider": "gemini",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "vertex_ai/claude-opus-4@20250514": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "vertex_ai/claude-sonnet-4@20250514": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "anthropic.claude-opus-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "anthropic.claude-sonnet-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "us.anthropic.claude-opus-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "us.anthropic.claude-sonnet-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "eu.anthropic.claude-3-7-sonnet-20250219-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "eu.anthropic.claude-opus-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "eu.anthropic.claude-sonnet-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "perplexity/sonar-reasoning": [
+    {
+      "provider": "perplexity",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "perplexity/sonar-reasoning-pro": [
+    {
+      "provider": "perplexity",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "databricks/databricks-llama-4-maverick": [
+    {
+      "provider": "databricks",
+      "input": 5e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Llama-4-Maverick-17B-128E-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 6.3e-07,
+      "output": 1.8e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Llama-4-Scout-17B-16E-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 4e-07,
+      "output": 7e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Meta-Llama-3.3-70B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 6e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Meta-Llama-Guard-3-8B": [
+    {
+      "provider": "sambanova",
+      "input": 3e-07,
+      "output": 3e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Qwen3-32B": [
+    {
+      "provider": "sambanova",
+      "input": 4e-07,
+      "output": 8e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/QwQ-32B": [
+    {
+      "provider": "sambanova",
+      "input": 5e-07,
+      "output": 1e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Qwen2-Audio-7B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 5e-07,
+      "output": 0.0001,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/DeepSeek-R1-Distill-Llama-70B": [
+    {
+      "provider": "sambanova",
+      "input": 7e-07,
+      "output": 1.4e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/DeepSeek-R1": [
+    {
+      "provider": "sambanova",
+      "input": 5e-06,
+      "output": 7e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/DeepSeek-V3-0324": [
+    {
+      "provider": "sambanova",
+      "input": 3e-06,
+      "output": 4.5e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/meta-llama/Llama-4-Scout-17B-16E-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 9e-08,
+      "output": 2.9e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/Qwen/Qwen2.5-Coder-3B-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 1e-08,
+      "output": 3e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/Qwen/Qwen2.5-Coder-7B-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 1e-08,
+      "output": 3e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/Qwen/Qwen2.5-Coder-32B-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 6e-08,
+      "output": 2e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/Qwen/QwQ-32B": [
+    {
+      "provider": "nscale",
+      "input": 1.8e-07,
+      "output": 2e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Llama-70B": [
+    {
+      "provider": "nscale",
+      "input": 3.75e-07,
+      "output": 3.75e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Llama-8B": [
+    {
+      "provider": "nscale",
+      "input": 2.5e-08,
+      "output": 2.5e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B": [
+    {
+      "provider": "nscale",
+      "input": 9e-08,
+      "output": 9e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B": [
+    {
+      "provider": "nscale",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Qwen-14B": [
+    {
+      "provider": "nscale",
+      "input": 7e-08,
+      "output": 7e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": [
+    {
+      "provider": "nscale",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/mistralai/mixtral-8x22b-instruct-v0.1": [
+    {
+      "provider": "nscale",
+      "input": 6e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/meta-llama/Llama-3.1-8B-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 3e-08,
+      "output": 3e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/meta-llama/Llama-3.3-70B-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-05-23 11:53:31"
     }
   ]
 }

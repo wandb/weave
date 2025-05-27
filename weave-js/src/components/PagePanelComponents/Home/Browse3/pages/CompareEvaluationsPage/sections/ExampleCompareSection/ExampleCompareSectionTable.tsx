@@ -928,8 +928,6 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     outputWidths,
   ]);
 
-  console.log(compositeMetrics);
-
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
       {
@@ -1190,8 +1188,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     compositeMetrics,
     outputWidths,
   ]);
-
-  console.log(compositeMetrics);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
