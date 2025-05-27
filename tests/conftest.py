@@ -12,6 +12,7 @@ import pytest
 import requests
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from unittest.mock import MagicMock, patch
 
 import weave
 from tests.trace.util import DummyTestException, client_is_sqlite
@@ -32,6 +33,16 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
 
+@pytest.fixture(autouse=True)
+def patch_kafka_producer():
+    """
+    Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
+    This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
+
+    If a test needs to test the Kafka producer, they should orride this patch explicitly.
+    """
+    with patch("weave.trace_server.clickhouse_trace_server_batched.KafkaProducer.from_env", return_value=MagicMock()):
+        yield
 
 @pytest.fixture(autouse=True)
 def disable_datadog():

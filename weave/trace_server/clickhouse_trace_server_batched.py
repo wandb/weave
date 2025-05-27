@@ -246,7 +246,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @property
     def kafka_producer(self) -> KafkaProducer:
-        raise Exception("Not implemented")
         if self._kafka_producer is not None:
             return self._kafka_producer
         self._kafka_producer = KafkaProducer.from_env()
@@ -2254,7 +2253,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
-        logger.info("Flushing %s calls", len(self._call_batch))
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
