@@ -44,11 +44,7 @@ const DEFAULT_OPTION_RENDERER: OptionRenderer = ({
     fontSize={fontSize}
     lineHeight={lineHeight}>
     {getOptionDisplayName(option)}
-    <S.ItemIcon
-      name={
-        option.icon ?? (selected && option.icon !== null ? 'check' : 'blank')
-      }
-    />
+    {option.icon && selected && <S.ItemIcon name="checkmark" />}
   </S.Item>
 );
 
