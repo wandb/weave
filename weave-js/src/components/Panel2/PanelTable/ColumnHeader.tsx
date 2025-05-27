@@ -28,6 +28,7 @@ import {useWeaveContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
 import {Button} from '../../Button';
+import {Icon, type IconName} from '../../Icon';
 import {Tooltip} from '../../Tooltip';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
@@ -38,7 +39,6 @@ import * as S from '../PanelTable.styles';
 import {WeaveFormatContext} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {defineColumnName, stripTag} from './util';
-import {Icon, type IconName} from '../../Icon';
 
 const recordEvent = makeEventRecorder('Table');
 
