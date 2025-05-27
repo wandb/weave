@@ -137,12 +137,6 @@ export const TableAction = styled.div<{
 `;
 TableAction.displayName = 'S.TableAction';
 
-export const EllipsisIcon: typeof Icon = styled(Icon)`
-  width: 100%;
-  height: 100%;
-  padding-top: 4px;
-`;
-
 export const TableIcon: typeof Icon = styled(Icon)<{highlight?: boolean}>`
   cursor: pointer;
   padding: 2px 0px 0px 0px;

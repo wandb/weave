@@ -38,6 +38,7 @@ import * as S from '../PanelTable.styles';
 import {WeaveFormatContext} from '../WeaveFormatContext';
 import * as Table from './tableState';
 import {defineColumnName, stripTag} from './util';
+import {Icon} from '../../Icon';
 
 const recordEvent = makeEventRecorder('Table');
 
@@ -796,9 +797,8 @@ export const ColumnHeader: React.FC<{
                     />
                   )}
                 </S.ColumnAction>
-                <S.ColumnAction>
-                  <S.EllipsisIcon
-                    ref={anchorRef}
+                <S.ColumnAction ref={anchorRef}>
+                  <Icon
                     data-test="column-options"
                     name="overflow-vertical"
                     className="column-actions-trigger"
