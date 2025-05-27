@@ -68,6 +68,7 @@ def init(
         A Weave client.
     """
     configure_logger()
+
     parse_and_apply_settings(settings)
 
     global _global_postprocess_inputs
