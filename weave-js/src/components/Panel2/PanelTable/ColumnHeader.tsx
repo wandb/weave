@@ -344,7 +344,7 @@ export const ColumnHeader: React.FC<{
     menuItems.push({
       value: 'settings',
       name: 'Edit cell expression',
-      icon: 'configuration',
+      icon: 'settings',
       onSelect: () => openColumnSettings(),
     });
     menuItems.push(makeMenuItemDivider('expression-div'));
@@ -365,7 +365,7 @@ export const ColumnHeader: React.FC<{
       menuItems.push({
         value: 'group',
         name: 'Group by',
-        icon: 'group-runs',
+        icon: 'group',
         onSelect: async () => {
           recordEvent('GROUP');
           let newTableState: Table.TableState | null = null;
@@ -402,7 +402,7 @@ export const ColumnHeader: React.FC<{
       menuItems.push({
         value: 'ungroup',
         name: 'Ungroup',
-        icon: 'group-runs',
+        icon: 'group',
         onSelect: doUngroup,
       });
     }
@@ -419,7 +419,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'insert-right',
           name: 'Insert 1 right',
-          icon: 'next',
+          icon: 'chevron-next',
           onSelect: () => {
             const newTableState = Table.insertColumnRight(
               tableState,
@@ -434,7 +434,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'insert-left',
           name: 'Insert 1 left',
-          icon: 'previous',
+          icon: 'chevron-back',
           onSelect: () => {
             const newTableState = Table.insertColumnLeft(
               tableState,
@@ -493,7 +493,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'remove-all-right',
           name: 'Remove to the right',
-          icon: 'next',
+          icon: 'chevron-next',
           onSelect: () => {
             const newTableState = Table.removeColumnsToRight(
               tableState,
@@ -507,7 +507,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'remove-all-left',
           name: 'Remove to the left',
-          icon: 'previous',
+          icon: 'chevron-back',
           onSelect: () => {
             const newTableState = Table.removeColumnsToLeft(
               tableState,
@@ -872,8 +872,11 @@ const ColumnMenuOptionRenderer: OptionRenderer = ({
     data-test={option['data-test']}
     hovered={hovered}
     style={{justifyContent: 'flex-start'}}>
-    {option.icon && selected && (
-      <ItemIcon style={{marginRight: '8px', marginLeft: 0}} name="checkmark" />
+    {option.icon && (
+      <ItemIcon
+        style={{marginRight: '8px', marginLeft: 0}}
+        name={selected ? 'checkmark' : option.icon}
+      />
     )}
     {option.name ?? option.value}
   </Item>
