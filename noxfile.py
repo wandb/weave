@@ -15,13 +15,24 @@ PY313_INCOMPATIBLE_SHARDS = [
     "notdiamond",
     "crewai",
 ]
-PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents"]
+PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents", "dspy"]
 
 
 @nox.session
 def lint(session):
     session.install("pre-commit", "jupyter")
-    session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
+    dry_run = session.posargs and "dry-run" in session.posargs
+    if dry_run:
+        session.run(
+            "pre-commit",
+            "run",
+            "--hook-stage",
+            "pre-push",
+            "--files",
+            "./weave/__init__.py",
+        )
+    else:
+        session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
@@ -37,6 +48,7 @@ def lint(session):
         "trace",
         "flow",
         "trace_server",
+        "trace_server_bindings",
         "anthropic",
         "cerebras",
         "cohere",
@@ -114,6 +126,7 @@ def tests(session, shard):
         "trace": ["trace/"],
         "flow": ["flow/"],
         "trace_server": ["trace_server/"],
+        "trace_server_bindings": ["trace_server_bindings"],
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
         "scorers": ["scorers/"],
