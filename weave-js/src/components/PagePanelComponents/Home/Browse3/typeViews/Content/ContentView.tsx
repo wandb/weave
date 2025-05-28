@@ -11,6 +11,7 @@ import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 import {PDFView} from './PDFView';
 import {VideoPopup, VideoThumbnail} from './VideoView';
+import {MiniAudioViewer} from './AudioView';
 
 const ICON_MAP: Record<string, IconName> = {
   'application/json': IconNames.JobProgramCode,
@@ -228,7 +229,41 @@ const ContentViewMetadataLoaded = ({
     );
     tooltipHint = 'Click icon or filename to preview, button to download';
   }
+  if (mimetype.startsWith('audio/')) {
+    const onTextClick = () => {
+      setShowPreview(true);
+      if (!contentResult) {
+        setIsDownloading(true);
+      }
+    };
+    const onPlay= () => {
+      setShowPreview(true);
+      if (!contentResult) {
+        setIsDownloading(true);
+      }
+    };
 
+    iconAndText = (
+      <>
+        {!showPreview && <CustomLink
+            variant="secondary"
+            icon={iconStart}
+            onClick={onTextClick}
+            text={filename}
+          />
+        }
+        {showPreview && !contentResult && (<LoadingDots />)}
+        {showPreview && contentResult && (
+          <MiniAudioViewer
+            audioSrc={contentResult}
+            height={24}
+            downloadFile={doSave}
+          />
+        )}
+      </>
+    );
+    tooltipHint = 'Click icon or filename to preview, button to download';
+  }
   if (mimetype.startsWith('video/')) {
     let videoRef = useRef<HTMLVideoElement>(null)
     const onTextClick = () => {
