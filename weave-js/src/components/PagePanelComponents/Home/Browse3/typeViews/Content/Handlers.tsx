@@ -76,6 +76,8 @@ type HandlerProps = {
   doSave: () => void;
   setShowPreview: (show: boolean) => void;
   setIsDownloading: (downloading: boolean) => void;
+  videoPlaybackState?: {currentTime: number; volume: number; muted: boolean};
+  updateVideoPlaybackState?: (newState: Partial<{currentTime: number; volume: number; muted: boolean}>) => void;
 };
 
 type HandlerReturnType = {
@@ -213,6 +215,8 @@ export const handleVideoMimetype = ({
   setIsDownloading,
   doSave,
   isDownloading,
+  videoPlaybackState,
+  updateVideoPlaybackState,
 }: HandlerProps) => {
   const onTextClick = () => {
     setShowPreview(true);
@@ -235,7 +239,17 @@ export const handleVideoMimetype = ({
   );
 
   const preview = showPreview && contentResult && (
-    <VideoPopup src={contentResult} isOpen={true} onClose={onClose} />
+    <VideoPopup
+      src={contentResult}
+      isOpen={true}
+      onClose={onClose}
+      initialTime={videoPlaybackState?.currentTime}
+      initialVolume={videoPlaybackState?.volume}
+      initialMuted={videoPlaybackState?.muted}
+      onTimeUpdate={time => updateVideoPlaybackState?.({currentTime: time})}
+      onVolumeChange={volume => updateVideoPlaybackState?.({volume})}
+      onMuteChange={muted => updateVideoPlaybackState?.({muted})}
+    />
   );
   const previewComponent = (result: Blob) => {
     return <VideoThumbnail src={result} onClick={onTextClick} />;

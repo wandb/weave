@@ -11,6 +11,12 @@ type VideoContentProps = {
   isThumbnail: boolean;
   videoRef: React.RefObject<HTMLVideoElement>;
   autoplay?: boolean;
+  initialTime?: number;
+  initialMuted?: boolean;
+  initialVolume?: number;
+  onTimeUpdate?: (time: number) => void;
+  onMuteChange?: (muted: boolean) => void;
+  onVolumeChange?: (volume: number) => void;
 } & VideoProps;
 
 type VideoPreviewProps = {
@@ -20,6 +26,12 @@ type VideoPreviewProps = {
 type VideoPopupProps = {
   isOpen: boolean;
   onClose: () => void;
+  initialTime?: number;
+  initialMuted?: boolean;
+  initialVolume?: number;
+  onTimeUpdate?: (time: number) => void;
+  onMuteChange?: (muted: boolean) => void;
+  onVolumeChange?: (volume: number) => void;
 } & VideoProps;
 
 const VideoContent: React.FC<VideoContentProps> = ({
@@ -27,6 +39,12 @@ const VideoContent: React.FC<VideoContentProps> = ({
   isThumbnail,
   videoRef,
   autoplay,
+  initialTime,
+  initialMuted,
+  initialVolume,
+  onTimeUpdate,
+  onMuteChange,
+  onVolumeChange,
 }) => {
   const [url, setUrl] = useState<string>('');
 
@@ -37,9 +55,44 @@ const VideoContent: React.FC<VideoContentProps> = ({
       return () => URL.revokeObjectURL(objectUrl);
     } else {
       setUrl(src);
-      return;
     }
   }, [src]);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (videoElement && url) {
+      const handleTimeUpdate = () => {
+        if (onTimeUpdate) {
+          onTimeUpdate(videoElement.currentTime);
+        }
+      };
+      const handleVolumeChange = () => {
+        if (onVolumeChange) {
+          onVolumeChange(videoElement.volume);
+        }
+        if (onMuteChange) {
+          onMuteChange(videoElement.muted);
+        }
+      };
+
+      videoElement.addEventListener('timeupdate', handleTimeUpdate);
+      videoElement.addEventListener('volumechange', handleVolumeChange);
+
+      if (!isThumbnail) {
+        if (initialVolume !== undefined) {
+          videoElement.volume = initialVolume;
+        }
+        if (initialMuted !== undefined) {
+          videoElement.muted = initialMuted;
+        }
+      }
+
+      return () => {
+        videoElement.removeEventListener('timeupdate', handleTimeUpdate);
+        videoElement.removeEventListener('volumechange', handleVolumeChange);
+      };
+    }
+  }, [videoRef, url, onTimeUpdate, onVolumeChange, onMuteChange, isThumbnail, initialVolume, initialMuted]);
 
   if (!url) {
     return <LoadingDots />;
@@ -65,13 +118,18 @@ const VideoContent: React.FC<VideoContentProps> = ({
         }}
         controls={!isThumbnail}
         autoPlay={autoplay ?? false}
-        muted={true}
+        muted={isThumbnail ? true : initialMuted ?? true}
         loop={isThumbnail}
         onLoadedData={() => {
-          if (isThumbnail && videoRef.current) {
-            // For thumbnails, seek to 1 second or 25% of the video duration
-            const seekTime = Math.min(1, videoRef.current.duration * 0.25);
-            videoRef.current.currentTime = seekTime;
+          if (videoRef.current) {
+            if (isThumbnail) {
+              const seekTime = Math.min(1, videoRef.current.duration * 0.25);
+              videoRef.current.currentTime = seekTime;
+            } else {
+              if (initialTime) {
+                videoRef.current.currentTime = initialTime;
+              }
+            }
           }
         }}
       />
@@ -79,7 +137,17 @@ const VideoContent: React.FC<VideoContentProps> = ({
   );
 };
 
-const VideoPopup: React.FC<VideoPopupProps> = ({src, isOpen, onClose}) => {
+const VideoPopup: React.FC<VideoPopupProps> = ({
+  src,
+  isOpen,
+  onClose,
+  initialTime,
+  initialMuted,
+  initialVolume,
+  onTimeUpdate,
+  onMuteChange,
+  onVolumeChange,
+}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
@@ -91,6 +159,12 @@ const VideoPopup: React.FC<VideoPopupProps> = ({src, isOpen, onClose}) => {
             videoRef={videoRef}
             isThumbnail={false}
             autoplay={false}
+            initialTime={initialTime}
+            initialMuted={initialMuted}
+            initialVolume={initialVolume}
+            onTimeUpdate={onTimeUpdate}
+            onMuteChange={onMuteChange}
+            onVolumeChange={onVolumeChange}
           />
         </Dialog.Content>
       </Dialog.Portal>

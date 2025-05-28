@@ -97,6 +97,9 @@ const ContentViewMetadataLoaded = ({
   const [contentResult, setContentResult] = useState<Blob | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [videoPlaybackStates, setVideoPlaybackStates] = useState<
+    Record<string, {currentTime: number; volume: number; muted: boolean}>
+  >({});
 
   const {useFileContent} = useWFHooks();
   const {filename, size, mimetype} = metadata;
@@ -150,6 +153,19 @@ const ContentViewMetadataLoaded = ({
     setShowPreview(false);
   };
 
+  const updateVideoPlaybackState = useCallback(
+    (videoId: string, newState: Partial<{currentTime: number; volume: number; muted: boolean}>) => {
+      setVideoPlaybackStates(prev => ({
+        ...prev,
+        [videoId]: {
+          ...(prev[videoId] || {currentTime: 0, volume: 1, muted: false}), // Default initial state
+          ...newState,
+        },
+      }));
+    },
+    []
+  );
+
   const handlerProps = {
     mimetype,
     filename,
@@ -163,6 +179,8 @@ const ContentViewMetadataLoaded = ({
     doSave,
     setShowPreview,
     setIsDownloading,
+    videoPlaybackState: videoPlaybackStates[content],
+    updateVideoPlaybackState: (newState: Partial<{currentTime: number; volume: number; muted: boolean}>) => updateVideoPlaybackState(content, newState),
   };
 
   const {body, tooltipHint, tooltipPreview} = handleMimetype(handlerProps);
