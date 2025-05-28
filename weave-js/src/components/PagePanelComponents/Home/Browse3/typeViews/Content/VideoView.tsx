@@ -55,7 +55,7 @@ const VideoContent: React.FC<VideoContentProps> = ({
       return () => URL.revokeObjectURL(objectUrl);
     } else {
       setUrl(src);
-      return
+      return;
     }
   }, [src]);
 
@@ -93,7 +93,7 @@ const VideoContent: React.FC<VideoContentProps> = ({
         videoElement.removeEventListener('volumechange', handleVolumeChange);
       };
     }
-    return
+    return;
   }, [
     videoRef,
     url,
@@ -129,7 +129,7 @@ const VideoContent: React.FC<VideoContentProps> = ({
         }}
         controls={!isThumbnail}
         autoPlay={autoplay ?? false}
-        muted={isThumbnail ? true : initialMuted ?? true}
+        muted={isThumbnail ? true : (initialMuted ?? true)}
         loop={isThumbnail}
         onLoadedData={() => {
           if (videoRef.current) {
