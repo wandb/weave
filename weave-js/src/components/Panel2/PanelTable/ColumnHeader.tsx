@@ -20,7 +20,10 @@ import {
 import React, {useCallback, useContext, useMemo, useState} from 'react';
 import {Popup} from 'semantic-ui-react';
 
-import {OptionRenderer, WBMenuOption} from '../../../common/components/WBMenu';
+import {
+  type OptionRenderer,
+  type WBMenuOption,
+} from '../../../common/components/WBMenu';
 import {Item, ItemIcon} from '../../../common/components/WBMenu.styles';
 import {WBPopupMenuTrigger} from '../../../common/components/WBPopupMenuTrigger';
 import {useWeaveContext} from '../../../context';
@@ -71,7 +74,7 @@ const makeSortingMenuItems = (
     menuItems.push({
       value: 'sort-asc',
       name: 'Sort Asc',
-      icon: 'up-arrow',
+      icon: 'sort-ascending',
       onSelect: async () => {
         recordEvent('UPDATE_COLUMN_SORT_ASC');
         const newTableState = Table.enableSortByCol(
@@ -101,7 +104,7 @@ const makeSortingMenuItems = (
     menuItems.push({
       value: 'sort-desc',
       name: 'Sort Desc',
-      icon: 'down-arrow',
+      icon: 'sort-descending',
       onSelect: async () => {
         recordEvent('UPDATE_COLUMN_SORT_DESC');
         const newTableState = Table.enableSortByCol(
@@ -342,7 +345,7 @@ export const ColumnHeader: React.FC<{
     menuItems.push({
       value: 'settings',
       name: 'Edit cell expression',
-      icon: 'configuration',
+      icon: 'settings',
       onSelect: () => openColumnSettings(),
     });
     menuItems.push(makeMenuItemDivider('expression-div'));
@@ -363,7 +366,7 @@ export const ColumnHeader: React.FC<{
       menuItems.push({
         value: 'group',
         name: 'Group by',
-        icon: 'group-runs',
+        icon: 'group',
         onSelect: async () => {
           recordEvent('GROUP');
           let newTableState: Table.TableState | null = null;
@@ -400,7 +403,7 @@ export const ColumnHeader: React.FC<{
       menuItems.push({
         value: 'ungroup',
         name: 'Ungroup',
-        icon: 'group-runs',
+        icon: 'group',
         onSelect: doUngroup,
       });
     }
@@ -417,7 +420,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'insert-right',
           name: 'Insert 1 right',
-          icon: 'next',
+          icon: 'chevron-next',
           onSelect: () => {
             const newTableState = Table.insertColumnRight(
               tableState,
@@ -432,7 +435,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'insert-left',
           name: 'Insert 1 left',
-          icon: 'previous',
+          icon: 'chevron-back',
           onSelect: () => {
             const newTableState = Table.insertColumnLeft(
               tableState,
@@ -454,7 +457,7 @@ export const ColumnHeader: React.FC<{
             recordEvent('REMOVE_COLUMN');
             updateTableState(newTableState);
           },
-          render: ({hovered, selected}) => {
+          render: ({hovered}) => {
             return isUsedInFilter ? (
               <Item data-test="remove-column" hovered={hovered}>
                 <ItemIcon
@@ -491,7 +494,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'remove-all-right',
           name: 'Remove to the right',
-          icon: 'next',
+          icon: 'chevron-next',
           onSelect: () => {
             const newTableState = Table.removeColumnsToRight(
               tableState,
@@ -505,7 +508,7 @@ export const ColumnHeader: React.FC<{
         {
           value: 'remove-all-left',
           name: 'Remove to the left',
-          icon: 'previous',
+          icon: 'chevron-back',
           onSelect: () => {
             const newTableState = Table.removeColumnsToLeft(
               tableState,
