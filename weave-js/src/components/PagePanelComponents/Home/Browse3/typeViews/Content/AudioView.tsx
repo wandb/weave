@@ -188,7 +188,7 @@ export const MiniAudioViewer: FC<{
                 className={`text-s pl-4 ${
                   showMode === ShowMode.Slider ? 'pr-4' : 'pr-10'
                 }`}>
-                {audioLoading && audioCurrentTimeStr}
+                {!audioLoading && audioCurrentTimeStr}
               </div>
             )}
             {/* Waveform should always be mounted, but hidden when not in slider mode */}

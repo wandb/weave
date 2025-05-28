@@ -193,6 +193,7 @@ const ContentViewMetadataLoaded = ({
 
   let tooltipPreview = null;
   let tooltipHint = 'Click button to download';
+  let body = null
   let iconAndText = (
     <>
       {iconStart}
@@ -263,6 +264,11 @@ const ContentViewMetadataLoaded = ({
       </>
     );
     tooltipHint = 'Click icon or filename to preview, button to download';
+    body = (
+      <TailwindContents>
+        {iconAndText}
+      </TailwindContents>
+    );
   }
   if (mimetype.startsWith('video/')) {
     let videoRef = useRef<HTMLVideoElement>(null)
@@ -295,21 +301,24 @@ const ContentViewMetadataLoaded = ({
     );
     tooltipHint = 'Click icon or filename to preview, button to download';
   }
-  const body = (
-    <TailwindContents>
-      <div className="flex items-center gap-4 group">
-        {iconAndText}
-          <div className="opacity-0 group-hover:opacity-100">
-            <Button
-              icon={isDownloading ? 'loading' : 'download'}
-              variant="ghost"
-              size="small"
-              onClick={onClickDownload}
-            />
+
+  if (!body) {
+    body = (
+      <TailwindContents>
+        <div className="flex items-center gap-4 group">
+          {iconAndText}
+            <div className="opacity-0 group-hover:opacity-100">
+              <Button
+                icon={isDownloading ? 'loading' : 'download'}
+                variant="ghost"
+                size="small"
+                onClick={onClickDownload}
+              />
+          </div>
         </div>
-      </div>
-    </TailwindContents>
-  );
+      </TailwindContents>
+    );
+  }
 
   // No need to compute the tooltip, we don't want it showing over the preview anyway.
   if (showPreview) {
