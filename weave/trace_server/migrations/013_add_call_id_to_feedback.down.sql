@@ -1,1 +1,1 @@
-ALTER TABLE feedback DROP COLUMN call_id;
+ALTER TABLE feedback DROP COLUMN weave_ref_id;
