@@ -298,9 +298,10 @@ class Span:
             ):
                 if isinstance(nested_top_level_input, dict):
                     # For type checker
-                    nested_top_level_input = cast(dict[str, Any], nested_top_level_input)
+                    nested_top_level_input = cast(
+                        dict[str, Any], nested_top_level_input
+                    )
                 inputs = to_json_serializable(nested_top_level_input)
-
 
         outputs = get_weave_outputs(events, self.attributes) or {}
         # Only de-nest if we have one key
