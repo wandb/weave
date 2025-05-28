@@ -99,7 +99,7 @@ export const MiniAudioViewer: FC<{
         wavesurferRef.current.destroy();
       }
     };
-  });
+  }, [audioSrc, height]);
 
   const audioCurrentTimeStr = [audioCurrentTime, audioTotalTime]
     .map(formatDurationWithColons)
