@@ -55,6 +55,7 @@ const VideoContent: React.FC<VideoContentProps> = ({
       return () => URL.revokeObjectURL(objectUrl);
     } else {
       setUrl(src);
+      return
     }
   }, [src]);
 
@@ -92,6 +93,7 @@ const VideoContent: React.FC<VideoContentProps> = ({
         videoElement.removeEventListener('volumechange', handleVolumeChange);
       };
     }
+    return
   }, [
     videoRef,
     url,
