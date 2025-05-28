@@ -7,12 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Generic, TypeVar
-
-# Python moved unpack to main typing package in 3.12
-try:
-    from typing import Unpack
-except ImportError:
-    from typing_extensions import Unpack
+from typing_extensions import Unpack
 
 from pydantic import BaseModel, ConfigDict
 
