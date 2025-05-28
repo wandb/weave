@@ -66,8 +66,8 @@ export const ImageThumbnail = ({
     };
   }, [url]);
 
-  thumbnailHeight = thumbnailHeight ?? 38; // Default height of the cell row
-  thumbnailWidth = thumbnailWidth ?? 68; // 16:9-ish ratio
+  thumbnailHeight = thumbnailHeight ?? 38*3; // Default height of the cell row
+  thumbnailWidth = thumbnailWidth ?? 68*3; // 16:9-ish ratio
 
   return (
     <Tailwind>
