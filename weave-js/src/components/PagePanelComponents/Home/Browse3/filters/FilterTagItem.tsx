@@ -89,7 +89,7 @@ export const FilterTagItem = ({
       value = <Timestamp value={item.value} dropTimeWhenDefault />;
     }
   } else if (fieldType === 'emoji') {
-    value = item.value === ':thumbs_up:' ? '👍' : '👎';
+    value = item.value;
   } else {
     const valueType = getOperatorValueType(item.operator);
     value = ' ' + quoteValue(valueType, item.value);

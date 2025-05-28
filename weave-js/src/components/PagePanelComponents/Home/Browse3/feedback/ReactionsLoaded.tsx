@@ -6,7 +6,7 @@ import EmojiPicker, {
   SkinTonePickerLocation,
 } from 'emoji-picker-react';
 import _ from 'lodash';
-import React, {useRef, useState} from 'react';
+import React, {useCallback, useRef, useState} from 'react';
 import styled from 'styled-components';
 import {twMerge} from 'tailwind-merge';
 
@@ -117,10 +117,13 @@ export const ReactionsLoaded = ({
   };
 
   // User selects an emoji from popup. Matches Slack behavior of toggling.
-  const onEmojiClick = (emojiData: EmojiClickData, event: MouseEvent) => {
-    onToggleEmoji(emojiData.emoji);
-    setAnchorElReactions(null);
-  };
+  const onEmojiClick = useCallback(
+    (emoji: string) => {
+      onToggleEmoji(emoji);
+      setAnchorElReactions(null);
+    },
+    [onToggleEmoji, setAnchorElReactions]
+  );
 
   const [note, setNote] = useState('');
   const noteLabel = notes.length > 0 ? `${notes.length.toLocaleString()}` : '';
@@ -145,14 +148,6 @@ export const ReactionsLoaded = ({
     scrollbarWidth: 'none' as const,
     ...twWrapperStyles,
   };
-
-  // The emoji picker itself can toggle between the small set of reactions
-  // and the full picker. Unfortunately, it seems difficult to consistently
-  // reposition the popover when this resize happens. (Maybe because of animations?
-  // Was trying the approach in https://github.com/mui/material-ui/issues/10595)
-  // So instead we have two emoji picker components and choose one or the other
-  // to render.
-  const [showFullPicker, setShowFullPicker] = useState(false);
 
   return (
     <Tailwind style={wrapperStyles}>
@@ -207,32 +202,7 @@ export const ReactionsLoaded = ({
                       },
                     },
                   }}>
-                  {!showFullPicker && (
-                    <WeaveEmojiPicker
-                      onEmojiClick={onEmojiClick}
-                      skinTonesDisabled={true}
-                      skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}
-                      reactionsDefaultOpen={true}
-                      reactions={[
-                        '1f44d', // thumbs up
-                        '1f44e', // thumbs down
-                      ]}
-                      onPlusButtonClick={() => {
-                        setShowFullPicker(true);
-                      }}
-                    />
-                  )}
-                  {showFullPicker && (
-                    <EmojiPicker
-                      onEmojiClick={onEmojiClick}
-                      skinTonesDisabled={true}
-                      skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}
-                      previewConfig={{
-                        defaultEmoji: '1f44d',
-                        defaultCaption: 'Hover for emoji name',
-                      }}
-                    />
-                  )}
+                  <ExtensibleEmojiPicker onEmojiClick={onEmojiClick} />
                 </Popover>
               </>
             )}
@@ -271,5 +241,58 @@ export const ReactionsLoaded = ({
         )}
       </div>
     </Tailwind>
+  );
+};
+
+export const ExtensibleEmojiPicker = ({
+  onEmojiClick,
+}: {
+  onEmojiClick: (emoji: string) => void;
+}) => {
+  // The emoji picker itself can toggle between the small set of reactions
+  // and the full picker. Unfortunately, it seems difficult to consistently
+  // reposition the popover when this resize happens. (Maybe because of animations?
+  // Was trying the approach in https://github.com/mui/material-ui/issues/10595)
+  // So instead we have two emoji picker components and choose one or the other
+  // to render.
+  const [showFullPicker, setShowFullPicker] = useState(false);
+
+  const onEmojiClickCallback = useCallback(
+    (emojiData: EmojiClickData, event: MouseEvent) => {
+      console.log('emojiData', emojiData);
+      onEmojiClick(emojiData.emoji);
+    },
+    [onEmojiClick]
+  );
+
+  return (
+    <>
+      {!showFullPicker && (
+        <WeaveEmojiPicker
+          onEmojiClick={onEmojiClickCallback}
+          skinTonesDisabled={true}
+          skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}
+          reactionsDefaultOpen={true}
+          reactions={[
+            '1f44d', // thumbs up
+            '1f44e', // thumbs down
+          ]}
+          onPlusButtonClick={() => {
+            setShowFullPicker(true);
+          }}
+        />
+      )}
+      {showFullPicker && (
+        <EmojiPicker
+          onEmojiClick={onEmojiClickCallback}
+          skinTonesDisabled={true}
+          skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}
+          previewConfig={{
+            defaultEmoji: '1f44d',
+            defaultCaption: 'Hover for emoji name',
+          }}
+        />
+      )}
+    </>
   );
 };

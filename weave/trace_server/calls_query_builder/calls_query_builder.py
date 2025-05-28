@@ -435,6 +435,7 @@ class CallsQuery(BaseModel):
         return self
 
     def add_condition(self, operand: "tsi_query.Operand") -> "CallsQuery":
+        print("operand", operand)
         if isinstance(operand, tsi_query.AndOperation):
             if len(operand.and_) == 0:
                 raise ValueError("Empty AND operation")

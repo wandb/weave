@@ -45,7 +45,7 @@ export type ColumnInfo = {
 };
 
 export const FEEDBACK_EMOJI_FIELD: string =
-  'feedback.[wandb.reaction.1].payload.detoned_alias';
+  'feedback.[wandb.reaction.1].payload.emoji';
 
 export const FIELD_LABELS: Record<string, string> = {
   id: 'Call ID',
