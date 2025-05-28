@@ -292,8 +292,9 @@ class Span:
         # Only de-nest if we have one key
         if len(inputs) == 1:
             nested_top_level_input = inputs.get("inputs") or inputs.get("input")
+            # If it isn't a dict we just have to nest it under the key
             if nested_top_level_input is not None and isinstance(
-                nested_top_level_input, (dict, list)
+                nested_top_level_input, (dict)
             ):
                 if isinstance(nested_top_level_input, dict):
                     # For type checker
