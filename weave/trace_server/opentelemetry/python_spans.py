@@ -10,7 +10,7 @@ from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
@@ -296,12 +296,8 @@ class Span:
             if nested_top_level_input is not None and isinstance(
                 nested_top_level_input, (dict)
             ):
-                if isinstance(nested_top_level_input, dict):
-                    # For type checker
-                    nested_top_level_input = cast(
-                        dict[str, Any], nested_top_level_input
-                    )
-                inputs = to_json_serializable(nested_top_level_input)
+                if all(type(key) == str for key in nested_top_level_input.keys()):
+                    inputs = to_json_serializable(nested_top_level_input)
 
         outputs = get_weave_outputs(events, self.attributes) or {}
         # Only de-nest if we have one key
