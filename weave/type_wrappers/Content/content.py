@@ -20,15 +20,6 @@ from weave.type_wrappers.Content.utils import (
 
 logger = logging.getLogger(__name__)
 
-TO_BYTES_METHODS = [
-    "tobytes",  # Numpy, Pandas, etc
-    "to_bytes",  # Some custom classes and int
-    "read",  # File-like objects
-    "read_bytes",  # File-like objects, Path, etc
-    "as_bytes",  # Some custom classes
-]
-
-
 class BaseContentHandler(BaseModel):
     size: int
     filename: str
@@ -92,32 +83,6 @@ def create_b64_content(
         raise ValueError(f"Invalid base64 string: {e}") from e
 
 
-def create_object_content(
-    input: object, /, **values: Unpack[ContentOptionalArgs]
-) -> BaseContentHandler:
-    if not input.__getattribute__("__class__"):
-        raise ValueError("Input object does not have a class attribute.")
-
-    handler: Callable[..., bytes] | None = None
-
-    class_members = inspect.getmembers(input.__class__)
-    for name, _ in class_members:
-        if name in TO_BYTES_METHODS:
-            handler = getattr(input, name)
-
-    if handler is None:
-        raise ValueError(
-            """
-                No valid method found to convert object to bytes.
-                If your object has a method to convert to bytes, please supply the name
-                in the the to_bytes keyword arguement
-                """
-        )
-
-    data = handler()
-    return create_bytes_content(data, **values)
-
-
 T = TypeVar("T", bound=str)
 
 
@@ -172,8 +137,6 @@ class Content(Generic[T]):
                     )
         elif isinstance(input, bytes):
             self.content_handler = create_bytes_content(input, **values_with_defaults)
-        elif hasattr(input, "__class__"):
-            self.content_handler = create_object_content(input, **values_with_defaults)
         else:
             raise ValueError(f"Unsupported input type: {type(input)}")
 
