@@ -52,6 +52,9 @@ It’s important to store traces of LLM applications in a central database, both
 
     Start capturing by calling `await weave.init(<project-name>)` with a project name your choice, and then wrapping your OpenAI client with `weave.wrapOpenAI`.
 
+    (There is no need to manual wrap any more. Mention it and point a link to the guide.)
+    (In extreme cases, user might still have to do `weave.wrapOpenAI()`, this doc should explain how it can be done.  )
+
     ```typescript
     import {OpenAI} from 'openai';
     import * as weave from 'weave';
