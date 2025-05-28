@@ -780,6 +780,7 @@ class CallsQuery(BaseModel):
         id_mask_sql = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
             id_mask_sql = f"AND (calls_merged.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
+        # TODO: We should also pull out id-masks from the dynamic query
 
         feedback_join_sql = ""
         if needs_feedback:
