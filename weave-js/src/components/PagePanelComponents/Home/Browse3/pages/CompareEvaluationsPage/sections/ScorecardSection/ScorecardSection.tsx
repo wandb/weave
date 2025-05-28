@@ -7,7 +7,6 @@ import styled from 'styled-components';
 import {
   MOON_100,
   MOON_300,
-  MOON_600,
 } from '../../../../../../../../common/css/color.styles';
 import {parseRefMaybe, WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
@@ -17,6 +16,7 @@ import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 import {NotApplicable} from '../../../../NotApplicable';
 import {SmallRef} from '../../../../smallRef/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
+import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
   CompositeScoreMetrics,
@@ -32,7 +32,6 @@ import {
 } from '../../ecpConstants';
 import {
   EvaluationComparisonState,
-  getBaselineCallId,
   getOrderedCallIds,
   getOrderedModelRefs,
 } from '../../ecpState';
@@ -58,6 +57,7 @@ const GridCell = styled.div<{
 }>`
   padding: 6px 16px;
   min-width: 100px;
+  font-size: 14px;
   ${props =>
     props.button &&
     `
@@ -73,16 +73,30 @@ GridCell.displayName = 'S.GridCell';
 export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const modelRefs = useMemo(
-    () => getOrderedModelRefs(props.state),
-    [props.state]
+  const {hiddenEvaluationIds} = useCompareEvaluationsState();
+
+  const evalCallIds = useMemo(
+    () =>
+      getOrderedCallIds(props.state).filter(id => !hiddenEvaluationIds.has(id)),
+    [props.state, hiddenEvaluationIds]
   );
+
+  const modelRefs = useMemo(() => {
+    // Get all model refs from visible evaluations only
+    const visibleEvalCalls = evalCallIds.map(
+      id => props.state.summary.evaluationCalls[id]
+    );
+    const visibleModelRefs = new Set(
+      visibleEvalCalls.map(call => call.modelRef)
+    );
+    // Keep the ordering from getOrderedModelRefs but filter to only visible ones
+    return getOrderedModelRefs(props.state).filter(ref =>
+      visibleModelRefs.has(ref)
+    );
+  }, [props.state, evalCallIds]);
+
   const datasetRefs = useMemo(
     () => Object.values(props.state.summary.evaluations).map(e => e.datasetRef),
-    [props.state]
-  );
-  const evalCallIds = useMemo(
-    () => getOrderedCallIds(props.state),
     [props.state]
   );
 
@@ -241,8 +255,8 @@ export const ScorecardSection: React.FC<{
           style={{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
             backgroundColor: MOON_100,
-            color: MOON_600,
-            fontWeight: 'bold',
+            fontWeight: 600,
+            fontSize: '16px',
             borderTop: '1px solid #ccc',
             borderBottom: '1px solid #ccc',
             display: 'flex',
@@ -257,7 +271,7 @@ export const ScorecardSection: React.FC<{
               flexDirection: 'row',
               gap: '8px',
             }}>
-            <span>diff only</span>
+            <span style={{fontSize: '14px'}}>Diff only</span>
             <Checkbox checked={diffOnly} onClick={() => setDiffOnly(v => !v)} />
           </div>
         </GridCell>
@@ -311,8 +325,8 @@ export const ScorecardSection: React.FC<{
           style={{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
             backgroundColor: MOON_100,
-            color: MOON_600,
-            fontWeight: 'bold',
+            fontWeight: 600,
+            fontSize: '16px',
             borderTop: '1px solid #ccc',
             borderBottom: '1px solid #ccc',
           }}>
@@ -399,8 +413,10 @@ export const ScorecardSection: React.FC<{
                       {metricKey}
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
+                      // Use the first visible evaluation as baseline
+                      const baselineCallId = evalCallIds[0];
                       const baseline = resolveSummaryMetricResult(
-                        getBaselineCallId(props.state),
+                        baselineCallId,
                         groupName,
                         metricKey,
                         compositeSummaryMetrics,
