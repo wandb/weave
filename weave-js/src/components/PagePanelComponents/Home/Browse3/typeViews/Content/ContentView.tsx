@@ -128,16 +128,17 @@ const ContentViewMetadataLoaded = ({
   const [contentResult, setContentResult] = useState<Blob | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [contentUrl, setContentUrl] = useState<string>('');
 
   const {useFileContent} = useWFHooks();
   const {filename, size, mimetype} = metadata;
 
   const iconStart = <Icon name={getIconName(mimetype)} />;
+
   const onDownloadCallback = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsDownloading(true);
   }, []);
+
   const contentContent = useFileContent({
     entity,
     project,
@@ -157,19 +158,8 @@ const ContentViewMetadataLoaded = ({
 
       setContentResult(blob);
       setIsDownloading(false);
-      const url = URL.createObjectURL(blob);
-      setContentUrl(url);
     }
   }, [contentContent.result, mimetype]);
-
-  // Cleanup content URL on unmount
-  useEffect(() => {
-    return () => {
-      if (contentUrl) {
-        URL.revokeObjectURL(contentUrl);
-      }
-    };
-  }, [contentUrl]);
 
   const doSave = useCallback(() => {
     if (!contentResult) {
@@ -237,12 +227,6 @@ const ContentViewMetadataLoaded = ({
         setIsDownloading(true);
       }
     };
-    const onPlay= () => {
-      setShowPreview(true);
-      if (!contentResult) {
-        setIsDownloading(true);
-      }
-    };
 
     iconAndText = (
       <>
@@ -293,9 +277,9 @@ const ContentViewMetadataLoaded = ({
           onClick={onTextClick}
           text={filename}
         />
-        {showPreview && contentUrl && (
+        {showPreview && contentResult && (
           <VideoPopup
-            src={contentUrl}
+            src={contentResult}
             isOpen={true}
             onClose={onClose}
             videoRef={videoRef}

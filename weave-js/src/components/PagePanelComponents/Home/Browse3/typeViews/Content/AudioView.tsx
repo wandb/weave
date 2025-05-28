@@ -5,13 +5,6 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import WaveSurfer from 'wavesurfer.js';
 
-type AudioUnloadedProps = {
-  filename: string;
-  onPlay: () => void;
-  onDownload?: () => void;
-  autoplay?: boolean;
-};
-
 const SLIDER_WIDTH_THRESHOLD = 180;
 const MINI_WIDTH_THRESHOLD = 80;
 

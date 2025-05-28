@@ -22,6 +22,7 @@ type VideoPopupProps = {
   isOpen: boolean;
   onClose: (() => void);
 } & VideoProps;
+
 const VideoContent: React.FC<VideoContentProps> = ({
   src,
   isThumbnail,
