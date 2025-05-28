@@ -139,7 +139,8 @@ const ContentViewMetadataLoaded = ({
     if (!contentResult && !isDownloading) {
       setIsDownloading(true);
     } else if (contentResult) {
-      console.log('Already Downloaded!');
+      // We really want to know if we are duplicating these large downloads
+      console.warn('Attempted to download previously loaded content.');
     }
   };
 

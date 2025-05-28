@@ -33,7 +33,6 @@ const loadImage = (setImageDim: any, imageUrl: string) => {
     });
   };
   img.onerror = err => {
-    console.log('img error');
     console.error(err);
   };
 };
