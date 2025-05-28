@@ -1,44 +1,13 @@
-import {Button} from '@wandb/weave/components/Button';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React, {Ref, RefObject, useCallback, useEffect, useRef, useState} from 'react';
-
-import {convertBytes} from '../../../../../../util';
-import {Icon, IconName, IconNames} from '../../../../../Icon';
+import React, {useCallback, useEffect, useState} from 'react';
+import {Icon} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {TailwindContents} from '../../../../../Tailwind';
-import {CustomLink} from '../../pages/common/Links';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
-import {PDFView} from './PDFView';
-import {VideoPopup, VideoThumbnail} from './VideoView';
-import {MiniAudioViewer} from './AudioView';
+import {getIconName, handleMimetype} from './Handlers';
+import {convertBytes} from '../../../../../../util';
 
-const ICON_MAP: Record<string, IconName> = {
-  'application/json': IconNames.JobProgramCode,
-  'text/csv': IconNames.Table,
-  'text/html': IconNames.JobProgramCode,
-  'text/xml': IconNames.JobProgramCode,
-};
-
-const getIconName = (mimetype: string): IconName => {
-  const iconName = ICON_MAP[mimetype];
-  if (iconName) {
-    return iconName;
-  }
-
-  const [type] = mimetype.split('/', 2);
-  if (type === 'image') {
-    return IconNames.Photo;
-  } else if (type === 'audio') {
-    return IconNames.MusicAudio;
-  } else if (type === 'video') {
-    return IconNames.VideoPlay;
-  } else if (type === 'text') {
-    return IconNames.Document;
-  }
-
-  return IconNames.Document;
-};
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
@@ -179,100 +148,26 @@ const ContentViewMetadataLoaded = ({
   }
 
 
-  let tooltipHint = 'Click button to download';
-  let body = null
-  let iconAndText = (
-    <>
-      {iconStart}
-      <span>{filename}</span>
-    </>
-  );
-  if (mimetype === 'application/pdf') {
-    iconAndText = (
-      <>
-        <CustomLink
-          variant="secondary"
-          icon={iconStart}
-          onClick={openPreview}
-          text={filename}
-        />
-        {showPreview && contentResult && (
-          <PDFView
-            open={true}
-            onClose={closePreview}
-            blob={contentResult}
-            onDownload={doSave}
-          />
-        )}
-      </>
-    );
-    tooltipHint = 'Click icon or filename to preview, button to download';
-  }
-  if (mimetype.startsWith('audio/')) {
-    const onTextClick = () => {
-      setShowPreview(true);
-      if (!contentResult) {
-        setIsDownloading(true);
-      }
-    };
+  const handlerProps = {
+    mimetype,
+    filename,
+    size,
+    iconStart,
+    showPreview,
+    isDownloading,
+    contentResult,
+    openPreview,
+    closePreview,
+    doSave,
+    setShowPreview,
+    setIsDownloading,
+  };
 
-    iconAndText = (
-      <>
-        {!showPreview && <CustomLink
-            variant="secondary"
-            icon={iconStart}
-            onClick={onTextClick}
-            text={filename}
-          />
-        }
-        {showPreview && contentResult && (
-          <MiniAudioViewer
-            audioSrc={contentResult}
-            autoplay={true}
-            height={24}
-            downloadFile={doSave}
-          />
-        )}
-      </>
-    );
-    tooltipHint = 'Click icon or filename to preview, button to download';
-  }
+  const { body, tooltipHint, tooltipPreview } = handleMimetype(handlerProps);
 
-  if (mimetype.startsWith('video/')) {
-    let videoRef = useRef<HTMLVideoElement>(null)
-    const onTextClick = () => {
-      setShowPreview(true);
-      if (!contentResult) {
-        setIsDownloading(true);
-      }
-    };
-
-    const onClose = () => {
-      setShowPreview(false);
-    };
-
-    iconAndText = (
-      <>
-        <CustomLink
-          variant="secondary"
-          icon={iconStart}
-          onClick={onTextClick}
-          text={filename}
-        />
-        {showPreview && contentResult && (
-          <VideoPopup
-            src={contentResult}
-            isOpen={true}
-            onClose={onClose}
-            videoRef={videoRef}
-          />
-        )}
-      </>
-    );
-    tooltipHint = 'Click icon or filename to preview, button to download';
-  }
   const tooltip = (
     <TailwindContents>
+      {tooltipPreview}
       <div className="grid grid-cols-[auto_auto] items-center gap-x-2 gap-y-1">
         <div className="text-right font-bold">Name</div>
         <div>{filename}</div>
@@ -288,22 +183,6 @@ const ContentViewMetadataLoaded = ({
       )}
     </TailwindContents>
   );
-
-  body = (
-    <TailwindContents>
-      <div className="flex items-center gap-4 group">
-        {iconAndText}
-          <div className="opacity-0 group-hover:opacity-100">
-            <Button
-              icon={isDownloading ? 'loading' : 'download'}
-              variant="ghost"
-              size="small"
-              onClick={isDownloading ? undefined : doSave}
-            />
-        </div>
-      </div>
-    </TailwindContents>
-  )
   return (
     <>
       {showPreview && body}
