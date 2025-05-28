@@ -7,9 +7,9 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Generic, TypeVar
-from typing_extensions import Unpack
 
 from pydantic import BaseModel, ConfigDict
+from typing_extensions import Unpack
 
 from weave.type_wrappers.Content.utils import (
     ContentKeywordArgs,
@@ -185,7 +185,7 @@ class Content(Generic[T]):
 
         try:
             if sys.platform == "win32":
-                os.startfile(self.path)
+                os.startfile(self.original_path)
             elif sys.platform == "darwin":  # macOS
                 subprocess.call(("open", str(self.original_path)))
             else:  # linux variants
