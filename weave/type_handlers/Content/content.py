@@ -29,12 +29,5 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> Content:
     return Content(path, metadata["mimetype"])
 
 
-def instance_check(obj: object) -> bool:
-    if isinstance(obj, Content):
-        return True
-    ser_id = obj.__module__ + "." + getattr(obj, "__name__", "")
-    return ser_id.startswith("weave.") and ser_id.endswith(".Content")
-
-
 def register() -> None:
-    serializer.register_serializer(Content, save, load, instance_check)
+    serializer.register_serializer(Content, save, load)
