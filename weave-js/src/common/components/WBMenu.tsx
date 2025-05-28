@@ -4,8 +4,8 @@ import computeScrollIntoView from 'compute-scroll-into-view';
 import React, {useEffect, useMemo, useState} from 'react';
 import {ThemeProvider} from 'styled-components';
 
-import * as S from './WBMenu.styles';
 import type {IconName} from '../../components/Icon';
+import * as S from './WBMenu.styles';
 
 export type WBMenuOption = {
   name?: string;
