@@ -139,7 +139,10 @@ export const usePlaygroundState = () => {
           }
         }
         if (inputs.response_format) {
-          newState.responseFormat = inputs.response_format.type;
+          newState.responseFormat =
+            inputs.response_format.type in PlaygroundResponseFormats
+              ? inputs.response_format.type
+              : PlaygroundResponseFormats.Text;
         }
         for (const [key, value] of Object.entries(NUMERIC_SETTINGS_MAPPING)) {
           if (inputs[value.pythonValue] !== undefined) {

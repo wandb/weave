@@ -107,6 +107,7 @@ def get_smolagents_patcher(
             # Patch model-related classes
             get_symbol_patcher("smolagents", "TransformersModel.__call__", base),
             get_symbol_patcher("smolagents", "HfApiModel.__call__", base),
+            get_symbol_patcher("smolagents", "InferenceClientModel.__call__", base),
             get_symbol_patcher("smolagents", "LiteLLMModel.__call__", base),
             get_symbol_patcher("smolagents", "OpenAIServerModel.__call__", base),
             get_symbol_patcher("smolagents", "AzureOpenAIServerModel.__call__", base),
