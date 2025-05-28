@@ -1,11 +1,13 @@
 import {Button} from '@wandb/weave/components/Button';
-import React, {RefObject, useRef} from 'react';
+import React, {RefObject, useEffect, useRef} from 'react';
 import {IconName, IconNames} from '../../../../../Icon';
 import {CustomLink} from '../../pages/common/Links';
 import {PDFView} from './PDFView';
 import {VideoPopup} from './VideoView';
 import {MiniAudioViewer} from './AudioView';
+import {ImageThumbnail, ImageViewport} from './ImageView';
 import {TailwindContents} from '../../../../../Tailwind';
+import { LoadingDots } from '@wandb/weave/components/LoadingDots';
 
 const ICON_MAP: Record<string, IconName> = {
   'application/json': IconNames.JobProgramCode,
@@ -14,6 +16,36 @@ const ICON_MAP: Record<string, IconName> = {
   'text/xml': IconNames.JobProgramCode,
 };
 
+type CreateToolTipPreviewProps = {
+  contentResult: Blob | null;
+  isDownloading: boolean;
+  setIsDownloading: (downloading: boolean) => void;
+  onClick: () => void;
+  previewComponent: (contentResult: Blob) => React.ReactNode;
+};
+
+export const CreateToolTipPreview = ({
+  contentResult,
+  isDownloading,
+  setIsDownloading,
+  previewComponent
+}: CreateToolTipPreviewProps) => {
+  useEffect(() => {
+    if(!isDownloading && !contentResult) {
+      setIsDownloading(true)
+    }
+  })
+  return (
+    <>
+      {contentResult && (
+        previewComponent(contentResult)
+      )}
+      {!contentResult && (
+        <LoadingDots />
+      )}
+    </>
+  )
+}
 export const getIconName = (mimetype: string): IconName => {
   const iconName = ICON_MAP[mimetype];
   if (iconName) {
@@ -235,6 +267,76 @@ export const handleVideoMimetype = ({
   };
 };
 
+export const handleImageMimetype = ({
+  iconStart,
+  filename,
+  showPreview,
+  contentResult,
+  setShowPreview,
+  setIsDownloading,
+  doSave,
+  isDownloading,
+}: HandlerProps) => {
+  const onTextClick = () => {
+    setShowPreview(true);
+    if (!contentResult) {
+      setIsDownloading(true);
+    }
+  };
+
+  const onClose = () => {
+    setShowPreview(false);
+  };
+
+  const iconAndText = (
+    <CustomLink
+      variant="secondary"
+      icon={iconStart}
+      onClick={onTextClick}
+      text={filename}
+    />
+  );
+
+  const preview = (
+    showPreview && contentResult && (
+      <ImageViewport blob={contentResult} isOpen={true} onClose={onClose}/>
+    )
+  );
+
+  const body = (
+    <TailwindContents>
+      <div className="flex items-center gap-4 group">
+        {iconAndText}
+        {preview}
+        <div className="opacity-0 group-hover:opacity-100">
+          <DownloadButton isDownloading={isDownloading} doSave={doSave} />
+        </div>
+      </div>
+    </TailwindContents>
+  );
+
+
+  const previewComponent = (result: Blob) => {
+    return <ImageThumbnail blob={result} onClick={onTextClick}/>
+  }
+
+  const tooltipPreview = (
+
+    <CreateToolTipPreview
+      onClick={onTextClick}
+      previewComponent={previewComponent}
+      isDownloading={isDownloading}
+      setIsDownloading={(val) => {setIsDownloading(val)}}
+      contentResult={contentResult}
+    />
+  )
+  return {
+    body,
+    tooltipHint: 'Click icon or filename to preview, button to download',
+    tooltipPreview
+  };
+};
+
 export const handleGenericMimetype = ({
   iconStart,
   filename,
@@ -272,6 +374,8 @@ export const handleMimetype = ({mimetype, ...handlerProps}: HandlerProps): Handl
     return handleAudioMimetype({mimetype, ...handlerProps})
   } else if (mimetype.startsWith('video/')) {
     return handleVideoMimetype({mimetype, ...handlerProps})
+  } else if (mimetype.startsWith('image/')) {
+    return handleImageMimetype({mimetype, ...handlerProps})
   } else {
     return handleGenericMimetype({mimetype, ...handlerProps})
   }

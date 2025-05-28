@@ -109,8 +109,8 @@ const VideoThumbnail: React.FC<VideoPreviewProps> = ({
   videoRef,
 }) => {
   const [showPopup, setShowPopup] = useState<boolean>(false);
-  const thumbnailHeight = Math.min(38); // Default height of the cell row
-  const thumbnailWidth = Math.min(68); // 16:9-ish ratio
+  const thumbnailHeight = 38; // Default height of the cell row
+  const thumbnailWidth = 68; // 16:9-ish ratio
   return (
     <Tailwind>
       {!showPopup &&
