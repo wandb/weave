@@ -1,13 +1,12 @@
-
 import * as Dialog from '@wandb/weave/components/Dialog/Dialog';
 import {IconPlay} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 
 type VideoProps = {
   src: Blob | string;
-}
+};
 type VideoContentProps = {
   isThumbnail: boolean;
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -15,19 +14,19 @@ type VideoContentProps = {
 } & VideoProps;
 
 type VideoPreviewProps = {
-  onClick: (() => void);
+  onClick: () => void;
 } & VideoProps;
 
 type VideoPopupProps = {
   isOpen: boolean;
-  onClose: (() => void);
+  onClose: () => void;
 } & VideoProps;
 
 const VideoContent: React.FC<VideoContentProps> = ({
   src,
   isThumbnail,
   videoRef,
-  autoplay
+  autoplay,
 }) => {
   const [url, setUrl] = useState<string>('');
 
@@ -36,10 +35,9 @@ const VideoContent: React.FC<VideoContentProps> = ({
       const objectUrl = URL.createObjectURL(src);
       setUrl(objectUrl);
       return () => URL.revokeObjectURL(objectUrl);
-    }
-    else {
-      setUrl(src)
-      return
+    } else {
+      setUrl(src);
+      return;
     }
   }, [src]);
 
@@ -78,16 +76,11 @@ const VideoContent: React.FC<VideoContentProps> = ({
         }}
       />
     </div>
-  )
+  );
 };
 
-
-const VideoPopup: React.FC<VideoPopupProps> = ({
-  src,
-  isOpen,
-  onClose
-}) => {
-  const videoRef = useRef<HTMLVideoElement>(null)
+const VideoPopup: React.FC<VideoPopupProps> = ({src, isOpen, onClose}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
       <Dialog.Portal>
@@ -102,15 +95,12 @@ const VideoPopup: React.FC<VideoPopupProps> = ({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
-  )
-}
-const VideoThumbnail: React.FC<VideoPreviewProps> = ({
-  src,
-  onClick
-}) => {
+  );
+};
+const VideoThumbnail: React.FC<VideoPreviewProps> = ({src, onClick}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const thumbnailHeight = 38*3; // Default height of the cell row
-  const thumbnailWidth = 68*3; // 16:9-ish ratio
+  const thumbnailHeight = 38 * 3; // Default height of the cell row
+  const thumbnailWidth = 68 * 3; // 16:9-ish ratio
   return (
     <Tailwind>
       <div
@@ -120,7 +110,7 @@ const VideoThumbnail: React.FC<VideoPreviewProps> = ({
         <div
           style={{height: thumbnailHeight, width: thumbnailWidth}}
           className="relative">
-          <VideoContent src={src} videoRef={videoRef} isThumbnail={true}/>
+          <VideoContent src={src} videoRef={videoRef} isThumbnail={true} />
           <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 transition-all duration-200 hover:bg-oblivion/10">
             <IconPlay className="text-white" />
           </div>
@@ -128,7 +118,5 @@ const VideoThumbnail: React.FC<VideoPreviewProps> = ({
       </div>
     </Tailwind>
   );
-}
-export {VideoPopup,VideoThumbnail};
-
-
+};
+export {VideoPopup, VideoThumbnail};

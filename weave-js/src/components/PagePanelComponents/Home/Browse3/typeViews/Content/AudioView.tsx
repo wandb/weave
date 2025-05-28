@@ -2,7 +2,7 @@ import {MOON_350, TEAL_500} from '@wandb/weave/common/css/color.styles';
 import {formatDurationWithColons} from '@wandb/weave/common/util/time';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
+import React, {FC, useEffect, useRef, useState} from 'react';
 import WaveSurfer from 'wavesurfer.js';
 
 const SLIDER_WIDTH_THRESHOLD = 180;
@@ -64,7 +64,6 @@ export const MiniAudioViewer: FC<{
         setPressedPause(false);
       });
       wavesurfer.on('pause', () => {
-        autoplay = false
         setAudioPlaying(false);
         setPressedPause(true);
       });
@@ -100,7 +99,7 @@ export const MiniAudioViewer: FC<{
         wavesurferRef.current.destroy();
       }
     };
-  }, [audioSrc, height, measureDivRef.current?.offsetWidth]);
+  });
 
   const audioCurrentTimeStr = [audioCurrentTime, audioTotalTime]
     .map(formatDurationWithColons)

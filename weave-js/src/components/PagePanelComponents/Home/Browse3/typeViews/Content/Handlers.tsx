@@ -1,6 +1,6 @@
 import {Button} from '@wandb/weave/components/Button';
-import { LoadingDots } from '@wandb/weave/components/LoadingDots';
-import React, {RefObject, useEffect, useRef} from 'react';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import React, {useEffect} from 'react';
 
 import {IconName, IconNames} from '../../../../../Icon';
 import {TailwindContents} from '../../../../../Tailwind';
@@ -29,24 +29,20 @@ export const CreateToolTipPreview = ({
   contentResult,
   isDownloading,
   setIsDownloading,
-  previewComponent
+  previewComponent,
 }: CreateToolTipPreviewProps) => {
   useEffect(() => {
-    if(!isDownloading && !contentResult) {
-      setIsDownloading(true)
+    if (!isDownloading && !contentResult) {
+      setIsDownloading(true);
     }
-  })
+  });
   return (
     <>
-      {contentResult && (
-        previewComponent(contentResult)
-      )}
-      {!contentResult && (
-        <LoadingDots />
-      )}
+      {contentResult && previewComponent(contentResult)}
+      {!contentResult && <LoadingDots />}
     </>
-  )
-}
+  );
+};
 export const getIconName = (mimetype: string): IconName => {
   const iconName = ICON_MAP[mimetype];
   if (iconName) {
@@ -86,12 +82,15 @@ type HandlerReturnType = {
   body: React.ReactNode;
   tooltipHint: string;
   tooltipPreview?: React.ReactNode;
-}
+};
 
 const DownloadButton = ({
   isDownloading,
-  doSave
-}: { isDownloading: boolean, doSave: () => void}) =>{
+  doSave,
+}: {
+  isDownloading: boolean;
+  doSave: () => void;
+}) => {
   return (
     <Button
       icon={isDownloading ? 'loading' : 'download'}
@@ -99,8 +98,8 @@ const DownloadButton = ({
       size="small"
       onClick={isDownloading ? undefined : doSave}
     />
-  )
-}
+  );
+};
 
 const handlePDFMimetype = ({
   iconStart,
@@ -119,20 +118,18 @@ const handlePDFMimetype = ({
       onClick={openPreview}
       text={filename}
     />
-  )
-  const preview = (
-    showPreview && contentResult && (
-      <PDFView
-        open={true}
-        onClose={closePreview}
-        blob={contentResult}
-        onDownload={doSave}
-      />
-    )
-  )
+  );
+  const preview = showPreview && contentResult && (
+    <PDFView
+      open={true}
+      onClose={closePreview}
+      blob={contentResult}
+      onDownload={doSave}
+    />
+  );
   const body = (
     <TailwindContents>
-      <div className="flex items-center gap-4 group">
+      <div className="group flex items-center gap-4">
         {iconAndText}
         {preview}
         <div className="opacity-0 group-hover:opacity-100">
@@ -140,7 +137,7 @@ const handlePDFMimetype = ({
         </div>
       </div>
     </TailwindContents>
-  )
+  );
   return {
     body,
     tooltipHint: 'Click icon or filename to preview, button to download',
@@ -189,7 +186,7 @@ export const handleAudioMimetype = ({
     <TailwindContents>
       {showPreview && iconAndText}
       {!showPreview && (
-        <div className="flex items-center gap-4 group">
+        <div className="group flex items-center gap-4">
           {iconAndText}
           {!showPreview && (
             <div className="opacity-0 group-hover:opacity-100">
@@ -237,32 +234,28 @@ export const handleVideoMimetype = ({
     />
   );
 
-  const preview = (
-    showPreview && contentResult && (
-      <VideoPopup
-        src={contentResult}
-        isOpen={true}
-        onClose={onClose}
-      />
-    )
+  const preview = showPreview && contentResult && (
+    <VideoPopup src={contentResult} isOpen={true} onClose={onClose} />
   );
   const previewComponent = (result: Blob) => {
-    return <VideoThumbnail src={result} onClick={onTextClick}/>
-  }
+    return <VideoThumbnail src={result} onClick={onTextClick} />;
+  };
 
   const tooltipPreview = (
     <CreateToolTipPreview
       onClick={onTextClick}
       previewComponent={previewComponent}
       isDownloading={isDownloading}
-      setIsDownloading={(val) => {setIsDownloading(val)}}
+      setIsDownloading={val => {
+        setIsDownloading(val);
+      }}
       contentResult={contentResult}
     />
-  )
+  );
 
   const body = (
     <TailwindContents>
-      <div className="flex items-center gap-4 group">
+      <div className="group flex items-center gap-4">
         {iconAndText}
         {preview}
         <div className="opacity-0 group-hover:opacity-100">
@@ -275,7 +268,7 @@ export const handleVideoMimetype = ({
   return {
     body,
     tooltipHint: 'Click icon or filename to preview, button to download',
-    tooltipPreview
+    tooltipPreview,
   };
 };
 
@@ -309,15 +302,13 @@ export const handleImageMimetype = ({
     />
   );
 
-  const preview = (
-    showPreview && contentResult && (
-      <ImageViewport blob={contentResult} isOpen={true} onClose={onClose}/>
-    )
+  const preview = showPreview && contentResult && (
+    <ImageViewport blob={contentResult} isOpen={true} onClose={onClose} />
   );
 
   const body = (
     <TailwindContents>
-      <div className="flex items-center gap-4 group">
+      <div className="group flex items-center gap-4">
         {iconAndText}
         {preview}
         <div className="opacity-0 group-hover:opacity-100">
@@ -327,25 +318,25 @@ export const handleImageMimetype = ({
     </TailwindContents>
   );
 
-
   const previewComponent = (result: Blob) => {
-    return <ImageThumbnail blob={result} onClick={onTextClick}/>
-  }
+    return <ImageThumbnail blob={result} onClick={onTextClick} />;
+  };
 
   const tooltipPreview = (
-
     <CreateToolTipPreview
       onClick={onTextClick}
       previewComponent={previewComponent}
       isDownloading={isDownloading}
-      setIsDownloading={(val) => {setIsDownloading(val)}}
+      setIsDownloading={val => {
+        setIsDownloading(val);
+      }}
       contentResult={contentResult}
     />
-  )
+  );
   return {
     body,
     tooltipHint: 'Click icon or filename to preview, button to download',
-    tooltipPreview
+    tooltipPreview,
   };
 };
 
@@ -364,7 +355,7 @@ export const handleGenericMimetype = ({
 
   const body = (
     <TailwindContents>
-      <div className="flex items-center gap-4 group">
+      <div className="group flex items-center gap-4">
         {iconAndText}
         <div className="opacity-0 group-hover:opacity-100">
           <DownloadButton isDownloading={isDownloading} doSave={doSave} />
@@ -377,18 +368,21 @@ export const handleGenericMimetype = ({
     body,
     tooltipHint: 'Click button to download',
   };
-}
+};
 
-export const handleMimetype = ({mimetype, ...handlerProps}: HandlerProps): HandlerReturnType => {
+export const handleMimetype = ({
+  mimetype,
+  ...handlerProps
+}: HandlerProps): HandlerReturnType => {
   if (mimetype === 'application/pdf') {
-    return handlePDFMimetype({mimetype, ...handlerProps})
+    return handlePDFMimetype({mimetype, ...handlerProps});
   } else if (mimetype.startsWith('audio/')) {
-    return handleAudioMimetype({mimetype, ...handlerProps})
+    return handleAudioMimetype({mimetype, ...handlerProps});
   } else if (mimetype.startsWith('video/')) {
-    return handleVideoMimetype({mimetype, ...handlerProps})
+    return handleVideoMimetype({mimetype, ...handlerProps});
   } else if (mimetype.startsWith('image/')) {
-    return handleImageMimetype({mimetype, ...handlerProps})
+    return handleImageMimetype({mimetype, ...handlerProps});
   } else {
-    return handleGenericMimetype({mimetype, ...handlerProps})
+    return handleGenericMimetype({mimetype, ...handlerProps});
   }
-}
+};

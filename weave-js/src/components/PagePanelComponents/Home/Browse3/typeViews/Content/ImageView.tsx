@@ -2,23 +2,11 @@ import * as Dialog from '@wandb/weave/components/Dialog/Dialog';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useMemo, useState} from 'react';
-import {AutoSizer} from 'react-virtualized';
-import Lightbox from 'yet-another-react-lightbox';
-import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
-import Zoom from 'yet-another-react-lightbox/plugins/zoom';
-
-import {StyledTooltip, TooltipHint} from '../../../../../DraggablePopups';
 
 type ImageViewProps = {
   blob: Blob;
   containerWidth?: number;
   containerHeight?: number;
-};
-
-type ImageScaledProps = {
-  blob: Blob;
-  width: number;
-  height: number;
 };
 
 type ImageViewportProps = {
@@ -85,7 +73,7 @@ export const ImageThumbnail = ({
               objectFit: 'contain',
             }}
             src={url}
-            alt="Image"
+            alt="Preview Thumbnail"
           />
           <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 transition-all duration-200 hover:bg-oblivion/10">
             <span className="text-xs text-white">🔍</span>
@@ -134,7 +122,7 @@ export const ImageViewport = ({blob, isOpen, onClose}: ImageViewportProps) => {
                 objectFit: 'contain',
               }}
               src={url}
-              alt="Image"
+              alt="Popup Preview"
             />
           </div>
         </Dialog.Content>

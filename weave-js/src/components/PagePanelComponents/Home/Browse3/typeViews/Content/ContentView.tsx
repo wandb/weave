@@ -9,7 +9,6 @@ import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 import {getIconName, handleMimetype} from './Handlers';
 
-
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
 const saveBlob = (blob: Blob, filename: string) => {
@@ -134,20 +133,22 @@ const ContentViewMetadataLoaded = ({
   }, [contentResult, filename]);
 
   const downloadContent = () => {
-    if(!contentResult && !isDownloading) { setIsDownloading(true); }
-    else if(contentResult) { console.log('Already Downloaded!') }
-  }
+    if (!contentResult && !isDownloading) {
+      setIsDownloading(true);
+    } else if (contentResult) {
+      console.log('Already Downloaded!');
+    }
+  };
 
   const openPreview = () => {
     setShowPreview(true);
     if (!contentResult && !isDownloading) {
-      downloadContent()
+      downloadContent();
     }
   };
   const closePreview = () => {
-    setShowPreview(false)
-  }
-
+    setShowPreview(false);
+  };
 
   const handlerProps = {
     mimetype,
@@ -164,14 +165,12 @@ const ContentViewMetadataLoaded = ({
     setIsDownloading,
   };
 
-  const { body, tooltipHint, tooltipPreview } = handleMimetype(handlerProps);
+  const {body, tooltipHint, tooltipPreview} = handleMimetype(handlerProps);
 
   const tooltip = (
     <TailwindContents>
       {tooltipPreview && (
-        <div className="flex justify-center">
-          {tooltipPreview}
-        </div>
+        <div className="flex justify-center">{tooltipPreview}</div>
       )}
       {!tooltipPreview && (
         <div className="grid grid-cols-[auto_auto] items-center gap-x-2 gap-y-1">
@@ -193,7 +192,7 @@ const ContentViewMetadataLoaded = ({
   return (
     <>
       {showPreview && body}
-      {!showPreview && (<Tooltip trigger={body} content={tooltip} />)}
+      {!showPreview && <Tooltip trigger={body} content={tooltip} />}
     </>
-  )
+  );
 };
