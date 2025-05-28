@@ -39,6 +39,7 @@ export const MiniAudioViewer: FC<{
   const [audioPlaying, setAudioPlaying] = React.useState(false);
   const [audioTotalTime, setAudioTotalTime] = React.useState<number>();
   const [audioCurrentTime, setAudioCurrentTime] = React.useState<number>();
+  const [pressedPause, setPressedPause] = React.useState(false);
 
   // initializes the wavesurfer.js div and object (used to display waveforms)
   React.useEffect(() => {
@@ -60,18 +61,22 @@ export const MiniAudioViewer: FC<{
       /* WAVESURFER EVENTS */
       wavesurfer.on('play', () => {
         setAudioPlaying(true);
+        setPressedPause(false);
       });
       wavesurfer.on('pause', () => {
+        autoplay = false
         setAudioPlaying(false);
+        setPressedPause(true);
       });
       wavesurfer.on('ready', () => {
-        const duration = wavesurfer!.getDuration();
-
         setAudioLoading(false);
-        setAudioCurrentTime(undefined);
+        const duration = wavesurfer!.getDuration();
         setAudioTotalTime(duration || undefined);
-        if (autoplay) {
-          wavesurferRef.current?.play();
+        if (autoplay && !pressedPause) {
+          // We only want to do this once or it runs on every render.
+          // Normally you would want to do this on 'load' but that doesn't work here
+          wavesurferRef.current?.seekTo(audioCurrentTime ?? 0);
+          wavesurferRef.current?.play(audioCurrentTime ?? 0);
         }
       });
       // fires when you click a new location in the waveform
