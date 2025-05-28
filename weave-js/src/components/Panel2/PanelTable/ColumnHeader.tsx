@@ -868,8 +868,7 @@ const ColumnMenuOptionRenderer: OptionRenderer = ({
   hovered,
   selected,
 }) => {
-  const iconName =
-    option.icon ?? (selected && option.icon !== null ? 'checkmark' : 'blank');
+  const iconName = option.icon ?? (selected && option.icon ? 'check' : 'blank');
 
   return (
     <Item
