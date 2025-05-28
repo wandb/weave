@@ -189,7 +189,7 @@ class Content(Generic[T]):
             elif sys.platform == "darwin":  # macOS
                 subprocess.call(("open", str(self.original_path)))
             else:  # linux variants
-                subprocess.call(("xdg-open", str(self.path)))
+                subprocess.call(("xdg-open", str(self.original_path)))
         except Exception as e:
             logger.exception(f"Failed to open file {self.original_path}: {e}")
             return False
