@@ -1,10 +1,8 @@
 import base64
-import inspect
 import logging
 import os
 import subprocess
 import sys
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Generic, TypeVar, Unpack
 
@@ -19,6 +17,7 @@ from weave.type_wrappers.Content.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
 
 class BaseContentHandler(BaseModel):
     size: int
