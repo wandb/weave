@@ -129,7 +129,7 @@ const VideoContent: React.FC<VideoContentProps> = ({
         }}
         controls={!isThumbnail}
         autoPlay={autoplay ?? false}
-        muted={isThumbnail ? true : (initialMuted ?? true)}
+        muted={isThumbnail ? true : initialMuted ?? true}
         loop={isThumbnail}
         onLoadedData={() => {
           if (videoRef.current) {
