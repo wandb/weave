@@ -133,12 +133,6 @@ const ContentViewMetadataLoaded = ({
   const {filename, size, mimetype} = metadata;
 
   const iconStart = <Icon name={getIconName(mimetype)} />;
-
-  const onDownloadCallback = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDownloading(true);
-  }, []);
-
   const contentContent = useFileContent({
     entity,
     project,
@@ -169,19 +163,22 @@ const ContentViewMetadataLoaded = ({
     saveBlob(contentResult, filename);
   }, [contentResult, filename]);
 
-  useEffect(() => {
-    // If we have finished downloading the content and the
-    // user action wasn't opening a preview, save it.
-    if (contentResult && !isDownloading && !showPreview) {
-      doSave();
+  const downloadContent = () => {
+    if(!contentResult && !isDownloading) { setIsDownloading(true); }
+    else if(contentResult) { console.log('Already Downloaded!') }
+  }
+
+  const openPreview = () => {
+    setShowPreview(true);
+    if (!contentResult && !isDownloading) {
+      downloadContent()
     }
-    // Don't want a showPreview dependency because we don't want to save on preview close
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentResult, isDownloading, doSave]);
+  };
+  const closePreview = () => {
+    setShowPreview(false)
+  }
 
-  const onClickDownload = isDownloading ? undefined : onDownloadCallback;
 
-  let tooltipPreview = null;
   let tooltipHint = 'Click button to download';
   let body = null
   let iconAndText = (
@@ -191,27 +188,18 @@ const ContentViewMetadataLoaded = ({
     </>
   );
   if (mimetype === 'application/pdf') {
-    const onTextClick = () => {
-      setShowPreview(true);
-      if (!contentResult) {
-        setIsDownloading(true);
-      }
-    };
-    const onClose = () => {
-      setShowPreview(false);
-    };
     iconAndText = (
       <>
         <CustomLink
           variant="secondary"
           icon={iconStart}
-          onClick={onTextClick}
+          onClick={openPreview}
           text={filename}
         />
         {showPreview && contentResult && (
           <PDFView
             open={true}
-            onClose={onClose}
+            onClose={closePreview}
             blob={contentResult}
             onDownload={doSave}
           />
@@ -237,7 +225,6 @@ const ContentViewMetadataLoaded = ({
             text={filename}
           />
         }
-        {showPreview && !contentResult && (<LoadingDots />)}
         {showPreview && contentResult && (
           <MiniAudioViewer
             audioSrc={contentResult}
@@ -249,15 +236,10 @@ const ContentViewMetadataLoaded = ({
       </>
     );
     tooltipHint = 'Click icon or filename to preview, button to download';
-    body = (
-      <TailwindContents>
-        {iconAndText}
-      </TailwindContents>
-    );
   }
+
   if (mimetype.startsWith('video/')) {
     let videoRef = useRef<HTMLVideoElement>(null)
-
     const onTextClick = () => {
       setShowPreview(true);
       if (!contentResult) {
@@ -289,37 +271,8 @@ const ContentViewMetadataLoaded = ({
     );
     tooltipHint = 'Click icon or filename to preview, button to download';
   }
-
-  if (!body) {
-    body = (
-      <TailwindContents>
-        <div className="flex items-center gap-4 group">
-          {iconAndText}
-            <div className="opacity-0 group-hover:opacity-100">
-              <Button
-                icon={isDownloading ? 'loading' : 'download'}
-                variant="ghost"
-                size="small"
-                onClick={onClickDownload}
-              />
-          </div>
-        </div>
-      </TailwindContents>
-    );
-  }
-
-  // No need to compute the tooltip, we don't want it showing over the preview anyway.
-  if (showPreview) {
-    return body;
-  }
-
   const tooltip = (
     <TailwindContents>
-      {tooltipPreview && (
-        <div className="flex h-full w-full items-center justify-start">
-          {tooltipPreview}
-        </div>
-      )}
       <div className="grid grid-cols-[auto_auto] items-center gap-x-2 gap-y-1">
         <div className="text-right font-bold">Name</div>
         <div>{filename}</div>
@@ -336,5 +289,25 @@ const ContentViewMetadataLoaded = ({
     </TailwindContents>
   );
 
-  return <Tooltip trigger={body} content={tooltip} />;
+  body = (
+    <TailwindContents>
+      <div className="flex items-center gap-4 group">
+        {iconAndText}
+          <div className="opacity-0 group-hover:opacity-100">
+            <Button
+              icon={isDownloading ? 'loading' : 'download'}
+              variant="ghost"
+              size="small"
+              onClick={isDownloading ? undefined : doSave}
+            />
+        </div>
+      </div>
+    </TailwindContents>
+  )
+  return (
+    <>
+      {showPreview && body}
+      {!showPreview && (<Tooltip trigger={body} content={tooltip} />)}
+    </>
+  )
 };
