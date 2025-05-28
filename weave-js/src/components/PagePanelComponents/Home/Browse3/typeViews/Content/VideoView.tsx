@@ -92,7 +92,16 @@ const VideoContent: React.FC<VideoContentProps> = ({
         videoElement.removeEventListener('volumechange', handleVolumeChange);
       };
     }
-  }, [videoRef, url, onTimeUpdate, onVolumeChange, onMuteChange, isThumbnail, initialVolume, initialMuted]);
+  }, [
+    videoRef,
+    url,
+    onTimeUpdate,
+    onVolumeChange,
+    onMuteChange,
+    isThumbnail,
+    initialVolume,
+    initialMuted,
+  ]);
 
   if (!url) {
     return <LoadingDots />;
@@ -118,7 +127,7 @@ const VideoContent: React.FC<VideoContentProps> = ({
         }}
         controls={!isThumbnail}
         autoPlay={autoplay ?? false}
-        muted={isThumbnail ? true : initialMuted ?? true}
+        muted={isThumbnail ? true : (initialMuted ?? true)}
         loop={isThumbnail}
         onLoadedData={() => {
           if (videoRef.current) {

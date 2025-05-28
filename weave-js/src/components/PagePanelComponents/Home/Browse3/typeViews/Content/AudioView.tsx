@@ -2,7 +2,14 @@ import {MOON_350, TEAL_500} from '@wandb/weave/common/css/color.styles';
 import {formatDurationWithColons} from '@wandb/weave/common/util/time';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {FC, useCallback, useEffect, useMemo,useRef, useState} from 'react';
+import React, {
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import WaveSurfer from 'wavesurfer.js';
 
 const SLIDER_WIDTH_THRESHOLD = 180;
@@ -28,7 +35,9 @@ export const MiniAudioViewer: FC<{
   const [audioLoading, setAudioLoading] = useState(true);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [audioTotalTime, setAudioTotalTime] = useState<number | undefined>();
-  const [audioCurrentTime, setAudioCurrentTime] = useState<number | undefined>(0);
+  const [audioCurrentTime, setAudioCurrentTime] = useState<number | undefined>(
+    0
+  );
   const [pressedPause, setPressedPause] = useState(false);
 
   const autoplayAttemptedForCurrentSrcRef = useRef(false);
@@ -42,7 +51,6 @@ export const MiniAudioViewer: FC<{
     setAudioLoading(true);
     // Reset current time when source changes, before WaveSurfer is ready
     setAudioCurrentTime(0);
-
 
     const wavesurfer = WaveSurfer.create({
       backend: 'WebAudio',
@@ -171,19 +179,24 @@ export const MiniAudioViewer: FC<{
       resizeObserver.disconnect(); // Important for cleanup
     };
   }, []); // Empty dependency array is correct here as measureDivRef itself is stable,
-          // and setShowMode, SLIDER_WIDTH_THRESHOLD, MINI_WIDTH_THRESHOLD are constants/stable.
+  // and setShowMode, SLIDER_WIDTH_THRESHOLD, MINI_WIDTH_THRESHOLD are constants/stable.
 
-  const handlePlayPauseClick = useCallback(() => {
-    const wavesurfer = wavesurferRef.current;
-    if (wavesurfer) {
-      if (wavesurfer.isPlaying()) {
-        setPressedPause(true); // User is intending to pause
-      } else {
-        setPressedPause(false); // User is intending to play
+  const handlePlayPauseClick = useCallback(
+    () => {
+      const wavesurfer = wavesurferRef.current;
+      if (wavesurfer) {
+        if (wavesurfer.isPlaying()) {
+          setPressedPause(true); // User is intending to pause
+        } else {
+          setPressedPause(false); // User is intending to play
+        }
+        wavesurfer.playPause();
       }
-      wavesurfer.playPause();
-    }
-  }, [/* wavesurferRef is stable, setPressedPause is stable */]);
+    },
+    [
+      /* wavesurferRef is stable, setPressedPause is stable */
+    ]
+  );
 
   const audioTimeDisplay = useMemo(() => {
     return [audioCurrentTime, audioTotalTime]
@@ -221,7 +234,8 @@ export const MiniAudioViewer: FC<{
             )}
             <div
               ref={waveformDomRef}
-              className={`flex-grow overflow-hidden ${ // Use flex-grow for better space utilization
+              className={`flex-grow overflow-hidden ${
+                // Use flex-grow for better space utilization
                 showMode === ShowMode.Slider ? 'block' : 'hidden'
               }`}
               style={{minWidth: showMode === ShowMode.Slider ? '50px' : '0'}} // Ensure some min width for waveform

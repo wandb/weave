@@ -77,7 +77,9 @@ type HandlerProps = {
   setShowPreview: (show: boolean) => void;
   setIsDownloading: (downloading: boolean) => void;
   videoPlaybackState?: {currentTime: number; volume: number; muted: boolean};
-  updateVideoPlaybackState?: (newState: Partial<{currentTime: number; volume: number; muted: boolean}>) => void;
+  updateVideoPlaybackState?: (
+    newState: Partial<{currentTime: number; volume: number; muted: boolean}>
+  ) => void;
 };
 
 type HandlerReturnType = {

@@ -154,7 +154,10 @@ const ContentViewMetadataLoaded = ({
   };
 
   const updateVideoPlaybackState = useCallback(
-    (videoId: string, newState: Partial<{currentTime: number; volume: number; muted: boolean}>) => {
+    (
+      videoId: string,
+      newState: Partial<{currentTime: number; volume: number; muted: boolean}>
+    ) => {
       setVideoPlaybackStates(prev => ({
         ...prev,
         [videoId]: {
@@ -180,7 +183,9 @@ const ContentViewMetadataLoaded = ({
     setShowPreview,
     setIsDownloading,
     videoPlaybackState: videoPlaybackStates[content],
-    updateVideoPlaybackState: (newState: Partial<{currentTime: number; volume: number; muted: boolean}>) => updateVideoPlaybackState(content, newState),
+    updateVideoPlaybackState: (
+      newState: Partial<{currentTime: number; volume: number; muted: boolean}>
+    ) => updateVideoPlaybackState(content, newState),
   };
 
   const {body, tooltipHint, tooltipPreview} = handleMimetype(handlerProps);
