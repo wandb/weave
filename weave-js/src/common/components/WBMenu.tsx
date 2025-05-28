@@ -38,23 +38,26 @@ const DEFAULT_OPTION_RENDERER: OptionRenderer = ({
   selected,
   fontSize,
   lineHeight,
-}) => (
-  <S.Item
-    data-test={option['data-test']}
-    hovered={hovered}
-    fontSize={fontSize}
-    lineHeight={lineHeight}>
-    {getOptionDisplayName(option)}
-    <S.ItemIcon
-      name={
-        (option.icon ??
-          (selected && option.icon !== null
-            ? 'checkmark'
-            : 'blank')) as IconName
-      }
-    />
-  </S.Item>
-);
+}) => {
+  const iconName =
+    option.icon ?? (selected && option.icon !== null ? 'checkmark' : 'blank');
+  return (
+    <S.Item
+      data-test={option['data-test']}
+      hovered={hovered}
+      fontSize={fontSize}
+      lineHeight={lineHeight}>
+      {getOptionDisplayName(option)}
+      {iconName !== 'blank' && (
+        <S.ItemIcon
+          name={iconName as IconName}
+          hovered={hovered}
+          selected={selected}
+        />
+      )}
+    </S.Item>
+  );
+};
 
 export type OptionRenderer = (props: {
   option: WBMenuOption;

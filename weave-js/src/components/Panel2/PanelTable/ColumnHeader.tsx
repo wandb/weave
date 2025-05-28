@@ -867,18 +867,23 @@ const ColumnMenuOptionRenderer: OptionRenderer = ({
   option,
   hovered,
   selected,
-}) => (
-  <Item
-    data-test={option['data-test']}
-    hovered={hovered}
-    style={{justifyContent: 'flex-start'}}>
-    <ItemIcon
-      style={{marginRight: '8px', marginLeft: 0}}
-      name={
-        (option.icon ??
-          (selected && option.icon ? 'checkmark' : 'blank')) as IconName
-      }
-    />
-    {option.name ?? option.value}
-  </Item>
-);
+}) => {
+  const iconName =
+    option.icon ?? (selected && option.icon !== null ? 'checkmark' : 'blank');
+
+  return (
+    <Item
+      data-test={option['data-test']}
+      hovered={hovered}
+      style={{justifyContent: 'flex-start'}}>
+      {iconName !== 'blank' && (
+        <ItemIcon
+          style={{marginRight: '8px', marginLeft: 0}}
+          name={iconName as IconName}
+        />
+      )}
+
+      {option.name ?? option.value}
+    </Item>
+  );
+};
