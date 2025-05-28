@@ -872,13 +872,13 @@ const ColumnMenuOptionRenderer: OptionRenderer = ({
     data-test={option['data-test']}
     hovered={hovered}
     style={{justifyContent: 'flex-start'}}>
-    {option.icon && (
-      <ItemIcon
-        style={{marginRight: '8px', marginLeft: 0}}
-        // @todo: fix this type by updating wandb/ui local implementation
-        name={selected ? 'checkmark' : (option.icon as IconName)}
-      />
-    )}
+    <ItemIcon
+      style={{marginRight: '8px', marginLeft: 0}}
+      name={
+        (option.icon ??
+          (selected && option.icon ? 'checkmark' : 'blank')) as IconName
+      }
+    />
     {option.name ?? option.value}
   </Item>
 );

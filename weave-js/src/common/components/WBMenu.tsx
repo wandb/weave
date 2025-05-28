@@ -5,6 +5,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {ThemeProvider} from 'styled-components';
 
 import * as S from './WBMenu.styles';
+import type {IconName} from '../../components/Icon';
 
 export type WBMenuOption = {
   name?: string;
@@ -44,7 +45,14 @@ const DEFAULT_OPTION_RENDERER: OptionRenderer = ({
     fontSize={fontSize}
     lineHeight={lineHeight}>
     {getOptionDisplayName(option)}
-    {option.icon && selected && <S.ItemIcon name="checkmark" />}
+    <S.ItemIcon
+      name={
+        (option.icon ??
+          (selected && option.icon !== null
+            ? 'checkmark'
+            : 'blank')) as IconName
+      }
+    />
   </S.Item>
 );
 
