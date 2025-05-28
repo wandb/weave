@@ -129,6 +129,6 @@ const VideoThumbnail: React.FC<VideoPreviewProps> = ({
     </Tailwind>
   );
 }
-export {VideoThumbnail, VideoPopup};
+export {VideoPopup,VideoThumbnail};
 
 

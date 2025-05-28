@@ -1,13 +1,14 @@
 import {Button} from '@wandb/weave/components/Button';
+import { LoadingDots } from '@wandb/weave/components/LoadingDots';
 import React, {RefObject, useEffect, useRef} from 'react';
+
 import {IconName, IconNames} from '../../../../../Icon';
+import {TailwindContents} from '../../../../../Tailwind';
 import {CustomLink} from '../../pages/common/Links';
-import {PDFView} from './PDFView';
-import {VideoPopup, VideoThumbnail} from './VideoView';
 import {MiniAudioViewer} from './AudioView';
 import {ImageThumbnail, ImageViewport} from './ImageView';
-import {TailwindContents} from '../../../../../Tailwind';
-import { LoadingDots } from '@wandb/weave/components/LoadingDots';
+import {PDFView} from './PDFView';
+import {VideoPopup, VideoThumbnail} from './VideoView';
 
 const ICON_MAP: Record<string, IconName> = {
   'application/json': IconNames.JobProgramCode,

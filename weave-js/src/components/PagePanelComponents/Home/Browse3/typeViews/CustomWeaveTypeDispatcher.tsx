@@ -1,9 +1,9 @@
 import React from 'react';
 
 import {AudioPlayer} from './Audio/AudioPlayer';
+import {ContentView} from './Content/ContentView';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {DateTimeView} from './datetime.datetime/DateTimeView';
-import {ContentView} from './Content/ContentView';
 import {MarkdownView} from './Markdown/MarkdownView';
 import {VideoPlayer} from './moviepy.video.VideoClip/VideoPlayer';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';

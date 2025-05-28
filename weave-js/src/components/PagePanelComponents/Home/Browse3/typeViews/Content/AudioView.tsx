@@ -70,7 +70,7 @@ export const MiniAudioViewer: FC<{
         setAudioLoading(false);
         setAudioCurrentTime(undefined);
         setAudioTotalTime(duration || undefined);
-        if(autoplay) {
+        if (autoplay) {
           wavesurferRef.current?.play();
         }
       });
@@ -85,9 +85,8 @@ export const MiniAudioViewer: FC<{
 
       if (typeof audioSrc == 'string') {
         wavesurfer.load(audioSrc);
-      }
-      else {
-        wavesurfer.loadBlob(audioSrc)
+      } else {
+        wavesurfer.loadBlob(audioSrc);
       }
     }
 

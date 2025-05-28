@@ -23,13 +23,13 @@ type ImageScaledProps = {
 
 type ImageViewportProps = {
   blob: Blob;
-  isOpen: boolean,
-  onClose: (() => void)
+  isOpen: boolean;
+  onClose: () => void;
 };
 
 type ImageThumbnailProps = ImageViewProps & {
   blob: Blob;
-  onClick: (() => void);
+  onClick: () => void;
   thumbnailHeight?: number;
   thumbnailWidth?: number;
 };
@@ -54,7 +54,7 @@ export const ImageThumbnail = ({
   blob,
   onClick,
   thumbnailHeight,
-  thumbnailWidth
+  thumbnailWidth,
 }: ImageThumbnailProps) => {
   const url = useMemo(() => {
     return URL.createObjectURL(blob);
@@ -66,8 +66,8 @@ export const ImageThumbnail = ({
     };
   }, [url]);
 
-  thumbnailHeight = thumbnailHeight ?? 38*3; // Default height of the cell row
-  thumbnailWidth = thumbnailWidth ?? 68*3; // 16:9-ish ratio
+  thumbnailHeight = thumbnailHeight ?? 38 * 3; // Default height of the cell row
+  thumbnailWidth = thumbnailWidth ?? 68 * 3; // 16:9-ish ratio
 
   return (
     <Tailwind>
@@ -88,18 +88,14 @@ export const ImageThumbnail = ({
             alt="Image"
           />
           <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 transition-all duration-200 hover:bg-oblivion/10">
-            <span className="text-white text-xs">🔍</span>
+            <span className="text-xs text-white">🔍</span>
           </div>
         </div>
       </div>
     </Tailwind>
-  )
-}
-export const ImageViewport = ({
-  blob,
-  isOpen,
-  onClose
-}: ImageViewportProps) => {
+  );
+};
+export const ImageViewport = ({blob, isOpen, onClose}: ImageViewportProps) => {
   const [imageDim, setImageDim] = useState({width: -1, height: -1});
 
   const url = useMemo(() => {

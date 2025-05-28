@@ -1,12 +1,13 @@
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useCallback, useEffect, useState} from 'react';
+
+import {convertBytes} from '../../../../../../util';
 import {Icon} from '../../../../../Icon';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {TailwindContents} from '../../../../../Tailwind';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 import {getIconName, handleMimetype} from './Handlers';
-import {convertBytes} from '../../../../../../util';
 
 
 // Save a Blob as a content in the user's downloads folder in a
