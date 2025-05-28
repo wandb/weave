@@ -3,7 +3,7 @@ import React, {RefObject, useEffect, useRef} from 'react';
 import {IconName, IconNames} from '../../../../../Icon';
 import {CustomLink} from '../../pages/common/Links';
 import {PDFView} from './PDFView';
-import {VideoPopup} from './VideoView';
+import {VideoPopup, VideoThumbnail} from './VideoView';
 import {MiniAudioViewer} from './AudioView';
 import {ImageThumbnail, ImageViewport} from './ImageView';
 import {TailwindContents} from '../../../../../Tailwind';
@@ -216,8 +216,6 @@ export const handleVideoMimetype = ({
   doSave,
   isDownloading,
 }: HandlerProps) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  
   const onTextClick = () => {
     setShowPreview(true);
     if (!contentResult) {
@@ -244,10 +242,22 @@ export const handleVideoMimetype = ({
         src={contentResult}
         isOpen={true}
         onClose={onClose}
-        videoRef={videoRef}
       />
     )
   );
+  const previewComponent = (result: Blob) => {
+    return <VideoThumbnail src={result} onClick={onTextClick}/>
+  }
+
+  const tooltipPreview = (
+    <CreateToolTipPreview
+      onClick={onTextClick}
+      previewComponent={previewComponent}
+      isDownloading={isDownloading}
+      setIsDownloading={(val) => {setIsDownloading(val)}}
+      contentResult={contentResult}
+    />
+  )
 
   const body = (
     <TailwindContents>
@@ -264,6 +274,7 @@ export const handleVideoMimetype = ({
   return {
     body,
     tooltipHint: 'Click icon or filename to preview, button to download',
+    tooltipPreview
   };
 };
 

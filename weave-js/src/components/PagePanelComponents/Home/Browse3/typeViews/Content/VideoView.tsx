@@ -7,10 +7,10 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 type VideoProps = {
   src: Blob | string;
-  videoRef: React.RefObject<HTMLVideoElement>;
 }
 type VideoContentProps = {
   isThumbnail: boolean;
+  videoRef: React.RefObject<HTMLVideoElement>;
   autoplay?: boolean;
 } & VideoProps;
 
@@ -84,10 +84,10 @@ const VideoContent: React.FC<VideoContentProps> = ({
 
 const VideoPopup: React.FC<VideoPopupProps> = ({
   src,
-  videoRef,
   isOpen,
   onClose
 }) => {
+  const videoRef = useRef<HTMLVideoElement>(null)
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
       <Dialog.Portal>
@@ -106,31 +106,26 @@ const VideoPopup: React.FC<VideoPopupProps> = ({
 }
 const VideoThumbnail: React.FC<VideoPreviewProps> = ({
   src,
-  videoRef,
+  onClick
 }) => {
-  const [showPopup, setShowPopup] = useState<boolean>(false);
-  const thumbnailHeight = 38; // Default height of the cell row
-  const thumbnailWidth = 68; // 16:9-ish ratio
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const thumbnailHeight = 38*3; // Default height of the cell row
+  const thumbnailWidth = 68*3; // 16:9-ish ratio
   return (
     <Tailwind>
-      {!showPopup &&
+      <div
+        className="relative flex h-full w-full items-center justify-start"
+        style={{cursor: 'pointer'}}
+        onClick={onClick}>
         <div
-          className="relative flex h-full w-full items-center justify-start"
-          style={{cursor: 'pointer'}}
-          onClick={() => setShowPopup(true)}>
-          <div
-            style={{height: thumbnailHeight, width: thumbnailWidth}}
-            className="relative">
-            <VideoContent src={src} videoRef={videoRef} isThumbnail={true}/>
-            <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 transition-all duration-200 hover:bg-oblivion/10">
-              <IconPlay className="text-white" />
-            </div>
+          style={{height: thumbnailHeight, width: thumbnailWidth}}
+          className="relative">
+          <VideoContent src={src} videoRef={videoRef} isThumbnail={true}/>
+          <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 transition-all duration-200 hover:bg-oblivion/10">
+            <IconPlay className="text-white" />
           </div>
         </div>
-      }
-      {showPopup &&
-        <VideoPopup src={src} videoRef={videoRef} isOpen={true} onClose={()=> {setShowPopup(false)}}/>
-      }
+      </div>
     </Tailwind>
   );
 }
