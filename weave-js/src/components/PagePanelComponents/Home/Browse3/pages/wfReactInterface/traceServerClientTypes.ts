@@ -383,7 +383,7 @@ type MetaChunk = {
   };
 };
 
-type ContentChunk = {
+export type ContentChunk = {
   id: string;
   created: number;
   model: string;
@@ -404,7 +404,6 @@ type ContentChunk = {
           name: string | null;
         };
         type: 'function';
-        index: number;
       }> | null;
       audio: null;
     };

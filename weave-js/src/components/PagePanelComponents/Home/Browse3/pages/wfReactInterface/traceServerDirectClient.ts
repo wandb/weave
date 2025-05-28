@@ -438,16 +438,6 @@ export class DirectTraceServerClient {
       if (line.trim() === '') return;
       try {
         const parsed = JSON.parse(line);
-        console.log(
-          'Completion chunk:',
-          JSON.stringify({
-            raw: line,
-            parsed,
-            hasMeta: !!parsed._meta,
-            hasWeaveCallId: !!parsed._meta?.weave_call_id,
-            keys: Object.keys(parsed),
-          })
-        );
         if (parsed._meta?.weave_call_id) {
           weaveCallId = parsed._meta.weave_call_id;
         } else {

@@ -31,7 +31,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from typing import Any, Optional, Union, cast
+from typing import Any, Callable, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -2027,212 +2027,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return chunk_iter
 
         # Otherwise, wrap the iterator with tracking
-        return self._create_tracked_stream_wrapper(
-            chunk_iter, start_call, model_name, req.project_id
+        return _create_tracked_stream_wrapper(
+            self._insert_call, chunk_iter, start_call, model_name, req.project_id
         )
-
-    def _update_metadata_from_chunk(
-        self, chunk: dict[str, Any], aggregated_metadata: dict[str, Any]
-    ) -> None:
-        """Update aggregated metadata from a chunk."""
-        metadata_fields = [
-            "id",
-            "created",
-            "model",
-            "system_fingerprint",
-            "service_tier",
-            "usage",
-        ]
-
-        for field in metadata_fields:
-            if field in chunk and field not in aggregated_metadata:
-                if field == "service_tier":
-                    aggregated_metadata[field] = chunk.get(field, "default")
-                else:
-                    aggregated_metadata[field] = chunk[field]
-
-    def _process_tool_call_delta(
-        self, tool_call_delta: list, tool_calls: list[dict[str, Any]]
-    ) -> None:
-        """Process tool call delta and update tool_calls list."""
-        for tool_call in tool_call_delta:
-            tool_call_index = tool_call.get("index", 0)
-
-            # Ensure we have enough tool calls in our list
-            while len(tool_calls) <= tool_call_index:
-                tool_calls.append(
-                    {
-                        "id": None,
-                        "type": "function",
-                        "function": {"name": "", "arguments": ""},
-                    }
-                )
-
-            existing_tool_call = tool_calls[tool_call_index]
-
-            # Update existing tool call fields
-            if tool_call.get("id"):
-                existing_tool_call["id"] = tool_call["id"]
-            if tool_call.get("type"):
-                existing_tool_call["type"] = tool_call["type"]
-
-            if "function" in tool_call:
-                function_data = tool_call["function"]
-                if function_data.get("name"):
-                    existing_tool_call["function"]["name"] = function_data["name"]
-                if "arguments" in function_data:
-                    existing_tool_call["function"]["arguments"] += function_data[
-                        "arguments"
-                    ]
-
-    def _clean_tool_calls(
-        self, tool_calls: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        """Clean up tool_calls - remove incomplete ones and ensure proper format."""
-        cleaned_tool_calls = []
-        for tool_call in tool_calls:
-            if tool_call.get("id") and tool_call.get("function", {}).get("name"):
-                cleaned_tool_call = {
-                    "function": {
-                        "arguments": tool_call["function"]["arguments"],
-                        "name": tool_call["function"]["name"],
-                    },
-                    "id": tool_call["id"],
-                    "type": "function",
-                }
-                cleaned_tool_calls.append(cleaned_tool_call)
-        return cleaned_tool_calls
-
-    def _build_aggregated_output(
-        self,
-        aggregated_metadata: dict[str, Any],
-        assistant_acc: list[str],
-        tool_calls: list[dict[str, Any]],
-        chunk: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Build the aggregated output from accumulated data."""
-        current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
-        cleaned_tool_calls = self._clean_tool_calls(tool_calls)
-
-        return {
-            "id": aggregated_metadata.get("id", ""),
-            "created": aggregated_metadata.get("created", 0),
-            "model": aggregated_metadata.get("model", ""),
-            "object": "chat.completion",
-            "system_fingerprint": aggregated_metadata.get("system_fingerprint", ""),
-            "choices": [
-                {
-                    "finish_reason": current_finish_reason,
-                    "index": 0,
-                    "message": {
-                        "content": (
-                            "".join(assistant_acc)
-                            if assistant_acc
-                            else (None if cleaned_tool_calls else "")
-                        ),
-                        "role": "assistant",
-                        "tool_calls": (
-                            cleaned_tool_calls if cleaned_tool_calls else None
-                        ),
-                        "function_call": None,
-                    },
-                }
-            ],
-            "usage": aggregated_metadata.get("usage", {}),
-            "service_tier": aggregated_metadata.get("service_tier", "default"),
-        }
-
-    def _create_tracked_stream_wrapper(
-        self,
-        chunk_iter: Iterator[dict[str, Any]],
-        start_call: CallStartCHInsertable,
-        model_name: str,
-        project_id: str,
-    ) -> Iterator[dict[str, Any]]:
-        """Create a wrapper that tracks streaming completion and emits call records."""
-
-        def _stream_wrapper() -> Iterator[dict[str, Any]]:
-            # (1) send meta chunk first so clients can associate stream
-            yield {"_meta": {"weave_call_id": start_call.id}}
-
-            # Initialize accumulation variables
-            aggregated_output: Optional[dict[str, Any]] = None
-            assistant_acc: list[str] = []
-            tool_calls: list[dict[str, Any]] = []
-            aggregated_metadata: dict[str, Any] = {}
-
-            try:
-                for chunk in chunk_iter:
-                    yield chunk  # Yield to client immediately
-
-                    if not isinstance(chunk, dict):
-                        continue
-
-                    # Accumulate metadata from chunks
-                    self._update_metadata_from_chunk(chunk, aggregated_metadata)
-
-                    # Process assistant content and tool calls
-                    choices = chunk.get("choices")
-                    if choices:
-                        delta = choices[0].get("delta")
-                        if delta and isinstance(delta, dict):
-                            # Accumulate assistant content
-                            content_piece = delta.get("content")
-                            if content_piece:
-                                assistant_acc.append(content_piece)
-
-                            # Handle tool calls
-                            tool_call_delta = delta.get("tool_calls")
-                            if tool_call_delta:
-                                self._process_tool_call_delta(
-                                    tool_call_delta, tool_calls
-                                )
-
-                    # Build aggregated output
-                    aggregated_output = self._build_aggregated_output(
-                        aggregated_metadata, assistant_acc, tool_calls, chunk
-                    )
-
-            finally:
-                # Handle fallback case for aggregated output
-                if aggregated_output is None and (assistant_acc or tool_calls):
-                    cleaned_tool_calls = self._clean_tool_calls(tool_calls)
-                    aggregated_output = {
-                        "choices": [
-                            {
-                                "message": {
-                                    "role": "assistant",
-                                    "content": (
-                                        "".join(assistant_acc)
-                                        if assistant_acc
-                                        else (None if cleaned_tool_calls else "")
-                                    ),
-                                    "tool_calls": (
-                                        cleaned_tool_calls
-                                        if cleaned_tool_calls
-                                        else None
-                                    ),
-                                }
-                            }
-                        ]
-                    }
-
-                # Prepare summary and end call
-                summary: dict[str, Any] = {}
-                if aggregated_output and "usage" in aggregated_output:
-                    summary["usage"] = {model_name: aggregated_output["usage"]}
-
-                end = tsi.EndedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=start_call.id,
-                    ended_at=datetime.datetime.now(),
-                    output=aggregated_output,
-                    summary=summary,
-                )
-                end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
-                self._insert_call(end_call)
-
-        return _stream_wrapper()
 
     # Private Methods
     @property
@@ -2834,3 +2631,203 @@ def set_root_span_dd_tags(tags: dict[str, Union[str, float, int]]) -> None:
         logger.debug("No root span")
     else:
         root_span.set_tags(tags)
+
+
+def _update_metadata_from_chunk(
+    chunk: dict[str, Any], aggregated_metadata: dict[str, Any]
+) -> None:
+    """Update aggregated metadata from a chunk."""
+    metadata_fields = [
+        "id",
+        "created",
+        "model",
+        "system_fingerprint",
+        "service_tier",
+        "usage",
+    ]
+
+    for field in metadata_fields:
+        if field in chunk and field not in aggregated_metadata:
+            if field == "service_tier":
+                aggregated_metadata[field] = chunk.get(field, "default")
+            else:
+                aggregated_metadata[field] = chunk[field]
+
+
+def _process_tool_call_delta(
+    tool_call_delta: list, tool_calls: list[dict[str, Any]]
+) -> None:
+    """Process tool call delta and update tool_calls list."""
+    for tool_call in tool_call_delta:
+        tool_call_index = tool_call.get("index", 0)
+
+        # Ensure we have enough tool calls in our list
+        while len(tool_calls) <= tool_call_index:
+            tool_calls.append(
+                {
+                    "id": None,
+                    "type": "function",
+                    "function": {"name": "", "arguments": ""},
+                }
+            )
+
+        existing_tool_call = tool_calls[tool_call_index]
+
+        # Update existing tool call fields
+        if tool_call.get("id"):
+            existing_tool_call["id"] = tool_call["id"]
+        if tool_call.get("type"):
+            existing_tool_call["type"] = tool_call["type"]
+
+        if "function" in tool_call:
+            function_data = tool_call["function"]
+            if function_data.get("name"):
+                existing_tool_call["function"]["name"] = function_data["name"]
+            if "arguments" in function_data:
+                existing_tool_call["function"]["arguments"] += function_data[
+                    "arguments"
+                ]
+
+
+def _clean_tool_calls(tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Clean up tool_calls - remove incomplete ones and ensure proper format."""
+    cleaned_tool_calls = [
+        {
+            "function": {
+                "arguments": tool_call["function"]["arguments"],
+                "name": tool_call["function"]["name"],
+            },
+            "id": tool_call["id"],
+            "type": "function",
+        }
+        for tool_call in tool_calls
+        if tool_call.get("id") is not None
+        and tool_call.get("function", {}).get("name") is not None
+    ]
+    return cleaned_tool_calls
+
+
+def _build_aggregated_output(
+    aggregated_metadata: dict[str, Any],
+    assistant_acc: list[str],
+    tool_calls: list[dict[str, Any]],
+    chunk: dict[str, Any],
+) -> dict[str, Any]:
+    """Build the aggregated output from accumulated data."""
+    current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
+    cleaned_tool_calls = _clean_tool_calls(tool_calls)
+
+    return {
+        "id": aggregated_metadata.get("id", ""),
+        "created": aggregated_metadata.get("created", 0),
+        "model": aggregated_metadata.get("model", ""),
+        "object": "chat.completion",
+        "system_fingerprint": aggregated_metadata.get("system_fingerprint", ""),
+        "choices": [
+            {
+                "finish_reason": current_finish_reason,
+                "index": 0,
+                "message": {
+                    "content": (
+                        "".join(assistant_acc)
+                        if assistant_acc
+                        else (None if cleaned_tool_calls else "")
+                    ),
+                    "role": "assistant",
+                    "tool_calls": (cleaned_tool_calls if cleaned_tool_calls else None),
+                    "function_call": None,
+                },
+            }
+        ],
+        "usage": aggregated_metadata.get("usage", {}),
+        "service_tier": aggregated_metadata.get("service_tier", "default"),
+    }
+
+
+def _create_tracked_stream_wrapper(
+    insert_call: Callable[[CallEndCHInsertable], None],
+    chunk_iter: Iterator[dict[str, Any]],
+    start_call: CallStartCHInsertable,
+    model_name: str,
+    project_id: str,
+) -> Iterator[dict[str, Any]]:
+    """Create a wrapper that tracks streaming completion and emits call records."""
+
+    def _stream_wrapper() -> Iterator[dict[str, Any]]:
+        # (1) send meta chunk first so clients can associate stream
+        yield {"_meta": {"weave_call_id": start_call.id}}
+
+        # Initialize accumulation variables
+        aggregated_output: Optional[dict[str, Any]] = None
+        assistant_acc: list[str] = []
+        tool_calls: list[dict[str, Any]] = []
+        aggregated_metadata: dict[str, Any] = {}
+
+        try:
+            for chunk in chunk_iter:
+                yield chunk  # Yield to client immediately
+
+                if not isinstance(chunk, dict):
+                    continue
+
+                # Accumulate metadata from chunks
+                _update_metadata_from_chunk(chunk, aggregated_metadata)
+
+                # Process assistant content and tool calls
+                choices = chunk.get("choices")
+                if choices:
+                    delta = choices[0].get("delta")
+                    if delta and isinstance(delta, dict):
+                        # Accumulate assistant content
+                        content_piece = delta.get("content")
+                        if content_piece:
+                            assistant_acc.append(content_piece)
+
+                        # Handle tool calls
+                        tool_call_delta = delta.get("tool_calls")
+                        if tool_call_delta:
+                            _process_tool_call_delta(tool_call_delta, tool_calls)
+
+                # Build aggregated output
+                aggregated_output = _build_aggregated_output(
+                    aggregated_metadata, assistant_acc, tool_calls, chunk
+                )
+
+        finally:
+            # Handle fallback case for aggregated output
+            if aggregated_output is None and (assistant_acc or tool_calls):
+                cleaned_tool_calls = _clean_tool_calls(tool_calls)
+                aggregated_output = {
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": (
+                                    "".join(assistant_acc)
+                                    if assistant_acc
+                                    else (None if cleaned_tool_calls else "")
+                                ),
+                                "tool_calls": (
+                                    cleaned_tool_calls if cleaned_tool_calls else None
+                                ),
+                            }
+                        }
+                    ]
+                }
+
+            # Prepare summary and end call
+            summary: dict[str, Any] = {}
+            if aggregated_output and "usage" in aggregated_output:
+                summary["usage"] = {model_name: aggregated_output["usage"]}
+
+            end = tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=start_call.id,
+                ended_at=datetime.datetime.now(),
+                output=aggregated_output,
+                summary=summary,
+            )
+            end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+            insert_call(end_call)
+
+    return _stream_wrapper()
