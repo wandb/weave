@@ -303,7 +303,7 @@ class Span:
         # Only de-nest if we have one key
         if len(outputs) == 1:
             nested_top_level_output = outputs.get("outputs") or outputs.get("output")
-            if nested_top_level_output is not None and len(outputs) == 1:
+            if nested_top_level_output is not None:
                 outputs = to_json_serializable(nested_top_level_output)
 
         attributes = get_weave_attributes(self.attributes) or {}
