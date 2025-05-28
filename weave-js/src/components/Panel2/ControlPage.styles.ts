@@ -1,6 +1,7 @@
-import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
+
+import {Icon} from '../Icon';
 
 export const ControlBar = styled.div`
   height: 1.7em;
@@ -10,7 +11,7 @@ export const ControlBar = styled.div`
   justify-content: space-between;
 `;
 
-export const ArrowIcon = styled(WBIcon)`
+export const ArrowIcon: typeof Icon = styled(Icon)`
   cursor: pointer;
   height: 100%;
   padding: 4px 0px 0px 0px;

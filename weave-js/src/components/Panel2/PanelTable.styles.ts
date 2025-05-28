@@ -1,9 +1,9 @@
-import {WBIcon} from '@wandb/ui';
 import * as globals from '@wandb/weave/common/css/globals.styles';
 import styled from 'styled-components';
 
 import {OBLIVION} from '../../common/css/color.styles';
 import {hexToRGB} from '../../common/css/utils';
+import {Icon} from '../Icon';
 
 export const ColumnHeader = styled.div`
   display: flex;
@@ -86,7 +86,7 @@ export const IndexColumnDrag = styled.div`
 `;
 IndexColumnDrag.displayName = 'S.IndexColumnDrag';
 
-export const FilterIcon = styled(WBIcon)`
+export const FilterIcon: typeof Icon = styled(Icon)`
   cursor: pointer;
   color: ${globals.primary};
   :hover {
@@ -94,7 +94,6 @@ export const FilterIcon = styled(WBIcon)`
     border-radius: 2px;
   }
 `;
-FilterIcon.displayName = 'S.FilterIcon';
 
 export const ColumnAction = styled.div<{isHovered?: boolean}>`
   cursor: pointer;
@@ -138,14 +137,7 @@ export const TableAction = styled.div<{
 `;
 TableAction.displayName = 'S.TableAction';
 
-export const EllipsisIcon = styled(WBIcon)`
-  width: 100%;
-  height: 100%;
-  padding-top: 4px;
-`;
-EllipsisIcon.displayName = 'S.EllipsisIcon';
-
-export const TableIcon = styled(WBIcon)<{highlight?: boolean}>`
+export const TableIcon: typeof Icon = styled(Icon)<{highlight?: boolean}>`
   cursor: pointer;
   padding: 2px 0px 0px 0px;
   :hover {
@@ -155,16 +147,14 @@ export const TableIcon = styled(WBIcon)<{highlight?: boolean}>`
     border-radius: 2px;
   }
 `;
-TableIcon.displayName = 'S.TableIcon';
 
-export const ControlIcon = styled(WBIcon)`
+export const ControlIcon: typeof Icon = styled(Icon)`
   cursor: pointer;
   color: ${globals.primary};
   margin: auto;
 `;
-ControlIcon.displayName = 'S.ControlIcon';
 
-export const SortIcon = styled(WBIcon)`
+export const SortIcon: typeof Icon = styled(Icon)`
   cursor: pointer;
   color: #afafaf;
   :hover {
@@ -172,7 +162,6 @@ export const SortIcon = styled(WBIcon)`
     border-radius: 2px;
   }
 `;
-SortIcon.displayName = 'S.SortIcon';
 
 export const ColumnEditorSection = styled.div`
   margin-bottom: 24px;

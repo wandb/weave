@@ -1,6 +1,6 @@
-import {WBIcon} from '@wandb/ui';
 import React from 'react';
 
+import {Icon} from '../Icon';
 import {ControlsImageOverlaysControls} from './ControlImageOverlays';
 import * as Controls from './controlsImage';
 import {DEFAULT_TILE_LAYOUT, defaultHideImageState} from './ImageWithOverlays';
@@ -36,7 +36,7 @@ export const ControlsMask: React.FC<ControlMaskProps> = ({
 
   return (
     <span>
-      <WBIcon
+      <Icon
         style={{
           fontSize: '1.1em',
           cursor: 'pointer',

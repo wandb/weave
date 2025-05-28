@@ -1,7 +1,7 @@
 import {foundations} from '@wandb/ui';
-import {WBIcon} from '@wandb/ui';
 import styled from 'styled-components';
 
+import {Icon} from '../../components/Icon';
 import type {WBMenuTheme} from './WBMenu';
 
 const {legacy} = foundations;
@@ -40,7 +40,7 @@ export const Item = styled.div<{
     props.hovered ? getHighlightForTheme(props.theme.main) : 'none'};
 `;
 
-export const ItemIcon: typeof WBIcon = styled(WBIcon)`
+export const ItemIcon: typeof Icon = styled(Icon)`
   margin-left: 8px;
   font-size: 16px;
   width: 16px;
