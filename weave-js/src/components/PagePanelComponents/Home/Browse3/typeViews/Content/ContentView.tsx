@@ -257,6 +257,7 @@ const ContentViewMetadataLoaded = ({
         {showPreview && contentResult && (
           <MiniAudioViewer
             audioSrc={contentResult}
+            autoplay={true}
             height={24}
             downloadFile={doSave}
           />
@@ -272,15 +273,18 @@ const ContentViewMetadataLoaded = ({
   }
   if (mimetype.startsWith('video/')) {
     let videoRef = useRef<HTMLVideoElement>(null)
+
     const onTextClick = () => {
       setShowPreview(true);
       if (!contentResult) {
         setIsDownloading(true);
       }
     };
+
     const onClose = () => {
       setShowPreview(false);
     };
+
     iconAndText = (
       <>
         <CustomLink

@@ -9,53 +9,9 @@ type AudioUnloadedProps = {
   filename: string;
   onPlay: () => void;
   onDownload?: () => void;
+  autoplay?: boolean;
 };
 
-export const AudioUnloaded = ({filename, onPlay, onDownload}: AudioUnloadedProps) => {
-  const measureDivRef = useRef<HTMLDivElement>(null);
-  const [showMode, setShowMode] = useState<ShowMode>(ShowMode.Controls);
-  useEffect(() => {
-    if (measureDivRef.current) {
-      if (measureDivRef.current.offsetWidth > SLIDER_WIDTH_THRESHOLD) {
-        setShowMode(ShowMode.Slider);
-      } else if (measureDivRef.current.offsetWidth < MINI_WIDTH_THRESHOLD) {
-        setShowMode(ShowMode.Mini);
-      } else {
-        setShowMode(ShowMode.Controls);
-      }
-    }
-  }, [measureDivRef.current?.offsetWidth]);
-  return (
-    <Tailwind>
-      <div ref={measureDivRef} className="w-full">
-        <div
-          className={`rounded-2xl bg-moon-150 ${
-            showMode === ShowMode.Slider ? 'w-full' : 'w-fit'
-          }`}>
-          <div className="flex w-full items-center">
-            <Button
-              className={`pl-1 pr-1 ${
-                showMode === ShowMode.Mini ? 'ml-0' : 'ml-6'
-              }`}
-              icon={'play'}
-              onClick={onPlay}
-              size={showMode === ShowMode.Mini ? 'medium' : 'small'}
-              variant="ghost"
-            />
-            {showMode !== ShowMode.Mini && (
-              <div
-                className={`text-s pl-4 ${
-                  showMode === ShowMode.Slider ? 'pr-4' : 'pr-10'
-                }`}>
-                {filename}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </Tailwind>
-  )
-}
 const SLIDER_WIDTH_THRESHOLD = 180;
 const MINI_WIDTH_THRESHOLD = 80;
 
@@ -69,7 +25,8 @@ export const MiniAudioViewer: FC<{
   audioSrc: string | Blob;
   height: number;
   downloadFile?: () => void;
-}> = ({audioSrc, height, downloadFile}) => {
+  autoplay?: boolean;
+}> = ({audioSrc, height, downloadFile, autoplay}) => {
   /* 
   Heavily inspired by code in weave-js/src/components/Panel2/AudioViewer.tsx 
   
@@ -84,6 +41,7 @@ export const MiniAudioViewer: FC<{
 
   const wavesurferRef = useRef<WaveSurfer>();
   const waveformDomRef = useRef<HTMLDivElement>(null);
+
   const [audioLoading, setAudioLoading] = React.useState(true);
   const [audioPlaying, setAudioPlaying] = React.useState(false);
   const [audioTotalTime, setAudioTotalTime] = React.useState<number>();
@@ -119,6 +77,9 @@ export const MiniAudioViewer: FC<{
         setAudioLoading(false);
         setAudioCurrentTime(undefined);
         setAudioTotalTime(duration || undefined);
+        if(autoplay) {
+          wavesurferRef.current?.play();
+        }
       });
       // fires when you click a new location in the waveform
       wavesurfer.on('seek', () => {
