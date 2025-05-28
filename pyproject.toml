@@ -104,7 +104,7 @@ huggingface = ["huggingface-hub>=0.28.1"]
 smolagents = [
   "openai>=1.0.0",
   "litellm>=1.58",
-  "smolagents>=1.8.1",
+  "smolagents>=1.17.0",
   "huggingface-hub>=0.28.1",
   "SQLAlchemy>=2.0.38",
 ]
