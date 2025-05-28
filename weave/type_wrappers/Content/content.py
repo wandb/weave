@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import logging
 import os
@@ -5,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Generic, TypeVar
+
 # Python moved unpack to main typing package in 3.12
 try:
     from typing import Unpack
@@ -142,7 +145,7 @@ class Content(Generic[T]):
         elif isinstance(input, bytes):
             self.content_handler = create_bytes_content(input, **values_with_defaults)
         else:
-            raise ValueError(f"Unsupported input type: {type(input)}")
+            raise TypeError(f"Unsupported input type: {type(input)}")
 
     @property
     def metadata(self) -> dict[str, Any]:
