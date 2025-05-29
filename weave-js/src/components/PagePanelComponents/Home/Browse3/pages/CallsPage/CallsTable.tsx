@@ -1161,34 +1161,6 @@ export const CallsTable: FC<{
   );
 };
 
-const useParentIdOptions = (
-  entity: string,
-  project: string,
-  effectiveFilter: WFHighLevelCallFilter
-) => {
-  const {useCall} = useWFHooks();
-  const callKey = effectiveFilter.parentId
-    ? {
-        entity,
-        project,
-        callId: effectiveFilter.parentId,
-      }
-    : null;
-  const parentCall = useCall({key: callKey});
-  return useMemo(() => {
-    if (parentCall.loading || parentCall.result == null) {
-      return {};
-    }
-    const call = parentCall.result;
-    const truncatedId = call.callId.slice(-4);
-    const label = `${call.displayName} (${truncatedId})`;
-    return {
-      [call.callId]: label,
-    };
-  }, [parentCall.loading, parentCall.result]);
-
-};
-
 // Get the tail of the peekPath (ignore query params)
 const getPeekId = (peekPath: string | null): string | null => {
   if (!peekPath) {
