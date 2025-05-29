@@ -2775,7 +2775,7 @@ def _create_tracked_stream_wrapper(
 
 
 def _setup_completion_model_info(
-    model_info: LLMModelProviderInfo | None,
+    model_info: Optional[LLMModelProviderInfo],
     req: tsi.CompletionsCreateReq,
     obj_read: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
 ) -> tuple[str, Optional[str], str, Optional[str], dict[str, str], Optional[str]]:
