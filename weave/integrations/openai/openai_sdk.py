@@ -4,6 +4,7 @@ import importlib
 import logging
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
+from urllib.parse import urlparse
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -327,10 +328,14 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            def _wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
                 if kwargs.get("stream") and kwargs.get("stream_options") is None:
-                    kwargs["stream_options"] = {"include_usage": True}
-                return fn(*args, **kwargs)
+                    completion = self
+                    base_url = str(completion._client._base_url)
+                    # Only set stream_options if it targets the OpenAI endpoints
+                    if urlparse(base_url).hostname == "api.openai.com":
+                        kwargs["stream_options"] = {"include_usage": True}
+                return fn(self, *args, **kwargs)
 
             return _wrapper
 
@@ -341,6 +346,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
+
         op._set_on_input_handler(openai_on_input_handler)
         return _add_accumulator(
             op,  # type: ignore
@@ -363,10 +369,14 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            async def _wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
                 if kwargs.get("stream") and kwargs.get("stream_options") is None:
-                    kwargs["stream_options"] = {"include_usage": True}
-                return await fn(*args, **kwargs)
+                    completion = self
+                    base_url = str(completion._client._base_url)
+                    # Only set stream_options if it targets the OpenAI endpoints
+                    if urlparse(base_url).hostname == "api.openai.com":
+                        kwargs["stream_options"] = {"include_usage": True}
+                return await fn(self, *args, **kwargs)
 
             return _wrapper
 
