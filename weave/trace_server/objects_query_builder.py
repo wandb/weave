@@ -267,6 +267,17 @@ class ObjectMetadataQueryBuilder:
             ) as object_versions_stats ON object_versions_stats.digest = {main_table_alias}.digest
             """
 
+        # Object versions are uniquely identified by (kind, project_id, object_id, digest).
+        # The first subquery selects a row to represent each object version. There are multiple rows
+        # for each object version if it has been deleted or recreated prior to a table merge.
+
+        # In the most nested order by (defining row_number), we follow this crucial logic:
+        # Prefer the most recent row. If there is a tie, prefer the row
+        # with non-null deleted_at, which represents the deletion event.
+        #
+        # Rows for the same object version may have the same created_at
+        # because deletion events inherit the created_at of the last
+        # non-deleted row for the object version.
         query = f"""
 SELECT
     {columns_str}
@@ -297,11 +308,6 @@ FROM (
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
     FROM (
-        --
-        -- Object versions are uniquely identified by (kind, project_id, object_id, digest).
-        -- This subquery selects a row to represent each object version. There are multiple rows
-        -- for each object version if it has been deleted or recreated prior to a table merge.
-        --
         SELECT
             project_id,
             object_id,
@@ -318,14 +324,6 @@ FROM (
                 kind,
                 object_id,
                 digest
-                --
-                -- Prefer the most recent row. If there is a tie, prefer the row
-                -- with non-null deleted_at, which represents the deletion event.
-                --
-                -- Rows for the same object version may have the same created_at
-                -- because deletion events inherit the created_at of the last
-                -- non-deleted row for the object version.
-                --
                 ORDER BY created_at DESC, (deleted_at IS NULL) ASC
             ) AS rn
         FROM object_versions

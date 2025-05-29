@@ -21,6 +21,8 @@ from weave.flow.scorer import Scorer
 from weave.initialization import *
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
+from weave.type_handlers.Audio.audio import Audio
+from weave.type_handlers.File.file import File
 from weave.type_handlers.Markdown.markdown import Markdown
 
 # Alias for succinct code
@@ -50,7 +52,39 @@ __docspec__ = [
     EvaluationLogger,
     Scorer,
     AnnotationSpec,
+    File,
     Markdown,
     Monitor,
     SavedView,
+    Audio,
+]
+
+__all__ = [
+    "Agent",
+    "AgentState",
+    "AnnotationSpec",
+    "Audio",
+    "attributes",
+    "Dataset",
+    "EasyPrompt",
+    "Evaluation",
+    "EvaluationLogger",
+    "File",
+    "finish",
+    "get",
+    "get_current_call",
+    "init",
+    "Markdown",
+    "MessagesPrompt",
+    "Model",
+    "Monitor",
+    "Object",
+    "op",
+    "Prompt",
+    "publish",
+    "ref",
+    "require_current_call",
+    "SavedView",
+    "Scorer",
+    "StringPrompt",
 ]

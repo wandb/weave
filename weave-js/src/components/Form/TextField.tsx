@@ -19,6 +19,8 @@ export type TextFieldSize =
   (typeof TextFieldSizes)[keyof typeof TextFieldSizes];
 
 type TextFieldProps = {
+  /** id to assign to the input element */
+  id?: string;
   size?: TextFieldSize;
   placeholder?: string;
   value?: string;
@@ -43,6 +45,7 @@ type TextFieldProps = {
 };
 
 export const TextField = ({
+  id,
   size,
   variant = 'default',
   placeholder,
@@ -129,6 +132,7 @@ export const TextField = ({
             </div>
           )}
           <input
+            id={id}
             className={classNames(
               'h-full w-full flex-1 rounded-[5px] bg-inherit pr-8',
               'appearance-none border-none',

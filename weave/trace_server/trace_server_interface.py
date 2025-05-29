@@ -64,6 +64,7 @@ class TraceStatus(str, Enum):
     SUCCESS = "success"
     ERROR = "error"
     RUNNING = "running"
+    DESCENDANT_ERROR = "descendant_error"
 
 
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
@@ -77,6 +78,7 @@ class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
     usage: dict[str, LLMUsageSchema]
+    status_counts: dict[TraceStatus, int]
 
 
 class SummaryMap(SummaryInsertMap, total=False):
@@ -208,7 +210,7 @@ class ObjSchemaForInsert(BaseModel):
     builtin_object_class: Optional[str] = None
     # Keeping `set_base_object_class` here until it is successfully removed from UI client
     set_base_object_class: Optional[str] = Field(
-        include=False, default=None, deprecated=True
+        exclude=True, default=None, deprecated=True
     )
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)

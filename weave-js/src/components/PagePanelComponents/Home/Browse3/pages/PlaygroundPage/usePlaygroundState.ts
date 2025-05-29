@@ -1,11 +1,6 @@
-import {cloneDeep} from 'lodash';
 import {SetStateAction, useCallback, useState} from 'react';
 
-import {
-  anthropicContentBlocksToChoices,
-  hasStringProp,
-  isAnthropicCompletionFormat,
-} from '../ChatView/hooks';
+import {normalizeChatTraceCall} from '../ChatView/hooks';
 import {
   DEFAULT_LLM_MODEL,
   LLM_MAX_TOKENS_KEYS,
@@ -129,8 +124,7 @@ export const usePlaygroundState = () => {
       // pulled from litellm
       setPlaygroundStates(prevState => {
         const newState = {...prevState[0]};
-
-        newState.traceCall = parseTraceCall(traceCall);
+        newState.traceCall = normalizeChatTraceCall(traceCall);
 
         if (!inputs) {
           return [newState];
@@ -145,7 +139,10 @@ export const usePlaygroundState = () => {
           }
         }
         if (inputs.response_format) {
-          newState.responseFormat = inputs.response_format.type;
+          newState.responseFormat =
+            inputs.response_format.type in PlaygroundResponseFormats
+              ? inputs.response_format.type
+              : PlaygroundResponseFormats.Text;
         }
         for (const [key, value] of Object.entries(NUMERIC_SETTINGS_MAPPING)) {
           if (inputs[value.pythonValue] !== undefined) {
@@ -223,39 +220,4 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
   }
 
   return inputs;
-};
-
-// This is a helper function to parse the trace call output for anthropic
-// so that the playground can display the choices
-export const parseTraceCall = (traceCall: OptionalTraceCallSchema) => {
-  const parsedTraceCall = cloneDeep(traceCall);
-
-  // Handles anthropic outputs
-  // Anthropic has content and stop_reason as top-level fields
-  if (
-    parsedTraceCall.output !== null &&
-    isAnthropicCompletionFormat(parsedTraceCall.output)
-  ) {
-    const {content, stop_reason, ...outputs} = parsedTraceCall.output as any;
-    parsedTraceCall.output = {
-      ...outputs,
-      choices: anthropicContentBlocksToChoices(content, stop_reason),
-    };
-  }
-  // Handles anthropic inputs
-  // Anthropic has system message as a top-level request field
-  if (hasStringProp(parsedTraceCall.inputs, 'system')) {
-    const {messages, system, ...inputs} = parsedTraceCall.inputs as any;
-    parsedTraceCall.inputs = {
-      ...inputs,
-      messages: [
-        {
-          role: 'system',
-          content: system,
-        },
-        ...messages,
-      ],
-    };
-  }
-  return parsedTraceCall;
 };

@@ -500,17 +500,19 @@ const useCallsStats = (
         entity: params.entity,
         project: params.project,
       }),
-      filter: {
-        op_names: deepFilter?.opVersionRefs,
-        input_refs: deepFilter?.inputObjectVersionRefs,
-        output_refs: deepFilter?.outputObjectVersionRefs,
-        parent_ids: deepFilter?.parentIds,
-        trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter?.callIds,
-        trace_roots_only: deepFilter?.traceRootsOnly,
-        wb_run_ids: deepFilter?.runIds,
-        wb_user_ids: deepFilter?.userIds,
-      },
+      filter: deepFilter
+        ? {
+            op_names: deepFilter?.opVersionRefs,
+            input_refs: deepFilter?.inputObjectVersionRefs,
+            output_refs: deepFilter?.outputObjectVersionRefs,
+            parent_ids: deepFilter?.parentIds,
+            trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
+            call_ids: deepFilter?.callIds,
+            trace_roots_only: deepFilter?.traceRootsOnly,
+            wb_run_ids: deepFilter?.runIds,
+            wb_user_ids: deepFilter?.userIds,
+          }
+        : undefined,
       query: params.query,
       limit: params.limit,
       ...(!!params.includeTotalStorageSize
@@ -572,7 +574,6 @@ const useProjectHasCalls = (
   const callsStats = useCallsStats({
     entity: params.entity,
     project: params.project,
-    filter: {},
     limit: 1,
     skip: params.skip,
   });
@@ -674,6 +675,9 @@ const useCallsExport = () => {
         expand_columns: params.expandedRefCols ?? undefined,
         include_feedback: params.includeFeedback ?? false,
         include_costs: params.includeCosts ?? false,
+        include_total_storage_size: (params.columns ?? []).includes(
+          'total_storage_size_bytes'
+        ),
       };
       return getTsClient().callsStreamDownload(req, params.contentType);
     },
@@ -1351,8 +1355,14 @@ const useObjectDeleteFunc = () => {
 
 const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
   const getTsClient = useGetTraceServerClientContext();
-  const [refsRes, setRefsRes] =
-    useState<traceServerTypes.TraceRefsReadBatchRes | null>(null);
+  // Here we keep track of the result and the uris we fetched for. This is
+  // because repeated calls to this hook with different uris will return
+  // could result in stale results if we just returned the result from the
+  // hook.
+  const [refsRes, setRefsRes] = useState<{
+    res: traceServerTypes.TraceRefsReadBatchRes;
+    forUris: string[];
+  } | null>(null);
   const loadingRef = useRef(false);
 
   const deepRefUris = useDeepMemo(params.refUris);
@@ -1369,7 +1379,7 @@ const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
       })
       .then((res: traceServerTypes.TraceRefsReadBatchRes) => {
         loadingRef.current = false;
-        setRefsRes(res);
+        setRefsRes({res, forUris: deepRefUris});
       })
       .catch((err: Error) => {
         loadingRef.current = false;
@@ -1382,11 +1392,15 @@ const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
     if (params.skip || params.refUris.length === 0) {
       return {loading: false, result: null};
     }
-    if (refsRes == null || loadingRef.current) {
+    if (
+      refsRes == null ||
+      loadingRef.current ||
+      refsRes.forUris !== deepRefUris
+    ) {
       return {loading: true, result: null};
     }
-    return {loading: false, result: refsRes.vals};
-  }, [refsRes, params.skip, params.refUris]);
+    return {loading: false, result: refsRes.res.vals};
+  }, [params.skip, params.refUris.length, refsRes, deepRefUris]);
 };
 
 const useTableQuery = makeTraceServerEndpointHook<
@@ -1933,17 +1947,34 @@ const useRefsType = (params: UseGetRefsTypeParams): Loadable<Types.Type[]> => {
 };
 
 /// Converters ///
-type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET';
+
+/**
+ * Getting the status code for a trace call has a few complexities.
+ */
 export const traceCallStatusCode = (
-  traceCall: traceServerTypes.TraceCallSchema
-): StatusCodeType => {
-  if (traceCall.exception) {
-    return 'ERROR';
-  } else if (traceCall.ended_at) {
-    return 'SUCCESS';
-  } else {
-    return 'UNSET';
+  traceCall: traceServerTypes.TraceCallSchema,
+  hasDescendantErrors?: boolean
+): traceServerTypes.ComputedCallStatusType => {
+  const serverSideStatus = traceCall.summary?.weave?.status;
+  if (serverSideStatus) {
+    if (
+      serverSideStatus === traceServerTypes.ComputedCallStatuses.success &&
+      hasDescendantErrors
+    ) {
+      return traceServerTypes.ComputedCallStatuses.descendant_error;
+    }
+    return serverSideStatus;
   }
+  if (traceCall.exception) {
+    return traceServerTypes.ComputedCallStatuses.error;
+  } else if (traceCall.ended_at) {
+    const errors = traceCall.summary?.status_counts?.error ?? 0;
+    if (errors > 0 || hasDescendantErrors) {
+      return traceServerTypes.ComputedCallStatuses.descendant_error;
+    }
+    return traceServerTypes.ComputedCallStatuses.success;
+  }
+  return traceServerTypes.ComputedCallStatuses.running;
 };
 
 export const traceCallLatencyS = (
@@ -2109,11 +2140,11 @@ export const useTableCreate = (): ((
   );
 };
 
-export const useFilesStats = (projectId: string) => {
+export const useProjectStats = (projectId: string) => {
   const getTsClient = useGetTraceServerClientContext();
 
   return useAsync(async () => {
-    return getTsClient().filesStats({project_id: projectId});
+    return getTsClient().projectStats({project_id: projectId});
   }, [getTsClient, projectId]);
 };
 

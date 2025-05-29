@@ -63,3 +63,5 @@ flask_cors
 
 
 anyio==3.6.2
+
+orjson >= 3.10,<4

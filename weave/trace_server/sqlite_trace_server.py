@@ -260,7 +260,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallReadRes(call=calls[0] if calls else None)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        print("REQ", req)
         conn, cursor = get_conn_cursor(self.db_path)
         conds = []
         filter = req.filter
@@ -507,6 +506,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                             CASE
                                 WHEN exception IS NOT NULL THEN 'error'
                                 WHEN ended_at IS NULL THEN 'running'
+                                WHEN json_extract(summary, '$.status_counts.error') > 0 THEN 'descendant_error'
                                 ELSE 'success'
                             END
                         """
@@ -565,8 +565,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if limit is None:
                 query += " LIMIT -1"
             query += f" OFFSET {req.offset}"
-
-        print("QUERY", query)
 
         cursor.execute(query)
 
@@ -1596,6 +1594,15 @@ def _transform_external_calls_field_to_internal_calls_field(
             END
         """
         json_path = None
+    elif field == "summary.weave.status":
+        field = """
+                            CASE
+                                WHEN exception IS NOT NULL THEN 'error'
+                                WHEN ended_at IS NULL THEN 'running'
+                                WHEN json_extract(summary, '$.status_counts.error') > 0 THEN 'descendant_error'
+                                ELSE 'success'
+                            END
+                        """
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"
