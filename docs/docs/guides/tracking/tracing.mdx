@@ -73,7 +73,7 @@ There are three main ways to create Calls in Weave:
     import OpenAI from 'openai'
     import * as weave from 'weave'
 
-    const client = weave.wrapOpenAI(new OpenAI())
+    const client = new OpenAI()
 
     // Initialize Weave Tracing
     await weave.init('intro-example')

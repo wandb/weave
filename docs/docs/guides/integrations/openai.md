@@ -62,7 +62,7 @@ It’s important to store traces of LLM applications in a central database, both
     // highlight-next-line
     const client = await weave.init('emoji-bot');
     // highlight-next-line
-    const openai = weave.wrapOpenAI(new OpenAI());
+    const openai = new OpenAI();
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4',
@@ -182,7 +182,7 @@ Wrapping a function with `weave.op` starts capturing inputs, outputs and app log
       'eevee',
     ];
 
-    const openai = weave.wrapOpenAI(new OpenAI());
+    const openai = new OpenAI();
 
     interface PokemonData {
       name: string;
