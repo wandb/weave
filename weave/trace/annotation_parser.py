@@ -28,17 +28,17 @@ def parse_data_annotation(annotation_string: str) -> ContentAnnotation | None:
     Returns:
         ContentAnnotation | None: An instance of ContentAnnotation if the parsing is successful,
     """
-    # Audio annotation with a format specifier
-    # Example: "typing.Annotated[typing.Union[str, bytes], weave.type_wrappers.Content.Content.Audio[typing.Literal['mp3']]]"
+    # Content annotation with a format specifier
+    # Example: "typing.Annotated[typing.Union[str, bytes], weave.type_wrappers.Content.Content.Content[typing.Literal['mp3']]]"
     # Explanation:
     # - r"typing\.Annotated\[": Matches the literal "typing.Annotated["
     # - r"(.+?)": Group 1. Captures the base type (non-greedy match for any characters).
     #            This allows capturing complex types like `typing.Union[str, bytes]`.
-    # - r",\s*": Matches a comma followed by optional whitespace (this comma separates base_type from the Audio annotation).
-    # - fr"{re.escape(audio_class_name)}\[": Matches the audio class name followed by "[".
+    # - r",\s*": Matches a comma followed by optional whitespace (this comma separates base_type from the Content annotation).
+    # - fr"{re.escape(content_class_name)}\[": Matches the content class name followed by "[".
     # - r"typing\.Literal\[": Matches "typing.Literal[".
     # - r"['\"](mp3|wav)['\"]": Group 2. Captures 'mp3' or 'wav' (allowing single or double quotes).
-    # - r"\]\]": Matches the two closing square brackets for Literal and Audio.
+    # - r"\]\]": Matches the two closing square brackets for Literal and Content.
     # - r"\]": Matches the final closing square bracket for Annotated.
 
     pattern_with_format = re.compile(
@@ -46,7 +46,7 @@ def parse_data_annotation(annotation_string: str) -> ContentAnnotation | None:
         r"(.+?),\s*"  # Group 1: Base type (non-greedy)
         rf"{re.escape(CONTENT_CLASS_NAME)}\["
         r"typing\.Literal\[['\"](.+?)['\"]\]"  # Group 2: Any literal, non-greedy
-        r"\]"  # Closing bracket for Audio[...]
+        r"\]"  # Closing bracket for Content[...]
         r"\]"  # Closing bracket for Annotated[...]
     )
     match_with_format = pattern_with_format.fullmatch(annotation_string)
@@ -67,7 +67,7 @@ def parse_data_annotation(annotation_string: str) -> ContentAnnotation | None:
 def parse_file_annotation(annotation_string: str) -> ContentAnnotation | None:
     """
     The function expects the string to be of the form:
-    typing.Annotated[<SomeType>, <class 'weave.type_handlers.Content.audio.Content'>]
+    typing.Annotated[<SomeType>, <class 'weave.type_handlers.Content.content.Content'>]
 
     where <SomeType> is a string or PathLike type
 
@@ -78,12 +78,12 @@ def parse_file_annotation(annotation_string: str) -> ContentAnnotation | None:
         ContentFileAnnotation | None: An instance of ContentFileAnnotation if the parsing is successful,
     """
     # Content annotation without a format specifier
-    # Example: "typing.Annotated[SomePathLikeType, <class 'weave.type_handlers.Content.audio.Content'>]"
+    # Example: "typing.Annotated[SomePathLikeType, <class 'weave.type_handlers.Content.content.Content'>]"
     # Explanation:
     # - r"typing\.Annotated\[": Matches the literal "typing.Annotated["
     # - r"(.+?)": Group 1. Captures the base type (non-greedy).
     # - r",\s*": Matches a comma followed by optional whitespace.
-    # - fr"<class '{re.escape(audio_class_name)}'>": Matches the class representation.
+    # - fr"<class '{re.escape(content_class_name)}'>": Matches the class representation.
     # - r"\]": Matches the closing square bracket for Annotated.
     pattern_without_format = re.compile(
         r"typing\.Annotated\["
@@ -104,18 +104,18 @@ def parse_file_annotation(annotation_string: str) -> ContentAnnotation | None:
     )
 
 
-def parse_audio_annotation(
+def parse_content_annotation(
     annotation_string: str,
 ) -> ContentAnnotation | None:
     """
-    Parses an audio type annotation string.
+    Parses an content type annotation string.
 
     The function expects the string to be one of two forms:
     1. typing.Annotated[SomeType, weave.type_wrappers.Content.content.Content[typing.Literal['format']]]
     2. typing.Annotated[SomeType, <class 'weave.type_wrappers.Content.content.Content'>]
 
     It extracts the base type (which can be complex, like typing.Union),
-    confirms the Content class, and identifies the audio format.
+    confirms the Content class, and identifies the content format.
 
     Args:
         annotation_string: The string representation of the type annotation.
@@ -123,8 +123,8 @@ def parse_audio_annotation(
     Returns:
         A dictionary containing:
         - "base_type": The underlying type being annotated (e.g., "SomeType", "str", "typing.Union[str, bytes]").
-        - "audio_class": The name of the audio handler class.
-        - "audio_format": The audio format ("mp3", "wav") if specified, otherwise None.
+        - "content_class": The name of the content handler class.
+        - "content_format": The content format ("mp3", "wav") if specified, otherwise None.
         - "raw_annotation": The original input string.
         If parsing fails, it returns a dictionary with an "error" key and "raw_annotation".
     """
@@ -141,7 +141,7 @@ def parse_from_signature(sig: Signature) -> dict[str, ContentAnnotation]:
         if not param.annotation:
             continue
 
-        parse_result = parse_audio_annotation(str(param.annotation))
+        parse_result = parse_content_annotation(str(param.annotation))
 
         if not parse_result:
             continue

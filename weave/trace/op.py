@@ -40,7 +40,7 @@ from typing_extensions import ParamSpec
 from weave.trace import box, settings
 from weave.trace.annotation_parser import (
     ContentAnnotation,
-    parse_audio_annotation,
+    parse_content_annotation,
     parse_from_signature,
 )
 from weave.trace.constants import TRACE_CALL_EMOJI
@@ -315,7 +315,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     # Annotated return type flow
     # If user defines postprocess_output manually, trust it instead of running this
     if not func.postprocess_output and sig.return_annotation:
-        parsed = parse_audio_annotation(str(sig.return_annotation))
+        parsed = parse_content_annotation(str(sig.return_annotation))
         if isinstance(parsed, ContentAnnotation):
             func.postprocess_output = lambda x: Content(x, parsed.type_hint)
 
