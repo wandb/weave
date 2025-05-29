@@ -10,7 +10,7 @@ import * as S from './WBMenu.styles';
 export type WBMenuOption = {
   name?: string;
   value: string | number;
-  icon?: IconName | null;
+  icon?: IconName | string | null;
   disabled?: boolean;
   'data-test'?: string;
   render?(props: {hovered: boolean; selected: boolean}): React.ReactNode;
