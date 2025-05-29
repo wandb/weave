@@ -703,6 +703,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             wb_user_id=req.obj.wb_user_id,
             kind=get_kind(processed_val),
             base_object_class=processed_result["base_object_class"],
+            leaf_object_class=processed_result["leaf_object_class"],
             refs=extract_refs_from_values(processed_val),
             val_dump=json_val,
             digest=digest,
@@ -752,6 +753,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if req.filter.base_object_classes:
                 object_query_builder.add_base_object_classes_condition(
                     req.filter.base_object_classes
+                )
+            if req.filter.leaf_object_classes:
+                object_query_builder.add_leaf_object_classes_condition(
+                    req.filter.leaf_object_classes
                 )
         if req.limit is not None:
             object_query_builder.set_limit(req.limit)
@@ -2402,12 +2407,14 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         project_id=ch_obj.project_id,
         object_id=ch_obj.object_id,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
+        deleted_at=_ensure_datetimes_have_tz(ch_obj.deleted_at),
         wb_user_id=ch_obj.wb_user_id,
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
         digest=ch_obj.digest,
         kind=ch_obj.kind,
         base_object_class=ch_obj.base_object_class,
+        leaf_object_class=ch_obj.leaf_object_class,
         val=json.loads(ch_obj.val_dump),
         size_bytes=ch_obj.size_bytes,
     )

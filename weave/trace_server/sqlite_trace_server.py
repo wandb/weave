@@ -118,6 +118,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 created_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
+                leaf_object_class TEXT,
                 refs TEXT,
                 val_dump TEXT,
                 digest TEXT,
@@ -692,7 +693,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(", ".join("?" * len(req.call_ids)))
+            """.format(
+                ", ".join("?" * len(req.call_ids))
+            )
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -704,7 +707,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(", ".join("?" * len(all_ids)))
+            """.format(
+                ", ".join("?" * len(all_ids))
+            )
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()
@@ -766,6 +771,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     created_at,
                     kind,
                     base_object_class,
+                    leaf_object_class,
                     refs,
                     val_dump,
                     digest,
@@ -778,6 +784,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     created_at = excluded.created_at,
                     kind = excluded.kind,
                     base_object_class = excluded.base_object_class,
+                    leaf_object_class = excluded.leaf_object_class,
                     refs = excluded.refs,
                     val_dump = excluded.val_dump,
                     version_index = excluded.version_index,
@@ -790,6 +797,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     datetime.datetime.now().isoformat(),
                     get_kind(processed_val),
                     processed_result["base_object_class"],
+                    processed_result["leaf_object_class"],
                     json.dumps([]),
                     json_val,
                     digest,
@@ -887,6 +895,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 placeholders = ",".join(["?" for _ in req.filter.base_object_classes])
                 conds.append(f"base_object_class IN ({placeholders})")
                 parameters["base_object_classes"] = req.filter.base_object_classes
+            if req.filter.leaf_object_classes:
+                placeholders = ",".join(["?" for _ in req.filter.leaf_object_classes])
+                conds.append(f"leaf_object_class IN ({placeholders})")
+                parameters["leaf_object_classes"] = req.filter.leaf_object_classes
 
         objs = self._select_objs_query(
             req.project_id,
@@ -944,7 +956,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             WHERE project_id = ? AND
                 object_id = ? AND
                 digest IN ({})
-        """.format(", ".join("?" * len(found_digests)))
+        """.format(
+            ", ".join("?" * len(found_digests))
+        )
         delete_parameters = [req.project_id, req.object_id] + list(found_digests)
 
         with self.lock:
@@ -1483,7 +1497,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 version_index,
                 is_latest,
                 deleted_at,
-                wb_user_id
+                wb_user_id,
+                leaf_object_class
             FROM objects
             WHERE project_id = ? AND {pred}
         """
@@ -1529,6 +1544,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     is_latest=row[8],
                     deleted_at=row[9],
                     wb_user_id=row[10],
+                    leaf_object_class=row[11],
                 )
             )
         return result

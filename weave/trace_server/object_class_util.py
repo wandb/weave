@@ -46,6 +46,7 @@ def get_object_classes(val: Any) -> Optional[GetObjectClassesResult]:
 class ProcessIncomingObjectResult(TypedDict):
     val: Any
     base_object_class: Optional[str]
+    leaf_object_class: Optional[str]
 
 
 def process_incoming_object_val(
@@ -113,6 +114,7 @@ def process_incoming_object_val(
             return ProcessIncomingObjectResult(
                 val=dict_val,
                 base_object_class=new_val_object_classes["base_object_class"],
+                leaf_object_class=new_val_object_classes["object_class"],
             )
         else:
             raise ValueError(f"Unknown object class: {req_builtin_object_class}")

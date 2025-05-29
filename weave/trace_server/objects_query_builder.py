@@ -15,6 +15,7 @@ OBJECT_METADATA_COLUMNS = [
     "refs",
     "kind",
     "base_object_class",
+    "leaf_object_class",
     "digest",
     "version_index",
     "is_latest",
@@ -227,6 +228,12 @@ class ObjectMetadataQueryBuilder:
         )
         self.parameters.update({"base_object_classes": base_object_classes})
 
+    def add_leaf_object_classes_condition(self, leaf_object_classes: list[str]) -> None:
+        self._conditions.append(
+            "leaf_object_class IN {leaf_object_classes: Array(String)}"
+        )
+        self.parameters.update({"leaf_object_classes": leaf_object_classes})
+
     def add_order(self, field: str, direction: str) -> None:
         direction = direction.lower()
         if direction not in ("asc", "desc"):
@@ -278,6 +285,7 @@ FROM (
         deleted_at,
         kind,
         base_object_class,
+        leaf_object_class,
         refs,
         digest,
         wb_user_id,
@@ -309,6 +317,7 @@ FROM (
             deleted_at,
             kind,
             base_object_class,
+            leaf_object_class,
             refs,
             digest,
             wb_user_id,
