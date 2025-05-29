@@ -15,9 +15,12 @@ import {
 import {DeleteObjectButtonWithModal} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectDeleteButtons';
 import {ObjectIcon} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectVersionPage';
 import {queryToGridFilterModel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/SavedViews/savedViewUtil';
-import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {Query} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientInterface/query';
 import {SortBy} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientTypes';
+import {
+  useCallsStats,
+  useRootObjectVersions,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallOpVersionsRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallOpVersionsRef';
@@ -41,8 +44,6 @@ export const MonitorPage = (props: {
   objectName: string;
   version: string;
 }) => {
-  const {useRootObjectVersions} = useWFHooks();
-
   const monitorVersionFilter = useMemo(
     () => ({
       objectIds: [props.objectName],
@@ -112,8 +113,6 @@ const MonitorPageInner = ({
     );
     history.push(url);
   }, [baseRouter, history, callsFilterModel, entity, project]);
-
-  const {useCallsStats} = useWFHooks();
 
   const callCountQuery: Query = useMemo(() => {
     const allVersionRefOperands = allVersionRefs.map(versionRefUri => ({

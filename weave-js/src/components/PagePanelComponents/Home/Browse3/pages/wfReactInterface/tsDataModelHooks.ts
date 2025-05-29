@@ -472,7 +472,7 @@ const useCalls = (
   }, [calls.refetch, expandedCalls, loading, calls.error]);
 };
 
-const useCallsStats = (
+export const useCallsStats = (
   params: UseCallsStatsParams
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();

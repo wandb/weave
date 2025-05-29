@@ -17,6 +17,11 @@ def wf_kafka_broker_port() -> int:
 # Scoring worker settings
 
 
+def wf_enable_online_eval() -> bool:
+    """Whether to enable online evaluation."""
+    return os.environ.get("WF_ENABLE_ONLINE_EVAL", "false").lower() == "true"
+
+
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
     return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", 100))

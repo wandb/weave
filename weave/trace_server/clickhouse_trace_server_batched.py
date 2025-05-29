@@ -328,7 +328,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # the call does not already exist
         self._insert_call(ch_call)
 
-        if publish:
+        if wf_env.wf_enable_online_eval() and publish:
             self.kafka_producer.produce_call_end(req.end)
 
         # Returns the id of the newly created call
