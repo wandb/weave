@@ -30,7 +30,7 @@ import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
-import {ExampleCompareSectionDetail} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {ExampleCompareSectionDetailGuarded} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
 import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
@@ -344,7 +344,7 @@ const ResultExplorer: React.FC<{
             borderLeft: '1px solid #e0e0e0',
             display: viewMode !== 'table' ? 'block' : 'none',
           }}>
-          <ExampleCompareSectionDetail
+          <ExampleCompareSectionDetailGuarded
             state={state}
             onClose={() => setViewMode('table')}
             onExpandToggle={() =>
