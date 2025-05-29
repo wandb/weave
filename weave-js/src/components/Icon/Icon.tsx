@@ -297,6 +297,7 @@ const updateIconProps = (props: SVGIconProps) => {
     ...props,
     style: {
       flexShrink: 0,
+      display: 'inline-block',
       ...props.style,
     },
   };
