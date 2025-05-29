@@ -64,6 +64,7 @@ class TraceStatus(str, Enum):
     SUCCESS = "success"
     ERROR = "error"
     RUNNING = "running"
+    DESCENDANT_ERROR = "descendant_error"
 
 
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
@@ -77,6 +78,7 @@ class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
     usage: dict[str, LLMUsageSchema]
+    status_counts: dict[TraceStatus, int]
 
 
 class SummaryMap(SummaryInsertMap, total=False):
@@ -208,7 +210,7 @@ class ObjSchemaForInsert(BaseModel):
     builtin_object_class: Optional[str] = None
     # Keeping `set_base_object_class` here until it is successfully removed from UI client
     set_base_object_class: Optional[str] = Field(
-        include=False, default=None, deprecated=True
+        exclude=True, default=None, deprecated=True
     )
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -1007,6 +1009,21 @@ class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
+class ProjectStatsReq(BaseModel):
+    project_id: str
+    include_trace_storage_size: Optional[bool] = True
+    include_object_storage_size: Optional[bool] = True
+    include_table_storage_size: Optional[bool] = True
+    include_file_storage_size: Optional[bool] = True
+
+
+class ProjectStatsRes(BaseModel):
+    trace_storage_size_bytes: int
+    objects_storage_size_bytes: int
+    tables_storage_size_bytes: int
+    files_storage_size_bytes: int
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1074,3 +1091,6 @@ class TraceServerInterface(Protocol):
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
+
+    # Project statistics API
+    def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...

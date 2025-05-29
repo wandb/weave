@@ -64,7 +64,7 @@ export const FilterRow = ({
 
   const isOperatorDisabled =
     isWeaveRef(item.value) ||
-    ['id', 'status', 'user'].includes(getFieldType(item.field));
+    ['id', 'status', 'run', 'user'].includes(getFieldType(item.field));
 
   return (
     <>

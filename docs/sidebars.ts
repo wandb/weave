@@ -59,6 +59,7 @@ const sidebars: SidebarsConfig = {
             },
             "guides/tracking/trace-tree",
             "guides/tracking/otel",
+            "guides/tracking/video"
           ]
         },
         {
@@ -196,7 +197,8 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/instructor",
             "guides/integrations/crewai",
             "guides/integrations/smolagents",
-            "guides/integrations/pydantic_ai"
+            "guides/integrations/pydantic_ai",
+            "guides/integrations/google_adk"
           ],
         },
         {

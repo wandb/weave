@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import atexit
 import datetime
+import json
 import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from multiprocessing import Lock
 from types import MethodType
 from typing import Annotated, Any, TypeVar, Union, cast
 
@@ -15,14 +17,14 @@ from pydantic import (
     ConfigDict,
     Field,
     PrivateAttr,
-    validate_call,
 )
 
 import weave
 from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import Model
-from weave.flow.scorer import Scorer, auto_summarize
+from weave.flow.scorer import Scorer
+from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
@@ -97,8 +99,8 @@ def _set_current_summary(summary: dict) -> Iterator[None]:
         current_summary.reset(token)
 
 
-def _cast_to_cls(type_: type[T]) -> Callable[[str | T], T]:
-    def _convert_to_cls_inner(value: str | T) -> T:
+def _cast_to_cls(type_: type[T]) -> Callable[[str | dict | T], T]:
+    def _convert_to_cls_inner(value: str | dict | T) -> T:
         if isinstance(value, str):
             cls_name = value
 
@@ -180,6 +182,30 @@ def _validate_class_name(name: str) -> str:
     return name
 
 
+class ScorerCache:
+    _cached_scorers: dict[str, Scorer]
+    _cached_scorers_lock: Any
+    _max_size: int
+
+    def __init__(self, max_size: int = 1000) -> None:
+        self._cached_scorers = {}
+        self._cached_scorers_lock = Lock()
+        self._max_size = max_size
+
+    def get_scorer(
+        self, scorer_id: str, default_factory: Callable[[], Scorer]
+    ) -> Scorer:
+        with self._cached_scorers_lock:
+            if scorer_id not in self._cached_scorers:
+                if len(self._cached_scorers) >= self._max_size:
+                    self._cached_scorers.popitem()
+                self._cached_scorers[scorer_id] = default_factory()
+        return self._cached_scorers[scorer_id]
+
+
+global_scorer_cache = ScorerCache()
+
+
 class ScoreLogger(BaseModel):
     """This class provides an imperative interface for logging scores."""
 
@@ -233,12 +259,10 @@ class ScoreLogger(BaseModel):
             # No event loop exists, create one with asyncio.run
             return asyncio.run(self.alog_score(scorer, score))
 
-    @validate_call
     async def alog_score(
         self,
         scorer: Annotated[
             Scorer | dict | str,
-            BeforeValidator(_cast_to_cls(Scorer)),
             Field(
                 description="A metadata-only scorer used for comparisons."
                 "Alternatively, you can pass a dict of attributes or just a string"
@@ -247,6 +271,11 @@ class ScoreLogger(BaseModel):
         ],
         score: ScoreType,
     ) -> None:
+        if not isinstance(scorer, Scorer):
+            scorer_id = json.dumps(scorer)
+            scorer = global_scorer_cache.get_scorer(
+                scorer_id, lambda: _cast_to_cls(Scorer)(scorer)
+            )
         if self._has_finished:
             raise ValueError("Cannot log score after finish has been called")
 
@@ -489,7 +518,11 @@ class EvaluationLogger(BaseModel):
         self._accumulated_predictions.append(pred)
         return pred
 
-    def log_summary(self, summary: dict | None = None) -> None:
+    def log_summary(
+        self,
+        summary: dict | None = None,
+        auto_summarize: bool = True,
+    ) -> None:
         """Log a summary dict to the Evaluation.
 
         This will calculate the summary, call the summarize op, and then finalize
@@ -499,11 +532,18 @@ class EvaluationLogger(BaseModel):
             logger.warn("(NO-OP): Evaluation already finalized, cannot log summary.")
             return
 
+        if summary is None:
+            summary = {}
+
         # Calculate summary
-        data_to_summarize = [
-            pred._captured_scores for pred in self._accumulated_predictions
-        ]
-        summary_data = auto_summarize(data_to_summarize)
+        if auto_summarize:
+            data_to_summarize = [
+                pred._captured_scores for pred in self._accumulated_predictions
+            ]
+            summary_data = auto_summarize_fn(data_to_summarize)
+        else:
+            summary_data = summary
+
         final_summary = {}
         if summary_data:
             final_summary = summary_data

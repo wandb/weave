@@ -112,7 +112,7 @@ export function prepareFlattenedDataForTable<T>(
       cleaned[newKey] = flattened[key];
     });
 
-    return cleaned as T & {[key: string]: string};
+    return {...r, ...cleaned} as T & {[key: string]: string};
   });
 }
 /**

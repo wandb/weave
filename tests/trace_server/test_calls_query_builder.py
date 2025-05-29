@@ -386,8 +386,8 @@ def test_query_light_column_with_costs() -> None:
                     JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
                 FROM all_calls),
             -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-            ranked_prices AS (
-                SELECT
+            ranked_prices AS
+                (SELECT
                     *,
                     llm_token_prices.id,
                     llm_token_prices.pricing_level,
@@ -419,15 +419,14 @@ def test_query_light_column_with_costs() -> None:
                             llm_token_prices.effective_date DESC
                     ) AS rank
                 FROM llm_usage
-                LEFT JOIN llm_token_prices ON (llm_usage.llm_id = llm_token_prices.llm_id)
-                WHERE ((llm_token_prices.pricing_level_id = {pb_2:String})
+                LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id) AND ((llm_token_prices.pricing_level_id = {pb_2:String})
                     OR (llm_token_prices.pricing_level_id = {pb_3:String})
-                    OR (llm_token_prices.pricing_level_id = {pb_4:String})))
+                    OR (llm_token_prices.pricing_level_id = {pb_4:String}))) )
             -- Final Select, which just selects the correct fields, and adds a costs object
             SELECT
                 id,
                 started_at,
-                if( any(llm_id) = 'weave_dummy_llm_id',
+                if( any(llm_id) = 'weave_dummy_llm_id' or any(llm_token_prices.id) == '',
                 any(summary_dump),
                 concat(
                     left(any(summary_dump), length(any(summary_dump)) - 1),
@@ -835,7 +834,7 @@ def test_query_with_summary_weave_status_sort() -> None:
             any(calls_merged.exception) AS exception,
             any(calls_merged.ended_at) AS ended_at
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_3:String}
+        WHERE calls_merged.project_id = {pb_5:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
@@ -849,12 +848,25 @@ def test_query_with_summary_weave_status_sort() -> None:
             ))
         )
         ORDER BY CASE
-            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_0:String}
-            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_1:String}
-            ELSE {pb_2:String}
-        END ASC
+            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
+            WHEN IFNULL(
+                toInt64OrNull(
+                    JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String})
+                ),
+                0
+            ) > 0 THEN {pb_4:String}
+            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
+            ELSE {pb_3:String}
+            END ASC
         """,
-        {"pb_0": "error", "pb_1": "running", "pb_2": "success", "pb_3": "project"},
+        {
+            "pb_0": '$."status_counts"."error"',
+            "pb_1": "error",
+            "pb_2": "running",
+            "pb_3": "success",
+            "pb_4": "descendant_error",
+            "pb_5": "project",
+        },
     )
 
 
@@ -884,26 +896,30 @@ def test_query_with_summary_weave_status_sort_and_filter() -> None:
             any(calls_merged.exception) AS exception,
             any(calls_merged.ended_at) AS ended_at
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_3:String}
+        WHERE calls_merged.project_id = {pb_5:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((CASE
-                WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_0:String}
-                WHEN any(calls_merged.ended_at) IS NULL THEN {pb_1:String}
-                ELSE {pb_2:String}
-            END = {pb_2:String}))
+                WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
+                WHEN IFNULL(toInt64OrNull(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String})), 0) > 0 THEN {pb_4:String}
+                WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
+                ELSE {pb_3:String}
+            END = {pb_3:String}))
         AND ((any(calls_merged.deleted_at) IS NULL))
         AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         ORDER BY CASE
-            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_0:String}
-            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_1:String}
-            ELSE {pb_2:String}
+            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
+            WHEN IFNULL(toInt64OrNull(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String})), 0) > 0 THEN {pb_4:String}
+            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
+            ELSE {pb_3:String}
         END DESC
         """,
         {
-            "pb_0": "error",
-            "pb_1": "running",
-            "pb_2": "success",
-            "pb_3": "project",
+            "pb_0": '$."status_counts"."error"',
+            "pb_1": "error",
+            "pb_2": "running",
+            "pb_3": "success",
+            "pb_4": "descendant_error",
+            "pb_5": "project",
         },
     )
 

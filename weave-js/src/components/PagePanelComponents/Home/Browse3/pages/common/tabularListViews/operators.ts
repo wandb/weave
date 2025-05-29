@@ -114,8 +114,9 @@ export const operationConverter = (
     if (item.value === '') {
       return null;
     }
-    const field = getFieldExpression(item.field);
-    return {$eq: [field, {$literal: `${item.value}`}]};
+    return {
+      $eq: [{$getField: item.field}, {$literal: `${item.value}`}],
+    };
   } else if (item.operator === '(date): after') {
     if (item.value === '') {
       return null;

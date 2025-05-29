@@ -3,11 +3,27 @@ import TabItem from '@theme/TabItem';
 
 # Logging media
 
-Weave supports logging and displaying multiple first class media types. Log images with `PIL.Image.Image` and audio with `wave.Wave_read` either directly with the object API, or as the inputs or output of an op.
+Weave supports logging and displaying video, images, and audio.
+
+## Video
+
+Weave automatically logs videos using [`moviepy`](https://zulko.github.io/moviepy/). This allows you to pass video inputs and outputs to traced functions, and Weave will automatically handle uploading and storing video data.
+
+:::note
+Video support is currently only available in Python.
+:::
+
+For usage information, see [Video Support](../tracking/video).
 
 ## Images
 
-Logging type: `PIL.Image.Image`. Here is an example of logging an image with the OpenAI DALL-E API:
+Logging type: `PIL.Image.Image`. 
+
+:::important
+Base64-encoded image strings (e.g., `data:image/jpeg;base64,...`) are technically supported but discouraged. They can cause performance issues and should only be used if absolutely necessary (e.g., for integration with specific APIs).
+:::
+
+The following example shows how to log an image generated via the OpenAI DALL-E API:
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -75,13 +91,15 @@ Logging type: `PIL.Image.Image`. Here is an example of logging an image with the
   </TabItem>
 </Tabs>
 
-This image will be logged to weave and automatically displayed in the UI. The following is the trace view for above.
+This image is logged to Weave and automatically displayed in the UI. 
 
 ![Screenshot of pumpkin cat trace view](imgs/cat-pumpkin-trace.png)
 
 ## Audio
 
-Logging type: `wave.Wave_read`. Here is an example of logging an audio file using openai's speech generation API.
+Logging type: `wave.Wave_read`. 
+
+The following example shows how to log an audio file using OpenAI's speech generation API.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -146,8 +164,10 @@ Logging type: `wave.Wave_read`. Here is an example of logging an audio file usin
   </TabItem>
 </Tabs>
 
-This audio will be logged to weave and automatically displayed in the UI, with an audio player. The player can be expanded to view the raw audio waveform, in addition to a download button.
+This audio is logged to Weave and automatically displayed in the UI, along with an audio player. In the audio player, you can view and download the raw audio waveform.
 
 ![Screenshot of audio trace view](imgs/audio-trace.png)
 
+:::tip
 Try our cookbook for [Audio Logging](/reference/gen_notebooks/audio_with_weave) or <a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/audio_with_weave.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>. The cookbook also includes an advanced example of a Real Time Audio API based assistant integrated with Weave.
+:::

@@ -1,6 +1,9 @@
+import logging
 from importlib import metadata
 
 from packaging import version
+
+logger = logging.getLogger(__name__)
 
 try:
     mistral_version = metadata.version("mistralai")
@@ -10,7 +13,7 @@ except metadata.PackageNotFoundError:
 if version.parse(mistral_version) < version.parse("1.0.0"):
     from .v0.mistral import get_mistral_patcher  # noqa: F401
 
-    print(
+    logger.info(
         f"Using MistralAI version {mistral_version}. Please consider upgrading to version 1.0.0 or later."
     )
 else:

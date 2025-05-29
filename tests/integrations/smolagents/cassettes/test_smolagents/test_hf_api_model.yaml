@@ -1,0 +1,238 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 05c36051-0111-4b75-8ce0-a7ebdc9498bc
+      user-agent:
+      - unknown/None; hf_hub/0.31.4; python/3.11.11
+    method: GET
+    uri: https://huggingface.co/api/models/Qwen/Qwen2.5-Coder-32B-Instruct?expand=inferenceProviderMapping
+  response:
+    body:
+      string: '{"_id":"672b1f9e956e6880fdb8c1e5","id":"Qwen/Qwen2.5-Coder-32B-Instruct","inferenceProviderMapping":{"hf-inference":{"status":"live","providerId":"Qwen/Qwen2.5-Coder-32B-Instruct","task":"conversational"},"together":{"status":"live","providerId":"Qwen/Qwen2.5-Coder-32B-Instruct","task":"conversational"},"nscale":{"status":"live","providerId":"Qwen/Qwen2.5-Coder-32B-Instruct","task":"conversational"},"nebius":{"status":"live","providerId":"Qwen/Qwen2.5-Coder-32B-Instruct-fast","task":"conversational"},"hyperbolic":{"status":"live","providerId":"Qwen/Qwen2.5-Coder-32B-Instruct","task":"conversational"},"fireworks-ai":{"status":"live","providerId":"accounts/fireworks/models/qwen2p5-coder-32b-instruct","task":"conversational"}}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '734'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 20 May 2025 08:04:29 GMT
+      ETag:
+      - W/"2de-J4LPgZ4eq+3reP4JXOFc2kCrMTc"
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 f0baf1369e301dc8f36cd909a541181e.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - mdluE4qyGz7wpUtYLNPLnWRQ6T3VIi1KoDyft05HjH6J_IMU0uvOaQ==
+      X-Amz-Cf-Pop:
+      - BLR50-P4
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-682c378d-5c28156b2f7cc3760bbd9a0d;05c36051-0111-4b75-8ce0-a7ebdc9498bc
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - ffd5a677-40bd-4041-a0f0-d6680df88f3b
+      user-agent:
+      - unknown/None; hf_hub/0.31.4; python/3.11.11
+    method: GET
+    uri: https://huggingface.co/api/models/Qwen/Qwen2.5-Coder-32B-Instruct
+  response:
+    body:
+      string: '{"_id":"672b1f9e956e6880fdb8c1e5","id":"Qwen/Qwen2.5-Coder-32B-Instruct","private":false,"pipeline_tag":"text-generation","library_name":"transformers","tags":["transformers","safetensors","qwen2","text-generation","code","codeqwen","chat","qwen","qwen-coder","conversational","en","arxiv:2409.12186","arxiv:2309.00071","arxiv:2407.10671","base_model:Qwen/Qwen2.5-Coder-32B","base_model:finetune:Qwen/Qwen2.5-Coder-32B","license:apache-2.0","autotrain_compatible","text-generation-inference","endpoints_compatible","region:us"],"downloads":93847,"likes":1834,"modelId":"Qwen/Qwen2.5-Coder-32B-Instruct","author":"Qwen","sha":"381fc969f78efac66bc87ff7ddeadb7e73c218a7","lastModified":"2025-01-12T02:02:22.000Z","gated":false,"disabled":false,"widgetData":[{"text":"Hi,
+        what can you help me with?"},{"text":"What is 84 * 3 / 2?"},{"text":"Tell
+        me an interesting fact about the universe!"},{"text":"Explain quantum computing
+        in simple terms."}],"model-index":null,"config":{"architectures":["Qwen2ForCausalLM"],"model_type":"qwen2","tokenizer_config":{"bos_token":null,"chat_template":"{%-
+        if tools %}\n    {{- ''<|im_start|>system\\n'' }}\n    {%- if messages[0][''role'']
+        == ''system'' %}\n        {{- messages[0][''content''] }}\n    {%- else %}\n        {{-
+        ''You are Qwen, created by Alibaba Cloud. You are a helpful assistant.'' }}\n    {%-
+        endif %}\n    {{- \"\\n\\n# Tools\\n\\nYou may call one or more functions
+        to assist with the user query.\\n\\nYou are provided with function signatures
+        within <tools></tools> XML tags:\\n<tools>\" }}\n    {%- for tool in tools
+        %}\n        {{- \"\\n\" }}\n        {{- tool | tojson }}\n    {%- endfor %}\n    {{-
+        \"\\n</tools>\\n\\nFor each function call, return a json object with function
+        name and arguments within <tool_call></tool_call> XML tags:\\n<tool_call>\\n{\\\"name\\\":
+        <function-name>, \\\"arguments\\\": <args-json-object>}\\n</tool_call><|im_end|>\\n\"
+        }}\n{%- else %}\n    {%- if messages[0][''role''] == ''system'' %}\n        {{-
+        ''<|im_start|>system\\n'' + messages[0][''content''] + ''<|im_end|>\\n'' }}\n    {%-
+        else %}\n        {{- ''<|im_start|>system\\nYou are Qwen, created by Alibaba
+        Cloud. You are a helpful assistant.<|im_end|>\\n'' }}\n    {%- endif %}\n{%-
+        endif %}\n{%- for message in messages %}\n    {%- if (message.role == \"user\")
+        or (message.role == \"system\" and not loop.first) or (message.role == \"assistant\"
+        and not message.tool_calls) %}\n        {{- ''<|im_start|>'' + message.role
+        + ''\\n'' + message.content + ''<|im_end|>'' + ''\\n'' }}\n    {%- elif message.role
+        == \"assistant\" %}\n        {{- ''<|im_start|>'' + message.role }}\n        {%-
+        if message.content %}\n            {{- ''\\n'' + message.content }}\n        {%-
+        endif %}\n        {%- for tool_call in message.tool_calls %}\n            {%-
+        if tool_call.function is defined %}\n                {%- set tool_call = tool_call.function
+        %}\n            {%- endif %}\n            {{- ''\\n<tool_call>\\n{\"name\":
+        \"'' }}\n            {{- tool_call.name }}\n            {{- ''\", \"arguments\":
+        '' }}\n            {{- tool_call.arguments | tojson }}\n            {{- ''}\\n</tool_call>''
+        }}\n        {%- endfor %}\n        {{- ''<|im_end|>\\n'' }}\n    {%- elif
+        message.role == \"tool\" %}\n        {%- if (loop.index0 == 0) or (messages[loop.index0
+        - 1].role != \"tool\") %}\n            {{- ''<|im_start|>user'' }}\n        {%-
+        endif %}\n        {{- ''\\n<tool_response>\\n'' }}\n        {{- message.content
+        }}\n        {{- ''\\n</tool_response>'' }}\n        {%- if loop.last or (messages[loop.index0
+        + 1].role != \"tool\") %}\n            {{- ''<|im_end|>\\n'' }}\n        {%-
+        endif %}\n    {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n    {{-
+        ''<|im_start|>assistant\\n'' }}\n{%- endif %}\n","eos_token":"<|im_end|>","pad_token":"<|endoftext|>","unk_token":null}},"cardData":{"license":"apache-2.0","license_link":"https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct/blob/main/LICENSE","language":["en"],"base_model":["Qwen/Qwen2.5-Coder-32B"],"pipeline_tag":"text-generation","library_name":"transformers","tags":["code","codeqwen","chat","qwen","qwen-coder"]},"transformersInfo":{"auto_model":"AutoModelForCausalLM","pipeline_tag":"text-generation","processor":"AutoTokenizer"},"siblings":[{"rfilename":".gitattributes"},{"rfilename":"LICENSE"},{"rfilename":"README.md"},{"rfilename":"config.json"},{"rfilename":"generation_config.json"},{"rfilename":"merges.txt"},{"rfilename":"model-00001-of-00014.safetensors"},{"rfilename":"model-00002-of-00014.safetensors"},{"rfilename":"model-00003-of-00014.safetensors"},{"rfilename":"model-00004-of-00014.safetensors"},{"rfilename":"model-00005-of-00014.safetensors"},{"rfilename":"model-00006-of-00014.safetensors"},{"rfilename":"model-00007-of-00014.safetensors"},{"rfilename":"model-00008-of-00014.safetensors"},{"rfilename":"model-00009-of-00014.safetensors"},{"rfilename":"model-00010-of-00014.safetensors"},{"rfilename":"model-00011-of-00014.safetensors"},{"rfilename":"model-00012-of-00014.safetensors"},{"rfilename":"model-00013-of-00014.safetensors"},{"rfilename":"model-00014-of-00014.safetensors"},{"rfilename":"model.safetensors.index.json"},{"rfilename":"tokenizer.json"},{"rfilename":"tokenizer_config.json"},{"rfilename":"vocab.json"}],"spaces":["akhaliq/anycoder","bigcode/bigcode-models-leaderboard","Vokturz/can-it-run-llm","huggingface-projects/ai-video-composer","agents-course/First_agent_template","eduagarcia/open_pt_llm_leaderboard","NeurixYUFI/imggen","m-ric/agent-data-analyst","modelscope/modelscope-studio","acidtib/Travel-Planning-Agent","agents-course/unit2_smolagents_quiz","KBaba7/Quant","Hyperbolic/Hyperbolic-Qwen2.5-Coder-Artifacts","Nymbo/Serverless-TextGen-Hub","sergiopaniego/AlfredAgent","Kuberwastaken/resume-roaster","AiActivity/AI-Assistant","agents-course/First_agent","mikeee/open-deep-research","openfree/LLM_Quantization-advanced","Bhaskar2611/Code_Generater_best","broadfield-dev/logo_gen","wasmdashai/LAHJA-AI","fdaudens/my-news-agent","evangelosmeklis/deepdrone","HPAI-BSC/TuRTLe-Leaderboard","florentgbelidji/alpine-agent","burtenshaw/coworking_agent","MINEOGO/pro-zephyr-coder","yasserrmd/ReadMeForge","yasserrmd/InfographicWizard","burtenshaw/agent_builder","yasserrmd/CodeCompliance","Nymbo/Qwen2.5-Coder-32B-Instruct-Serverless","bhaskartripathi/LLM_Quantization","yjernite/space-privacy","Sg-at-srijan-us-kg/Qwen2.5-Coder","jairo/SmolNews","keeperballon/multi-llm","ysharma/anychat","JeCabrera/anychat","pdx97/ScholarAgent","FallnAI/Quantize-HF-Models","akhaliq/Qwen-Qwen2.5-Coder-32B-Instruct-test","samihalawa/AutoInterpreter","yyasso/reffidGPT-coder-32B-V2-Instruct","Canstralian/Transformers-Fine-Tuner","totolook/Quant","Ferocious0xide/First_agent_template","cast42/agent_to_ask_about_repo","kernel-memory-dump/HuggingFaceAgentsCourse_SmolAgent1","lmattingly/github_pr_review_agent","Quazim0t0/CSVAgent","rahulnamdev/First_agent_template_RN","matthewfranglen/weather-picture-agent","youplala/chartGPT","BoltzmannEntropy/QuantumLLMInstruct","TejAndrewsACC/Coding","Chandranath/Qwen-Qwen2.5-Coder-32B-Instruct","hpeter11/First_agent_template","oort/First_agent_template","preslaff/linkedin_job_search_agent","AaronShih/First_agent_template","piotrekgrl/smolagents-local-python-debugger-tool","K00B404/HugChatWrap","Gradio-Community/hyperbolic-qwen2.5Coder-32B","SunDay-s/NelzGPT-A1-Coder-32B-Instruct","Aarvee320/Short-Story-Generator","burtenshaw/code_quiz","cpgrant/First_agent_template","drdro1/First_agent_template","m-ric/agent_toolcall2","m-ric/agent_push","paulofroes/First_agent_template","uasername/First_agent_uasername","Giuliano/First_agent_template","Tera-Byte/Opti-Flight","Mikasa06/AI_Agent_ChartMaster","ahmedelgendy/First_agent_template","victorbarra/First_agent_template","Sellid/First_agent_template","StivenLancheros/First_agent_template","harishraju7/CharacterInAScene-Image-Gen","maiurilorenzo/data_detective","thanhkt/text2manim","innoai/ai-video-editor","innoai/ai-video-editor2","ruslanmv/convert_to_gguf","nruto/rxple","GabrielSalem/RealTimeAnswer","Rooni/Qwen-Qwen2.5-Coder-32B-Instruct","dfd186488/Qwen-Qwen2.5-Coder-32B-Instruct","IdenGhost/Qwen-Qwen2.5-Coder-32B-Instruct","roshikhan301/Qwen-Qwen2.5-Coder-32B-Instruct","Manojajj/CodeAssistant-Qwen","Anonymous1355/Qwen-Qwen2.5-Coder-32B-Instruct","usermew12/marco","SaisExperiments/Model-Repo-Sizer","cocktailpeanut/ai-video-composer","Gyatolazo/Qwen-Qwen2.5-Coder-32B-Instruct"],"createdAt":"2024-11-06T07:49:50.000Z","safetensors":{"parameters":{"BF16":32763876352},"total":32763876352},"inference":"warm","usedStorage":131063594210}'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '8541'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 20 May 2025 08:04:29 GMT
+      ETag:
+      - W/"215d-NrEpfWuH4nH4jdAxngYZNF/6Ss4"
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 5d782e204f31cf29d8ed8448ac335be4.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - qdPLohnoIvQcDP9CTP-nEQ8u-J1i8majVOxRMRkyg8XJZPeGjeT6_A==
+      X-Amz-Cf-Pop:
+      - BLR50-P4
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-682c378d-17faed7c47a8d7781046dafd;ffd5a677-40bd-4041-a0f0-d6680df88f3b
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"model": "Qwen/Qwen2.5-Coder-32B-Instruct", "stop": ["END"], "stream":
+      false, "messages": [{"role": "user", "content": "What is the capital of France?"}]}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '155'
+      Content-Type:
+      - application/json
+      X-Amzn-Trace-Id:
+      - ac588a1e-2cb2-4b5e-b1ae-a350976fc20f
+      user-agent:
+      - unknown/None; hf_hub/0.31.4; python/3.11.11
+    method: POST
+    uri: https://router.huggingface.co/hf-inference/models/Qwen/Qwen2.5-Coder-32B-Instruct/v1/chat/completions
+  response:
+    body:
+      string: '{"object":"chat.completion","id":"","created":1747723620,"model":"Qwen/Qwen2.5-Coder-32B-Instruct","system_fingerprint":"3.2.1-sha-4d28897","choices":[{"index":0,"message":{"role":"assistant","content":"The
+        capital of France is Paris."},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":36,"completion_tokens":8,"total_tokens":44}}'
+    headers:
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '347'
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 20 May 2025 08:04:29 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Via:
+      - 1.1 5d387a3229a0e482822bf05ffa16fb04.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - JGQ-L0LtNcWMtoDQYglkntQeAPHNWmZL-CFCS_X1-9QTwRwtQskUpQ==
+      X-Amz-Cf-Pop:
+      - BLR50-P1
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Robots-Tag:
+      - none
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-origin:
+      - '*'
+      cross-origin-opener-policy:
+      - same-origin
+      vary:
+      - origin, access-control-request-method, access-control-request-headers, origin,
+        access-control-request-method, access-control-request-headers, origin, access-control-request-method,
+        access-control-request-headers
+      x-compute-characters:
+      - '178'
+      x-compute-time:
+      - '0.390465398'
+      x-compute-type:
+      - 4-nvidia-a10g
+      x-generated-tokens:
+      - '8'
+      x-inference-id:
+      - 33e8d8be-a1ce-4756-8bd8-493144161de9
+      x-inference-time:
+      - '389'
+      x-prompt-tokens:
+      - '36'
+      x-proxied-host:
+      - http://10.101.156.74
+      x-proxied-path:
+      - /v1/chat/completions
+      x-proxied-replica:
+      - px22ei3y-k6iat
+      x-queue-time:
+      - '0'
+      x-request-id:
+      - Root=1-682c378d-3eae23f1523b2015186b3200;ac588a1e-2cb2-4b5e-b1ae-a350976fc20f
+      x-time-per-token:
+      - '48'
+      x-total-time:
+      - '390'
+      x-validation-time:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1
