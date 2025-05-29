@@ -7,6 +7,7 @@ import {Alert} from '@mui/material';
 import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {Pill} from '@wandb/weave/components/Tag';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {
   FC,
@@ -255,7 +256,14 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
           },
           {
             value: 'results',
-            label: 'Results',
+            label: (
+              <>
+                Results
+                <Tailwind>
+                  <Pill label="New" color="purple" className="ml-2" />
+                </Tailwind>
+              </>
+            ) as any,
             loading: resultsLoading,
             content: (
               <VerticalBox
