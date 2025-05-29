@@ -61,8 +61,8 @@ export const CompareEvaluationsPage: React.FC<
     <SimplePageLayout
       title={
         props.evaluationCallIds.length === 1
-          ? 'Evaluation Results'
-          : 'Compare Evaluations'
+          ? 'Evaluation results'
+          : 'Compare evaluations'
       }
       hideTabsIfSingle
       tabs={[
