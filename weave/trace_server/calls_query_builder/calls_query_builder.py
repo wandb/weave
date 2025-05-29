@@ -1199,7 +1199,7 @@ def process_query_to_conditions(
             ):
                 cond = f"({lhs_part} IS NULL)"
             else:
-                rhs_part = process_operand(operation.eq_[1])
+                rhs_part = process_operand(operation.eq_[1])[0]
                 cond = f"({lhs_part} = {rhs_part})"
         elif isinstance(operation, tsi_query.GtOperation):
             lhs_part, is_complete = process_operand(operation.gt_[0])
@@ -1273,6 +1273,14 @@ def process_query_to_conditions(
             return field, isinstance(structured_field, CallsMergedObjectJoinField)
         elif isinstance(operand, tsi_query.ConvertOperation):
             field = process_operand(operand.convert_.input)[0]
+            print(
+                ">>>CONVERT<<<",
+                field,
+                ".",
+                operand.convert_.input,
+                "to",
+                operand.convert_.to,
+            )
             return clickhouse_cast(field, operand.convert_.to), False
         elif isinstance(
             operand,
@@ -1610,6 +1618,9 @@ def build_object_ref_conditions(
 
         print("op_str", op_str, "get_field", get_field, "val", val)
 
+        if isinstance(get_field, tsi_query.ConvertOperation):
+            get_field = get_field.convert_.input
+
         full_field = get_field.get_field_
         property_path = full_field.split(".")
         root_field = get_field_by_name(full_field, expand_columns=[]).field
@@ -1636,7 +1647,7 @@ def build_object_ref_conditions(
                 expand_column_match = col
                 break
 
-        print("----------------- sexpand_column_match", expand_column_match)
+        print("----------------- expand_column_match", expand_column_match)
 
         # remove up to the expand_column path
         object_property_path = full_field.replace(f"{expand_column_match}.", "")
