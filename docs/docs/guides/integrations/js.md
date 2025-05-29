@@ -1,4 +1,4 @@
-## Weave TypeScript SDK: Third-Party Integration Guide
+# TypeScript SDK: Third-Party Integration Guide
 
 This guide describes how to integrate third-party libraries (e.g., OpenAI) with the Weave TypeScript SDK. Weave supports automatic instrumentation, making setup easier and reducing the need for manual configuration.
 
@@ -9,7 +9,7 @@ As of [PR #4554](https://github.com/wandb/weave/pull/4554), supported libraries 
 weave.wrapOpenAI(new OpenAI());
 ```
 
-Weave will handle this automatically, as shown below:
+Weave will generally handle this automatically. However, there may be [edge cases](#advanced-usage).
 :::
 
 ## Usage instructions
@@ -58,7 +58,7 @@ Some bundlers such as Next.js may rewrite `require` statements in ways that inte
 - [Use `NODE_OPTIONS` as a workaround.](#use-node_options-as-an-alternate-hook)
 - If needed, fall back to manual patching.
 
-### Manual Patching (Fallback Option)
+### Manual patching (fallback option)
 
 :::important
 Manual patching is the legacy approach and should only be used when auto-patching doesn't work.
