@@ -78,24 +78,6 @@ export const MessagePanel = ({
     }
   }, [isLast, isShowingMore, isOverflowing, isPlayground]);
 
-  // Auto-scroll message panel into view during streaming
-  // This will scroll for the first couple paragraphs of the message
-  // Making it scroll to the end of the message always makes the first part unreadable, too quickly
-  // and you end up scrolling back up to start reading the beginning of the message
-  // could update this if users want a different behavior (this is the behavior currently of chatgpt)
-  useEffect(() => {
-    if (shouldAnimateText && contentRef.current) {
-      // Find the closest scrollable parent and scroll to this message
-      const messageElement = contentRef.current.closest('.group');
-      if (messageElement) {
-        messageElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'end',
-        });
-      }
-    }
-  }, [shouldAnimateText]);
-
   const isUser = message.role === 'user';
   const isSystemPrompt = message.role === 'system';
   const isTool = message.role === 'tool';

@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import {useMemo} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 
 import {isWeaveRef} from '../../filters/common';
 import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
@@ -233,8 +233,8 @@ export const useAnimatedText = (
   const [displayedText, setDisplayedText] = useState('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wordIndexRef = useRef(0);
+  const isAnimatingRef = useRef(false);
   const targetTextRef = useRef('');
-  const animationActiveRef = useRef(false);
 
   // Clear any pending timeouts on unmount
   useEffect(() => {
@@ -242,56 +242,66 @@ export const useAnimatedText = (
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      isAnimatingRef.current = false;
     };
   }, []);
 
   useEffect(() => {
-    // If we should not animate and no animation is running, show full text immediately
-    if (!shouldAnimate && !animationActiveRef.current) {
+    // If we should not animate, show full text immediately
+    if (!shouldAnimate) {
       setDisplayedText(text);
-      targetTextRef.current = text;
-      wordIndexRef.current = text.split(' ').length;
-      return;
-    }
-
-    // If animation is running, just update the target but let animation continue
-    if (animationActiveRef.current) {
+      wordIndexRef.current = 0;
+      isAnimatingRef.current = false;
       targetTextRef.current = text;
       return;
     }
 
-    // Start new animation
+    // Update target text for ongoing animation
+    targetTextRef.current = text;
+
+    // If already animating, let it continue with updated target
+    if (isAnimatingRef.current) {
+      return;
+    }
+
+    // Start animation
     const words = text.split(' ');
     const currentWords = displayedText.split(' ');
 
     // If text is shorter, update immediately
     if (words.length < currentWords.length) {
       setDisplayedText(text);
-      targetTextRef.current = text;
       wordIndexRef.current = words.length;
+      isAnimatingRef.current = false;
       return;
     }
 
-    // If text hasn't changed, don't animate
-    if (text === displayedText) {
+    // If text hasn't changed and we're already showing all of it, don't animate
+    if (text === displayedText && wordIndexRef.current >= words.length) {
+      isAnimatingRef.current = false;
       return;
     }
 
-    // Start animation
-    targetTextRef.current = text;
-    animationActiveRef.current = true;
+    // Reset word index to current displayed words count when starting new animation
+    wordIndexRef.current = Math.min(currentWords.length, words.length);
+    isAnimatingRef.current = true;
 
     const animateText = () => {
       const targetWords = targetTextRef.current.split(' ');
 
+      if (!isAnimatingRef.current) {
+        return;
+      }
+
       if (wordIndexRef.current < targetWords.length) {
         const wordsToShow = targetWords.slice(0, wordIndexRef.current + 1);
-        setDisplayedText(wordsToShow.join(' '));
+        const newDisplayText = wordsToShow.join(' ');
+        setDisplayedText(newDisplayText);
         wordIndexRef.current++;
         timeoutRef.current = setTimeout(animateText, speed);
       } else {
-        animationActiveRef.current = false;
         setDisplayedText(targetTextRef.current);
+        isAnimatingRef.current = false;
       }
     };
 

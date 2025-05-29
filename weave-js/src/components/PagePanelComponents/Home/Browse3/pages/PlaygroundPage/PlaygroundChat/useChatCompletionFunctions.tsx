@@ -214,14 +214,18 @@ export const useChatCompletionFunctions = (
       let updatedState: PlaygroundState;
 
       if (messageIndex !== undefined) {
-        // Retry scenario - slice messages to messageIndex
+        // Retry scenario
         updatedState = JSON.parse(JSON.stringify(playgroundStates[idx]));
         if (choiceIndex !== undefined) {
+          // Choice retry - keep all messages, just regenerate the response
           updatedState = appendChoiceToMessages(updatedState, choiceIndex);
-        }
-        if (updatedState.traceCall?.inputs?.messages) {
-          updatedState.traceCall.inputs.messages =
-            updatedState.traceCall.inputs.messages.slice(0, messageIndex + 1);
+        } else {
+          // Message retry - slice messages to messageIndex
+          if (updatedState.traceCall?.inputs?.messages) {
+            updatedState.traceCall.inputs.messages =
+              updatedState.traceCall.inputs.messages.slice(0, messageIndex + 1);
+            updatedState.traceCall.output = undefined;
+          }
         }
       } else {
         // Send scenario - append choice and add new message
@@ -322,21 +326,17 @@ export const useChatCompletionFunctions = (
       // Aggregate content incrementally per chat
       let aggregatedRes = createAggregatedResponse();
 
-      // Frequent per-token setState calls from multiple parallel streams can
-      // saturate React's render queue, making later streams appear to start
-      // only after earlier ones finish.  Throttling each chat's state
-      // updates keeps the UI responsive and lets all streams render
-      // concurrently while still feeling live.
-      const throttledUpdate = throttle(() => {
-        updatePlaygroundStateWithStream(idx, aggregatedRes);
-      }, 80); // 80-ms cadence feels responsive without blocking
-
       try {
         const res = await makeCompletionStreamRequest(
           idx,
           updatedStates,
           chunk => {
-            processStreamChunk(chunk, aggregatedRes, throttledUpdate);
+            processStreamChunk(
+              chunk,
+              aggregatedRes,
+              () => updatePlaygroundStateWithStream(idx, aggregatedRes),
+              80 // 80-ms throttle cadence feels responsive without blocking
+            );
           }
         );
 
@@ -414,6 +414,7 @@ export const useChatCompletionFunctions = (
         messageIndex,
         choiceIndex,
       });
+
       setPlaygroundStates(updatedStates);
       // Accumulate chunks into a single response object while streaming
       let aggregatedRes = createAggregatedResponse();
@@ -423,9 +424,12 @@ export const useChatCompletionFunctions = (
         callIndex,
         updatedStates,
         chunk => {
-          processStreamChunk(chunk, aggregatedRes, () => {
-            updatePlaygroundStateWithStream(callIndex, aggregatedRes);
-          });
+          processStreamChunk(
+            chunk,
+            aggregatedRes,
+            () => updatePlaygroundStateWithStream(callIndex, aggregatedRes),
+            80 // 80-ms throttle cadence feels responsive without blocking
+          );
         }
       );
 
@@ -483,19 +487,26 @@ export const useChatCompletionFunctions = (
 
   /**
    * Processes streaming completion chunks, handling both content and tool calls.
-   * Accumulates content and merges tool call deltas, calling updateCallback when data is ready.
+   * Accumulates content and merges tool call deltas, calling throttled updateCallback when data is ready.
    */
   const processStreamChunk = (
     chunk: CompletionChunk,
     aggregatedRes: OptionalLitellmCompletionResponse,
-    updateCallback: () => void
+    updateCallback: () => void,
+    throttleTimeout: number
   ) => {
+    // Create a throttled version of the update callback to prevent React render queue saturation.
+    // Frequent per-token setState calls from multiple parallel streams can saturate React's
+    // render queue, making later streams appear to start only after earlier ones finish.
+    // Throttling keeps the UI responsive and lets all streams render concurrently while still feeling live.
+    const throttledUpdate = throttle(updateCallback, throttleTimeout);
+
     const delta = (chunk as ContentChunk)?.choices?.[0]?.delta;
 
     // Handle content updates
     if (delta?.content && aggregatedRes.choices?.[0]?.message) {
       aggregatedRes.choices[0].message.content += delta.content;
-      updateCallback();
+      throttledUpdate();
     }
 
     // Handle tool calls
@@ -514,7 +525,7 @@ export const useChatCompletionFunctions = (
       );
 
       if (toolCallsAreValid) {
-        updateCallback(); // Trigger update to show tool calls
+        throttledUpdate(); // Trigger update to show tool calls
       }
     }
   };
