@@ -1,0 +1,2597 @@
+<!--- Docs: Tracking -->
+<!--- Costs -->
+
+# Costs
+
+# Costs
+
+## Adding a custom cost
+
+
+  
+    You can add a custom cost by using the [`add_cost`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-add_cost) method.
+    The three required fields are `llm_id`, `prompt_token_cost`, and `completion_token_cost`.
+    `llm_id` is the name of the LLM (e.g. `gpt-4o`). `prompt_token_cost` and `completion_token_cost` are cost per token for the LLM (if the LLM prices were specified inper million tokens, make sure to convert the value).
+    You can also set `effective_date` to a datetime, to make the cost effective at a specific date, this defaults to the current date.
+
+    ```python
+    import weave
+    from datetime import datetime
+
+    client = weave.init("my_custom_cost_model")
+
+    client.add_cost(
+        llm_id="your_model_name",
+        prompt_token_cost=0.01,
+        completion_token_cost=0.02
+    )
+
+    client.add_costs(
+        llm_id="your_model_name",
+        prompt_token_cost=10,
+        completion_token_cost=20,
+        # If for example I want to raise the price of the model after a certain date
+        effective_date=datetime(2025, 4, 22),
+    )
+    ```
+
+  
+  
+
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+
+  
+
+
+## Querying for costs
+
+
+  
+    You can query for costs by using the [`query_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-query_costs) method.
+    There are a few ways to query for costs, you can pass in a singular cost id, or a list of LLM model names.
+
+    ```python
+    import weave
+
+    client = weave.init("my_custom_cost_model")
+
+    costs = client.query_costs(llm_ids=["your_model_name"])
+
+    cost = client.query_costs(costs[0].id)
+    ```
+
+  
+  
+
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+
+  
+
+
+## Purging a custom cost
+
+
+  
+    You can purge a custom cost by using the [`purge_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-purge_costs) method. You pass in a list of cost ids, and the costs with those ids are purged.
+
+    ```python
+    import weave
+
+    client = weave.init("my_custom_cost_model")
+
+    costs = client.query_costs(llm_ids=["your_model_name"])
+    client.purge_costs([cost.id for cost in costs])
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+## Calculating costs for a Project
+
+
+  
+    You can calculate costs for a project by using our `calls_query` and adding `include_costs=True` with a little bit of setup.
+
+    ```python
+    import weave
+
+    weave.init("project_costs")
+    @weave.op()
+    def get_costs_for_project(project_name: str):
+        total_cost = 0
+        requests = 0
+
+        client = weave.init(project_name)
+        # Fetch all the calls in the project
+        calls = list(
+            client.get_calls(filter={"trace_roots_only": True}, include_costs=True)
+        )
+
+        for call in calls:
+            # If the call has costs, we add them to the total cost
+            if call.summary["weave"] is not None and call.summary["weave"].get("costs", None) is not None:
+                for k, cost in call.summary["weave"]["costs"].items():
+                    requests += cost["requests"]
+                    total_cost += cost["prompt_tokens_total_cost"]
+                    total_cost += cost["completion_tokens_total_cost"]
+
+        # We return the total cost, requests, and calls
+        return {
+            "total_cost": total_cost,
+            "requests": requests,
+            "calls": len(calls),
+        }
+
+    # Since we decorated our function with @weave.op(),
+    # our totals are stored in weave for historic cost total calculations
+    get_costs_for_project("my_custom_cost_model")
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+## Setting up a custom model with custom costs
+
+Try our cookbook for a [Setting up costs with a custom model](/reference/gen_notebooks/custom_model_cost) or Open in Colab
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/costs)
+
+<!--- Docs: Tracking -->
+<!--- Ops -->
+
+# Ops
+
+# Ops
+
+A Weave op is a versioned function that automatically logs all calls.
+
+
+  
+    To create an op, decorate a python function with `weave.op()`
+
+    ```python showLineNumbers
+    import weave
+
+    @weave.op()
+    def track_me(v):
+        return v + 5
+
+    weave.init('intro-example')
+    track_me(15)
+    ```
+
+    Calling an op will create a new op version if the code has changed from the last call, and log the inputs and outputs of the function.
+
+    :::note
+    Functions decorated with `@weave.op()` will behave normally (without code versioning and tracking), if you don't call `weave.init('your-project-name')` before calling them.
+    :::
+
+    Ops can be [served](/guides/tools/serve) or [deployed](/guides/tools/deploy) using the Weave toolbelt.
+
+  
+  
+    To create an op, wrap a typescript function with `weave.op`
+
+    ```typescript showLineNumbers
+    import * as weave from 'weave'
+
+    function trackMe(v: number) {
+        return v + 5
+    }
+
+    const trackMeOp = weave.op(trackMe)
+    trackMeOp(15)
+
+
+    // You can also do this inline, which may be more convenient
+    const trackMeInline = weave.op((v: number) => v + 5)
+    trackMeInline(15)
+    ```
+
+  
+
+
+## Customize display names
+
+
+  
+    You can customize the op's display name by setting the `name` parameter in the `@weave.op` decorator:
+
+    ```python
+    @weave.op(name="custom_name")
+    def func():
+        ...
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+## Customize logged inputs and outputs
+
+
+  
+    If you want to change the data that is logged to weave without modifying the original function (e.g. to hide sensitive data), you can pass `postprocess_inputs` and `postprocess_output` to the op decorator.
+
+    `postprocess_inputs` takes in a dict where the keys are the argument names and the values are the argument values, and returns a dict with the transformed inputs.
+
+    `postprocess_output` takes in any value which would normally be returned by the function and returns the transformed output.
+
+    ```py
+    from dataclasses import dataclass
+    from typing import Any
+    import weave
+
+    @dataclass
+    class CustomObject:
+        x: int
+        secret_password: str
+
+    def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+        return {k:v for k,v in inputs.items() if k != "hide_me"}
+
+    def postprocess_output(output: CustomObject) -> CustomObject:
+        return CustomObject(x=output.x, secret_password="REDACTED")
+
+    @weave.op(
+        postprocess_inputs=postprocess_inputs,
+        postprocess_output=postprocess_output,
+    )
+    def func(a: int, hide_me: str) -> CustomObject:
+        return CustomObject(x=a, secret_password=hide_me)
+
+    weave.init('hide-data-example') # 🐝
+    func(a=1, hide_me="password123")
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+## Control sampling rate
+
+
+  
+    You can control how frequently an op's calls are traced by setting the `tracing_sample_rate` parameter in the `@weave.op` decorator. This is useful for high-frequency ops where you only need to trace a subset of calls.
+
+     Note that sampling rates are only applied to root calls. If an op has a sample rate, but is called by another op first, then that sampling rate will be ignored.
+
+    ```python
+    @weave.op(tracing_sample_rate=0.1)  # Only trace ~10% of calls
+    def high_frequency_op(x: int) -> int:
+        return x + 1
+
+    @weave.op(tracing_sample_rate=1.0)  # Always trace (default)
+    def always_traced_op(x: int) -> int:
+        return x + 1
+    ```
+
+    When an op's call is not sampled:
+    - The function executes normally
+    - No trace data is sent to Weave
+    - Child ops are also not traced for that call
+
+    The sampling rate must be between 0.0 and 1.0 inclusive.
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet. Stay tuned!
+    ```
+  
+
+
+## Control call link output
+
+If you want to suppress the printing of call links during logging, you can set the `WEAVE_PRINT_CALL_LINK` environment variable to `false`. This can be useful if you want to reduce output verbosity and reduce clutter in your logs.
+
+```bash
+export WEAVE_PRINT_CALL_LINK=false
+```
+
+## Deleting an op
+
+
+  
+    To delete a version of an op, call `.delete()` on the op ref.
+
+    ```python
+    weave.init('intro-example')
+    my_op_ref = weave.ref('track_me:v1')
+    my_op_ref.delete()
+    ```
+
+    Trying to access a deleted op will result in an error.
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/ops)
+
+<!--- Docs: Tracking -->
+<!--- Faqs -->
+
+# Faqs
+
+# FAQs
+
+The following page provides answers to common questions about Weave tracing.
+
+## What information does Weave capture for a function?
+
+A function can be designated as a Weave [Op](/guides/tracking/ops) either manually through a decorator or automatically as part of an enabled integration. When an Op executes, Weave captures detailed information to support your analysis. Weave provides you with fine grained control over what is logged in case you would like something different than the default; see below for configuration examples.
+
+- **Code capture** - Weave captures a representation of the Op's source code. This includes inline comments as well as recursively capturing the value of variables or the source of non-Op functions that were called. Code capture allows you to see what your function was doing even if the change was not saved to your source control system. Code capture is used as part of Op versioning, allowing you to understand the evaluation of your code over time. If code capture is disabled, a hash value will be used instead.
+
+- **Function name, inputs, and outputs** - The name of the function will be captured but can be [overridden](/guides/tracking/tracing/#call-display-name). A JSON-based representation of the inputs and outputs will be captured. For inputs, argument name will be capture in addition to value. Weave lets you [customize the logging](/guides/tracking/ops#customize-logged-inputs-and-outputs) of inputs and outputs - you can specify a function to add/remove/modify what is logged.
+
+- **Op call hierarchy** - When an Op is called within the context of another Op executing, this relationship is captured, even in cases
+  where there is an intermediate non-Op function executing. This relationship between Op calls is used to provide a "Trace tree".
+
+- **Execution status and exceptions** - Weave tracks whether a function is executing, finished, or errored. If an exception occurs during execution the error message and a stack track is recorded.
+
+- **System information** - Weave may capture information about which operating system the client is running on including detailed version information.
+
+- **Client information** - Weave may capture information about the Weave client itself, such as the programming language in use and detailed version information for that language and the Weave client library.
+
+- **Timing** - The execution start and end time is captured and also used for latency calculations.
+
+- **Token usage** - In some [integrations](/guides/integrations/) LLM token usage counts may be automatically logged.
+
+- **User and run context** - Logging is associated with a W&B user account. That will be captured along with any wandb Run context.
+
+- **Derived information** - Weave may compute derived information from the raw information logged, for example a cost estimate may be calculated based on token usage and knowledge of the model used. Weave also aggregates some information over calls.
+
+- **Additional information you choose** - You can choose to log [custom metadata with `weave.attributes`](/guides/core-types/models#track-production-calls) as part of your call or attach [feedback](/guides/tracking/feedback#add-feedback-to-a-call) to a call.
+
+## How can I disable code capture?
+
+You can disable code capture during Weave client initialization: `weave.init("entity/project", settings={"capture_code": False})`.
+You can also use the [environment variable](/guides/core-types/env-vars) `WEAVE_CAPTURE_CODE=false`.
+
+## How can I disable system information capture?
+
+You can disable system information capture during Weave client initialization: `weave.init("entity/project", settings={"capture_system_info": False})`.
+
+## How can I disable client information capture?
+
+You can disable client information capture during Weave client initialization: `weave.init("entity/project", settings={"capture_client_info": False})`.
+
+## How do I render Python datetime values in the UI?
+
+Use Python’s `datetime.datetime` (with timezone info), and publish the object using `weave.publish(...)`. Weave recognizes this type and renders it as a timestamp.
+
+## How do I render Markdown in the UI?
+
+Wrap your string with `weave.Markdown(...)` before saving, and use `weave.publish(...)` to store it. Weave uses the object’s type to determine rendering, and `weave.Markdown` maps to a known UI renderer.  The value will be shown as a formatted Markdown object in the UI.
+
+## Will Weave affect my function's execution speed?
+
+The overhead of Weave logging is typically negligible compared to making a call to an LLM.
+To minimize Weave's impact on the speed of your Op's execution, its network activity happens on a background thread.
+When your program is exiting it may appear to pause while any remaining enqueued data is logged.
+
+## How is Weave data ingestion calculated?
+
+We define ingested bytes as bytes that we receive, process, and store on your behalf. This includes trace metadata, LLM inputs/outputs, and any other information you explicitly log to Weave, but does not include communication overhead (e.g., HTTP headers) or any other data that is not placed in long-term storage. We count bytes as "ingested" only once at the time they are received and stored.
+
+## What is pairwise evaluation and how do I do it?
+
+When [scoring](../evaluation/scorers.md) models in a Weave [evaluation](../core-types/evaluations.md), absolute value metrics (e.g. `9/10` for Model A and `8/10` for Model B) are typically harder to assign than relative ones (e.g. Model A performs better than Model B). _Pairwise evaluation_ allows you to compare the outputs of two models by ranking them relative to each other. This approach is particularly useful when you want to determine which model performs better for subjective tasks such as text generation, summarization, or question answering. With pairwise evaluation, you can obtain a relative preference ranking that reveals which model is best for specific inputs.
+
+> 🚨 **Important**: This approach is a workaround and may change in future releases. We are actively working on a more robust API to support pairwise evaluations. Stay tuned for updates!
+
+The following code sample demonstrates how to implement a pairwise evaluation in Weave by creating a [class-based scorer](../evaluation/scorers.md#class-based-scorers) called `PreferenceScorer`. The `PreferenceScorer` compares two models, `ModelA` and `ModelB`, and returns a relative score of the model outputs based on explicit hints in the input text.
+
+```python
+from weave import Model, Evaluation, Scorer, Dataset
+from weave.flow.model import ApplyModelError, apply_model_async
+
+class ModelA(Model):
+    @weave.op
+    def predict(self, input_text: str):
+        if "Prefer model A" in input_text:
+            return {"response": "This is a great answer from Model A"}
+        return {"response": "Meh, whatever"}
+
+class ModelB(Model):
+    @weave.op
+    def predict(self, input_text: str):
+        if "Prefer model B" in input_text:
+            return {"response": "This is a thoughtful answer from Model B"}
+        return {"response": "I don't know"}
+
+class PreferenceScorer(Scorer):
+    @weave.op
+    async def _get_other_model_output(self, example: dict) -> Any:
+        """Get output from the other model for comparison.
+        Args:
+            example: The input example data to run through the other model
+        Returns:
+            The output from the other model
+        """
+
+        other_model_result = await apply_model_async(
+            self.other_model,
+            example,
+            None,
+        )
+
+        if isinstance(other_model_result, ApplyModelError):
+            return None
+
+        return other_model_result.model_output
+
+    @weave.op
+    async def score(self, output: dict, input_text: str) -> dict:
+        """Compare the output of the primary model with the other model.
+        Args:
+            output (dict): The output from the primary model.
+            input_text (str): The input text used to generate the outputs.
+        Returns:
+            dict: A flat dictionary containing the comparison result and reason.
+        """
+        other_output = await self._get_other_model_output(
+            {"input_text": input_text}
+        )
+        if other_output is None:
+            return {"primary_is_better": False, "reason": "Other model failed"}
+
+        if "Prefer model A" in input_text:
+            primary_is_better = True
+            reason = "Model A gave a great answer"
+        else:
+            primary_is_better = False
+            reason = "Model B is preferred for this type of question"
+
+        return {"primary_is_better": primary_is_better, "reason": reason}
+
+dataset = Dataset(
+    rows=[
+        {"input_text": "Prefer model A: Question 1"},  # Model A wins
+        {"input_text": "Prefer model A: Question 2"},  # Model A wins
+        {"input_text": "Prefer model B: Question 3"},  # Model B wins
+        {"input_text": "Prefer model B: Question 4"},  # Model B wins
+    ]
+)
+
+model_a = ModelA()
+model_b = ModelB()
+pref_scorer = PreferenceScorer(other_model=model_b)
+evaluation = Evaluation(dataset=dataset, scorers=[pref_scorer])
+evaluation.evaluate(model_a)
+```
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/faqs)
+
+<!--- Docs: Tracking -->
+<!--- Otel -->
+
+# Otel
+
+# Send OpenTelemetry Traces
+
+## Overview
+Weave supports ingestion of OpenTelemetry compatible trace data through a dedicated endpoint. This endpoint allows you to send OTLP (OpenTelemetry Protocol) formatted trace data directly to your Weave project.
+
+## Endpoint details
+
+**Path**: `/otel/v1/traces`
+**Method**: POST
+**Content-Type**: `application/x-protobuf`
+
+## Authentication
+Standard W&B authentication is used. You must have write permissions to the project where you're sending trace data.
+
+## Required Headers
+- `project_id: /`
+- `Authorization=Basic `
+
+## Examples:
+
+You must modify the following fields before you can run the code samples below:
+1. `WANDB_API_KEY`: You can get this from [https://wandb.ai/authorize](https://wandb.ai/authorize).
+2. Entity: You can only log traces to the project under an entity that you have access to. You can find your entity name by visiting your W&N dashboard at [https://wandb.ai/home], and checking the **Teams** field in the left sidebar.
+3. Project Name: Choose a fun name!
+4. `OPENAI_API_KEY`: You can obtain this from the [OpenAI dashboard](https://platform.openai.com/api-keys).
+
+### OpenInference Instrumentation:
+
+This example shows how to use the OpenAI instrumentation. There are many more available which you can find in the official repository: https://github.com/Arize-ai/openinference
+
+First, install the required dependencies:
+
+```bash
+pip install openai openinference-instrumentation-openai opentelemetry-exporter-otlp-proto-http
+```
+
+Next, paste the following code into a python file such as `openinference_example.py`
+
+```python
+import base64
+import openai
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+from openinference.instrumentation.openai import OpenAIInstrumentor
+
+OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+WANDB_BASE_URL = "https://trace.wandb.ai"
+PROJECT_ID = "/"
+
+OTEL_EXPORTER_OTLP_ENDPOINT = f"{WANDB_BASE_URL}/otel/v1/traces"
+
+# Can be found at https://wandb.ai/authorize
+WANDB_API_KEY = ""
+AUTH = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
+
+OTEL_EXPORTER_OTLP_HEADERS = {
+    "Authorization": f"Basic {AUTH}",
+    "project_id": PROJECT_ID,
+}
+
+tracer_provider = trace_sdk.TracerProvider()
+
+# Configure the OTLP exporter
+exporter = OTLPSpanExporter(
+    endpoint=OTEL_EXPORTER_OTLP_ENDPOINT,
+    headers=OTEL_EXPORTER_OTLP_HEADERS,
+)
+
+# Add the exporter to the tracer provider
+tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+# Optionally, print the spans to the console.
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+
+def main():
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": "Describe OTEL in a single sentence."}],
+        max_tokens=20,
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+    for chunk in response:
+        if chunk.choices and (content := chunk.choices[0].delta.content):
+            print(content, end="")
+
+if __name__ == "__main__":
+    main()
+```
+
+Finally, once you have set the fields specified above to their correct values, run the code:
+
+```bash
+python openinference_example.py
+```
+
+### OpenLLMetry Instrumentation:
+
+The following example shows how to use the OpenAI instrumentation. Additional examples are available at [https://github.com/traceloop/openllmetry/tree/main/packages](https://github.com/traceloop/openllmetry/tree/main/packages).
+
+First install the required dependencies:
+
+```bash
+pip install openai opentelemetry-instrumentation-openai opentelemetry-exporter-otlp-proto-http
+```
+
+Next, paste the following code into a python file such as `openllmetry_example.py`. Note that this is the same code as above, except the `OpenAIInstrumentor` is imported from `opentelemetry.instrumentation.openai` instead of `openinference.instrumentation.openai`
+
+```python
+import base64
+import openai
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
+
+OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+WANDB_BASE_URL = "https://trace.wandb.ai"
+PROJECT_ID = "/"
+
+OTEL_EXPORTER_OTLP_ENDPOINT = f"{WANDB_BASE_URL}/otel/v1/traces"
+
+# Can be found at https://wandb.ai/authorize
+WANDB_API_KEY = ""
+AUTH = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
+
+OTEL_EXPORTER_OTLP_HEADERS = {
+    "Authorization": f"Basic {AUTH}",
+    "project_id": PROJECT_ID,
+}
+
+tracer_provider = trace_sdk.TracerProvider()
+
+# Configure the OTLP exporter
+exporter = OTLPSpanExporter(
+    endpoint=OTEL_EXPORTER_OTLP_ENDPOINT,
+    headers=OTEL_EXPORTER_OTLP_HEADERS,
+)
+
+# Add the exporter to the tracer provider
+tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+# Optionally, print the spans to the console.
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+
+OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+
+def main():
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": "Describe OTEL in a single sentence."}],
+        max_tokens=20,
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+    for chunk in response:
+        if chunk.choices and (content := chunk.choices[0].delta.content):
+            print(content, end="")
+
+if __name__ == "__main__":
+    main()
+```
+
+Finally, once you have set the fields specified above to their correct values, run the code:
+
+```bash
+python openllmetry_example.py
+```
+
+### Without Instrumentation
+
+If you would prefer to use OTEL directly instead of an instrumentation package, you may do so. Span attributes will be parsed according to the OpenTelemetry semantic conventions described at [https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/).
+
+First, install the required dependencies:
+
+```bash
+pip install openai opentelemetry-sdk opentelemetry-api opentelemetry-exporter-otlp-proto-http
+```
+
+Next, paste the following code into a python file such as `opentelemetry_example.py`
+
+```python
+import json
+import base64
+import openai
+from opentelemetry import trace
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+
+OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
+WANDB_BASE_URL = "https://trace.wandb.ai"
+PROJECT_ID = "/"
+
+OTEL_EXPORTER_OTLP_ENDPOINT = f"{WANDB_BASE_URL}/otel/v1/traces"
+
+# Can be found at https://wandb.ai/authorize
+WANDB_API_KEY = ""
+AUTH = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
+
+OTEL_EXPORTER_OTLP_HEADERS = {
+    "Authorization": f"Basic {AUTH}",
+    "project_id": PROJECT_ID,
+}
+
+tracer_provider = trace_sdk.TracerProvider()
+
+# Configure the OTLP exporter
+exporter = OTLPSpanExporter(
+    endpoint=OTEL_EXPORTER_OTLP_ENDPOINT,
+    headers=OTEL_EXPORTER_OTLP_HEADERS,
+)
+
+# Add the exporter to the tracer provider
+tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+# Optionally, print the spans to the console.
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+
+trace.set_tracer_provider(tracer_provider)
+# Creates a tracer from the global tracer provider
+tracer = trace.get_tracer(__name__)
+tracer.start_span('name=standard-span')
+
+def my_function():
+    with tracer.start_as_current_span("outer_span") as outer_span:
+        client = openai.OpenAI()
+        input_messages=[{"role": "user", "content": "Describe OTEL in a single sentence."}]
+        # This will only appear in the side panel
+        outer_span.set_attribute("input.value", json.dumps(input_messages))
+        # This follows conventions and will appear in the dashboard
+        outer_span.set_attribute("gen_ai.system", 'openai')
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=input_messages,
+            max_tokens=20,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        out = ""
+        for chunk in response:
+            if chunk.choices and (content := chunk.choices[0].delta.content):
+                out += content
+        # This will only appear in the side panel
+        outer_span.set_attribute("output.value", json.dumps({"content": out}))
+
+if __name__ == "__main__":
+    my_function()
+```
+
+Finally, once you have set the fields specified above to their correct values, run the code:
+
+```bash
+python opentelemetry_example.py
+```
+
+The span attribute prefixes `gen_ai` and `openinference` are used to determine which convention to use, if any, when interpreting the trace. If neither key is detected, then all span attributes are visible in the trace view. The full span is available in the side panel when you select a trace.
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/otel)
+
+<!--- Docs: Tracking -->
+<!--- Video -->
+
+# Video
+
+# Video Support
+
+Weave automatically logs videos using [`moviepy`](https://zulko.github.io/moviepy/). This allows you to pass video inputs and outputs to traced functions, and Weave will automatically handle uploading and storing video data.
+
+> 💡 **Note**: Video support is currently only available in Python.
+
+## Supported video types
+
+Weave recognizes `moviepy` video clip objects, such as:
+
+- A `VideoFileClip` loaded from a video file
+- In-memory clips like `ImageClip`, `ColorClip`, and `TextClip`
+
+### Direct upload of file-based clips
+
+If your clip is a `VideoFileClip` and has a valid filename with a supported extension, Weave will upload the file directly.
+
+**Supported file extensions:**
+
+- `.mp4`
+- `.webm`
+- `.gif`
+
+### In-memory clip support
+
+If the video object is in memory (no file on disk), Weave will encode it as an `.mp4` file and handle the upload automatically. This applies to clips of the following type:
+
+- `ImageClip`
+- `ColorClip`
+- `TextClip`
+
+## Example: Trace a video function
+
+The following code sample demonstrates how to trace a video processing function in Weave. The code sample:
+
+1. Initializes a Weave project `video-test`.
+2. Defines a `get_video` function tracked as a `weave.op` that extracts a 1 second subclip of the loaded `VideoFileClip` as a `VideoClip`.
+3. Uploads and tracks the clip in Weave.
+4. Automatically generates a dummy MP4 video if none is found.
+
+Before you can use the code sample, complete the prerequisites:
+
+1. Install `weave` and `moviepy==1.0.3`.
+2. Create a W&B account.
+
+> 🚨 **Important**: To avoid thread-safety issues, always pass the path to `VideoFileClip` objects instead of creating them outside the Weave `op`.
+
+```python
+import os
+import weave
+from moviepy import VideoFileClip, ColorClip, VideoClip
+
+# Update to your project name, or create a new project named 'video-test'
+weave.init('video-test')
+
+@weave.op
+def get_video(clip: VideoFileClip) -> VideoClip:
+    """Process a video by path rather than by passing the clip directly.
+
+    This ensures that the VideoFileClip is created and managed within the
+    Weave op's thread context, avoiding thread-safety issues.
+    """
+    new_clip = clip.subclip(0, 1)
+    return new_clip
+
+if __name__ == "__main__":
+    os.makedirs("videos", exist_ok=True)
+
+    # Update the path to point to your MP4 file
+    video_path = './videos/example.mp4'
+
+    # Generate a dummy video if it doesn't exist
+    # Dummy video contents: A red square that displays for 5 seconds
+    if not os.path.isfile(video_path):
+        print("No video found. Creating dummy video...")
+        dummy_clip = ColorClip(size=(640, 480), color=(255, 0, 0), duration=5)
+        dummy_clip.write_videofile(video_path, fps=24)
+
+    clip = VideoFileClip(video_path, has_mask=False, audio=True)
+    get_video(clip) 
+```
+
+When the code sample runs successfully, you can view your video by clicking the link in the **Traces** table of your project.
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/video)
+
+<!--- Docs: Tracking -->
+<!--- Objects -->
+
+# Objects
+
+# Objects
+
+## Publishing an object
+
+Weave's serialization layer saves and versions objects.
+
+
+  
+
+    ```python
+    import weave
+    # Initialize tracking to the project 'intro-example'
+    weave.init('intro-example')
+    # Save a list, giving it the name 'cat-names'
+    weave.publish(['felix', 'jimbo', 'billie'], 'cat-names')
+    ```
+
+  
+  
+    Publishing in TypeScript is still early, so not all objects are fully supported yet.
+
+    ```typescript
+    import * as weave from 'weave'
+
+    // Initialize tracking to the project 'intro-example'
+    const client = await weave.init('intro-example')
+
+    // Save an array, giving it the name 'cat-names'
+    client.publish(['felix', 'jimbo', 'billie'], 'cat-names')
+    ```
+
+  
+
+
+Saving an object with a name will create the first version of that object if it doesn't exist.
+
+## Getting an object back
+
+
+  
+    `weave.publish` returns a Ref. You can call `.get()` on any Ref to get the object back.
+
+    You can construct a ref and then fetch the object back.
+
+    ```python
+    weave.init('intro-example')
+    cat_names = weave.ref('cat-names').get()
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+## Deleting an object
+
+
+  
+    To delete a version of an object, call `.delete()` on the object ref.
+
+    ```python
+    weave.init('intro-example')
+    cat_names_ref = weave.ref('cat-names:v1')
+    cat_names_ref.delete()
+    ```
+
+    Trying to access a deleted object will result in an error. Resolving an object that has a reference to a deleted object will return a `DeletedRef` object in place of the deleted object.
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+## Ref styles
+
+A fully qualified weave object ref uri looks like this:
+
+```
+weave://///object/:
+```
+
+- _entity_: wandb entity (username or team)
+- _project_: wandb project
+- _object_name_: object name
+- _object_version_: either a version hash, a string like v0, v1..., or an alias like ":latest". All objects have the ":latest" alias.
+
+Refs can be constructed with a few different styles
+
+- `weave.ref()`: requires `weave.init()` to have been called. Refers to the ":latest" version
+- `weave.ref(:)`: requires `weave.init()` to have been called.
+- `weave.ref()`: can be constructed without calling weave.init
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/objects)
+
+<!--- Docs: Tracking -->
+<!--- Trace Tree -->
+
+# Trace Tree
+
+# Navigate the Trace View
+
+The Weave Trace view is designed to help you make sense of complex execution paths in your LLM and agentic apps. Whether you're debugging an agentic app with dozens of nested calls, or tracking the flow of a single model prediction, the Trace view provides a clear breakdown, while also providing alternate ways to view and understand your application flow.
+
+This guide describes how to move through the trace stack, filter and search for ops, switch between visual representations, and more.
+
+## Get started
+
+To enter the Trace view:
+1. Navigate to the **Traces** tab.
+2. Click on any trace to open the Trace view. The Trace view pops out and displays a hierarchical breakdown of the trace execution.
+
+## Traces page overview
+
+The Traces page is composed of three core panels:
+
+- _Left sidebar_: A sortable, paginated list of all trace runs for the project.
+- _Center panel_: Interactive [trace view](#trace-view-navigation) showing the stack and ops hierarchy for a selected trace. 
+- _Right panel_: Detailed view for a selected op (Call, Code, Feedback, Scores, Summary, Use).
+
+
+
+## Trace view navigation
+
+- _Breadcrumbs_: At the top of the center panel, navigate up and down the trace stack via the breadcrumb trail.
+- _Stack arrows_: Use the `↑` and `↓` buttons to move up and down the stack.
+- _Double-click_: Double-click on an op to focus the view exclusively on that substack.
+- _"Jump to Top" Button_: Return to the root of the trace stack.
+
+### Filter and search
+
+- _Filter an op by name_: Use the input bar above the trace tree to search for ops of a specific type (e.g., `tool`, `openai.response.create`).
+- _Filter persistence_: Selecting ops across traces retains the sub-path context for easier comparison.
+
+
+
+### Scrubbers and contextual navigation
+
+The panel below the tree includes multiple scrubbers for navigating across calls:
+
+- **Timeline**: Chronological order of events.
+- **Peers**: Ops sharing the same type.
+- **Siblings**: Ops with the same parent.
+- **Stack**: Traverse up/down the call stack.
+
+To view the available scrubbers, click the **^** button at the bottom of the panel.
+
+Each scrubber has a slider and **>** jump buttons to move step-by-step.
+
+
+
+### Alternate trace tree views
+
+You can switch between multiple visual representations of the trace tree depending on your needs. To switch to an alternate trace view, click one of available options (default trace view, code composition, flame graph, graph view) in the upper right corner 
+
+#### Traces (default)
+
+The default view showing, stack hierarchy, cost per op, execution time, and status indicators.
+
+#### Code view
+
+In the code view, boxes represent ops and their nested calls. This is helpful for visualizing flow of function calls. In this view, you can click on a box to drill into that op and filter the call path.
+
+
+
+#### Flame graph
+
+The flame graph view provides a timeline-based visualization of execution depth and duration. This is helpful for when trying to understand performance diagnostics over time. You can click into frames to isolate sub-traces.
+
+
+
+#### Graph view
+
+The graph view shows hierarchical relationships between ops. This is useful for understanding parent/child relationships.
+
+## Usage tips and tricks
+
+- Use the **"Filter by op name”** search bar at the top of the trace tree view to quickly isolate relevant tool or LLM calls.
+- Switch between views based on your debugging need. Use **Code View** for call logic, **Flame Graph** for to understand performance over time, and **Graph View** to understand structure.
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/trace-tree)
+
+<!--- Docs: Tracking -->
+<!--- Index -->
+
+# Index
+
+# Tracing
+
+Weave provides powerful tracing capabilities to track and version objects and function calls in your applications. This comprehensive system enables better monitoring, debugging, and iterative development of AI-powered applications, allowing you to "track insights between commits."
+
+## Key Tracing Features
+
+Weave's tracing functionality comprises three main components:
+
+### Calls
+
+[Calls](/guides/tracking/tracing) trace function calls, inputs, and outputs, enabling you to:
+
+- Analyze data flow through your application
+- Debug complex interactions between components
+- Optimize application performance based on call patterns
+
+### Ops
+
+[Ops](/guides/tracking/ops) are automatically versioned and tracked functions (which produce Calls) that allow you to:
+
+- Monitor function performance and behavior
+- Maintain a record of function modifications
+- Ensure experiment reproducibility
+
+### Objects
+
+[Objects](/guides/tracking/objects) form Weave's extensible serialization layer, automatically versioning runtime objects (often the inputs and outputs of Calls). This feature allows you to:
+
+- Track changes in data structures over time
+- Maintain a clear history of object modifications
+- Easily revert to previous versions when needed
+
+By leveraging these tracing capabilities, you can gain deeper insights into your application's behavior, streamline your development process, and build more robust AI-powered systems.
+
+## FAQs
+
+For answers to common questions about Weave tracing, see the [FAQs page](./faqs.md)
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/index)
+
+<!--- Docs: Tracking -->
+<!--- Tracing -->
+
+# Tracing
+
+import { DesktopWindow } from '../../../src/components/DesktopImage'
+
+
+# Tracing Basics
+
+<DesktopWindow 
+  images={[
+    TracingCallsMacroImage,
+    BasicCallImage,
+    TracingCallsFilterImage,
+  ]}
+  alt="Screenshot of Weave Calls"
+  title="Weave Calls"
+/>
+
+:::info[Calls]
+Calls are the fundamental building block in Weave. They represent a single execution of a function, including:
+- Inputs (arguments)
+- Outputs (return value) 
+- Metadata (duration, exceptions, LLM usage, etc.)
+
+Calls are similar to spans in the [OpenTelemetry](https://opentelemetry.io) data model. A Call can:
+- Belong to a Trace (a collection of calls in the same execution context)
+- Have parent and child Calls, forming a tree structure
+:::
+
+## Creating Calls
+
+There are three main ways to create Calls in Weave:
+
+### 1. Automatic tracking of LLM libraries
+
+
+
+  
+    Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`, `anthropic`, `cohere`, and `mistral`. Simply call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) at the start of your program:
+
+    > 🌟 **Tip**:     You can control Weave's default tracking behavior [using the `autopatch_settings` argument in `weave.init`](#configure-autopatching).
+    :::
+
+    ```python showLineNumbers
+    import weave
+
+    from openai import OpenAI
+    client = OpenAI()
+
+    # Initialize Weave Tracing
+    weave.init('intro-example')
+
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {
+                "role": "user",
+                "content": "How are you?"
+            }
+        ],
+        temperature=0.8,
+        max_tokens=64,
+        top_p=1,
+    )
+    ```
+
+  
+  
+    Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`. Simply call [`await weave.init('project_name')`](../../reference/typescript-sdk/weave/functions/init.md) and wrap your OpenAI client with [`weave.wrapOpenAI`](../../reference/typescript-sdk/weave/functions/wrapOpenAI.md) at the start of your program:
+
+    ```typescript showLineNumbers
+    import OpenAI from 'openai'
+    import * as weave from 'weave'
+
+    const client = weave.wrapOpenAI(new OpenAI())
+
+    // Initialize Weave Tracing
+    await weave.init('intro-example')
+
+    const response = await client.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'user',
+          content: 'How are you?',
+        },
+      ],
+      temperature: 0.8,
+      max_tokens: 64,
+      top_p: 1,
+    });
+    ```
+
+  
+
+
+### 2. Decorating and wrapping functions
+
+However, often LLM applications have additional logic (such as pre/post processing, prompts, etc.) that you want to track.
+
+
+  
+    Weave allows you to manually track these calls using the [`@weave.op`](../../reference/python-sdk/weave/index.md#function-op) decorator. For example:
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize Weave Tracing
+    weave.init('intro-example')
+
+    # Decorate your function
+    @weave.op
+    def my_function(name: str):
+        return f"Hello, {name}!"
+
+    # Call your function -- Weave will automatically track inputs and outputs
+    print(my_function("World"))
+    ```
+
+    You can also track [methods on classes](#4-track-class-and-object-methods).
+
+  
+  
+    Weave allows you to manually track these calls by wrapping your function with [`weave.op`](../../reference/typescript-sdk/weave/functions/op.md). For example:
+
+    ```typescript showLineNumbers
+    import * as weave from 'weave'
+
+    await weave.init('intro-example')
+
+    function myFunction(name: string) {
+        return `Hello, ${name}!`
+    }
+
+    const myFunctionOp = weave.op(myFunction)
+    ```
+
+    You can also define the wrapping inline:
+
+    ```typescript
+    const myFunctionOp = weave.op((name: string) => `Hello, ${name}!`)
+    ```
+
+    This works for both functions as well as methods on classes:
+
+    ```typescript
+    class MyClass {
+        constructor() {
+            this.myMethod = weave.op(this.myMethod)
+        }
+
+        myMethod(name: string) {
+            return `Hello, ${name}!`
+        }
+    }
+    ```
+  
+
+
+
+#### Getting a handle to the call object during execution
+
+
+  
+    Sometimes it is useful to get a handle to the `Call` object itself. You can do this by calling the `op.call` method, which returns both the result and the `Call` object. For example:
+
+    ```python showLineNumbers
+    result, call = my_function.call("World")
+    ```
+
+    Then, `call` can be used to set / update / fetch additional properties (most commonly used to get the ID of the call to be used for feedback).
+
+    > 💡 **Note**:     If your op is a method on a class, you need to pass the instance as the first argument to the op (see example below).
+    :::
+
+    ```python showLineNumbers
+    # Notice that we pass the `instance` as the first argument.
+    print(instance.my_method.call(instance, "World"))
+    ```
+
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize Weave Tracing
+    weave.init("intro-example")
+
+    class MyClass:
+        # Decorate your method
+        @weave.op
+        def my_method(self, name: str):
+            return f"Hello, {name}!"
+
+    instance = MyClass()
+
+    # Call your method -- Weave will automatically track inputs and outputs
+    instance.my_method.call(instance, "World")
+    ```
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+
+
+#### Call display name
+
+
+  
+    Sometimes you may want to override the display name of a call. You can achieve this in one of four ways:
+
+    1. Change the display name at the time of calling the op:
+
+    ```python showLineNumbers
+    result = my_function("World", __weave={"display_name": "My Custom Display Name"})
+    ```
+
+    :::note
+
+    Using the `__weave` dictionary sets the call display name which will take precedence over the Op display name.
+
+    :::
+
+    2. Change the display name on a per-call basis. This uses the [`Op.call`](../../reference/python-sdk/weave/trace/weave.trace.op.md#function-call) method to return a `Call` object, which you can then use to set the display name using [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-set_display_name).
+    ```python showLineNumbers
+    result, call = my_function.call("World")
+    call.set_display_name("My Custom Display Name")
+    ```
+
+    3. Change the display name for all Calls of a given Op:
+
+    ```python showLineNumbers
+    @weave.op(call_display_name="My Custom Display Name")
+    def my_function(name: str):
+        return f"Hello, {name}!"
+    ```
+
+    4. The `call_display_name` can also be a function that takes in a `Call` object and returns a string.  The `Call` object will be passed automatically when the function is called, so you can use it to dynamically generate names based on the function's name, call inputs, fields, etc.
+
+    1. One common use case is just appending a timestamp to the function's name.
+
+        ```py
+        from datetime import datetime
+
+        @weave.op(call_display_name=lambda call: f"{call.func_name}__{datetime.now()}")
+        def func():
+            return ...
+        ```
+
+    2. You can also log custom metadata using `.attributes`
+
+        ```py
+        def custom_attribute_name(call):
+            model = call.attributes["model"]
+            revision = call.attributes["revision"]
+            now = call.attributes["date"]
+
+            return f"{model}__{revision}__{now}"
+
+        @weave.op(call_display_name=custom_attribute_name)
+        def func():
+            return ...
+
+        with weave.attributes(
+            {
+                "model": "finetuned-llama-3.1-8b",
+                "revision": "v0.1.2",
+                "date": "2024-08-01",
+            }
+        ):
+            func()  # the display name will be "finetuned-llama-3.1-8b__v0.1.2__2024-08-01"
+
+
+            with weave.attributes(
+                {
+                    "model": "finetuned-gpt-4o",
+                    "revision": "v0.1.3",
+                    "date": "2024-08-02",
+                }
+            ):
+                func()  # the display name will be "finetuned-gpt-4o__v0.1.3__2024-08-02"
+        ```
+
+
+    **Technical Note:** "Calls" are produced by "Ops". An Op is a function or method that is decorated with `@weave.op`. 
+    By default, the Op's name is the function name, and the associated calls will have the same display name. The above example shows how to override the display name for all Calls of a given Op.  Sometimes, users wish to override the name of the Op itself. This can be achieved in one of two ways:
+
+    1. Set the `name` property of the Op before any calls are logged
+    ```python showLineNumbers
+    my_function.name = "My Custom Op Name"
+    ```
+
+    2. Set the `name` option on the op decorator
+    ```python showLineNumbers
+    @weave.op(name="My Custom Op Name)
+    ```
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+
+
+
+
+#### Attributes
+
+
+  
+    When calling tracked functions, you can add additional metadata to the call by using [`weave.attributes`](../../reference/python-sdk/weave/index.md#function-attributes) context manager. In the example below, we add an `env` attribute to the call specified as `'production'`.
+
+    ```python showLineNumbers
+    # ... continued from above ...
+
+    # Add additional attributes to the call
+    with weave.attributes({'env': 'production'}):
+        print(my_function.call("World"))
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+### 3. Manual Call tracking
+
+You can also manually create Calls using the API directly.
+
+
+    
+
+        ```python showLineNumbers
+        import weave
+
+        # Initialize Weave Tracing
+        client = weave.init('intro-example')
+
+        def my_function(name: str):
+            # Start a call
+            call = client.create_call(op="my_function", inputs={"name": name})
+
+            # ... your function code ...
+
+            # End a call
+            client.finish_call(call, output="Hello, World!")
+
+        # Call your function
+        print(my_function("World"))
+        ```
+
+    
+    
+
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+
+    
+
+    
+    * Start a call: [POST `/call/start`](../../reference/service-api/call-start-call-start-post.api.mdx)
+    * End a call: [POST `/call/end`](../../reference/service-api/call-end-call-end-post.api.mdx)
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/start' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "start": {
+            "project_id": "string",
+            "id": "string",
+            "op_name": "string",
+            "display_name": "string",
+            "trace_id": "string",
+            "parent_id": "string",
+            "started_at": "2024-09-08T20:07:34.849Z",
+            "attributes": {},
+            "inputs": {},
+            "wb_run_id": "string"
+        }
+    }
+    ```
+    
+
+
+### 4. Track class and object methods
+
+You can also track class and object methods.
+
+
+    
+    Track any method on a class using `weave.op`.
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize Weave Tracing
+    weave.init("intro-example")
+
+    class MyClass:
+        # Decorate your method
+        @weave.op
+        def my_method(self, name: str):
+            return f"Hello, {name}!"
+
+    instance = MyClass()
+
+    # Call your method -- Weave will automatically track inputs and outputs
+    print(instance.my_method("World"))
+    ```
+
+    
+    
+
+    :::important
+    **Using decorators in TypeScript**
+
+    To use the `@weave.op` decorator with your TypeScript code, make sure your environment is properly configured:
+
+    - **TypeScript v5.0 or newer**: Decorators are supported out of the box and no additional configuration is required.
+    - **TypeScript older than v5.0**: Enable experimental support for decorators. For more details, see the [official TypeScript documentation on decorators](https://www.typescriptlang.org/docs/handbook/decorators.html).
+    :::
+    
+    #### Decorate a class method
+
+    Use `@weave.op` to trace instance methods.
+
+    ```typescript
+    class Foo {
+        @weave.op
+        async predict(prompt: string) {
+            return "bar"
+        }
+    }
+    ```
+
+    #### Decorate a static class method
+
+    Apply `@weave.op` to static methods to monitor utility functions within a class.
+
+    ```typescript
+    class MathOps {
+        @weave.op
+        static square(n: number): number {
+            return n * n;
+        }
+    }
+    ```
+
+    
+
+
+
+## Viewing Calls
+
+    
+    To view a call in the web app:
+    1. Navigate to your project's "Traces" tab
+    2. Find the call you want to view in the list
+    3. Click on the call to open its details page
+    
+    The details page will show the call's inputs, outputs, runtime, and any additional metadata.
+    
+    
+    
+    
+    To view a call using the Python API, you can use the [`get_call`](../../reference/python-sdk/weave/trace/weave.trace.weave_client#method-get_call) method:
+
+    ```python
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    # Get a specific call by its ID
+    call = client.get_call("call-uuid-here")
+
+    print(call)
+    ```
+
+    
+    
+    ```typescript showLineNumbers
+    import * as weave from 'weave'
+
+    // Initialize the client
+    const client = await weave.init('intro-example')
+
+    // Get a specific call by its ID
+    const call = await client.getCall('call-uuid-here')
+
+    console.log(call)
+    ```
+    
+
+    
+    To view a call using the Service API, you can make a request to the [`/call/read`](../../reference/service-api/call-read-call-read-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/read' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "project_id": "string",
+        "id": "string",
+    }'
+    ```
+    
+
+
+
+## Updating Calls
+
+Calls are mostly immutable once created, however, there are a few mutations which are supported:
+* [Set Display Name](#set-display-name)
+* [Add Feedback](#add-feedback)
+* [Delete a Call](#delete-a-call)
+
+All of these mutations can be performed from the UI by navigating to the call detail page:
+
+
+
+### Set display name
+
+
+    
+    In order to set the display name of a call, you can use the [`Call.set_display_name`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-set_display_name) method.
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    # Get a specific call by its ID
+    call = client.get_call("call-uuid-here")
+
+    # Set the display name of the call
+    call.set_display_name("My Custom Display Name")
+    ```
+    
+    
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+    
+    
+    To set the display name of a call using the Service API, you can make a request to the [`/call/update`](../../reference/service-api/call-update-call-update-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/update' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "project_id": "string",
+        "call_id": "string",
+        "display_name": "string",
+    }'
+    ```
+    
+
+
+### Add feedback 
+
+Please see the [Feedback Documentation](./feedback.md) for more details.
+
+### Delete a Call
+
+
+    
+    To delete a Call using the Python API, you can use the [`Call.delete`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-delete) method.
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    # Get a specific call by its ID
+    call = client.get_call("call-uuid-here")
+    
+    # Delete the call
+    call.delete()
+    ```
+
+    
+    
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+    
+    
+    To delete a call using the Service API, you can make a request to the [`/calls/delete`](../../reference/service-api/calls-delete-calls-delete-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/calls/delete' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "project_id": "string",
+        "call_ids": [
+            "string"
+        ],
+    }'
+    ```
+    
+
+
+### Delete multiple Calls
+
+
+    
+    To delete batches of Calls using the Python API, pass a list of Call IDs to `delete_calls()`.
+
+    :::important
+    - The maximum amount of Calls that can be deleted is `1000`.
+    - Deleting a Call also deletes all of its children.
+    :::
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize the client
+    client = weave.init("my-project")
+
+    # Get all calls from client 
+    all_calls = client.get_calls()
+
+    # Get list of first 1000 Call objects
+    first_1000_calls = all_calls[:1000]
+
+    # Get list of first 1000 Call IDs
+    first_1000_calls_ids = [c.id for c in first_1000_calls]
+
+    # Delete first 1000 Call objects by ID
+    client.delete_calls(call_ids=first_1000_calls_ids)
+    ```
+
+    
+    
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+    
+
+
+## Querying and exporting Calls
+
+<DesktopWindow 
+  images={[
+    TracingCallsFilterImage,
+  ]}
+  alt="Screenshot of many calls"
+  title="Weave Calls"
+/>
+
+The `/calls` page of your project ("Traces" tab) contains a table view of all the Calls in your project. From there, you can:
+* Sort
+* Filter
+* Export
+
+
+
+The Export Modal (shown above) allows you to export your data in a number of formats, as well as shows the Python & CURL equivalents for the selected calls!
+The easiest way to get started is to construct a view in the UI, then learn more about the export API via the generated code snippets.
+
+
+
+    
+    To fetch calls using the Python API, you can use the [`client.get_calls`](../../reference/python-sdk/weave/trace/weave.trace.weave_client.md#method-get_calls) method:
+
+    ```python
+    import weave
+
+    # Initialize the client
+    client = weave.init("your-project-name")
+
+    # Fetch calls
+    calls = client.get_calls(filter=...)
+    ```
+
+    
+    
+    To fetch calls using the TypeScript API, you can use the [`client.getCalls`](../../reference/typescript-sdk/weave/classes/WeaveClient#getcalls) method.
+    ```typescript
+    import * as weave from 'weave'
+
+    // Initialize the client
+    const client = await weave.init('intro-example')
+
+    // Fetch calls
+    const calls = await client.getCalls(filter=...)
+    ```
+    
+    
+    The most powerful query layer is at the Service API. To fetch calls using the Service API, you can make a request to the [`/calls/stream_query`](../../reference/service-api/calls-query-stream-calls-stream-query-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/calls/stream_query' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+    "project_id": "string",
+    "filter": {
+        "op_names": [
+            "string"
+        ],
+        "input_refs": [
+            "string"
+        ],
+        "output_refs": [
+            "string"
+        ],
+        "parent_ids": [
+            "string"
+        ],
+        "trace_ids": [
+            "string"
+        ],
+        "call_ids": [
+            "string"
+        ],
+        "trace_roots_only": true,
+        "wb_user_ids": [
+            "string"
+        ],
+        "wb_run_ids": [
+            "string"
+        ]
+    },
+    "limit": 100,
+    "offset": 0,
+    "sort_by": [
+        {
+        "field": "string",
+        "direction": "asc"
+        }
+    ],
+    "query": {
+        "$expr": {}
+    },
+    "include_costs": true,
+    "include_feedback": true,
+    "columns": [
+        "string"
+    ],
+    "expand_columns": [
+        "string"
+    ]
+    }'
+    ```
+    
+
+
+{/* ## Compare calls
+info[Comming Soon] */}
+
+### Call schema
+
+Please see the [schema](../../reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface#class-callschema) for a complete list of fields.
+
+
+| Property | Type | Description |
+|----------|------|-------------|
+| id | string (uuid) | Unique identifier for the call |
+| project_id | string (optional) | Associated project identifier |
+| op_name | string | Name of the operation (can be a reference) |
+| display_name | string (optional) | User-friendly name for the call |
+| trace_id | string (uuid) | Identifier for the trace this call belongs to |
+| parent_id | string (uuid) | Identifier of the parent call |
+| started_at | datetime | Timestamp when the call started |
+| attributes | Dict[str, Any] | User-defined metadata about the call |
+| inputs | Dict[str, Any] | Input parameters for the call |
+| ended_at | datetime (optional) | Timestamp when the call ended |
+| exception | string (optional) | Error message if the call failed |
+| output | Any (optional) | Result of the call |
+| summary | Optional[SummaryMap] | Post-execution summary information |
+| wb_user_id | Optional[str] | Associated Weights & Biases user ID |
+| wb_run_id | Optional[str] | Associated Weights & Biases run ID |
+| deleted_at | datetime (optional) | Timestamp of call deletion, if applicable |
+
+The table above outlines the key properties of a Call in Weave. Each property plays a crucial role in tracking and managing function calls:
+
+- The `id`, `trace_id`, and `parent_id` fields help in organizing and relating calls within the system.
+- Timing information (`started_at`, `ended_at`) allows for performance analysis.
+- The `attributes` and `inputs` fields provide context for the call, while `output` and `summary` capture the results.
+- Integration with Weights & Biases is facilitated through `wb_user_id` and `wb_run_id`.
+
+This comprehensive set of properties enables detailed tracking and analysis of function calls throughout your project.
+
+
+Calculated Fields:
+    * Cost
+    * Duration
+    * Status
+
+## Saved views 
+
+You can save your Trace table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).
+
+## View a W&B run in the Traces table
+
+With Weave, you can trace function calls in your code and link them directly to the [W&B runs](https://docs.wandb.ai/guides/runs/) in which they were executed. 
+When you trace a function with @weave.op() and call it inside a wandb.init() context, Weave automatically associates the trace with the W&B run. 
+Links to any associated runs are shown in the Traces table.
+
+### Python example
+
+The following Python code shows how traced operations are linked to W&B
+runs when executed inside a `wandb.init()` context. These traces appear in the
+Weave UI and are associated with the corresponding run.
+
+```python 
+import wandb
+import weave
+
+def example_wandb(projname):
+    # Split projname into entity and project
+    entity, project = projname.split("/", 1)
+
+    # Initialize Weave context for tracing
+    weave.init(projname)
+
+    # Define a traceable operation
+    @weave.op()
+    def say(message: str) -> str:
+        return f"I said: {message}"
+
+    # First W&B run
+    with wandb.init(
+        entity=entity,
+        project=project,
+        notes="Experiment 1",
+        tags=["baseline", "paper1"],
+    ) as run:
+        say("Hello, world!")
+        say("How are you!")
+        run.log({"messages": 2})
+
+    # Second W&B run
+    with wandb.init(
+        entity=entity,
+        project=project,
+        notes="Experiment 2",
+        tags=["baseline", "paper1"],
+    ) as run:
+        say("Hello, world from experiment 2!")
+        say("How are you!")
+        run.log({"messages": 2})
+
+
+if __name__ == "__main__":
+    # Replace this with your actual W&B username/project
+    example_wandb("your-username/your-project")
+```
+
+To use the code sample:
+
+1. In the terminal, install dependencies:
+
+   ```bash
+   pip install wandb weave
+   ```
+
+2. Log in to W&B:
+
+   ```bash
+   wandb login
+   ```
+
+3. In the script, replace `your-username/your-project` with your actual W&B entity/project.
+4. Run the script:
+
+   ```bash
+   python weave_trace_with_wandb.py
+   ```
+5. Visit [https://weave.wandb.ai](https://weave.wandb.ai) and select your project.
+6. In the **Traces** tab, view the trace output. Links to any associated runs are shown in the Traces table.
+
+## Configure autopatching
+
+By default, Weave automatically patches and tracks calls to common LLM libraries like `openai`, `anthropic`, `cohere`, and `mistral`.
+You can control this behavior using the `autopatch_settings` argument in `weave.init`.
+
+### Disable all autopatching
+
+```python showLineNumbers
+weave.init(..., autopatch_settings={"disable_autopatch": True})
+```
+
+### Disable a specific integration
+
+```python showLineNumbers
+weave.init(..., autopatch_settings={"openai": {"enabled": False}})
+```
+
+### Post-process inputs and outputs 
+
+You can also customize how post-process inputs and outputs (e.g. for PII data) are handled during autopatching:
+
+```python showLineNumbers
+def redact_inputs(inputs: dict) -> dict:
+    if "email" in inputs:
+        inputs["email"] = "[REDACTED]"
+    return inputs
+
+weave.init(
+    ...,
+    autopatch_settings={
+        "openai": {
+            "op_settings": {
+                "postprocess_inputs": redact_inputs,
+            }
+        }
+    }
+)
+```
+
+For more details, see [How to use Weave with PII data](../../reference/gen_notebooks/pii.md).
+
+## FAQs
+
+### How do I stop large traces from being truncated?
+
+For more information, see [Trace data is truncated](../troubleshooting.md#trace-data-is-truncated) in the [Troubleshooting guide](../troubleshooting.md).
+
+### How do I disable tracing?
+
+#### Environment variable
+
+In situations where you want to unconditionally disable tracing for the entire program, you can set the environment variable `WEAVE_DISABLED=true`.
+
+#### Client initialization
+
+Sometimes, you may want to conditionally enable tracing for a specific initialization based on some condition. In this case, you can initialize the client with the `disabled` flag in init settings.
+
+```python
+import weave
+
+# Initialize the client
+client = weave.init(..., settings={"disabled": True})
+```
+
+#### Context manager
+
+Finally, you may want to conditionally disable tracing for a single function based on some application logic. In this case, you can use the context manager `with set_tracing_enabled(False)` which can be imported from `weave.trace.context.call_context`.
+
+```python
+import weave
+from weave.trace.context.call_context import set_tracing_enabled
+
+client = weave.init(...)
+
+@weave.op
+def my_op():
+    ...
+
+with set_tracing_enabled(False):
+    my_op()
+```
+
+### How do I capture information about a Call?
+
+Typically you would call an op directly:
+
+```python
+@weave.op
+def my_op():
+    ...
+
+my_op()
+```
+
+However, you can also get access to the call object directly by invoking the `call` method on the op:
+
+```python
+@weave.op
+def my_op():
+    ...
+
+output, call = my_op.call()
+```
+
+From here, the `call` object will have all the information about the call, including the inputs, outputs, and other metadata.
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/tracing)
+
+<!--- Docs: Tracking -->
+<!--- Feedback -->
+
+# Feedback
+
+# Feedback
+
+Efficiently evaluating LLM applications requires robust tooling to collect and analyze feedback. Weave provides an integrated feedback system, allowing users to provide call feedback directly through the UI or programmatically via the SDK. Various feedback types are supported, including emoji reactions, textual comments, and structured data, enabling teams to:
+
+- Build evaluation datasets for performance monitoring.
+- Identify and resolve LLM content issues effectively.
+- Gather examples for advanced tasks like fine-tuning.
+
+This guide covers how to use Weave’s feedback functionality in both the UI and SDK, query and manage feedback, and use human annotations for detailed evaluations.
+
+- [Provide feedback in the UI](#provide-feedback-in-the-ui)
+- [Provide feedback via the SDK](#provide-feedback-via-the-sdk)
+- [Add human annotations](#add-human-annotations)
+
+## Provide feedback in the UI
+
+In the Weave UI, you can add and view feedback [from the call details page](#from-the-call-details-page) or [using the icons](#use-the-icons).
+
+### From the call details page
+
+1. In the sidebar, navigate to **Traces**.
+2. Find the row for the call that you want to add feedback to.
+3. Open the call details page.
+4. Select the **Feedback** column for the call.
+5. Add, view, or delete feedback:
+   - _[Add and view feedback using the icons](#use-the-icons)_ located in the upper right corner of the call details feedback view.
+   - _View and delete feedback from the call details feedback table._ Delete feedback by clicking the trashcan icon in the rightmost column of the appropriate feedback row.
+
+
+
+### Use the icons
+
+You can add or remove a reaction, and add a note using the icons that are located in both the call table and individual call details pages.
+
+- _Call table_: Located in **Feedback** column in the appropriate row in the call table.
+- _Call details page_: Located in the upper right corner of each call details page.
+
+To add a reaction:
+
+1. Click the emoji icon.
+2. Add a thumbs up, thumbs down, or click the **+** icon for more emojis.
+
+To remove a reaction:
+
+1. Hover over the emoji reaction you want to remove.
+2. Click the reaction to remove it.
+
+> You can also delete feedback from the [**Feedback** column on the call details page.](#from-the-call-details-page).
+
+To add a comment:
+
+1. Click the comment bubble icon.
+2. In the text box, add your note.
+3. To save the note, press the **Enter** key. You can add additional notes.
+
+> 🚨 **Important**: The maximum number of characters in a feedback note is 1024. If a note exceeds this limit, it will not be created.
+
+
+
+## Provide feedback via the SDK
+
+> You can find SDK usage examples for feedback in the UI under the **Use** tab in the call details page.
+
+You can use the Weave SDK to programmatically add, remove, and query feedback on calls.
+
+### Query a project's feedback
+
+You can query the feedback for your Weave project using the SDK. The SDK supports the following feedback query operations:
+
+- `client.get_feedback()`: Returns all feedback in a project.
+- `client.get_feedback("")`: Return a specific feedback object specified by `` as a collection.
+- `client.get_feedback(reaction="")`: Returns all feedback objects for a specific reaction type.
+
+You can also get additional information for each feedback object in `client.get_feedback()`:
+
+- `id`: The feedback object ID.
+- `created_at`: The creation time information for the feedback object.
+- `feedback_type`: The type of feedback (reaction, note, custom).
+- `payload`: The feedback payload
+
+
+  
+    ```python
+    import weave
+    client = weave.init('intro-example')
+
+    # Get all feedback in a project
+    all_feedback = client.get_feedback()
+
+    # Fetch a specific feedback object by id.
+    # The API returns a collection, which is expected to contain at most one item.
+    one_feedback = client.get_feedback("")[0]
+
+    # Find all feedback objects with a specific reaction. You can specify offset and limit.
+    thumbs_up = client.get_feedback(reaction="👍", limit=10)
+
+    # After retrieval, view the details of individual feedback objects.
+    for f in client.get_feedback():
+        print(f.id)
+        print(f.created_at)
+        print(f.feedback_type)
+        print(f.payload)
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+### Add feedback to a call
+
+You can add feedback to a call using the call's UUID. To use the UUID to get a particular call, [retrieve it during or after call execution](#retrieve-the-call-uuid). The SDK supports the following operations for adding feedback to a call:
+
+- `call.feedback.add_reaction("")`: Add one of the supported `` (emojis), such as 👍.
+- `call.feedback.add_note("")`: Add a note.
+- `call.feedback.add("", )`: Add a custom feedback `` specified by ``.
+
+> 🚨 **Important**: The maximum number of characters in a feedback note is 1024. If a note exceeds this limit, it will not be created.
+
+
+  
+    ```python
+    import weave
+    client = weave.init('intro-example')
+
+    call = client.get_call("")
+
+    # Adding an emoji reaction
+    call.feedback.add_reaction("👍")
+
+    # Adding a note
+    call.feedback.add_note("this is a note")
+
+    # Adding custom key/value pairs.
+    # The first argument is a user-defined "type" string.
+    # Feedback must be JSON serializable and less than 1 KB when serialized.
+    call.feedback.add("correctness", { "value": 5 })
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+#### Retrieve the call UUID
+
+For scenarios where you need to add feedback immediately after a call, you can retrieve the call UUID programmatically during or after the call execution.
+
+- [During call execution](#during-call-execution)
+- [After call execution](#after-call-execution)
+
+##### During call execution
+
+To retrieve the UUID during call execution, get the current call, and return the ID.
+
+
+  
+    ```python
+
+    import weave
+    weave.init("uuid")
+
+    @weave.op()
+    def simple_operation(input_value):
+        # Perform some simple operation
+        output = f"Processed {input_value}"
+        # Get the current call ID
+        current_call = weave.require_current_call()
+        call_id = current_call.id
+        return output, call_id
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+##### After call execution
+
+Alternatively, you can use `call()` method to execute the operation and retrieve the ID after call execution:
+
+
+  
+    ```python
+    import weave
+    weave.init("uuid")
+
+    @weave.op()
+    def simple_operation(input_value):
+        return f"Processed {input_value}"
+
+    # Execute the operation and retrieve the result and call ID
+    result, call = simple_operation.call("example input")
+    call_id = call.id
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+### Delete feedback from a call
+
+You can delete feedback from a particular call by specifying a UUID.
+
+
+  
+    ```python
+    call.feedback.purge("")
+    ```
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+## Add human annotations
+
+Human annotations are supported in the Weave UI. To make human annotations, you must first create a Human Annotation scorer using either the [UI](#create-a-human-annotation-scorer-in-the-ui) or the [API](#create-a-human-annotation-scorer-using-the-api). Then, you can [use the scorer in the UI to make annotations](#use-the-human-annotation-scorer-in-the-ui), and [modify your annotation scorers using the API](#modify-a-human-annotation-scorer-using-the-api).
+
+### Create a human annotation scorer in the UI
+
+To create a human annotation scorer in the UI, do the following:
+
+1. In the sidebar, navigate to **Scorers**.
+2. In the upper right corner, click **+ Create scorer**.
+3. In the configuration page, set:
+   - `Scorer type` to `Human annotation`
+   - `Name`
+   - `Description`
+   - `Type`, which determines the type of feedback that will be collected, such as `boolean` or `integer`.
+4. Click **Create scorer**. Now, you can [use your scorer to make annotations](#use-the-human-annotation-scorer-in-the-ui).
+
+In the following example, a human annotator is asked to select which type of document the LLM ingested. As such, the `Type` selected for the score configuration is an `enum` containing the possible document types.
+
+
+
+### Use the human annotation scorer in the UI
+
+Once you [create a human annotation scorer](#create-a-human-annotation-scorer-in-the-ui), it will automatically display in the **Feedback** sidebar of the call details page with the configured options. To use the scorer, do the following:
+
+1. In the sidebar, navigate to **Traces**
+2. Find the row for the call that you want to add a human annotation to.
+3. Open the call details page.
+4. In the upper right corner, click the **Show feedback** button.
+
+   
+
+   Your available human annotation scorers display in the sidebar.
+
+   
+
+5. Make an annotation.
+6. Click **Save**.
+7. In the call details page, click **Feedback** to view the calls table. The new annotation displays in the table. You can also view the annotations in the **Annotations** column in the call table in **Traces**.
+
+   > Refresh the call table to view the most up-to-date information.
+
+
+
+### Create a human annotation scorer using the API
+
+Human annotation scorers can also be created through the API. Each scorer is its own object, which is created and updated independently. To create a human annotation scorer programmatically, do the following:
+
+1. Import the `AnnotationSpec` class from `weave.flow.annotation_spec`
+2. Use the `publish` method from `weave` to create the scorer.
+
+In the following example, two scorers are created. The first scorer, `Temperature`, is used to score the perceived temperature of the LLM call. The second scorer, `Tone`, is used to score the tone of the LLM response. Each scorer is created using `save` with an associated object ID (`temperature-scorer` and `tone-scorer`).
+
+
+  
+    ```python
+    import weave
+    from weave.flow.annotation_spec import AnnotationSpec
+
+    client = weave.init("feedback-example")
+
+    spec1 = AnnotationSpec(
+      name="Temperature",
+      description="The perceived temperature of the llm call",
+      field_schema={
+        "type": "number",
+        "minimum": -1,
+        "maximum": 1,
+      }
+    )
+    spec2 = AnnotationSpec(
+      name="Tone",
+      description="The tone of the llm response",
+      field_schema={
+        "type": "string",
+        "enum": ["Aggressive", "Neutral", "Polite", "N/A"],
+      },
+    )
+    weave.publish(spec1, "temperature-scorer")
+    weave.publish(spec2, "tone-scorer")
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+### Modify a human annotation scorer using the API
+
+Expanding on [creating a human annotation scorer using the API](#create-a-human-annotation-scorer-using-the-api), the following example creates an updated version of the `Temperature` scorer, by using the original object ID (`temperature-scorer`) on `publish`. The result is an updated object, with a history of all versions.
+
+> You can view human annotation scorer object history in the **Scorers** tab under **Human annotations**.
+
+
+  
+    ```python
+    import weave
+    from weave.flow.annotation_spec import AnnotationSpec
+
+    client = weave.init("feedback-example")
+
+    # create a new version of the scorer
+    spec1 = AnnotationSpec(
+      name="Temperature",
+      description="The perceived temperature of the llm call",
+      field_schema={
+        "type": "integer",  # <<- change type to integer
+        "minimum": -1,
+        "maximum": 1,
+      }
+    )
+    weave.publish(spec1, "temperature-scorer")
+    ```
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+
+
+### Use a human annotation scorer using the API
+
+The feedback API allows you to use a human annotation scorer by specifying a specially constructed name and an `annotation_ref` field. You can obtain the `annotation_spec_ref` from the UI by selecting the appropriate tab, or during the creation of the `AnnotationSpec`.
+
+
+  
+    ```python
+    import weave
+
+    client = weave.init("feedback-example")
+
+    call = client.get_call("")
+    annotation_spec = weave.ref("")
+
+    call.feedback.add(
+      feedback_type="wandb.annotation." + annotation_spec.name,
+      payload={"value": 1},
+      annotation_ref=annotation_spec.uri(),
+    )
+    ```
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/feedback)
+
+<!--- Docs: Tracking -->
+<!--- Redact Pii -->
+
+# Redact Pii
+
+# Redacting PII
+
+> 🚨 **Important**: This feature is only accessible via the Python SDK.
+
+Some organizations process Personally Identifiable Information (PII) such as names, phone numbers, and email addresses in their Large Language Model (LLM) workflows. Storing this data in Weights & Biases (W&B) Weave poses compliance and security risks.
+
+The _Sensitive Data Protection_ feature allows you to automatically redact Personally Identifiable Information (PII) from a [trace](../tracking/index.md) before it is sent to Weave servers. This feature integrates [Microsoft Presidio](https://microsoft.github.io/presidio/) into the Weave Python SDK, which means that you can control redaction settings at the SDK level.
+
+The Sensitive Data Protection feature introduces the following functionality to the Python SDK:
+
+- A `redact_pii` setting, which can be toggled on or off in the `weave.init` call to enable PII redaction.
+- Automatic redaction of [common entities](#entities-redacted-by-default) when `redact_pii = True`.
+- Customizable redaction fields using the configurable `redact_pii_fields` setting.
+
+## Enable PII redaction
+
+To get started with the Sensitive Data Protection feature in Weave, complete the following steps:
+
+1. Install the required dependencies:
+
+    ```bash
+    pip install presidio-analyzer presidio-anonymizer
+    ```
+
+2. Modify your `weave.init` call to enable redaction. When `redact_pii=True`, [common entities are redacted by default](#entities-redacted-by-default):
+
+    ```python
+    import weave
+
+    weave.init("my-project", settings={"redact_pii": True})
+    ```
+
+3. (Optional) Customize redaction fields using the `redact_pii_fields` parameter:
+
+    ```python
+    weave.init("my-project", settings={"redact_pii": True, "redact_pii_fields":["CREDIT_CARD", "US_SSN"]})
+    ```
+
+    For a full list of the entities that can be detected and redacted, see [PII entities supported by Presidio](https://microsoft.github.io/presidio/supported_entities/).
+
+## Entities redacted by default
+
+The following entities are automatically redacted when PII redaction is enabled:
+
+- `CREDIT_CARD`
+- `CRYPTO`
+- `EMAIL_ADDRESS`
+- `ES_NIF`
+- `FI_PERSONAL_IDENTITY_CODE`
+- `IBAN_CODE`
+- `IN_AADHAAR`
+- `IN_PAN`
+- `IP_ADDRESS`
+- `LOCATION`
+- `PERSON`
+- `PHONE_NUMBER`
+- `UK_NHS`
+- `UK_NINO`
+- `US_BANK_NUMBER`
+- `US_DRIVER_LICENSE`
+- `US_PASSPORT`
+- `US_SSN`
+
+## Redacting sensitive keys with `REDACT_KEYS`
+
+In addition to PII redaction, the Weave SDK also supports redaction of custom keys using `REDACT_KEYS`. This is useful when you want to protect additional sensitive data that might not fall under the PII category but needs to be kept private. Examples include:
+
+- API keys
+- Authentication headers
+- Tokens
+- Internal IDs
+- Config values
+
+### Pre-defined `REDACT_KEYS`
+
+Weave automatically redacts the following sensitive keys by default:
+
+```json
+[
+  "api_key",
+  "auth_headers",
+  "authorization"
+]
+```
+
+### Adding your own keys
+
+You can extend this list with your own custom keys that you want to redact from traces:
+
+```python
+import weave
+
+client = weave.init("my-project")
+
+# Add custom keys to redact
+weave.trace.sanitize.REDACT_KEYS.add("client_id")
+weave.trace.sanitize.REDACT_KEYS.add("whatever_else")
+
+client_id = "123"
+whatever_else = "456"
+
+@weave.op()
+def test():
+    a = client_id
+    b = whatever_else
+    return 1
+```
+
+When viewed in the Weave UI, the values of `client_id` and `whatever_else` will appear as `"REDACTED"`:
+
+```python
+client_id = "REDACTED"
+whatever_else = "REDACTED"
+```
+
+## Usage information
+
+- This feature is only available in the Python SDK.
+- Enabling redaction increases processing time due to the Presidio dependency.
+
+[Source](https://weave-docs.wandb.ai/guides/tracking/redact-pii)

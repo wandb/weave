@@ -4,11 +4,13 @@ import dataclasses
 import datetime
 import json
 import logging
+import numbers
 import os
 import platform
 import re
 import sys
 import time
+from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
@@ -132,6 +134,7 @@ from weave.trace_server.trace_server_interface import (
     TableSchemaForInsert,
     TableUpdateReq,
     TraceServerInterface,
+    TraceStatus,
 )
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
@@ -686,14 +689,13 @@ class Call:
 
         wc = weave_client_context.get_weave_client()
         if wc:
-            scorer_ref_uri = None
+            scorer_ref = None
             if weave_isinstance(scorer, Scorer):
                 # Very important: if the score is generated from a Scorer subclass,
-                # then scorer_ref_uri will be None, and we will use the op_name from
+                # then scorer_ref will be None, and we will use the op_name from
                 # the score_call instead.
                 scorer_ref = get_ref(scorer)
-                scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
-            wc._send_score_call(self, score_call, scorer_ref_uri)
+            wc._send_score_call(self, score_call, scorer_ref)
         return apply_scorer_result
 
     def to_dict(self) -> CallDict:
@@ -752,16 +754,64 @@ def make_client_call(
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
-    # dicts is a list of dictionaries, that may or may not
-    # have nested dictionaries. Sum all the leaves that match
-    result: dict = {}
+    """Recursively combines multiple dictionaries by summing their leaf values.
+
+    This function takes a list of dictionaries and combines them by:
+    1. For non-dict values: extending lists or summing numbers
+    2. For nested dictionaries: recursively combining them
+
+    Args:
+        dicts: A list of dictionaries to combine
+
+    Returns:
+        A single dictionary with combined values
+
+    Examples:
+        >>> # Combining status counts from multiple runs
+        >>> dicts = [
+        ...     {"status_counts": {"SUCCESS": 5, "FAILED": 1}},
+        ...     {"status_counts": {"SUCCESS": 3, "FAILED": 2, "PENDING": 1}}
+        ... ]
+        >>> sum_dict_leaves(dicts)
+        {'status_counts': {'SUCCESS': 8, 'FAILED': 3, 'PENDING': 1}}
+
+        >>> # Combining metrics with nested structure
+        >>> dicts = [
+        ...     {"metrics": {"accuracy": 0.95, "loss": 0.1, "details": {"precision": 0.9, "recall": 0.8}}},
+        ...     {"metrics": {"accuracy": 0.97, "loss": 0.08, "details": {"precision": 0.92, "f1": 0.85}}}
+        ... ]
+        >>> sum_dict_leaves(dicts)
+        {'metrics': {'accuracy': 1.92, 'loss': 0.18, 'details': {'precision': 1.82, 'recall': 0.8, 'f1': 0.85}}}
+    """
+    nested_dicts: dict[str, list[dict]] = defaultdict(list)
+    result: dict[str, Any] = defaultdict(list)
+
+    # First, collect all nested dictionaries by key
     for d in dicts:
         for k, v in d.items():
             if isinstance(v, dict):
-                result[k] = sum_dict_leaves([result.get(k, {}), v])
+                nested_dicts[k].append(v)
             elif v is not None:
-                result[k] = result.get(k, 0) + v
+                if isinstance(v, list):
+                    result[k].extend(v)
+                else:
+                    result[k].append(v)
+
+    # Sum those values that are numbers
+    for k, values in result.items():
+        # we only sum numbers if we are not going to combine nested dicts later
+        if k not in nested_dicts and all(isinstance(v, numbers.Number) for v in values):
+            result[k] = sum(values)
+
+    # Then recursively sum each collection of nested dictionaries
+    for k in nested_dicts.keys():
+        result[k] = sum_dict_leaves(nested_dicts[k])
+
     return result
+
+
+RESERVED_SUMMARY_USAGE_KEY = "usage"
+RESERVED_SUMMARY_STATUS_COUNTS_KEY = "status_counts"
 
 
 class WeaveKeyDict(dict):
@@ -1143,9 +1193,7 @@ class WeaveClient:
 
         # First create an AttributesDict with global attributes, then update with local attributes
         # Local attributes take precedence over global ones
-        attributes_dict = AttributesDict()
-        attributes_dict.update(_global_attributes)
-        attributes_dict.update(attributes)
+        attributes_dict = AttributesDict(**zip_dicts(_global_attributes, attributes))
 
         if should_capture_client_info():
             attributes_dict._set_weave_item("client_version", version.VERSION)
@@ -1271,15 +1319,17 @@ class WeaveClient:
             summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
             isinstance(original_output, dict)
-            and "usage" in original_output
+            and RESERVED_SUMMARY_USAGE_KEY in original_output
             and "model" in original_output
         ):
-            summary["usage"] = {}
-            summary["usage"][original_output["model"]] = {
+            summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+            summary[RESERVED_SUMMARY_USAGE_KEY][original_output["model"]] = {
                 "requests": 1,
-                **original_output["usage"],
+                **original_output[RESERVED_SUMMARY_USAGE_KEY],
             }
-        elif hasattr(original_output, "usage") and hasattr(original_output, "model"):
+        elif hasattr(original_output, RESERVED_SUMMARY_USAGE_KEY) and hasattr(
+            original_output, "model"
+        ):
             # Handle the cases where we are emitting an object instead of a pre-serialized dict
             # In fact, this is going to become the more common case
             model = original_output.model
@@ -1287,21 +1337,19 @@ class WeaveClient:
             if isinstance(usage, pydantic.BaseModel):
                 usage = usage.model_dump(exclude_unset=True)
             if isinstance(usage, dict) and isinstance(model, str):
-                summary["usage"] = {}
-                summary["usage"][model] = {"requests": 1, **usage}
+                summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+                summary[RESERVED_SUMMARY_USAGE_KEY][model] = {"requests": 1, **usage}
 
-        # JR Oct 24 - This descendants stats code has been commented out since
-        # it entered the code base. A screenshot of the non-ideal UI that the
-        # comment refers to is available in the description of that PR:
-        # https://github.com/wandb/weave/pull/1414
-        # These should probably be added under the "weave" key in the summary.
-        # ---
-        # Descendent error tracking disabled til we fix UI
-        # Add this call's summary after logging the call, so that only
-        # descendents are included in what we log
-        # summary.setdefault("descendants", {}).setdefault(
-        #     call.op_name, {"successes": 0, "errors": 0}
-        # )["successes"] += 1
+        # Create client-side rollup of status_counts_by_op
+        status_counts_dict = summary.setdefault(
+            RESERVED_SUMMARY_STATUS_COUNTS_KEY,
+            {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0},
+        )
+        if exception:
+            status_counts_dict[TraceStatus.ERROR] += 1
+        else:
+            status_counts_dict[TraceStatus.SUCCESS] += 1
+
         call.summary = summary
 
         # Exception Handling
@@ -1629,7 +1677,7 @@ class WeaveClient:
         self,
         predict_call: Call,
         score_call: Call,
-        scorer_object_ref_uri: str | None = None,
+        scorer_object_ref: ObjectRef | None = None,
     ) -> Future[str]:
         """(Private) Adds a score to a call. This is particularly useful
         for adding evaluation metrics to a call.
@@ -1645,9 +1693,12 @@ class WeaveClient:
                 raise ValueError("Score call must have a ref")
             scorer_call_ref_uri = scorer_call_ref.uri()
 
-            # If scorer_object_ref_uri is provided, it is used as the runnable_ref_uri
+            # If scorer_object_ref is provided, it is used as the runnable_ref_uri
             # Otherwise, we use the op_name from the score_call. This should happen
             # when there is a Scorer subclass that is the source of the score call.
+            scorer_object_ref_uri = (
+                scorer_object_ref.uri() if scorer_object_ref else None
+            )
             runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
             score_results = score_call.output
 
@@ -2387,6 +2438,27 @@ def elide_display_name(name: str) -> str:
         )
         return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
     return name
+
+
+def zip_dicts(base_dict: dict, new_dict: dict) -> dict:
+    final_dict = {}
+    for key, value in base_dict.items():
+        if key in new_dict:
+            # Shared key (if both dicts, merge)
+            new_value = new_dict[key]
+            if isinstance(value, dict) and isinstance(new_value, dict):
+                final_dict[key] = zip_dicts(value, new_value)
+            else:
+                # base-only key
+                final_dict[key] = new_value
+        else:
+            final_dict[key] = value
+    for key, value in new_dict.items():
+        if key not in base_dict:
+            # new-only key
+            final_dict[key] = value
+
+    return final_dict
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]
