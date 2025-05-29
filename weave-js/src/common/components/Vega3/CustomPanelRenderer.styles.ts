@@ -1,6 +1,6 @@
-import {WBIcon} from '@wandb/ui';
 import styled, {css} from 'styled-components';
 
+import {Icon} from '../../../components/Icon';
 import {GLOBAL_COLORS} from '../../util/colors';
 
 export const Wrapper = styled.div<{showBindings?: boolean}>`
@@ -59,7 +59,7 @@ export const Wrapper = styled.div<{showBindings?: boolean}>`
 `;
 Wrapper.displayName = 'S.Wrapper';
 
-export const ToggleBindingsButton = styled(WBIcon)`
+export const ToggleBindingsButton: typeof Icon = styled(Icon)`
   position: absolute;
   top: 8px;
   right: 8px;
@@ -79,4 +79,3 @@ export const ToggleBindingsButton = styled(WBIcon)`
     background: white;
   }
 `;
-ToggleBindingsButton.displayName = 'S.ToggleBindingsButton';
