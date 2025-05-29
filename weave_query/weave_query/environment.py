@@ -252,8 +252,7 @@ def weave_wandb_api_key() -> typing.Optional[str]:
     if env_api_key is not None:
         return env_api_key
 
-    netrc_api_key = _wandb_api_key_via_netrc()
-    return env_api_key or netrc_api_key
+    return _wandb_api_key_via_netrc()
 
 
 def projection_timeout_sec() -> typing.Optional[typing.Union[int, float]]:
