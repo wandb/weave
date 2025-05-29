@@ -3,11 +3,14 @@ from __future__ import annotations
 import mimetypes
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
-import magic
+if TYPE_CHECKING:
+    import magic
 
 try:
+    import magic
+
     _MAGIC_INSTANCE_FOR_CHECK = magic.Magic(mime=True)
     MAGIC_LIB_AVAILABLE = True
     del _MAGIC_INSTANCE_FOR_CHECK  # Clean up
