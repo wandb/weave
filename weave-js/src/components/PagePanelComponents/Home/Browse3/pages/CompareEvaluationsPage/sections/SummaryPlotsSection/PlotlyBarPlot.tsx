@@ -40,7 +40,7 @@ export const PlotlyBarPlot: React.FC<{
       title: {
         multiline: true,
         text: props.plotlyData.name ?? '',
-        font: {size: 10},
+        font: {size: 12},
         xref: 'paper',
         x: 0.5,
         y: 1,
