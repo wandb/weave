@@ -30,6 +30,7 @@ import {useWeaveContext} from '../../../context';
 import {focusEditor, WeaveExpression} from '../../../panel/WeaveExpression';
 import {SUGGESTION_OPTION_CLASS} from '../../../panel/WeaveExpression/styles';
 import {Button} from '../../Button';
+import {Icon, type IconName} from '../../Icon';
 import {Tooltip} from '../../Tooltip';
 import {usePanelStacksForType} from '../availablePanels';
 import * as ExpressionView from '../ExpressionView';
@@ -779,8 +780,8 @@ export const ColumnHeader: React.FC<{
                   )}
                   {isGroupCol && (
                     <S.ControlIcon
-                      name="group-runs"
-                      onClick={e => {
+                      name="group"
+                      onClick={() => {
                         recordEvent('REMOVE_COLUMN_GROUPING');
                         doUngroup();
                       }}
@@ -798,11 +799,10 @@ export const ColumnHeader: React.FC<{
                     />
                   )}
                 </S.ColumnAction>
-                <S.ColumnAction>
-                  <S.EllipsisIcon
-                    ref={anchorRef}
+                <S.ColumnAction ref={anchorRef}>
+                  <Icon
                     data-test="column-options"
-                    name="overflow"
+                    name="overflow-vertical"
                     className="column-actions-trigger"
                     onClick={() => setOpen(o => !o)}
                   />
@@ -827,8 +827,8 @@ const SortStateToggle: React.FC<{
   if (colSortState && colSortState === 'desc') {
     return (
       <S.ControlIcon
-        name="down-arrow"
-        onClick={async e => {
+        name="sort-descending"
+        onClick={async () => {
           recordEvent('REMOVE_COLUMN_SORT');
           updateTableState(Table.disableSortByCol(tableState, colId));
         }}
@@ -837,8 +837,8 @@ const SortStateToggle: React.FC<{
   } else if (colSortState && colSortState === 'asc') {
     return (
       <S.ControlIcon
-        name="up-arrow"
-        onClick={async e => {
+        name="sort-ascending"
+        onClick={async () => {
           recordEvent('UPDATE_COLUMN_SORT_DESC');
           updateTableState(
             Table.enableSortByCol(Table.disableSort(tableState), colId, false)
@@ -869,15 +869,22 @@ const ColumnMenuOptionRenderer: OptionRenderer = ({
   option,
   hovered,
   selected,
-}) => (
-  <Item
-    data-test={option['data-test']}
-    hovered={hovered}
-    style={{justifyContent: 'flex-start'}}>
-    <ItemIcon
-      style={{marginRight: '8px', marginLeft: 0}}
-      name={option.icon ?? (selected && option.icon ? 'check' : 'blank')}
-    />
-    {option.name ?? option.value}
-  </Item>
-);
+}) => {
+  const iconName = option.icon ?? (selected && option.icon ? 'check' : 'blank');
+
+  return (
+    <Item
+      data-test={option['data-test']}
+      hovered={hovered}
+      style={{justifyContent: 'flex-start'}}>
+      {iconName !== 'blank' && (
+        <ItemIcon
+          style={{marginRight: '8px', marginLeft: 0}}
+          name={iconName as IconName}
+        />
+      )}
+
+      {option.name ?? option.value}
+    </Item>
+  );
+};

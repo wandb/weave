@@ -376,6 +376,9 @@ const useSelectedRowState = (
     if (!shouldHighlightSelectedRow) {
       return [];
     }
+    if (_.isEmpty(rows)) {
+      return [];
+    }
     const assumedSelectedInputDigest =
       state.selectedInputDigest ?? rows[0].inputDigest;
     return rows
