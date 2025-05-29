@@ -120,26 +120,62 @@ However, often LLM applications have additional logic (such as pre/post processi
     print(my_function("World"))
     ```
 
-    This works for both functions as well as methods on classes:
+    You can also track [methods on classes](#4-track-class-and-object-methods).
 
+    #### Trace sync & async generator functions
+
+    Weave supports tracing both sync and async generator functions, including deeply nested patterns.
+
+    :::important
+    Since generators yield values lazily, the outputs are only logged when the generator is fully consumed (e.g., by converting it to a list).
+    To ensure outputs are captured in the trace, fully consume the generator (e.g., by using `list()`).
+    :::
 
     ```python showLineNumbers
+    from typing import Generator
     import weave
 
-    # Initialize Weave Tracing
-    weave.init("intro-example")
+    weave.init("my-project")
 
-    class MyClass:
-        # Decorate your method
-        @weave.op
-        def my_method(self, name: str):
-            return f"Hello, {name}!"
+    # This function uses a simple sync generator.
+    # Weave will trace the call and its input (`x`), 
+    # but output values are only captured once the generator is consumed (e.g., via `list()`).
+    @weave.op
+    def basic_gen(x: int) -> Generator[int, None, None]:
+        yield from range(x)
 
-    instance = MyClass()
+    # A normal sync function used within the generator pipeline.
+    # Its calls are also traced independently by Weave.
+    @weave.op
+    def inner(x: int) -> int:
+        return x + 1
 
-    # Call your method -- Weave will automatically track inputs and outputs
-    print(instance.my_method("World"))
+    # A sync generator that calls another traced function (`inner`).
+    # Each yielded value comes from a separate traced call to `inner`.
+    @weave.op
+    def nested_generator(x: int) -> Generator[int, None, None]:
+        for i in range(x):
+            yield inner(i)
+
+    # A more complex generator that composes the above generator.
+    # Tracing here produces a hierarchical call tree:
+    # - `deeply_nested_generator` (parent)
+    #   - `nested_generator` (child)
+    #     - `inner` (grandchild)
+    @weave.op
+    def deeply_nested_generator(x: int) -> Generator[int, None, None]:
+        for i in range(x):
+            for j in nested_generator(i):
+                yield j
+
+    # The generator must be *consumed* for Weave to capture outputs.
+    # This is true for both sync and async generators.
+    res = deeply_nested_generator(4)
+    list(res)  # Triggers tracing of all nested calls and yields
     ```
+    
+    ![Tracing generator functions in Weave.](imgs/generators.png)
+
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     Weave allows you to manually track these calls by wrapping your function with [`weave.op`](../../reference/typescript-sdk/weave/functions/op.md). For example:
@@ -413,7 +449,72 @@ You can also manually create Calls using the API directly.
     </TabItem>
 </Tabs>
 
+### 4. Track class and object methods
 
+You can also track class and object methods.
+
+<Tabs groupId="programming-language">
+    <TabItem value="python" label="Python" default>
+    Track any method on a class using `weave.op`.
+
+    ```python showLineNumbers
+    import weave
+
+    # Initialize Weave Tracing
+    weave.init("intro-example")
+
+    class MyClass:
+        # Decorate your method
+        @weave.op
+        def my_method(self, name: str):
+            return f"Hello, {name}!"
+
+    instance = MyClass()
+
+    # Call your method -- Weave will automatically track inputs and outputs
+    print(instance.my_method("World"))
+    ```
+
+    </TabItem>
+    <TabItem value="typescript" label="TypeScript">
+
+    :::important
+    **Using decorators in TypeScript**
+
+    To use the `@weave.op` decorator with your TypeScript code, make sure your environment is properly configured:
+
+    - **TypeScript v5.0 or newer**: Decorators are supported out of the box and no additional configuration is required.
+    - **TypeScript older than v5.0**: Enable experimental support for decorators. For more details, see the [official TypeScript documentation on decorators](https://www.typescriptlang.org/docs/handbook/decorators.html).
+    :::
+    
+    #### Decorate a class method
+
+    Use `@weave.op` to trace instance methods.
+
+    ```typescript
+    class Foo {
+        @weave.op
+        async predict(prompt: string) {
+            return "bar"
+        }
+    }
+    ```
+
+    #### Decorate a static class method
+
+    Apply `@weave.op` to static methods to monitor utility functions within a class.
+
+    ```typescript
+    class MathOps {
+        @weave.op
+        static square(n: number): number {
+            return n * n;
+        }
+    }
+    ```
+
+    </TabItem>
+</Tabs>
 
 
 ## Viewing Calls
@@ -442,6 +543,75 @@ You can also manually create Calls using the API directly.
 
     print(call)
     ```
+    
+    ### Customize rendered traces with `weave.Markdown`
+
+    Weave makes it easy to tailor how your traced operations are displayed without losing the original data. 
+    With `weave.Markdown`, you can render inputs and outputs as clean, readable blocks of formatted content while preserving the underlying structured data for programmatic access.
+    Use `postprocess_inputs` and `postprocess_output` in your `@weave.op` decorator to enhance trace readability.
+
+    The following code sample uses postprocessors to render a call in Weave to with emojis and nicer formatting:
+    
+    <pre>
+    ```python
+    import weave
+
+    def postprocess_inputs(query) -> weave.Markdown:
+        search_box = f"""
+    🔍 **Search Query:**
+    ``+`
+    {query}
+    ``+`
+    """
+        return {"search_box": weave.Markdown(search_box),
+                "query": query}
+
+
+    def postprocess_output(docs) -> weave.Markdown:
+        formatted_docs = f"""
+    # 📰 {docs[0]["title"]}
+
+    {docs[0]["content"]}
+
+    🔗 [Read more]({docs[0]["url"]})
+
+    ---
+
+    # 📰 {docs[1]["title"]}
+
+    {docs[1]["content"]}
+
+    🔗 [Read more]({docs[1]["url"]})
+    """
+        return weave.Markdown(formatted_docs)
+
+    @weave.op(
+        postprocess_inputs=postprocess_inputs,
+        postprocess_output=postprocess_output,
+    )
+    def rag_step(query):
+        # example newspaper articles of the companies on the S&P 500 
+        docs = [
+            {
+                "title": "OpenAI",
+                "content": "OpenAI is a company that makes AI models.",
+                "url": "https://www.openai.com",
+            },
+            {
+                "title": "Google",
+                "content": "Google is a company that makes search engines.",
+                "url": "https://www.google.com",
+            },
+        ]
+        return docs
+
+    if __name__ == "__main__":
+        weave.init('markdown_renderers')
+        rag_step("Tell me about OpenAI")
+    ```
+    </pre>
+
+    ![A call rendered in the Weave UI using the code sample.](imgs/md-call-render.png)
 
     </TabItem>
     <TabItem value="typescript" label="TypeScript">

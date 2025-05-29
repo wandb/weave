@@ -66,7 +66,6 @@ import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
 import {useControllableState, useURLSearchParamsDict} from '../util';
-import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
@@ -99,12 +98,18 @@ import {CallsTableNoRowsOverlay} from './CallsTableNoRowsOverlay';
 import {DEFAULT_FILTER_CALLS, useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import {ParentFilterTag} from './ParentFilterTag';
 
 const MAX_SELECT = 100;
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
   'summary.weave.feedback',
+  'summary.status_counts',
+  // attributes.python was logged for a short period of time
+  // accidentally in v0.51.47. We can hide it for a while
+  // and remove this after a few months (say Sept 2025)
+  'attributes.python',
   'wb_run_id',
   'attributes.otel_span',
 ];
@@ -555,14 +560,15 @@ export const CallsTable: FC<{
       : null;
   }, [effectiveFilter.outputObjectVersionRefs, outputObjectVersionOptions]);
 
-  // 4. Parent ID
-  const parentIdOptions = useParentIdOptions(entity, project, effectiveFilter);
-  const selectedParentId = useMemo(
-    () =>
-      effectiveFilter.parentId
-        ? parentIdOptions[effectiveFilter.parentId]
-        : null,
-    [effectiveFilter.parentId, parentIdOptions]
+  // 4. Parent ID - UI delegated to ParentFilterTag
+  const onSetParentFilter = useCallback(
+    (parentId: string | undefined) => {
+      setFilter({
+        ...filter,
+        parentId,
+      });
+    },
+    [setFilter, filter]
   );
 
   // DataGrid Model Management
@@ -752,8 +758,15 @@ export const CallsTable: FC<{
     tableData.forEach(row => {
       Object.keys(row).forEach(key => keysSet.add(key));
     });
+    // `storage_size_bytes` is never shown in the table view, so don't include it
+    keysSet.delete('storage_size_bytes');
+    // set the `total_storage_size_bytes` based on whether we are showing trace roots only
+    if (!effectiveFilter.traceRootsOnly) {
+      keysSet.delete('total_storage_size_bytes');
+    }
+
     return Array.from(keysSet);
-  }, [tableData]);
+  }, [tableData, effectiveFilter]);
 
   const visibleColumns = useMemo(() => {
     return tableData.length > 0
@@ -1022,25 +1035,12 @@ export const CallsTable: FC<{
                 }
               />
             )}
-            {selectedParentId && (
-              <RemovableTag
-                maxChars={48}
-                truncatedPart="middle"
-                color="moon"
-                label={`Parent: ${selectedParentId}`}
-                removeAction={
-                  <RemoveAction
-                    onClick={(e: React.SyntheticEvent) => {
-                      e.stopPropagation();
-                      setFilter({
-                        ...filter,
-                        parentId: undefined,
-                      });
-                    }}
-                  />
-                }
-              />
-            )}
+            <ParentFilterTag
+              entity={entity}
+              project={project}
+              parentId={effectiveFilter.parentId}
+              onSetParentFilter={onSetParentFilter}
+            />
             <div className="flex items-center gap-6">
               <Button
                 variant="ghost"
@@ -1271,33 +1271,6 @@ const OpSelector = ({
       </ListItem>
     </div>
   );
-};
-
-const useParentIdOptions = (
-  entity: string,
-  project: string,
-  effectiveFilter: WFHighLevelCallFilter
-) => {
-  const {useCall} = useWFHooks();
-  const callKey = effectiveFilter.parentId
-    ? {
-        entity,
-        project,
-        callId: effectiveFilter.parentId,
-      }
-    : null;
-  const parentCall = useCall({key: callKey});
-  return useMemo(() => {
-    if (parentCall.loading || parentCall.result == null) {
-      return {};
-    }
-    const call = parentCall.result;
-    const truncatedId = call.callId.slice(-4);
-    const label = `${call.displayName} (${truncatedId})`;
-    return {
-      [call.callId]: label,
-    };
-  }, [parentCall.loading, parentCall.result]);
 };
 
 // Get the tail of the peekPath (ignore query params)

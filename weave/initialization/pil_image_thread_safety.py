@@ -16,9 +16,12 @@ not only in our persistence layer but also in user code where loaded images are 
 We call `apply_threadsafe_patch_to_pil_image` in the `__init__.py` file to ensure thread-safety for the ImageFile class.
 """
 
+import logging
 import threading
 from functools import wraps
 from typing import Any, Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 # Global state
 # `_patched` is a boolean that indicates whether the thread-safety patch has been applied
@@ -47,7 +50,7 @@ def apply_threadsafe_patch_to_pil_image() -> None:
     except ImportError:
         pass
     except Exception as e:
-        print(f"Failed to patch PIL.ImageFile.ImageFile: Unexpected error - {e}")
+        logger.info(f"Failed to patch PIL.ImageFile.ImageFile: Unexpected error - {e}")
     else:
         _patched = True
 
@@ -120,7 +123,7 @@ def undo_threadsafe_patch_to_pil_image() -> None:
     except ImportError:
         pass
     except Exception as e:
-        print(
+        logger.info(
             f"Failed to unpatch PIL.ImageFile.ImageFile: Unable to restore original methods - {e}"
         )
     else:
