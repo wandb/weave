@@ -1,30 +1,33 @@
-import Tabs from "@theme/Tabs";
-import TabItem from "@theme/TabItem";
-import { DesktopWindow } from "../../../src/components/DesktopImage";
-import TracingCallsMacroImage from "@site/static/img/screenshots/calls_macro.png";
-import TracingCallsFilterImage from "@site/static/img/screenshots/calls_filter.png";
-import BasicCallImage from "@site/static/img/screenshots/basic_call.png";
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import { DesktopWindow } from '../../../src/components/DesktopImage'
+import TracingCallsMacroImage from '@site/static/img/screenshots/calls_macro.png';
+import TracingCallsFilterImage from '@site/static/img/screenshots/calls_filter.png';
+import BasicCallImage from '@site/static/img/screenshots/basic_call.png';
+
 
 # Tracing Basics
 
-<DesktopWindow
-  images={[TracingCallsMacroImage, BasicCallImage, TracingCallsFilterImage]}
+<DesktopWindow 
+  images={[
+    TracingCallsMacroImage,
+    BasicCallImage,
+    TracingCallsFilterImage,
+  ]}
   alt="Screenshot of Weave Calls"
   title="Weave Calls"
 />
 
 :::info[Calls]
 Calls are the fundamental building block in Weave. They represent a single execution of a function, including:
-
 - Inputs (arguments)
-- Outputs (return value)
+- Outputs (return value) 
 - Metadata (duration, exceptions, LLM usage, etc.)
 
 Calls are similar to spans in the [OpenTelemetry](https://opentelemetry.io) data model. A Call can:
-
 - Belong to a Trace (a collection of calls in the same execution context)
 - Have parent and child Calls, forming a tree structure
-  :::
+:::
 
 ## Creating Calls
 
@@ -32,13 +35,12 @@ There are three main ways to create Calls in Weave:
 
 ### 1. Automatic tracking of LLM libraries
 
+
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
+    Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`, `anthropic`, `cohere`, and `mistral`. Simply call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) at the start of your program:
 
-    Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`, `anthropic`, `cohere`, and `mistral`. Simply call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) at the start of your program (There is a better way to do this now, do manually wrapping is no longer needed, we mention it and leave a link to the guide for greater details):
-
-
-    :::tip
+    :::tip 
     You can control Weave's default tracking behavior [using the `autopatch_settings` argument in `weave.init`](#configure-autopatching).
     :::
 
@@ -73,7 +75,7 @@ There are three main ways to create Calls in Weave:
     import OpenAI from 'openai'
     import * as weave from 'weave'
 
-    const client = new OpenAI()
+    const client = weave.wrapOpenAI(new OpenAI())
 
     // Initialize Weave Tracing
     await weave.init('intro-example')
@@ -136,7 +138,7 @@ However, often LLM applications have additional logic (such as pre/post processi
     weave.init("my-project")
 
     # This function uses a simple sync generator.
-    # Weave will trace the call and its input (`x`),
+    # Weave will trace the call and its input (`x`), 
     # but output values are only captured once the generator is consumed (e.g., via `list()`).
     @weave.op
     def basic_gen(x: int) -> Generator[int, None, None]:
@@ -171,7 +173,7 @@ However, often LLM applications have additional logic (such as pre/post processi
     res = deeply_nested_generator(4)
     list(res)  # Triggers tracing of all nested calls and yields
     ```
-
+    
     ![Tracing generator functions in Weave.](imgs/generators.png)
 
   </TabItem>
@@ -209,9 +211,9 @@ However, often LLM applications have additional logic (such as pre/post processi
         }
     }
     ```
-
   </TabItem>
 </Tabs>
+
 
 #### Getting a handle to the call object during execution
 
@@ -252,7 +254,6 @@ However, often LLM applications have additional logic (such as pre/post processi
     # Call your method -- Weave will automatically track inputs and outputs
     instance.my_method.call(instance, "World")
     ```
-
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     ```plaintext
@@ -260,6 +261,8 @@ However, often LLM applications have additional logic (such as pre/post processi
     ```
   </TabItem>
 </Tabs>
+
+
 
 #### Call display name
 
@@ -340,7 +343,7 @@ However, often LLM applications have additional logic (such as pre/post processi
         ```
 
 
-    **Technical Note:** "Calls" are produced by "Ops". An Op is a function or method that is decorated with `@weave.op`.
+    **Technical Note:** "Calls" are produced by "Ops". An Op is a function or method that is decorated with `@weave.op`. 
     By default, the Op's name is the function name, and the associated calls will have the same display name. The above example shows how to override the display name for all Calls of a given Op.  Sometimes, users wish to override the name of the Op itself. This can be achieved in one of two ways:
 
     1. Set the `name` property of the Op before any calls are logged
@@ -352,7 +355,6 @@ However, often LLM applications have additional logic (such as pre/post processi
     ```python showLineNumbers
     @weave.op(name="My Custom Op Name)
     ```
-
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     ```plaintext
@@ -360,6 +362,10 @@ However, often LLM applications have additional logic (such as pre/post processi
     ```
   </TabItem>
 </Tabs>
+
+
+
+
 
 #### Attributes
 
@@ -441,7 +447,6 @@ You can also manually create Calls using the API directly.
     }
     ```
     </TabItem>
-
 </Tabs>
 
 ### 4. Track class and object methods
@@ -481,7 +486,7 @@ You can also track class and object methods.
     - **TypeScript v5.0 or newer**: Decorators are supported out of the box and no additional configuration is required.
     - **TypeScript older than v5.0**: Enable experimental support for decorators. For more details, see the [official TypeScript documentation on decorators](https://www.typescriptlang.org/docs/handbook/decorators.html).
     :::
-
+    
     #### Decorate a class method
 
     Use `@weave.op` to trace instance methods.
@@ -509,11 +514,10 @@ You can also track class and object methods.
     ```
 
     </TabItem>
-
 </Tabs>
 
-## Viewing Calls
 
+## Viewing Calls
 <Tabs groupId="programming-language">
     <TabItem value="web_app" label="Web App">
     To view a call in the web app:
@@ -539,15 +543,15 @@ You can also track class and object methods.
 
     print(call)
     ```
-
+    
     ### Customize rendered traces with `weave.Markdown`
 
-    Weave makes it easy to tailor how your traced operations are displayed without losing the original data.
+    Weave makes it easy to tailor how your traced operations are displayed without losing the original data. 
     With `weave.Markdown`, you can render inputs and outputs as clean, readable blocks of formatted content while preserving the underlying structured data for programmatic access.
     Use `postprocess_inputs` and `postprocess_output` in your `@weave.op` decorator to enhance trace readability.
 
     The following code sample uses postprocessors to render a call in Weave to with emojis and nicer formatting:
-
+    
     <pre>
     ```python
     import weave
@@ -586,7 +590,7 @@ You can also track class and object methods.
         postprocess_output=postprocess_output,
     )
     def rag_step(query):
-        # example newspaper articles of the companies on the S&P 500
+        # example newspaper articles of the companies on the S&P 500 
         docs = [
             {
                 "title": "OpenAI",
@@ -637,16 +641,15 @@ You can also track class and object methods.
     }'
     ```
     </TabItem>
-
 </Tabs>
+
 
 ## Updating Calls
 
 Calls are mostly immutable once created, however, there are a few mutations which are supported:
-
-- [Set Display Name](#set-display-name)
-- [Add Feedback](#add-feedback)
-- [Delete a Call](#delete-a-call)
+* [Set Display Name](#set-display-name)
+* [Add Feedback](#add-feedback)
+* [Delete a Call](#delete-a-call)
 
 All of these mutations can be performed from the UI by navigating to the call detail page:
 
@@ -690,10 +693,9 @@ All of these mutations can be performed from the UI by navigating to the call de
     }'
     ```
     </TabItem>
-
 </Tabs>
 
-### Add feedback
+### Add feedback 
 
 Please see the [Feedback Documentation](./feedback.md) for more details.
 
@@ -711,7 +713,7 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
 
     # Get a specific call by its ID
     call = client.get_call("call-uuid-here")
-
+    
     # Delete the call
     call.delete()
     ```
@@ -737,7 +739,6 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
     }'
     ```
     </TabItem>
-
 </Tabs>
 
 ### Delete multiple Calls
@@ -757,7 +758,7 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
     # Initialize the client
     client = weave.init("my-project")
 
-    # Get all calls from client
+    # Get all calls from client 
     all_calls = client.get_calls()
 
     # Get list of first 1000 Call objects
@@ -776,27 +777,28 @@ Please see the [Feedback Documentation](./feedback.md) for more details.
     This feature is not available in TypeScript yet.  Stay tuned!
     ```
     </TabItem>
-
 </Tabs>
 
 ## Querying and exporting Calls
 
-<DesktopWindow
-  images={[TracingCallsFilterImage]}
+<DesktopWindow 
+  images={[
+    TracingCallsFilterImage,
+  ]}
   alt="Screenshot of many calls"
   title="Weave Calls"
 />
 
 The `/calls` page of your project ("Traces" tab) contains a table view of all the Calls in your project. From there, you can:
-
-- Sort
-- Filter
-- Export
+* Sort
+* Filter
+* Export
 
 ![Calls Table View](../../../static/img/export_modal.png)
 
 The Export Modal (shown above) allows you to export your data in a number of formats, as well as shows the Python & CURL equivalents for the selected calls!
 The easiest way to get started is to construct a view in the UI, then learn more about the export API via the generated code snippets.
+
 
 <Tabs groupId="client-layer">
     <TabItem value="python_sdk" label="Python">
@@ -883,36 +885,36 @@ The easiest way to get started is to construct a view in the UI, then learn more
     }'
     ```
     </TabItem>
-
 </Tabs>
 
-{/\* ## Compare calls
+{/* ## Compare calls
 
 :::info[Comming Soon]
-::: \*/}
+::: */}
 
 ### Call schema
 
 Please see the [schema](../../reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface#class-callschema) for a complete list of fields.
 
-| Property     | Type                 | Description                                   |
-| ------------ | -------------------- | --------------------------------------------- |
-| id           | string (uuid)        | Unique identifier for the call                |
-| project_id   | string (optional)    | Associated project identifier                 |
-| op_name      | string               | Name of the operation (can be a reference)    |
-| display_name | string (optional)    | User-friendly name for the call               |
-| trace_id     | string (uuid)        | Identifier for the trace this call belongs to |
-| parent_id    | string (uuid)        | Identifier of the parent call                 |
-| started_at   | datetime             | Timestamp when the call started               |
-| attributes   | Dict[str, Any]       | User-defined metadata about the call          |
-| inputs       | Dict[str, Any]       | Input parameters for the call                 |
-| ended_at     | datetime (optional)  | Timestamp when the call ended                 |
-| exception    | string (optional)    | Error message if the call failed              |
-| output       | Any (optional)       | Result of the call                            |
-| summary      | Optional[SummaryMap] | Post-execution summary information            |
-| wb_user_id   | Optional[str]        | Associated Weights & Biases user ID           |
-| wb_run_id    | Optional[str]        | Associated Weights & Biases run ID            |
-| deleted_at   | datetime (optional)  | Timestamp of call deletion, if applicable     |
+
+| Property | Type | Description |
+|----------|------|-------------|
+| id | string (uuid) | Unique identifier for the call |
+| project_id | string (optional) | Associated project identifier |
+| op_name | string | Name of the operation (can be a reference) |
+| display_name | string (optional) | User-friendly name for the call |
+| trace_id | string (uuid) | Identifier for the trace this call belongs to |
+| parent_id | string (uuid) | Identifier of the parent call |
+| started_at | datetime | Timestamp when the call started |
+| attributes | Dict[str, Any] | User-defined metadata about the call |
+| inputs | Dict[str, Any] | Input parameters for the call |
+| ended_at | datetime (optional) | Timestamp when the call ended |
+| exception | string (optional) | Error message if the call failed |
+| output | Any (optional) | Result of the call |
+| summary | Optional[SummaryMap] | Post-execution summary information |
+| wb_user_id | Optional[str] | Associated Weights & Biases user ID |
+| wb_run_id | Optional[str] | Associated Weights & Biases run ID |
+| deleted_at | datetime (optional) | Timestamp of call deletion, if applicable |
 
 The table above outlines the key properties of a Call in Weave. Each property plays a crucial role in tracking and managing function calls:
 
@@ -923,18 +925,20 @@ The table above outlines the key properties of a Call in Weave. Each property pl
 
 This comprehensive set of properties enables detailed tracking and analysis of function calls throughout your project.
 
-Calculated Fields:
-_ Cost
-_ Duration \* Status
 
-## Saved views
+Calculated Fields:
+    * Cost
+    * Duration
+    * Status
+
+## Saved views 
 
 You can save your Trace table configurations, filters, and sorts as _saved views_ for quick access to your preferred setup. You can configure and access saved views via the UI and the Python SDK. For more information, see [Saved Views](/guides/tools/saved-views.md).
 
 ## View a W&B run in the Traces table
 
-With Weave, you can trace function calls in your code and link them directly to the [W&B runs](https://docs.wandb.ai/guides/runs/) in which they were executed.
-When you trace a function with @weave.op() and call it inside a wandb.init() context, Weave automatically associates the trace with the W&B run.
+With Weave, you can trace function calls in your code and link them directly to the [W&B runs](https://docs.wandb.ai/guides/runs/) in which they were executed. 
+When you trace a function with @weave.op() and call it inside a wandb.init() context, Weave automatically associates the trace with the W&B run. 
 Links to any associated runs are shown in the Traces table.
 
 ### Python example
@@ -943,7 +947,7 @@ The following Python code shows how traced operations are linked to W&B
 runs when executed inside a `wandb.init()` context. These traces appear in the
 Weave UI and are associated with the corresponding run.
 
-```python
+```python 
 import wandb
 import weave
 
@@ -1007,7 +1011,6 @@ To use the code sample:
    ```bash
    python weave_trace_with_wandb.py
    ```
-
 5. Visit [https://weave.wandb.ai](https://weave.wandb.ai) and select your project.
 6. In the **Traces** tab, view the trace output. Links to any associated runs are shown in the Traces table.
 
@@ -1028,7 +1031,7 @@ weave.init(..., autopatch_settings={"disable_autopatch": True})
 weave.init(..., autopatch_settings={"openai": {"enabled": False}})
 ```
 
-### Post-process inputs and outputs
+### Post-process inputs and outputs 
 
 You can also customize how post-process inputs and outputs (e.g. for PII data) are handled during autopatching:
 
@@ -1116,3 +1119,4 @@ output, call = my_op.call()
 ```
 
 From here, the `call` object will have all the information about the call, including the inputs, outputs, and other metadata.
+
