@@ -351,7 +351,7 @@ const useBarPlotData = (filteredData: RadarPlotData) =>
           Number.isInteger(value) ? value.toString() : value.toFixed(3)
         ),
         textposition: 'outside',
-        textfont: {size: 14, color: 'black'},
+        textfont: {size: 12, color: 'black'},
         name: metric,
         marker: {color: metricBin.colors},
       };

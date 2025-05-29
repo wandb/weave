@@ -51,6 +51,9 @@ export const PlotlyRadarPlot: React.FC<{
           linecolor: PLOT_GRID_COLOR,
           gridcolor: PLOT_GRID_COLOR,
           ticklen: 3,
+          tickfont: {
+            size: 10,
+          },
         },
       },
     };
