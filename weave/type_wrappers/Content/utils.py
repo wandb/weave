@@ -48,7 +48,10 @@ class ContentKeywordArgs(TypedDict, total=False):
 def is_valid_path(input: str | Path) -> bool:
     if isinstance(input, str):
         input = Path(input)
-    return input.exists() and input.is_file()
+    try:
+        return input.exists() and input.is_file()
+    except Exception as _:
+        return False
 
 
 def default_filename(
