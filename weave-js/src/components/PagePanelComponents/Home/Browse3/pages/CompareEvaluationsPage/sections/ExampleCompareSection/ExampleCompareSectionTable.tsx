@@ -376,6 +376,9 @@ const useSelectedRowState = (
     if (!shouldHighlightSelectedRow) {
       return [];
     }
+    if (_.isEmpty(rows)) {
+      return [];
+    }
     const assumedSelectedInputDigest =
       state.selectedInputDigest ?? rows[0].inputDigest;
     return rows
@@ -928,8 +931,6 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     outputWidths,
   ]);
 
-  console.log(compositeMetrics);
-
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
       {
@@ -1190,8 +1191,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     compositeMetrics,
     outputWidths,
   ]);
-
-  console.log(compositeMetrics);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     return [
