@@ -101,6 +101,7 @@ from weave.trace_server.llm_completion import (
     lite_llm_completion_stream,
 )
 from weave.trace_server.model_providers.model_providers import (
+    LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
 from weave.trace_server.object_class_util import process_incoming_object_val
@@ -1848,9 +1849,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
         # Use shared setup logic
+        model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
             model_name, api_key, provider, base_url, extra_headers, return_type = (
-                self._setup_completion_model_info(req)
+                _setup_completion_model_info(model_info, req, self.obj_read)
             )
         except Exception as e:
             return tsi.CompletionsCreateRes(response={"error": str(e)})
@@ -1914,68 +1916,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # -------------------------------------------------------------------
     # Streaming variant
     # -------------------------------------------------------------------
-
-    def _setup_completion_model_info(
-        self, req: tsi.CompletionsCreateReq
-    ) -> tuple[str, Optional[str], str, Optional[str], dict[str, str], Optional[str]]:
-        """Extract model setup logic shared between completions_create and completions_create_stream.
-
-        Returns: (model_name, api_key, provider, base_url, extra_headers, return_type)
-        Note: api_key can be None for bedrock providers since they use AWS credentials instead.
-        """
-        model_name = req.inputs.model
-        api_key = None
-        provider = None
-        base_url: Optional[str] = None
-        extra_headers: dict[str, str] = {}
-        return_type: Optional[str] = None
-
-        model_info = self._model_to_provider_info_map.get(model_name)
-
-        if model_info:
-            secret_name = model_info.get("api_key_name")
-            if not secret_name:
-                raise InvalidRequest(f"No secret name found for model {model_name}")
-
-            secret_fetcher = _secret_fetcher_context.get()
-            if not secret_fetcher:
-                raise InvalidRequest(
-                    f"No secret fetcher found, cannot fetch API key for model {model_name}"
-                )
-
-            api_key = (
-                secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-            )
-            provider = model_info.get("litellm_provider", "openai")
-
-            if not api_key and provider not in ("bedrock", "bedrock_converse"):
-                raise MissingLLMApiKeyError(
-                    f"No API key {secret_name} found for model {model_name}",
-                    api_key_name=secret_name,
-                )
-        else:
-            # Custom provider path
-            custom_provider_info = get_custom_provider_info(
-                project_id=req.project_id,
-                model_name=model_name,
-                obj_read_func=self.obj_read,
-            )
-
-            base_url = custom_provider_info.base_url
-            api_key = custom_provider_info.api_key
-            extra_headers = custom_provider_info.extra_headers
-            return_type = custom_provider_info.return_type
-            actual_model_name = custom_provider_info.actual_model_name
-
-            provider = "custom"
-            req.inputs.model = (
-                "ollama/" + actual_model_name
-                if "ollama" in model_name
-                else actual_model_name
-            )
-
-        return model_name, api_key, provider, base_url, extra_headers, return_type
-
     def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
@@ -1986,9 +1926,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         a call_end record once the stream finishes (successfully or not).
         """
         # --- Shared setup logic (copy of completions_create up to litellm call)
+        model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
             model_name, api_key, provider, base_url, extra_headers, return_type = (
-                self._setup_completion_model_info(req)
+                _setup_completion_model_info(model_info, req, self.obj_read)
             )
         except Exception as e:
             # Yield error as single chunk then stop.
@@ -2831,3 +2772,63 @@ def _create_tracked_stream_wrapper(
             insert_call(end_call)
 
     return _stream_wrapper()
+
+
+def _setup_completion_model_info(
+    model_info: LLMModelProviderInfo | None,
+    req: tsi.CompletionsCreateReq,
+    obj_read: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
+) -> tuple[str, Optional[str], str, Optional[str], dict[str, str], Optional[str]]:
+    """Extract model setup logic shared between completions_create and completions_create_stream.
+
+    Returns: (model_name, api_key, provider, base_url, extra_headers, return_type)
+    Note: api_key can be None for bedrock providers since they use AWS credentials instead.
+    """
+    model_name = req.inputs.model
+    api_key = None
+    provider = None
+    base_url: Optional[str] = None
+    extra_headers: dict[str, str] = {}
+    return_type: Optional[str] = None
+
+    if model_info:
+        secret_name = model_info.get("api_key_name")
+        if not secret_name:
+            raise InvalidRequest(f"No secret name found for model {model_name}")
+
+        secret_fetcher = _secret_fetcher_context.get()
+        if not secret_fetcher:
+            raise InvalidRequest(
+                f"No secret fetcher found, cannot fetch API key for model {model_name}"
+            )
+
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        provider = model_info.get("litellm_provider", "openai")
+
+        if not api_key and provider not in ("bedrock", "bedrock_converse"):
+            raise MissingLLMApiKeyError(
+                f"No API key {secret_name} found for model {model_name}",
+                api_key_name=secret_name,
+            )
+    else:
+        # Custom provider path
+        custom_provider_info = get_custom_provider_info(
+            project_id=req.project_id,
+            model_name=model_name,
+            obj_read_func=obj_read,
+        )
+
+        base_url = custom_provider_info.base_url
+        api_key = custom_provider_info.api_key
+        extra_headers = custom_provider_info.extra_headers
+        return_type = custom_provider_info.return_type
+        actual_model_name = custom_provider_info.actual_model_name
+
+        provider = "custom"
+        req.inputs.model = (
+            "ollama/" + actual_model_name
+            if "ollama" in model_name
+            else actual_model_name
+        )
+
+    return model_name, api_key, provider, base_url, extra_headers, return_type

@@ -226,7 +226,7 @@ export const PlaygroundChat = ({
                     className={`absolute bottom-0 left-0 right-0 top-0 z-[100] flex items-center justify-center bg-[${hexToRGB(
                       WHITE,
                       0.7
-                    )}]`}>
+                    )}] pointer-events-none`}>
                     <WaveLoader size="small" />
                   </div>
                 )}

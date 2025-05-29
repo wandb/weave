@@ -4,6 +4,7 @@ import _ from 'lodash';
 import React, {useEffect, useRef, useState} from 'react';
 
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
+import {useAnimatedText} from './hooks';
 import {MessagePanelPart} from './MessagePanelPart';
 import {PlaygroundMessagePanelButtons} from './PlaygroundMessagePanelButtons';
 import {PlaygroundMessagePanelEditor} from './PlaygroundMessagePanelEditor';
@@ -44,6 +45,20 @@ export const MessagePanel = ({
   const contentRef = useRef<HTMLDivElement>(null);
 
   const {isPlayground, isStreaming} = usePlaygroundContext();
+
+  // Determine if we should animate text
+  const shouldAnimateText = Boolean(
+    isPlayground &&
+      isStreaming &&
+      isLast &&
+      contentRef?.current &&
+      (message.content || (message.tool_calls && message.tool_calls.length > 0))
+  );
+
+  // Use animated text for the message content
+  const messageText = _.isString(message.content) ? message.content : '';
+  const {displayedText} = useAnimatedText(messageText, shouldAnimateText, 50);
+
   useEffect(() => {
     if (contentRef.current) {
       setIsOverflowing(contentRef.current.scrollHeight > 400);
@@ -69,13 +84,7 @@ export const MessagePanel = ({
   // and you end up scrolling back up to start reading the beginning of the message
   // could update this if users want a different behavior (this is the behavior currently of chatgpt)
   useEffect(() => {
-    if (
-      isPlayground &&
-      isStreaming &&
-      isLast &&
-      contentRef?.current &&
-      (message.content || (message.tool_calls && message.tool_calls.length > 0))
-    ) {
+    if (shouldAnimateText && contentRef.current) {
       // Find the closest scrollable parent and scroll to this message
       const messageElement = contentRef.current.closest('.group');
       if (messageElement) {
@@ -85,7 +94,7 @@ export const MessagePanel = ({
         });
       }
     }
-  }, [isPlayground, isStreaming, isLast, message.content, message.tool_calls]);
+  }, [shouldAnimateText]);
 
   const isUser = message.role === 'user';
   const isSystemPrompt = message.role === 'system';
@@ -181,7 +190,9 @@ export const MessagePanel = ({
                       })}>
                       {_.isString(message.content) ? (
                         <MessagePanelPart
-                          value={message.content}
+                          value={
+                            shouldAnimateText ? displayedText : message.content
+                          }
                           isStructuredOutput={isStructuredOutput}
                         />
                       ) : (

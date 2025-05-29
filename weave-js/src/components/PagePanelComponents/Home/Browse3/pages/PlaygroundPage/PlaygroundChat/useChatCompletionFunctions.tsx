@@ -414,7 +414,7 @@ export const useChatCompletionFunctions = (
         messageIndex,
         choiceIndex,
       });
-
+      setPlaygroundStates(updatedStates);
       // Accumulate chunks into a single response object while streaming
       let aggregatedRes = createAggregatedResponse();
 

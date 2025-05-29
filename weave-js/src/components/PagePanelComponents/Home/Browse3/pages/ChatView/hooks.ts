@@ -224,3 +224,81 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
     ...rest,
   };
 };
+
+export const useAnimatedText = (
+  text: string,
+  shouldAnimate: boolean,
+  speed: number = 20
+) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wordIndexRef = useRef(0);
+  const targetTextRef = useRef('');
+  const animationActiveRef = useRef(false);
+
+  // Clear any pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // If we should not animate and no animation is running, show full text immediately
+    if (!shouldAnimate && !animationActiveRef.current) {
+      setDisplayedText(text);
+      targetTextRef.current = text;
+      wordIndexRef.current = text.split(' ').length;
+      return;
+    }
+
+    // If animation is running, just update the target but let animation continue
+    if (animationActiveRef.current) {
+      targetTextRef.current = text;
+      return;
+    }
+
+    // Start new animation
+    const words = text.split(' ');
+    const currentWords = displayedText.split(' ');
+
+    // If text is shorter, update immediately
+    if (words.length < currentWords.length) {
+      setDisplayedText(text);
+      targetTextRef.current = text;
+      wordIndexRef.current = words.length;
+      return;
+    }
+
+    // If text hasn't changed, don't animate
+    if (text === displayedText) {
+      return;
+    }
+
+    // Start animation
+    targetTextRef.current = text;
+    animationActiveRef.current = true;
+
+    const animateText = () => {
+      const targetWords = targetTextRef.current.split(' ');
+
+      if (wordIndexRef.current < targetWords.length) {
+        const wordsToShow = targetWords.slice(0, wordIndexRef.current + 1);
+        setDisplayedText(wordsToShow.join(' '));
+        wordIndexRef.current++;
+        timeoutRef.current = setTimeout(animateText, speed);
+      } else {
+        animationActiveRef.current = false;
+        setDisplayedText(targetTextRef.current);
+      }
+    };
+
+    // Start animation from current position
+    animateText();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, shouldAnimate, speed]);
+
+  return {displayedText};
+};
