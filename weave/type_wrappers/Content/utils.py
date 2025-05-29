@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import mimetypes
 from datetime import datetime
 from pathlib import Path
@@ -14,9 +13,6 @@ try:
     del _MAGIC_INSTANCE_FOR_CHECK  # Clean up
 except magic.MagicException as e:
     MAGIC_LIB_AVAILABLE = False
-
-
-logger = logging.getLogger(__name__)
 
 
 # TODO: Mypy is really unfriendly to kwargs. Can we use pydantic or something to not make this so repetitive?
