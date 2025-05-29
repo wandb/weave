@@ -2,6 +2,7 @@ import {Box, Tooltip} from '@material-ui/core';
 import {WarningAmberOutlined} from '@mui/icons-material';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import styled from 'styled-components';
@@ -200,6 +201,22 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
  *    * Example. Go here and make the screen quite small - notice the 3rd eval's trials don't have sticky headers
  *      https://wandb.ai/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%2C%2232f3e6bc-5488-4dd4-b9c4-801929f2c541%22%2C%2234c0a20f-657f-407e-bb33-277abbb9997f%22%5D
  */
+export const ExampleCompareSectionDetailGuarded: typeof ExampleCompareSectionDetail =
+  props => {
+    const ctx = useCompareEvaluationsState();
+    const {filteredRows} = useFilteredAggregateRows(ctx.state);
+    if (_.isEmpty(filteredRows)) {
+      return (
+        <TailwindContents>
+          <div className="m-8">
+            These evaluations have no common rows between them, or the filter is
+            too restrictive.
+          </div>
+        </TailwindContents>
+      );
+    }
+    return <ExampleCompareSectionDetail {...props} />;
+  };
 
 export const ExampleCompareSectionDetail: React.FC<{
   // Not to future devs: `state` here can be derived from the context.

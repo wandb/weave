@@ -160,10 +160,14 @@ import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/ic
 import {ReactComponent as ImportOrganizationCorporate} from '../../assets/icons/icon-organization-corporate.svg';
 import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/icon-overflow-horizontal.svg';
 import {ReactComponent as ImportOverflowVertical} from '../../assets/icons/icon-overflow-vertical.svg';
+import {ReactComponent as ImportOverlay2Column} from '../../assets/icons/icon-overlay-2-column.svg';
+import {ReactComponent as ImportOverlay3Column} from '../../assets/icons/icon-overlay-3-column.svg';
+import {ReactComponent as ImportOverlayStack} from '../../assets/icons/icon-overlay-stack.svg';
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
 import {ReactComponent as ImportPanelAutoGen} from '../../assets/icons/icon-panel-auto-gen.svg';
+import {ReactComponent as ImportPanelImages} from '../../assets/icons/icon-panel-images.svg';
 import {ReactComponent as ImportPanelManual} from '../../assets/icons/icon-panel-manual.svg';
 import {ReactComponent as ImportParallelCoordinates} from '../../assets/icons/icon-parallel-coordinates.svg';
 import {ReactComponent as ImportParentBackUp} from '../../assets/icons/icon-parent-back-up.svg';
@@ -777,6 +781,15 @@ export const IconOverflowHorizontal = (props: SVGIconProps) => (
 export const IconOverflowVertical = (props: SVGIconProps) => (
   <ImportOverflowVertical {...updateIconProps(props)} />
 );
+export const IconOverlay2Column = (props: SVGIconProps) => (
+  <ImportOverlay2Column {...updateIconProps(props)} />
+);
+export const IconOverlay3Column = (props: SVGIconProps) => (
+  <ImportOverlay3Column {...updateIconProps(props)} />
+);
+export const IconOverlayStack = (props: SVGIconProps) => (
+  <ImportOverlayStack {...updateIconProps(props)} />
+);
 export const IconPanTool = (props: SVGIconProps) => (
   <ImportPanTool {...updateIconProps(props)} />
 );
@@ -788,6 +801,9 @@ export const IconPanel = (props: SVGIconProps) => (
 );
 export const IconPanelAutoGen = (props: SVGIconProps) => (
   <ImportPanelAutoGen {...updateIconProps(props)} />
+);
+export const IconPanelImages = (props: SVGIconProps) => (
+  <ImportPanelImages {...updateIconProps(props)} />
 );
 export const IconPanelManual = (props: SVGIconProps) => (
   <ImportPanelManual {...updateIconProps(props)} />
@@ -1296,10 +1312,14 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'organization-corporate': IconOrganizationCorporate,
   'overflow-horizontal': IconOverflowHorizontal,
   'overflow-vertical': IconOverflowVertical,
+  'overlay-2-column': IconOverlay2Column,
+  'overlay-3-column': IconOverlay3Column,
+  'overlay-stack': IconOverlayStack,
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
   'panel-auto-gen': IconPanelAutoGen,
+  'panel-images': IconPanelImages,
   'panel-manual': IconPanelManual,
   'parallel-coordinates': IconParallelCoordinates,
   'parent-back-up': IconParentBackUp,

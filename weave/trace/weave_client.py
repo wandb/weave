@@ -4,11 +4,13 @@ import dataclasses
 import datetime
 import json
 import logging
+import numbers
 import os
 import platform
 import re
 import sys
 import time
+from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
@@ -752,15 +754,59 @@ def make_client_call(
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
-    # dicts is a list of dictionaries, that may or may not
-    # have nested dictionaries. Sum all the leaves that match
-    result: dict = {}
+    """Recursively combines multiple dictionaries by summing their leaf values.
+
+    This function takes a list of dictionaries and combines them by:
+    1. For non-dict values: extending lists or summing numbers
+    2. For nested dictionaries: recursively combining them
+
+    Args:
+        dicts: A list of dictionaries to combine
+
+    Returns:
+        A single dictionary with combined values
+
+    Examples:
+        >>> # Combining status counts from multiple runs
+        >>> dicts = [
+        ...     {"status_counts": {"SUCCESS": 5, "FAILED": 1}},
+        ...     {"status_counts": {"SUCCESS": 3, "FAILED": 2, "PENDING": 1}}
+        ... ]
+        >>> sum_dict_leaves(dicts)
+        {'status_counts': {'SUCCESS': 8, 'FAILED': 3, 'PENDING': 1}}
+
+        >>> # Combining metrics with nested structure
+        >>> dicts = [
+        ...     {"metrics": {"accuracy": 0.95, "loss": 0.1, "details": {"precision": 0.9, "recall": 0.8}}},
+        ...     {"metrics": {"accuracy": 0.97, "loss": 0.08, "details": {"precision": 0.92, "f1": 0.85}}}
+        ... ]
+        >>> sum_dict_leaves(dicts)
+        {'metrics': {'accuracy': 1.92, 'loss': 0.18, 'details': {'precision': 1.82, 'recall': 0.8, 'f1': 0.85}}}
+    """
+    nested_dicts: dict[str, list[dict]] = defaultdict(list)
+    result: dict[str, Any] = defaultdict(list)
+
+    # First, collect all nested dictionaries by key
     for d in dicts:
         for k, v in d.items():
             if isinstance(v, dict):
-                result[k] = sum_dict_leaves([result.get(k, {}), v])
+                nested_dicts[k].append(v)
             elif v is not None:
-                result[k] = result.get(k, 0) + v
+                if isinstance(v, list):
+                    result[k].extend(v)
+                else:
+                    result[k].append(v)
+
+    # Sum those values that are numbers
+    for k, values in result.items():
+        # we only sum numbers if we are not going to combine nested dicts later
+        if k not in nested_dicts and all(isinstance(v, numbers.Number) for v in values):
+            result[k] = sum(values)
+
+    # Then recursively sum each collection of nested dictionaries
+    for k in nested_dicts.keys():
+        result[k] = sum_dict_leaves(nested_dicts[k])
+
     return result
 
 
