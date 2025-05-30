@@ -26,12 +26,12 @@ import {
   normalizeMistralChatCompletion,
 } from './ChatFormats/mistral';
 import {
-  isTraceCallChatFormatOpenAI,
   isTraceCallChatFormatOAIResponses,
   isTraceCallChatFormatOAIResponsesRequest,
   isTraceCallChatFormatOAIResponsesResult,
-  normalizeOAIResponsesRequest,
+  isTraceCallChatFormatOpenAI,
   normalizeOAIReponsesResult,
+  normalizeOAIResponsesRequest,
 } from './ChatFormats/openai';
 import {
   isTraceCallChatFormatOTEL,
