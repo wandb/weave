@@ -5,10 +5,14 @@ import React, {useEffect} from 'react';
 import {IconName, IconNames} from '../../../../../Icon';
 import {TailwindContents} from '../../../../../Tailwind';
 import {CustomLink} from '../../pages/common/Links';
-import {MiniAudioViewer} from './AudioView';
-import {ImageThumbnail, ImageViewport} from './ImageView';
-import {PDFView} from './PDFView';
-import {VideoPopup, VideoThumbnail} from './VideoView';
+import {
+  PDFView,
+  ImageThumbnail,
+  ImageViewport,
+  MiniAudioViewer,
+  VideoPopup,
+  VideoThumbnail,
+} from './Views';
 
 const ICON_MAP: Record<string, IconName> = {
   'application/json': IconNames.JobProgramCode,
