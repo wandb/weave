@@ -4,6 +4,8 @@ import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {Timestamp} from '@wandb/weave/components/Timestamp';
+import {UserLink} from '@wandb/weave/components/UserLink';
 import _ from 'lodash';
 import React, {
   FC,
@@ -25,7 +27,7 @@ import {
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {useShowDeleteButton} from '../common/DeleteModal';
-import {SimplePageLayout} from '../common/SimplePageLayout';
+import {SimplePageLayout, SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {DeleteObjectButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
 import {
   useBaseObjectInstances,
@@ -58,11 +60,67 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
       setIsEditing(true);
     }
   }, [isEditor, props.openEditorOnMount]);
+
+  // Create header content with metadata and action buttons for peek view
+  const headerContent = useMemo(() => {
+    if (!isPeeking || !leaderboardObjectVersion) {
+      return undefined;
+    }
+
+    const createdAtMs = new Date(leaderboardObjectVersion.createdAtMs).getTime();
+    
+    return (
+      <Tailwind>
+        <div className="flex justify-between">
+          <div className="grid auto-cols-max grid-flow-col gap-[16px] overflow-x-auto text-[14px]">
+            <div className="block">
+              <p className="text-moon-500">Name</p>
+              <p className="font-medium">{name}</p>
+            </div>
+            <div className="block">
+              <p className="text-moon-500">Created</p>
+              <Timestamp value={createdAtMs / 1000} format="relative" />
+            </div>
+            {leaderboardObjectVersion.userId && (
+              <div className="block">
+                <p className="text-moon-500">Created by</p>
+                <UserLink username={leaderboardObjectVersion.userId} />
+              </div>
+            )}
+          </div>
+          
+          {/* Action buttons on the right */}
+          {!isEditing && (
+            <div className="ml-auto flex-shrink-0 flex items-center gap-2">
+              {isEditor && (
+                <Button
+                  title="Edit leaderboard"
+                  tooltip="Edit leaderboard"
+                  variant="ghost"
+                  size="medium"
+                  icon="pencil-edit"
+                  onClick={() => setIsEditing(true)}>
+                  Edit
+                </Button>
+              )}
+              {showDeleteButton && (
+                <DeleteObjectButtonWithModal
+                  objVersionSchema={leaderboardObjectVersion}
+                  overrideDisplayStr={name}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </Tailwind>
+    );
+  }, [isPeeking, leaderboardObjectVersion, name, isEditing, isEditor, showDeleteButton]);
   
   return (
-    <SimplePageLayout
+    <SimplePageLayoutWithHeader
       title={name}
       hideTabsIfSingle
+      headerContent={headerContent}
       tabs={[
         {
           label: 'Leaderboard',
