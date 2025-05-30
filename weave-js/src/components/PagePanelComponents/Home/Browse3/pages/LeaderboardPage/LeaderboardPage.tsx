@@ -4,13 +4,9 @@ import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {Timestamp} from '@wandb/weave/components/Timestamp';
-import {UserLink} from '@wandb/weave/components/UserLink';
 import _ from 'lodash';
 import React, {
-  FC,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -18,7 +14,8 @@ import React, {
 import ReactMarkdown from 'react-markdown';
 import styled from 'styled-components';
 
-import {WeaveflowPeekContext} from '../../context';
+import {ResizableDrawer} from '../common/ResizableDrawer';
+
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {
   LeaderboardColumnOrderType,
@@ -27,7 +24,7 @@ import {
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {useShowDeleteButton} from '../common/DeleteModal';
-import {SimplePageLayout, SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {DeleteObjectButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
 import {
   useBaseObjectInstances,
@@ -49,7 +46,6 @@ type LeaderboardPageProps = {
 
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const [name, setName] = useState(props.leaderboardName);
-  const {isPeeking} = useContext(WeaveflowPeekContext);
   const {isEditor} = useIsEditor(props.entity);
   const showDeleteButton = useShowDeleteButton(props.entity);
   const [isEditing, setIsEditing] = useState(false);
@@ -67,7 +63,6 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
       return undefined;
     }
 
-    const createdAtMs = new Date(leaderboardObjectVersion.createdAtMs).getTime();
     // Use the actual display name from the leaderboard object, falling back to objectId
     const displayName = leaderboardObjectVersion.val?.name || leaderboardObjectVersion.objectId;
     
@@ -232,6 +227,9 @@ export const LeaderboardPageContentInner: React.FC<
   const [leaderboardVal, setLeaderboardVal] = useState(props.leaderboardVal);
   const [workingLeaderboardValCopy, setWorkingLeaderboardValCopy] =
     useState(leaderboardVal);
+  const [drawerWidth, setDrawerWidth] = useState(800);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
   useEffect(() => {
     props.setName(workingLeaderboardValCopy.name ?? '');
   }, [props, workingLeaderboardValCopy.name]);
@@ -289,14 +287,52 @@ export const LeaderboardPageContentInner: React.FC<
       .filter(c => c != null) as LeaderboardColumnOrderType;
   }, [workingLeaderboardValCopy, evalData]);
 
-  return (
-    <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
+  const handleToggleFullscreen = useCallback(() => {
+    setIsFullscreen(!isFullscreen);
+  }, [isFullscreen]);
+
+  const drawerHeaderContent = useMemo(() => {
+    if (!props.isEditing) return null;
+    
+    return (
       <Box
-        flex={1}
-        display="flex"
-        flexDirection="column"
-        height="100%"
-        minWidth="50%">
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          backgroundColor: 'white',
+          borderBottom: `1px solid ${MOON_250}`,
+          padding: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+        <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
+          <Button
+            variant="ghost"
+            size="medium"
+            icon="chevron-back"
+            onClick={() => props.setIsEditing(false)}
+            tooltip="Close editor"
+          />
+          <Box sx={{fontSize: '16px', fontWeight: 600}}>
+            Edit Leaderboard
+          </Box>
+        </Box>
+        <Button
+          variant="ghost"
+          size="medium"
+          icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
+          onClick={handleToggleFullscreen}
+          tooltip={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+        />
+      </Box>
+    );
+  }, [props.isEditing, props.setIsEditing, isFullscreen, handleToggleFullscreen]);
+
+  return (
+    <>
+      <Box display="flex" flexDirection="column" height="100%" flexGrow={1}>
         {workingLeaderboardValCopy.description ? (
           <Box
             display="flex"
@@ -334,29 +370,64 @@ export const LeaderboardPageContentInner: React.FC<
           />
         </Box>
       </Box>
-      {props.isEditing && (
+      
+      <ResizableDrawer
+        open={props.isEditing}
+        onClose={() => props.setIsEditing(false)}
+        defaultWidth={isFullscreen ? window.innerWidth - 73 : drawerWidth}
+        setWidth={width => !isFullscreen && setDrawerWidth(width)}
+        headerContent={drawerHeaderContent}
+        hideBackdrop
+        disableScrollLock
+        ModalProps={{
+          keepMounted: true,
+        }}>
         <Box
-          flex={1}
-          display="flex"
-          flexDirection="column"
-          height="100%"
-          minWidth="50%"
           sx={{
-            borderLeft: `1px solid ${MOON_250}`,
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
           }}>
-          <LeaderboardConfigEditor
-            entity={props.entity}
-            project={props.project}
-            saving={saving}
-            isDirty={isDirty}
-            leaderboardVal={workingLeaderboardValCopy}
-            setWorkingCopy={setWorkingLeaderboardValCopy}
-            discardChanges={discardChanges}
-            commitChanges={commitChanges}
-          />
+          {/* Main content area */}
+          <Box sx={{flex: 1, overflowY: 'auto', overflowX: 'hidden'}}>
+            <LeaderboardConfigEditor
+              entity={props.entity}
+              project={props.project}
+              leaderboardVal={workingLeaderboardValCopy}
+              setWorkingCopy={setWorkingLeaderboardValCopy}
+            />
+          </Box>
+          
+          {/* Sticky footer with actions */}
+          <Box
+            sx={{
+              borderTop: `1px solid ${MOON_250}`,
+              backgroundColor: 'white',
+              padding: '16px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 2,
+              position: 'sticky',
+              bottom: 0,
+              zIndex: 10,
+            }}>
+            <Button
+              variant="secondary"
+              onClick={discardChanges}
+              disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={commitChanges}
+              disabled={!isDirty || saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </Box>
         </Box>
-      )}
-    </Box>
+      </ResizableDrawer>
+    </>
   );
 };
 
@@ -378,32 +449,6 @@ export const ToggleLeaderboardConfig: React.FC<{
         tooltip={isOpen ? 'Discard Changes' : 'Configure Leaderboard'}
         icon={isOpen ? 'close' : 'settings'}
       />
-    </Box>
-  );
-};
-
-const EditLeaderboardButton: FC<{
-  isEditing: boolean;
-  setIsEditing: (isEditing: boolean) => void;
-}> = ({isEditing, setIsEditing}) => {
-  return (
-    <Box
-      sx={{
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-      }}>
-      <Button
-        className="mx-16"
-        style={{
-          marginLeft: '0px',
-        }}
-        size="medium"
-        variant="secondary"
-        onClick={() => setIsEditing(!isEditing)}
-        icon={isEditing ? 'close' : 'pencil-edit'}>
-        {isEditing ? 'Discard Changes' : 'Edit'}
-      </Button>
     </Box>
   );
 };
