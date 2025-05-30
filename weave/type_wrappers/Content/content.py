@@ -71,6 +71,7 @@ def create_file_content(
     values["path"] = str(path)
     values["size"] = path.stat().st_size
     values["filename"] = path.name
+    values["extra"]["original_path"] = values["extra"].get("original_path") or str(path)
     data = path.read_bytes()
     return create_bytes_content(data, **values)
 
@@ -96,6 +97,7 @@ class Content(Generic[T]):
     """
 
     content_handler: BaseContentHandler
+    _last_saved_path: str | None = None
 
     def __init__(
         self,
@@ -159,16 +161,16 @@ class Content(Generic[T]):
         return self.content_handler.filename
 
     @property
-    def original_path(self) -> str | None:
-        return self.content_handler.metadata.get("original_path")
-
-    @property
     def extension(self) -> str:
         return self.content_handler.extension
 
     @property
     def mimetype(self) -> str:
         return self.content_handler.mimetype
+
+    @property
+    def path(self) -> str | None:
+        return self.content_handler.path
 
     def open(self) -> bool:
         """Open the file using the operating system's default application.
@@ -179,24 +181,30 @@ class Content(Generic[T]):
         Returns:
             bool: True if the file was successfully opened, False otherwise.
         """
-        if not self.original_path:
-            # TODO: Tempfile
+        path = self._last_saved_path or self.path
+
+        if not path:
+            logger.exception(
+                "Opening unsaved files is not supported. Please run Content.save() and try running Content.open() again.",
+                exc_info=False,
+            )
             return False
 
         try:
             if sys.platform == "win32":
-                os.startfile(self.original_path)
+                os.startfile(path)
             elif sys.platform == "darwin":  # macOS
-                subprocess.call(("open", str(self.original_path)))
+                subprocess.call(("open", str(path)))
             else:  # linux variants
-                subprocess.call(("xdg-open", str(self.original_path)))
+                subprocess.call(("xdg-open", str(path)))
         except Exception as e:
-            logger.exception(f"Failed to open file {self.original_path}: {e}")
+            logger.exception(f"Failed to open file {path}: {e}")
             return False
         return True
 
     def save(self, dest: str | Path) -> None:
         """Copy the file to the specified destination path.
+        Updates the filename and the path of the content to reflect the last saved copy
 
         Args:
             dest: Destination path where the file will be copied to (string or pathlib.Path)
@@ -208,3 +216,6 @@ class Content(Generic[T]):
         # Otherwise write the data to the path
         with open(path, "wb") as f:
             f.write(self.data)
+
+        # Update the last_saved_path to reflect the saved copy. This ensures open works.
+        self._last_saved_path = str(dest)

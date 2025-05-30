@@ -14,7 +14,7 @@ try:
     _MAGIC_INSTANCE_FOR_CHECK = magic.Magic(mime=True)
     MAGIC_LIB_AVAILABLE = True
     del _MAGIC_INSTANCE_FOR_CHECK  # Clean up
-except magic.MagicException as e:
+except Exception as e:
     MAGIC_LIB_AVAILABLE = False
 
 
