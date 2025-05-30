@@ -95,20 +95,20 @@ const responseFunctionCallToToolCall = (
 export const responseMessageToMessage = (
   message: OpenAIResponseMessage
 ): Message | undefined => {
-  if (message['type'] == 'function_call') {
+  if (message['type'] === 'function_call') {
     return {
       role: 'assistant',
       tool_calls: [responseFunctionCallToToolCall(message)],
     };
-  } else if (message['type'] == 'function_call_output') {
+  } else if (message['type'] === 'function_call_output') {
     return {
       role: 'assistant',
       content: message.output,
       tool_call_id: message.call_id,
     };
-  } else if (message['type'] == 'message') {
+  } else if (message['type'] === 'message') {
     const output = message.content.find(msg => {
-      return msg['type'] == 'output_text';
+      return msg['type'] === 'output_text';
     });
     if (!output) {
       console.error('Failed to parse output_text from message');
@@ -185,7 +185,7 @@ export const isTraceCallChatFormatOAIResponses = (
 export const isTraceCallChatFormatOAIResponsesResult = (
   result: any
 ): boolean => {
-  return 'object' in result && result['object'] == 'response';
+  return 'object' in result && result['object'] === 'response';
 };
 
 export const isTraceCallChatFormatOAIResponsesRequest = (
