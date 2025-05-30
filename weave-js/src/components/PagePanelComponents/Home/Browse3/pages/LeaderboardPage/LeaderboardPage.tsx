@@ -61,9 +61,9 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
     }
   }, [isEditor, props.openEditorOnMount]);
 
-  // Create header content with metadata and action buttons for peek view
+  // Create header content with metadata and action buttons for both peek and full-screen views
   const headerContent = useMemo(() => {
-    if (!isPeeking || !leaderboardObjectVersion) {
+    if (!leaderboardObjectVersion) {
       return undefined;
     }
 
@@ -116,7 +116,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
         </div>
       </Tailwind>
     );
-  }, [isPeeking, leaderboardObjectVersion, isEditing, isEditor, showDeleteButton]);
+  }, [leaderboardObjectVersion, isEditing, isEditor, showDeleteButton]);
   
   // Use consistent display name for title
   const displayTitle = leaderboardObjectVersion?.val?.name || name;
@@ -141,26 +141,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
           ),
         },
       ]}
-      headerExtra={
-        !isPeeking && !isEditing && (
-          <Tailwind>
-            <div className="flex items-center gap-8">
-              {isEditor && (
-                <EditLeaderboardButton
-                  isEditing={isEditing}
-                  setIsEditing={setIsEditing}
-                />
-              )}
-              {showDeleteButton && leaderboardObjectVersion && (
-                <DeleteObjectButtonWithModal
-                  objVersionSchema={leaderboardObjectVersion}
-                  overrideDisplayStr={name}
-                />
-              )}
-            </div>
-          </Tailwind>
-        )
-      }
+      headerExtra={undefined}
     />
   );
 };
