@@ -518,7 +518,7 @@ export const LeaderboardPageContentInner: React.FC<
             flex: '1 1 auto',
           }}>
           {/* Leaderboard Table */}
-          <Box sx={{minHeight: '400px'}}>
+          <Box>
             <LeaderboardGrid
               entity={props.entity}
               project={props.project}
