@@ -1,9 +1,10 @@
-from pydantic import BaseModel
-from litellm import ModelResponse
-from unittest.mock import patch, AsyncMock
-import pytest
+from unittest.mock import AsyncMock, patch
+
 import jsonschema
 import pydantic
+import pytest
+from litellm import ModelResponse
+from pydantic import BaseModel
 
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.call_context import tracing_disabled
@@ -43,7 +44,9 @@ async def test_response_format(mock_acompletion, response_format):
         response_format=response_format,
     )
 
-    score = await scorer.score(input="The input data.", output="The output of the model.")
+    score = await scorer.score(
+        input="The input data.", output="The output of the model."
+    )
     mock_acompletion.assert_called_once()
 
     assert score == {"score": 0.9}

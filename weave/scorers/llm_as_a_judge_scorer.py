@@ -1,9 +1,12 @@
-from typing import Union, Type, Any
+import json
+from typing import Any, Type, Union
+
+import jsonschema
 from pydantic import BaseModel, Field
+
 from weave.scorers.scorer_types import LLMScorer
 from weave.trace.op import op
-import jsonschema
-import json
+
 
 class LLMAsAJudgeScorer(LLMScorer):
     """
@@ -25,26 +28,21 @@ class LLMAsAJudgeScorer(LLMScorer):
                          This can be a JSON schema (as a dictionary) or a Pydantic
                          BaseModel subclass. The LLM's output will be validated
                          against this format.
-    
+
     Methods:
         score(output: str) -> dict[str, Any]:
             Scores the output of a system or LLM using the LLM as a judge.
 
-            Args:
+    Args:
                 output: The output to be scored.
 
-            Returns:
+    Returns:
                 dict[str, Any]: A dictionary containing the output of the LLM with schema compliant with response_format.
     """
-    system_prompt: str = Field(
-        description="The system prompt for the scorer LLM."
-    )
-    scorer_prompt: str = Field(
-        description="The scorer prompt for the scorer LLM."
-    )
-    model: str = Field(
-        description="The scoring model to use to scorer outputs."
-    )
+
+    system_prompt: str = Field(description="The system prompt for the scorer LLM.")
+    scorer_prompt: str = Field(description="The scorer prompt for the scorer LLM.")
+    model: str = Field(description="The scoring model to use to scorer outputs.")
     response_format: Union[dict, Type[BaseModel]] = Field(
         description="The response format for the scorer LLM."
     )
@@ -60,11 +58,14 @@ class LLMAsAJudgeScorer(LLMScorer):
         response: ModelResponse = await self._acompletion(
             messages=[
                 {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": self.scorer_prompt.format(input=input, output=output)}
+                {
+                    "role": "user",
+                    "content": self.scorer_prompt.format(input=input, output=output),
+                },
             ],
             model=self.model,
             response_format=self.response_format,
-            temperature=0
+            temperature=0,
         )
 
         content = response.choices[0].message.content
