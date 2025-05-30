@@ -68,6 +68,8 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
     }
 
     const createdAtMs = new Date(leaderboardObjectVersion.createdAtMs).getTime();
+    // Use the actual display name from the leaderboard object, falling back to objectId
+    const displayName = leaderboardObjectVersion.val?.name || leaderboardObjectVersion.objectId;
     
     return (
       <Tailwind>
@@ -75,7 +77,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
           <div className="grid auto-cols-max grid-flow-col gap-[16px] overflow-x-auto text-[14px]">
             <div className="block">
               <p className="text-moon-500">Name</p>
-              <p className="font-medium">{name}</p>
+              <p className="font-medium">{displayName}</p>
             </div>
             <div className="block">
               <p className="text-moon-500">Created</p>
@@ -84,7 +86,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
             {leaderboardObjectVersion.userId && (
               <div className="block">
                 <p className="text-moon-500">Created by</p>
-                <UserLink username={leaderboardObjectVersion.userId} />
+                <UserLink userId={leaderboardObjectVersion.userId} includeName />
               </div>
             )}
           </div>
@@ -106,7 +108,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
               {showDeleteButton && (
                 <DeleteObjectButtonWithModal
                   objVersionSchema={leaderboardObjectVersion}
-                  overrideDisplayStr={name}
+                  overrideDisplayStr={displayName}
                 />
               )}
             </div>
@@ -114,11 +116,14 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
         </div>
       </Tailwind>
     );
-  }, [isPeeking, leaderboardObjectVersion, name, isEditing, isEditor, showDeleteButton]);
+  }, [isPeeking, leaderboardObjectVersion, isEditing, isEditor, showDeleteButton]);
   
+  // Use consistent display name for title
+  const displayTitle = leaderboardObjectVersion?.val?.name || name;
+
   return (
     <SimplePageLayoutWithHeader
-      title={name}
+      title={displayTitle}
       hideTabsIfSingle
       headerContent={headerContent}
       tabs={[

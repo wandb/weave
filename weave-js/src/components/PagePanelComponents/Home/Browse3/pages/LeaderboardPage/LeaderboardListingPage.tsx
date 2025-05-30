@@ -10,15 +10,10 @@ import {Empty} from '../common/Empty';
 import {EMPTY_PROPS_LEADERBOARDS} from '../common/EmptyContent';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {ObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
-import {
-  useBaseObjectInstances,
-  useCreateBuiltinObjectInstance,
-} from '../wfReactInterface/objectClassQuery';
+import {useCreateBuiltinObjectInstance} from '../wfReactInterface/objectClassQuery';
+import {useWFHooks} from '../wfReactInterface/context';
 import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
-import {
-  convertTraceServerObjectVersionToSchema,
-  projectIdFromParts,
-} from '../wfReactInterface/tsDataModelHooks';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {useIsEditor} from './LeaderboardPage';
 
@@ -105,22 +100,20 @@ const LeaderboardTable: React.FC<{
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
+  const {useRootObjectVersions} = useWFHooks();
 
-  // TODO: Once `useCollectionObjects` lands from the online
-  // evals project, switch to that (much more type safe)
-  const leaderboardQuery = useBaseObjectInstances('Leaderboard', {
-    project_id: projectIdFromParts({
-      entity: props.entity,
-      project: props.project,
-    }),
-    filter: {latest_only: true},
+  // Use useRootObjectVersions for automatic refresh when objects are deleted
+  const leaderboardQuery = useRootObjectVersions({
+    entity: props.entity,
+    project: props.project,
+    filter: {
+      baseObjectClasses: ['Leaderboard'],
+      latestOnly: true,
+    },
+    metadataOnly: false, // Need full object data to get val.name for display
   });
 
-  const leaderboardObjectVersions = useMemo(() => {
-    return (leaderboardQuery.result ?? []).map(
-      convertTraceServerObjectVersionToSchema
-    );
-  }, [leaderboardQuery.result]);
+  const leaderboardObjectVersions = leaderboardQuery.result ?? [];
   const onClick = useCallback(
     (obj: ObjectVersionSchema) => {
       const to = peekingRouter.leaderboardsUIUrl(
