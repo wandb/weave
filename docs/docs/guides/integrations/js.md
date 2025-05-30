@@ -71,7 +71,6 @@ If this describes your setup, try the following steps:
     }
     ```
 
-2. [Use the --import flag](#esm) (or [NODE_OPTIONS for ESM](#use-node_options-only-for-esm) projects).
 
 3. If patching still fails, fall back to [manual instrumentation](#manual-patching-fallback-option).
 
