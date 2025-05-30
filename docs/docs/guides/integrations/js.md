@@ -37,26 +37,44 @@ For ESM, use Node's `--import` flag to enable auto-instrumentation. The `weave/i
     node --import=weave/instrument dist/main.js
     ```
 
-## Advanced usage
+## Advanced usage and troubleshooting
 
-### Use `NODE_OPTIONS` as an alternate hook
+This section covers edge cases and workarounds for when the TypeScript SDK's automatic patching doesn’t work as expected. For example, ESM-only environments, bundler setups like Next.js, or constrained runtime environments may cause unexpected issues. If you're seeing missing traces or integration issues, start here.
+
+### Use `NODE_OPTIONS` (only for ESM)
 
 :::warning
-Setting `export NODE_OPTIONS="--import=weave/instrument"` will affect all Node.js processes and may cause unintended side effects.
+Use with `NODE_OPTIONS` with caution, as this affects all Node.js processes in the environment and may introduce side effects.
 :::
 
-If you can't pass `--import` directly (e.g., inside CLI scripts or toolchains), you can use the `NODE_OPTIONS` environment variable:
+If you're using an ESM project and cannot pass CLI flags (e.g., due to constraints in CLI tools or frameworks), set the `NODE_OPTIONS` environment variable:
 
 ```bash
 export NODE_OPTIONS="--import=weave/instrument"
 ```
 
-### CommonJS bundler compatibility (e.g., Next.js)
+`NODE_OPTIONS` is only recognized by Node's ESM loader. It has no effect on CommonJS projects or modules bundled for the browser.
 
-Some bundlers such as Next.js may rewrite `require` statements in ways that interfere with auto-patching. In the case, try the following:
+### Bundler compatibility (e.g., Next.js)
 
-- [Use `NODE_OPTIONS` as a workaround.](#use-node_options-as-an-alternate-hook)
-- If needed, fall back to manual patching.
+Some frameworks and bundlers, such as Next.js, may bundle third-party libraries in ways that break Node’s ability to patch them at runtime.
+
+If this describes your setup, try the following steps:
+
+1. Mark LLM libraries as external in your bundler configuration. This prevents them from being bundled, so Weave can patch them correctly at runtime.
+
+   The following example shows how to mark the `openai` package as external in a `next.config.js` configuration, which prevents it from being bundled. The module is loaded at runtime, so Weave can automatically patch and track it. Use this setup when working with frameworks like Next.js to enable auto-instrumentation.
+
+    ```js
+    externals: {
+    'openai': 'commonjs openai'
+    }
+    ```
+
+2. [Use the --import flag](#esm) (or [NODE_OPTIONS for ESM](#use-node_options-only-for-esm) projects).
+
+3. If patching still fails, fall back to [manual instrumentation](#manual-patching-fallback-option).
+
 
 ### Manual patching (fallback option)
 
