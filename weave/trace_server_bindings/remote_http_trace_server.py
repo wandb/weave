@@ -603,6 +603,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             tsi.CompletionsCreateRes,
         )
 
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        # For remote servers, streaming is not implemented
+        # Fall back to non-streaming completion
+        response = self.completions_create(req)
+        yield {"response": response.response, "weave_call_id": response.weave_call_id}
+
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         return self._generic_request(
             "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
