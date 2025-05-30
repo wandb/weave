@@ -4,7 +4,7 @@ import {OpOptions} from '../opType';
 
 // exported just for testing
 export const openAIStreamReducer = {
-  initialState: {
+  initialState: () => ({
     id: '',
     object: 'chat.completion',
     created: 0,
@@ -21,7 +21,7 @@ export const openAIStreamReducer = {
       },
     ],
     usage: null,
-  },
+  }),
   reduceFn: (state: any, chunk: any) => {
     if (chunk.id) state.id = chunk.id;
     if (chunk.object) state.object = chunk.object;
@@ -94,6 +94,30 @@ export function makeOpenAIChatCompletionsOp(originalCreate: any, name: string) {
   return op(wrapped, options);
 }
 
+export function makeOpenAIResponsesOp(originalCreate: any, name: string) {
+  function wrapped(...args: Parameters<typeof originalCreate>) {
+    const [originalParams]: any[] = args;
+    if (originalParams.stream) {
+      throw new Error('Stream is not supported for responses');
+    }
+
+    return originalCreate(originalParams);
+  }
+
+  const options: OpOptions<typeof wrapped> = {
+    name: name,
+    parameterNames: 'useParam0Object',
+    summarize: result => ({
+      usage: {
+        [result.model]: result.usage,
+      },
+    }),
+    streamReducer: openAIStreamReducer,
+  };
+
+  return op(wrapped, options);
+}
+
 export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
   async function wrapped(...args: Parameters<typeof originalGenerate>) {
     const result = await originalGenerate(...args);
@@ -144,6 +168,9 @@ interface OpenAIAPI {
       };
     };
   };
+  responses?: {
+    create: any;
+  };
 }
 
 /**
@@ -178,6 +205,22 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
       return targetVal;
     },
   });
+
+  const responsesProxy =
+    openai.responses != null
+      ? new Proxy(openai.responses, {
+          get(target, p, receiver) {
+            const targetVal = Reflect.get(target, p, receiver);
+            if (p === 'create') {
+              return makeOpenAIResponsesOp(
+                targetVal.bind(target),
+                'openai.responses.create'
+              );
+            }
+            return targetVal;
+          },
+        })
+      : undefined;
 
   const imagesProxy = new Proxy(openai.images, {
     get(target, p, receiver) {
@@ -225,6 +268,9 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
       const targetVal = Reflect.get(target, p, receiver);
       if (p === 'chat') {
         return chatProxy;
+      }
+      if (p === 'responses') {
+        return responsesProxy;
       }
       if (p === 'images') {
         return imagesProxy;

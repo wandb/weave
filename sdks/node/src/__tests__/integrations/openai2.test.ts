@@ -128,7 +128,7 @@ describe('OpenAI Integration', () => {
     });
 
     it('should handle function calls in stream chunks', () => {
-      const state = {...openAIStreamReducer.initialState};
+      const state = {...openAIStreamReducer.initialState()};
 
       const chunks = [
         {

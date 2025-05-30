@@ -12,7 +12,7 @@ export type Op<T extends (...args: any[]) => any> = {
 } & T;
 
 interface StreamReducer<T, R> {
-  initialState: R;
+  initialState: () => R;
   reduceFn: (state: R, chunk: T) => R;
 }
 
