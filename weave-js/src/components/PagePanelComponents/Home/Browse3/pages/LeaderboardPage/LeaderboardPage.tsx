@@ -3,6 +3,7 @@ import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Loading} from '@wandb/weave/components/Loading';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {
   FC,
@@ -23,12 +24,18 @@ import {
 } from '../../views/Leaderboard/LeaderboardGrid';
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {useShowDeleteButton} from '../common/DeleteModal';
 import {SimplePageLayout} from '../common/SimplePageLayout';
+import {DeleteObjectButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
 import {
   useBaseObjectInstances,
   useCreateBuiltinObjectInstance,
 } from '../wfReactInterface/objectClassQuery';
-import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {
+  convertTraceServerObjectVersionToSchema,
+  projectIdFromParts,
+} from '../wfReactInterface/tsDataModelHooks';
+import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 
 type LeaderboardPageProps = {
@@ -42,12 +49,16 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const [name, setName] = useState(props.leaderboardName);
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const {isEditor} = useIsEditor(props.entity);
+  const showDeleteButton = useShowDeleteButton(props.entity);
   const [isEditing, setIsEditing] = useState(false);
+  const [leaderboardObjectVersion, setLeaderboardObjectVersion] = useState<ObjectVersionSchema | null>(null);
+  
   useEffect(() => {
     if (isEditor && props.openEditorOnMount) {
       setIsEditing(true);
     }
   }, [isEditor, props.openEditorOnMount]);
+  
   return (
     <SimplePageLayout
       title={name}
@@ -61,18 +72,30 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
               setName={setName}
               isEditing={isEditing}
               setIsEditing={setIsEditing}
+              showDeleteButton={showDeleteButton}
+              setLeaderboardObjectVersion={setLeaderboardObjectVersion}
             />
           ),
         },
       ]}
       headerExtra={
-        !isPeeking &&
-        !isEditing &&
-        isEditor && (
-          <EditLeaderboardButton
-            isEditing={isEditing}
-            setIsEditing={setIsEditing}
-          />
+        !isPeeking && !isEditing && (
+          <Tailwind>
+            <div className="flex items-center gap-8">
+              {isEditor && (
+                <EditLeaderboardButton
+                  isEditing={isEditing}
+                  setIsEditing={setIsEditing}
+                />
+              )}
+              {showDeleteButton && leaderboardObjectVersion && (
+                <DeleteObjectButtonWithModal
+                  objVersionSchema={leaderboardObjectVersion}
+                  overrideDisplayStr={name}
+                />
+              )}
+            </div>
+          </Tailwind>
         )
       }
     />
@@ -84,6 +107,8 @@ export const LeaderboardPageContent: React.FC<
     setName: (name: string) => void;
     isEditing: boolean;
     setIsEditing: (isEditing: boolean) => void;
+    showDeleteButton?: boolean;
+    setLeaderboardObjectVersion?: (version: ObjectVersionSchema) => void;
   }
 > = props => {
   const {entity, project} = props;
@@ -91,6 +116,21 @@ export const LeaderboardPageContent: React.FC<
     project_id: projectIdFromParts({entity, project}),
     filter: {object_ids: [props.leaderboardName], latest_only: true},
   });
+
+  // Calculate the object version if we have results
+  const leaderboardObjectVersion = useMemo(() => {
+    if (leaderboardInstances.result && leaderboardInstances.result.length === 1) {
+      return convertTraceServerObjectVersionToSchema(leaderboardInstances.result[0]);
+    }
+    return null;
+  }, [leaderboardInstances.result]);
+
+  // Set the object version in the parent component
+  useEffect(() => {
+    if (props.setLeaderboardObjectVersion && leaderboardObjectVersion) {
+      props.setLeaderboardObjectVersion(leaderboardObjectVersion);
+    }
+  }, [props.setLeaderboardObjectVersion, leaderboardObjectVersion]);
 
   if (leaderboardInstances.loading) {
     return <Loading centered />;
@@ -121,6 +161,7 @@ export const LeaderboardPageContent: React.FC<
     <LeaderboardPageContentInner
       {...props}
       leaderboardVal={leaderboardVal}
+      leaderboardObjectVersion={leaderboardObjectVersion!}
       setIsEditing={props.setIsEditing}
     />
   );
@@ -151,8 +192,10 @@ export const LeaderboardPageContentInner: React.FC<
     setName: (name: string) => void;
     isEditing: boolean;
     setIsEditing: (isEditing: boolean) => void;
+    showDeleteButton?: boolean;
   } & {
     leaderboardVal: LeaderboardObjectVal;
+    leaderboardObjectVersion: ObjectVersionSchema;
   }
 > = props => {
   const updateLeaderboard = useUpdateLeaderboard(
