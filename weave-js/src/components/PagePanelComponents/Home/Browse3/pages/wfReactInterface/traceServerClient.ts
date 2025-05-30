@@ -8,6 +8,8 @@ import {
 import {
   CompletionsCreateReq,
   CompletionsCreateRes,
+  CompletionsCreateStreamReq,
+  CompletionsCreateStreamRes,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
@@ -183,6 +185,13 @@ export class TraceServerClient extends CachingTraceServerClient {
     req: CompletionsCreateReq
   ): Promise<CompletionsCreateRes> {
     return super.completionsCreate(req);
+  }
+
+  public completionsCreateStream(
+    req: CompletionsCreateStreamReq,
+    onChunk?: (chunk: any) => void
+  ): Promise<CompletionsCreateStreamRes> {
+    return super.completionsCreateStream(req, onChunk);
   }
 
   public override tableQuery(

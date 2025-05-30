@@ -400,6 +400,15 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         res = self._ref_apply(self._internal_trace_server.completions_create, req)
         return res
 
+    # Streaming completions – simply proxy through after converting project ID.
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> typing.Iterator[dict[str, typing.Any]]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        # The streamed chunks contain no project-scoped references, so we can
+        # forward directly without additional ref conversion.
+        return self._internal_trace_server.completions_create_stream(req)
+
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.project_stats, req)
