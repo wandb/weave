@@ -71,7 +71,7 @@ If this describes your setup, try the following steps:
     ```
 
 
-3. If patching still fails, fall back to [manual instrumentation](#manual-patching-fallback-option).
+2. If patching still fails, fall back to [manual instrumentation](#manual-patching-fallback-option).
 
 
 ### Manual patching (fallback option)
