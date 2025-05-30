@@ -108,10 +108,35 @@ export const ScorecardSection: React.FC<{
 
   const datasetRefs = useMemo(() => {
     // Use filtered evalCallIds instead of all evaluations to respect filtering
-    return evalCallIds.map(callId => 
-      props.state.summary.evaluationCalls[callId]?.datasetRef
-    ).filter(ref => ref != null);
-  }, [evalCallIds, props.state.summary.evaluationCalls]);
+    return evalCallIds.map(callId => {
+      const evaluationCall = props.state.summary.evaluationCalls[callId];
+      if (!evaluationCall) return null;
+      const evaluationObj = props.state.summary.evaluations[evaluationCall.evaluationRef];
+      return evaluationObj?.datasetRef;
+    }).filter(ref => ref != null);
+  }, [evalCallIds, props.state.summary.evaluationCalls, props.state.summary.evaluations]);
+
+  const datasetVariation = useMemo(() => {
+    // Extract dataset names and versions to check for version variations
+    const datasetVersionMap: {[datasetName: string]: Set<string>} = {};
+    
+    datasetRefs.forEach(ref => {
+      // Parse the ref to extract name and version
+      const parsed = parseRefMaybe(ref) as WeaveObjectRef;
+      if (parsed && parsed.artifactName && parsed.artifactVersion) {
+        const datasetName = parsed.artifactName;
+        const datasetVersion = parsed.artifactVersion;
+        
+        if (!datasetVersionMap[datasetName]) {
+          datasetVersionMap[datasetName] = new Set();
+        }
+        datasetVersionMap[datasetName].add(datasetVersion);
+      }
+    });
+    
+    // Check if any dataset has multiple versions
+    return Object.values(datasetVersionMap).some(versions => versions.size > 1);
+  }, [datasetRefs]);
 
   const modelProps = useMemo(() => {
     const propsRes: {[prop: string]: {[ref: string]: any}} = {};
@@ -156,8 +181,6 @@ export const ScorecardSection: React.FC<{
     props.state.summary.entity,
     props.state.summary.project
   );
-
-  const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
 
   let gridTemplateColumns = '';
   gridTemplateColumns += 'min-content '; // Scorer Name
