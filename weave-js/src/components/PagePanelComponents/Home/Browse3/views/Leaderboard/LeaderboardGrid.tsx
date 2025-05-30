@@ -353,23 +353,26 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                 
                 return (
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                    {ref ? (
-                      <SmallRef objRef={ref} />
+                    {hasMultipleVersions ? (
+                      <>
+                        <div>{scorerGroupName}</div>
+                        <Tooltip title={`This scorer has ${versions.size} different versions across evaluations. Take precaution when comparing results.`}>
+                          <Alert
+                            severity="warning"
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '11px',
+                            }}>
+                            Scoring inconsistency detected
+                          </Alert>
+                        </Tooltip>
+                      </>
                     ) : (
-                      <div>{scorerGroupName}</div>
-                    )}
-                    {hasMultipleVersions && (
-                      <Tooltip title={`This scorer has ${versions.size} different versions across evaluations. Take precaution when comparing results.`}>
-                        <Alert
-                          severity="warning"
-                          style={{
-                            padding: '2px 8px',
-                            fontSize: '11px',
-                            marginLeft: '4px',
-                          }}>
-                          Scoring inconsistency detected
-                        </Alert>
-                      </Tooltip>
+                      ref ? (
+                        <SmallRef objRef={ref} />
+                      ) : (
+                        <div>{scorerGroupName}</div>
+                      )
                     )}
                   </div>
                 );
