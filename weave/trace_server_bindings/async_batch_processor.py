@@ -145,7 +145,7 @@ class AsyncBatchProcessor(Generic[T]):
     def _health_check(self) -> None:
         """Health check thread that monitors and revives the processing thread if it dies."""
         while self.is_accepting_new_work():
-            time.sleep(HEALTH_CHECK_INTERVAL)  # Check every 5 seconds
+            time.sleep(HEALTH_CHECK_INTERVAL)
 
             # If we're shutting down, don't revive
             if self.stop_accepting_work_event.is_set():
