@@ -75,6 +75,15 @@ def test_health_check_thread_is_created():
 
     processor.stop_accepting_new_work_and_flush_queue()
 
+    assert not processor.health_check_thread.is_alive()
+    assert not processor.processing_thread.is_alive()
+
+    # restart thread
+    processor.accept_new_work()
+    assert processor.health_check_thread.is_alive()
+    assert processor.processing_thread.is_alive()
+    processor.stop_accepting_new_work_and_flush_queue()
+
 
 def test_health_check_functionality_and_logging():
     """Test health check revival functionality, logging, and full queue behavior."""
