@@ -540,7 +540,7 @@ def test_trace_call_wb_run_step_query(client):
     res = server.calls_query(
         tsi.CallsQueryReq(project_id=get_client_project_id(client))
     )
-    steps = set(c.wb_run_step for c in res.calls)
+    steps = {c.wb_run_step for c in res.calls}
     assert steps == set(range(call_spec.total_calls))
 
     query = tsi.Query(
