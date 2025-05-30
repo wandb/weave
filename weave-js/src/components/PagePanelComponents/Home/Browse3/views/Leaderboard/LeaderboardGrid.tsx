@@ -1,4 +1,4 @@
-import {Box} from '@mui/material';
+import {Alert, Box, Tooltip} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroup,
@@ -79,7 +79,67 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     [entity, history, peekingRouter, project]
   );
 
-  const columnStats = useMemo(() => getColumnStats(data), [data]);
+  // Process data to group scorers by name only (without version)
+  const processedData = useMemo(() => {
+    const newData: GroupedLeaderboardData = {modelGroups: {}};
+    const scorerVersionMap: {[datasetGroup: string]: {[scorerName: string]: Set<string>}} = {};
+    
+    // Process each model group
+    Object.entries(data.modelGroups).forEach(([modelGroup, modelData]) => {
+      newData.modelGroups[modelGroup] = {datasetGroups: {}};
+      
+      Object.entries(modelData.datasetGroups).forEach(([datasetGroup, datasetData]) => {
+        newData.modelGroups[modelGroup].datasetGroups[datasetGroup] = {scorerGroups: {}};
+        if (!scorerVersionMap[datasetGroup]) {
+          scorerVersionMap[datasetGroup] = {};
+        }
+        
+        Object.entries(datasetData.scorerGroups).forEach(([scorerGroup, scorerData]) => {
+          // Extract scorer name and version from scorerGroup (format: "name:version" or just "name")
+          const colonIndex = scorerGroup.lastIndexOf(':');
+          let scorerName: string;
+          let scorerVersion: string;
+          
+          if (colonIndex !== -1 && scorerGroup !== 'Summary') {
+            scorerName = scorerGroup.substring(0, colonIndex);
+            scorerVersion = scorerGroup.substring(colonIndex + 1);
+          } else {
+            // No version found (e.g., "Summary" scorer)
+            scorerName = scorerGroup;
+            scorerVersion = '';
+          }
+          
+          // Track scorer versions
+          if (!scorerVersionMap[datasetGroup][scorerName]) {
+            scorerVersionMap[datasetGroup][scorerName] = new Set();
+          }
+          if (scorerVersion) {
+            scorerVersionMap[datasetGroup][scorerName].add(scorerVersion);
+          }
+          
+          // Group by scorer name only
+          if (!newData.modelGroups[modelGroup].datasetGroups[datasetGroup].scorerGroups[scorerName]) {
+            newData.modelGroups[modelGroup].datasetGroups[datasetGroup].scorerGroups[scorerName] = {
+              metricPathGroups: {}
+            };
+          }
+          
+          // Merge metric path groups
+          Object.entries(scorerData.metricPathGroups).forEach(([metricPath, records]) => {
+            const targetScorerGroup = newData.modelGroups[modelGroup].datasetGroups[datasetGroup].scorerGroups[scorerName];
+            if (!targetScorerGroup.metricPathGroups[metricPath]) {
+              targetScorerGroup.metricPathGroups[metricPath] = [];
+            }
+            targetScorerGroup.metricPathGroups[metricPath].push(...records);
+          });
+        });
+      });
+    });
+    
+    return {processedData: newData, scorerVersionMap};
+  }, [data]);
+
+  const columnStats = useMemo(() => getColumnStats(processedData.processedData), [processedData]);
 
   const getColorForScore = useCallback(
     (datasetGroup, scorerGroup, metricPathGroup, score) => {
@@ -109,7 +169,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
   const rows: RowData[] = useMemo(() => {
     const rowData: RowData[] = [];
-    Object.entries(data.modelGroups).forEach(([modelGroupName, modelGroup]) => {
+    Object.entries(processedData.processedData.modelGroups).forEach(([modelGroupName, modelGroup]) => {
       rowData.push({
         id: modelGroupName,
         modelGroupName,
@@ -117,7 +177,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       });
     });
     return rowData;
-  }, [data]);
+  }, [processedData]);
 
   const columns: Array<GridColDef<RowData>> = useMemo(
     () => [
@@ -276,13 +336,36 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               freeReordering: true,
               children: [],
               renderHeaderGroup: params => {
+                // Check if there are multiple versions for this scorer
+                const versions = processedData.scorerVersionMap[datasetGroupName]?.[scorerGroupName];
+                const hasMultipleVersions = versions && versions.size > 1;
+                
                 const ref = parseRefMaybe(
                   `weave:///${entity}/${project}/op/${scorerGroupName}` ?? ''
                 );
-                if (ref) {
-                  return <SmallRef objRef={ref} />;
-                }
-                return <div>{scorerGroupName}</div>;
+                
+                return (
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    {ref ? (
+                      <SmallRef objRef={ref} />
+                    ) : (
+                      <div>{scorerGroupName}</div>
+                    )}
+                    {hasMultipleVersions && (
+                      <Tooltip title={`This scorer has ${versions.size} different versions across evaluations. Take precaution when comparing results.`}>
+                        <Alert
+                          severity="warning"
+                          style={{
+                            padding: '2px 8px',
+                            fontSize: '11px',
+                            marginLeft: '4px',
+                          }}>
+                          Scoring inconsistency detected
+                        </Alert>
+                      </Tooltip>
+                    )}
+                  </div>
+                );
               },
             };
             datasetColGroup.children.push(scorerColGroup);
@@ -302,7 +385,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     const finalGroupingModel = datasetGroups;
 
     return finalGroupingModel;
-  }, [columnStats.datasetGroups, entity, project]);
+  }, [columnStats.datasetGroups, entity, project, processedData.scorerVersionMap]);
 
   const [sortModel, setSortModel] = useState<GridSortItem[]>([]);
 
