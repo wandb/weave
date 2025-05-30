@@ -162,16 +162,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        # If a single item is too large, we can't send it -- raise an error
+        # If a single item is over the configured limit we should log a warning
+        # Bytes limit can change based on env so we don't want to actually error here
         if encoded_bytes > self.remote_request_bytes_limit and len(batch) == 1:
-            error_message = (
-                f"Single call size ({encoded_bytes} bytes) is too large to send. "
-                f"The maximum size is {self.remote_request_bytes_limit} bytes."
+            logger.warning(
+                f"Single call size ({encoded_bytes} bytes) may be too large to send."
+                f"The configured maximum size is {self.remote_request_bytes_limit} bytes."
             )
-            logger.error(error_message)
-            # If we get down to here we have recursed to size 1
-            # We don't want to error the whole process, just drop the call that is too large
-            return
 
         try:
             self._send_batch_to_server(encoded_data)
@@ -197,6 +194,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 # Only requeue if the processor is still accepting work
                 if self.call_processor and self.call_processor.is_accepting_new_work():
                     self.call_processor.enqueue(batch)
+                else:
+                    logger.exception(
+                        f"Failed to enqueue batch of size {len(batch)} - Processor is shutting down"
+                    )
 
     @with_retry
     def _generic_request_executor(
