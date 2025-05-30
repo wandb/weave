@@ -525,6 +525,7 @@ export const LeaderboardPageContentInner: React.FC<
               loading={loading}
               data={data}
               columnOrder={columnOrder}
+              hideFooter={true}
             />
           </Box>
           
@@ -789,7 +790,7 @@ const ResultExplorer: React.FC<{
   height: number;
 }> = ({state, height}) => {
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
-    'split'
+    'table'
   );
   const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
 
@@ -867,12 +868,7 @@ const LeaderboardChartsSection: React.FC = () => {
         gridGap: STANDARD_PADDING,
         paddingBottom: STANDARD_PADDING * 2,
       }}>
-      <Box sx={{width: '100%'}}>
-        <h2 style={{fontSize: '1.5rem', fontWeight: 600, marginBottom: '16px'}}>
-          Evaluation Summary
-        </h2>
-      </Box>
-      
+              
       {/* Summary Plots */}
       <SummaryPlots
         state={state}

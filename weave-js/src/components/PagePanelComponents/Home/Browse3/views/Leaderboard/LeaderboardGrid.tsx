@@ -39,6 +39,7 @@ interface LeaderboardGridProps {
   data: GroupedLeaderboardData;
   columnOrder?: LeaderboardColumnOrderType;
   loading: boolean;
+  hideFooter?: boolean;
 }
 
 type RowData = {
@@ -53,6 +54,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   data,
   loading,
   columnOrder,
+  hideFooter,
 }) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
@@ -376,6 +378,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         loading={loading}
         sortModel={sortModel}
         onSortModelChange={setSortModel}
+        hideFooter={hideFooter}
         sx={{
           borderRadius: 0,
           '& .MuiDataGrid-footerContainer': {
