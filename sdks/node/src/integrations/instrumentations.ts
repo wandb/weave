@@ -1,29 +1,51 @@
-const sym = Symbol.for('_weave_instrumentations');
+const symCJSInstrumentations = Symbol.for('_weave_cjs_instrumentations');
+export const symESMInstrumentations = Symbol.for('_weave_esm_instrumentations');
+export const symESMCache = Symbol.for('_weave_esm_cached_patched');
 
-(global as any)[sym] =
-  (global as any)[sym] ||
+(global as any)[symCJSInstrumentations] =
+  (global as any)[symCJSInstrumentations] ||
   // key is the module name and sub path(lookup key),
   // value is an array of instrumentations pinned to an expected version range of the module
-  new Map<string, Array<Pick<Instrumentation, 'version' | 'hook'>>>();
+  new Map<string, Array<Pick<CJSInstrumentation, 'version' | 'hook'>>>();
 
-export default (global as any)[sym];
+export interface CacheEntry {
+  originalExports: any;
+  patchedExports: any;
+}
+
+(global as any)[symESMCache] =
+  (global as any)[symESMCache] || new Map<string, CacheEntry>();
+
+export default (global as any)[symCJSInstrumentations];
 
 export type HookFn = (exports: any, name: string, baseDir: string) => any;
 
-export interface Instrumentation {
+(global as any)[symESMInstrumentations] =
+  (global as any)[symESMInstrumentations] ||
+  // key is the module name (lookup key),
+  // value is an array of instrumentations pinned to an expected version range of the module
+  new Map<string, Array<Pick<ESMInstrumentation, 'version' | 'hook'>>>();
+
+export interface CJSInstrumentation {
   moduleName: string;
   subPath: string;
   version: string;
   hook: HookFn;
 }
 
-export function addInstrumentation({
+export interface ESMInstrumentation {
+  moduleName: string;
+  version: string;
+  hook: HookFn;
+}
+
+export function addCJSInstrumentation({
   moduleName,
   subPath,
   version,
   hook,
-}: Instrumentation) {
-  const instrumentations = (global as any)[sym];
+}: CJSInstrumentation) {
+  const instrumentations = (global as any)[symCJSInstrumentations];
 
   const instrumentationLookupKey = `${moduleName}@${subPath}`;
 
@@ -35,4 +57,25 @@ export function addInstrumentation({
     version,
     hook,
   });
+}
+
+export function addESMInstrumentation({
+  moduleName,
+  version,
+  hook,
+}: ESMInstrumentation) {
+  const instrumentations = (global as any)[symESMInstrumentations];
+
+  if (!instrumentations.has(moduleName)) {
+    instrumentations.set(moduleName, []);
+  }
+  instrumentations.get(moduleName)!.push({
+    version,
+    hook,
+  });
+}
+
+export function getESMInstrumentedModules(): string[] {
+  const instrumentations = (global as any)[symESMInstrumentations];
+  return Array.from(instrumentations.keys());
 }
