@@ -18,7 +18,7 @@ The `EvaluationLogger` offers flexibility while the standard framework offers st
 1. _Initialize the logger:_ Create an instance of `EvaluationLogger`, optionally providing metadata about the `model` and `dataset`. Defaults will be used if omitted.
     :::important Track token usage and cost
     To capture token usage and cost for LLM calls (e.g. OpenAI), initialize `EvaluationLogger` before any LLM invocations**. 
-    If you call your LLM first and then log predictions afterward, token and cost data are not be captured.
+    If you call your LLM first and then log predictions afterward, token and cost data are not captured.
     :::
 2. _Log predictions:_ Call `log_prediction` for each input/output pair from your system.
 3. _Log scores:_ Use the returned `ScoreLogger` to `log_score` for the prediction. Multiple scores per prediction are supported.
