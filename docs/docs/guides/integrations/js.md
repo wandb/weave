@@ -53,7 +53,6 @@ If you're using an ESM project and cannot pass CLI flags (e.g., due to constrain
 export NODE_OPTIONS="--import=weave/instrument"
 ```
 
-`NODE_OPTIONS` is only recognized by Node's ESM loader. It has no effect on CommonJS projects or modules bundled for the browser.
 
 ### Bundler compatibility (e.g., Next.js)
 
