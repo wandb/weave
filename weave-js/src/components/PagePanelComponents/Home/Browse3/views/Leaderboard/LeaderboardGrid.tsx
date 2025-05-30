@@ -83,6 +83,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   const processedData = useMemo(() => {
     const newData: GroupedLeaderboardData = {modelGroups: {}};
     const scorerVersionMap: {[datasetGroup: string]: {[scorerName: string]: Set<string>}} = {};
+    const scorerLatestVersionMap: {[datasetGroup: string]: {[scorerName: string]: string}} = {};
     
     // Process each model group
     Object.entries(data.modelGroups).forEach(([modelGroup, modelData]) => {
@@ -92,6 +93,9 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         newData.modelGroups[modelGroup].datasetGroups[datasetGroup] = {scorerGroups: {}};
         if (!scorerVersionMap[datasetGroup]) {
           scorerVersionMap[datasetGroup] = {};
+        }
+        if (!scorerLatestVersionMap[datasetGroup]) {
+          scorerLatestVersionMap[datasetGroup] = {};
         }
         
         Object.entries(datasetData.scorerGroups).forEach(([scorerGroup, scorerData]) => {
@@ -115,6 +119,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           }
           if (scorerVersion) {
             scorerVersionMap[datasetGroup][scorerName].add(scorerVersion);
+            // Store the latest version we've seen (this will be overwritten as we process more)
+            scorerLatestVersionMap[datasetGroup][scorerName] = scorerVersion;
           }
           
           // Group by scorer name only
@@ -136,7 +142,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       });
     });
     
-    return {processedData: newData, scorerVersionMap};
+    return {processedData: newData, scorerVersionMap, scorerLatestVersionMap};
   }, [data]);
 
   const columnStats = useMemo(() => getColumnStats(processedData.processedData), [processedData]);
@@ -339,10 +345,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                 // Check if there are multiple versions for this scorer
                 const versions = processedData.scorerVersionMap[datasetGroupName]?.[scorerGroupName];
                 const hasMultipleVersions = versions && versions.size > 1;
+                const scorerVersion = processedData.scorerLatestVersionMap[datasetGroupName]?.[scorerGroupName];
                 
-                const ref = parseRefMaybe(
-                  `weave:///${entity}/${project}/op/${scorerGroupName}` ?? ''
-                );
+                const ref = scorerVersion 
+                  ? parseRefMaybe(`weave:///${entity}/${project}/op/${scorerGroupName}:${scorerVersion}`)
+                  : null;
                 
                 return (
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
@@ -385,7 +392,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     const finalGroupingModel = datasetGroups;
 
     return finalGroupingModel;
-  }, [columnStats.datasetGroups, entity, project, processedData.scorerVersionMap]);
+  }, [columnStats.datasetGroups, entity, project, processedData.scorerVersionMap, processedData.scorerLatestVersionMap]);
 
   const [sortModel, setSortModel] = useState<GridSortItem[]>([]);
 
