@@ -360,6 +360,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             and req.filter is None
             and req.query is None
             and not req.include_total_storage_size
+            and not req.aggregates
+            and not req.binning
+            and not req.group_by
         ):
             query = optimized_project_contains_call_query(req.project_id, pb)
             raw_res = self._query(query, pb.get_params())
@@ -374,14 +377,88 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         raw_res = self._query(query, pb.get_params())
 
-        res_dict = (
-            dict(zip(columns, raw_res.result_rows[0])) if raw_res.result_rows else {}
-        )
+        # Handle simple case (no grouping or binning)
+        if not req.group_by and not req.binning:
+            res_dict = (
+                dict(zip(columns, raw_res.result_rows[0]))
+                if raw_res.result_rows
+                else {}
+            )
 
-        return tsi.CallsQueryStatsRes(
-            count=res_dict.get("count", 0),
-            total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
-        )
+            # Extract aggregates if present
+            aggregates = None
+            if req.aggregates:
+                aggregates = {}
+                for aggregate in req.aggregates:
+                    agg_name = f"{aggregate.field}_{aggregate.function.value}"
+                    if aggregate.binning:
+                        agg_name += f"_bin_{aggregate.binning.bin_size}_{aggregate.binning.bin_type.value}"
+                    if agg_name in res_dict:
+                        aggregates[agg_name] = res_dict[agg_name]
+
+            return tsi.CallsQueryStatsRes(
+                count=res_dict.get("count", 0),
+                total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
+                aggregates=aggregates,
+            )
+
+        # Handle complex case (grouping and/or binning)
+        if not raw_res.result_rows:
+            return tsi.CallsQueryStatsRes(
+                count=0,
+                total_storage_size_bytes=None,
+                groups=[] if req.group_by else None,
+                bins=[] if req.binning else None,
+            )
+
+        # Process grouped/binned results
+        results = []
+        total_count = 0
+        total_storage_size = 0
+
+        for row in raw_res.result_rows:
+            row_dict = dict(zip(columns, row))
+            total_count += row_dict.get("count", 0)
+            if "total_storage_size_bytes" in row_dict:
+                total_storage_size += row_dict.get("total_storage_size_bytes", 0)
+            results.append(row_dict)
+
+        # Determine response structure based on request
+        if req.group_by and req.binning:
+            # Both grouping and binning - return as groups
+            return tsi.CallsQueryStatsRes(
+                count=total_count,
+                total_storage_size_bytes=total_storage_size
+                if req.include_total_storage_size
+                else None,
+                groups=results,
+            )
+        elif req.group_by:
+            # Only grouping
+            return tsi.CallsQueryStatsRes(
+                count=total_count,
+                total_storage_size_bytes=total_storage_size
+                if req.include_total_storage_size
+                else None,
+                groups=results,
+            )
+        elif req.binning:
+            # Only binning
+            return tsi.CallsQueryStatsRes(
+                count=total_count,
+                total_storage_size_bytes=total_storage_size
+                if req.include_total_storage_size
+                else None,
+                bins=results,
+            )
+        else:
+            # This shouldn't happen, but fallback to simple case
+            return tsi.CallsQueryStatsRes(
+                count=total_count,
+                total_storage_size_bytes=total_storage_size
+                if req.include_total_storage_size
+                else None,
+            )
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
