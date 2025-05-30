@@ -72,28 +72,11 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
     const displayName = leaderboardObjectVersion.val?.name || leaderboardObjectVersion.objectId;
     
     return (
-      <Tailwind>
-        <div className="flex justify-between">
-          <div className="grid auto-cols-max grid-flow-col gap-[16px] overflow-x-auto text-[14px]">
-            <div className="block">
-              <p className="text-moon-500">Name</p>
-              <p className="font-medium">{displayName}</p>
-            </div>
-            <div className="block">
-              <p className="text-moon-500">Created</p>
-              <Timestamp value={createdAtMs / 1000} format="relative" />
-            </div>
-            {leaderboardObjectVersion.userId && (
-              <div className="block">
-                <p className="text-moon-500">Created by</p>
-                <UserLink userId={leaderboardObjectVersion.userId} includeName />
-              </div>
-            )}
-          </div>
-          
+      <Tailwind style={{padding: '0px', minWidth: '46px'}}>
+        <div className="absolute z-10 right-16 flex justify-between">          
           {/* Action buttons on the right */}
           {!isEditing && (
-            <div className="ml-auto flex-shrink-0 flex items-center gap-2">
+            <div className="flex-shrink-0 flex items-center gap-2">
               {isEditor && (
                 <Button
                   title="Edit leaderboard"
@@ -102,7 +85,6 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
                   size="medium"
                   icon="pencil-edit"
                   onClick={() => setIsEditing(true)}>
-                  Edit
                 </Button>
               )}
               {showDeleteButton && (
@@ -315,7 +297,7 @@ export const LeaderboardPageContentInner: React.FC<
         flexDirection="column"
         height="100%"
         minWidth="50%">
-        {workingLeaderboardValCopy.description && (
+        {workingLeaderboardValCopy.description ? (
           <Box
             display="flex"
             flexDirection="row"
@@ -324,7 +306,8 @@ export const LeaderboardPageContentInner: React.FC<
             sx={{
               flex: '1 1 auto',
               alignItems: 'flex-start',
-              padding: '12px 16px',
+              padding: '12px 96px 12px 16px',
+              marginTop: '-8px',
               gap: '12px',
               overflowY: 'auto',
             }}>
@@ -332,6 +315,8 @@ export const LeaderboardPageContentInner: React.FC<
               {workingLeaderboardValCopy.description}
             </StyledReactMarkdown>
           </Box>
+        ) : (
+          <Box height="38px" />
         )}
         <Box
           display="flex"
