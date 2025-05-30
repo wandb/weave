@@ -69,13 +69,13 @@ There are three main ways to create Calls in Weave:
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`. Simply call [`await weave.init('project_name')`](../../reference/typescript-sdk/weave/functions/init.md) and wrap your OpenAI client with [`weave.wrapOpenAI`](../../reference/typescript-sdk/weave/functions/wrapOpenAI.md) at the start of your program:
+    Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`.
 
     ```typescript showLineNumbers
     import OpenAI from 'openai'
     import * as weave from 'weave'
 
-    const client = weave.wrapOpenAI(new OpenAI())
+    const client = new OpenAI()
 
     // Initialize Weave Tracing
     await weave.init('intro-example')
@@ -93,6 +93,8 @@ There are three main ways to create Calls in Weave:
       top_p: 1,
     });
     ```
+
+    Please also see [TypeScript SDK: Third-Party Integration Guide](../integrations/js.md) for complete setup guide for JS/TS projects.
 
   </TabItem>
 </Tabs>
