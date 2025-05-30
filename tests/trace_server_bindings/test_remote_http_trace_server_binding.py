@@ -144,10 +144,10 @@ def test_empty_batch_is_noop(server):
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
-def test_oversized_item_will_log_error_without_sending(server, caplog):
-    """Test that a single item that's too large logs an error but doesn't raise an exception."""
+def test_oversized_item_will_log_warning_and_send(server, caplog):
+    """Test that a single item that's too large logs an error but doesn't raise an exception and still tries to submit."""
     # Set logging level to capture error logs
-    caplog.set_level(logging.ERROR)
+    caplog.set_level(logging.WARNING)
 
     # Create a single item with a very large payload
     start = generate_start()
@@ -156,7 +156,7 @@ def test_oversized_item_will_log_error_without_sending(server, caplog):
     }
     batch = [StartBatchItem(req=tsi.CallStartReq(start=start))]
 
-    # Verify the single item is actually large enough to trigger the error
+    # Verify the single item is actually large enough to trigger the error message
     data = Batch(batch=batch).model_dump_json()
     encoded_data = data.encode("utf-8")
     assert len(encoded_data) > server.remote_request_bytes_limit
@@ -166,10 +166,10 @@ def test_oversized_item_will_log_error_without_sending(server, caplog):
 
     # Verify error was logged
     assert any("Single call size" in record.message for record in caplog.records)
-    assert any("is too large to send" in record.message for record in caplog.records)
+    assert any("may be too large" in record.message for record in caplog.records)
 
-    # Verify _send_batch_to_server was not called
-    assert server._send_batch_to_server.call_count == 0
+    # Verify _send_batch_to_server was still called
+    assert server._send_batch_to_server.call_count == 1
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
