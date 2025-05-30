@@ -540,8 +540,8 @@ def test_trace_call_wb_run_step_query(client):
     res = server.calls_query(
         tsi.CallsQueryReq(project_id=get_client_project_id(client))
     )
-    steps = [c.wb_run_step for c in res.calls]
-    assert set(steps) == set(range(call_spec.total_calls))
+    steps = set(c.wb_run_step for c in res.calls)
+    assert steps == set(range(call_spec.total_calls))
 
     query = tsi.Query(
         **{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
@@ -551,14 +551,28 @@ def test_trace_call_wb_run_step_query(client):
     )
     assert len(res.calls) == 1
 
-    max_step = call_spec.total_calls - 2
+    compare_step = call_spec.total_calls - 2
     range_query = tsi.Query(
-        **{"$expr": {"$gte": [{"$getField": "wb_run_step"}, {"$literal": max_step}]}}
+        **{
+            "$expr": {
+                "$gte": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]
+            }
+        }
     )
     res = server.calls_query(
         tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
     )
     assert len(res.calls) == 2
+
+    res = server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="wb_run_step", direction="desc")],
+        )
+    )
+    exp_steps = list(range(call_spec.total_calls))[::-1]
+    found_steps = [c.wb_run_step for c in res.calls]
+    assert found_steps == exp_steps
 
 
 def test_trace_call_query_filter_output_object_version_refs(client):

@@ -120,6 +120,7 @@ class SelectableCHCallSchema(BaseModel):
 
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
     deleted_at: Optional[datetime.datetime] = None
 
