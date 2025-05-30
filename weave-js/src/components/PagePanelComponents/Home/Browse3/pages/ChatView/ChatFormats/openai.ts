@@ -14,19 +14,9 @@ import {
 } from '../types';
 import {hasStringProp, isMessage} from './utils';
 
-const isOAIReponseRequest = (
-  value: KeyedDictType
-): value is OpenAIResponseRequest => {
-  const hasAttributes = 'input' in value && 'model' in value;
-  if (!hasAttributes) {
-    return false;
-  }
-
-  const input = value['input'];
-  return _.isString(value['input']) || _.isArray(input);
-};
 
 interface OpenAIResponseRequest {
+  self: string;
   input: string | Message[];
   model: string;
   instructions?: string;
@@ -75,8 +65,10 @@ interface OpenAIResponseResult {
   output: ResponseFunctionCall[];
   tools: ResponseFunctionCall[];
   usage: Usage;
+  status: string;
   created_at: number;
   instructions?: string;
+  object: "response";
 }
 
 const responseFunctionCallToToolCall = (
@@ -151,14 +143,17 @@ export const normalizeOAIReponsesResult = (
   };
 };
 export const normalizeOAIResponsesRequest = (request: any): ChatRequest => {
-  const messages: Message[] = request['input'].map(
-    (msg: ResponseUserMessage | OpenAIResponseMessage) => {
+  const input = request['input'];
+  const messages = _.isString(input)
+    ? [{role: "user", content: input}]
+    : input.map((msg: ResponseUserMessage | OpenAIResponseMessage) => {
       if ('type' in msg) {
         return responseMessageToMessage(msg);
       }
       return msg;
     }
   );
+
   if ('instructions' in request) {
     return {
       messages: [
@@ -179,25 +174,31 @@ export const normalizeOAIResponsesRequest = (request: any): ChatRequest => {
 export const isTraceCallChatFormatOAIResponses = (
   call: TraceCallSchema
 ): boolean => {
-  return isTraceCallChatFormatOAIResponsesRequest(call.inputs);
+  return (
+    isTraceCallChatFormatOAIResponsesRequest(call.inputs)
+    && isTraceCallChatFormatOAIResponsesResult(call.output)
+  )
 };
 
 export const isTraceCallChatFormatOAIResponsesResult = (
-  result: any
-): boolean => {
-  return 'object' in result && result['object'] === 'response';
+  outputs: any
+): outputs is OpenAIResponseResult => {
+  return 'object' in outputs && outputs['object'] === 'response';
 };
 
 export const isTraceCallChatFormatOAIResponsesRequest = (
-  request: any
-): boolean => {
-  return isOAIReponseRequest(request);
+  value: KeyedDictType
+): value is OpenAIResponseRequest => {
+  const hasInput = 'input' in value && (_.isString(value['input']) || _.isArray(value['input']));
+  const hasModel = 'model' in value && _.isString('model');
+  const hasSelf = 'self' in value && _.isString('self');
+  return hasInput && hasModel && hasSelf;
 };
 
 export const isTraceCallChatFormatOpenAI = (call: TraceCallSchema): boolean => {
   // TODO: This is probably not a good enough check
   // We should do legitimate schema validation on this
-  if (!('messages' in call.inputs || 'input' in call.inputs)) {
+  if (!('messages' in call.inputs)) {
     return false;
   }
   const {messages} = call.inputs;
