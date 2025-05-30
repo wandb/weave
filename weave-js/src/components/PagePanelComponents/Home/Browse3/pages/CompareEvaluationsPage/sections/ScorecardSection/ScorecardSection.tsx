@@ -106,10 +106,12 @@ export const ScorecardSection: React.FC<{
     );
   }, [props.state, evalCallIds]);
 
-  const datasetRefs = useMemo(
-    () => Object.values(props.state.summary.evaluations).map(e => e.datasetRef),
-    [props.state]
-  );
+  const datasetRefs = useMemo(() => {
+    // Use filtered evalCallIds instead of all evaluations to respect filtering
+    return evalCallIds.map(callId => 
+      props.state.summary.evaluationCalls[callId]?.datasetRef
+    ).filter(ref => ref != null);
+  }, [evalCallIds, props.state.summary.evaluationCalls]);
 
   const modelProps = useMemo(() => {
     const propsRes: {[prop: string]: {[ref: string]: any}} = {};

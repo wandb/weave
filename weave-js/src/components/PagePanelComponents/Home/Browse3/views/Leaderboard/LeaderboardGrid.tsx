@@ -87,6 +87,37 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     const datasetVersionMap: {[datasetName: string]: Set<string>} = {};
     const datasetLatestVersionMap: {[datasetName: string]: string} = {};
     
+    // Helper function to get the latest record from a list based on createdAt
+    const getLatestRecord = (records: LeaderboardValueRecord[]): LeaderboardValueRecord | null => {
+      if (!records || records.length === 0) return null;
+      return records.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    };
+
+    // Helper function to get latest evaluation records per model for a specific metric
+    const getLatestEvaluationsPerModel = (records: LeaderboardValueRecord[]): LeaderboardValueRecord[] => {
+      const modelGroups = new Map<string, LeaderboardValueRecord[]>();
+      
+      // Group by model
+      records.forEach(record => {
+        const modelKey = `${record.modelName}:${record.modelVersion}`;
+        if (!modelGroups.has(modelKey)) {
+          modelGroups.set(modelKey, []);
+        }
+        modelGroups.get(modelKey)!.push(record);
+      });
+      
+      // Get latest evaluation for each model
+      const latestRecords: LeaderboardValueRecord[] = [];
+      modelGroups.forEach(modelRecords => {
+        const latest = getLatestRecord(modelRecords);
+        if (latest) {
+          latestRecords.push(latest);
+        }
+      });
+      
+      return latestRecords;
+    };
+    
     // First pass: collect all dataset versions and determine grouping
     const datasetGroupToName: {[datasetGroup: string]: string} = {};
     Object.entries(data.modelGroups).forEach(([modelGroup, modelData]) => {
@@ -107,16 +138,56 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         }
         
         datasetGroupToName[datasetGroup] = datasetName;
-        
-        // Track dataset versions
-        if (!datasetVersionMap[datasetName]) {
-          datasetVersionMap[datasetName] = new Set();
-        }
-        if (datasetVersion) {
-          datasetVersionMap[datasetName].add(datasetVersion);
-          datasetLatestVersionMap[datasetName] = datasetVersion;
-        }
       });
+    });
+    
+    // Collect all records across all models/datasets/scorers/metrics
+    const allRecords: LeaderboardValueRecord[] = [];
+    Object.entries(data.modelGroups).forEach(([modelGroup, modelData]) => {
+      Object.entries(modelData.datasetGroups).forEach(([datasetGroup, datasetData]) => {
+        Object.entries(datasetData.scorerGroups).forEach(([scorerGroup, scorerData]) => {
+          Object.entries(scorerData.metricPathGroups).forEach(([metricPath, records]) => {
+            allRecords.push(...records);
+          });
+        });
+      });
+    });
+
+    // Filter to latest evaluations per model to check for inconsistencies
+    const latestRecordsOnly = getLatestEvaluationsPerModel(allRecords);
+    
+    // Track dataset and scorer versions only from latest evaluations
+    latestRecordsOnly.forEach(record => {
+      const datasetName = record.datasetName;
+      const datasetVersion = record.datasetVersion;
+      
+      // Track dataset versions only from latest evaluations
+      if (!datasetVersionMap[datasetName]) {
+        datasetVersionMap[datasetName] = new Set();
+      }
+      if (datasetVersion) {
+        datasetVersionMap[datasetName].add(datasetVersion);
+        datasetLatestVersionMap[datasetName] = datasetVersion;
+      }
+      
+      // Track scorer versions only from latest evaluations
+      if (!scorerVersionMap[datasetName]) {
+        scorerVersionMap[datasetName] = {};
+      }
+      if (!scorerLatestVersionMap[datasetName]) {
+        scorerLatestVersionMap[datasetName] = {};
+      }
+      
+      const scorerName = record.scorerName;
+      const scorerVersion = record.scorerVersion;
+      
+      if (!scorerVersionMap[datasetName][scorerName]) {
+        scorerVersionMap[datasetName][scorerName] = new Set();
+      }
+      if (scorerVersion) {
+        scorerVersionMap[datasetName][scorerName].add(scorerVersion);
+        scorerLatestVersionMap[datasetName][scorerName] = scorerVersion;
+      }
     });
     
     // Process each model group and group datasets by name
@@ -129,13 +200,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         // Use dataset name as the group key (without version)
         if (!newData.modelGroups[modelGroup].datasetGroups[datasetName]) {
           newData.modelGroups[modelGroup].datasetGroups[datasetName] = {scorerGroups: {}};
-        }
-        
-        if (!scorerVersionMap[datasetName]) {
-          scorerVersionMap[datasetName] = {};
-        }
-        if (!scorerLatestVersionMap[datasetName]) {
-          scorerLatestVersionMap[datasetName] = {};
         }
         
         Object.entries(datasetData.scorerGroups).forEach(([scorerGroup, scorerData]) => {
@@ -151,16 +215,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
             // No version found (e.g., "Summary" scorer)
             scorerName = scorerGroup;
             scorerVersion = '';
-          }
-          
-          // Track scorer versions
-          if (!scorerVersionMap[datasetName][scorerName]) {
-            scorerVersionMap[datasetName][scorerName] = new Set();
-          }
-          if (scorerVersion) {
-            scorerVersionMap[datasetName][scorerName].add(scorerVersion);
-            // Store the latest version we've seen (this will be overwritten as we process more)
-            scorerLatestVersionMap[datasetName][scorerName] = scorerVersion;
           }
           
           // Group by scorer name only
@@ -731,7 +785,31 @@ const getAggregatedResults = (
   if (data.length === 1) {
     return data[0];
   }
-  return data.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  
+  // Group records by model and get the latest evaluation for each model
+  const modelGroups = new Map<string, LeaderboardValueRecord[]>();
+  data.forEach(record => {
+    const modelKey = `${record.modelName}:${record.modelVersion}`;
+    if (!modelGroups.has(modelKey)) {
+      modelGroups.set(modelKey, []);
+    }
+    modelGroups.get(modelKey)!.push(record);
+  });
+  
+  // Get latest evaluation for each model
+  const latestRecords: LeaderboardValueRecord[] = [];
+  modelGroups.forEach(modelRecords => {
+    const latest = modelRecords.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    latestRecords.push(latest);
+  });
+  
+  // If we have only one model's latest record, return it
+  if (latestRecords.length === 1) {
+    return latestRecords[0];
+  }
+  
+  // If we have multiple models, return the most recent overall
+  return latestRecords.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
 };
 
 const defaultGetSortComparator =
