@@ -14,7 +14,6 @@ import {
 } from '../types';
 import {hasStringProp, isMessage} from './utils';
 
-
 interface OpenAIResponseRequest {
   self: string;
   input: string | Message[];
@@ -68,7 +67,7 @@ interface OpenAIResponseResult {
   status: string;
   created_at: number;
   instructions?: string;
-  object: "response";
+  object: 'response';
 }
 
 const responseFunctionCallToToolCall = (
@@ -145,14 +144,13 @@ export const normalizeOAIReponsesResult = (
 export const normalizeOAIResponsesRequest = (request: any): ChatRequest => {
   const input = request['input'];
   const messages = _.isString(input)
-    ? [{role: "user", content: input}]
+    ? [{role: 'user', content: input}]
     : input.map((msg: ResponseUserMessage | OpenAIResponseMessage) => {
-      if ('type' in msg) {
-        return responseMessageToMessage(msg);
-      }
-      return msg;
-    }
-  );
+        if ('type' in msg) {
+          return responseMessageToMessage(msg);
+        }
+        return msg;
+      });
 
   if ('instructions' in request) {
     return {
@@ -175,9 +173,9 @@ export const isTraceCallChatFormatOAIResponses = (
   call: TraceCallSchema
 ): boolean => {
   return (
-    isTraceCallChatFormatOAIResponsesRequest(call.inputs)
-    && isTraceCallChatFormatOAIResponsesResult(call.output)
-  )
+    isTraceCallChatFormatOAIResponsesRequest(call.inputs) &&
+    isTraceCallChatFormatOAIResponsesResult(call.output)
+  );
 };
 
 export const isTraceCallChatFormatOAIResponsesResult = (
@@ -189,7 +187,9 @@ export const isTraceCallChatFormatOAIResponsesResult = (
 export const isTraceCallChatFormatOAIResponsesRequest = (
   value: KeyedDictType
 ): value is OpenAIResponseRequest => {
-  const hasInput = 'input' in value && (_.isString(value['input']) || _.isArray(value['input']));
+  const hasInput =
+    'input' in value &&
+    (_.isString(value['input']) || _.isArray(value['input']));
   const hasModel = 'model' in value && _.isString('model');
   const hasSelf = 'self' in value && _.isString('self');
   return hasInput && hasModel && hasSelf;
