@@ -1,21 +1,30 @@
-import {Box, SxProps, Tooltip} from '@mui/material';
+import {Box, Popover, SxProps} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroupingModel,
   GridColumnHeaderParams,
   GridColumnNode,
   GridEventListener,
+  GridFooter,
+  GridFooterContainer,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
-import {MOON_50} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
+import {
+  HIDE_TRACETREE_PARAM,
+  SHOW_FEEDBACK_PARAM,
+  usePeekLocation,
+  useWeaveflowRouteContext,
+} from '../../../../context';
 import {NotApplicable} from '../../../../NotApplicable';
 import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {IdPanel} from '../../../common/Id';
@@ -29,13 +38,12 @@ import {
   DERIVED_SCORER_REF_PLACEHOLDER,
 } from '../../compositeMetricsUtil';
 import {EvaluationComparisonState} from '../../ecpState';
-import {HorizontalBox, VerticalBox} from '../../Layout';
+import {HorizontalBox} from '../../Layout';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
   ColumnsManagementPanel,
   CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY,
 } from './ColumnsManagementPanel';
-import {HEADER_HIEGHT_PX} from './common';
 import {
   evalAggScorerMetricCompGeneric,
   lookupMetricValueDirect,
@@ -49,6 +57,7 @@ import {
 } from './exampleCompareSectionUtil';
 
 const styledDataGridStyleOverrides: SxProps = {
+  borderTop: 0,
   '& .MuiDataGrid-row:hover': {
     backgroundColor: 'white',
   },
@@ -60,7 +69,190 @@ const styledDataGridStyleOverrides: SxProps = {
     backgroundColor: 'white',
     zIndex: '7 !important',
   },
+  '& .MuiDataGrid-footerContainer': {
+    minHeight: '40px !important',
+  },
+  '& .MuiTablePagination-root': {
+    minHeight: '40px !important',
+    fontFamily: 'Source Sans Pro',
+    color: '#79808A', // moon-500
+  },
+  '& .MuiTablePagination-displayedRows': {
+    fontFamily: 'Source Sans Pro',
+    color: '#79808A', // moon-500
+  },
+  '& .MuiTablePagination-selectLabel': {
+    fontFamily: 'Source Sans Pro',
+    color: '#79808A', // moon-500
+  },
+  '& .MuiTablePagination-select': {
+    fontFamily: 'Source Sans Pro',
+    color: '#79808A', // moon-500
+  },
+  '& .MuiTablePagination-actions': {
+    color: '#79808A', // moon-500
+  },
+  '& .input-digest-cell': {
+    padding: '0px !important',
+  },
+  '& .input-digest-cell:hover': {
+    backgroundColor: '#E9F8FB !important',
+  },
+  '& .call-id-cell': {
+    padding: '0px !important',
+  },
+  '& .call-id-cell:hover': {
+    backgroundColor: '#E9F8FB !important',
+  },
   width: '100%',
+};
+
+/**
+ * Hook to handle navigation to a call
+ */
+const useCallNavigation = () => {
+  const history = useHistory();
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const peekLoc = usePeekLocation();
+
+  return useCallback(
+    (entityName: string, projectName: string, callId: string) => {
+      const peekParams = new URLSearchParams(peekLoc?.search ?? '');
+      const traceTreeParam = peekParams.get(HIDE_TRACETREE_PARAM);
+      const hideTraceTree =
+        traceTreeParam === '1'
+          ? true
+          : traceTreeParam === '0'
+          ? false
+          : undefined;
+      const showFeedbackParam = peekParams.get(SHOW_FEEDBACK_PARAM);
+      const showFeedbackExpand =
+        showFeedbackParam === '1'
+          ? true
+          : showFeedbackParam === '0'
+          ? false
+          : undefined;
+
+      const url = peekingRouter.callUIUrl(
+        entityName,
+        projectName,
+        '',
+        callId,
+        undefined,
+        hideTraceTree,
+        showFeedbackExpand
+      );
+
+      history.push(url);
+    },
+    [history, peekingRouter, peekLoc]
+  );
+};
+
+/**
+ * Custom footer component that includes controls and pagination
+ */
+interface CustomFooterProps {
+  increaseRowHeight: () => void;
+  decreaseRowHeight: () => void;
+  onlyOneModel: boolean;
+  setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
+  shouldHighlightSelectedRow?: boolean;
+  onShowSplitView: () => void;
+}
+
+const CustomFooter: React.FC<CustomFooterProps> = props => {
+  const [columnMenuAnchorEl, setColumnMenuAnchorEl] =
+    useState<HTMLElement | null>(null);
+
+  const handleColumnMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setColumnMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleColumnMenuClose = () => {
+    setColumnMenuAnchorEl(null);
+  };
+
+  return (
+    <GridFooterContainer>
+      <HorizontalBox
+        sx={{
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+          padding: '0 16px',
+          minHeight: '40px',
+          height: '40px',
+        }}>
+        <Tooltip
+          content="Increase row height"
+          trigger={
+            <IconButton onClick={props.increaseRowHeight}>
+              <Icon name="row-height-small" />
+            </IconButton>
+          }
+        />
+        <Tooltip
+          content="Decrease row height"
+          trigger={
+            <IconButton onClick={props.decreaseRowHeight}>
+              <Icon name="row-height-large" />
+            </IconButton>
+          }
+        />
+        <Tooltip
+          content="Show/hide columns"
+          trigger={
+            <IconButton onClick={handleColumnMenuOpen}>
+              <Icon name="column" />
+            </IconButton>
+          }
+        />
+        {!props.onlyOneModel && (
+          <Tooltip
+            content="Pivot on eval"
+            trigger={
+              <IconButton onClick={() => props.setModelsAsRows(v => !v)}>
+                <Icon name="retry" />
+              </IconButton>
+            }
+          />
+        )}
+        {/* {!props.shouldHighlightSelectedRow && (
+          <Tooltip
+            content="Show Detail Panel"
+            trigger={
+              <IconButton onClick={props.onShowSplitView}>
+                <Icon name="panel" />
+              </IconButton>
+            }
+          />
+        )} */}
+      </HorizontalBox>
+      <GridFooter sx={{border: 'none'}} />
+      <Popover
+        open={Boolean(columnMenuAnchorEl)}
+        anchorEl={columnMenuAnchorEl}
+        onClose={handleColumnMenuClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        slotProps={{
+          paper: {
+            sx: {
+              maxHeight: '400px',
+              overflow: 'auto',
+            },
+          },
+        }}>
+        <ColumnsManagementPanel />
+      </Popover>
+    </GridFooterContainer>
+  );
 };
 
 /**
@@ -106,6 +298,7 @@ type RowData = TrialRowData | SummaryRowData;
 interface DatasetRowItemRendererProps {
   digest: string;
   inputKey: string;
+  lineClamp?: number;
 }
 
 interface ExampleCompareSectionTableProps {
@@ -123,7 +316,7 @@ const DISABLED_ROW_SPANNING = {
 
 const SCORE_COLUMN_SETTINGS = {
   flex: 1,
-  minWidth: 120,
+  minWidth: 162,
 };
 
 // Constants for column width calculations
@@ -208,15 +401,202 @@ const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps> = props => {
   if (row.loading) {
     return <LoadingDots />;
   }
-  return <DenseCellValue value={row.targetRowValue?.[props.inputKey]} />;
+  return (
+    <DenseCellValue
+      value={row.targetRowValue?.[props.inputKey]}
+      lineClamp={props.lineClamp}
+    />
+  );
+};
+
+// Component for showing preview of cell content in a popover
+const CellPreviewPopover: React.FC<{
+  anchorEl: HTMLElement | null;
+  onClose: () => void;
+  content: any;
+  isJsonContent?: boolean;
+}> = ({anchorEl, onClose, content, isJsonContent}) => {
+  if (!anchorEl) return null;
+
+  const displayContent = isJsonContent
+    ? JSON.stringify(content, null, 2)
+    : content;
+
+  return (
+    <Popover
+      open={Boolean(anchorEl)}
+      anchorEl={anchorEl}
+      onClose={onClose}
+      anchorOrigin={{
+        vertical: 'center',
+        horizontal: 'center',
+      }}
+      transformOrigin={{
+        vertical: 'center',
+        horizontal: 'center',
+      }}
+      slotProps={{
+        paper: {
+          sx: {
+            maxWidth: '600px',
+            maxHeight: '400px',
+            overflow: 'auto',
+            p: 2,
+            boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.15)',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+          },
+        },
+      }}>
+      <Box
+        sx={{
+          fontFamily: isJsonContent ? 'monospace' : 'inherit',
+          fontSize: '14px',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}>
+        {displayContent}
+      </Box>
+    </Popover>
+  );
 };
 
 const DenseCellValue: React.FC<
-  React.ComponentProps<typeof CellValue>
+  React.ComponentProps<typeof CellValue> & {lineClamp?: number}
 > = props => {
+  const {lineClamp = 1, ...cellValueProps} = props;
+  const [previewAnchorEl, setPreviewAnchorEl] = useState<HTMLElement | null>(
+    null
+  );
+  const textRef = useRef<HTMLDivElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  // Check if text is overflowing
+  useEffect(() => {
+    if (textRef.current) {
+      const isTextOverflowing =
+        textRef.current.scrollHeight > textRef.current.clientHeight ||
+        textRef.current.scrollWidth > textRef.current.clientWidth;
+      setIsOverflowing(isTextOverflowing);
+    }
+  }, [props.value, lineClamp]);
+
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (isOverflowing) {
+      event.stopPropagation();
+      setPreviewAnchorEl(event.currentTarget);
+    }
+  };
+
+  const handleClosePreview = () => {
+    setPreviewAnchorEl(null);
+  };
+
   if (props.value == null) {
     return <NotApplicable />;
   }
+
+  // For string values, render directly with line-clamp
+  if (
+    typeof props.value === 'string' &&
+    !props.value.startsWith('data:image/')
+  ) {
+    return (
+      <>
+        <Box
+          sx={{
+            height: '100%',
+            width: '100%',
+            padding: '6px 4px',
+            display: 'flex',
+            alignItems: 'flex-start',
+          }}
+          onClick={handleClick}>
+          <Box
+            ref={textRef}
+            sx={{
+              width: '100%',
+              overflow: 'hidden',
+              textAlign: 'left',
+              lineHeight: '17px',
+              display: '-webkit-box',
+              WebkitLineClamp: lineClamp,
+              WebkitBoxOrient: 'vertical',
+              textOverflow: 'ellipsis',
+              wordBreak: 'break-word',
+              whiteSpace: 'normal',
+              cursor: isOverflowing ? 'pointer' : 'default',
+              '&:hover': isOverflowing
+                ? {
+                    textDecoration: 'underline',
+                    textDecorationStyle: 'dotted',
+                  }
+                : {},
+            }}
+            title={isOverflowing ? 'Click to preview' : undefined}>
+            {props.value.trim()}
+          </Box>
+        </Box>
+        <CellPreviewPopover
+          anchorEl={previewAnchorEl}
+          onClose={handleClosePreview}
+          content={props.value}
+        />
+      </>
+    );
+  }
+
+  // For objects/arrays that will be JSON stringified, also apply line-clamp
+  if (typeof props.value === 'object') {
+    const stringified = JSON.stringify(props.value);
+    return (
+      <>
+        <Box
+          sx={{
+            height: '100%',
+            width: '100%',
+            padding: '6px 4px',
+            display: 'flex',
+            alignItems: 'flex-start',
+          }}
+          onClick={handleClick}>
+          <Box
+            ref={textRef}
+            sx={{
+              width: '100%',
+              overflow: 'hidden',
+              textAlign: 'left',
+              lineHeight: '17px',
+              display: '-webkit-box',
+              WebkitLineClamp: lineClamp,
+              WebkitBoxOrient: 'vertical',
+              textOverflow: 'ellipsis',
+              wordBreak: 'break-word',
+              whiteSpace: 'normal',
+              cursor: isOverflowing ? 'pointer' : 'default',
+              fontFamily: 'monospace',
+              fontSize: '0.875em',
+              '&:hover': isOverflowing
+                ? {
+                    textDecoration: 'underline',
+                    textDecorationStyle: 'dotted',
+                  }
+                : {},
+            }}
+            title={isOverflowing ? 'Click to preview' : undefined}>
+            {stringified}
+          </Box>
+        </Box>
+        <CellPreviewPopover
+          anchorEl={previewAnchorEl}
+          onClose={handleClosePreview}
+          content={props.value}
+          isJsonContent={true}
+        />
+      </>
+    );
+  }
+
+  // For non-string values, use the default CellValue component
   return (
     <Box
       sx={{
@@ -224,25 +604,10 @@ const DenseCellValue: React.FC<
         width: '100%',
         overflow: 'hidden',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        alignItems: 'flex-start',
         padding: '4px',
       }}>
-      <CellValue
-        value={props.value}
-        stringStyle={{
-          maxHeight: '100%',
-          width: '100%',
-          overflow: 'auto',
-          textAlign: 'left',
-          lineHeight: '1.2',
-          flex: 1,
-          whiteSpace: 'pre-wrap',
-          wordWrap: 'break-word',
-          textOverflow: 'ellipsis',
-          display: 'flex',
-        }}
-      />
+      <CellValue {...cellValueProps} />
     </Box>
   );
 };
@@ -253,85 +618,69 @@ const DenseCellValue: React.FC<
 export const ExampleCompareSectionTable: React.FC<
   ExampleCompareSectionTableProps
 > = props => {
+  const {hiddenEvaluationIds} = useCompareEvaluationsState();
   const [modelsAsRows, setModelsAsRows] = useState(false);
-  const [rowHeight, setRowHeight] = useState(70);
+  const [rowHeight, setRowHeight] = useState(32);
+  const [lineClamp, setLineClamp] = useState(1);
+
   const increaseRowHeight = useCallback(() => {
-    setRowHeight(v => clip(v * 2, 35, 35 * 2 ** 4));
+    setRowHeight(v => {
+      const newHeight = Math.min(v + 17, 32 + 17 * 7); // Max 8 lines
+      return newHeight;
+    });
+    setLineClamp(v => Math.min(v + 1, 8));
   }, []);
+
   const decreaseRowHeight = useCallback(() => {
-    setRowHeight(v => clip(v / 2, 35, 35 * 2 ** 4));
+    setRowHeight(v => {
+      const newHeight = Math.max(v - 17, 32); // Min 1 line
+      return newHeight;
+    });
+    setLineClamp(v => Math.max(v - 1, 1));
   }, []);
-  const onlyOneModel = props.state.evaluationCallIdsOrdered.length === 1;
-  const header = (
-    <HorizontalBox
-      sx={{
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        bgcolor: MOON_50,
-        padding: '16px',
-        height: HEADER_HIEGHT_PX,
-      }}>
-      <HorizontalBox
-        sx={{
-          justifyContent: 'flex-start',
-          alignItems: 'center',
-        }}>
-        <Tooltip title="Increase Row Height">
-          <IconButton onClick={increaseRowHeight}>
-            <Icon name="expand-uncollapse" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Decrease Row Height">
-          <IconButton onClick={decreaseRowHeight}>
-            <Icon name="collapse" />
-          </IconButton>
-        </Tooltip>
-        {!onlyOneModel && (
-          <Tooltip title="Pivot on Model">
-            <IconButton onClick={() => setModelsAsRows(v => !v)}>
-              <Icon name="table" />
-            </IconButton>
-          </Tooltip>
-        )}
-      </HorizontalBox>
-      <HorizontalBox
-        sx={{
-          justifyContent: 'flex-start',
-          alignItems: 'center',
-        }}>
-        {!props.shouldHighlightSelectedRow && (
-          <Tooltip title="Show Detail Panel">
-            <IconButton onClick={props.onShowSplitView}>
-              <Icon name="panel" />
-            </IconButton>
-          </Tooltip>
-        )}
-      </HorizontalBox>
-    </HorizontalBox>
-  );
+
+  // Filter out hidden evaluations
+  const visibleEvaluationCallIds = useMemo(() => {
+    return props.state.evaluationCallIdsOrdered.filter(
+      id => !hiddenEvaluationIds.has(id)
+    );
+  }, [props.state.evaluationCallIdsOrdered, hiddenEvaluationIds]);
+
+  const onlyOneModel = visibleEvaluationCallIds.length === 1;
+
+  // Create a modified state with filtered evaluation call IDs
+  const filteredState = useMemo(() => {
+    return {
+      ...props.state,
+      evaluationCallIdsOrdered: visibleEvaluationCallIds,
+    };
+  }, [props.state, visibleEvaluationCallIds]);
+
   const inner =
     modelsAsRows || onlyOneModel ? (
       <ExampleCompareSectionTableModelsAsRows
         {...props}
+        state={filteredState}
         rowHeight={rowHeight}
+        lineClamp={lineClamp}
+        increaseRowHeight={increaseRowHeight}
+        decreaseRowHeight={decreaseRowHeight}
+        setModelsAsRows={setModelsAsRows}
+        onlyOneModel={onlyOneModel}
       />
     ) : (
       <ExampleCompareSectionTableModelsAsColumns
         {...props}
+        state={filteredState}
         rowHeight={rowHeight}
+        lineClamp={lineClamp}
+        increaseRowHeight={increaseRowHeight}
+        decreaseRowHeight={decreaseRowHeight}
+        setModelsAsRows={setModelsAsRows}
+        onlyOneModel={onlyOneModel}
       />
     );
-  return (
-    <VerticalBox
-      sx={{
-        height: '100%',
-        width: '100%',
-        gridGap: '0px',
-      }}>
-      {header}
-      {inner}
-    </VerticalBox>
-  );
+  return inner;
 };
 
 /**
@@ -571,7 +920,8 @@ const inputFields = (
   inputSubFields: string[],
   setSelectedInputDigest: (inputDigest: string) => void,
   onShowSplitView: () => void,
-  columnWidths: {[key: string]: number}
+  columnWidths: {[key: string]: number},
+  lineClamp: number
 ): GridColDef<RowData>[] => [
   {
     field: 'inputDigest',
@@ -585,6 +935,7 @@ const inputFields = (
     filterable: false,
     sortable: false,
     hideable: false,
+    cellClassName: 'input-digest-cell',
     renderCell: params => {
       return (
         <Box
@@ -595,37 +946,43 @@ const inputFields = (
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
+            cursor: 'pointer',
           }}
           onClick={() => {
             setSelectedInputDigest(params.row.inputDigest);
             onShowSplitView();
           }}>
-          <span style={{flexShrink: 1}}>
+          <span
+            style={{flexShrink: 1, marginLeft: 'auto', marginRight: 'auto'}}>
             <IdPanel clickable>{params.row.inputDigest.slice(-4)}</IdPanel>
           </span>
         </Box>
       );
     },
   },
-  ...inputSubFields.map(key => ({
-    field: `inputs.${key}`,
-    headerName: key,
-    sortable: false,
-    filterable: false,
-    width: columnWidths[key],
-    maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
-    valueGetter: (value: any, row: RowData) => {
-      return row.inputDigest;
-    },
-    renderCell: (params: GridRenderCellParams<RowData>) => {
-      return (
-        <DatasetRowItemRenderer
-          digest={params.row.inputDigest}
-          inputKey={key}
-        />
-      );
-    },
-  })),
+  ...inputSubFields.map(
+    key =>
+      ({
+        field: `inputs.${key}`,
+        headerName: key,
+        sortable: false,
+        filterable: false,
+        width: columnWidths[key],
+        maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+        valueGetter: (value: any, row: RowData) => {
+          return row.inputDigest;
+        },
+        renderCell: (params: GridRenderCellParams<RowData>) => {
+          return (
+            <DatasetRowItemRenderer
+              digest={params.row.inputDigest}
+              inputKey={key}
+              lineClamp={lineClamp}
+            />
+          );
+        },
+      } as GridColDef<RowData>)
+  ),
 ];
 
 const expansionField = (
@@ -647,13 +1004,22 @@ const expansionField = (
   headerAlign: 'center',
   renderHeader: (params: GridColumnHeaderParams<RowData>) => {
     return (
-      <IconButton onClick={toggleDefaultExpansionState}>
-        <Icon
-          name={
-            defaultExpandState === 'expanded' ? 'collapse' : 'expand-uncollapse'
-          }
-        />
-      </IconButton>
+      <Tooltip
+        content={
+          defaultExpandState === 'expanded' ? 'Hide trials' : 'Show trials'
+        }
+        trigger={
+          <IconButton onClick={toggleDefaultExpansionState}>
+            <Icon
+              name={
+                defaultExpandState === 'expanded'
+                  ? 'collapse'
+                  : 'expand-uncollapse'
+              }
+            />
+          </IconButton>
+        }
+      />
     );
   },
   valueGetter: (value: any, row: RowData) => {
@@ -670,12 +1036,17 @@ const expansionField = (
           height: '100%',
           width: '100%',
         }}>
-        <IconButton
-          onClick={() => {
-            toggleExpansion(params.row._expansionId);
-          }}>
-          <Icon name={itemIsExpanded ? 'collapse' : 'expand-uncollapse'} />
-        </IconButton>
+        <Tooltip
+          content={itemIsExpanded ? 'Hide trials' : 'Show trials'}
+          trigger={
+            <IconButton
+              onClick={() => {
+                toggleExpansion(params.row._expansionId);
+              }}>
+              <Icon name={itemIsExpanded ? 'collapse' : 'expand-uncollapse'} />
+            </IconButton>
+          }
+        />
       </Box>
     );
   },
@@ -683,7 +1054,14 @@ const expansionField = (
 
 // Component for displaying models as rows
 export const ExampleCompareSectionTableModelsAsRows: React.FC<
-  ExampleCompareSectionTableProps & {rowHeight: number}
+  ExampleCompareSectionTableProps & {
+    rowHeight: number;
+    lineClamp: number;
+    increaseRowHeight: () => void;
+    decreaseRowHeight: () => void;
+    setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
+    onlyOneModel: boolean;
+  }
 > = props => {
   const ctx = useCompareEvaluationsState();
   const onlyOneModel = ctx.state.evaluationCallIdsOrdered.length === 1;
@@ -716,13 +1094,16 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     rows
   );
 
+  const navigateToCall = useCallNavigation();
+
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
       ...inputFields(
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView,
-        inputWidths
+        inputWidths,
+        props.lineClamp
       ),
       ...(onlyOneModel
         ? []
@@ -747,7 +1128,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                   />
                 );
               },
-            },
+            } as GridColDef<RowData>,
           ]),
       ...(hasTrials
         ? [
@@ -804,9 +1185,15 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                 style={{
                   overflow: 'hidden',
                   height: '100%',
+                  width: '100%',
                   display: 'flex',
                   alignItems: 'center',
-                }}>
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                onClick={() =>
+                  navigateToCall(trialEntity, trialProject, trialCallId)
+                }>
                 <CallLink
                   entityName={trialEntity}
                   projectName={trialProject}
@@ -820,39 +1207,167 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
           return null;
         },
       },
-      ...outputColumnKeys.map(key => ({
-        field: `output.${key}`,
-        headerName: key,
-        renderHeader: () => removePrefix(key, 'output.'),
-        width: outputWidths[key],
-        maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+      {
+        field: 'predictCall',
+        headerName: 'Call',
+        width: 100,
+        maxWidth: 150,
+        resizable: true,
+        disableColumnMenu: true,
+        sortable: false,
+        filterable: false,
+        hideable: false,
+        headerAlign: 'center',
+        cellClassName: 'call-id-cell',
         ...DISABLED_ROW_SPANNING,
-        disableReorder: true,
-        valueGetter: (value: any, row: RowData) => {
-          if (row._pivot === 'modelsAsColumns') {
-            return null;
-          }
-          return row.output[key]?.[row.evaluationCallId];
-        },
         renderCell: (params: GridRenderCellParams<RowData>) => {
           if (params.row._pivot === 'modelsAsColumns') {
             return null;
           }
-          if (params.row._type === 'summary') {
-            // TODO: Should we indicate that this is just the first trial?
-            return (
-              <DenseCellValue
-                value={params.row.output[key]?.[params.row.evaluationCallId]}
-              />
-            );
+
+          // For trial rows, we have direct access to predictAndScore
+          if (
+            params.row._type === 'trial' &&
+            params.row._pivot === 'modelsAsRows'
+          ) {
+            const trialPredict =
+              params.row.predictAndScore._rawPredictTraceData;
+            const [trialEntity, trialProject] =
+              trialPredict?.project_id.split('/') ?? [];
+            const trialOpName = parseRefMaybe(
+              trialPredict?.op_name ?? ''
+            )?.artifactName;
+            const trialCallId = params.row.predictAndScore.callId;
+
+            if (trialEntity && trialProject && trialOpName && trialCallId) {
+              return (
+                <Box
+                  style={{
+                    overflow: 'hidden',
+                    height: '100%',
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() =>
+                    navigateToCall(trialEntity, trialProject, trialCallId)
+                  }>
+                  <CallLink
+                    entityName={trialEntity}
+                    projectName={trialProject}
+                    opName={trialOpName}
+                    callId={trialCallId}
+                    noName
+                  />
+                </Box>
+              );
+            }
           }
-          return (
-            <DenseCellValue
-              value={params.row.output[key]?.[params.row.evaluationCallId]}
-            />
-          );
+
+          // For summary rows, we need to get the first trial from filteredRows
+          if (params.row._type === 'summary') {
+            // Find the corresponding filtered row
+            const correspondingFilteredRow = filteredRows.find(
+              fr => fr.inputDigest === params.row.inputDigest
+            );
+            if (correspondingFilteredRow) {
+              // For modelsAsRows, we can use evaluationCallId directly
+              const evalCallId =
+                (params.row as RowData)._pivot === 'modelsAsRows'
+                  ? (params.row as ModelAsRowsRowData).evaluationCallId
+                  : (params.row as RowData)._pivot === 'modelsAsColumns'
+                  ? props.state.evaluationCallIdsOrdered[0] // Use first evaluation for modelsAsColumns
+                  : null;
+
+              if (!evalCallId) return null;
+
+              const firstTrial = correspondingFilteredRow.originalRows.find(
+                row => row.evaluationCallId === evalCallId
+              );
+              if (firstTrial) {
+                const trialPredict =
+                  firstTrial.predictAndScore._rawPredictTraceData;
+                const [trialEntity, trialProject] =
+                  trialPredict?.project_id.split('/') ?? [];
+                const trialOpName = parseRefMaybe(
+                  trialPredict?.op_name ?? ''
+                )?.artifactName;
+                const trialCallId = firstTrial.predictAndScore.callId;
+
+                if (trialEntity && trialProject && trialOpName && trialCallId) {
+                  return (
+                    <Box
+                      style={{
+                        overflow: 'hidden',
+                        height: '100%',
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() =>
+                        navigateToCall(trialEntity, trialProject, trialCallId)
+                      }>
+                      <CallLink
+                        entityName={trialEntity}
+                        projectName={trialProject}
+                        opName={trialOpName}
+                        callId={trialCallId}
+                        noName
+                      />
+                    </Box>
+                  );
+                }
+              }
+            }
+          }
+
+          return null;
         },
-      })),
+      },
+      ...outputColumnKeys.map(
+        key =>
+          ({
+            field: `output.${key}`,
+            headerName: key,
+            renderHeader: () => removePrefix(key, 'output.'),
+            width: outputWidths[key],
+            maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+            ...DISABLED_ROW_SPANNING,
+            disableReorder: true,
+            valueGetter: (value: any, row: RowData) => {
+              if (row._pivot === 'modelsAsColumns') {
+                return null;
+              }
+              return row.output[key]?.[row.evaluationCallId];
+            },
+            renderCell: (params: GridRenderCellParams<RowData>) => {
+              if (params.row._pivot === 'modelsAsColumns') {
+                return null;
+              }
+              if (params.row._type === 'summary') {
+                // TODO: Should we indicate that this is just the first trial?
+                return (
+                  <DenseCellValue
+                    value={
+                      params.row.output[key]?.[params.row.evaluationCallId]
+                    }
+                    lineClamp={props.lineClamp}
+                  />
+                );
+              }
+              return (
+                <DenseCellValue
+                  value={params.row.output[key]?.[params.row.evaluationCallId]}
+                  lineClamp={props.lineClamp}
+                />
+              );
+            },
+          } as GridColDef<RowData>)
+      ),
       ...Object.entries(compositeMetrics).flatMap(
         ([metricGroupKey, metricGroupDef]) => {
           return Object.entries(metricGroupDef.metrics).map(
@@ -907,7 +1422,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                     baselineValue
                   );
                 },
-              };
+              } as GridColDef<RowData>;
             }
           );
         }
@@ -929,6 +1444,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     outputColumnKeys,
     compositeMetrics,
     outputWidths,
+    filteredRows,
+    props.lineClamp,
+    navigateToCall,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -939,6 +1457,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         children: inputSubFields.inputSubFields.map(key => ({
           field: `inputs.${key}`,
         })),
+      },
+      {
+        groupId: 'predictCall',
+        headerName: 'Calls',
+        children: [{field: 'predictCall'}],
       },
       {
         groupId: 'scores',
@@ -996,6 +1519,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       pinnedColumns={{
         left: ['inputDigest'],
       }}
+      columnHeaderHeight={36}
       rowHeight={props.rowHeight}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
@@ -1006,7 +1530,19 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       pagination
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
-      slots={{columnsPanel: ColumnsManagementPanel}}
+      slots={{
+        columnsPanel: ColumnsManagementPanel,
+        footer: () => (
+          <CustomFooter
+            increaseRowHeight={props.increaseRowHeight}
+            decreaseRowHeight={props.decreaseRowHeight}
+            onlyOneModel={props.onlyOneModel}
+            setModelsAsRows={props.setModelsAsRows}
+            shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
+            onShowSplitView={props.onShowSplitView}
+          />
+        ),
+      }}
     />
   );
 };
@@ -1026,7 +1562,14 @@ const useOnlyExpandedRows = (
 
 // Component for displaying models as columns
 export const ExampleCompareSectionTableModelsAsColumns: React.FC<
-  ExampleCompareSectionTableProps & {rowHeight: number}
+  ExampleCompareSectionTableProps & {
+    rowHeight: number;
+    lineClamp: number;
+    increaseRowHeight: () => void;
+    decreaseRowHeight: () => void;
+    setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
+    onlyOneModel: boolean;
+  }
 > = props => {
   const ctx = useCompareEvaluationsState();
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(ctx.state);
@@ -1056,13 +1599,16 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     rows
   );
 
+  const navigateToCall = useCallNavigation();
+
   const columns: GridColDef<RowData>[] = useMemo(() => {
     const res: GridColDef<RowData>[] = [
       ...inputFields(
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView,
-        inputWidths
+        inputWidths,
+        props.lineClamp
       ),
       ...(hasTrials
         ? [
@@ -1074,6 +1620,91 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             ),
           ]
         : []),
+      // Add predict call columns for each evaluation
+      ...props.state.evaluationCallIdsOrdered.map(
+        evaluationCallId =>
+          ({
+            field: `predictCall.${evaluationCallId}`,
+            headerName: 'Call',
+            width: 100,
+            maxWidth: 150,
+            resizable: true,
+            disableColumnMenu: false,
+            disableReorder: true,
+            sortable: false,
+            filterable: false,
+            headerAlign: 'center',
+            cellClassName: 'call-id-cell',
+            ...DISABLED_ROW_SPANNING,
+            renderHeader: (params: GridColumnHeaderParams<RowData>) => {
+              return (
+                <EvaluationModelLink
+                  callId={evaluationCallId}
+                  state={props.state}
+                />
+              );
+            },
+            renderCell: (params: GridRenderCellParams<RowData>) => {
+              // Find the corresponding filtered row
+              const correspondingFilteredRow = filteredRows.find(
+                fr => fr.inputDigest === params.row.inputDigest
+              );
+              if (correspondingFilteredRow) {
+                const trial =
+                  params.row._type === 'trial'
+                    ? correspondingFilteredRow.originalRows.filter(
+                        row => row.evaluationCallId === evaluationCallId
+                      )[params.row._trialNdx]
+                    : correspondingFilteredRow.originalRows.find(
+                        row => row.evaluationCallId === evaluationCallId
+                      );
+
+                if (trial) {
+                  const trialPredict =
+                    trial.predictAndScore._rawPredictTraceData;
+                  const [trialEntity, trialProject] =
+                    trialPredict?.project_id.split('/') ?? [];
+                  const trialOpName = parseRefMaybe(
+                    trialPredict?.op_name ?? ''
+                  )?.artifactName;
+                  const trialCallId = trial.predictAndScore.callId;
+
+                  if (
+                    trialEntity &&
+                    trialProject &&
+                    trialOpName &&
+                    trialCallId
+                  ) {
+                    return (
+                      <Box
+                        style={{
+                          overflow: 'hidden',
+                          height: '100%',
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() =>
+                          navigateToCall(trialEntity, trialProject, trialCallId)
+                        }>
+                        <CallLink
+                          entityName={trialEntity}
+                          projectName={trialProject}
+                          opName={trialOpName}
+                          callId={trialCallId}
+                          noName
+                        />
+                      </Box>
+                    );
+                  }
+                }
+              }
+              return null;
+            },
+          } as GridColDef<RowData>)
+      ),
       ...outputColumnKeys.flatMap(key => {
         return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
           return {
@@ -1101,16 +1732,18 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                 return (
                   <DenseCellValue
                     value={params.row.output?.[key]?.[evaluationCallId]}
+                    lineClamp={props.lineClamp}
                   />
                 );
               }
               return (
                 <DenseCellValue
                   value={params.row.output?.[key]?.[evaluationCallId]}
+                  lineClamp={props.lineClamp}
                 />
               );
             },
-          };
+          } as GridColDef<RowData>;
         });
       }),
       ...Object.entries(compositeMetrics).flatMap(
@@ -1166,7 +1799,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                         baselineValue
                       );
                     },
-                  };
+                  } as GridColDef<RowData>;
                 }
               );
             }
@@ -1190,6 +1823,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     outputColumnKeys,
     compositeMetrics,
     outputWidths,
+    filteredRows,
+    props.lineClamp,
+    navigateToCall,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -1200,6 +1836,15 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         children: inputSubFields.inputSubFields.map(key => ({
           field: `inputs.${key}`,
         })),
+      },
+      {
+        groupId: 'predictCalls',
+        headerName: 'Calls',
+        children: props.state.evaluationCallIdsOrdered.map(
+          evaluationCallId => ({
+            field: `predictCall.${evaluationCallId}`,
+          })
+        ),
       },
       {
         groupId: 'output',
@@ -1291,6 +1936,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       pinnedColumns={{
         left: ['inputDigest'],
       }}
+      columnHeaderHeight={36}
       rowHeight={props.rowHeight}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
@@ -1301,7 +1947,19 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       pagination
       pageSizeOptions={[50]}
       sx={styledDataGridStyleOverrides}
-      slots={{columnsPanel: ColumnsManagementPanel}}
+      slots={{
+        columnsPanel: ColumnsManagementPanel,
+        footer: () => (
+          <CustomFooter
+            increaseRowHeight={props.increaseRowHeight}
+            decreaseRowHeight={props.decreaseRowHeight}
+            onlyOneModel={props.onlyOneModel}
+            setModelsAsRows={props.setModelsAsRows}
+            shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
+            onShowSplitView={props.onShowSplitView}
+          />
+        ),
+      }}
     />
   );
 };
@@ -1328,8 +1986,4 @@ const useColumnsWithControlledWidths = (columns: GridColDef<RowData>[]) => {
     columnsWithControlledWidths,
     onColumnWidthChange,
   };
-};
-
-const clip = (value: number, min: number, max: number) => {
-  return Math.max(min, Math.min(value, max));
 };

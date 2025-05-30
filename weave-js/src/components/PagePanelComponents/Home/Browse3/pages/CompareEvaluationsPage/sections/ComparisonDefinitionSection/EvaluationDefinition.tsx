@@ -3,12 +3,10 @@ import React, {useMemo} from 'react';
 
 import {
   MOON_300,
-  MOON_600,
   MOON_800,
 } from '../../../../../../../../common/css/color.styles';
-import {hexToRGB} from '../../../../../../../../common/css/utils';
 import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
-import {Icon, IconNames} from '../../../../../../../Icon';
+import {Icon} from '../../../../../../../Icon';
 import {SmallRef} from '../../../../smallRef/SmallRef';
 import {objectRefDisplayName} from '../../../../smallRef/SmallWeaveRef';
 import {CallLink, ObjectVersionLink} from '../../../common/Links';
@@ -84,7 +82,7 @@ export const EvaluationModelLink: React.FC<{
           textDecoration: 'line-through',
         }}>
         <Box display="flex" alignItems="center">
-          <ModelIcon />
+          <Icon name="filled-circle" color={evaluationCall.color} />
           {objectRefDisplayName(objRef).label}
         </Box>
       </Box>
@@ -99,7 +97,7 @@ export const EvaluationModelLink: React.FC<{
       version={objRef.artifactVersion}
       versionIndex={objectVersion.result?.versionIndex ?? 0}
       color={MOON_800}
-      icon={<ModelIcon color={evaluationCall.color} />}
+      icon={<Icon name="filled-circle" color={evaluationCall.color} />}
     />
   );
 };
@@ -118,22 +116,14 @@ export const EvaluationDatasetLink: React.FC<{
   return <SmallRef objRef={parsed} />;
 };
 
-const ModelIcon: React.FC<{color?: string}> = ({color}) => {
+export const VerticalBar: React.FC = () => {
   return (
-    <Box
-      mr="4px"
-      bgcolor={hexToRGB(MOON_300, 0.48)}
-      sx={{
-        height: '22px',
-        width: '22px',
-        borderRadius: '16px',
-        display: 'flex',
-        flex: '0 0 22px',
-        justifyContent: 'center',
-        alignItems: 'center',
-        color: color ?? MOON_600,
-      }}>
-      <Icon name={IconNames.Model} width={14} height={14} />
-    </Box>
+    <div
+      style={{
+        width: '1px',
+        height: '100%',
+        backgroundColor: MOON_300,
+      }}
+    />
   );
 };
