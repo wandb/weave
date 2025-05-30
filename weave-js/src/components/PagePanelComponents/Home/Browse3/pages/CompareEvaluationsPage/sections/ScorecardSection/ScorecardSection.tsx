@@ -222,14 +222,14 @@ export const ScorecardSection: React.FC<{
             </GridCell>
           );
         })}
-        {datasetVariation && (
-          <>
-            <GridCell
-              style={{
-                fontWeight: '600',
-                textAlign: 'right',
-                gridColumnEnd: 'span 2',
-              }}>
+        <>
+          <GridCell
+            style={{
+              fontWeight: '600',
+              textAlign: 'right',
+              gridColumnEnd: 'span 2',
+            }}>
+            {datasetVariation ? (
               <Alert
                 severity="warning"
                 style={{
@@ -245,25 +245,27 @@ export const ScorecardSection: React.FC<{
                   </div>
                 </Tooltip>
               </Alert>
-            </GridCell>
-            {evalCallIds.map(evalCallId => {
-              return (
-                <GridCell
-                  key={evalCallId}
-                  style={{
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}>
-                  <EvaluationDatasetLink
-                    callId={evalCallId}
-                    state={props.state}
-                  />
-                </GridCell>
-              );
-            })}
-          </>
-        )}
+            ) : (
+              'Dataset'
+            )}
+          </GridCell>
+          {evalCallIds.map(evalCallId => {
+            return (
+              <GridCell
+                key={evalCallId}
+                style={{
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}>
+                <EvaluationDatasetLink
+                  callId={evalCallId}
+                  state={props.state}
+                />
+              </GridCell>
+            );
+          })}
+        </>
         <GridCell
           style={{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
