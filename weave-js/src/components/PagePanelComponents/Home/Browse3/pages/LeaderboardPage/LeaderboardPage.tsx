@@ -53,6 +53,8 @@ import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerCli
 import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {ALL_VALUE} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {SummaryPlots} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
+import {ScorecardSection} from '../CompareEvaluationsPage/sections/ScorecardSection/ScorecardSection';
 
 type LeaderboardPageProps = {
   entity: string;
@@ -79,8 +81,6 @@ const useEvaluationCallIds = (
     const client = getClient();
     const fetchCallIds = async () => {
       try {
-        console.log('Fetching evaluation calls for refs:', evaluationRefs);
-        
         // Construct the proper op name reference
         const evaluateOpRef = opVersionKeyToRefUri({
           entity,
@@ -88,8 +88,6 @@ const useEvaluationCallIds = (
           opId: EVALUATE_OP_NAME_POST_PYDANTIC,
           versionHash: ALL_VALUE,
         });
-        
-        console.log('Using op ref:', evaluateOpRef);
         
         // Query for evaluation.evaluate calls that use these evaluation objects
         // Based on the pattern in useMetrics, we need to look for calls
@@ -103,13 +101,8 @@ const useEvaluationCallIds = (
           limit: 1000,
         });
         
-        console.log('Found evaluation calls:', response.calls.length);
-        console.log('Sample call:', response.calls[0]);
-        
         // Get all the call IDs from the matching calls
         const matchingCallIds = response.calls.map(call => call.id);
-        
-        console.log('Matching call IDs:', matchingCallIds);
         
         setCallIds(matchingCallIds);
       } catch (error) {
@@ -140,15 +133,6 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
     }
   }, [isEditor, props.openEditorOnMount]);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('LeaderboardPage state:', {
-      leaderboardVal,
-      evaluationCallIds,
-      hasLeaderboardVal: !!leaderboardVal,
-      hasEvaluationCallIds: evaluationCallIds.length > 0
-    });
-  }, [leaderboardVal, evaluationCallIds]);
 
   // Create header content with metadata and action buttons for both peek and full-screen views
   const headerContent = useMemo(() => {
@@ -296,14 +280,6 @@ export const LeaderboardPageContent: React.FC<
     evaluationRefs
   );
 
-  // Debug logging
-  useEffect(() => {
-    console.log('LeaderboardPageContent debug:', {
-      evaluationRefs,
-      evaluationCallIds,
-      leaderboardVal
-    });
-  }, [evaluationRefs, evaluationCallIds, leaderboardVal]);
 
   // Update parent component state
   useEffect(() => {
@@ -393,6 +369,22 @@ export const LeaderboardPageContentInner: React.FC<
     useState(leaderboardVal);
   const [drawerWidth, setDrawerWidth] = useState(800);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [selectedMetrics, setSelectedMetrics] = useState<Record<string, boolean> | null>(null);
+  
+  // Extract evaluation refs and get call IDs for charts
+  const evaluationRefs = useMemo(() => {
+    return [...new Set(
+      workingLeaderboardValCopy.columns
+        .map(col => col.evaluation_object_ref)
+        .filter(ref => ref != null)
+    )];
+  }, [workingLeaderboardValCopy.columns]);
+
+  const evaluationCallIds = useEvaluationCallIds(
+    props.entity,
+    props.project,
+    evaluationRefs
+  );
   
   useEffect(() => {
     props.setName(workingLeaderboardValCopy.name ?? '');
@@ -520,18 +512,41 @@ export const LeaderboardPageContentInner: React.FC<
         )}
         <Box
           display="flex"
-          flexDirection="row"
-          overflow="hidden"
+          flexDirection="column"
+          overflow="auto"
           sx={{
             flex: '1 1 auto',
           }}>
-          <LeaderboardGrid
-            entity={props.entity}
-            project={props.project}
-            loading={loading}
-            data={data}
-            columnOrder={columnOrder}
-          />
+          {/* Leaderboard Table */}
+          <Box sx={{minHeight: '400px'}}>
+            <LeaderboardGrid
+              entity={props.entity}
+              project={props.project}
+              loading={loading}
+              data={data}
+              columnOrder={columnOrder}
+            />
+          </Box>
+          
+          {/* Charts Section - Only show if we have evaluation call IDs */}
+          {evaluationCallIds.length > 0 && (
+            <Box sx={{marginTop: 4, paddingX: 2}}>
+              <CompareEvaluationsProvider
+                entity={props.entity}
+                project={props.project}
+                initialEvaluationCallIds={evaluationCallIds}
+                selectedMetrics={selectedMetrics}
+                setSelectedMetrics={setSelectedMetrics}
+                onEvaluationCallIdsUpdate={() => {}}
+                setComparisonDimensions={() => {}}
+                setSelectedInputDigest={() => {}}>
+                <CustomWeaveTypeProjectContext.Provider
+                  value={{entity: props.entity, project: props.project}}>
+                  <LeaderboardChartsSection />
+                </CustomWeaveTypeProjectContext.Provider>
+              </CompareEvaluationsProvider>
+            </Box>
+          )}
         </Box>
       </Box>
       
@@ -831,3 +846,41 @@ type ComparisonDimensionsType = Array<{
   metricId: string;
   rangeSelection?: {[evalCallId: string]: {min: number; max: number}};
 }>;
+
+// Component to display charts below the leaderboard
+const LeaderboardChartsSection: React.FC = () => {
+  const {state, setSelectedMetrics} = useCompareEvaluationsState();
+  
+  if (state.loadableComparisonResults.loading) {
+    return (
+      <Box sx={{textAlign: 'center', py: 4}}>
+        <WaveLoader size="small" />
+      </Box>
+    );
+  }
+
+  return (
+    <VerticalBox
+      sx={{
+        width: '100%',
+        alignItems: 'flex-start',
+        gridGap: STANDARD_PADDING,
+        paddingBottom: STANDARD_PADDING * 2,
+      }}>
+      <Box sx={{width: '100%'}}>
+        <h2 style={{fontSize: '1.5rem', fontWeight: 600, marginBottom: '16px'}}>
+          Evaluation Summary
+        </h2>
+      </Box>
+      
+      {/* Summary Plots */}
+      <SummaryPlots
+        state={state}
+        setSelectedMetrics={setSelectedMetrics}
+      />
+      
+      {/* Scorecard Section */}
+      <ScorecardSection state={state} />
+    </VerticalBox>
+  );
+};
