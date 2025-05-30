@@ -197,7 +197,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
           ),
         },
         {
-          label: 'Results',
+          label: 'Trace results',
           content: leaderboardVal && evaluationCallIds.length > 0 ? (
             <LeaderboardResultsTab
               entity={props.entity}
@@ -851,6 +851,10 @@ type ComparisonDimensionsType = Array<{
 // Component to display charts below the leaderboard
 const LeaderboardChartsSection: React.FC = () => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
+  const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
+    summaryPlots: false,
+    scorecard: false,
+  });
   
   if (state.loadableComparisonResults.loading) {
     return (
@@ -860,6 +864,13 @@ const LeaderboardChartsSection: React.FC = () => {
     );
   }
 
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
   return (
     <VerticalBox
       sx={{
@@ -868,15 +879,89 @@ const LeaderboardChartsSection: React.FC = () => {
         gridGap: STANDARD_PADDING,
         paddingBottom: STANDARD_PADDING * 2,
       }}>
-              
-      {/* Summary Plots */}
-      <SummaryPlots
-        state={state}
-        setSelectedMetrics={setSelectedMetrics}
-      />
       
-      {/* Scorecard Section */}
-      <ScorecardSection state={state} />
+      {/* Summary Plots Accordion */}
+      <Box sx={{width: '100%'}}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'pointer',
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #e0e0e0',
+            borderRadius: '8px 8px 0 0',
+            '&:hover': {
+              backgroundColor: '#f0f1f2',
+            },
+          }}
+          onClick={() => toggleSection('summaryPlots')}>
+          <Tailwind>
+            <div className="flex items-center justify-between w-full">
+              <h3 className="text-lg font-semibold m-0">Summary Plots</h3>
+              <div className={`transform transition-transform ${expandedSections.summaryPlots ? 'rotate-90' : ''}`}>
+                <div className="w-4 h-4">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 6l6 6-6 6V6z"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </Tailwind>
+        </Box>
+        {expandedSections.summaryPlots && (
+          <Box
+            sx={{
+              border: '1px solid #e0e0e0',
+              borderTop: 'none',
+              borderRadius: '0 0 8px 8px',
+            }}>
+            <SummaryPlots
+              state={state}
+              setSelectedMetrics={setSelectedMetrics}
+            />
+          </Box>
+        )}
+      </Box>
+      
+      {/* Scorecard Accordion */}
+      <Box sx={{width: '100%'}}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'pointer',
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #e0e0e0',
+            borderRadius: '8px 8px 0 0',
+            '&:hover': {
+              backgroundColor: '#f0f1f2',
+            },
+          }}
+          onClick={() => toggleSection('scorecard')}>
+          <Tailwind>
+            <div className="flex items-center justify-between w-full">
+              <h3 className="text-lg font-semibold m-0">Scorecard</h3>
+              <div className={`transform transition-transform ${expandedSections.scorecard ? 'rotate-90' : ''}`}>
+                <div className="w-4 h-4">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 6l6 6-6 6V6z"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </Tailwind>
+        </Box>
+        {expandedSections.scorecard && (
+          <Box
+            sx={{
+              border: '1px solid #e0e0e0',
+              borderTop: 'none',
+              borderRadius: '0 0 8px 8px',
+            }}>
+            <ScorecardSection state={state} />
+          </Box>
+        )}
+      </Box>
     </VerticalBox>
   );
 };

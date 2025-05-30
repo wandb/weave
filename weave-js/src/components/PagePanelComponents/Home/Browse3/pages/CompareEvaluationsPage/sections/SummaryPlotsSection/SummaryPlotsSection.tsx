@@ -1,7 +1,6 @@
 import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo} from 'react';
 
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
@@ -46,14 +45,6 @@ export const SummaryPlots: React.FC<{
   const normalizedRadarData = normalizeDataForRadarPlot(filteredData);
   const barPlotData = useBarPlotData(filteredData);
 
-  const {
-    containerRef,
-    isInitialRender,
-    plotsPerPage,
-    currentPage,
-    setCurrentPage,
-  } = useContainerDimensions();
-
   const handleCloseMetric = React.useCallback(
     (metric: string) => {
       if (selectedMetrics) {
@@ -66,58 +57,36 @@ export const SummaryPlots: React.FC<{
     [setSelectedMetrics, selectedMetrics]
   );
 
-  const {plotsToShow, totalPlots, startIndex, endIndex, totalPages} =
-    usePaginatedPlots(
-      normalizedRadarData,
-      barPlotData,
-      plotsPerPage,
-      currentPage,
-      handleCloseMetric
-    );
-
-  // Render placeholder during initial render
-  if (isInitialRender) {
-    return <div ref={containerRef} style={{width: '100%', height: '400px'}} />;
-  }
+  const allPlots = useAllPlots(normalizedRadarData, barPlotData, handleCloseMetric);
 
   return (
     <VerticalBox
       sx={{
-        paddingLeft: STANDARD_PADDING,
-        paddingRight: STANDARD_PADDING,
-        // flex: '1 1 auto',
         width: '100%',
         gridGap: STANDARD_PADDING / 2,
       }}>
       <HorizontalBox
         sx={{
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
         }}>
-        <div style={{display: 'flex', alignItems: 'center'}}>
-          <MetricsSelector
-            selectedMetrics={selectedMetrics}
-            setSelectedMetrics={setSelectedMetrics}
-            allMetrics={Array.from(allMetricNames)}
-          />
-        </div>
-        <div style={{display: 'flex', alignItems: 'center'}}>
-          <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            startIndex={startIndex}
-            endIndex={endIndex}
-            totalPlots={totalPlots}
-            onPrevPage={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
-            onNextPage={() =>
-              setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))
-            }
-          />
-        </div>
+        <MetricsSelector
+          selectedMetrics={selectedMetrics}
+          setSelectedMetrics={setSelectedMetrics}
+          allMetrics={Array.from(allMetricNames)}
+        />
       </HorizontalBox>
 
-      <div ref={containerRef} style={{width: '100%'}}>
-        <HorizontalBox>{plotsToShow}</HorizontalBox>
+      <div style={{width: '100%'}}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: STANDARD_PADDING,
+            width: '100%',
+          }}>
+          {allPlots}
+        </div>
       </div>
     </VerticalBox>
   );
@@ -127,11 +96,11 @@ const RadarPlotBox: React.FC<{data: RadarPlotData}> = ({data}) => (
   <Box
     sx={{
       height: PLOT_HEIGHT,
-      width: PLOT_HEIGHT * 1.5,
       borderRadius: BOX_RADIUS,
       border: STANDARD_BORDER,
       padding: PLOT_PADDING,
-      flex: '1 0 auto',
+      width: '100%',
+      minWidth: '300px',
     }}>
     <PlotlyRadarPlot height={PLOT_HEIGHT} data={data} />
   </Box>
@@ -145,14 +114,14 @@ const BarPlotBox: React.FC<{
     sx={{
       position: 'relative',
       height: PLOT_HEIGHT,
-      width: PLOT_HEIGHT,
       borderRadius: BOX_RADIUS,
       border: STANDARD_BORDER,
       paddingTop: PLOT_PADDING - 30,
       paddingBottom: PLOT_PADDING,
       paddingLeft: PLOT_PADDING,
       paddingRight: PLOT_PADDING,
-      flex: '1 1 auto',
+      width: '100%',
+      minWidth: '300px',
     }}>
     <Button
       variant="ghost"
@@ -179,53 +148,33 @@ const BarPlotBox: React.FC<{
   </Box>
 );
 
-const PaginationControls: React.FC<{
-  currentPage: number;
-  totalPages: number;
-  startIndex: number;
-  endIndex: number;
-  totalPlots: number;
-  onPrevPage: () => void;
-  onNextPage: () => void;
-}> = ({
-  currentPage,
-  totalPages,
-  startIndex,
-  endIndex,
-  totalPlots,
-  onPrevPage,
-  onNextPage,
-}) => (
-  <HorizontalBox sx={{width: '100%'}}>
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-      <Tailwind>
-        <div className="flex items-center">
-          <Button
-            variant="ghost"
-            onClick={onPrevPage}
-            disabled={currentPage === 0}
-            icon="chevron-next"
-            className="rotate-180"
-          />
-          <span className="mx-2 pb-2 text-sm text-moon-500">
-            {startIndex}-{endIndex} of {totalPlots}
-          </span>
-          <Button
-            variant="ghost"
-            onClick={onNextPage}
-            disabled={currentPage === totalPages - 1}
-            icon="chevron-next"
-          />
-        </div>
-      </Tailwind>
-    </Box>
-  </HorizontalBox>
-);
+const useAllPlots = (
+  filteredData: RadarPlotData,
+  barPlotData: Array<{
+    plotlyData: Plotly.Data;
+    yRange: [number, number];
+    metric: string;
+  }>,
+  onClose: (metric: string) => void
+) => {
+  return useMemo(() => {
+    const plots = [];
+
+    // Always show radar plot first if we have data
+    if (Object.keys(filteredData).length > 0) {
+      plots.push(<RadarPlotBox key="radar" data={filteredData} />);
+    }
+
+    // Add all bar plots
+    barPlotData.forEach((plot, index) => {
+      plots.push(
+        <BarPlotBox key={`bar-${index}`} plot={plot} onClose={onClose} />
+      );
+    });
+
+    return plots;
+  }, [filteredData, barPlotData, onClose]);
+};
 
 const useFilteredData = (
   radarData: RadarPlotData,
@@ -359,95 +308,6 @@ const useBarPlotData = (filteredData: RadarPlotData) =>
     });
   }, [filteredData]);
 
-const useContainerDimensions = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [isInitialRender, setIsInitialRender] = useState(true);
-  const [currentPage, setCurrentPage] = useState(0);
-
-  useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
-      }
-    };
-
-    updateWidth();
-    setIsInitialRender(false);
-
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
-
-  const plotsPerPage = useMemo(() => {
-    return Math.max(1, Math.floor(containerWidth / PLOT_HEIGHT));
-  }, [containerWidth]);
-
-  return {
-    containerRef,
-    isInitialRender,
-    plotsPerPage,
-    currentPage,
-    setCurrentPage,
-  };
-};
-
-const usePaginatedPlots = (
-  filteredData: RadarPlotData,
-  barPlotData: Array<{
-    plotlyData: Plotly.Data;
-    yRange: [number, number];
-    metric: string;
-  }>,
-  plotsPerPage: number,
-  currentPage: number,
-  onClose: (metric: string) => void
-) => {
-  const radarPlotWidth = 2;
-  const totalBarPlots = barPlotData.length;
-  const totalPlotWidth = radarPlotWidth + totalBarPlots;
-  const totalPages = Math.ceil(totalPlotWidth / plotsPerPage);
-
-  const plotsToShow = useMemo(() => {
-    // First page always shows radar plot
-    if (currentPage === 0) {
-      const availableSpace = plotsPerPage - radarPlotWidth;
-      return [
-        <RadarPlotBox key="radar" data={filteredData} />,
-        ...barPlotData
-          .slice(0, availableSpace)
-          .map((plot, index) => (
-            <BarPlotBox key={`bar-${index}`} plot={plot} onClose={onClose} />
-          )),
-      ];
-    } else {
-      // Subsequent pages show only bar plots
-      const startIdx =
-        (currentPage - 1) * plotsPerPage + (plotsPerPage - radarPlotWidth);
-      const endIdx = startIdx + plotsPerPage;
-      return barPlotData
-        .slice(startIdx, endIdx)
-        .map((plot, index) => (
-          <BarPlotBox
-            key={`bar-${startIdx + index}`}
-            plot={plot}
-            onClose={onClose}
-          />
-        ));
-    }
-  }, [currentPage, plotsPerPage, filteredData, barPlotData, onClose]);
-
-  // Calculate pagination details
-  const totalPlots = barPlotData.length + 1; // +1 for the radar plot
-  const startIndex =
-    currentPage === 0 ? 1 : Math.min(plotsPerPage + 1, totalPlots);
-  const endIndex =
-    currentPage === 0
-      ? Math.min(plotsToShow.length, totalPlots)
-      : Math.min(startIndex + plotsToShow.length - 1, totalPlots);
-
-  return {plotsToShow, totalPlots, startIndex, endIndex, totalPages};
-};
 
 const usePlotDataFromMetrics = (
   state: EvaluationComparisonState
