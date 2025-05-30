@@ -65,7 +65,7 @@ export const StatusChip = ({
   const {icon, color, label, tooltip} = statusInfo;
 
   const pill = iconOnly ? (
-    <IconOnlyPill icon={icon} color={color} />
+    <IconOnlyPill icon={icon} color={color} style={{flexShrink: 1}} />
   ) : (
     <Pill icon={icon} color={color} label={label} />
   );

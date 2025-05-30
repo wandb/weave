@@ -137,15 +137,3 @@ const ModelIcon: React.FC<{color?: string}> = ({color}) => {
     </Box>
   );
 };
-
-export const VerticalBar: React.FC = () => {
-  return (
-    <div
-      style={{
-        width: '1px',
-        height: '100%',
-        backgroundColor: MOON_300,
-      }}
-    />
-  );
-};

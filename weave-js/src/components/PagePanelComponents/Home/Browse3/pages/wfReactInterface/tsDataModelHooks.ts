@@ -343,7 +343,7 @@ const useCallsNoExpansion = (
   ]);
 
   // Keep track of the request we're waiting for, so that we
-  // can ignore requests that are superceded by more recent reqs
+  // can ignore requests that are superseded by more recent reqs
   const expectedRequestRef = useRef(req);
 
   const doFetch = useCallback(() => {
@@ -496,17 +496,19 @@ const useCallsStats = (
         entity: params.entity,
         project: params.project,
       }),
-      filter: {
-        op_names: deepFilter?.opVersionRefs,
-        input_refs: deepFilter?.inputObjectVersionRefs,
-        output_refs: deepFilter?.outputObjectVersionRefs,
-        parent_ids: deepFilter?.parentIds,
-        trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter?.callIds,
-        trace_roots_only: deepFilter?.traceRootsOnly,
-        wb_run_ids: deepFilter?.runIds,
-        wb_user_ids: deepFilter?.userIds,
-      },
+      filter: deepFilter
+        ? {
+            op_names: deepFilter?.opVersionRefs,
+            input_refs: deepFilter?.inputObjectVersionRefs,
+            output_refs: deepFilter?.outputObjectVersionRefs,
+            parent_ids: deepFilter?.parentIds,
+            trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
+            call_ids: deepFilter?.callIds,
+            trace_roots_only: deepFilter?.traceRootsOnly,
+            wb_run_ids: deepFilter?.runIds,
+            wb_user_ids: deepFilter?.userIds,
+          }
+        : undefined,
       query: params.query,
       limit: params.limit,
       ...(!!params.includeTotalStorageSize
@@ -568,7 +570,6 @@ const useProjectHasCalls = (
   const callsStats = useCallsStats({
     entity: params.entity,
     project: params.project,
-    filter: {},
     limit: 1,
     skip: params.skip,
   });
