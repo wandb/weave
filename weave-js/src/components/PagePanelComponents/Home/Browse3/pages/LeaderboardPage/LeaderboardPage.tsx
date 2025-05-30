@@ -1,9 +1,10 @@
-import {Box} from '@mui/material';
+import {Box, Alert} from '@mui/material';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import _ from 'lodash';
 import React, {
   useCallback,
@@ -12,6 +13,7 @@ import React, {
   useState,
 } from 'react';
 import ReactMarkdown from 'react-markdown';
+import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
 
 import {ResizableDrawer} from '../common/ResizableDrawer';
@@ -36,6 +38,21 @@ import {
 } from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
+import {
+  CompareEvaluationsProvider,
+  useCompareEvaluationsState,
+} from '../CompareEvaluationsPage/compareEvaluationsContext';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
+import {STANDARD_PADDING} from '../CompareEvaluationsPage/ecpConstants';
+import {VerticalBox} from '../CompareEvaluationsPage/Layout';
+import {ExampleFilterSection} from '../CompareEvaluationsPage/sections/ExampleFilterSection/ExampleFilterSection';
+import {ExampleCompareSectionTable} from '../CompareEvaluationsPage/sections/ExampleCompareSection/ExampleCompareSectionTable';
+import {ExampleCompareSectionDetailGuarded} from '../CompareEvaluationsPage/sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {EvaluationComparisonState} from '../CompareEvaluationsPage/ecpState';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
+import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
+import {ALL_VALUE} from '../../views/Leaderboard/types/leaderboardConfigType';
 
 type LeaderboardPageProps = {
   entity: string;
@@ -44,18 +61,94 @@ type LeaderboardPageProps = {
   openEditorOnMount?: boolean;
 };
 
+// Hook to resolve evaluation refs to call IDs
+const useEvaluationCallIds = (
+  entity: string,
+  project: string,
+  evaluationRefs: string[]
+): string[] => {
+  const getClient = useGetTraceServerClientContext();
+  const [callIds, setCallIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (evaluationRefs.length === 0) {
+      setCallIds([]);
+      return;
+    }
+
+    const client = getClient();
+    const fetchCallIds = async () => {
+      try {
+        console.log('Fetching evaluation calls for refs:', evaluationRefs);
+        
+        // Construct the proper op name reference
+        const evaluateOpRef = opVersionKeyToRefUri({
+          entity,
+          project,
+          opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+          versionHash: ALL_VALUE,
+        });
+        
+        console.log('Using op ref:', evaluateOpRef);
+        
+        // Query for evaluation.evaluate calls that use these evaluation objects
+        // Based on the pattern in useMetrics, we need to look for calls
+        // where the evaluation ref is in the input_refs
+        const response = await client.callsStreamQuery({
+          project_id: projectIdFromParts({entity, project}),
+          filter: {
+            op_names: [evaluateOpRef],
+            input_refs: evaluationRefs, // This is the key - evaluation refs are in inputs
+          },
+          limit: 1000,
+        });
+        
+        console.log('Found evaluation calls:', response.calls.length);
+        console.log('Sample call:', response.calls[0]);
+        
+        // Get all the call IDs from the matching calls
+        const matchingCallIds = response.calls.map(call => call.id);
+        
+        console.log('Matching call IDs:', matchingCallIds);
+        
+        setCallIds(matchingCallIds);
+      } catch (error) {
+        console.error('Error fetching evaluation call IDs:', error);
+        setCallIds([]);
+      }
+    };
+
+    fetchCallIds();
+  }, [entity, project, evaluationRefs, getClient]);
+
+  return callIds;
+};
+
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const [name, setName] = useState(props.leaderboardName);
   const {isEditor} = useIsEditor(props.entity);
   const showDeleteButton = useShowDeleteButton(props.entity);
   const [isEditing, setIsEditing] = useState(false);
   const [leaderboardObjectVersion, setLeaderboardObjectVersion] = useState<ObjectVersionSchema | null>(null);
+  const [leaderboardVal, setLeaderboardVal] = useState<LeaderboardObjectVal | null>(null);
+  const [selectedMetrics, setSelectedMetrics] = useState<Record<string, boolean> | null>(null);
+  const [evaluationCallIds, setEvaluationCallIds] = useState<string[]>([]);
   
   useEffect(() => {
     if (isEditor && props.openEditorOnMount) {
       setIsEditing(true);
     }
   }, [isEditor, props.openEditorOnMount]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('LeaderboardPage state:', {
+      leaderboardVal,
+      evaluationCallIds,
+      hasLeaderboardVal: !!leaderboardVal,
+      hasEvaluationCallIds: evaluationCallIds.length > 0
+    });
+  }, [leaderboardVal, evaluationCallIds]);
 
   // Create header content with metadata and action buttons for both peek and full-screen views
   const headerContent = useMemo(() => {
@@ -101,7 +194,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   return (
     <SimplePageLayoutWithHeader
       title={displayTitle}
-      hideTabsIfSingle
+      hideTabsIfSingle={false}
       headerContent={headerContent}
       tabs={[
         {
@@ -114,7 +207,28 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
               setIsEditing={setIsEditing}
               showDeleteButton={showDeleteButton}
               setLeaderboardObjectVersion={setLeaderboardObjectVersion}
+              setLeaderboardVal={setLeaderboardVal}
+              setEvaluationCallIds={setEvaluationCallIds}
             />
+          ),
+        },
+        {
+          label: 'Results',
+          content: leaderboardVal && evaluationCallIds.length > 0 ? (
+            <LeaderboardResultsTab
+              entity={props.entity}
+              project={props.project}
+              leaderboardVal={leaderboardVal}
+              evaluationCallIds={evaluationCallIds}
+              selectedMetrics={selectedMetrics}
+              setSelectedMetrics={setSelectedMetrics}
+            />
+          ) : (
+            <Box sx={{padding: STANDARD_PADDING}}>
+              <Alert severity="info">
+                No evaluation data available. Make sure the leaderboard is configured with evaluations.
+              </Alert>
+            </Box>
           ),
         },
       ]}
@@ -130,6 +244,8 @@ export const LeaderboardPageContent: React.FC<
     setIsEditing: (isEditing: boolean) => void;
     showDeleteButton?: boolean;
     setLeaderboardObjectVersion?: (version: ObjectVersionSchema) => void;
+    setLeaderboardVal?: (val: LeaderboardObjectVal) => void;
+    setEvaluationCallIds?: (ids: string[]) => void;
   }
 > = props => {
   const {entity, project} = props;
@@ -146,12 +262,62 @@ export const LeaderboardPageContent: React.FC<
     return null;
   }, [leaderboardInstances.result]);
 
+  // Get the leaderboard value safely
+  const leaderboardVal = useMemo(() => {
+    if (leaderboardInstances.result && leaderboardInstances.result.length === 1) {
+      return leaderboardInstances.result[0].val;
+    }
+    return null;
+  }, [leaderboardInstances.result]);
+
   // Set the object version in the parent component
   useEffect(() => {
     if (props.setLeaderboardObjectVersion && leaderboardObjectVersion) {
       props.setLeaderboardObjectVersion(leaderboardObjectVersion);
     }
   }, [props.setLeaderboardObjectVersion, leaderboardObjectVersion]);
+
+  // Extract unique evaluation refs from the leaderboard columns
+  const evaluationRefs = useMemo(() => {
+    if (leaderboardVal?.columns) {
+      return [...new Set(
+        leaderboardVal.columns
+          .map(col => col.evaluation_object_ref)
+          .filter(ref => ref != null)
+      )];
+    }
+    return [];
+  }, [leaderboardVal]);
+
+  // Use hook to resolve evaluation refs to call IDs
+  const evaluationCallIds = useEvaluationCallIds(
+    props.entity,
+    props.project,
+    evaluationRefs
+  );
+
+  // Debug logging
+  useEffect(() => {
+    console.log('LeaderboardPageContent debug:', {
+      evaluationRefs,
+      evaluationCallIds,
+      leaderboardVal
+    });
+  }, [evaluationRefs, evaluationCallIds, leaderboardVal]);
+
+  // Update parent component state
+  useEffect(() => {
+    if (props.setLeaderboardVal && leaderboardVal) {
+      props.setLeaderboardVal(leaderboardVal);
+    }
+  }, [props.setLeaderboardVal, leaderboardVal]);
+
+  useEffect(() => {
+    if (props.setEvaluationCallIds) {
+      // Always set the evaluation call IDs, even if empty
+      props.setEvaluationCallIds(evaluationCallIds);
+    }
+  }, [props.setEvaluationCallIds, evaluationCallIds]);
 
   if (leaderboardInstances.loading) {
     return <Loading centered />;
@@ -167,8 +333,6 @@ export const LeaderboardPageContent: React.FC<
       />
     );
   }
-
-  const leaderboardVal = leaderboardInstances.result[0].val;
 
   if (leaderboardVal == null) {
     return (
@@ -471,6 +635,7 @@ export const useIsEditor = (entity: string) => {
   }, [entity, loadingUserInfo, userInfo]);
 };
 
+
 const StyledReactMarkdown = styled(ReactMarkdown)`
   > *:first-child {
     margin-top: 0;
@@ -500,3 +665,169 @@ const StyledReactMarkdown = styled(ReactMarkdown)`
     font-size: 1rem;
   }
 `;
+
+// New component for the Results tab
+const LeaderboardResultsTab: React.FC<{
+  entity: string;
+  project: string;
+  leaderboardVal: LeaderboardObjectVal;
+  evaluationCallIds: string[];
+  selectedMetrics: Record<string, boolean> | null;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+}> = props => {
+  const [comparisonDimensions, setComparisonDimensions] =
+    React.useState<ComparisonDimensionsType | null>(null);
+  const [selectedInputDigest, setSelectedInputDigest] = React.useState<
+    string | null
+  >(null);
+
+  const setComparisonDimensionsAndClearInputDigest = useCallback(
+    (
+      dimensions:
+        | ComparisonDimensionsType
+        | null
+        | ((
+            prev: ComparisonDimensionsType | null
+          ) => ComparisonDimensionsType | null)
+    ) => {
+      if (typeof dimensions === 'function') {
+        dimensions = dimensions(comparisonDimensions);
+      }
+      setComparisonDimensions(dimensions);
+      setSelectedInputDigest(null);
+    },
+    [comparisonDimensions]
+  );
+
+  return (
+    <CompareEvaluationsProvider
+      entity={props.entity}
+      project={props.project}
+      initialEvaluationCallIds={props.evaluationCallIds}
+      selectedMetrics={props.selectedMetrics}
+      setSelectedMetrics={props.setSelectedMetrics}
+      comparisonDimensions={comparisonDimensions ?? undefined}
+      onEvaluationCallIdsUpdate={() => {}} // We don't update call IDs from the results tab
+      setComparisonDimensions={setComparisonDimensionsAndClearInputDigest}
+      selectedInputDigest={selectedInputDigest ?? undefined}
+      setSelectedInputDigest={setSelectedInputDigest}>
+      <CustomWeaveTypeProjectContext.Provider
+        value={{entity: props.entity, project: props.project}}>
+        <LeaderboardResultsContent />
+      </CustomWeaveTypeProjectContext.Provider>
+    </CompareEvaluationsProvider>
+  );
+};
+
+const LeaderboardResultsContent: React.FC = () => {
+  const {state} = useCompareEvaluationsState();
+  const showExamples =
+    Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
+      .length > 0;
+  const resultsLoading = state.loadableComparisonResults.loading;
+
+  if (resultsLoading) {
+    return (
+      <Box
+        sx={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '200px',
+        }}>
+        <WaveLoader size="small" />
+      </Box>
+    );
+  }
+
+  if (!showExamples) {
+    return (
+      <Box sx={{padding: STANDARD_PADDING}}>
+        <Alert severity="info">
+          The selected evaluations' datasets have 0 rows in common,
+          try comparing evaluations with datasets that have at least
+          one row in common.
+        </Alert>
+      </Box>
+    );
+  }
+
+  return (
+    <VerticalBox
+      sx={{
+        height: '100%',
+        width: '100%',
+        overflow: 'auto',
+      }}>
+      <AutoSizer style={{height: '100%', width: '100%'}}>
+        {({height}) => {
+          return <ResultExplorer state={state} height={height} />;
+        }}
+      </AutoSizer>
+    </VerticalBox>
+  );
+};
+
+const ResultExplorer: React.FC<{
+  state: EvaluationComparisonState;
+  height: number;
+}> = ({state, height}) => {
+  const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
+    'split'
+  );
+  const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
+
+  return (
+    <VerticalBox
+      sx={{
+        height: '100%',
+        width: '100%',
+        overflow: 'auto',
+      }}>
+      {regressionFinderEnabled && <ExampleFilterSection state={state} />}
+      <Box
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          height: height,
+          borderTop: '1px solid #e0e0e0',
+        }}>
+        <Box
+          style={{
+            flex: 1,
+            width: '50%',
+            display: viewMode !== 'detail' ? 'block' : 'none',
+          }}>
+          <ExampleCompareSectionTable
+            state={state}
+            shouldHighlightSelectedRow={viewMode === 'split'}
+            onShowSplitView={() => setViewMode('split')}
+          />
+        </Box>
+
+        <Box
+          style={{
+            flex: 1,
+            width: '50%',
+            borderLeft: '1px solid #e0e0e0',
+            display: viewMode !== 'table' ? 'block' : 'none',
+          }}>
+          <ExampleCompareSectionDetailGuarded
+            state={state}
+            onClose={() => setViewMode('table')}
+            onExpandToggle={() =>
+              setViewMode(viewMode === 'detail' ? 'split' : 'detail')
+            }
+            isExpanded={viewMode === 'detail'}
+          />
+        </Box>
+      </Box>
+    </VerticalBox>
+  );
+};
+
+type ComparisonDimensionsType = Array<{
+  metricId: string;
+  rangeSelection?: {[evalCallId: string]: {min: number; max: number}};
+}>;
