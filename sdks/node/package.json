@@ -8,7 +8,12 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "require": "./dist/index.js",
+      "import": "./dist/index.js"
+    },
+    "./instrument": {
+      "types": "./dist/esm/instrument.d.ts",
+      "import": "./dist/esm/instrument.js"
     }
   },
   "scripts": {
@@ -142,6 +147,7 @@
     "ini": "^5.0.0",
     "module-details-from-path": "^1.0.4",
     "openai": "^4.68.4",
+    "semifies": "^1.0.0",
     "uuidv7": "^1.0.1"
   },
   "devDependencies": {

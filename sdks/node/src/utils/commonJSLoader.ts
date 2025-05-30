@@ -1,21 +1,20 @@
 'use strict';
 import path from 'path';
+import semifies from 'semifies';
+
 import instrumentations, {
-  Instrumentation,
+  CacheEntry,
+  CJSInstrumentation,
 } from '../integrations/instrumentations';
+import {requirePackageJson} from './npmModuleUtils';
 
 const parse: (filePath: string) => {
   name: string;
-  baseDir: string;
+  basedir: string;
   path: string;
 } = require('module-details-from-path');
 
 export let reset = () => {};
-
-interface CacheEntry {
-  originalExports: any;
-  patchedExports: any;
-}
 
 let patching = Object.create(null);
 
@@ -47,7 +46,7 @@ if (typeof module !== 'undefined' && module.exports) {
     if (parsed === undefined) {
       return originalRequire.apply(this, arguments as any);
     }
-    const {name, baseDir, path: subPath} = parsed;
+    const {name, basedir, path: subPath} = parsed;
 
     const instrumentationLookupKey = `${name}@${subPath}`;
 
@@ -72,17 +71,27 @@ if (typeof module !== 'undefined' && module.exports) {
       const originalExports = originalRequire.apply(this, arguments as any);
 
       let instrumentation:
-        | Pick<Instrumentation, 'version' | 'hook'>
+        | Pick<CJSInstrumentation, 'version' | 'hook'>
         | undefined;
+
+      let packageJson: any;
+      try {
+        packageJson = requirePackageJson(basedir, module.paths);
+      } catch (e) {
+        console.log('Cannot find package.json for', name, basedir);
+        return originalExports;
+      }
+
+      const version = packageJson.version;
 
       for (const instrumentationCandiate of instrumentations.get(
         instrumentationLookupKey
       ) || []) {
-        // TODO check if the version is compatible with the current version of the module
-        // if (semver.satisfies(version, instrumentationCandiate.version)) {
-        instrumentation = instrumentationCandiate;
-        break;
-        // }
+        // check if the version is compatible with the current version of the module
+        if (semifies(version, instrumentationCandiate.version)) {
+          instrumentation = instrumentationCandiate;
+          break;
+        }
       }
 
       if (!instrumentation) {
@@ -95,7 +104,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
       const cacheEntry: CacheEntry = {
         originalExports,
-        patchedExports: hook(originalExports, name, baseDir),
+        patchedExports: hook(originalExports, name, basedir),
       };
 
       cachedModules.set(filename, cacheEntry);
