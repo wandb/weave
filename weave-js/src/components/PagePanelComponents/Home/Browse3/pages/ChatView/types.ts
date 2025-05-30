@@ -104,7 +104,6 @@ export type ChatCompletion = {
 
   // This fingerprint represents the backend configuration that the model runs with.
   // Can be used in conjunction with the seed request parameter to understand when backend changes have been made that might impact determinism.
-  // Optional because it is not included in Responses API
   system_fingerprint: string;
 
   usage: Usage;
