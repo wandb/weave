@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import {fork} from 'child_process';
 
-describe('require("openai") instrumentation', () => {
+describe('ESM Module instrumentation', () => {
   test('should apply the hook when module version is compatible', done => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openai-fork-test-'));
     // create fake openai module
@@ -24,52 +24,53 @@ describe('require("openai") instrumentation', () => {
     `;
     fs.writeFileSync(path.join(modDir, 'index.js'), file);
 
-    const childPath = path.join(tmpDir, 'openaiRequire.forkChild.js');
     // Use the compiled JavaScript paths from dist directory
     const instrumentationsPath = path.resolve(
       __dirname,
       '../../../dist/integrations/instrumentations.js'
     );
-    const commonJSLoaderPath = path.resolve(
-      __dirname,
-      '../../../dist/utils/commonJSLoader.js'
+    const customInstrumentationFile = `
+      // Add instrumentation for OpenAI
+      const {addESMInstrumentation} = require('${instrumentationsPath}');
+      addESMInstrumentation({
+        moduleName: 'openai',
+        version: '4.0.0',
+        hook: (exports) => {
+          console.log('Instrumentation hook called for OpenAI');
+          const proto = exports.OpenAI.prototype;
+          if (
+            proto.chat &&
+            proto.chat.completions &&
+            typeof proto.chat.completions.create === 'function'
+          ) {
+            const originalCreate = proto.chat.completions.create;
+            proto.chat.completions.create = async function(params) {
+              console.log('OpenAI create called with params:', JSON.stringify(params));
+              const result = await originalCreate.call(this, params);
+              console.log('OpenAI create returned:', JSON.stringify(result));
+              return result;
+            };
+          }
+          return exports;
+        }
+      });
+      console.log('OpenAI instrumentation added');
+    `;
+    const customInstrumentationPath = path.join(
+      tmpDir,
+      'customInstrumentation.js'
     );
+    fs.writeFileSync(customInstrumentationPath, customInstrumentationFile);
+    const esmLoaderPath = path.resolve(
+      __dirname,
+      '../../../dist/esm/instrument.js'
+    );
+    const childPath = path.join(tmpDir, 'openaiRequire.forkChild.mjs');
     fs.writeFileSync(
       childPath,
       `console.log('Starting child process...');
-require('${commonJSLoaderPath}');
-console.log('CommonJS loader loaded');
-require('${instrumentationsPath}');
-console.log('Instrumentations loaded');
 
-// Add instrumentation for OpenAI
-const {addCJSInstrumentation} = require('${instrumentationsPath}');
-addCJSInstrumentation({
-  moduleName: 'openai',
-  subPath: 'index.js',
-  version: '4.0.0',
-  hook: (exports, name, baseDir) => {
-    console.log('Instrumentation hook called for OpenAI');
-    const proto = exports.OpenAI.prototype;
-    if (
-      proto.chat &&
-      proto.chat.completions &&
-      typeof proto.chat.completions.create === 'function'
-    ) {
-      const originalCreate = proto.chat.completions.create;
-      proto.chat.completions.create = async function(params) {
-        console.log('OpenAI create called with params:', JSON.stringify(params));
-        const result = await originalCreate.call(this, params);
-        console.log('OpenAI create returned:', JSON.stringify(result));
-        return result;
-      };
-    }
-    return exports;
-  }
-});
-console.log('OpenAI instrumentation added');
-
-const {OpenAI} = require('openai');
+import {OpenAI} from 'openai';
 console.log('OpenAI module loaded');
 const client = new OpenAI();
 client.chat.completions.create({messages: [{role: 'user', content: 'test'}]}).then(result => {
@@ -87,6 +88,10 @@ client.chat.completions.create({messages: [{role: 'user', content: 'test'}]}).th
           (process.env.NODE_PATH ? path.delimiter + process.env.NODE_PATH : ''),
       },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      execArgv: [
+        `--import=${customInstrumentationPath}`,
+        `--import=${esmLoaderPath}`,
+      ],
     });
     let output = '';
     if (child.stdout) {
@@ -123,51 +128,53 @@ client.chat.completions.create({messages: [{role: 'user', content: 'test'}]}).th
     `;
     fs.writeFileSync(path.join(modDir, 'index.js'), file);
 
-    const childPath = path.join(tmpDir, 'openaiRequire.forkChild.js');
+    // Use the compiled JavaScript paths from dist directory
     const instrumentationsPath = path.resolve(
       __dirname,
       '../../../dist/integrations/instrumentations.js'
     );
-    const commonJSLoaderPath = path.resolve(
-      __dirname,
-      '../../../dist/utils/commonJSLoader.js'
+    const customInstrumentationFile = `
+      // Add instrumentation for OpenAI
+      const {addESMInstrumentation} = require('${instrumentationsPath}');
+      addESMInstrumentation({
+        moduleName: 'openai',
+        version: '4.0.0',
+        hook: (exports) => {
+          console.log('Instrumentation hook called for OpenAI');
+          const proto = exports.OpenAI.prototype;
+          if (
+            proto.chat &&
+            proto.chat.completions &&
+            typeof proto.chat.completions.create === 'function'
+          ) {
+            const originalCreate = proto.chat.completions.create;
+            proto.chat.completions.create = async function(params) {
+              console.log('OpenAI create called with params:', JSON.stringify(params));
+              const result = await originalCreate.call(this, params);
+              console.log('OpenAI create returned:', JSON.stringify(result));
+              return result;
+            };
+          }
+          return exports;
+        }
+      });
+      console.log('OpenAI instrumentation added');
+    `;
+    const customInstrumentationPath = path.join(
+      tmpDir,
+      'customInstrumentation.js'
     );
+    fs.writeFileSync(customInstrumentationPath, customInstrumentationFile);
+    const esmLoaderPath = path.resolve(
+      __dirname,
+      '../../../dist/esm/instrument.js'
+    );
+    const childPath = path.join(tmpDir, 'openaiRequire.forkChild.mjs');
     fs.writeFileSync(
       childPath,
       `console.log('Starting child process...');
-require('${commonJSLoaderPath}');
-console.log('CommonJS loader loaded');
-require('${instrumentationsPath}');
-console.log('Instrumentations loaded');
 
-// Add instrumentation for OpenAI
-const {addCJSInstrumentation} = require('${instrumentationsPath}');
-addCJSInstrumentation({
-  moduleName: 'openai',
-  subPath: 'index.js',
-  version: '>= 4.0.0',
-  hook: (exports, name, baseDir) => {
-    console.log('Instrumentation hook called for OpenAI');
-    const proto = exports.OpenAI.prototype;
-    if (
-      proto.chat &&
-      proto.chat.completions &&
-      typeof proto.chat.completions.create === 'function'
-    ) {
-      const originalCreate = proto.chat.completions.create;
-      proto.chat.completions.create = async function(params) {
-        console.log('Patched OpenAI create called with params:', JSON.stringify(params));
-        const result = await originalCreate.call(this, params);
-        console.log('Patched OpenAI create returned:', JSON.stringify(result));
-        return result;
-      };
-    }
-    return exports;
-  }
-});
-console.log('OpenAI instrumentation added');
-
-const {OpenAI} = require('openai');
+import {OpenAI} from 'openai';
 console.log('OpenAI module loaded');
 const client = new OpenAI();
 client.chat.completions.create({messages: [{role: 'user', content: 'test'}]}).then(result => {
@@ -185,6 +192,10 @@ client.chat.completions.create({messages: [{role: 'user', content: 'test'}]}).th
           (process.env.NODE_PATH ? path.delimiter + process.env.NODE_PATH : ''),
       },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      execArgv: [
+        `--import=${customInstrumentationPath}`,
+        `--import=${esmLoaderPath}`,
+      ],
     });
     let output = '';
     if (child.stdout) {

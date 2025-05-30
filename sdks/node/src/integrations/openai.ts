@@ -1,7 +1,7 @@
 import {weaveImage} from '../media';
 import {op} from '../op';
 import {OpOptions} from '../opType';
-import {addInstrumentation} from './instrumentations';
+import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 
 // exported just for testing
 export const openAIStreamReducer = {
@@ -237,30 +237,35 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
     },
   });
 }
+function commonPatchOpenAI(exports: any) {
+  const OriginalOpenAIClass = exports.OpenAI;
+  exports.OpenAI = new Proxy(OriginalOpenAIClass, {
+    construct(target, args, newTarget) {
+      const instance = new target(...args);
+      return wrapOpenAI(instance);
+    },
+  });
+
+  if (exports.default) {
+    exports.default.OpenAI = exports.OpenAI;
+  }
+
+  return exports;
+}
 
 export function instrumentOpenAI() {
-  addInstrumentation({
+  addCJSInstrumentation({
     moduleName: 'openai',
     subPath: 'index.js',
     // 4.0.0 is the prevalently used version of openai at the time of writing
     // if we want to support other versions with different implementations,
     // we can add a call of `addInstrumentation()` for each version.
     version: '>= 4.0.0',
-    hook: exports => {
-      const OriginalOpenAIClass = exports.OpenAI;
-
-      exports.OpenAI = new Proxy(OriginalOpenAIClass, {
-        construct(target, args, newTarget) {
-          const instance = new target(...args);
-          return wrapOpenAI(instance);
-        },
-      });
-
-      if (exports.default) {
-        exports.default.OpenAI = exports.OpenAI;
-      }
-
-      return exports;
-    },
+    hook: commonPatchOpenAI,
+  });
+  addESMInstrumentation({
+    moduleName: 'openai',
+    version: '>= 4.0.0',
+    hook: commonPatchOpenAI,
   });
 }

@@ -3,7 +3,8 @@ import path from 'path';
 import semifies from 'semifies';
 
 import instrumentations, {
-  Instrumentation,
+  CacheEntry,
+  CJSInstrumentation,
 } from '../integrations/instrumentations';
 import {requirePackageJson} from './npmModuleUtils';
 
@@ -14,11 +15,6 @@ const parse: (filePath: string) => {
 } = require('module-details-from-path');
 
 export let reset = () => {};
-
-interface CacheEntry {
-  originalExports: any;
-  patchedExports: any;
-}
 
 let patching = Object.create(null);
 
@@ -75,7 +71,7 @@ if (typeof module !== 'undefined' && module.exports) {
       const originalExports = originalRequire.apply(this, arguments as any);
 
       let instrumentation:
-        | Pick<Instrumentation, 'version' | 'hook'>
+        | Pick<CJSInstrumentation, 'version' | 'hook'>
         | undefined;
 
       let packageJson: any;

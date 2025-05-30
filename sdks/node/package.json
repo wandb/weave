@@ -8,7 +8,12 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "require": "./dist/index.js",
+      "import": "./dist/index.js"
+    },
+    "./instrument": {
+      "types": "./dist/esm/instrument.d.ts",
+      "import": "./dist/esm/instrument.js"
     }
   },
   "scripts": {

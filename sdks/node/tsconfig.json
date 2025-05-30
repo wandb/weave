@@ -14,7 +14,9 @@
     "declaration": true,
     "declarationMap": true,
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "allowJs": true,
+    "resolveJsonModule": true
   },
   "include": ["src/**/*", "types/**/*"],
   "exclude": [
