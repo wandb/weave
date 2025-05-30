@@ -25,7 +25,14 @@ import {
   isTraceCallChatFormatMistral,
   normalizeMistralChatCompletion,
 } from './ChatFormats/mistral';
-import {isTraceCallChatFormatOpenAI} from './ChatFormats/openai';
+import {
+  isTraceCallChatFormatOAIResponses,
+  isTraceCallChatFormatOAIResponsesRequest,
+  isTraceCallChatFormatOAIResponsesResult,
+  isTraceCallChatFormatOpenAI,
+  normalizeOAIReponsesResult,
+  normalizeOAIResponsesRequest,
+} from './ChatFormats/openai';
 import {
   isTraceCallChatFormatOTEL,
   normalizeOTELChatCompletion,
@@ -73,6 +80,9 @@ export const getChatFormat = (call: CallSchema): ChatFormat => {
   if (!('traceCall' in call) || !call.traceCall) {
     return ChatFormat.None;
   }
+  if (isTraceCallChatFormatOAIResponses(call.traceCall)) {
+    return ChatFormat.OAIResponses;
+  }
   if (isTraceCallChatFormatAnthropic(call.traceCall)) {
     return ChatFormat.Anthropic;
   }
@@ -107,6 +117,9 @@ export const normalizeChatCompletion = (
   if (isTraceCallChatFormatOTEL(completion)) {
     return normalizeOTELChatCompletion(request, completion);
   }
+  if (isTraceCallChatFormatOAIResponsesResult(completion)) {
+    return normalizeOAIReponsesResult(completion);
+  }
   return completion as ChatCompletion;
 };
 
@@ -130,6 +143,9 @@ const isStructuredOutputCall = (call: TraceCallSchema): boolean => {
 export const normalizeChatRequest = (request: any): ChatRequest => {
   if (isGeminiRequestFormat(request)) {
     return normalizeGeminiChatRequest(request);
+  }
+  if (isTraceCallChatFormatOAIResponsesRequest(request)) {
+    return normalizeOAIResponsesRequest(request);
   }
   if (isAnthropicCompletionFormat(request)) {
     return normalizeAnthropicChatRequest(request);
