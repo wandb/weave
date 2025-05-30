@@ -540,7 +540,8 @@ export const LeaderboardPageContentInner: React.FC<
                 setSelectedMetrics={setSelectedMetrics}
                 onEvaluationCallIdsUpdate={() => {}}
                 setComparisonDimensions={() => {}}
-                setSelectedInputDigest={() => {}}>
+                setSelectedInputDigest={() => {}}
+                filterToLatestEvaluationsPerModel={true}>
                 <CustomWeaveTypeProjectContext.Provider
                   value={{entity: props.entity, project: props.project}}>
                   <LeaderboardChartsSection />
@@ -726,7 +727,8 @@ const LeaderboardResultsTab: React.FC<{
       onEvaluationCallIdsUpdate={() => {}} // We don't update call IDs from the results tab
       setComparisonDimensions={setComparisonDimensionsAndClearInputDigest}
       selectedInputDigest={selectedInputDigest ?? undefined}
-      setSelectedInputDigest={setSelectedInputDigest}>
+      setSelectedInputDigest={setSelectedInputDigest}
+      filterToLatestEvaluationsPerModel={true}>
       <CustomWeaveTypeProjectContext.Provider
         value={{entity: props.entity, project: props.project}}>
         <LeaderboardResultsContent />

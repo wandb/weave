@@ -23,6 +23,9 @@ export type CompareEvaluationContext = {
 
   getCachedRowData: (digest: string) => any;
   setCachedRowData: (digest: string, data: any) => void;
+
+  // Flag to indicate if we should filter to latest evaluations per model (leaderboard mode)
+  filterToLatestEvaluationsPerModel?: boolean;
 };
 
 const CompareEvaluationsContext =
@@ -50,6 +53,7 @@ export const CompareEvaluationsProvider: React.FC<{
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
   comparisonDimensions?: ComparisonDimensionsType;
   selectedInputDigest?: string;
+  filterToLatestEvaluationsPerModel?: boolean;
 }> = ({
   entity,
   project,
@@ -61,6 +65,7 @@ export const CompareEvaluationsProvider: React.FC<{
   setSelectedInputDigest,
   comparisonDimensions,
   selectedInputDigest,
+  filterToLatestEvaluationsPerModel = false,
   children,
 }) => {
   const initialEvaluationCallIdsMemo = useDeepMemo(initialEvaluationCallIds);
@@ -138,6 +143,7 @@ export const CompareEvaluationsProvider: React.FC<{
       toggleHideEvaluation,
       getCachedRowData,
       setCachedRowData,
+      filterToLatestEvaluationsPerModel,
     };
   }, [
     initialState.loading,
@@ -148,6 +154,7 @@ export const CompareEvaluationsProvider: React.FC<{
     evaluationCallIds,
     hiddenEvaluationIds,
     onEvaluationCallIdsUpdate,
+    filterToLatestEvaluationsPerModel,
   ]);
 
   if (!value) {

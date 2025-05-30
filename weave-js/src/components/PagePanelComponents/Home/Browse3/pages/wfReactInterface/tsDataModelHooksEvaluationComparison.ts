@@ -248,6 +248,7 @@ const fetchEvaluationSummaryData = async (
         modelRef: call.inputs.model,
         summaryMetrics: {}, // These cannot be filled out yet since we don't know the IDs yet
         traceId: call.trace_id,
+        startedAt: call.started_at,
       },
     ])
   );

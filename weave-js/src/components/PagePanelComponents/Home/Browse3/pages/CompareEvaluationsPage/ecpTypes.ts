@@ -82,6 +82,7 @@ export type EvaluationCall = {
   color: string;
   summaryMetrics: MetricResultMap;
   traceId: string;
+  startedAt: string;
 };
 
 /**

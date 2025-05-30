@@ -4,6 +4,8 @@ import _ from 'lodash';
 import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
+import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
+
 import {
   MOON_100,
   MOON_300,
@@ -73,12 +75,21 @@ GridCell.displayName = 'S.GridCell';
 export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const {hiddenEvaluationIds} = useCompareEvaluationsState();
+  const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} = useCompareEvaluationsState();
 
   const evalCallIds = useMemo(
-    () =>
-      getOrderedCallIds(props.state).filter(id => !hiddenEvaluationIds.has(id)),
-    [props.state, hiddenEvaluationIds]
+    () => {
+      const allCallIds = getOrderedCallIds(props.state).filter(id => !hiddenEvaluationIds.has(id));
+      
+      // Only apply latest evaluation filtering if we're in leaderboard mode
+      if (filterToLatestEvaluationsPerModel) {
+        // Filter to keep only the latest evaluation for each model
+        return filterLatestCallIdsPerModel(allCallIds, props.state.summary.evaluationCalls, {}, true);
+      }
+      
+      return allCallIds;
+    },
+    [props.state, hiddenEvaluationIds, filterToLatestEvaluationsPerModel]
   );
 
   const modelRefs = useMemo(() => {

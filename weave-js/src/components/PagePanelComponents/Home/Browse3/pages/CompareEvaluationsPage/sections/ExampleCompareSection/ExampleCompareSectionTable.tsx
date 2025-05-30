@@ -39,6 +39,7 @@ import {
 } from '../../compositeMetricsUtil';
 import {EvaluationComparisonState} from '../../ecpState';
 import {HorizontalBox} from '../../Layout';
+import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
   ColumnsManagementPanel,
@@ -618,7 +619,7 @@ const DenseCellValue: React.FC<
 export const ExampleCompareSectionTable: React.FC<
   ExampleCompareSectionTableProps
 > = props => {
-  const {hiddenEvaluationIds} = useCompareEvaluationsState();
+  const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} = useCompareEvaluationsState();
   const [modelsAsRows, setModelsAsRows] = useState(false);
   const [rowHeight, setRowHeight] = useState(32);
   const [lineClamp, setLineClamp] = useState(1);
@@ -639,12 +640,20 @@ export const ExampleCompareSectionTable: React.FC<
     setLineClamp(v => Math.max(v - 1, 1));
   }, []);
 
-  // Filter out hidden evaluations
+  // Filter out hidden evaluations and keep only latest for each model (if in leaderboard mode)
   const visibleEvaluationCallIds = useMemo(() => {
-    return props.state.evaluationCallIdsOrdered.filter(
+    const nonHiddenIds = props.state.evaluationCallIdsOrdered.filter(
       id => !hiddenEvaluationIds.has(id)
     );
-  }, [props.state.evaluationCallIdsOrdered, hiddenEvaluationIds]);
+    
+    // Only apply latest evaluation filtering if we're in leaderboard mode
+    if (filterToLatestEvaluationsPerModel) {
+      // Filter to keep only the latest evaluation for each model
+      return filterLatestCallIdsPerModel(nonHiddenIds, props.state.summary.evaluationCalls, {}, true);
+    }
+    
+    return nonHiddenIds;
+  }, [props.state.evaluationCallIdsOrdered, props.state.summary.evaluationCalls, hiddenEvaluationIds, filterToLatestEvaluationsPerModel]);
 
   const onlyOneModel = visibleEvaluationCallIds.length === 1;
 

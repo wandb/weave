@@ -18,6 +18,7 @@ import {
   resolveSummaryMetricValueForEvaluateCall,
 } from '../../ecpUtil';
 import {HorizontalBox, VerticalBox} from '../../Layout';
+import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
 import {MetricsSelector} from './MetricsSelector';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
@@ -312,13 +313,21 @@ const useBarPlotData = (filteredData: RadarPlotData) =>
 const usePlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): {radarData: RadarPlotData; allMetricNames: Set<string>} => {
-  const {hiddenEvaluationIds} = useCompareEvaluationsState();
+  const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} = useCompareEvaluationsState();
   const compositeMetrics = useMemo(() => {
     return buildCompositeMetricsMap(state.summary, 'summary');
   }, [state]);
   const callIds = useMemo(() => {
-    return getOrderedCallIds(state).filter(id => !hiddenEvaluationIds.has(id));
-  }, [state, hiddenEvaluationIds]);
+    const allCallIds = getOrderedCallIds(state).filter(id => !hiddenEvaluationIds.has(id));
+    
+    // Only apply latest evaluation filtering if we're in leaderboard mode
+    if (filterToLatestEvaluationsPerModel) {
+      // Filter to keep only the latest evaluation for each model
+      return filterLatestCallIdsPerModel(allCallIds, state.summary.evaluationCalls, {}, true);
+    }
+    
+    return allCallIds;
+  }, [state, hiddenEvaluationIds, filterToLatestEvaluationsPerModel]);
 
   return useMemo(() => {
     const metrics = Object.values(compositeMetrics)
