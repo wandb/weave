@@ -134,9 +134,9 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   }, [isEditor, props.openEditorOnMount]);
 
 
-  // Create header content with metadata and action buttons for both peek and full-screen views
-  const headerContent = useMemo(() => {
-    if (!leaderboardObjectVersion) {
+  // Create header extra content with action buttons that will appear in the header bar
+  const headerExtra = useMemo(() => {
+    if (!leaderboardObjectVersion || isEditing) {
       return undefined;
     }
 
@@ -144,31 +144,24 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
     const displayName = leaderboardObjectVersion.val?.name || leaderboardObjectVersion.objectId;
     
     return (
-      <Tailwind style={{padding: '0px', minWidth: '46px'}}>
-        <div className="absolute z-10 right-16 flex justify-between">          
-          {/* Action buttons on the right */}
-          {!isEditing && (
-            <div className="flex-shrink-0 flex items-center gap-2">
-              {isEditor && (
-                <Button
-                  title="Edit leaderboard"
-                  tooltip="Edit leaderboard"
-                  variant="ghost"
-                  size="medium"
-                  icon="pencil-edit"
-                  onClick={() => setIsEditing(true)}>
-                </Button>
-              )}
-              {showDeleteButton && (
-                <DeleteObjectButtonWithModal
-                  objVersionSchema={leaderboardObjectVersion}
-                  overrideDisplayStr={displayName}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      </Tailwind>
+      <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+        {isEditor && (
+          <Button
+            title="Edit leaderboard"
+            tooltip="Edit leaderboard"
+            variant="ghost"
+            size="medium"
+            icon="pencil-edit"
+            onClick={() => setIsEditing(true)}
+          />
+        )}
+        {showDeleteButton && (
+          <DeleteObjectButtonWithModal
+            objVersionSchema={leaderboardObjectVersion}
+            overrideDisplayStr={displayName}
+          />
+        )}
+      </div>
     );
   }, [leaderboardObjectVersion, isEditing, isEditor, showDeleteButton]);
   
@@ -179,7 +172,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
     <SimplePageLayoutWithHeader
       title={displayTitle}
       hideTabsIfSingle={false}
-      headerContent={headerContent}
+      headerContent={undefined}
       tabs={[
         {
           label: 'Leaderboard',
@@ -220,7 +213,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
           ),
         },
       ]}
-      headerExtra={undefined}
+      headerExtra={headerExtra}
     />
   );
 };
