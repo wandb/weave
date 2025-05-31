@@ -1,6 +1,6 @@
 # Microsoft Azure
 
-Weights & Biases (W&B) Weave integrates with Microsoft Azure OpenAI services, helping teams to optimize their Azure AI applications. Using W&B, you can 
+Weights & Biases (W&B) Weave integrates with Microsoft Azure OpenAI services, helping teams to optimize their Azure AI applications.
 
 :::tip
 For the latest tutorials, visit [Weights & Biases on Microsoft Azure](https://wandb.ai/site/partners/azure).
@@ -20,7 +20,6 @@ def call_azure_chat(model_id: str, messages: list, max_tokens: int = 1000, tempe
         temperature=temperature
     )
     return {"status": "success", "response": response.choices[0].message.content}
-
 ```
 
 ## Learn more
