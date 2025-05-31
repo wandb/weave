@@ -468,15 +468,54 @@ const fetchEvaluationComparisonResults = async (
     modelRefs
   );
 
-  // Filter out non-intersecting rows
-  result.resultRows = Object.fromEntries(
-    Object.entries(result.resultRows).filter(([digest, row]) => {
-      return (
-        Object.values(row.evaluations).length ===
-        Object.values(summaryData.evaluationCalls).length
-      );
-    })
-  );
+  // Group evaluations by dataset to handle cases where we're comparing evaluations with different datasets
+  const evaluationsByDataset: {[datasetRef: string]: string[]} = {};
+  Object.entries(summaryData.evaluationCalls).forEach(([callId, evalCall]) => {
+    const evaluation = summaryData.evaluations[evalCall.evaluationRef];
+    if (evaluation) {
+      const datasetRef = evaluation.datasetRef;
+      if (!evaluationsByDataset[datasetRef]) {
+        evaluationsByDataset[datasetRef] = [];
+      }
+      evaluationsByDataset[datasetRef].push(callId);
+    }
+  });
+
+  // If all evaluations use the same dataset, use the original strict intersection logic
+  const datasetCount = Object.keys(evaluationsByDataset).length;
+  if (datasetCount === 1) {
+    // Filter out non-intersecting rows (original behavior)
+    result.resultRows = Object.fromEntries(
+      Object.entries(result.resultRows).filter(([digest, row]) => {
+        return (
+          Object.values(row.evaluations).length ===
+          Object.values(summaryData.evaluationCalls).length
+        );
+      })
+    );
+  } else {
+    // When comparing evaluations with different datasets, only require that rows
+    // exist in all evaluations that share the same dataset
+    result.resultRows = Object.fromEntries(
+      Object.entries(result.resultRows).filter(([digest, row]) => {
+        // For each dataset group, check if the row exists in all evaluations of that dataset
+        for (const [datasetRef, evalCallIds] of Object.entries(evaluationsByDataset)) {
+          const rowEvalsForDataset = evalCallIds.filter(callId => 
+            row.evaluations[callId] !== undefined
+          );
+          
+          // If this row has data from this dataset, it must have data from ALL evaluations
+          // that use this dataset
+          if (rowEvalsForDataset.length > 0 && rowEvalsForDataset.length !== evalCallIds.length) {
+            return false;
+          }
+        }
+        
+        // The row must exist in at least one evaluation
+        return Object.values(row.evaluations).length > 0;
+      })
+    );
+  }
 
   return result;
 };
