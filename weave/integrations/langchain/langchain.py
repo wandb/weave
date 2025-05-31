@@ -32,6 +32,7 @@ This approach allows for more flexible runtime configuration while still respect
 import datetime
 import json
 import logging
+from collections import defaultdict
 from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
@@ -44,6 +45,7 @@ from weave.integrations.integration_utilities import (
 from weave.integrations.patcher import Patcher
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.op import Op
 from weave.trace.weave_client import Call
 
 import_failed = False
@@ -241,7 +243,7 @@ if not import_failed:
                 # Finish the call.
                 call = self._call_map.pop(run_id)
                 run_dict = _run_to_dict(run, as_input=False)
-                self.wc.finish_call(call, run_dict)
+                self.wc.finish_call(call, run_dict, op=MockOpForFormatting())
 
         def _update_run_error(self, run: Run) -> None:
             call = self._call_map.pop(str(run.id), None)
@@ -365,6 +367,50 @@ else:
 
     class WeaveTracer:  # type: ignore
         pass
+
+
+class MockOpForFormatting(Op):
+    _tracing_enabled = True
+    call_display_name = "langchain.llm"
+    ref = None
+    resolve_fn = None
+    postprocess_inputs = None
+    postprocess_output = None
+    accumulator = None
+
+    def _on_finish_handler(
+        self, call: Call, output: Any, exception: Optional[BaseException] = None
+    ) -> None:
+        """Handle the finish event of a call.
+
+        Args:
+            call: The call that finished
+            output: The output of the call
+        """
+        usage = defaultdict(lambda: defaultdict(int))
+        if output is not None:
+            if "outputs" in output:
+                for output in output["outputs"]:
+                    for generation_list in output["generations"]:
+                        for generation in generation_list:
+                            response_metadata = generation["message"]["kwargs"][
+                                "response_metadata"
+                            ]
+                            model = response_metadata["model_name"]
+                            usage_metadata = response_metadata["usage_metadata"]
+
+                            usage[model]["prompt_tokens"] += usage_metadata.get(
+                                "prompt_token_count", 0
+                            )
+                            usage[model]["completion_tokens"] += usage_metadata.get(
+                                "candidates_token_count", 0
+                            )
+                            usage[model]["total_tokens"] += usage_metadata.get(
+                                "total_token_count", 0
+                            )
+
+        if call.summary is not None:
+            call.summary.update({"usage": usage})
 
 
 weave_tracing_callback_var: ContextVar[Optional[WeaveTracer]] = ContextVar(
