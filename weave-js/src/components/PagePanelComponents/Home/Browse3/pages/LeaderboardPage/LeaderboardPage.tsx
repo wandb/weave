@@ -485,35 +485,24 @@ export const LeaderboardPageContentInner: React.FC<
 
   return (
     <>
-      <Box display="flex" flexDirection="column" height="100%" flexGrow={1}>
+      <Box display="flex" flexDirection="column" height="100%" flexGrow={1} overflow="auto">
         {workingLeaderboardValCopy.description ? (
           <Box
-            display="flex"
-            flexDirection="row"
-            maxHeight="35%"
+            display="block"
             width="100%"
             sx={{
-              flex: '1 1 auto',
-              alignItems: 'flex-start',
-              padding: '12px 96px 12px 16px',
-              marginTop: '-8px',
-              gap: '12px',
-              overflowY: 'auto',
+              padding: '12px 16px 12px 16px',
+              backgroundColor: 'white',
             }}>
             <StyledReactMarkdown>
               {workingLeaderboardValCopy.description}
             </StyledReactMarkdown>
           </Box>
         ) : (
-          <Box height="38px" />
+          <Box height="0px" />
         )}
         <Box
-          display="flex"
-          flexDirection="column"
-          overflow="auto"
-          sx={{
-            flex: '1 1 auto',
-          }}>
+          display="block">
           {/* Leaderboard Table */}
           <Box sx={{backgroundColor: 'white', paddingBottom: '4px'}}>
             <LeaderboardGrid
