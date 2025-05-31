@@ -9,6 +9,7 @@ import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Pill} from '@wandb/weave/components/Tag';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
+import {MOON_100} from '@wandb/weave/common/css/color.styles';
 import React, {
   FC,
   useCallback,
@@ -44,7 +45,7 @@ import {ExampleCompareSectionDetailGuarded} from './sections/ExampleCompareSecti
 import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
-import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
+import {SummaryPlotsSection} from './sections/SummaryPlotsSection/SummaryPlotsSection';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -217,22 +218,19 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
             value: 'summary',
             label: 'Summary',
             content: (
-              <VerticalBox
-                sx={{
-                  height: '100%',
-                  overflow: 'auto',
-                  paddingTop: STANDARD_PADDING / 2,
-                  alignItems: 'flex-start',
-                  gridGap: STANDARD_PADDING,
-                }}>
-                <SummaryPlots
+              <div style={{marginTop: '-1px', minHeight: '100vh', backgroundColor: MOON_100, overflow: 'auto'}}>
+                <SummaryPlotsSection
                   state={state}
                   setSelectedMetrics={setSelectedMetrics}
+                  initialExpanded={true}
                 />
-                <ScorecardSection state={state} />
-                <Tailwind style={{width: '100%'}}>
+                <ScorecardSection 
+                  state={state} 
+                  initialExpanded={true}
+                />
+                <Tailwind style={{width: '100%', backgroundColor: MOON_100}}>
                   <div className="px-16">
-                    <div className="flex w-full flex items-center gap-3 rounded-lg bg-moon-100 px-16 py-8">
+                    <div className="flex w-full flex items-center gap-3 rounded-lg bg-white px-16 py-8">
                       <Icon name="table" size="large" color="moon-500 mb-4" />
                       <p className="text-[14px] ml-[8px] font-semibold">
                         Looking for your evaluation results?
@@ -249,7 +247,7 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
                     <div className="h-16"></div>
                   </div>
                 </Tailwind>
-              </VerticalBox>
+              </div>
             ),
           },
           {

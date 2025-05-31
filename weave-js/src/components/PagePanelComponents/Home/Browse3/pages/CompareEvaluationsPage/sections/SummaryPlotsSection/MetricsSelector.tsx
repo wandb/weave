@@ -41,7 +41,7 @@ export const MetricsSelector: React.FC<{
       <span ref={ref}>
         <Button
           variant="ghost"
-          icon="column"
+          icon="settings"
           tooltip="Manage metrics"
           onClick={onClick}
         />

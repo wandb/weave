@@ -1538,7 +1538,10 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       disableRowSelectionOnClick
       pagination
       pageSizeOptions={[50]}
-      sx={styledDataGridStyleOverrides}
+      sx={{
+        ...styledDataGridStyleOverrides,
+        backgroundColor: 'white',
+      }}
       slots={{
         columnsPanel: ColumnsManagementPanel,
         footer: () => (
@@ -1955,7 +1958,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       disableRowSelectionOnClick
       pagination
       pageSizeOptions={[50]}
-      sx={styledDataGridStyleOverrides}
+      sx={{
+        ...styledDataGridStyleOverrides,
+        backgroundColor: 'white',
+      }}
       slots={{
         columnsPanel: ColumnsManagementPanel,
         footer: () => (

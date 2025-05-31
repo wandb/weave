@@ -1,5 +1,5 @@
 import {Box, Alert} from '@mui/material';
-import {MOON_250} from '@wandb/weave/common/css/color.styles';
+import {MOON_250, MOON_100} from '@wandb/weave/common/css/color.styles';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Loading} from '@wandb/weave/components/Loading';
@@ -53,7 +53,7 @@ import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerCli
 import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {ALL_VALUE} from '../../views/Leaderboard/types/leaderboardConfigType';
-import {SummaryPlots} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
+import {SummaryPlotsSection} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
 import {ScorecardSection} from '../CompareEvaluationsPage/sections/ScorecardSection/ScorecardSection';
 
 type LeaderboardPageProps = {
@@ -184,31 +184,35 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
         {
           label: 'Leaderboard',
           content: (
-            <LeaderboardPageContent
-              {...props}
-              setName={setName}
-              isEditing={isEditing}
-              setIsEditing={setIsEditing}
-              showDeleteButton={showDeleteButton}
-              setLeaderboardObjectVersion={setLeaderboardObjectVersion}
-              setLeaderboardVal={setLeaderboardVal}
-              setEvaluationCallIds={setEvaluationCallIds}
-            />
+            <Box sx={{backgroundColor: MOON_100, height: '100%', width: '100%'}}>
+              <LeaderboardPageContent
+                {...props}
+                setName={setName}
+                isEditing={isEditing}
+                setIsEditing={setIsEditing}
+                showDeleteButton={showDeleteButton}
+                setLeaderboardObjectVersion={setLeaderboardObjectVersion}
+                setLeaderboardVal={setLeaderboardVal}
+                setEvaluationCallIds={setEvaluationCallIds}
+              />
+            </Box>
           ),
         },
         {
           label: 'Trace results',
           content: leaderboardVal && evaluationCallIds.length > 0 ? (
-            <LeaderboardResultsTab
-              entity={props.entity}
-              project={props.project}
-              leaderboardVal={leaderboardVal}
-              evaluationCallIds={evaluationCallIds}
-              selectedMetrics={selectedMetrics}
-              setSelectedMetrics={setSelectedMetrics}
-            />
+            <Box sx={{backgroundColor: MOON_100, height: '100%', width: '100%'}}>
+              <LeaderboardResultsTab
+                entity={props.entity}
+                project={props.project}
+                leaderboardVal={leaderboardVal}
+                evaluationCallIds={evaluationCallIds}
+                selectedMetrics={selectedMetrics}
+                setSelectedMetrics={setSelectedMetrics}
+              />
+            </Box>
           ) : (
-            <Box sx={{padding: STANDARD_PADDING}}>
+            <Box sx={{padding: STANDARD_PADDING, backgroundColor: MOON_100, height: '100%'}}>
               <Alert severity="info">
                 No evaluation data available. Make sure the leaderboard is configured with evaluations.
               </Alert>
@@ -518,7 +522,7 @@ export const LeaderboardPageContentInner: React.FC<
             flex: '1 1 auto',
           }}>
           {/* Leaderboard Table */}
-          <Box>
+          <Box sx={{backgroundColor: 'white', paddingBottom: '4px'}}>
             <LeaderboardGrid
               entity={props.entity}
               project={props.project}
@@ -531,7 +535,7 @@ export const LeaderboardPageContentInner: React.FC<
           
           {/* Charts Section - Only show if we have evaluation call IDs */}
           {evaluationCallIds.length > 0 && (
-            <Box sx={{marginTop: 4, paddingX: 2}}>
+            <Box sx={{marginBottom: '16px'}}>
               <CompareEvaluationsProvider
                 entity={props.entity}
                 project={props.project}
@@ -853,10 +857,6 @@ type ComparisonDimensionsType = Array<{
 // Component to display charts below the leaderboard
 const LeaderboardChartsSection: React.FC = () => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
-    summaryPlots: false,
-    scorecard: false,
-  });
   
   if (state.loadableComparisonResults.loading) {
     return (
@@ -866,104 +866,17 @@ const LeaderboardChartsSection: React.FC = () => {
     );
   }
 
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
-  };
-
   return (
-    <VerticalBox
-      sx={{
-        width: '100%',
-        alignItems: 'flex-start',
-        gridGap: STANDARD_PADDING,
-        paddingBottom: STANDARD_PADDING * 2,
-      }}>
-      
-      {/* Summary Plots Accordion */}
-      <Box sx={{width: '100%'}}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            cursor: 'pointer',
-            backgroundColor: '#f8f9fa',
-            border: '1px solid #e0e0e0',
-            borderRadius: '8px 8px 0 0',
-            '&:hover': {
-              backgroundColor: '#f0f1f2',
-            },
-          }}
-          onClick={() => toggleSection('summaryPlots')}>
-          <Tailwind>
-            <div className="flex items-center justify-between w-full">
-              <h3 className="text-lg font-semibold m-0">Summary Plots</h3>
-              <div className={`transform transition-transform ${expandedSections.summaryPlots ? 'rotate-90' : ''}`}>
-                <div className="w-4 h-4">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M9 6l6 6-6 6V6z"/>
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </Tailwind>
-        </Box>
-        {expandedSections.summaryPlots && (
-          <Box
-            sx={{
-              border: '1px solid #e0e0e0',
-              borderTop: 'none',
-              borderRadius: '0 0 8px 8px',
-            }}>
-            <SummaryPlots
-              state={state}
-              setSelectedMetrics={setSelectedMetrics}
-            />
-          </Box>
-        )}
-      </Box>
-      
-      {/* Scorecard Accordion */}
-      <Box sx={{width: '100%'}}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            cursor: 'pointer',
-            backgroundColor: '#f8f9fa',
-            border: '1px solid #e0e0e0',
-            borderRadius: '8px 8px 0 0',
-            '&:hover': {
-              backgroundColor: '#f0f1f2',
-            },
-          }}
-          onClick={() => toggleSection('scorecard')}>
-          <Tailwind>
-            <div className="flex items-center justify-between w-full">
-              <h3 className="text-lg font-semibold m-0">Scorecard</h3>
-              <div className={`transform transition-transform ${expandedSections.scorecard ? 'rotate-90' : ''}`}>
-                <div className="w-4 h-4">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M9 6l6 6-6 6V6z"/>
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </Tailwind>
-        </Box>
-        {expandedSections.scorecard && (
-          <Box
-            sx={{
-              border: '1px solid #e0e0e0',
-              borderTop: 'none',
-              borderRadius: '0 0 8px 8px',
-            }}>
-            <ScorecardSection state={state} />
-          </Box>
-        )}
-      </Box>
-    </VerticalBox>
+    <div>      
+      <SummaryPlotsSection
+        state={state}
+        setSelectedMetrics={setSelectedMetrics}
+        initialExpanded={false}
+      />
+      <ScorecardSection 
+        state={state} 
+        initialExpanded={true}
+      />
+    </div>
   );
 };

@@ -40,6 +40,8 @@ export const PlotlyRadarPlot: React.FC<{
         t: 20,
         pad: 0,
       },
+      paper_bgcolor: 'white',
+      plot_bgcolor: 'white',
       polar: {
         color: PLOT_GRID_COLOR,
         radialaxis: {

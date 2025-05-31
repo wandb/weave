@@ -1,7 +1,7 @@
 import {Box, Tooltip} from '@material-ui/core';
 import {Alert} from '@mui/material';
 import _ from 'lodash';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import styled from 'styled-components';
 
 import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
@@ -13,6 +13,8 @@ import {
 import {parseRefMaybe, WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {Button} from '@wandb/weave/components/Button';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 import {NotApplicable} from '../../../../NotApplicable';
@@ -73,6 +75,60 @@ const GridCell = styled.div<{
 GridCell.displayName = 'S.GridCell';
 
 export const ScorecardSection: React.FC<{
+  state: EvaluationComparisonState;
+  initialExpanded?: boolean;
+}> = props => {
+  const [isExpanded, setIsExpanded] = useState(props.initialExpanded ?? false);
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  return (
+    <div style={{backgroundColor: MOON_100, width: '100%', paddingBottom: '16px'}}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          borderTop: `1px solid ${MOON_300}`,
+          borderBottom: !isExpanded ? `1px solid ${MOON_300}` : 'none',
+          paddingLeft: STANDARD_PADDING,
+          paddingRight: STANDARD_PADDING,
+          paddingTop: '8px',
+          paddingBottom: '8px',
+        }}
+        style={{
+          backgroundColor: 'transparent',
+        }}>
+        <Tailwind>
+          <div className="flex items-center gap-8">
+            <Button
+              variant="ghost"
+              icon={isExpanded ? 'chevron-down' : 'chevron-next'}
+              size="small"
+              onClick={e => {
+                e.stopPropagation();
+                toggleExpanded();
+              }}
+            />
+            <h3 className="text-lg m-0">Evaluation details</h3>
+          </div>
+        </Tailwind>
+      </Box>
+      {isExpanded && (
+        <Box
+          sx={{
+            borderTop: 'none',
+            borderRadius: '0 0 8px 8px',
+          }}>
+          <ScorecardContent state={props.state} />
+        </Box>
+      )}
+    </div>
+  );
+};
+
+const ScorecardContent: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
   const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} = useCompareEvaluationsState();
@@ -203,8 +259,9 @@ export const ScorecardSection: React.FC<{
           display: 'grid',
           gridTemplateColumns,
           border: STANDARD_BORDER,
-          borderRadius: BOX_RADIUS,
+          borderRadius: "BOX_RADIUS",
           overflow: 'auto',
+          backgroundColor: 'white',
         }}>
         {/* Header Row */}
         <GridCell

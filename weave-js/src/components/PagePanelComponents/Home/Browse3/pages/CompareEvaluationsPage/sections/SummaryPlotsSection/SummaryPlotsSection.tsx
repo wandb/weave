@@ -1,6 +1,8 @@
 import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
-import React, {useEffect, useMemo} from 'react';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import React, {useEffect, useMemo, useState} from 'react';
+import {MOON_100, MOON_300} from '../../../../../../../../common/css/color.styles';
 
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
@@ -26,6 +28,72 @@ import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 /**
  * Summary plots produce plots to summarize evaluation comparisons.
  */
+export const SummaryPlotsSection: React.FC<{
+  state: EvaluationComparisonState;
+  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+  initialExpanded?: boolean;
+}> = ({state, setSelectedMetrics, initialExpanded = false}) => {
+  const [isExpanded, setIsExpanded] = useState(initialExpanded);
+  const {radarData, allMetricNames} = usePlotDataFromMetrics(state);
+  const {selectedMetrics} = state;
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  return (
+    <div style={{backgroundColor: MOON_100, width: '100%', ...(isExpanded && {paddingBottom: '24px'})}}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          borderTop: `1px solid ${MOON_300}`,
+          paddingLeft: STANDARD_PADDING,
+          paddingRight: STANDARD_PADDING,
+          paddingTop: '8px',
+          paddingBottom: '8px',
+        }}
+        style={{
+          backgroundColor: 'transparent',
+        }}>
+        <Tailwind style={{width: '100%'}}>
+          <div className="flex items-center gap-8 w-full">
+            <Button
+              variant="ghost"
+              icon={isExpanded ? 'chevron-down' : 'chevron-next'}
+              size="small"
+              onClick={e => {
+                e.stopPropagation();
+                toggleExpanded();
+              }}
+            />
+            <h3 className="text-lg m-0">Metrics</h3>
+            <div className="flex items-center ml-auto">
+              <MetricsSelector
+                selectedMetrics={selectedMetrics}
+                setSelectedMetrics={setSelectedMetrics}
+                allMetrics={Array.from(allMetricNames)}
+              />
+            </div>
+          </div>
+        </Tailwind>
+      </Box>
+      {isExpanded && (
+        <Box
+          sx={{
+            borderTop: 'none',
+            borderRadius: '0 0 8px 8px',
+          }}>
+          <SummaryPlots
+            state={state}
+            setSelectedMetrics={setSelectedMetrics}
+          />
+        </Box>
+      )}
+    </div>
+  );
+};
+
 export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
@@ -61,35 +129,19 @@ export const SummaryPlots: React.FC<{
   const allPlots = useAllPlots(normalizedRadarData, barPlotData, handleCloseMetric);
 
   return (
-    <VerticalBox
-      sx={{
-        width: '100%',
-        gridGap: STANDARD_PADDING / 2,
-      }}>
-      <HorizontalBox
-        sx={{
-          alignItems: 'center',
-          justifyContent: 'flex-start',
+    <div style={{width: '100%'}}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: STANDARD_PADDING,
+          paddingLeft: STANDARD_PADDING,
+          paddingRight: STANDARD_PADDING,
+          width: '100%',
         }}>
-        <MetricsSelector
-          selectedMetrics={selectedMetrics}
-          setSelectedMetrics={setSelectedMetrics}
-          allMetrics={Array.from(allMetricNames)}
-        />
-      </HorizontalBox>
-
-      <div style={{width: '100%'}}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: STANDARD_PADDING,
-            width: '100%',
-          }}>
-          {allPlots}
-        </div>
+        {allPlots}
       </div>
-    </VerticalBox>
+    </div>
   );
 };
 
@@ -102,6 +154,7 @@ const RadarPlotBox: React.FC<{data: RadarPlotData}> = ({data}) => (
       padding: PLOT_PADDING,
       width: '100%',
       minWidth: '300px',
+      bgcolor: 'white',
     }}>
     <PlotlyRadarPlot height={PLOT_HEIGHT} data={data} />
   </Box>
@@ -123,6 +176,7 @@ const BarPlotBox: React.FC<{
       paddingRight: PLOT_PADDING,
       width: '100%',
       minWidth: '300px',
+      bgcolor: 'white',
     }}>
     <Button
       variant="ghost"
