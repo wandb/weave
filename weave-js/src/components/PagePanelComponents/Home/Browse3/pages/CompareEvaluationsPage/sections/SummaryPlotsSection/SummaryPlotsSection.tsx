@@ -22,7 +22,7 @@ import {
   flattenedDimensionPath,
   resolveSummaryMetricValueForEvaluateCall,
 } from '../../ecpUtil';
-import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
+import {filterLatestCallIdsPerModelDataset} from '../../latestEvaluationUtil';
 import {MetricsSelector} from './MetricsSelector';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
@@ -386,10 +386,11 @@ const usePlotDataFromMetrics = (
 
     // Only apply latest evaluation filtering if we're in leaderboard mode
     if (filterToLatestEvaluationsPerModel) {
-      // Filter to keep only the latest evaluation for each model
-      return filterLatestCallIdsPerModel(
+      // Filter to keep only the latest evaluation for each model-dataset combination
+      return filterLatestCallIdsPerModelDataset(
         allCallIds,
         state.summary.evaluationCalls,
+        state.summary.evaluations,
         {},
         true
       );

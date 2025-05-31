@@ -63,7 +63,7 @@ export type EvaluationComparisonResults = {
 /**
  * The EvaluationObj is the primary object that defines the evaluation itself.
  */
-type EvaluationObj = {
+export type EvaluationObj = {
   ref: string;
   datasetRef: string;
   scorerRefs: string[];

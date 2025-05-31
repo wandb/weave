@@ -378,22 +378,43 @@ export function useExampleCompareDataAndPrefetch(
   }, [filteredRows, targetIndex]);
   const getTraceServerClient = useGetTraceServerClientContext();
   const client = getTraceServerClient();
-  const partialTableRequest = usePartialTableRequest(state);
+  const partialTableRequests = usePartialTableRequests(state);
 
   useEffect(() => {
     (async () => {
-      // Nothing we can do if the partial table request is not set
-      if (partialTableRequest == null) {
+      // Nothing we can do if no partial table requests are available
+      if (Object.keys(partialTableRequests).length === 0) {
         return;
       }
-      await loadMissingRowDataIntoCache(
-        client,
-        ctx,
-        prefetchDigests,
-        partialTableRequest
-      );
+      
+      // For each prefetch digest, determine its dataset and load if needed
+      for (const digest of prefetchDigests) {
+        const rowData = state.loadableComparisonResults.result?.resultRows?.[digest];
+        if (!rowData) continue;
+
+        // Find the dataset ref for this row
+        const evalCallId = Object.keys(rowData.evaluations)[0];
+        if (!evalCallId) continue;
+
+        const evaluationCall = state.summary.evaluationCalls[evalCallId];
+        if (!evaluationCall) continue;
+
+        const evaluation = state.summary.evaluations[evaluationCall.evaluationRef];
+        const datasetRef = evaluation?.datasetRef;
+        if (!datasetRef) continue;
+
+        const partialTableRequest = partialTableRequests[datasetRef];
+        if (!partialTableRequest) continue;
+
+        await loadMissingRowDataIntoCache(
+          client,
+          ctx,
+          [digest],
+          partialTableRequest
+        );
+      }
     })();
-  }, [partialTableRequest, client, prefetchDigests, state, ctx]);
+  }, [partialTableRequests, client, prefetchDigests, state, ctx]);
 
   return {
     targetRowValue,
@@ -414,7 +435,25 @@ export function useExampleCompareData(
   );
   const getTraceServerClient = useGetTraceServerClientContext();
   const client = getTraceServerClient();
-  const partialTableRequest = usePartialTableRequest(state);
+  const partialTableRequests = usePartialTableRequests(state);
+
+  // Determine which dataset to use for this row by checking which evaluations have data for it
+  const datasetRefForRow = useMemo(() => {
+    // Check which evaluations have data for this digest
+    const rowData = state.loadableComparisonResults.result?.resultRows?.[targetDigest];
+    if (!rowData) return null;
+
+    // Find the first evaluation that has data for this row
+    const evalCallId = Object.keys(rowData.evaluations)[0];
+    if (!evalCallId) return null;
+
+    // Get the dataset ref from that evaluation
+    const evaluationCall = state.summary.evaluationCalls[evalCallId];
+    if (!evaluationCall) return null;
+
+    const evaluation = state.summary.evaluations[evaluationCall.evaluationRef];
+    return evaluation?.datasetRef;
+  }, [state, targetDigest]);
 
   useEffect(() => {
     let mounted = true;
@@ -425,10 +464,20 @@ export function useExampleCompareData(
         setTargetRowValue(flattenObjectPreservingWeaveTypes(cachedRowData));
         return;
       }
-      // Nothing we can do if the partial table request is not set
-      if (partialTableRequest == null) {
+      
+      // If we couldn't determine the dataset ref, we can't fetch the row
+      if (!datasetRefForRow) {
+        setLoading(false);
         return;
       }
+
+      // Get the partial table request for this dataset
+      const partialTableRequest = partialTableRequests[datasetRefForRow];
+      if (!partialTableRequest) {
+        // Partial table request not ready yet
+        return;
+      }
+      
       // immediately fetch the current row
       setLoading(true);
 
@@ -449,7 +498,7 @@ export function useExampleCompareData(
     return () => {
       mounted = false;
     };
-  }, [partialTableRequest, client, ctx, targetDigest]);
+  }, [partialTableRequests, client, ctx, targetDigest, datasetRefForRow]);
 
   return {
     targetRowValue,
@@ -520,29 +569,51 @@ async function makePartialTableReq(
 }
 
 // React hook to wrap the `makePartialTableReq`
-const usePartialTableRequest = (state: EvaluationComparisonState) => {
+// This now returns a map of dataset refs to their partial table requests
+const usePartialTableRequests = (state: EvaluationComparisonState) => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const client = getTraceServerClient();
-  const [partialTableRequest, setPartialTableRequest] =
-    useState<PartialTableRequestType | null>(null);
+  const [partialTableRequests, setPartialTableRequests] =
+    useState<{[datasetRef: string]: PartialTableRequestType}>({});
 
-  const datasetRef = useMemo(() => {
-    return Object.values(state.summary.evaluations)[0].datasetRef as string;
+  const datasetRefs = useMemo(() => {
+    // Get all unique dataset refs from all evaluations
+    const refs = new Set<string>();
+    Object.values(state.summary.evaluations).forEach(evaluation => {
+      if (evaluation.datasetRef) {
+        refs.add(evaluation.datasetRef);
+      }
+    });
+    return Array.from(refs);
   }, [state.summary.evaluations]);
 
   useEffect(() => {
     let mounted = true;
-    makePartialTableReq(client, datasetRef).then(res => {
+    
+    // Fetch partial table requests for all datasets
+    Promise.all(
+      datasetRefs.map(async datasetRef => {
+        const req = await makePartialTableReq(client, datasetRef);
+        return {datasetRef, req};
+      })
+    ).then(results => {
       if (mounted) {
-        setPartialTableRequest(res);
+        const newRequests: {[datasetRef: string]: PartialTableRequestType} = {};
+        results.forEach(({datasetRef, req}) => {
+          if (req) {
+            newRequests[datasetRef] = req;
+          }
+        });
+        setPartialTableRequests(newRequests);
       }
     });
+    
     return () => {
       mounted = false;
     };
-  }, [client, datasetRef]);
+  }, [client, datasetRefs]);
 
-  return partialTableRequest;
+  return partialTableRequests;
 };
 
 // Helper to fetch and store row data in our state cache

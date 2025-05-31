@@ -42,7 +42,7 @@ import {
 } from '../../ecpState';
 import {resolveSummaryMetricResultForEvaluateCall} from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
-import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
+import {filterLatestCallIdsPerModelDataset} from '../../latestEvaluationUtil';
 import {HorizontalBox} from '../../Layout';
 import {
   EvaluationCallLink,
@@ -193,10 +193,11 @@ const ScorecardContent: React.FC<{
 
     // Only apply latest evaluation filtering if we're in leaderboard mode
     if (filterToLatestEvaluationsPerModel) {
-      // Filter to keep only the latest evaluation for each model
-      return filterLatestCallIdsPerModel(
+      // Filter to keep only the latest evaluation for each model-dataset combination
+      return filterLatestCallIdsPerModelDataset(
         allCallIds,
         props.state.summary.evaluationCalls,
+        props.state.summary.evaluations,
         {},
         true
       );

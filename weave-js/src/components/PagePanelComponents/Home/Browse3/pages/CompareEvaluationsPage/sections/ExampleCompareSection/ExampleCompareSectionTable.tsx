@@ -38,7 +38,7 @@ import {
   DERIVED_SCORER_REF_PLACEHOLDER,
 } from '../../compositeMetricsUtil';
 import {EvaluationComparisonState} from '../../ecpState';
-import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
+import {filterLatestCallIdsPerModelDataset} from '../../latestEvaluationUtil';
 import {HorizontalBox} from '../../Layout';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
@@ -652,10 +652,11 @@ export const ExampleCompareSectionTable: React.FC<
 
     // Only apply latest evaluation filtering if we're in leaderboard mode
     if (filterToLatestEvaluationsPerModel) {
-      // Filter to keep only the latest evaluation for each model
-      return filterLatestCallIdsPerModel(
+      // Filter to keep only the latest evaluation for each model-dataset combination
+      return filterLatestCallIdsPerModelDataset(
         nonHiddenIds,
         props.state.summary.evaluationCalls,
+        props.state.summary.evaluations,
         {},
         true
       );
@@ -665,6 +666,7 @@ export const ExampleCompareSectionTable: React.FC<
   }, [
     props.state.evaluationCallIdsOrdered,
     props.state.summary.evaluationCalls,
+    props.state.summary.evaluations,
     hiddenEvaluationIds,
     filterToLatestEvaluationsPerModel,
   ]);
