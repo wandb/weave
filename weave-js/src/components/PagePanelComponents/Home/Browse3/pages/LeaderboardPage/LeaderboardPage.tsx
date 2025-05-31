@@ -55,12 +55,80 @@ import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
 import {ALL_VALUE} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {SummaryPlotsSection} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
 import {ScorecardSection} from '../CompareEvaluationsPage/sections/ScorecardSection/ScorecardSection';
+import {ComputedCallStatusType} from '../wfReactInterface/traceServerClientTypes';
 
 type LeaderboardPageProps = {
   entity: string;
   project: string;
   leaderboardName: string;
   openEditorOnMount?: boolean;
+};
+
+// Hook to check for running evaluations
+const useHasRunningEvaluations = (
+  entity: string,
+  project: string,
+  data: any // The leaderboard data from useSavedLeaderboardData
+): boolean => {
+  const getClient = useGetTraceServerClientContext();
+  const [hasRunning, setHasRunning] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!data || !data.modelGroups) {
+      setHasRunning(false);
+      return;
+    }
+
+    // Extract all unique evaluation call IDs from the data
+    const callIds = new Set<string>();
+    Object.values(data.modelGroups).forEach((modelGroup: any) => {
+      Object.values(modelGroup.datasetGroups).forEach((datasetGroup: any) => {
+        Object.values(datasetGroup.scorerGroups).forEach((scorerGroup: any) => {
+          Object.values(scorerGroup.metricPathGroups).forEach((records: any) => {
+            records.forEach((record: any) => {
+              if (record.sourceEvaluationCallId) {
+                callIds.add(record.sourceEvaluationCallId);
+              }
+            });
+          });
+        });
+      });
+    });
+
+    if (callIds.size === 0) {
+      setHasRunning(false);
+      return;
+    }
+
+    const client = getClient();
+    const checkForRunningEvaluations = async () => {
+      try {
+        const callIdsArray = Array.from(callIds);
+        const response = await client.callsStreamQuery({
+          project_id: projectIdFromParts({entity, project}),
+          filter: {
+            call_ids: callIdsArray,
+          },
+          limit: callIdsArray.length,
+        });
+
+        // Check if any calls are still running
+        const hasRunningCalls = response.calls.some(call => {
+          const status = call.summary?.status || (call.ended_at ? 'success' : 'running');
+          return status === 'running';
+        });
+
+        setHasRunning(hasRunningCalls);
+      } catch (error) {
+        console.error('Error checking for running evaluations:', error);
+        setHasRunning(false);
+      }
+    };
+
+    checkForRunningEvaluations();
+  }, [entity, project, data, getClient]);
+
+  return hasRunning;
 };
 
 // Hook to resolve evaluation refs to call IDs
@@ -391,6 +459,7 @@ export const LeaderboardPageContentInner: React.FC<
     props.project,
     workingLeaderboardValCopy.columns
   );
+  const hasRunningEvaluations = useHasRunningEvaluations(props.entity, props.project, data);
   const [saving, setSaving] = useState(false);
   const discardChanges = useCallback(() => {
     setWorkingLeaderboardValCopy(leaderboardVal);
@@ -503,6 +572,15 @@ export const LeaderboardPageContentInner: React.FC<
         )}
         <Box
           display="block">
+          {/* Running Evaluations Banner */}
+          {hasRunningEvaluations && (
+            <Box sx={{padding: '12px 16px', backgroundColor: 'white', marginBottom: '1px'}}>
+              <Alert severity="info" sx={{margin: 0}}>
+                Some models have evaluations currently running. Results will update automatically when evaluations complete.
+              </Alert>
+            </Box>
+          )}
+          
           {/* Leaderboard Table */}
           <Box sx={{backgroundColor: 'white', paddingBottom: '4px'}}>
             <LeaderboardGrid

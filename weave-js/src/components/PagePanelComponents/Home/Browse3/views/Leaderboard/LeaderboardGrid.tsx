@@ -18,8 +18,12 @@ import {NotApplicable} from '../../NotApplicable';
 import {PaginationButtons} from '../../pages/CallsPage/CallsTableButtons';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_LEADERBOARD} from '../../pages/common/EmptyContent';
+import {StatusChip} from '../../pages/common/StatusChip';
 import {SmallRef} from '../../smallRef/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
+import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
+import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
+import {ComputedCallStatusType} from '../../pages/wfReactInterface/traceServerClientTypes';
 import {
   GroupedLeaderboardData,
   GroupedLeaderboardModelGroup,
@@ -48,6 +52,98 @@ type RowData = {
   modelGroup: GroupedLeaderboardModelGroup;
 };
 
+// Hook to fetch call statuses for evaluation calls
+const useEvaluationCallStatuses = (
+  entity: string,
+  project: string,
+  data: GroupedLeaderboardData
+): Record<string, ComputedCallStatusType> => {
+  const getClient = useGetTraceServerClientContext();
+  const [callStatuses, setCallStatuses] = useState<Record<string, ComputedCallStatusType>>({});
+
+  useEffect(() => {
+    // Extract all unique evaluation call IDs from the data
+    const callIds = new Set<string>();
+    Object.values(data.modelGroups).forEach(modelGroup => {
+      Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
+        Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
+          Object.values(scorerGroup.metricPathGroups).forEach(records => {
+            records.forEach(record => {
+              if (record.sourceEvaluationCallId) {
+                callIds.add(record.sourceEvaluationCallId);
+              }
+            });
+          });
+        });
+      });
+    });
+
+    if (callIds.size === 0) {
+      setCallStatuses({});
+      return;
+    }
+
+    const client = getClient();
+    const fetchCallStatuses = async () => {
+      try {
+        const callIdsArray = Array.from(callIds);
+        const response = await client.callsStreamQuery({
+          project_id: projectIdFromParts({entity, project}),
+          filter: {
+            call_ids: callIdsArray,
+          },
+          limit: callIdsArray.length,
+        });
+
+        const statuses: Record<string, ComputedCallStatusType> = {};
+        response.calls.forEach(call => {
+          // Extract status from the call summary or default to 'success' if finished
+          const status = call.summary?.status || (call.ended_at ? 'success' : 'running');
+          statuses[call.id] = status;
+        });
+
+        setCallStatuses(statuses);
+      } catch (error) {
+        console.error('Error fetching call statuses:', error);
+        setCallStatuses({});
+      }
+    };
+
+    fetchCallStatuses();
+  }, [entity, project, data, getClient]);
+
+  return callStatuses;
+};
+
+// Helper function to get the latest evaluation status for a model
+const getLatestEvaluationStatus = (
+  modelGroup: GroupedLeaderboardModelGroup,
+  callStatuses: Record<string, ComputedCallStatusType>
+): ComputedCallStatusType | null => {
+  let latestRecord: LeaderboardValueRecord | null = null;
+  let latestCreatedAt = new Date(0);
+
+  // Find the latest evaluation record for this model
+  Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
+    Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
+      Object.values(scorerGroup.metricPathGroups).forEach(records => {
+        records.forEach(record => {
+          if (record.createdAt.getTime() > latestCreatedAt.getTime()) {
+            latestCreatedAt = record.createdAt;
+            latestRecord = record;
+          }
+        });
+      });
+    });
+  });
+
+  if (latestRecord && latestRecord.sourceEvaluationCallId) {
+    return callStatuses[latestRecord.sourceEvaluationCallId] || null;
+  }
+
+  return null;
+};
+
 export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   entity,
   project,
@@ -58,6 +154,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 }) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
+  const callStatuses = useEvaluationCallStatuses(entity, project, data);
   const onCellClick = useCallback(
     (record: LeaderboardValueRecord) => {
       const sourceCallId = record.sourceEvaluationCallId;
@@ -353,26 +450,35 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         minWidth: 150,
         flex: 1,
         renderCell: (params: GridRenderCellParams) => {
-          const isOp = modelGroupIsOp((params.row as RowData).modelGroup);
+          const rowData = params.row as RowData;
+          const isOp = modelGroupIsOp(rowData.modelGroup);
           const modelRef = parseRefMaybe(
             `weave:///${entity}/${project}/${isOp ? 'op' : 'object'}/${
               params.value
             }` ?? ''
           );
+          
+          // Get the latest evaluation status for this model
+          const latestStatus = getLatestEvaluationStatus(rowData.modelGroup, callStatuses);
+          const showStatusChip = latestStatus === 'running';
+          
           if (modelRef) {
             return (
               <div
                 style={{
-                  width: '100%',
+                  width: 'max-content',
                   height: '100%',
                   alignContent: 'center',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
                   lineHeight: '20px',
                   marginLeft: '10px',
+                  gap: '8px',
                 }}>
                 <SmallRef objRef={modelRef} />
+                {showStatusChip && (
+                  <StatusChip value="running" iconOnly tooltipOverride="Evaluation in progress" />
+                )}
               </div>
             );
           }
@@ -471,7 +577,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           )
       ),
     ],
-    [columnStats.datasetGroups, entity, getColorForScore, onCellClick, project]
+    [columnStats.datasetGroups, entity, getColorForScore, onCellClick, project, callStatuses]
   );
 
   const groupingModel: GridColumnGroup[] = useMemo(() => {
