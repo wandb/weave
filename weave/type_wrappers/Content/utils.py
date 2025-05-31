@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 import mimetypes
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import magic
@@ -107,12 +109,16 @@ def get_mime_and_extension(
     elif mimetype and not extension:
         return mimetype, get_extension_from_mimetype(mimetype)
     elif not MAGIC_LIB_AVAILABLE:
-        raise RuntimeError(
+        logger.warning(
             "Failed to determine MIME type from file extension and cannot infer from data"
             "MIME type detection from raw data requires a functional python-magic library "
             "and its underlying libmagic dependency. Please install or configure them correctly."
             "See: https://pypi.org/project/python-magic/ for detailed instructions"
         )
-    raise RuntimeError(
-        "Failed to determine MIME type from file extension and cannot infer from data"
-    )
+    if filename is not None:
+        idx = filename.rfind('.')
+        if idx != -1:
+            extension = filename[idx:]
+
+    extension = extension or ""
+    return 'application/octet-stream', extension
