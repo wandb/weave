@@ -7,11 +7,11 @@ export type Path = string[];
 export type PathList = Path[];
 
 export function stringToPath(str: string): Path {
-  return str.split('.');
+  return str.split('_SUPER_CRAZY_SEPARATOR_');
 }
 
 export function pathToString(path: Path): string {
-  return path.join('.');
+  return path.join('_SUPER_CRAZY_SEPARATOR_');
 }
 
 export function isDynamicCallColumn(path: Path): boolean {
