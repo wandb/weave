@@ -5,7 +5,7 @@ import TabItem from '@theme/TabItem';
 
 <!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
 
-Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="https://weave-docs.wandb.ai/reference/gen_notebooks/intro_notebook/"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Try the notebook"/></a>
 
 ## 1. Install Weave and create an API Key
 
