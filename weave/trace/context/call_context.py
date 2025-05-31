@@ -118,6 +118,13 @@ def get_current_call() -> Call | None:
         The Call object for the currently executing Op, or
         None if tracking has not been initialized or this method is
         invoked outside an Op.
+
+    Note:
+        The returned Call's ``attributes`` dictionary becomes immutable
+        once the call starts. Use :func:`weave.attributes` to set
+        call metadata before invoking an Op. The ``summary`` field may
+        be updated while the Op executes and will be merged with
+        computed summary information when the call finishes.
     """
     return _call_stack.get()[-1] if _call_stack.get() else None
 
