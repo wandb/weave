@@ -13,7 +13,10 @@ import React, {
 import {normalizeChatTraceCall} from '../ChatView/hooks';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
-import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
+import {
+  useBaseObjectInstances,
+  useLeafObjectInstances,
+} from '../wfReactInterface/objectClassQuery';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
@@ -155,7 +158,7 @@ export const PlaygroundPageInner = ({
     result: savedModelsResult,
     loading: savedModelsLoading,
     refetch: refetchSavedModels,
-  } = useBaseObjectInstances('LLMStructuredCompletionModel', {
+  } = useLeafObjectInstances('LLMStructuredCompletionModel', {
     project_id: projectId,
   });
 

@@ -210,6 +210,7 @@ export type FeedbackPurgeError = {
 };
 export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
 interface TraceObjectsFilter {
+  leaf_object_classes?: string[];
   base_object_classes?: string[];
   object_ids?: string[];
   is_op?: boolean;
@@ -238,6 +239,7 @@ export interface TraceObjSchema<
   is_latest: number;
   kind: 'op' | 'object';
   base_object_class?: OBC;
+  leaf_object_class?: string;
   val: T;
   wb_user_id?: string;
   size_bytes?: number;

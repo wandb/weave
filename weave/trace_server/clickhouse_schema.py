@@ -127,6 +127,7 @@ class ObjCHInsertable(BaseModel):
     wb_user_id: Optional[str] = None
     kind: str
     base_object_class: Optional[str]
+    leaf_object_class: Optional[str]
     object_id: str
     refs: list[str]
     val_dump: str
@@ -152,6 +153,7 @@ class SelectableCHObjSchema(BaseModel):
     val_dump: str
     kind: str
     base_object_class: Optional[str]
+    leaf_object_class: Optional[str]
     digest: str
     version_index: int
     is_latest: int

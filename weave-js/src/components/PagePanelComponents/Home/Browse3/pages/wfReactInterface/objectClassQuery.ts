@@ -13,6 +13,24 @@ import {
 } from './traceServerClientTypes';
 import {LoadableWithError} from './wfDataModelHooksInterface';
 
+/**
+ * Object query hooks for base and leaf object classes.
+ *
+ * Usage examples:
+ *
+ * // Query by base object class (parent class):
+ * const baseObjects = useBaseObjectInstances('Dataset', {
+ *   project_id: 'my-project',
+ *   limit: 10
+ * });
+ *
+ * // Query by leaf object class (specific implementation):
+ * const leafObjects = useLeafObjectInstances('Dataset', {
+ *   project_id: 'my-project',
+ *   limit: 10
+ * });
+ */
+
 type BuiltinObjectClassRegistry = typeof builtinObjectClassRegistry;
 type BuiltinObjectClassRegistryKeys = keyof BuiltinObjectClassRegistry;
 type BaseObjectClassType<C extends BuiltinObjectClassRegistryKeys> = z.infer<
@@ -28,6 +46,15 @@ type BaseObjectInstancesState<C extends BuiltinObjectClassRegistryKeys> =
 
 type BaseObjectInstancesResult<C extends BuiltinObjectClassRegistryKeys> =
   BaseObjectInstancesState<C> & {
+    refetch: () => void;
+  };
+
+// Types for leaf object instances
+type LeafObjectInstancesState<C extends BuiltinObjectClassRegistryKeys> =
+  LoadableWithError<Array<TraceObjSchemaForBaseObjectClass<C>>>;
+
+type LeafObjectInstancesResult<C extends BuiltinObjectClassRegistryKeys> =
+  LeafObjectInstancesState<C> & {
     refetch: () => void;
   };
 
@@ -129,6 +156,111 @@ const getBaseObjectInstances = async <C extends BuiltinObjectClassRegistryKeys>(
     })
     .filter(({parsed}) => parsed.success)
     .filter(({obj}) => obj.base_object_class === baseObjectClassName)
+    .map(
+      ({obj, parsed}) =>
+        ({...obj, val: parsed.data} as TraceObjSchema<
+          BaseObjectClassType<C>,
+          C
+        >)
+    );
+  return filteredObjects;
+};
+
+// Hook for querying leaf object instances
+// leaf_object_class: the actual string name of the specific class implementation
+export const useLeafObjectInstances = <
+  C extends BuiltinObjectClassRegistryKeys
+>(
+  leafObjectClassName: C,
+  req: TraceObjQueryReq
+): LeafObjectInstancesResult<C> => {
+  const getTsClient = useGetTraceServerClientContext();
+  const client = getTsClient();
+  const deepReq = useDeepMemo(req);
+  const currReq = useRef(deepReq);
+  const [result, setResult] = useState<LeafObjectInstancesState<C>>({
+    loading: true,
+    result: null,
+    error: null,
+  });
+  const [doReload, setDoReload] = useState(false);
+  const refetch = useCallback(() => {
+    setDoReload(true);
+  }, [setDoReload]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (doReload) {
+      setDoReload(false);
+    }
+    setResult({
+      loading: true,
+      result: null,
+      error: null,
+    });
+    currReq.current = deepReq;
+    getLeafObjectInstances(client, leafObjectClassName, deepReq)
+      .then(collectionObjects => {
+        if (isMounted && currReq.current === deepReq) {
+          setResult({
+            loading: false,
+            result: collectionObjects,
+            error: null,
+          });
+        }
+      })
+      .catch(error => {
+        if (isMounted && currReq.current === deepReq) {
+          setResult({
+            loading: false,
+            result: null,
+            error,
+          });
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [client, leafObjectClassName, deepReq, doReload]);
+
+  return {...result, refetch};
+};
+
+const getLeafObjectInstances = async <C extends BuiltinObjectClassRegistryKeys>(
+  client: TraceServerClient,
+  leafObjectClassName: C,
+  req: TraceObjQueryReq
+): Promise<Array<TraceObjSchema<BaseObjectClassType<C>, C>>> => {
+  const knownObjectClass = builtinObjectClassRegistry[leafObjectClassName];
+  if (!knownObjectClass) {
+    console.warn(`Unknown object class: ${leafObjectClassName}`);
+    return [];
+  }
+
+  const reqWithLeafObjectClass: TraceObjQueryReq = {
+    ...req,
+    filter: {...req.filter, leaf_object_classes: [leafObjectClassName]},
+  };
+
+  const objectPromise = client.objsQuery(reqWithLeafObjectClass);
+
+  const objects = await objectPromise;
+
+  // We would expect that this filtering does not filter anything
+  // out because the backend enforces the leaf object class, but this
+  // is here as a sanity check.
+  const filteredObjects = objects.objs
+    .map(obj => ({obj, parsed: knownObjectClass.safeParse(obj.val)}))
+    .map(({obj, parsed}) => {
+      if (!parsed.success) {
+        console.warn(
+          `Failed to parse object: ${JSON.stringify(parsed.error.errors)}`
+        );
+      }
+      return {obj, parsed};
+    })
+    .filter(({parsed}) => parsed.success)
+    .filter(({obj}) => obj.leaf_object_class === leafObjectClassName)
     .map(
       ({obj, parsed}) =>
         ({...obj, val: parsed.data} as TraceObjSchema<
