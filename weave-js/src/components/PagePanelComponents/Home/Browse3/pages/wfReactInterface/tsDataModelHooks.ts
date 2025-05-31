@@ -182,7 +182,7 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
+export const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
 
@@ -472,7 +472,7 @@ const useCalls = (
   }, [calls.refetch, expandedCalls, loading, calls.error]);
 };
 
-const useCallsStats = (
+export const useCallsStats = (
   params: UseCallsStatsParams
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -996,7 +996,7 @@ const useFileContent = (
   }, [fileContentRes, params.skip, error]);
 };
 
-const useObjectVersion = (
+export const useObjectVersion = (
   params: UseObjectVersionParams
 ): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1139,7 +1139,7 @@ export const convertTraceServerObjectVersionToSchema = <
   };
 };
 
-const useRootObjectVersions = (
+export const useRootObjectVersions = (
   params: UseRootObjectVersionsParams
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1173,6 +1173,7 @@ const useRootObjectVersions = (
       },
       limit: params.limit,
       metadata_only: params.metadataOnly,
+      sort_by: params.sortBy,
       ...(!!params.includeStorageSize ? {include_storage_size: true} : null),
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
@@ -1197,6 +1198,7 @@ const useRootObjectVersions = (
     params.limit,
     params.metadataOnly,
     params.includeStorageSize,
+    params.sortBy,
     getTsClient,
   ]);
 

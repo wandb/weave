@@ -251,7 +251,10 @@ const filterToClause = (item: Filter): Record<string, any> => {
     return {
       $not: [{$eq: [{$getField: item.field}, {$literal: item.value}]}],
     };
-  } else if (item.operator === '(string): in') {
+  } else if (
+    item.operator === '(string): in' ||
+    item.operator === '(monitored): by'
+  ) {
     const values =
       typeof item.value === 'string'
         ? item.value.split(',').map((v: string) => v.trim())

@@ -1,6 +1,39 @@
 import os
 from typing import Optional
 
+# Kafka Settings
+
+
+def wf_kafka_broker_host() -> str:
+    """The host of the kafka broker."""
+    return os.environ.get("WF_KAFKA_BROKER_HOST", "localhost")
+
+
+def wf_kafka_broker_port() -> int:
+    """The port of the kafka broker."""
+    return int(os.environ.get("WF_KAFKA_BROKER_PORT", 9092))
+
+
+# Scoring worker settings
+
+
+def wf_enable_online_eval() -> bool:
+    """Whether to enable online evaluation."""
+    return os.environ.get("WF_ENABLE_ONLINE_EVAL", "false").lower() == "true"
+
+
+def wf_scoring_worker_batch_size() -> int:
+    """The batch size for the scoring worker."""
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", 100))
+
+
+def wf_scoring_worker_batch_timeout() -> int:
+    """The timeout for the scoring worker."""
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", 5))
+
+
+# Clickhouse Settings
+
 
 def wf_clickhouse_host() -> str:
     """The host of the clickhouse server."""

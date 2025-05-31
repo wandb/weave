@@ -2,7 +2,7 @@
  * Display a link to a Weave object.
  */
 
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {
   isWandbArtifactRef,
@@ -15,7 +15,12 @@ import {LoadingDots} from '../../../../LoadingDots';
 import {TailwindContents} from '../../../../Tailwind';
 import {useWeaveflowRouteContext} from '../context';
 import {Id} from '../pages/common/Id';
-import {useWFHooks} from '../pages/wfReactInterface/context';
+import {
+  useCall,
+  useObjectVersion,
+  useRootObjectVersions,
+} from '../pages/wfReactInterface/tsDataModelHooks';
+import {KnownBaseObjectClassType} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {SmallRefLoaded} from './SmallRefLoaded';
 
 export const objectRefDisplayName = (
@@ -67,9 +72,10 @@ const ICON_MAP: Record<string, IconName> = {
   Op: IconNames.JobProgramCode,
   Prompt: IconNames.ForumChatBubble,
   Scorer: IconNames.TypeNumberAlt,
+  Monitor: IconNames.JobAutomation,
 };
 
-const getObjectVersionLabel = (
+export const getObjectVersionLabel = (
   objRef: ObjectRef,
   versionIndex: number
 ): string => {
@@ -121,7 +127,7 @@ export const SmallWeaveObjectRef = ({
   noLink = false,
 }: SmallWeaveRefProps) => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const {useObjectVersion} = useWFHooks();
+
   const objectVersion = useObjectVersion({
     key: {
       scheme: 'weave',
@@ -179,7 +185,6 @@ export const SmallWeaveCallRef = ({
   noLink = false,
 }: SmallWeaveRefProps) => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  const {useCall} = useWFHooks();
 
   const callKey = {
     entity: objRef.entityName,
@@ -231,5 +236,58 @@ export const SmallWeaveCallRef = ({
       noLink={noLink}
       suffix={suffix}
     />
+  );
+};
+
+export const SmallObjectVersionsRef = ({
+  objRef,
+  iconOnly,
+  noLink,
+}: SmallWeaveRefProps) => {
+  const {peekingRouter} = useWeaveflowRouteContext();
+
+  const objectVersions = useRootObjectVersions({
+    entity: objRef.entityName,
+    project: objRef.projectName,
+    filter: {objectIds: [objRef.artifactName]},
+  });
+
+  const error =
+    objectVersions?.error ??
+    (objectVersions.result?.length === 0 ? new Error('Not found') : null);
+
+  const objVersion = objectVersions.result?.[0] ?? {
+    baseObjectClass: undefined,
+    versionIndex: -1,
+  };
+
+  const baseObjectClass =
+    objVersion.baseObjectClass as KnownBaseObjectClassType;
+
+  const url = useMemo(
+    () =>
+      peekingRouter.objectVersionsUIUrl(objRef.entityName, objRef.projectName, {
+        baseObjectClass,
+        objectName: objRef.artifactName,
+      }),
+    [objRef, peekingRouter, baseObjectClass]
+  );
+
+  const rootTypeName = baseObjectClass ?? 'Object';
+
+  const icon = ICON_MAP[rootTypeName] ?? IconNames.CubeContainer;
+
+  return objectVersions.loading && !error ? (
+    <LoadingDots />
+  ) : (
+    <TailwindContents>
+      <SmallRefLoaded
+        icon={icon}
+        label={objRef.artifactName}
+        url={url}
+        error={error}
+        noLink={noLink}
+      />
+    </TailwindContents>
   );
 };

@@ -44,6 +44,7 @@ import {DatasetsPage} from './Browse3/pages/DatasetsPage/DatasetsPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
+import {MonitorsPage} from './Browse3/pages/MonitorsPage/MonitorsPage';
 import {ObjectPage} from './Browse3/pages/ObjectsPage/ObjectPage';
 import {WFHighLevelObjectVersionFilter} from './Browse3/pages/ObjectsPage/objectsPageTypes';
 import {ObjectVersionPage} from './Browse3/pages/ObjectsPage/ObjectVersionPage';
@@ -414,6 +415,9 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
         </Route>
+        <Route path={`${projectRoot}/monitors`}>
+          <MonitorsPageBinding />
+        </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
         </Route>
@@ -726,6 +730,12 @@ const CallPageBinding = () => {
   );
 };
 
+const MonitorsPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <MonitorsPage entity={entity} project={project} />;
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
