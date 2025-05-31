@@ -32,6 +32,7 @@ export type LeaderboardValueRecord = {
     | 'modelErrors';
   scorerName: string; // modelMetrics repeat the type here
   scorerVersion: string; // modelMetrics repeat the type here
+  scorerType?: 'object' | 'op'; // Track whether scorer is an op or object
   metricPath: string; // modelMetrics repeat the type here
   metricValue: number | string | boolean | null | Date;
   modelName: string;
@@ -270,6 +271,7 @@ const getLeaderboardGroupableData = async (
           metricType: 'scorerMetric',
           scorerName,
           scorerVersion,
+          scorerType: scorerRef.weaveKind === 'op' ? 'op' : 'object',
           metricPath,
           metricValue,
         };
@@ -649,6 +651,7 @@ const getLeaderboardObjectGroupableData = async (
             metricType: 'scorerMetric',
             scorerName: scorerRef.artifactName,
             scorerVersion: scorerRef.artifactVersion,
+            scorerType: scorerRef.weaveKind === 'op' ? 'op' : 'object',
             metricPath: col.summary_metric_path,
             metricValue: value as any,
             modelName: modelRef.artifactName,

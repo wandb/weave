@@ -86,6 +86,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     const scorerLatestVersionMap: {[datasetGroup: string]: {[scorerName: string]: string}} = {};
     const datasetVersionMap: {[datasetName: string]: Set<string>} = {};
     const datasetLatestVersionMap: {[datasetName: string]: string} = {};
+    // Global scorer version tracking (since scorers are not dataset-specific)
+    const globalScorerVersionMap: {[scorerName: string]: Set<string>} = {};
+    const globalScorerLatestVersionMap: {[scorerName: string]: string} = {};
+    // Track whether each scorer is an op or object
+    const globalScorerTypeMap: {[scorerName: string]: 'op' | 'object'} = {};
     
     // Helper function to get the latest record from a list based on createdAt
     const getLatestRecord = (records: LeaderboardValueRecord[]): LeaderboardValueRecord | null => {
@@ -153,10 +158,60 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       });
     });
 
+    // First pass: collect scorer types and versions from ALL records
+    // This ensures we capture scorers that might not be in the latest evaluations
+    console.log('Total records to process:', allRecords.length);
+    const scorerRecordCounts: {[key: string]: number} = {};
+    allRecords.forEach(record => {
+      const scorerName = record.scorerName;
+      const scorerVersion = record.scorerVersion;
+      const scorerType = record.scorerType;
+      
+      // Count records per scorer
+      scorerRecordCounts[scorerName] = (scorerRecordCounts[scorerName] || 0) + 1;
+      
+      // Debug specific scorers
+      if ((scorerName === 'ResponseQualityScorer' || scorerName === 'tool_usage_scorer') && 
+          scorerRecordCounts[scorerName] <= 3) {
+        console.log(`First pass - ${scorerName} record:`, {
+          scorerName,
+          scorerVersion,
+          scorerType,
+          hasVersion: !!scorerVersion,
+          hasType: !!scorerType,
+          metricType: record.metricType
+        });
+      }
+      
+      // Track scorer versions and types globally
+      if (scorerVersion && scorerType) {
+        if (!globalScorerVersionMap[scorerName]) {
+          globalScorerVersionMap[scorerName] = new Set();
+        }
+        globalScorerVersionMap[scorerName].add(scorerVersion);
+        // Keep the latest version we see (by record date)
+        if (!globalScorerLatestVersionMap[scorerName] || 
+            record.createdAt > (allRecords.find(r => 
+              r.scorerName === scorerName && 
+              r.scorerVersion === globalScorerLatestVersionMap[scorerName]
+            )?.createdAt || new Date(0))) {
+          globalScorerLatestVersionMap[scorerName] = scorerVersion;
+        }
+        
+        // Track scorer type
+        if (scorerType) {
+          globalScorerTypeMap[scorerName] = scorerType;
+        }
+      }
+    });
+
     // Filter to latest evaluations per model to check for inconsistencies
     const latestRecordsOnly = getLatestEvaluationsPerModel(allRecords);
     
-    // Track dataset and scorer versions only from latest evaluations
+    // Second pass: track dataset and scorer versions only from latest evaluations for inconsistency detection
+    console.log('Processing latest records:', latestRecordsOnly.length);
+    console.log('Global scorer versions found:', globalScorerVersionMap);
+    console.log('Global scorer types found:', globalScorerTypeMap);
     latestRecordsOnly.forEach(record => {
       const datasetName = record.datasetName;
       const datasetVersion = record.datasetVersion;
@@ -186,6 +241,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       }
       if (scorerVersion) {
         scorerVersionMap[datasetName][scorerName].add(scorerVersion);
+        // Track the latest version we see
         scorerLatestVersionMap[datasetName][scorerName] = scorerVersion;
       }
     });
@@ -236,7 +292,17 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       });
     });
     
-    return {processedData: newData, scorerVersionMap, scorerLatestVersionMap, datasetVersionMap, datasetLatestVersionMap};
+    
+    return {
+      processedData: newData, 
+      scorerVersionMap, 
+      scorerLatestVersionMap, 
+      datasetVersionMap, 
+      datasetLatestVersionMap,
+      globalScorerVersionMap,
+      globalScorerLatestVersionMap,
+      globalScorerTypeMap
+    };
   }, [data]);
 
   const columnStats = useMemo(() => getColumnStats(processedData.processedData), [processedData]);
@@ -467,21 +533,45 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               freeReordering: true,
               children: [],
               renderHeaderGroup: () => {
-                // Check if there are multiple versions for this scorer
-                const versions = processedData.scorerVersionMap[datasetGroupName]?.[scorerGroupName];
-                const hasMultipleVersions = versions && versions.size > 1;
-                const scorerVersion = processedData.scorerLatestVersionMap[datasetGroupName]?.[scorerGroupName];
+                // Check if there are multiple versions for this scorer (using global map)
+                const allVersions = processedData.globalScorerVersionMap[scorerGroupName] || new Set<string>();
+                const hasMultipleVersions = allVersions.size > 1;
+                const scorerVersion = processedData.globalScorerLatestVersionMap[scorerGroupName];
+                const scorerType = processedData.globalScorerTypeMap[scorerGroupName] || 'op';
                 
-                const ref = scorerVersion 
-                  ? parseRefMaybe(`weave:///${entity}/${project}/op/${scorerGroupName}:${scorerVersion}`)
+                // Debug logging
+                console.log(`Scorer ${scorerGroupName} render:`, {
+                  scorerVersion,
+                  scorerType,
+                  hasMultipleVersions,
+                  allVersions: Array.from(allVersions),
+                  globalMaps: {
+                    version: processedData.globalScorerLatestVersionMap,
+                    type: processedData.globalScorerTypeMap
+                  }
+                });
+                
+                // Construct a proper WeaveObjectRef for the scorer
+                // The parseRefMaybe function needs the full URI format
+                // Skip creating refs for Summary scorers which don't have versions
+                const scorerUri = (scorerVersion && scorerGroupName !== 'Summary')
+                  ? `weave:///${entity}/${project}/${scorerType}/${scorerGroupName}:${scorerVersion}`
                   : null;
+                const ref = scorerUri ? parseRefMaybe(scorerUri) : null;
+                
+                console.log(`Scorer ${scorerGroupName} URI:`, {
+                  scorerUri,
+                  ref,
+                  hasRef: !!ref
+                });
+                
                 
                 return (
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     {hasMultipleVersions ? (
                       <>
                         <div>{scorerGroupName}</div>
-                        <Tooltip title={`This scorer has ${versions.size} different versions across evaluations. Take precaution when comparing results.`}>
+                        <Tooltip title={`This scorer has ${allVersions.size} different versions across evaluations. Take precaution when comparing results.`}>
                           <Alert
                             severity="warning"
                             style={{
@@ -520,7 +610,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     const finalGroupingModel = datasetGroups;
 
     return finalGroupingModel;
-  }, [columnStats.datasetGroups, entity, project, processedData.scorerVersionMap, processedData.scorerLatestVersionMap, processedData.datasetVersionMap, processedData.datasetLatestVersionMap]);
+  }, [columnStats.datasetGroups, entity, project, processedData.scorerVersionMap, processedData.scorerLatestVersionMap, processedData.datasetVersionMap, processedData.datasetLatestVersionMap, processedData.globalScorerVersionMap, processedData.globalScorerLatestVersionMap, processedData.globalScorerTypeMap]);
 
   const [sortModel, setSortModel] = useState<GridSortItem[]>([]);
 
