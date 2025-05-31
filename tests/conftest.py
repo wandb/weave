@@ -84,7 +84,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--weave-server",
         action="store",
-        default="sqlite",
+        default="clickhouse",
         help="Specify the client object to use: sqlite or clickhouse",
     )
 
@@ -619,15 +619,19 @@ def create_client(
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        ch_server.ch_client.command(
-            f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
-        )
-        ch_server._run_migrations()
-        server = TestOnlyUserInjectingExternalTraceServer(
-            ch_server, DummyIdConverter(), entity
-        )
+        # Ensure ClickHouse server is running if needed
+        weave_server_flag = request.config.getoption("--weave-server")
+        if weave_server_flag == "clickhouse":
+            # Invoke the clickhouse_server fixture manually
+            with request.getfixturevalue("clickhouse_trace_server") as ch_server:
+                ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
+                ch_server.ch_client.command(
+                    f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
+                )
+                ch_server._run_migrations()
+                server = TestOnlyUserInjectingExternalTraceServer(
+                    ch_server, DummyIdConverter(), entity
+                )
     elif weave_server_flag.startswith("http"):
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
             weave_server_flag
