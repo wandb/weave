@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+import weave
+from weave.trace.object_record import pydantic_object_record
 from weave.trace.serialization.serialize import (
     dictify,
     fallback_encode,
@@ -257,3 +259,15 @@ def test_to_json_pydantic_class(client) -> None:
         "title": "CalendarEvent",
         "type": "object",
     }
+
+
+def test_to_json_object_excludes_ref(client) -> None:
+    class MyObj(weave.Object):
+        @weave.op
+        def predict(self, x: int) -> int:
+            return x
+
+    obj = MyObj()
+    obj_rec = pydantic_object_record(obj)
+    serialized = to_json(obj_rec, client._project_id(), client)
+    assert "ref" not in serialized
