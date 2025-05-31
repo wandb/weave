@@ -1487,6 +1487,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       {
         groupId: 'predictCall',
         headerName: 'Calls',
+        [CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY]: true,
         children: [{field: 'predictCall'}],
       },
       {
@@ -1902,6 +1903,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       {
         groupId: 'predictCalls',
         headerName: 'Calls',
+        [CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY]: true,
         children: props.state.evaluationCallIdsOrdered.map(
           evaluationCallId => ({
             field: `predictCall.${evaluationCallId}`,
