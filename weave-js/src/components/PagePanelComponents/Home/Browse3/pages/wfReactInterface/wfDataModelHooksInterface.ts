@@ -126,6 +126,7 @@ export type ObjectVersionFilter = {
   baseObjectClasses?: KnownBaseObjectClassType[];
   objectIds?: string[];
   latestOnly?: boolean;
+  userIds?: string[];
 };
 
 export type TableQuery = {
