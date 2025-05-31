@@ -179,6 +179,7 @@ def test_completions_create_stream_custom_provider():
             object_id="custom-provider",
             digest="digest-1",
             base_object_class="Provider",
+            leaf_object_class=None,
             val={
                 "base_url": "https://api.custom.com",
                 "api_key_name": "CUSTOM_API_KEY",
@@ -198,6 +199,7 @@ def test_completions_create_stream_custom_provider():
             object_id="custom-provider-model",
             digest="digest-2",
             base_object_class="ProviderModel",
+            leaf_object_class=None,
             val={
                 "name": "custom-model",
                 "provider": "custom-provider",
@@ -319,6 +321,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
             object_id="custom-provider",
             digest="digest-1",
             base_object_class="Provider",
+            leaf_object_class=None,
             val={
                 "base_url": "https://api.custom.com",
                 "api_key_name": "CUSTOM_API_KEY",
@@ -338,6 +341,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
             object_id="custom-provider-model",
             digest="digest-2",
             base_object_class="ProviderModel",
+            leaf_object_class=None,
             val={
                 "name": "custom-model",
                 "provider": "custom-provider",

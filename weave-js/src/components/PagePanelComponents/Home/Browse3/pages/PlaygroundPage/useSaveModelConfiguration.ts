@@ -71,7 +71,7 @@ export const useSaveModelConfiguration = ({
     };
 
     const addMessageToTemplate = (message: Message) => {
-      defaultParams.messages_template.push({
+      defaultParams.messages_template?.push({
         content: message.content,
         function_call: message.function_call ?? null,
         name: message.name ?? null,

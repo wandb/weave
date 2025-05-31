@@ -1,16 +1,15 @@
-from typing import Optional, Union, Literal, Any, Annotated
 import json
-import re
-from pydantic import BaseModel, Field, BeforeValidator
+from typing import Annotated, Any, Literal, Optional, Union
 
-from weave.trace_server.interface.builtin_object_classes import base_object_def
+from pydantic import BaseModel, BeforeValidator, Field
+
 from weave import Model, op
+from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace_server.interface.builtin_object_classes import base_object_def
 from weave.trace_server.trace_server_interface import (
     CompletionsCreateReq,
     CompletionsCreateRequestInputs,
 )
-from weave.trace.context.weave_client_context import require_weave_client
-
 
 # TODO: Fast follow up
 # JSON_SCHEMA = "json_schema"

@@ -1018,11 +1018,19 @@
     "LLMStructuredCompletionModelDefaultParams": {
       "properties": {
         "messages_template": {
-          "items": {
-            "$ref": "#/$defs/Message"
-          },
-          "title": "Messages Template",
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Message"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Messages Template"
         },
         "temperature": {
           "anyOf": [
@@ -1144,9 +1152,6 @@
           "title": "Response Format"
         }
       },
-      "required": [
-        "messages_template"
-      ],
       "title": "LLMStructuredCompletionModelDefaultParams",
       "type": "object"
     },

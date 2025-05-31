@@ -156,7 +156,7 @@ export const LlmStructuredCompletionModelDefaultParamsSchema = z.object({
     .union([z.array(z.record(z.string(), z.any())), z.null()])
     .optional(),
   max_tokens: z.union([z.number(), z.null()]).optional(),
-  messages_template: z.array(MessageSchema),
+  messages_template: z.union([z.array(MessageSchema), z.null()]).optional(),
   n_times: z.union([z.number(), z.null()]).optional(),
   presence_penalty: z.union([z.number(), z.null()]).optional(),
   response_format: z.union([ResponseFormatSchema, z.null()]).optional(),
