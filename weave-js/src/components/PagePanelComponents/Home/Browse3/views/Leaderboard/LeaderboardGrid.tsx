@@ -1,4 +1,4 @@
-import {Alert, Box, Tooltip} from '@mui/material';
+import {Box} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroup,
@@ -8,7 +8,9 @@ import {
   GridSortItem,
 } from '@mui/x-data-grid-pro';
 import {Loading} from '@wandb/weave/components/Loading';
+import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -670,16 +672,17 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                   <>
                     <div>{datasetName}</div>
                     <Tooltip
-                      title={`This dataset has ${versions.size} different versions across evaluations. Take precaution when comparing results.`}>
-                      <Alert
-                        severity="warning"
-                        style={{
-                          padding: '2px 8px',
-                          fontSize: '11px',
-                        }}>
-                        Dataset inconsistency detected
-                      </Alert>
-                    </Tooltip>
+                      trigger={
+                        <span>
+                          <IconOnlyPill
+                            icon="warning"
+                            color="gold"
+                            style={{flexShrink: 1}}
+                          />
+                        </span>
+                      }
+                      content={`This dataset has ${versions.size} different versions across evaluations. Take precaution when comparing results.`}
+                    />
                   </>
                 ) : ref ? (
                   <SmallRef objRef={ref} />
@@ -743,16 +746,17 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                       <>
                         <div>{scorerGroupName}</div>
                         <Tooltip
-                          title={`This scorer has ${allVersions.size} different versions across evaluations. Take precaution when comparing results.`}>
-                          <Alert
-                            severity="warning"
-                            style={{
-                              padding: '2px 8px',
-                              fontSize: '11px',
-                            }}>
-                            Scoring inconsistency detected
-                          </Alert>
-                        </Tooltip>
+                          trigger={
+                            <span>
+                              <IconOnlyPill
+                                icon="warning"
+                                color="gold"
+                                style={{flexShrink: 1}}
+                              />
+                            </span>
+                          }
+                          content={`This scorer has ${allVersions.size} different versions across evaluations. Take precaution when comparing results.`}
+                        />
                       </>
                     ) : ref ? (
                       <SmallRef objRef={ref} />
