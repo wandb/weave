@@ -92,6 +92,7 @@
     "moment": "^2.29.3",
     "monaco-editor": "^0.29.1",
     "monaco-yaml": "2.5.1",
+    "motion": "^12.15.0",
     "ngl": "2.0.0-dev.37",
     "numeral": "^2.0.6",
     "onchange": "^7.1.0",
