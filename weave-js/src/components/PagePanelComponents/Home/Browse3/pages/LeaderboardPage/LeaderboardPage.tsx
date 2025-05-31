@@ -530,7 +530,7 @@ export const LeaderboardPageContentInner: React.FC<
                 filterToLatestEvaluationsPerModel={true}>
                 <CustomWeaveTypeProjectContext.Provider
                   value={{entity: props.entity, project: props.project}}>
-                  <LeaderboardChartsSection />
+                  <LeaderboardChartsSection leaderboardColumns={workingLeaderboardValCopy.columns} />
                 </CustomWeaveTypeProjectContext.Provider>
               </CompareEvaluationsProvider>
             </Box>
@@ -717,18 +717,36 @@ const LeaderboardResultsTab: React.FC<{
       filterToLatestEvaluationsPerModel={true}>
       <CustomWeaveTypeProjectContext.Provider
         value={{entity: props.entity, project: props.project}}>
-        <LeaderboardResultsContent />
+        <LeaderboardResultsContent leaderboardColumns={props.leaderboardVal.columns} />
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
   );
 };
 
-const LeaderboardResultsContent: React.FC = () => {
+const LeaderboardResultsContent: React.FC<{
+  leaderboardColumns: LeaderboardObjectVal['columns'];
+}> = ({leaderboardColumns}) => {
   const {state} = useCompareEvaluationsState();
   const showExamples =
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
+
+  // Create the set of visible scorers based on leaderboard columns
+  const visibleScorers = useMemo(() => {
+    const scorers = new Set<string>();
+    
+    // Extract all scorer names from leaderboard columns and create scorer prefixes
+    // This will show ALL metrics for any scorer that appears in the leaderboard
+    leaderboardColumns.forEach(column => {
+      if (column.scorer_name) {
+        // Add the scorer prefix so we can match against any column that starts with "scores.{scorerName}"
+        scorers.add(`scores.${column.scorer_name}`);
+      }
+    });
+    
+    return scorers;
+  }, [leaderboardColumns]);
 
   if (resultsLoading) {
     return (
@@ -766,7 +784,13 @@ const LeaderboardResultsContent: React.FC = () => {
       }}>
       <AutoSizer style={{height: '100%', width: '100%'}}>
         {({height}) => {
-          return <ResultExplorer state={state} height={height} />;
+          return (
+            <ResultExplorer 
+              state={state} 
+              height={height} 
+              defaultHiddenScorerMetrics={visibleScorers}
+            />
+          );
         }}
       </AutoSizer>
     </VerticalBox>
@@ -776,7 +800,8 @@ const LeaderboardResultsContent: React.FC = () => {
 const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
-}> = ({state, height}) => {
+  defaultHiddenScorerMetrics?: Set<string>;
+}> = ({state, height, defaultHiddenScorerMetrics}) => {
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
     'table'
   );
@@ -807,6 +832,7 @@ const ResultExplorer: React.FC<{
             state={state}
             shouldHighlightSelectedRow={viewMode === 'split'}
             onShowSplitView={() => setViewMode('split')}
+            defaultHiddenScorerMetrics={defaultHiddenScorerMetrics}
           />
         </Box>
 
@@ -837,8 +863,87 @@ type ComparisonDimensionsType = Array<{
 }>;
 
 // Component to display charts below the leaderboard
-const LeaderboardChartsSection: React.FC = () => {
+const LeaderboardChartsSection: React.FC<{
+  leaderboardColumns: LeaderboardObjectVal['columns'];
+}> = ({leaderboardColumns}) => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
+  
+  // Create a function to match actual metrics against leaderboard config
+  const getMatchingMetrics = useCallback((availableMetrics: string[]): Set<string> => {
+    const allowedMetrics = new Set<string>();
+    
+    leaderboardColumns.forEach(column => {
+      if (column.summary_metric_path) {
+        const metricPath = column.summary_metric_path;
+        
+        // Look for exact matches in available metrics
+        availableMetrics.forEach(availableMetric => {
+          // Check if this metric matches our leaderboard column
+          const isMatch = 
+            // Exact match for the metric path
+            availableMetric === metricPath ||
+            // Ends with the metric path (for scorer-prefixed metrics)
+            availableMetric.endsWith(`.${metricPath}`) ||
+            // For nested paths, check if it contains the metric path
+            (metricPath.includes('.') && availableMetric.includes(metricPath)) ||
+            // Check if this is a scorer-only metric (no sub-path)
+            (column.scorer_name && availableMetric === column.scorer_name) ||
+            // Check if scorer name is part of the available metric
+            (column.scorer_name && availableMetric.startsWith(`${column.scorer_name}.`));
+            
+          if (isMatch) {
+            allowedMetrics.add(availableMetric);
+          }
+        });
+      }
+    });
+    
+    return allowedMetrics;
+  }, [leaderboardColumns]);
+
+  // Filter selectedMetrics to only include metrics shown in leaderboard
+  const filteredSetSelectedMetrics = useCallback((newMetrics: Record<string, boolean>) => {
+    const availableMetricKeys = Object.keys(newMetrics);
+    const allowedMetrics = getMatchingMetrics(availableMetricKeys);
+    const filtered: Record<string, boolean> = {};
+    
+    // Only include metrics that match the leaderboard configuration
+    // But allow toggling any metric that was already present
+    Object.keys(newMetrics).forEach(metricKey => {
+      if (allowedMetrics.has(metricKey)) {
+        filtered[metricKey] = newMetrics[metricKey];
+      } else if (state.selectedMetrics && state.selectedMetrics[metricKey] !== undefined) {
+        // Allow toggling metrics that were already in the state (to fix toggle issue)
+        const isInAllowed = getMatchingMetrics([metricKey]).has(metricKey);
+        if (isInAllowed) {
+          filtered[metricKey] = newMetrics[metricKey];
+        }
+      }
+    });
+    
+    setSelectedMetrics(filtered);
+  }, [setSelectedMetrics, getMatchingMetrics, state.selectedMetrics]);
+
+  // Override the initial selected metrics when state changes
+  useEffect(() => {
+    if (state.selectedMetrics && Object.keys(state.selectedMetrics).length > 0) {
+      const availableMetricKeys = Object.keys(state.selectedMetrics);
+      const allowedMetrics = getMatchingMetrics(availableMetricKeys);
+      const filtered: Record<string, boolean> = {};
+      
+      // Filter existing metrics to only show those that match leaderboard
+      Object.keys(state.selectedMetrics).forEach(metricKey => {
+        if (allowedMetrics.has(metricKey)) {
+          filtered[metricKey] = state.selectedMetrics![metricKey];
+        }
+      });
+      
+      // Only update if the filtered metrics are different
+      if (!_.isEqual(filtered, state.selectedMetrics)) {
+        setSelectedMetrics(filtered);
+      }
+    }
+  }, [state.selectedMetrics, getMatchingMetrics, setSelectedMetrics]);
   
   if (state.loadableComparisonResults.loading) {
     return (
@@ -852,12 +957,12 @@ const LeaderboardChartsSection: React.FC = () => {
     <div>      
       <SummaryPlotsSection
         state={state}
-        setSelectedMetrics={setSelectedMetrics}
-        initialExpanded={false}
+        setSelectedMetrics={filteredSetSelectedMetrics}
+        initialExpanded={true}
       />
       <ScorecardSection 
         state={state} 
-        initialExpanded={true}
+        initialExpanded={false}
       />
     </div>
   );

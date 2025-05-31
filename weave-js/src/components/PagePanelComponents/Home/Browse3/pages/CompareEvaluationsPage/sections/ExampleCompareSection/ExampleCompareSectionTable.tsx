@@ -306,6 +306,9 @@ interface ExampleCompareSectionTableProps {
   state: EvaluationComparisonState;
   shouldHighlightSelectedRow?: boolean;
   onShowSplitView: () => void;
+  // Set of scorer prefixes (e.g., "scores.tool_usage_scorer") to show. 
+  // All other scorer columns will be hidden by default.
+  defaultHiddenScorerMetrics?: Set<string>;
 }
 
 /**
@@ -676,6 +679,7 @@ export const ExampleCompareSectionTable: React.FC<
         decreaseRowHeight={decreaseRowHeight}
         setModelsAsRows={setModelsAsRows}
         onlyOneModel={onlyOneModel}
+        defaultHiddenScorerMetrics={props.defaultHiddenScorerMetrics}
       />
     ) : (
       <ExampleCompareSectionTableModelsAsColumns
@@ -687,6 +691,7 @@ export const ExampleCompareSectionTable: React.FC<
         decreaseRowHeight={decreaseRowHeight}
         setModelsAsRows={setModelsAsRows}
         onlyOneModel={onlyOneModel}
+        defaultHiddenScorerMetrics={props.defaultHiddenScorerMetrics}
       />
     );
   return inner;
@@ -1070,6 +1075,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     decreaseRowHeight: () => void;
     setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
     onlyOneModel: boolean;
+    defaultHiddenScorerMetrics?: Set<string>;
   }
 > = props => {
   const ctx = useCompareEvaluationsState();
@@ -1519,6 +1525,35 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   const {columnsWithControlledWidths, onColumnWidthChange} =
     useColumnsWithControlledWidths(columns);
 
+  // Create initial column visibility model that conditionally hides scorer metrics
+  const initialColumnVisibilityModel = useMemo(() => {
+    const hiddenColumns: Record<string, boolean> = {};
+    
+    const scorerColumns = columns.filter(col => col.field.startsWith('scores.'));
+    
+    // If defaultHiddenScorerMetrics is provided (leaderboard context), 
+    // hide scorer columns that don't belong to any scorer in the leaderboard
+    if (props.defaultHiddenScorerMetrics) {
+      columns.forEach(col => {
+        if (col.field.startsWith('scores.')) {
+          // Check if this column belongs to any scorer that's in the leaderboard
+          // We check if the column field starts with any of the visible scorer prefixes
+          const shouldShow = Array.from(props.defaultHiddenScorerMetrics!).some(scorerPrefix => 
+            col.field.startsWith(scorerPrefix)
+          );
+          const shouldHide = !shouldShow;
+          if (shouldHide) {
+            hiddenColumns[col.field] = false; // false means hidden in MUI DataGrid
+          }
+        }
+      });
+    }
+    // If no defaultHiddenScorerMetrics provided (regular compare context),
+    // show all scorer metrics by default (don't add them to hiddenColumns)
+    
+    return hiddenColumns;
+  }, [columns, props.defaultHiddenScorerMetrics]);
+
   if (inputSubFields.loading || props.state.loadableComparisonResults.loading) {
     return <LoadingDots />;
   }
@@ -1538,6 +1573,11 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       disableRowSelectionOnClick
       pagination
       pageSizeOptions={[50]}
+      initialState={{
+        columns: {
+          columnVisibilityModel: initialColumnVisibilityModel,
+        },
+      }}
       sx={{
         ...styledDataGridStyleOverrides,
         backgroundColor: 'white',
@@ -1581,6 +1621,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     decreaseRowHeight: () => void;
     setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
     onlyOneModel: boolean;
+    defaultHiddenScorerMetrics?: Set<string>;
   }
 > = props => {
   const ctx = useCompareEvaluationsState();
@@ -1938,6 +1979,37 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
   const {columnsWithControlledWidths, onColumnWidthChange} =
     useColumnsWithControlledWidths(columns);
 
+  // Create initial column visibility model that conditionally hides scorer metrics
+  const initialColumnVisibilityModelAsColumns = useMemo(() => {
+    const hiddenColumns: Record<string, boolean> = {};
+    
+    const scorerColumns = columns.filter(col => col.field.startsWith('scores.'));
+    
+    // If defaultHiddenScorerMetrics is provided (leaderboard context), 
+    // hide scorer columns that don't belong to any scorer in the leaderboard
+    if (props.defaultHiddenScorerMetrics) {
+      columns.forEach(col => {
+        if (col.field.startsWith('scores.')) {
+          // Check if this column belongs to any scorer that's in the leaderboard
+          // We check if the column field starts with any of the visible scorer prefixes
+          // This works for both "scores.tool_usage_scorer.metric" and 
+          // "scores.tool_usage_scorer.metric.call-id" formats
+          const shouldShow = Array.from(props.defaultHiddenScorerMetrics!).some(scorerPrefix => 
+            col.field.startsWith(scorerPrefix)
+          );
+          const shouldHide = !shouldShow;
+          if (shouldHide) {
+            hiddenColumns[col.field] = false; // false means hidden in MUI DataGrid
+          }
+        }
+      });
+    }
+    // If no defaultHiddenScorerMetrics provided (regular compare context),
+    // show all scorer metrics by default (don't add them to hiddenColumns)
+    
+    return hiddenColumns;
+  }, [columns, props.defaultHiddenScorerMetrics]);
+
   if (inputSubFields.loading || props.state.loadableComparisonResults.loading) {
     return <LoadingDots />;
   }
@@ -1958,6 +2030,11 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       disableRowSelectionOnClick
       pagination
       pageSizeOptions={[50]}
+      initialState={{
+        columns: {
+          columnVisibilityModel: initialColumnVisibilityModelAsColumns,
+        },
+      }}
       sx={{
         ...styledDataGridStyleOverrides,
         backgroundColor: 'white',
