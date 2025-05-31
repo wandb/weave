@@ -1,5 +1,6 @@
 from typing import Optional, Union, Literal, Any, Annotated
 import json
+import re
 from pydantic import BaseModel, Field, BeforeValidator
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
@@ -39,11 +40,35 @@ class Message(BaseModel):
     tool_call_id: Optional[str] = None
 
 
+def _substitute_template_variables(
+    messages: list[Message], template_vars: dict[str, Any]
+) -> list[Message]:
+    """Substitute template variables using Python's .format()"""
+    substituted_messages = []
+
+    for message in messages:
+        message_dict = message.model_dump()
+
+        if isinstance(message_dict.get("content"), str):
+            try:
+                message_dict["content"] = message_dict["content"].format(
+                    **template_vars
+                )
+            except KeyError as e:
+                raise ValueError(
+                    f"Template variable {e} not found in template_vars"
+                ) from e
+
+        substituted_messages.append(Message.model_validate(message_dict))
+
+    return substituted_messages
+
+
 class LLMStructuredCompletionModelDefaultParams(BaseModel):
     # Could use Prompt objects for the message template
     # This is a list of Messages, loosely following litellm's message format
     # https://docs.litellm.ai/docs/completion/input#properties-of-messages
-    messages_template: list[Message]
+    messages_template: Optional[list[Message]] = None
 
     temperature: Optional[float] = None
     top_p: Optional[float] = None
@@ -67,6 +92,8 @@ def cast_to_message_list(obj: Any) -> list[Message]:
         return [obj]
     elif isinstance(obj, dict):
         return [Message.model_validate(obj)]
+    elif isinstance(obj, str):
+        return [Message(content=obj, role="user")]
     elif isinstance(obj, list):
         return [cast_to_message(item) for item in obj]
     raise TypeError("Unable to cast to Message")
@@ -113,24 +140,41 @@ class LLMStructuredCompletionModel(Model):
         self,
         user_input: MessageListLike,
         config: Optional[LLMStructuredModelParamsLike] = None,
-        return_type: Literal["string", "message", "json"] = "message",
+        **template_vars: Any,
     ) -> Union[Message, str, dict[str, Any]]:
         """
         Generates a prediction by preparing messages (template + user_input)
         and calling the LLM completions endpoint with overridden config, using the provided client.
+
+        Args:
+            user_input: The user input messages
+            config: Optional configuration to override default parameters
+            **template_vars: Variables to substitute in the messages template using {variable_name} syntax
         """
         current_client = require_weave_client()
 
-        # 1. Prepare messages
+        # Ensure user_input is properly converted to a list of Message objects
+        # This is needed because the @op decorator might interfere with Pydantic validation
+        if not isinstance(user_input, list) or (
+            user_input and not isinstance(user_input[0], Message)
+        ):
+            user_input = cast_to_message_list(user_input)
+
+        # 1. Prepare messages with template variable substitution
         template_msgs = None
-        if self.llm.default_params and self.llm.default_params.messages_template:
-            template_msgs = self.llm.default_params.messages_template
+        if self.default_params and self.default_params.messages_template:
+            template_msgs = self.default_params.messages_template
+            # Apply template variable substitution if variables are provided
+            if template_vars:
+                template_msgs = _substitute_template_variables(
+                    template_msgs, template_vars
+                )
 
         prepared_messages_dicts = _prepare_llm_messages(template_msgs, user_input)
 
         # 2. Prepare completion parameters, starting with defaults from LLMStructuredCompletionModel
         completion_params: dict[str, Any] = {}
-        default_p_model = self.llm.default_params
+        default_p_model = self.default_params
         if default_p_model:
             completion_params = parse_params_to_litellm_params(default_p_model)
 
@@ -142,7 +186,7 @@ class LLMStructuredCompletionModel(Model):
             }
 
         # 4. Create the completion inputs
-        model_id_str = str(self.llm.llm_model_id)
+        model_id_str = str(self.llm_model_id)
         completion_inputs = CompletionsCreateRequestInputs(
             model=model_id_str, messages=prepared_messages_dicts, **completion_params
         )
@@ -170,14 +214,14 @@ class LLMStructuredCompletionModel(Model):
             # Assuming OpenAI-like structure: a list of choices, first choice has the message
             output_message_dict = response_payload["choices"][0]["message"]
 
-            if self.return_type == "string":
+            if default_p_model.response_format == "text":
                 return output_message_dict["content"]
-            elif self.return_type == "message":
-                return Message.model_validate(output_message_dict)
-            elif self.return_type == "json":
+            elif default_p_model.response_format == "json_object":
                 return json.loads(output_message_dict["content"])
             else:
-                raise ValueError(f"Invalid return_type: {self.return_type}")
+                raise ValueError(
+                    f"Invalid response_format: {default_p_model.response_format}"
+                )
         except (
             KeyError,
             IndexError,

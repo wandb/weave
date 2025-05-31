@@ -63,7 +63,9 @@ def process_incoming_object_val(
     if not isinstance(val, dict):
         if req_builtin_object_class is not None:
             raise ValueError("object_class cannot be provided for non-dict objects")
-        return ProcessIncomingObjectResult(val=val, base_object_class=None)
+        return ProcessIncomingObjectResult(
+            val=val, base_object_class=None, leaf_object_class=None
+        )
 
     # Next we extract the object classes from the object. the `_bases` and `_class_name` keys are
     # special weave-added keys that tell us the class hierarchy of the object.
@@ -89,7 +91,9 @@ def process_incoming_object_val(
         # In this case, we assume that the object is valid and do not need to process it.
         # This would happen in practice if the user is editing an existing object by simply modifying the keys.
         return ProcessIncomingObjectResult(
-            val=val, base_object_class=val_object_classes["base_object_class"]
+            val=val,
+            base_object_class=val_object_classes["base_object_class"],
+            leaf_object_class=val_object_classes["object_class"],
         )
 
     # Next, we check if the user provided an object class. If they did, we need to validate the object
@@ -120,7 +124,9 @@ def process_incoming_object_val(
             raise ValueError(f"Unknown object class: {req_builtin_object_class}")
 
     # Finally, if there is no requested object class, just return the object as is.
-    return ProcessIncomingObjectResult(val=val, base_object_class=None)
+    return ProcessIncomingObjectResult(
+        val=val, base_object_class=None, leaf_object_class=None
+    )
 
 
 # Server-side version of `pydantic_object_record`
