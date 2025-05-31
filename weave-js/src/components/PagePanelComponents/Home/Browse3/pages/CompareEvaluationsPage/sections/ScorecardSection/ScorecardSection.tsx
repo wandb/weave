@@ -18,6 +18,9 @@ import {CellValue} from '../../../../../Browse2/CellValue';
 import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 import {NotApplicable} from '../../../../NotApplicable';
 import {SmallRef} from '../../../../smallRef/SmallRef';
+import {useGetTraceServerClientContext} from '../../../wfReactInterface/traceServerClientContext';
+import {ComputedCallStatusType} from '../../../wfReactInterface/traceServerClientTypes';
+import {projectIdFromParts} from '../../../wfReactInterface/tsDataModelHooks';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
@@ -126,6 +129,55 @@ export const ScorecardSection: React.FC<{
       )}
     </div>
   );
+};
+
+// Hook to fetch call statuses for evaluation calls in compare evaluations
+const useEvaluationCallStatuses = (
+  entity: string,
+  project: string,
+  evalCallIds: string[]
+): Record<string, ComputedCallStatusType> => {
+  const getClient = useGetTraceServerClientContext();
+  const [callStatuses, setCallStatuses] = useState<
+    Record<string, ComputedCallStatusType>
+  >({});
+
+  useEffect(() => {
+    if (evalCallIds.length === 0) {
+      setCallStatuses({});
+      return;
+    }
+
+    const client = getClient();
+    const fetchCallStatuses = async () => {
+      try {
+        const response = await client.callsStreamQuery({
+          project_id: projectIdFromParts({entity, project}),
+          filter: {
+            call_ids: evalCallIds,
+          },
+          limit: evalCallIds.length,
+        });
+
+        const statuses: Record<string, ComputedCallStatusType> = {};
+        response.calls.forEach(call => {
+          // Extract status from the call summary or default to 'success' if finished
+          const status =
+            call.summary?.status || (call.ended_at ? 'success' : 'running');
+          statuses[call.id] = status;
+        });
+
+        setCallStatuses(statuses);
+      } catch (error) {
+        console.error('Error fetching call statuses:', error);
+        setCallStatuses({});
+      }
+    };
+
+    fetchCallStatuses();
+  }, [entity, project, evalCallIds, getClient]);
+
+  return callStatuses;
 };
 
 const ScorecardContent: React.FC<{
@@ -245,6 +297,13 @@ const ScorecardContent: React.FC<{
     );
   }, [props.state]);
 
+  // Fetch call statuses for running indicators
+  const callStatuses = useEvaluationCallStatuses(
+    props.state.summary.entity,
+    props.state.summary.project,
+    evalCallIds
+  );
+
   const onCallClick = usePeekCall(
     props.state.summary.entity,
     props.state.summary.project
@@ -291,7 +350,11 @@ const ScorecardContent: React.FC<{
               style={{
                 fontWeight: '600',
               }}>
-              <EvaluationCallLink callId={evalCallId} state={props.state} />
+              <EvaluationCallLink 
+                callId={evalCallId} 
+                state={props.state}
+                callStatus={callStatuses[evalCallId]}
+              />
             </GridCell>
           );
         })}
