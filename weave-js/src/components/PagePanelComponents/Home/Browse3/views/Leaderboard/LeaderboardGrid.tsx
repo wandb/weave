@@ -277,7 +277,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
     // First pass: collect scorer types and versions from ALL records
     // This ensures we capture scorers that might not be in the latest evaluations
-    console.log('Total records to process:', allRecords.length);
     const scorerRecordCounts: {[key: string]: number} = {};
     allRecords.forEach(record => {
       const scorerName = record.scorerName;
@@ -288,21 +287,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       scorerRecordCounts[scorerName] =
         (scorerRecordCounts[scorerName] || 0) + 1;
 
-      // Debug specific scorers
-      if (
-        (scorerName === 'ResponseQualityScorer' ||
-          scorerName === 'tool_usage_scorer') &&
-        scorerRecordCounts[scorerName] <= 3
-      ) {
-        console.log(`First pass - ${scorerName} record:`, {
-          scorerName,
-          scorerVersion,
-          scorerType,
-          hasVersion: !!scorerVersion,
-          hasType: !!scorerType,
-          metricType: record.metricType,
-        });
-      }
 
       // Track scorer versions and types globally
       if (scorerVersion && scorerType) {
@@ -334,9 +318,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     const latestRecordsOnly = getLatestEvaluationsPerModel(allRecords);
 
     // Second pass: track dataset and scorer versions only from latest evaluations for inconsistency detection
-    console.log('Processing latest records:', latestRecordsOnly.length);
-    console.log('Global scorer versions found:', globalScorerVersionMap);
-    console.log('Global scorer types found:', globalScorerTypeMap);
     latestRecordsOnly.forEach(record => {
       const datasetName = record.datasetName;
       const datasetVersion = record.datasetVersion;
@@ -712,17 +693,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                 const scorerType =
                   processedData.globalScorerTypeMap[scorerGroupName] || 'op';
 
-                // Debug logging
-                console.log(`Scorer ${scorerGroupName} render:`, {
-                  scorerVersion,
-                  scorerType,
-                  hasMultipleVersions,
-                  allVersions: Array.from(allVersions),
-                  globalMaps: {
-                    version: processedData.globalScorerLatestVersionMap,
-                    type: processedData.globalScorerTypeMap,
-                  },
-                });
 
                 // Construct a proper WeaveObjectRef for the scorer
                 // The parseRefMaybe function needs the full URI format
@@ -733,11 +703,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                     : null;
                 const ref = scorerUri ? parseRefMaybe(scorerUri) : null;
 
-                console.log(`Scorer ${scorerGroupName} URI:`, {
-                  scorerUri,
-                  ref,
-                  hasRef: !!ref,
-                });
 
                 return (
                   <div
