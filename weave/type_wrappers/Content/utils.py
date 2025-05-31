@@ -18,22 +18,15 @@ except Exception as e:
     MAGIC_LIB_AVAILABLE = False
 
 
-# TODO: Mypy is really unfriendly to kwargs. Can we use pydantic or something to not make this so repetitive?
-class BaseContentArgs(TypedDict):
-    extension: str
-    mimetype: str
-    filename: str
-    size: int
-
-
-class ContentOptionalArgs(TypedDict):
+class ContentArgs(TypedDict):
+    input_type: str
+    input_category: str
     extension: str | None
     mimetype: str | None
     filename: str | None
     path: str | None
     size: int | None
     extra: dict[str, Any]
-
 
 class ContentKeywordArgs(TypedDict, total=False):
     extension: str

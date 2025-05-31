@@ -13,7 +13,7 @@ from typing_extensions import Unpack
 
 from weave.type_wrappers.Content.utils import (
     ContentKeywordArgs,
-    ContentOptionalArgs,
+    ContentArgs,
     default_filename,
     get_mime_and_extension,
     is_valid_path,
@@ -28,6 +28,8 @@ class BaseContentHandler(BaseModel):
     mimetype: str
     extension: str
     data: bytes
+    input_type: str
+    input_category: str
     path: str | None = None
     model_config = ConfigDict(extra="allow")
 
@@ -41,7 +43,7 @@ class BaseContentHandler(BaseModel):
 
 
 def create_bytes_content(
-    input: bytes, /, **values: Unpack[ContentOptionalArgs]
+    input: bytes, /, **values: Unpack[ContentArgs]
 ) -> BaseContentHandler:
     values["size"] = values["size"] or len(input)
     if values["mimetype"] is None or values["extension"] is None:
@@ -62,7 +64,7 @@ def create_bytes_content(
 
 
 def create_file_content(
-    input: str | Path, /, **values: Unpack[ContentOptionalArgs]
+    input: str | Path, /, **values: Unpack[ContentArgs]
 ) -> BaseContentHandler:
     if not is_valid_path(input):
         raise ValueError(f"Input {input} is not a valid file path.")
@@ -77,7 +79,7 @@ def create_file_content(
 
 
 def create_b64_content(
-    input: str | bytes, /, **values: Unpack[ContentOptionalArgs]
+    input: str | bytes, /, **values: Unpack[ContentArgs]
 ) -> BaseContentHandler:
     try:
         data = base64.b64decode(input, validate=True)
@@ -112,26 +114,34 @@ class Content(Generic[T]):
             else:
                 values["extension"] = type_hint.lstrip(".")
 
-        values_with_defaults = ContentOptionalArgs(
-            filename=values.get("filename", None),
-            path=values.get("path", None),
-            extension=values.get("extension", None),
-            mimetype=values.get("mimetype", None),
-            size=values.get("size", None),
-            extra=values.get("extra", {}),
-        )
+        values_with_defaults = {
+            "filename": values.get("filename", None),
+            "path": values.get("path", None),
+            "extension": values.get("extension", None),
+            "mimetype": values.get("mimetype", None),
+            "size": values.get("size", None),
+            "extra": values.get("extra", {}),
+        }
 
         if isinstance(input, Path):
             self.content_handler = create_file_content(
-                str(input), **values_with_defaults
+                str(input),
+                input_type=str(input.__class__),
+                input_category='object',
+                **values_with_defaults
             )
+
         elif isinstance(input, str):
-            if is_valid_path(str(input)):
+            if is_valid_path(input):
                 self.content_handler = create_file_content(
-                    str(input), **values_with_defaults
+                    str(input),
+                    input_type='str',
+                    input_category='path',
+                    **values_with_defaults
                 )
             else:
                 try:
+                    values_with_defaults['extra']['input_category'] = 'base64'
                     self.content_handler = create_b64_content(
                         str(input), **values_with_defaults
                     )
@@ -140,13 +150,28 @@ class Content(Generic[T]):
                         f"Could not parse string {input} as a valid path or base64 string"
                     )
         elif isinstance(input, bytes):
-            self.content_handler = create_bytes_content(input, **values_with_defaults)
+            self.content_handler = create_bytes_content(
+                input,
+                input_type='bytes',
+                input_category='data',
+                **values_with_defaults
+            )
         else:
             raise TypeError(f"Unsupported input type: {type(input)}")
 
     @property
     def metadata(self) -> dict[str, Any]:
         return self.content_handler.metadata
+
+    @property
+    def input_type(self) -> str:
+        """type or instance of the input - bytes, str, <class instance>"""
+        return self.content_handler.input_type
+
+    @property
+    def input_category(self) -> str:
+        """Category of the input - base64, path, data, object"""
+        return self.content_handler.input_category
 
     @property
     def data(self) -> bytes:
