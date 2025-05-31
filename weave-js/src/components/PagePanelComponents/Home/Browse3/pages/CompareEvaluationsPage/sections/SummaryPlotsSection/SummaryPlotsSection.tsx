@@ -3,7 +3,10 @@ import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useMemo, useState} from 'react';
 
-import {MOON_100, MOON_300} from '../../../../../../../../common/css/color.styles';
+import {
+  MOON_100,
+  MOON_300,
+} from '../../../../../../../../common/css/color.styles';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
@@ -20,7 +23,6 @@ import {
   resolveSummaryMetricValueForEvaluateCall,
 } from '../../ecpUtil';
 import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
-import {HorizontalBox, VerticalBox} from '../../Layout';
 import {MetricsSelector} from './MetricsSelector';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
@@ -34,7 +36,7 @@ export const SummaryPlotsSection: React.FC<{
   initialExpanded?: boolean;
 }> = ({state, setSelectedMetrics, initialExpanded = false}) => {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
-  const {radarData, allMetricNames} = usePlotDataFromMetrics(state);
+  const {allMetricNames} = usePlotDataFromMetrics(state);
   const {selectedMetrics} = state;
 
   const toggleExpanded = () => {
@@ -42,7 +44,12 @@ export const SummaryPlotsSection: React.FC<{
   };
 
   return (
-    <div style={{backgroundColor: MOON_100, width: '100%', ...(isExpanded && {paddingBottom: '24px'})}}>
+    <div
+      style={{
+        backgroundColor: MOON_100,
+        width: '100%',
+        ...(isExpanded && {paddingBottom: '24px'}),
+      }}>
       <Box
         sx={{
           display: 'flex',
@@ -57,7 +64,7 @@ export const SummaryPlotsSection: React.FC<{
           backgroundColor: 'transparent',
         }}>
         <Tailwind style={{width: '100%'}}>
-          <div className="flex items-center gap-8 w-full">
+          <div className="flex w-full items-center gap-8">
             <Button
               variant="ghost"
               icon={isExpanded ? 'chevron-down' : 'chevron-next'}
@@ -67,8 +74,8 @@ export const SummaryPlotsSection: React.FC<{
                 toggleExpanded();
               }}
             />
-            <h3 className="text-lg m-0">Metrics</h3>
-            <div className="flex items-center ml-auto">
+            <h3 className="m-0 text-lg">Metrics</h3>
+            <div className="ml-auto flex items-center">
               <MetricsSelector
                 selectedMetrics={selectedMetrics}
                 setSelectedMetrics={setSelectedMetrics}
@@ -84,10 +91,7 @@ export const SummaryPlotsSection: React.FC<{
             borderTop: 'none',
             borderRadius: '0 0 8px 8px',
           }}>
-          <SummaryPlots
-            state={state}
-            setSelectedMetrics={setSelectedMetrics}
-          />
+          <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />
         </Box>
       )}
     </div>
@@ -126,7 +130,11 @@ export const SummaryPlots: React.FC<{
     [setSelectedMetrics, selectedMetrics]
   );
 
-  const allPlots = useAllPlots(normalizedRadarData, barPlotData, handleCloseMetric);
+  const allPlots = useAllPlots(
+    normalizedRadarData,
+    barPlotData,
+    handleCloseMetric
+  );
 
   return (
     <div style={{width: '100%'}}>
@@ -363,23 +371,30 @@ const useBarPlotData = (filteredData: RadarPlotData) =>
     });
   }, [filteredData]);
 
-
 const usePlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): {radarData: RadarPlotData; allMetricNames: Set<string>} => {
-  const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} = useCompareEvaluationsState();
+  const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} =
+    useCompareEvaluationsState();
   const compositeMetrics = useMemo(() => {
     return buildCompositeMetricsMap(state.summary, 'summary');
   }, [state]);
   const callIds = useMemo(() => {
-    const allCallIds = getOrderedCallIds(state).filter(id => !hiddenEvaluationIds.has(id));
-    
+    const allCallIds = getOrderedCallIds(state).filter(
+      id => !hiddenEvaluationIds.has(id)
+    );
+
     // Only apply latest evaluation filtering if we're in leaderboard mode
     if (filterToLatestEvaluationsPerModel) {
       // Filter to keep only the latest evaluation for each model
-      return filterLatestCallIdsPerModel(allCallIds, state.summary.evaluationCalls, {}, true);
+      return filterLatestCallIdsPerModel(
+        allCallIds,
+        state.summary.evaluationCalls,
+        {},
+        true
+      );
     }
-    
+
     return allCallIds;
   }, [state, hiddenEvaluationIds, filterToLatestEvaluationsPerModel]);
 

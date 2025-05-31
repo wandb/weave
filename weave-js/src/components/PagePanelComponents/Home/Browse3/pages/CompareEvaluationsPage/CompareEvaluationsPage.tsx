@@ -41,7 +41,7 @@ import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
-import {ExampleCompareSectionDetailGuarded} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {ExampleCompareSectionDetail} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
 import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
@@ -218,24 +218,27 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
             value: 'summary',
             label: 'Summary',
             content: (
-              <div style={{marginTop: '-1px', minHeight: '100vh', backgroundColor: MOON_100, overflow: 'auto'}}>
+              <div
+                style={{
+                  marginTop: '-1px',
+                  minHeight: '100vh',
+                  backgroundColor: MOON_100,
+                  overflow: 'auto',
+                }}>
                 <SummaryPlotsSection
                   state={state}
                   setSelectedMetrics={setSelectedMetrics}
                   initialExpanded={true}
                 />
-                <ScorecardSection 
-                  state={state} 
-                  initialExpanded={true}
-                />
+                <ScorecardSection state={state} initialExpanded={true} />
                 <Tailwind style={{width: '100%', backgroundColor: MOON_100}}>
                   <div className="px-16">
-                    <div className="flex w-full flex items-center gap-3 rounded-lg bg-white px-16 py-8">
+                    <div className="flex flex w-full items-center gap-3 rounded-lg bg-white px-16 py-8">
                       <Icon name="table" size="large" color="moon-500 mb-4" />
-                      <p className="text-[14px] ml-[8px] font-semibold">
+                      <p className="ml-[8px] text-[14px] font-semibold">
                         Looking for your evaluation results?
                       </p>
-                      <p className="text-[14px] ml-[8px] mr-auto text-moon-500">
+                      <p className="ml-[8px] mr-auto text-[14px] text-moon-500">
                         You can find it in our new results tab.
                       </p>
                       <Button

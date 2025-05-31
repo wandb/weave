@@ -242,15 +242,12 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           // Format can be either "name:version" or just "name" (when already grouped)
           const colonIndex = datasetGroup.lastIndexOf(':');
           let datasetName: string;
-          let datasetVersion: string;
 
           if (colonIndex !== -1) {
             datasetName = datasetGroup.substring(0, colonIndex);
-            datasetVersion = datasetGroup.substring(colonIndex + 1);
           } else {
             // Already grouped by name only
             datasetName = datasetGroup;
-            datasetVersion = '';
           }
 
           datasetGroupToName[datasetGroup] = datasetName;
@@ -392,15 +389,12 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               // Extract scorer name and version from scorerGroup (format: "name:version" or just "name")
               const colonIndex = scorerGroup.lastIndexOf(':');
               let scorerName: string;
-              let scorerVersion: string;
 
               if (colonIndex !== -1 && scorerGroup !== 'Summary') {
                 scorerName = scorerGroup.substring(0, colonIndex);
-                scorerVersion = scorerGroup.substring(colonIndex + 1);
               } else {
                 // No version found (e.g., "Summary" scorer)
                 scorerName = scorerGroup;
-                scorerVersion = '';
               }
 
               // Group by scorer name only
@@ -790,8 +784,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     columnStats.datasetGroups,
     entity,
     project,
-    processedData.scorerVersionMap,
-    processedData.scorerLatestVersionMap,
     processedData.datasetVersionMap,
     processedData.datasetLatestVersionMap,
     processedData.globalScorerVersionMap,

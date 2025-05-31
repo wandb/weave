@@ -16,6 +16,7 @@ import {
 import {parseRef, parseRefMaybe} from '../../../../../../../../react';
 import {Button} from '../../../../../../../Button';
 import {Icon} from '../../../../../../../Icon';
+import {TailwindContents} from '../../../../../../../Tailwind';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {isWeaveRef} from '../../../../filters/common';
 import {NotApplicable} from '../../../../NotApplicable';

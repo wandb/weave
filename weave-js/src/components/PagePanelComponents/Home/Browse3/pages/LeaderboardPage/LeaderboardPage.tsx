@@ -1,17 +1,11 @@
-import {Alert,Box} from '@mui/material';
-import {MOON_100,MOON_250} from '@wandb/weave/common/css/color.styles';
+import {Alert, Box} from '@mui/material';
+import {MOON_100, MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Loading} from '@wandb/weave/components/Loading';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import ReactMarkdown from 'react-markdown';
 import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
@@ -47,7 +41,6 @@ import {
   useCreateBuiltinObjectInstance,
 } from '../wfReactInterface/objectClassQuery';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
-import {ComputedCallStatusType} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertTraceServerObjectVersionToSchema,
   projectIdFromParts,
@@ -83,13 +76,15 @@ const useHasRunningEvaluations = (
     Object.values(data.modelGroups).forEach((modelGroup: any) => {
       Object.values(modelGroup.datasetGroups).forEach((datasetGroup: any) => {
         Object.values(datasetGroup.scorerGroups).forEach((scorerGroup: any) => {
-          Object.values(scorerGroup.metricPathGroups).forEach((records: any) => {
-            records.forEach((record: any) => {
-              if (record.sourceEvaluationCallId) {
-                callIds.add(record.sourceEvaluationCallId);
-              }
-            });
-          });
+          Object.values(scorerGroup.metricPathGroups).forEach(
+            (records: any) => {
+              records.forEach((record: any) => {
+                if (record.sourceEvaluationCallId) {
+                  callIds.add(record.sourceEvaluationCallId);
+                }
+              });
+            }
+          );
         });
       });
     });
@@ -113,7 +108,8 @@ const useHasRunningEvaluations = (
 
         // Check if any calls are still running
         const hasRunningCalls = response.calls.some(call => {
-          const status = call.summary?.status || (call.ended_at ? 'success' : 'running');
+          const status =
+            call.summary?.status || (call.ended_at ? 'success' : 'running');
           return status === 'running';
         });
 
@@ -155,7 +151,7 @@ const useEvaluationCallIds = (
           opId: EVALUATE_OP_NAME_POST_PYDANTIC,
           versionHash: ALL_VALUE,
         });
-        
+
         // Query for evaluation.evaluate calls that use these evaluation objects
         // Based on the pattern in useMetrics, we need to look for calls
         // where the evaluation ref is in the input_refs
@@ -167,10 +163,10 @@ const useEvaluationCallIds = (
           },
           limit: 1000,
         });
-        
+
         // Get all the call IDs from the matching calls
         const matchingCallIds = response.calls.map(call => call.id);
-        
+
         setCallIds(matchingCallIds);
       } catch (error) {
         console.error('Error fetching evaluation call IDs:', error);
@@ -189,17 +185,21 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const {isEditor} = useIsEditor(props.entity);
   const showDeleteButton = useShowDeleteButton(props.entity);
   const [isEditing, setIsEditing] = useState(false);
-  const [leaderboardObjectVersion, setLeaderboardObjectVersion] = useState<ObjectVersionSchema | null>(null);
-  const [leaderboardVal, setLeaderboardVal] = useState<LeaderboardObjectVal | null>(null);
-  const [selectedMetrics, setSelectedMetrics] = useState<Record<string, boolean> | null>(null);
+  const [leaderboardObjectVersion, setLeaderboardObjectVersion] =
+    useState<ObjectVersionSchema | null>(null);
+  const [leaderboardVal, setLeaderboardVal] =
+    useState<LeaderboardObjectVal | null>(null);
+  const [selectedMetrics, setSelectedMetrics] = useState<Record<
+    string,
+    boolean
+  > | null>(null);
   const [evaluationCallIds, setEvaluationCallIds] = useState<string[]>([]);
-  
+
   useEffect(() => {
     if (isEditor && props.openEditorOnMount) {
       setIsEditing(true);
     }
   }, [isEditor, props.openEditorOnMount]);
-
 
   // Create header extra content with action buttons that will appear in the header bar
   const headerExtra = useMemo(() => {
@@ -208,8 +208,9 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
     }
 
     // Use the actual display name from the leaderboard object, falling back to objectId
-    const displayName = leaderboardObjectVersion.val?.name || leaderboardObjectVersion.objectId;
-    
+    const displayName =
+      leaderboardObjectVersion.val?.name || leaderboardObjectVersion.objectId;
+
     return (
       <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
         {isEditor && (
@@ -231,7 +232,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
       </div>
     );
   }, [leaderboardObjectVersion, isEditing, isEditor, showDeleteButton]);
-  
+
   // Use consistent display name for title
   const displayTitle = leaderboardObjectVersion?.val?.name || name;
 
@@ -244,7 +245,8 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
         {
           label: 'Leaderboard',
           content: (
-            <Box sx={{backgroundColor: MOON_100, height: '100%', width: '100%'}}>
+            <Box
+              sx={{backgroundColor: MOON_100, height: '100%', width: '100%'}}>
               <LeaderboardPageContent
                 {...props}
                 setName={setName}
@@ -260,24 +262,32 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
         },
         {
           label: 'Trace results',
-          content: leaderboardVal && evaluationCallIds.length > 0 ? (
-            <Box sx={{backgroundColor: MOON_100, height: '100%', width: '100%'}}>
-              <LeaderboardResultsTab
-                entity={props.entity}
-                project={props.project}
-                leaderboardVal={leaderboardVal}
-                evaluationCallIds={evaluationCallIds}
-                selectedMetrics={selectedMetrics}
-                setSelectedMetrics={setSelectedMetrics}
-              />
-            </Box>
-          ) : (
-            <Box sx={{padding: STANDARD_PADDING, backgroundColor: MOON_100, height: '100%'}}>
-              <Alert severity="info">
-                No evaluation data available. Make sure the leaderboard is configured with evaluations.
-              </Alert>
-            </Box>
-          ),
+          content:
+            leaderboardVal && evaluationCallIds.length > 0 ? (
+              <Box
+                sx={{backgroundColor: MOON_100, height: '100%', width: '100%'}}>
+                <LeaderboardResultsTab
+                  entity={props.entity}
+                  project={props.project}
+                  leaderboardVal={leaderboardVal}
+                  evaluationCallIds={evaluationCallIds}
+                  selectedMetrics={selectedMetrics}
+                  setSelectedMetrics={setSelectedMetrics}
+                />
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  padding: STANDARD_PADDING,
+                  backgroundColor: MOON_100,
+                  height: '100%',
+                }}>
+                <Alert severity="info">
+                  No evaluation data available. Make sure the leaderboard is
+                  configured with evaluations.
+                </Alert>
+              </Box>
+            ),
         },
       ]}
       headerExtra={headerExtra}
@@ -296,7 +306,13 @@ export const LeaderboardPageContent: React.FC<
     setEvaluationCallIds?: (ids: string[]) => void;
   }
 > = props => {
-  const {entity, project} = props;
+  const {
+    entity,
+    project,
+    setLeaderboardObjectVersion,
+    setLeaderboardVal,
+    setEvaluationCallIds,
+  } = props;
   const leaderboardInstances = useBaseObjectInstances('Leaderboard', {
     project_id: projectIdFromParts({entity, project}),
     filter: {object_ids: [props.leaderboardName], latest_only: true},
@@ -304,15 +320,23 @@ export const LeaderboardPageContent: React.FC<
 
   // Calculate the object version if we have results
   const leaderboardObjectVersion = useMemo(() => {
-    if (leaderboardInstances.result && leaderboardInstances.result.length === 1) {
-      return convertTraceServerObjectVersionToSchema(leaderboardInstances.result[0]);
+    if (
+      leaderboardInstances.result &&
+      leaderboardInstances.result.length === 1
+    ) {
+      return convertTraceServerObjectVersionToSchema(
+        leaderboardInstances.result[0]
+      );
     }
     return null;
   }, [leaderboardInstances.result]);
 
   // Get the leaderboard value safely
   const leaderboardVal = useMemo(() => {
-    if (leaderboardInstances.result && leaderboardInstances.result.length === 1) {
+    if (
+      leaderboardInstances.result &&
+      leaderboardInstances.result.length === 1
+    ) {
       return leaderboardInstances.result[0].val;
     }
     return null;
@@ -320,19 +344,21 @@ export const LeaderboardPageContent: React.FC<
 
   // Set the object version in the parent component
   useEffect(() => {
-    if (props.setLeaderboardObjectVersion && leaderboardObjectVersion) {
-      props.setLeaderboardObjectVersion(leaderboardObjectVersion);
+    if (setLeaderboardObjectVersion && leaderboardObjectVersion) {
+      setLeaderboardObjectVersion(leaderboardObjectVersion);
     }
-  }, [props.setLeaderboardObjectVersion, leaderboardObjectVersion]);
+  }, [setLeaderboardObjectVersion, leaderboardObjectVersion]);
 
   // Extract unique evaluation refs from the leaderboard columns
   const evaluationRefs = useMemo(() => {
     if (leaderboardVal?.columns) {
-      return [...new Set(
-        leaderboardVal.columns
-          .map(col => col.evaluation_object_ref)
-          .filter(ref => ref != null)
-      )];
+      return [
+        ...new Set(
+          leaderboardVal.columns
+            .map(col => col.evaluation_object_ref)
+            .filter(ref => ref != null)
+        ),
+      ];
     }
     return [];
   }, [leaderboardVal]);
@@ -344,20 +370,19 @@ export const LeaderboardPageContent: React.FC<
     evaluationRefs
   );
 
-
   // Update parent component state
   useEffect(() => {
-    if (props.setLeaderboardVal && leaderboardVal) {
-      props.setLeaderboardVal(leaderboardVal);
+    if (setLeaderboardVal && leaderboardVal) {
+      setLeaderboardVal(leaderboardVal);
     }
-  }, [props.setLeaderboardVal, leaderboardVal]);
+  }, [setLeaderboardVal, leaderboardVal]);
 
   useEffect(() => {
-    if (props.setEvaluationCallIds) {
+    if (setEvaluationCallIds) {
       // Always set the evaluation call IDs, even if empty
-      props.setEvaluationCallIds(evaluationCallIds);
+      setEvaluationCallIds(evaluationCallIds);
     }
-  }, [props.setEvaluationCallIds, evaluationCallIds]);
+  }, [setEvaluationCallIds, evaluationCallIds]);
 
   if (leaderboardInstances.loading) {
     return <Loading centered />;
@@ -423,6 +448,7 @@ export const LeaderboardPageContentInner: React.FC<
     leaderboardObjectVersion: ObjectVersionSchema;
   }
 > = props => {
+  const {isEditing, setIsEditing} = props;
   const updateLeaderboard = useUpdateLeaderboard(
     props.entity,
     props.project,
@@ -433,15 +459,20 @@ export const LeaderboardPageContentInner: React.FC<
     useState(leaderboardVal);
   const [drawerWidth, setDrawerWidth] = useState(800);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [selectedMetrics, setSelectedMetrics] = useState<Record<string, boolean> | null>(null);
-  
+  const [selectedMetrics, setSelectedMetrics] = useState<Record<
+    string,
+    boolean
+  > | null>(null);
+
   // Extract evaluation refs and get call IDs for charts
   const evaluationRefs = useMemo(() => {
-    return [...new Set(
-      workingLeaderboardValCopy.columns
-        .map(col => col.evaluation_object_ref)
-        .filter(ref => ref != null)
-    )];
+    return [
+      ...new Set(
+        workingLeaderboardValCopy.columns
+          .map(col => col.evaluation_object_ref)
+          .filter(ref => ref != null)
+      ),
+    ];
   }, [workingLeaderboardValCopy.columns]);
 
   const evaluationCallIds = useEvaluationCallIds(
@@ -449,7 +480,7 @@ export const LeaderboardPageContentInner: React.FC<
     props.project,
     evaluationRefs
   );
-  
+
   useEffect(() => {
     props.setName(workingLeaderboardValCopy.name ?? '');
   }, [props, workingLeaderboardValCopy.name]);
@@ -458,7 +489,11 @@ export const LeaderboardPageContentInner: React.FC<
     props.project,
     workingLeaderboardValCopy.columns
   );
-  const hasRunningEvaluations = useHasRunningEvaluations(props.entity, props.project, data);
+  const hasRunningEvaluations = useHasRunningEvaluations(
+    props.entity,
+    props.project,
+    data
+  );
   const [saving, setSaving] = useState(false);
   const discardChanges = useCallback(() => {
     setWorkingLeaderboardValCopy(leaderboardVal);
@@ -513,8 +548,8 @@ export const LeaderboardPageContentInner: React.FC<
   }, [isFullscreen]);
 
   const drawerHeaderContent = useMemo(() => {
-    if (!props.isEditing) return null;
-    
+    if (!isEditing) return null;
+
     return (
       <Box
         sx={{
@@ -533,12 +568,10 @@ export const LeaderboardPageContentInner: React.FC<
             variant="ghost"
             size="medium"
             icon="chevron-back"
-            onClick={() => props.setIsEditing(false)}
+            onClick={() => setIsEditing(false)}
             tooltip="Close editor"
           />
-          <Box sx={{fontSize: '16px', fontWeight: 600}}>
-            Edit Leaderboard
-          </Box>
+          <Box sx={{fontSize: '16px', fontWeight: 600}}>Edit Leaderboard</Box>
         </Box>
         <Button
           variant="ghost"
@@ -549,11 +582,16 @@ export const LeaderboardPageContentInner: React.FC<
         />
       </Box>
     );
-  }, [props.isEditing, props.setIsEditing, isFullscreen, handleToggleFullscreen]);
+  }, [isEditing, setIsEditing, isFullscreen, handleToggleFullscreen]);
 
   return (
     <>
-      <Box display="flex" flexDirection="column" height="100%" flexGrow={1} overflow="auto">
+      <Box
+        display="flex"
+        flexDirection="column"
+        height="100%"
+        flexGrow={1}
+        overflow="auto">
         {workingLeaderboardValCopy.description ? (
           <Box
             display="block"
@@ -569,17 +607,22 @@ export const LeaderboardPageContentInner: React.FC<
         ) : (
           <Box height="0px" />
         )}
-        <Box
-          display="block">
+        <Box display="block">
           {/* Running Evaluations Banner */}
           {hasRunningEvaluations && (
-            <Box sx={{padding: '12px 16px', backgroundColor: 'white', marginBottom: '1px'}}>
+            <Box
+              sx={{
+                padding: '12px 16px',
+                backgroundColor: 'white',
+                marginBottom: '1px',
+              }}>
               <Alert severity="info" sx={{margin: 0}}>
-                Some models have evaluations currently running. Results will update automatically when evaluations complete.
+                Some models have evaluations currently running. Results will
+                update automatically when evaluations complete.
               </Alert>
             </Box>
           )}
-          
+
           {/* Leaderboard Table */}
           <Box sx={{backgroundColor: 'white', paddingBottom: '4px'}}>
             <LeaderboardGrid
@@ -591,7 +634,7 @@ export const LeaderboardPageContentInner: React.FC<
               hideFooter={true}
             />
           </Box>
-          
+
           {/* Charts Section - Only show if we have evaluation call IDs */}
           {evaluationCallIds.length > 0 && (
             <Box sx={{marginBottom: '16px'}}>
@@ -607,14 +650,16 @@ export const LeaderboardPageContentInner: React.FC<
                 filterToLatestEvaluationsPerModel={true}>
                 <CustomWeaveTypeProjectContext.Provider
                   value={{entity: props.entity, project: props.project}}>
-                  <LeaderboardChartsSection leaderboardColumns={workingLeaderboardValCopy.columns} />
+                  <LeaderboardChartsSection
+                    leaderboardColumns={workingLeaderboardValCopy.columns}
+                  />
                 </CustomWeaveTypeProjectContext.Provider>
               </CompareEvaluationsProvider>
             </Box>
           )}
         </Box>
       </Box>
-      
+
       <ResizableDrawer
         open={props.isEditing}
         onClose={() => props.setIsEditing(false)}
@@ -642,7 +687,7 @@ export const LeaderboardPageContentInner: React.FC<
               setWorkingCopy={setWorkingLeaderboardValCopy}
             />
           </Box>
-          
+
           {/* Sticky footer with actions */}
           <Box
             sx={{
@@ -714,7 +759,6 @@ export const useIsEditor = (entity: string) => {
     };
   }, [entity, loadingUserInfo, userInfo]);
 };
-
 
 const StyledReactMarkdown = styled(ReactMarkdown)`
   > *:first-child {
@@ -794,7 +838,9 @@ const LeaderboardResultsTab: React.FC<{
       filterToLatestEvaluationsPerModel={true}>
       <CustomWeaveTypeProjectContext.Provider
         value={{entity: props.entity, project: props.project}}>
-        <LeaderboardResultsContent leaderboardColumns={props.leaderboardVal.columns} />
+        <LeaderboardResultsContent
+          leaderboardColumns={props.leaderboardVal.columns}
+        />
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
   );
@@ -812,7 +858,7 @@ const LeaderboardResultsContent: React.FC<{
   // Create the set of visible scorers based on leaderboard columns
   const visibleScorers = useMemo(() => {
     const scorers = new Set<string>();
-    
+
     // Extract all scorer names from leaderboard columns and create scorer prefixes
     // This will show ALL metrics for any scorer that appears in the leaderboard
     leaderboardColumns.forEach(column => {
@@ -821,7 +867,7 @@ const LeaderboardResultsContent: React.FC<{
         scorers.add(`scores.${column.scorer_name}`);
       }
     });
-    
+
     return scorers;
   }, [leaderboardColumns]);
 
@@ -844,9 +890,9 @@ const LeaderboardResultsContent: React.FC<{
     return (
       <Box sx={{padding: STANDARD_PADDING}}>
         <Alert severity="info">
-          The selected evaluations' datasets have 0 rows in common,
-          try comparing evaluations with datasets that have at least
-          one row in common.
+          The selected evaluations' datasets have 0 rows in common, try
+          comparing evaluations with datasets that have at least one row in
+          common.
         </Alert>
       </Box>
     );
@@ -862,9 +908,9 @@ const LeaderboardResultsContent: React.FC<{
       <AutoSizer style={{height: '100%', width: '100%'}}>
         {({height}) => {
           return (
-            <ResultExplorer 
-              state={state} 
-              height={height} 
+            <ResultExplorer
+              state={state}
+              height={height}
               defaultHiddenScorerMetrics={visibleScorers}
             />
           );
@@ -944,84 +990,98 @@ const LeaderboardChartsSection: React.FC<{
   leaderboardColumns: LeaderboardObjectVal['columns'];
 }> = ({leaderboardColumns}) => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  
+
   // Create a function to match actual metrics against leaderboard config
-  const getMatchingMetrics = useCallback((availableMetrics: string[]): Set<string> => {
-    const allowedMetrics = new Set<string>();
-    
-    leaderboardColumns.forEach(column => {
-      if (column.summary_metric_path) {
-        const metricPath = column.summary_metric_path;
-        
-        // Look for exact matches in available metrics
-        availableMetrics.forEach(availableMetric => {
-          // Check if this metric matches our leaderboard column
-          const isMatch = 
-            // Exact match for the metric path
-            availableMetric === metricPath ||
-            // Ends with the metric path (for scorer-prefixed metrics)
-            availableMetric.endsWith(`.${metricPath}`) ||
-            // For nested paths, check if it contains the metric path
-            (metricPath.includes('.') && availableMetric.includes(metricPath)) ||
-            // Check if this is a scorer-only metric (no sub-path)
-            (column.scorer_name && availableMetric === column.scorer_name) ||
-            // Check if scorer name is part of the available metric
-            (column.scorer_name && availableMetric.startsWith(`${column.scorer_name}.`));
-            
-          if (isMatch) {
-            allowedMetrics.add(availableMetric);
-          }
-        });
-      }
-    });
-    
-    return allowedMetrics;
-  }, [leaderboardColumns]);
+  const getMatchingMetrics = useCallback(
+    (availableMetrics: string[]): Set<string> => {
+      const allowedMetrics = new Set<string>();
+
+      leaderboardColumns.forEach(column => {
+        if (column.summary_metric_path) {
+          const metricPath = column.summary_metric_path;
+
+          // Look for exact matches in available metrics
+          availableMetrics.forEach(availableMetric => {
+            // Check if this metric matches our leaderboard column
+            const isMatch =
+              // Exact match for the metric path
+              availableMetric === metricPath ||
+              // Ends with the metric path (for scorer-prefixed metrics)
+              availableMetric.endsWith(`.${metricPath}`) ||
+              // For nested paths, check if it contains the metric path
+              (metricPath.includes('.') &&
+                availableMetric.includes(metricPath)) ||
+              // Check if this is a scorer-only metric (no sub-path)
+              (column.scorer_name && availableMetric === column.scorer_name) ||
+              // Check if scorer name is part of the available metric
+              (column.scorer_name &&
+                availableMetric.startsWith(`${column.scorer_name}.`));
+
+            if (isMatch) {
+              allowedMetrics.add(availableMetric);
+            }
+          });
+        }
+      });
+
+      return allowedMetrics;
+    },
+    [leaderboardColumns]
+  );
 
   // Filter selectedMetrics to only include metrics shown in leaderboard
-  const filteredSetSelectedMetrics = useCallback((newMetrics: Record<string, boolean>) => {
-    const availableMetricKeys = Object.keys(newMetrics);
-    const allowedMetrics = getMatchingMetrics(availableMetricKeys);
-    const filtered: Record<string, boolean> = {};
-    
-    // Only include metrics that match the leaderboard configuration
-    // But allow toggling any metric that was already present
-    Object.keys(newMetrics).forEach(metricKey => {
-      if (allowedMetrics.has(metricKey)) {
-        filtered[metricKey] = newMetrics[metricKey];
-      } else if (state.selectedMetrics && state.selectedMetrics[metricKey] !== undefined) {
-        // Allow toggling metrics that were already in the state (to fix toggle issue)
-        const isInAllowed = getMatchingMetrics([metricKey]).has(metricKey);
-        if (isInAllowed) {
+  const filteredSetSelectedMetrics = useCallback(
+    (newMetrics: Record<string, boolean>) => {
+      const availableMetricKeys = Object.keys(newMetrics);
+      const allowedMetrics = getMatchingMetrics(availableMetricKeys);
+      const filtered: Record<string, boolean> = {};
+
+      // Only include metrics that match the leaderboard configuration
+      // But allow toggling any metric that was already present
+      Object.keys(newMetrics).forEach(metricKey => {
+        if (allowedMetrics.has(metricKey)) {
           filtered[metricKey] = newMetrics[metricKey];
+        } else if (
+          state.selectedMetrics &&
+          state.selectedMetrics[metricKey] !== undefined
+        ) {
+          // Allow toggling metrics that were already in the state (to fix toggle issue)
+          const isInAllowed = getMatchingMetrics([metricKey]).has(metricKey);
+          if (isInAllowed) {
+            filtered[metricKey] = newMetrics[metricKey];
+          }
         }
-      }
-    });
-    
-    setSelectedMetrics(filtered);
-  }, [setSelectedMetrics, getMatchingMetrics, state.selectedMetrics]);
+      });
+
+      setSelectedMetrics(filtered);
+    },
+    [setSelectedMetrics, getMatchingMetrics, state.selectedMetrics]
+  );
 
   // Override the initial selected metrics when state changes
   useEffect(() => {
-    if (state.selectedMetrics && Object.keys(state.selectedMetrics).length > 0) {
+    if (
+      state.selectedMetrics &&
+      Object.keys(state.selectedMetrics).length > 0
+    ) {
       const availableMetricKeys = Object.keys(state.selectedMetrics);
       const allowedMetrics = getMatchingMetrics(availableMetricKeys);
       const filtered: Record<string, boolean> = {};
-      
+
       // Filter existing metrics to only show those that match leaderboard
       Object.keys(state.selectedMetrics).forEach(metricKey => {
         if (allowedMetrics.has(metricKey)) {
           filtered[metricKey] = state.selectedMetrics![metricKey];
         }
       });
-      
+
       // Only update if the filtered metrics are different
       if (!_.isEqual(filtered, state.selectedMetrics)) {
         setSelectedMetrics(filtered);
       }
     }
   }, [state.selectedMetrics, getMatchingMetrics, setSelectedMetrics]);
-  
+
   if (state.loadableComparisonResults.loading) {
     return (
       <Box sx={{textAlign: 'center', py: 4}}>
@@ -1031,16 +1091,13 @@ const LeaderboardChartsSection: React.FC<{
   }
 
   return (
-    <div>      
+    <div>
       <SummaryPlotsSection
         state={state}
         setSelectedMetrics={filteredSetSelectedMetrics}
         initialExpanded={true}
       />
-      <ScorecardSection 
-        state={state} 
-        initialExpanded={false}
-      />
+      <ScorecardSection state={state} initialExpanded={false} />
     </div>
   );
 };

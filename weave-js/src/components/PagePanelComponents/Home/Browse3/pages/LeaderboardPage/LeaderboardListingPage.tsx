@@ -1,7 +1,7 @@
 import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button/Button';
 import {Loading} from '@wandb/weave/components/Loading';
-import React, {FC, useCallback, useMemo} from 'react';
+import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 

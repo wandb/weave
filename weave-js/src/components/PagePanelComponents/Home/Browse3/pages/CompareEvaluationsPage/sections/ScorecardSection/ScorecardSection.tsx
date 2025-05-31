@@ -27,7 +27,6 @@ import {
   resolveDimension,
 } from '../../compositeMetricsUtil';
 import {
-  BOX_RADIUS,
   SIGNIFICANT_DIGITS,
   STANDARD_BORDER,
   STANDARD_PADDING,
@@ -84,7 +83,8 @@ export const ScorecardSection: React.FC<{
   };
 
   return (
-    <div style={{backgroundColor: MOON_100, width: '100%', paddingBottom: '16px'}}>
+    <div
+      style={{backgroundColor: MOON_100, width: '100%', paddingBottom: '16px'}}>
       <Box
         sx={{
           display: 'flex',
@@ -110,7 +110,7 @@ export const ScorecardSection: React.FC<{
                 toggleExpanded();
               }}
             />
-            <h3 className="text-lg m-0">Evaluation details</h3>
+            <h3 className="m-0 text-lg">Evaluation details</h3>
           </div>
         </Tailwind>
       </Box>
@@ -130,22 +130,27 @@ export const ScorecardSection: React.FC<{
 const ScorecardContent: React.FC<{
   state: EvaluationComparisonState;
 }> = props => {
-  const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} = useCompareEvaluationsState();
+  const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} =
+    useCompareEvaluationsState();
 
-  const evalCallIds = useMemo(
-    () => {
-      const allCallIds = getOrderedCallIds(props.state).filter(id => !hiddenEvaluationIds.has(id));
-      
-      // Only apply latest evaluation filtering if we're in leaderboard mode
-      if (filterToLatestEvaluationsPerModel) {
-        // Filter to keep only the latest evaluation for each model
-        return filterLatestCallIdsPerModel(allCallIds, props.state.summary.evaluationCalls, {}, true);
-      }
-      
-      return allCallIds;
-    },
-    [props.state, hiddenEvaluationIds, filterToLatestEvaluationsPerModel]
-  );
+  const evalCallIds = useMemo(() => {
+    const allCallIds = getOrderedCallIds(props.state).filter(
+      id => !hiddenEvaluationIds.has(id)
+    );
+
+    // Only apply latest evaluation filtering if we're in leaderboard mode
+    if (filterToLatestEvaluationsPerModel) {
+      // Filter to keep only the latest evaluation for each model
+      return filterLatestCallIdsPerModel(
+        allCallIds,
+        props.state.summary.evaluationCalls,
+        {},
+        true
+      );
+    }
+
+    return allCallIds;
+  }, [props.state, hiddenEvaluationIds, filterToLatestEvaluationsPerModel]);
 
   const modelRefs = useMemo(() => {
     // Get all model refs from visible evaluations only
@@ -163,32 +168,39 @@ const ScorecardContent: React.FC<{
 
   const datasetRefs = useMemo(() => {
     // Use filtered evalCallIds instead of all evaluations to respect filtering
-    return evalCallIds.map(callId => {
-      const evaluationCall = props.state.summary.evaluationCalls[callId];
-      if (!evaluationCall) return null;
-      const evaluationObj = props.state.summary.evaluations[evaluationCall.evaluationRef];
-      return evaluationObj?.datasetRef;
-    }).filter(ref => ref != null);
-  }, [evalCallIds, props.state.summary.evaluationCalls, props.state.summary.evaluations]);
+    return evalCallIds
+      .map(callId => {
+        const evaluationCall = props.state.summary.evaluationCalls[callId];
+        if (!evaluationCall) return null;
+        const evaluationObj =
+          props.state.summary.evaluations[evaluationCall.evaluationRef];
+        return evaluationObj?.datasetRef;
+      })
+      .filter(ref => ref != null);
+  }, [
+    evalCallIds,
+    props.state.summary.evaluationCalls,
+    props.state.summary.evaluations,
+  ]);
 
   const datasetVariation = useMemo(() => {
     // Extract dataset names and versions to check for version variations
     const datasetVersionMap: {[datasetName: string]: Set<string>} = {};
-    
+
     datasetRefs.forEach(ref => {
       // Parse the ref to extract name and version
       const parsed = parseRefMaybe(ref) as WeaveObjectRef;
       if (parsed && parsed.artifactName && parsed.artifactVersion) {
         const datasetName = parsed.artifactName;
         const datasetVersion = parsed.artifactVersion;
-        
+
         if (!datasetVersionMap[datasetName]) {
           datasetVersionMap[datasetName] = new Set();
         }
         datasetVersionMap[datasetName].add(datasetVersion);
       }
     });
-    
+
     // Check if any dataset has multiple versions
     return Object.values(datasetVersionMap).some(versions => versions.size > 1);
   }, [datasetRefs]);
@@ -258,7 +270,7 @@ const ScorecardContent: React.FC<{
           display: 'grid',
           gridTemplateColumns,
           border: STANDARD_BORDER,
-          borderRadius: "BOX_RADIUS",
+          borderRadius: 'BOX_RADIUS',
           overflow: 'auto',
           backgroundColor: 'white',
         }}>
