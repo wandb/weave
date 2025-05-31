@@ -9,7 +9,9 @@ import {parseRef, WeaveObjectRef} from '../../../../../../../../react';
 import {Icon} from '../../../../../../../Icon';
 import {SmallRef} from '../../../../smallRef/SmallRef';
 import {objectRefDisplayName} from '../../../../smallRef/SmallWeaveRef';
+import {StatusChip} from '../../../common/StatusChip';
 import {CallLink, ObjectVersionLink} from '../../../common/Links';
+import {ComputedCallStatusType} from '../../../wfReactInterface/traceServerClientTypes';
 import {useWFHooks} from '../../../wfReactInterface/context';
 import {isObjDeleteError} from '../../../wfReactInterface/utilities';
 import {ObjectVersionKey} from '../../../wfReactInterface/wfDataModelHooksInterface';
@@ -18,6 +20,7 @@ import {EvaluationComparisonState} from '../../ecpState';
 export const EvaluationCallLink: React.FC<{
   callId: string;
   state: EvaluationComparisonState;
+  callStatus?: ComputedCallStatusType;
 }> = props => {
   const evaluationCall = props.state.summary.evaluationCalls?.[props.callId];
   if (!evaluationCall) {
@@ -25,15 +28,26 @@ export const EvaluationCallLink: React.FC<{
   }
   const {entity, project} = props.state.summary;
 
+  const showStatusChip = props.callStatus === 'running';
+
   return (
-    <CallLink
-      entityName={entity}
-      projectName={project}
-      opName={evaluationCall.name}
-      callId={props.callId}
-      icon={<Icon name="filled-circle" color={evaluationCall.color} />}
-      color={MOON_800}
-    />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <CallLink
+        entityName={entity}
+        projectName={project}
+        opName={evaluationCall.name}
+        callId={props.callId}
+        icon={<Icon name="filled-circle" color={evaluationCall.color} />}
+        color={MOON_800}
+      />
+      {showStatusChip && (
+        <StatusChip
+          value="running"
+          iconOnly
+          tooltipOverride="Evaluation in progress"
+        />
+      )}
+    </div>
   );
 };
 

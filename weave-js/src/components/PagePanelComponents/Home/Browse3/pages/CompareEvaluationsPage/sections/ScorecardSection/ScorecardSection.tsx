@@ -1,9 +1,10 @@
-import {Box, Tooltip} from '@material-ui/core';
-import {Alert} from '@mui/material';
+import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
+import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import _ from 'lodash';
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
 import {
@@ -321,21 +322,21 @@ const ScorecardContent: React.FC<{
               gridColumnEnd: 'span 2',
             }}>
             {datasetVariation ? (
-              <Alert
-                severity="warning"
-                style={{
-                  paddingTop: 0,
-                  paddingBottom: 0,
-                }}>
-                <Tooltip title={DATASET_VARIATION_WARNING_EXPLANATION}>
-                  <div
-                    style={{
-                      whiteSpace: 'nowrap',
-                    }}>
-                    {DATASET_VARIATION_WARNING_TITLE}
-                  </div>
-                </Tooltip>
-              </Alert>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+                Dataset
+                <Tooltip
+                  trigger={
+                    <span>
+                      <IconOnlyPill
+                        icon="warning"
+                        color="gold"
+                        style={{flexShrink: 1}}
+                      />
+                    </span>
+                  }
+                  content={DATASET_VARIATION_WARNING_EXPLANATION}
+                />
+              </div>
             ) : (
               'Dataset'
             )}
@@ -462,21 +463,21 @@ const ScorecardContent: React.FC<{
                     {scorersAreComparable ? (
                       scorerRefParsed && <SmallRef objRef={scorerRefParsed} />
                     ) : (
-                      <Alert
-                        severity="warning"
-                        style={{
-                          paddingTop: 0,
-                          paddingBottom: 0,
-                        }}>
-                        <Tooltip title={SCORER_VARIATION_WARNING_EXPLANATION}>
-                          <div
-                            style={{
-                              whiteSpace: 'nowrap',
-                            }}>
-                            {SCORER_VARIATION_WARNING_TITLE}
-                          </div>
-                        </Tooltip>
-                      </Alert>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+                        Scorer
+                        <Tooltip
+                          trigger={
+                            <span>
+                              <IconOnlyPill
+                                icon="warning"
+                                color="gold"
+                                style={{flexShrink: 1}}
+                              />
+                            </span>
+                          }
+                          content={SCORER_VARIATION_WARNING_EXPLANATION}
+                        />
+                      </div>
                     )}
                   </GridCell>
                   {evalCallIds.map((evalCallId, mNdx) => {
