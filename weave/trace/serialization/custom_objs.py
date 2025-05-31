@@ -32,7 +32,7 @@ KNOWN_TYPES = {
     "datetime.datetime",
     "rich.markdown.Markdown",
     "moviepy.video.VideoClip.VideoClip",
-    "weave.type_wrappers.Content.content.Content"
+    "weave.type_wrappers.Content.content.Content",
 }
 
 
