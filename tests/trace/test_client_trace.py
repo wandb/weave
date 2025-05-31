@@ -194,6 +194,7 @@ def test_trace_server_call_start_and_end(client):
         },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
+        "wb_run_step": None,
         "deleted_at": None,
         "display_name": None,
         "storage_size_bytes": None,
@@ -242,6 +243,7 @@ def test_trace_server_call_start_and_end(client):
         },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
+        "wb_run_step": None,
         "deleted_at": None,
         "display_name": None,
         "storage_size_bytes": None,
@@ -517,6 +519,60 @@ def test_trace_call_query_filter_input_object_version_refs(client):
         )
 
         assert len(inner_res.calls) == exp_count
+
+
+def test_trace_call_wb_run_step_query(client):
+    full_wb_run_id = f"{client.entity}/{client.project}/test-run"
+    from weave.trace import weave_client
+
+    step_counter = iter(range(100))
+    with (
+        mock.patch.object(
+            weave_client, "safe_current_wb_run_id", lambda: full_wb_run_id
+        ),
+        mock.patch.object(
+            weave_client, "safe_current_wb_run_step", lambda: next(step_counter)
+        ),
+    ):
+        call_spec = simple_line_call_bootstrap()
+
+    server = get_client_trace_server(client)
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client))
+    )
+    steps = {c.wb_run_step for c in res.calls}
+    assert steps == set(range(call_spec.total_calls))
+
+    query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=query)
+    )
+    assert len(res.calls) == 1
+
+    compare_step = call_spec.total_calls - 2
+    range_query = tsi.Query(
+        **{
+            "$expr": {
+                "$gte": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]
+            }
+        }
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
+    )
+    assert len(res.calls) == 2
+
+    res = server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="wb_run_step", direction="desc")],
+        )
+    )
+    exp_steps = list(range(call_spec.total_calls))[::-1]
+    found_steps = [c.wb_run_step for c in res.calls]
+    assert found_steps == exp_steps
 
 
 def test_trace_call_query_filter_output_object_version_refs(client):

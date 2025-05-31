@@ -858,6 +858,7 @@ ALLOWED_CALL_FIELDS = {
     "exception": CallsMergedAggField(field="exception", agg_fn="any"),
     "wb_user_id": CallsMergedAggField(field="wb_user_id", agg_fn="any"),
     "wb_run_id": CallsMergedAggField(field="wb_run_id", agg_fn="any"),
+    "wb_run_step": CallsMergedAggField(field="wb_run_step", agg_fn="any"),
     "deleted_at": CallsMergedAggField(field="deleted_at", agg_fn="any"),
     "display_name": CallsMergedAggField(field="display_name", agg_fn="argMaxMerge"),
     "storage_size_bytes": AggFieldWithTableOverrides(
