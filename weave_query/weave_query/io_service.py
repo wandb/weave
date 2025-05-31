@@ -23,18 +23,18 @@ from typing import Any, Callable, Dict, Iterator, TypeVar
 import aioprocessing
 
 from weave_query import (
-    weave_http,
-    filesystem,
-    errors,
-    engine_trace,
-    server_error_handling,
     artifact_wandb,
     async_queue,
     cache,
     context_state,
+    engine_trace,
+    errors,
+    filesystem,
+    server_error_handling,
     uris,
     wandb_api,
     wandb_file_manager,
+    weave_http,
 )
 
 tracer = engine_trace.tracer()  # type: ignore
@@ -189,7 +189,7 @@ class Server:
         # The internal response queue is used to communicate results back between the server
         # process and the user process. The server process puts responses into this queue,
         # and then the Queue feeder thread puts them into the appropriate client response queue.
-        self._internal_response_queue: async_queue.Queue[ServerResponse]
+        # self._internal_response_queue: async_queue.Queue[ServerResponse]
 
         # just using a ThreadQueue here since this is for communication between two threads
         # that are both in the user process.
@@ -206,8 +206,8 @@ class Server:
         self._request_handler_ready_event = multiprocessing.Event()
         self._request_handler_ready_to_shut_down_event = multiprocessing.Event()
 
-        self._response_queue_feeder_ready_event = threading.Event()
-        self._response_queue_feeder_ready_to_shut_down_event = threading.Event()
+        # self._response_queue_feeder_ready_event = threading.Event()
+        # self._response_queue_feeder_ready_to_shut_down_event = threading.Event()
 
         # Register handlers
         self.register_handler_fn("ensure_manifest", self.handle_ensure_manifest)
@@ -224,19 +224,19 @@ class Server:
                 target=self._request_handler_fn, name="IO Server", daemon=True
             )
             self.request_queue = async_queue.ProcessQueue()
-            self._internal_response_queue = async_queue.ProcessQueue()
+            # self._internal_response_queue = async_queue.ProcessQueue()
         else:
             self.request_handler = threading.Thread(
                 target=self._request_handler_fn, name="IO Server", daemon=True
             )
             self.request_queue = async_queue.ThreadQueue()
-            self._internal_response_queue = async_queue.ThreadQueue()
+            # self._internal_response_queue = async_queue.ThreadQueue()
 
         # runs in the user process and puts responses from the server into the appropriate
         # client-consumed response queues.
-        self.response_queue_router = threading.Thread(
-            target=self._response_queue_router_fn, daemon=True
-        )
+        # self.response_queue_router = threading.Thread(
+        # target=self._response_queue_router_fn, daemon=True
+        # )
 
         self._ensure_incremental_files_sem = asyncio.Semaphore(16)
 
@@ -251,9 +251,9 @@ class Server:
     # start starts the server thread or process
     def start(self) -> None:
         self.request_handler.start()
-        self.response_queue_router.start()
+        # self.response_queue_router.start()
         self._request_handler_ready_event.wait()
-        self._response_queue_feeder_ready_event.wait()
+        # self._response_queue_feeder_ready_event.wait()
         atexit.register(self.shutdown)
 
     # cleanup performs cleanup actions, such as flushing stats
@@ -268,40 +268,40 @@ class Server:
             # tell the two auxiliary processes to shutdown
             # (the server process and the response queue feeder thread)
             self.request_queue.put(shutdown_request)
-            self._internal_response_queue.put(shutdown_response)
+            # self._internal_response_queue.put(shutdown_response)
 
-            self._response_queue_feeder_ready_to_shut_down_event.wait()
+            # self._response_queue_feeder_ready_to_shut_down_event.wait()
             self._request_handler_ready_to_shut_down_event.wait()
 
-            self.response_queue_router.join()
+            # self.response_queue_router.join()
             self.request_handler.join()
             self.cleanup()
 
-    def _response_queue_router_fn(self) -> None:
-        try:
-            asyncio.run(self._response_queue_router_fn_main(), debug=True)
-        except Exception as e:
-            logging.exception(f"Error in response queue router: {e}")
-            raise e
+    # def _response_queue_router_fn(self) -> None:
+    #     try:
+    #         asyncio.run(self._response_queue_router_fn_main(), debug=True)
+    #     except Exception as e:
+    #         logging.exception(f"Error in response queue router: {e}")
+    #         raise e
 
-    async def _response_queue_router_fn_main(self) -> None:
-        self._response_queue_feeder_ready_event.set()
-        while True:
-            try:
-                resp = await self._internal_response_queue.async_get()
-            except RuntimeError:
-                # this happens when the interpreter is shutting down
-                break
-            if resp.value == ShutDown():
-                self._internal_response_queue.task_done()
-                self._internal_response_queue.join()
-                break
-            client_response_queue = self.client_response_queues[resp.client_id]
-            # this is non-blocking b/c resp is already in memory
-            client_response_queue.put(resp)
-            self._internal_response_queue.task_done()
-        # drain queue
-        self._response_queue_feeder_ready_to_shut_down_event.set()
+    # async def _response_queue_router_fn_main(self) -> None:
+    #     self._response_queue_feeder_ready_event.set()
+    #     while True:
+    #         try:
+    #             resp = await self._internal_response_queue.async_get()
+    #         except RuntimeError:
+    #             # this happens when the interpreter is shutting down
+    #             break
+    #         if resp.value == ShutDown():
+    #             self._internal_response_queue.task_done()
+    #             self._internal_response_queue.join()
+    #             break
+    #         client_response_queue = self.client_response_queues[resp.client_id]
+    #         # this is non-blocking b/c resp is already in memory
+    #         client_response_queue.put(resp)
+    #         self._internal_response_queue.task_done()
+    #     # drain queue
+    #     self._response_queue_feeder_ready_to_shut_down_event.set()
 
     async def _handle(self, req: ServerRequest) -> None:
         with tracer.trace("WBArtifactManager.handle.%s" % req.name, service="weave-am"):
@@ -328,12 +328,14 @@ class Server:
                     )
                 else:
                     resp = req.success_response(val)
-            if isinstance(self._internal_response_queue, async_queue.ThreadQueue):
-                # this is fast
-                self._internal_response_queue.put(resp)
-            else:
-                # this needs to perform IPC
-                await self._internal_response_queue.async_put(resp)
+
+                return resp
+            # if isinstance(self._internal_response_queue, async_queue.ThreadQueue):
+            #     # this is fast
+            #     self._internal_response_queue.put(resp)
+            # else:
+            #     # this needs to perform IPC
+            #     await self._internal_response_queue.async_put(resp)
 
     # main is the server's main coroutine, handling incoming requests
     async def _request_handler_fn_main(self) -> None:
@@ -366,9 +368,19 @@ class Server:
                     ):
                         # launch a task to handle the request
                         task = loop.create_task(self._handle(req))
+
+                        # Creates a strong reference to the task
+                        # See: https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
                         active_tasks.add(task)
                         task.add_done_callback(active_tasks.discard)
-                self.request_queue.task_done()
+
+                        task.add_done_callback(
+                            lambda f: self.client_response_queues[
+                                f.result().client_id
+                            ].put(f.result())
+                        )
+                        task.add_done_callback(self.request_queue.task_done)
+                # self.request_queue.task_done()
         self._request_handler_ready_to_shut_down_event.set()
 
     def register_handler_fn(self, name: str, handler: HandlerFunction) -> None:
@@ -391,9 +403,9 @@ class Server:
             if isinstance(client, SyncClient):
                 self.client_response_queues[client.client_id] = queue.Queue()
             else:
-                self.client_response_queues[
-                    client.client_id
-                ] = async_queue.ThreadQueue()
+                self.client_response_queues[client.client_id] = (
+                    async_queue.ThreadQueue()
+                )
 
     def unregister_client(
         self, client: typing.Union["SyncClient", "AsyncClient"]
