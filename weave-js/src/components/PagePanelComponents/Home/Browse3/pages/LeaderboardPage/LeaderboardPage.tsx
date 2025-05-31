@@ -195,6 +195,16 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   > | null>(null);
   const [evaluationCallIds, setEvaluationCallIds] = useState<string[]>([]);
 
+  // Reset state when leaderboardName changes
+  useEffect(() => {
+    setName(props.leaderboardName);
+    setLeaderboardObjectVersion(null);
+    setLeaderboardVal(null);
+    setSelectedMetrics(null);
+    setEvaluationCallIds([]);
+    setIsEditing(false);
+  }, [props.leaderboardName]);
+
   useEffect(() => {
     if (isEditor && props.openEditorOnMount) {
       setIsEditing(true);
@@ -238,6 +248,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
 
   return (
     <SimplePageLayoutWithHeader
+      key={props.leaderboardName} // Force remount when leaderboard changes
       title={displayTitle}
       hideTabsIfSingle={false}
       headerContent={undefined}
@@ -463,6 +474,13 @@ export const LeaderboardPageContentInner: React.FC<
     string,
     boolean
   > | null>(null);
+
+  // Reset state when props.leaderboardVal changes (when a new leaderboard is selected)
+  useEffect(() => {
+    setLeaderboardVal(props.leaderboardVal);
+    setWorkingLeaderboardValCopy(props.leaderboardVal);
+    setSelectedMetrics(null);
+  }, [props.leaderboardVal]);
 
   // Extract evaluation refs and get call IDs for charts
   const evaluationRefs = useMemo(() => {
@@ -804,6 +822,12 @@ const LeaderboardResultsTab: React.FC<{
   const [selectedInputDigest, setSelectedInputDigest] = React.useState<
     string | null
   >(null);
+
+  // Reset local state when evaluation call IDs change
+  useEffect(() => {
+    setComparisonDimensions(null);
+    setSelectedInputDigest(null);
+  }, [props.evaluationCallIds]);
 
   const setComparisonDimensionsAndClearInputDigest = useCallback(
     (
