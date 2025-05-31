@@ -25,8 +25,9 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> Content:
     with open(metadata_path) as f:
         metadata = json.load(f)
 
-    path = artifact.path("content")
-    return Content(path, metadata["mimetype"])
+    with open(artifact.path("content"), "rb") as f:
+        data = f.read()
+    return Content(data, **metadata)
 
 
 def register() -> None:

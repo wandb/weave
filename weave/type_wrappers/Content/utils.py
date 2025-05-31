@@ -19,14 +19,13 @@ except Exception as e:
 
 
 class ContentArgs(TypedDict):
-    input_type: str
-    input_category: str
     extension: str | None
     mimetype: str | None
     filename: str | None
     path: str | None
     size: int | None
     extra: dict[str, Any]
+
 
 class ContentKeywordArgs(TypedDict, total=False):
     extension: str
