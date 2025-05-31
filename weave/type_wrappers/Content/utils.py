@@ -5,6 +5,7 @@ import mimetypes
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -116,9 +117,9 @@ def get_mime_and_extension(
             "See: https://pypi.org/project/python-magic/ for detailed instructions"
         )
     if filename is not None:
-        idx = filename.rfind('.')
+        idx = filename.rfind(".")
         if idx != -1:
             extension = filename[idx:]
 
     extension = extension or ""
-    return 'application/octet-stream', extension
+    return "application/octet-stream", extension
