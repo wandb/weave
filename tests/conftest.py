@@ -197,11 +197,85 @@ def client_with_throwing_server(client):
 
 @pytest.fixture(scope="session")
 def clickhouse_server():
-    server_up = _check_server_up(
-        ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
-    )
+    """
+    ClickHouse server fixture that automatically starts a server if one isn't already running.
+
+    This fixture checks if a ClickHouse server is already running on the configured host/port.
+    If not, it automatically starts a Docker-based ClickHouse server for testing.
+
+    The fixture handles cleanup by stopping the Docker container when the test session ends.
+    """
+    host = ts_env.wf_clickhouse_host()
+    port = ts_env.wf_clickhouse_port()
+
+    server_up = _check_server_up(host, port)
+    started_container = None
+
     if not server_up:
-        pytest.fail("clickhouse server is not running")
+        # Try to start a ClickHouse server using Docker
+        container_name = "weave-python-test-clickhouse-server"
+
+        # First, ensure any existing container is stopped and removed
+        subprocess.run(
+            ["docker", "stop", container_name], capture_output=True, check=False
+        )
+        subprocess.run(
+            ["docker", "rm", container_name], capture_output=True, check=False
+        )
+
+        # Start the ClickHouse container
+        process = subprocess.Popen(
+            [
+                "docker",
+                "run",
+                "-d",
+                "--rm",
+                "-e",
+                "CLICKHOUSE_DB=default",
+                "-e",
+                "CLICKHOUSE_USER=default",
+                "-e",
+                "CLICKHOUSE_PASSWORD=",
+                "-e",
+                "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
+                "-p",
+                f"{port}:8123",
+                "--name",
+                container_name,
+                "--ulimit",
+                "nofile=262144:262144",
+                "clickhouse/clickhouse-server",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        # Wait for the process to complete and get the container ID
+        stdout, stderr = process.communicate()
+        if process.returncode != 0:
+            pytest.fail(f"Failed to start ClickHouse container: {stderr.decode()}")
+
+        started_container = container_name
+
+        # Wait for the server to be healthy
+        server_up = _check_server_up(host, port)
+        if not server_up:
+            # Clean up the container if server didn't start properly
+            subprocess.run(
+                ["docker", "stop", container_name], capture_output=True, check=False
+            )
+            pytest.fail(
+                f"ClickHouse server failed to start and become healthy on {host}:{port}"
+            )
+
+    try:
+        yield
+    finally:
+        # Clean up: stop the container if we started it
+        if started_container:
+            subprocess.run(
+                ["docker", "stop", started_container], capture_output=True, check=False
+            )
 
 
 @pytest.fixture(scope="session")
@@ -233,47 +307,23 @@ def _check_server_health(
     return False
 
 
-def _check_server_up(host, port) -> bool:
+def _check_server_up(host, port, num_retries=30) -> bool:
+    """Check if a server is up and healthy at the given host:port.
+
+    Args:
+        host: The hostname to check
+        port: The port to check
+        num_retries: Number of retries to attempt (default 30)
+
+    Returns:
+        bool: True if server is healthy, False otherwise
+    """
     base_url = f"http://{host}:{port}/"
     endpoint = "ping"
 
-    def server_healthy(num_retries=1):
-        return _check_server_health(
-            base_url=base_url, endpoint=endpoint, num_retries=num_retries
-        )
-
-    if server_healthy():
-        return True
-
-    if os.environ.get("CI") != "true":
-        print("CI is not true, not starting clickhouse server")
-
-        subprocess.Popen(
-            [
-                "docker",
-                "run",
-                "-d",
-                "--rm",
-                "-e",
-                "CLICKHOUSE_DB=default",
-                "-e",
-                "CLICKHOUSE_USER=default",
-                "-e",
-                "CLICKHOUSE_PASSWORD=",
-                "-e",
-                "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
-                "-p",
-                f"{port}:8123",
-                "--name",
-                "weave-python-test-clickhouse-server",
-                "--ulimit",
-                "nofile=262144:262144",
-                "clickhouse/clickhouse-server",
-            ]
-        )
-
-    # wait for the server to start
-    return server_healthy(num_retries=30)
+    return _check_server_health(
+        base_url=base_url, endpoint=endpoint, num_retries=num_retries
+    )
 
 
 class TwoWayMapping:
