@@ -315,6 +315,7 @@ export const LeaderboardPageContent: React.FC<
     setLeaderboardObjectVersion?: (version: ObjectVersionSchema) => void;
     setLeaderboardVal?: (val: LeaderboardObjectVal) => void;
     setEvaluationCallIds?: (ids: string[]) => void;
+    onLeaderboardSaved?: () => void;
   }
 > = props => {
   const {
@@ -395,6 +396,18 @@ export const LeaderboardPageContent: React.FC<
     }
   }, [setEvaluationCallIds, evaluationCallIds]);
 
+  // Callback to handle when leaderboard is saved
+  // Must be defined before any early returns to maintain consistent hook order
+  const handleLeaderboardSaved = useCallback(() => {
+    // Refetch the leaderboard instances to get the latest data
+    leaderboardInstances.refetch();
+    
+    // Call parent callback if provided
+    if (props.onLeaderboardSaved) {
+      props.onLeaderboardSaved();
+    }
+  }, [leaderboardInstances, props]);
+
   if (leaderboardInstances.loading) {
     return <Loading centered />;
   }
@@ -424,6 +437,8 @@ export const LeaderboardPageContent: React.FC<
       leaderboardVal={leaderboardVal}
       leaderboardObjectVersion={leaderboardObjectVersion!}
       setIsEditing={props.setIsEditing}
+      setLeaderboardVal={setLeaderboardVal}
+      onLeaderboardSaved={handleLeaderboardSaved}
     />
   );
 };
@@ -454,6 +469,8 @@ export const LeaderboardPageContentInner: React.FC<
     isEditing: boolean;
     setIsEditing: (isEditing: boolean) => void;
     showDeleteButton?: boolean;
+    setLeaderboardVal?: (val: LeaderboardObjectVal) => void;
+    onLeaderboardSaved?: () => void;
   } & {
     leaderboardVal: LeaderboardObjectVal;
     leaderboardObjectVersion: ObjectVersionSchema;
@@ -524,9 +541,26 @@ export const LeaderboardPageContentInner: React.FC<
       .then(() => {
         if (mounted) {
           props.setIsEditing(false);
+          // Update the local state with the new values
           setLeaderboardVal(workingLeaderboardValCopy);
           setWorkingLeaderboardValCopy(workingLeaderboardValCopy);
           setSaving(false);
+          
+          // Update the parent component's state if the setter functions are available
+          if (props.setLeaderboardVal) {
+            props.setLeaderboardVal(workingLeaderboardValCopy);
+          }
+          if (props.setName) {
+            props.setName(workingLeaderboardValCopy.name ?? '');
+          }
+          
+          // Trigger the saved callback to refresh data
+          if (props.onLeaderboardSaved) {
+            // Small delay to ensure the server has updated
+            setTimeout(() => {
+              props.onLeaderboardSaved();
+            }, 500);
+          }
         }
       })
       .catch(e => {
