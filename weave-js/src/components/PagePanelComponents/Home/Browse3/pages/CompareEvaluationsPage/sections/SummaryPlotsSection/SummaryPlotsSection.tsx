@@ -2,8 +2,8 @@ import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useMemo, useState} from 'react';
-import {MOON_100, MOON_300} from '../../../../../../../../common/css/color.styles';
 
+import {MOON_100, MOON_300} from '../../../../../../../../common/css/color.styles';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
@@ -19,8 +19,8 @@ import {
   flattenedDimensionPath,
   resolveSummaryMetricValueForEvaluateCall,
 } from '../../ecpUtil';
-import {HorizontalBox, VerticalBox} from '../../Layout';
 import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
+import {HorizontalBox, VerticalBox} from '../../Layout';
 import {MetricsSelector} from './MetricsSelector';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';

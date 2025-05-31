@@ -1,10 +1,10 @@
 import {Box, Tooltip} from '@material-ui/core';
 import {Alert} from '@mui/material';
+import {Button} from '@wandb/weave/components/Button';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {useMemo, useState} from 'react';
 import styled from 'styled-components';
-
-import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
 
 import {
   MOON_100,
@@ -13,8 +13,6 @@ import {
 import {parseRefMaybe, WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
 import {Pill, TagColorName} from '../../../../../../../Tag';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {Button} from '@wandb/weave/components/Button';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 import {NotApplicable} from '../../../../NotApplicable';
@@ -41,6 +39,7 @@ import {
 } from '../../ecpState';
 import {resolveSummaryMetricResultForEvaluateCall} from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
+import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
 import {HorizontalBox} from '../../Layout';
 import {
   EvaluationCallLink,

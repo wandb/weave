@@ -28,12 +28,7 @@ export const LeaderboardConfigEditor: React.FC<{
   project: string;
   leaderboardVal: LeaderboardObjectVal;
   setWorkingCopy: (leaderboardVal: LeaderboardObjectVal) => void;
-}> = ({
-  entity,
-  project,
-  leaderboardVal,
-  setWorkingCopy,
-}) => {
+}> = ({entity, project, leaderboardVal, setWorkingCopy}) => {
   const handleNameChange = (value: string) => {
     setWorkingCopy({...leaderboardVal, name: value});
   };

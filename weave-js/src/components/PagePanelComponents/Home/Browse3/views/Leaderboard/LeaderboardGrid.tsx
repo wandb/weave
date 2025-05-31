@@ -19,11 +19,11 @@ import {PaginationButtons} from '../../pages/CallsPage/CallsTableButtons';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_LEADERBOARD} from '../../pages/common/EmptyContent';
 import {StatusChip} from '../../pages/common/StatusChip';
+import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
+import {ComputedCallStatusType} from '../../pages/wfReactInterface/traceServerClientTypes';
+import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
 import {SmallRef} from '../../smallRef/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
-import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
-import {ComputedCallStatusType} from '../../pages/wfReactInterface/traceServerClientTypes';
 import {
   GroupedLeaderboardData,
   GroupedLeaderboardModelGroup,
@@ -59,7 +59,9 @@ const useEvaluationCallStatuses = (
   data: GroupedLeaderboardData
 ): Record<string, ComputedCallStatusType> => {
   const getClient = useGetTraceServerClientContext();
-  const [callStatuses, setCallStatuses] = useState<Record<string, ComputedCallStatusType>>({});
+  const [callStatuses, setCallStatuses] = useState<
+    Record<string, ComputedCallStatusType>
+  >({});
 
   useEffect(() => {
     // Extract all unique evaluation call IDs from the data
@@ -98,7 +100,8 @@ const useEvaluationCallStatuses = (
         const statuses: Record<string, ComputedCallStatusType> = {};
         response.calls.forEach(call => {
           // Extract status from the call summary or default to 'success' if finished
-          const status = call.summary?.status || (call.ended_at ? 'success' : 'running');
+          const status =
+            call.summary?.status || (call.ended_at ? 'success' : 'running');
           statuses[call.id] = status;
         });
 
@@ -179,8 +182,12 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   // Process data to group scorers by name only (without version) and optionally group datasets
   const processedData = useMemo(() => {
     const newData: GroupedLeaderboardData = {modelGroups: {}};
-    const scorerVersionMap: {[datasetGroup: string]: {[scorerName: string]: Set<string>}} = {};
-    const scorerLatestVersionMap: {[datasetGroup: string]: {[scorerName: string]: string}} = {};
+    const scorerVersionMap: {
+      [datasetGroup: string]: {[scorerName: string]: Set<string>};
+    } = {};
+    const scorerLatestVersionMap: {
+      [datasetGroup: string]: {[scorerName: string]: string};
+    } = {};
     const datasetVersionMap: {[datasetName: string]: Set<string>} = {};
     const datasetLatestVersionMap: {[datasetName: string]: string} = {};
     // Global scorer version tracking (since scorers are not dataset-specific)
@@ -188,17 +195,23 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     const globalScorerLatestVersionMap: {[scorerName: string]: string} = {};
     // Track whether each scorer is an op or object
     const globalScorerTypeMap: {[scorerName: string]: 'op' | 'object'} = {};
-    
+
     // Helper function to get the latest record from a list based on createdAt
-    const getLatestRecord = (records: LeaderboardValueRecord[]): LeaderboardValueRecord | null => {
+    const getLatestRecord = (
+      records: LeaderboardValueRecord[]
+    ): LeaderboardValueRecord | null => {
       if (!records || records.length === 0) return null;
-      return records.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+      return records.sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+      )[0];
     };
 
     // Helper function to get latest evaluation records per model for a specific metric
-    const getLatestEvaluationsPerModel = (records: LeaderboardValueRecord[]): LeaderboardValueRecord[] => {
+    const getLatestEvaluationsPerModel = (
+      records: LeaderboardValueRecord[]
+    ): LeaderboardValueRecord[] => {
       const modelGroups = new Map<string, LeaderboardValueRecord[]>();
-      
+
       // Group by model
       records.forEach(record => {
         const modelKey = `${record.modelName}:${record.modelVersion}`;
@@ -207,7 +220,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         }
         modelGroups.get(modelKey)!.push(record);
       });
-      
+
       // Get latest evaluation for each model
       const latestRecords: LeaderboardValueRecord[] = [];
       modelGroups.forEach(modelRecords => {
@@ -216,43 +229,51 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           latestRecords.push(latest);
         }
       });
-      
+
       return latestRecords;
     };
-    
+
     // First pass: collect all dataset versions and determine grouping
     const datasetGroupToName: {[datasetGroup: string]: string} = {};
     Object.entries(data.modelGroups).forEach(([modelGroup, modelData]) => {
-      Object.entries(modelData.datasetGroups).forEach(([datasetGroup, datasetData]) => {
-        // Extract dataset name and version from datasetGroup
-        // Format can be either "name:version" or just "name" (when already grouped)
-        const colonIndex = datasetGroup.lastIndexOf(':');
-        let datasetName: string;
-        let datasetVersion: string;
-        
-        if (colonIndex !== -1) {
-          datasetName = datasetGroup.substring(0, colonIndex);
-          datasetVersion = datasetGroup.substring(colonIndex + 1);
-        } else {
-          // Already grouped by name only
-          datasetName = datasetGroup;
-          datasetVersion = '';
+      Object.entries(modelData.datasetGroups).forEach(
+        ([datasetGroup, datasetData]) => {
+          // Extract dataset name and version from datasetGroup
+          // Format can be either "name:version" or just "name" (when already grouped)
+          const colonIndex = datasetGroup.lastIndexOf(':');
+          let datasetName: string;
+          let datasetVersion: string;
+
+          if (colonIndex !== -1) {
+            datasetName = datasetGroup.substring(0, colonIndex);
+            datasetVersion = datasetGroup.substring(colonIndex + 1);
+          } else {
+            // Already grouped by name only
+            datasetName = datasetGroup;
+            datasetVersion = '';
+          }
+
+          datasetGroupToName[datasetGroup] = datasetName;
         }
-        
-        datasetGroupToName[datasetGroup] = datasetName;
-      });
+      );
     });
-    
+
     // Collect all records across all models/datasets/scorers/metrics
     const allRecords: LeaderboardValueRecord[] = [];
     Object.entries(data.modelGroups).forEach(([modelGroup, modelData]) => {
-      Object.entries(modelData.datasetGroups).forEach(([datasetGroup, datasetData]) => {
-        Object.entries(datasetData.scorerGroups).forEach(([scorerGroup, scorerData]) => {
-          Object.entries(scorerData.metricPathGroups).forEach(([metricPath, records]) => {
-            allRecords.push(...records);
-          });
-        });
-      });
+      Object.entries(modelData.datasetGroups).forEach(
+        ([datasetGroup, datasetData]) => {
+          Object.entries(datasetData.scorerGroups).forEach(
+            ([scorerGroup, scorerData]) => {
+              Object.entries(scorerData.metricPathGroups).forEach(
+                ([metricPath, records]) => {
+                  allRecords.push(...records);
+                }
+              );
+            }
+          );
+        }
+      );
     });
 
     // First pass: collect scorer types and versions from ALL records
@@ -263,23 +284,27 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       const scorerName = record.scorerName;
       const scorerVersion = record.scorerVersion;
       const scorerType = record.scorerType;
-      
+
       // Count records per scorer
-      scorerRecordCounts[scorerName] = (scorerRecordCounts[scorerName] || 0) + 1;
-      
+      scorerRecordCounts[scorerName] =
+        (scorerRecordCounts[scorerName] || 0) + 1;
+
       // Debug specific scorers
-      if ((scorerName === 'ResponseQualityScorer' || scorerName === 'tool_usage_scorer') && 
-          scorerRecordCounts[scorerName] <= 3) {
+      if (
+        (scorerName === 'ResponseQualityScorer' ||
+          scorerName === 'tool_usage_scorer') &&
+        scorerRecordCounts[scorerName] <= 3
+      ) {
         console.log(`First pass - ${scorerName} record:`, {
           scorerName,
           scorerVersion,
           scorerType,
           hasVersion: !!scorerVersion,
           hasType: !!scorerType,
-          metricType: record.metricType
+          metricType: record.metricType,
         });
       }
-      
+
       // Track scorer versions and types globally
       if (scorerVersion && scorerType) {
         if (!globalScorerVersionMap[scorerName]) {
@@ -287,14 +312,18 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         }
         globalScorerVersionMap[scorerName].add(scorerVersion);
         // Keep the latest version we see (by record date)
-        if (!globalScorerLatestVersionMap[scorerName] || 
-            record.createdAt > (allRecords.find(r => 
-              r.scorerName === scorerName && 
-              r.scorerVersion === globalScorerLatestVersionMap[scorerName]
-            )?.createdAt || new Date(0))) {
+        if (
+          !globalScorerLatestVersionMap[scorerName] ||
+          record.createdAt >
+            (allRecords.find(
+              r =>
+                r.scorerName === scorerName &&
+                r.scorerVersion === globalScorerLatestVersionMap[scorerName]
+            )?.createdAt || new Date(0))
+        ) {
           globalScorerLatestVersionMap[scorerName] = scorerVersion;
         }
-        
+
         // Track scorer type
         if (scorerType) {
           globalScorerTypeMap[scorerName] = scorerType;
@@ -304,7 +333,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
     // Filter to latest evaluations per model to check for inconsistencies
     const latestRecordsOnly = getLatestEvaluationsPerModel(allRecords);
-    
+
     // Second pass: track dataset and scorer versions only from latest evaluations for inconsistency detection
     console.log('Processing latest records:', latestRecordsOnly.length);
     console.log('Global scorer versions found:', globalScorerVersionMap);
@@ -312,7 +341,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     latestRecordsOnly.forEach(record => {
       const datasetName = record.datasetName;
       const datasetVersion = record.datasetVersion;
-      
+
       // Track dataset versions only from latest evaluations
       if (!datasetVersionMap[datasetName]) {
         datasetVersionMap[datasetName] = new Set();
@@ -321,7 +350,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         datasetVersionMap[datasetName].add(datasetVersion);
         datasetLatestVersionMap[datasetName] = datasetVersion;
       }
-      
+
       // Track scorer versions only from latest evaluations
       if (!scorerVersionMap[datasetName]) {
         scorerVersionMap[datasetName] = {};
@@ -329,10 +358,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       if (!scorerLatestVersionMap[datasetName]) {
         scorerLatestVersionMap[datasetName] = {};
       }
-      
+
       const scorerName = record.scorerName;
       const scorerVersion = record.scorerVersion;
-      
+
       if (!scorerVersionMap[datasetName][scorerName]) {
         scorerVersionMap[datasetName][scorerName] = new Set();
       }
@@ -342,67 +371,86 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         scorerLatestVersionMap[datasetName][scorerName] = scorerVersion;
       }
     });
-    
+
     // Process each model group and group datasets by name
     Object.entries(data.modelGroups).forEach(([modelGroup, modelData]) => {
       newData.modelGroups[modelGroup] = {datasetGroups: {}};
-      
-      Object.entries(modelData.datasetGroups).forEach(([datasetGroup, datasetData]) => {
-        const datasetName = datasetGroupToName[datasetGroup];
-        
-        // Use dataset name as the group key (without version)
-        if (!newData.modelGroups[modelGroup].datasetGroups[datasetName]) {
-          newData.modelGroups[modelGroup].datasetGroups[datasetName] = {scorerGroups: {}};
-        }
-        
-        Object.entries(datasetData.scorerGroups).forEach(([scorerGroup, scorerData]) => {
-          // Extract scorer name and version from scorerGroup (format: "name:version" or just "name")
-          const colonIndex = scorerGroup.lastIndexOf(':');
-          let scorerName: string;
-          let scorerVersion: string;
-          
-          if (colonIndex !== -1 && scorerGroup !== 'Summary') {
-            scorerName = scorerGroup.substring(0, colonIndex);
-            scorerVersion = scorerGroup.substring(colonIndex + 1);
-          } else {
-            // No version found (e.g., "Summary" scorer)
-            scorerName = scorerGroup;
-            scorerVersion = '';
-          }
-          
-          // Group by scorer name only
-          if (!newData.modelGroups[modelGroup].datasetGroups[datasetName].scorerGroups[scorerName]) {
-            newData.modelGroups[modelGroup].datasetGroups[datasetName].scorerGroups[scorerName] = {
-              metricPathGroups: {}
+
+      Object.entries(modelData.datasetGroups).forEach(
+        ([datasetGroup, datasetData]) => {
+          const datasetName = datasetGroupToName[datasetGroup];
+
+          // Use dataset name as the group key (without version)
+          if (!newData.modelGroups[modelGroup].datasetGroups[datasetName]) {
+            newData.modelGroups[modelGroup].datasetGroups[datasetName] = {
+              scorerGroups: {},
             };
           }
-          
-          // Merge metric path groups
-          Object.entries(scorerData.metricPathGroups).forEach(([metricPath, records]) => {
-            const targetScorerGroup = newData.modelGroups[modelGroup].datasetGroups[datasetName].scorerGroups[scorerName];
-            if (!targetScorerGroup.metricPathGroups[metricPath]) {
-              targetScorerGroup.metricPathGroups[metricPath] = [];
+
+          Object.entries(datasetData.scorerGroups).forEach(
+            ([scorerGroup, scorerData]) => {
+              // Extract scorer name and version from scorerGroup (format: "name:version" or just "name")
+              const colonIndex = scorerGroup.lastIndexOf(':');
+              let scorerName: string;
+              let scorerVersion: string;
+
+              if (colonIndex !== -1 && scorerGroup !== 'Summary') {
+                scorerName = scorerGroup.substring(0, colonIndex);
+                scorerVersion = scorerGroup.substring(colonIndex + 1);
+              } else {
+                // No version found (e.g., "Summary" scorer)
+                scorerName = scorerGroup;
+                scorerVersion = '';
+              }
+
+              // Group by scorer name only
+              if (
+                !newData.modelGroups[modelGroup].datasetGroups[datasetName]
+                  .scorerGroups[scorerName]
+              ) {
+                newData.modelGroups[modelGroup].datasetGroups[
+                  datasetName
+                ].scorerGroups[scorerName] = {
+                  metricPathGroups: {},
+                };
+              }
+
+              // Merge metric path groups
+              Object.entries(scorerData.metricPathGroups).forEach(
+                ([metricPath, records]) => {
+                  const targetScorerGroup =
+                    newData.modelGroups[modelGroup].datasetGroups[datasetName]
+                      .scorerGroups[scorerName];
+                  if (!targetScorerGroup.metricPathGroups[metricPath]) {
+                    targetScorerGroup.metricPathGroups[metricPath] = [];
+                  }
+                  targetScorerGroup.metricPathGroups[metricPath].push(
+                    ...records
+                  );
+                }
+              );
             }
-            targetScorerGroup.metricPathGroups[metricPath].push(...records);
-          });
-        });
-      });
+          );
+        }
+      );
     });
-    
-    
+
     return {
-      processedData: newData, 
-      scorerVersionMap, 
-      scorerLatestVersionMap, 
-      datasetVersionMap, 
+      processedData: newData,
+      scorerVersionMap,
+      scorerLatestVersionMap,
+      datasetVersionMap,
       datasetLatestVersionMap,
       globalScorerVersionMap,
       globalScorerLatestVersionMap,
-      globalScorerTypeMap
+      globalScorerTypeMap,
     };
   }, [data]);
 
-  const columnStats = useMemo(() => getColumnStats(processedData.processedData), [processedData]);
+  const columnStats = useMemo(
+    () => getColumnStats(processedData.processedData),
+    [processedData]
+  );
 
   const getColorForScore = useCallback(
     (datasetGroup, scorerGroup, metricPathGroup, score) => {
@@ -432,13 +480,15 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
   const rows: RowData[] = useMemo(() => {
     const rowData: RowData[] = [];
-    Object.entries(processedData.processedData.modelGroups).forEach(([modelGroupName, modelGroup]) => {
-      rowData.push({
-        id: modelGroupName,
-        modelGroupName,
-        modelGroup,
-      });
-    });
+    Object.entries(processedData.processedData.modelGroups).forEach(
+      ([modelGroupName, modelGroup]) => {
+        rowData.push({
+          id: modelGroupName,
+          modelGroupName,
+          modelGroup,
+        });
+      }
+    );
     return rowData;
   }, [processedData]);
 
@@ -457,11 +507,14 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               params.value
             }` ?? ''
           );
-          
+
           // Get the latest evaluation status for this model
-          const latestStatus = getLatestEvaluationStatus(rowData.modelGroup, callStatuses);
+          const latestStatus = getLatestEvaluationStatus(
+            rowData.modelGroup,
+            callStatuses
+          );
           const showStatusChip = latestStatus === 'running';
-          
+
           if (modelRef) {
             return (
               <div
@@ -477,7 +530,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                 }}>
                 <SmallRef objRef={modelRef} />
                 {showStatusChip && (
-                  <StatusChip value="running" iconOnly tooltipOverride="Evaluation in progress" />
+                  <StatusChip
+                    value="running"
+                    iconOnly
+                    tooltipOverride="Evaluation in progress"
+                  />
                 )}
               </div>
             );
@@ -577,7 +634,14 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           )
       ),
     ],
-    [columnStats.datasetGroups, entity, getColorForScore, onCellClick, project, callStatuses]
+    [
+      columnStats.datasetGroups,
+      entity,
+      getColorForScore,
+      onCellClick,
+      project,
+      callStatuses,
+    ]
   );
 
   const groupingModel: GridColumnGroup[] = useMemo(() => {
@@ -592,23 +656,27 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           renderHeaderGroup: params => {
             // datasetGroupName is now just the dataset name (without version)
             const datasetName = datasetGroupName;
-            
+
             // Check if there are multiple versions for this dataset
             const versions = processedData.datasetVersionMap[datasetName];
             const hasMultipleVersions = versions && versions.size > 1;
-            const latestVersion = processedData.datasetLatestVersionMap[datasetName];
-            
+            const latestVersion =
+              processedData.datasetLatestVersionMap[datasetName];
+
             // Try to create a ref using the latest version we've seen
-            const ref = latestVersion 
-              ? parseRefMaybe(`weave:///${entity}/${project}/object/${datasetName}:${latestVersion}`)
+            const ref = latestVersion
+              ? parseRefMaybe(
+                  `weave:///${entity}/${project}/object/${datasetName}:${latestVersion}`
+                )
               : null;
-            
+
             return (
               <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                 {hasMultipleVersions ? (
                   <>
                     <div>{datasetName}</div>
-                    <Tooltip title={`This dataset has ${versions.size} different versions across evaluations. Take precaution when comparing results.`}>
+                    <Tooltip
+                      title={`This dataset has ${versions.size} different versions across evaluations. Take precaution when comparing results.`}>
                       <Alert
                         severity="warning"
                         style={{
@@ -619,12 +687,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                       </Alert>
                     </Tooltip>
                   </>
+                ) : ref ? (
+                  <SmallRef objRef={ref} />
                 ) : (
-                  ref ? (
-                    <SmallRef objRef={ref} />
-                  ) : (
-                    <div>{datasetName}</div>
-                  )
+                  <div>{datasetName}</div>
                 )}
               </div>
             );
@@ -640,11 +706,15 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               children: [],
               renderHeaderGroup: () => {
                 // Check if there are multiple versions for this scorer (using global map)
-                const allVersions = processedData.globalScorerVersionMap[scorerGroupName] || new Set<string>();
+                const allVersions =
+                  processedData.globalScorerVersionMap[scorerGroupName] ||
+                  new Set<string>();
                 const hasMultipleVersions = allVersions.size > 1;
-                const scorerVersion = processedData.globalScorerLatestVersionMap[scorerGroupName];
-                const scorerType = processedData.globalScorerTypeMap[scorerGroupName] || 'op';
-                
+                const scorerVersion =
+                  processedData.globalScorerLatestVersionMap[scorerGroupName];
+                const scorerType =
+                  processedData.globalScorerTypeMap[scorerGroupName] || 'op';
+
                 // Debug logging
                 console.log(`Scorer ${scorerGroupName} render:`, {
                   scorerVersion,
@@ -653,31 +723,33 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                   allVersions: Array.from(allVersions),
                   globalMaps: {
                     version: processedData.globalScorerLatestVersionMap,
-                    type: processedData.globalScorerTypeMap
-                  }
+                    type: processedData.globalScorerTypeMap,
+                  },
                 });
-                
+
                 // Construct a proper WeaveObjectRef for the scorer
                 // The parseRefMaybe function needs the full URI format
                 // Skip creating refs for Summary scorers which don't have versions
-                const scorerUri = (scorerVersion && scorerGroupName !== 'Summary')
-                  ? `weave:///${entity}/${project}/${scorerType}/${scorerGroupName}:${scorerVersion}`
-                  : null;
+                const scorerUri =
+                  scorerVersion && scorerGroupName !== 'Summary'
+                    ? `weave:///${entity}/${project}/${scorerType}/${scorerGroupName}:${scorerVersion}`
+                    : null;
                 const ref = scorerUri ? parseRefMaybe(scorerUri) : null;
-                
+
                 console.log(`Scorer ${scorerGroupName} URI:`, {
                   scorerUri,
                   ref,
-                  hasRef: !!ref
+                  hasRef: !!ref,
                 });
-                
-                
+
                 return (
-                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                  <div
+                    style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     {hasMultipleVersions ? (
                       <>
                         <div>{scorerGroupName}</div>
-                        <Tooltip title={`This scorer has ${allVersions.size} different versions across evaluations. Take precaution when comparing results.`}>
+                        <Tooltip
+                          title={`This scorer has ${allVersions.size} different versions across evaluations. Take precaution when comparing results.`}>
                           <Alert
                             severity="warning"
                             style={{
@@ -688,12 +760,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                           </Alert>
                         </Tooltip>
                       </>
+                    ) : ref ? (
+                      <SmallRef objRef={ref} />
                     ) : (
-                      ref ? (
-                        <SmallRef objRef={ref} />
-                      ) : (
-                        <div>{scorerGroupName}</div>
-                      )
+                      <div>{scorerGroupName}</div>
                     )}
                   </div>
                 );
@@ -716,7 +786,18 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     const finalGroupingModel = datasetGroups;
 
     return finalGroupingModel;
-  }, [columnStats.datasetGroups, entity, project, processedData.scorerVersionMap, processedData.scorerLatestVersionMap, processedData.datasetVersionMap, processedData.datasetLatestVersionMap, processedData.globalScorerVersionMap, processedData.globalScorerLatestVersionMap, processedData.globalScorerTypeMap]);
+  }, [
+    columnStats.datasetGroups,
+    entity,
+    project,
+    processedData.scorerVersionMap,
+    processedData.scorerLatestVersionMap,
+    processedData.datasetVersionMap,
+    processedData.datasetLatestVersionMap,
+    processedData.globalScorerVersionMap,
+    processedData.globalScorerLatestVersionMap,
+    processedData.globalScorerTypeMap,
+  ]);
 
   const [sortModel, setSortModel] = useState<GridSortItem[]>([]);
 
@@ -981,7 +1062,7 @@ const getAggregatedResults = (
   if (data.length === 1) {
     return data[0];
   }
-  
+
   // Group records by model and get the latest evaluation for each model
   const modelGroups = new Map<string, LeaderboardValueRecord[]>();
   data.forEach(record => {
@@ -991,21 +1072,25 @@ const getAggregatedResults = (
     }
     modelGroups.get(modelKey)!.push(record);
   });
-  
+
   // Get latest evaluation for each model
   const latestRecords: LeaderboardValueRecord[] = [];
   modelGroups.forEach(modelRecords => {
-    const latest = modelRecords.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    const latest = modelRecords.sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    )[0];
     latestRecords.push(latest);
   });
-  
+
   // If we have only one model's latest record, return it
   if (latestRecords.length === 1) {
     return latestRecords[0];
   }
-  
+
   // If we have multiple models, return the most recent overall
-  return latestRecords.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  return latestRecords.sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  )[0];
 };
 
 const defaultGetSortComparator =

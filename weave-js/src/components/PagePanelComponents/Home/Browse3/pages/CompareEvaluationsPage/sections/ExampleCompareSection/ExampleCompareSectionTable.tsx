@@ -38,8 +38,8 @@ import {
   DERIVED_SCORER_REF_PLACEHOLDER,
 } from '../../compositeMetricsUtil';
 import {EvaluationComparisonState} from '../../ecpState';
-import {HorizontalBox} from '../../Layout';
 import {filterLatestCallIdsPerModel} from '../../latestEvaluationUtil';
+import {HorizontalBox} from '../../Layout';
 import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
   ColumnsManagementPanel,

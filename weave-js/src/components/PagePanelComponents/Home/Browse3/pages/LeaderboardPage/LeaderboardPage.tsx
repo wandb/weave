@@ -1,10 +1,10 @@
-import {Box, Alert} from '@mui/material';
-import {MOON_250, MOON_100} from '@wandb/weave/common/css/color.styles';
+import {Alert,Box} from '@mui/material';
+import {MOON_100,MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import _ from 'lodash';
 import React, {
   useCallback,
@@ -16,46 +16,45 @@ import ReactMarkdown from 'react-markdown';
 import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
 
-import {ResizableDrawer} from '../common/ResizableDrawer';
-
 import {NotFoundPanel} from '../../NotFoundPanel';
+import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {
   LeaderboardColumnOrderType,
   LeaderboardGrid,
 } from '../../views/Leaderboard/LeaderboardGrid';
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {ALL_VALUE} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {useShowDeleteButton} from '../common/DeleteModal';
+import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
+import {ResizableDrawer} from '../common/ResizableDrawer';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {
+  CompareEvaluationsProvider,
+  useCompareEvaluationsState,
+} from '../CompareEvaluationsPage/compareEvaluationsContext';
+import {STANDARD_PADDING} from '../CompareEvaluationsPage/ecpConstants';
+import {EvaluationComparisonState} from '../CompareEvaluationsPage/ecpState';
+import {VerticalBox} from '../CompareEvaluationsPage/Layout';
+import {ExampleCompareSectionDetailGuarded} from '../CompareEvaluationsPage/sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {ExampleCompareSectionTable} from '../CompareEvaluationsPage/sections/ExampleCompareSection/ExampleCompareSectionTable';
+import {ExampleFilterSection} from '../CompareEvaluationsPage/sections/ExampleFilterSection/ExampleFilterSection';
+import {ScorecardSection} from '../CompareEvaluationsPage/sections/ScorecardSection/ScorecardSection';
+import {SummaryPlotsSection} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
 import {DeleteObjectButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
 import {
   useBaseObjectInstances,
   useCreateBuiltinObjectInstance,
 } from '../wfReactInterface/objectClassQuery';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {ComputedCallStatusType} from '../wfReactInterface/traceServerClientTypes';
 import {
   convertTraceServerObjectVersionToSchema,
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
+import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
-import {
-  CompareEvaluationsProvider,
-  useCompareEvaluationsState,
-} from '../CompareEvaluationsPage/compareEvaluationsContext';
-import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
-import {STANDARD_PADDING} from '../CompareEvaluationsPage/ecpConstants';
-import {VerticalBox} from '../CompareEvaluationsPage/Layout';
-import {ExampleFilterSection} from '../CompareEvaluationsPage/sections/ExampleFilterSection/ExampleFilterSection';
-import {ExampleCompareSectionTable} from '../CompareEvaluationsPage/sections/ExampleCompareSection/ExampleCompareSectionTable';
-import {ExampleCompareSectionDetailGuarded} from '../CompareEvaluationsPage/sections/ExampleCompareSection/ExampleCompareSectionDetail';
-import {EvaluationComparisonState} from '../CompareEvaluationsPage/ecpState';
-import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
-import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
-import {EVALUATE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
-import {ALL_VALUE} from '../../views/Leaderboard/types/leaderboardConfigType';
-import {SummaryPlotsSection} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
-import {ScorecardSection} from '../CompareEvaluationsPage/sections/ScorecardSection/ScorecardSection';
-import {ComputedCallStatusType} from '../wfReactInterface/traceServerClientTypes';
 
 type LeaderboardPageProps = {
   entity: string;

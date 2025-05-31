@@ -57,7 +57,7 @@ export const SimplePageLayout: FC<{
   const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
 
   const showTabs = !props.hideTabsIfSingle || tabs.length > 1;
-  
+
   return (
     <Box
       sx={{
@@ -226,7 +226,7 @@ export const SimplePageLayoutWithHeader: FC<{
     [props.tabs]
   );
   const showTabs = !props.hideTabsIfSingle || tabs.length > 1;
-  
+
   return (
     <Box
       sx={{
@@ -326,8 +326,9 @@ export const SimpleTabView: FC<{
     () => props.tabs.find(t => t.value === props.tabValue),
     [props.tabs, props.tabValue]
   );
-  const showTabs = props.showTabs ?? (!props.hideTabsIfSingle || props.tabs.length > 1);
-  
+  const showTabs =
+    props.showTabs ?? (!props.hideTabsIfSingle || props.tabs.length > 1);
+
   return (
     <Box
       sx={{

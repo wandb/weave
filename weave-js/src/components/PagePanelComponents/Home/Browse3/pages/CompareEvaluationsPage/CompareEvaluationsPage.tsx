@@ -4,12 +4,12 @@
 
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
+import {MOON_100} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Pill} from '@wandb/weave/components/Tag';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import {MOON_100} from '@wandb/weave/common/css/color.styles';
 import React, {
   FC,
   useCallback,
