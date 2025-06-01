@@ -256,6 +256,19 @@ export const ExampleCompareSectionDetail: React.FC<{
     return filteredRows[targetIndex];
   }, [filteredRows, targetIndex]);
 
+  // Filter orderedCallIds to only include those that have data for the current row
+  const filteredOrderedCallIds = useMemo(() => {
+    if (!target) return orderedCallIds;
+    
+    // Get all evaluation call IDs that have data for this row
+    const callIdsWithData = new Set(
+      target.originalRows.map(row => row.evaluationCallId)
+    );
+    
+    // Filter orderedCallIds to only include those with data
+    return orderedCallIds.filter(callId => callIdsWithData.has(callId));
+  }, [orderedCallIds, target]);
+
   const {targetRowValue, loading: loadingInputValue} =
     useExampleCompareDataAndPrefetch(ctx, filteredRows, targetIndex);
 
@@ -292,7 +305,7 @@ export const ExampleCompareSectionDetail: React.FC<{
   const numInputProps = inputColumnKeys?.length ?? 0;
   const numOutputKeys = outputColumnKeys?.length ?? 0;
 
-  const numTrials = orderedCallIds.map(leafId => {
+  const numTrials = filteredOrderedCallIds.map(leafId => {
     return target.originalRows.filter(row => row.evaluationCallId === leafId)
       .length;
   });
@@ -337,14 +350,14 @@ export const ExampleCompareSectionDetail: React.FC<{
   };
 
   const lookupTrialsForEval = (evalIndex: number): PivotedRow[] => {
-    const currEvalCallId = orderedCallIds[evalIndex];
+    const currEvalCallId = filteredOrderedCallIds[evalIndex];
     return target.originalRows.filter(
       row => row.evaluationCallId === currEvalCallId
     );
   };
 
   const lookupSelectedTrialIndexForEval = (evalIndex: number): number => {
-    const currEvalCallId = orderedCallIds[evalIndex];
+    const currEvalCallId = filteredOrderedCallIds[evalIndex];
     return selectedTrials[currEvalCallId] || 0;
   };
 
@@ -417,7 +430,7 @@ export const ExampleCompareSectionDetail: React.FC<{
     metricIndex: number
   ): MetricValueType | undefined => {
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
-    const currEvalCallId = orderedCallIds[evalIndex];
+    const currEvalCallId = filteredOrderedCallIds[evalIndex];
     const dimension = lookupDimension(scorerIndex, metricIndex);
     return lookupMetricValueDirect(
       targetTrial.scores,
@@ -432,7 +445,7 @@ export const ExampleCompareSectionDetail: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ): MetricValueType | undefined => {
-    const currEvalCallId = orderedCallIds[evalIndex];
+    const currEvalCallId = filteredOrderedCallIds[evalIndex];
     const resolvedScoreId = resolvePeerDimension(
       compositeScoreMetrics,
       currEvalCallId,
@@ -450,7 +463,7 @@ export const ExampleCompareSectionDetail: React.FC<{
     evalIndex: number,
     outputPropIndex: number
   ): any => {
-    const currEvalCallId = orderedCallIds[evalIndex];
+    const currEvalCallId = filteredOrderedCallIds[evalIndex];
     const selectedTrial = lookupSelectedTrialForEval(evalIndex);
 
     return (selectedTrial?.output?.[outputColumnKeys[outputPropIndex]] ?? {})[
@@ -499,11 +512,11 @@ export const ExampleCompareSectionDetail: React.FC<{
   };
 
   const evalMapKey = (evalIndex: number) => {
-    return orderedCallIds[evalIndex];
+    return filteredOrderedCallIds[evalIndex];
   };
 
   const evalSelectedTrialPredictCallComp = (evalIndex: number) => {
-    const currEvalCallId = orderedCallIds[evalIndex];
+    const currEvalCallId = filteredOrderedCallIds[evalIndex];
     const selectedTrial = lookupSelectedTrialForEval(evalIndex);
     if (selectedTrial == null) {
       return null;
@@ -542,7 +555,7 @@ export const ExampleCompareSectionDetail: React.FC<{
   };
 
   const evalTrialSelectComp = (evalIndex: number, trialIndex: number) => {
-    const currEvalCallId = orderedCallIds[evalIndex];
+    const currEvalCallId = filteredOrderedCallIds[evalIndex];
     const selectedTrialNdx = lookupSelectedTrialIndexForEval(evalIndex);
     return (
       <Button
