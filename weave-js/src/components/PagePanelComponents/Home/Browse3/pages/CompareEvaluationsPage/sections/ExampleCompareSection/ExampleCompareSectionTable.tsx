@@ -160,6 +160,7 @@ interface CustomFooterProps {
   setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
   shouldHighlightSelectedRow?: boolean;
   onShowSplitView: () => void;
+  mergeDatasetResultsPerModel?: boolean;
 }
 
 const CustomFooter: React.FC<CustomFooterProps> = props => {
@@ -208,7 +209,7 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
             </IconButton>
           }
         />
-        {!props.onlyOneModel && (
+        {!props.onlyOneModel && !props.mergeDatasetResultsPerModel && (
           <Tooltip
             content="Pivot on eval"
             trigger={
@@ -1635,6 +1636,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
             setModelsAsRows={props.setModelsAsRows}
             shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
             onShowSplitView={props.onShowSplitView}
+            mergeDatasetResultsPerModel={props.mergeDatasetResultsPerModel}
           />
         ),
       }}
@@ -2335,6 +2337,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             setModelsAsRows={props.setModelsAsRows}
             shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
             onShowSplitView={props.onShowSplitView}
+            mergeDatasetResultsPerModel={props.mergeDatasetResultsPerModel}
           />
         ),
       }}
