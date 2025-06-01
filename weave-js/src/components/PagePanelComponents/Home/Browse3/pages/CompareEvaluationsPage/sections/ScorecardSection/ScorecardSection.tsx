@@ -79,6 +79,7 @@ GridCell.displayName = 'S.GridCell';
 export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
   initialExpanded?: boolean;
+  sortColumnsByDatasetAndModel?: boolean;
 }> = props => {
   const [isExpanded, setIsExpanded] = useState(props.initialExpanded ?? false);
 
@@ -124,7 +125,10 @@ export const ScorecardSection: React.FC<{
             borderTop: 'none',
             borderRadius: '0 0 8px 8px',
           }}>
-          <ScorecardContent state={props.state} />
+          <ScorecardContent 
+            state={props.state} 
+            sortColumnsByDatasetAndModel={props.sortColumnsByDatasetAndModel}
+          />
         </Box>
       )}
     </div>
@@ -182,6 +186,7 @@ const useEvaluationCallStatuses = (
 
 const ScorecardContent: React.FC<{
   state: EvaluationComparisonState;
+  sortColumnsByDatasetAndModel?: boolean;
 }> = props => {
   const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} =
     useCompareEvaluationsState();
@@ -191,10 +196,12 @@ const ScorecardContent: React.FC<{
       id => !hiddenEvaluationIds.has(id)
     );
 
+    let filteredCallIds = allCallIds;
+
     // Only apply latest evaluation filtering if we're in leaderboard mode
     if (filterToLatestEvaluationsPerModel) {
       // Filter to keep only the latest evaluation for each model-dataset combination
-      return filterLatestCallIdsPerModelDataset(
+      filteredCallIds = filterLatestCallIdsPerModelDataset(
         allCallIds,
         props.state.summary.evaluationCalls,
         props.state.summary.evaluations,
@@ -203,8 +210,42 @@ const ScorecardContent: React.FC<{
       );
     }
 
-    return allCallIds;
-  }, [props.state, hiddenEvaluationIds, filterToLatestEvaluationsPerModel]);
+    // Apply sorting by dataset name and then model name if requested
+    if (props.sortColumnsByDatasetAndModel) {
+      filteredCallIds = filteredCallIds.slice().sort((a, b) => {
+        const evaluationCallA = props.state.summary.evaluationCalls[a];
+        const evaluationCallB = props.state.summary.evaluationCalls[b];
+        
+        const evaluationA = props.state.summary.evaluations[evaluationCallA.evaluationRef];
+        const evaluationB = props.state.summary.evaluations[evaluationCallB.evaluationRef];
+        
+        const modelA = props.state.summary.models[evaluationCallA.modelRef];
+        const modelB = props.state.summary.models[evaluationCallB.modelRef];
+        
+        // Extract dataset names for comparison
+        const datasetRefA = evaluationA?.datasetRef;
+        const datasetRefB = evaluationB?.datasetRef;
+        
+        const datasetNameA = datasetRefA ? (parseRefMaybe(datasetRefA) as WeaveObjectRef)?.artifactName || datasetRefA : '';
+        const datasetNameB = datasetRefB ? (parseRefMaybe(datasetRefB) as WeaveObjectRef)?.artifactName || datasetRefB : '';
+        
+        // Extract model names for comparison
+        const modelNameA = modelA?.properties?.name || evaluationCallA.modelRef;
+        const modelNameB = modelB?.properties?.name || evaluationCallB.modelRef;
+        
+        // First sort by dataset name
+        const datasetComparison = datasetNameA.localeCompare(datasetNameB);
+        if (datasetComparison !== 0) {
+          return datasetComparison;
+        }
+        
+        // Then sort by model name
+        return modelNameA.localeCompare(modelNameB);
+      });
+    }
+
+    return filteredCallIds;
+  }, [props.state, hiddenEvaluationIds, filterToLatestEvaluationsPerModel, props.sortColumnsByDatasetAndModel]);
 
   const modelRefs = useMemo(() => {
     // Get all model refs from visible evaluations only

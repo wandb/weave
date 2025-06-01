@@ -1215,7 +1215,11 @@ const LeaderboardChartsSection: React.FC<{
         setSelectedMetrics={setSelectedMetrics}
         initialExpanded={true}
       />
-      <ScorecardSection state={state} initialExpanded={false} />
+      <ScorecardSection 
+        state={state} 
+        initialExpanded={false} 
+        sortColumnsByDatasetAndModel={true}
+      />
     </div>
   );
 };
