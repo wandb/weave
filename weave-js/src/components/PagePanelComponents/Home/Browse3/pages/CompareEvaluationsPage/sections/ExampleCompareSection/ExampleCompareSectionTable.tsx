@@ -18,6 +18,7 @@ import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
+import {SmallRef} from '../../../../smallRef/SmallRef';
 
 import {
   HIDE_TRACETREE_PARAM,
@@ -976,14 +977,124 @@ const useExpandedIds = () => {
  * Table Components
  */
 
+const datasetField = (
+  state?: EvaluationComparisonState,
+  filteredRows?: FilteredAggregateRows
+): GridColDef<RowData> | null => {
+  if (!state) return null;
+  
+  return {
+    field: 'dataset',
+    headerName: 'Dataset',
+    width: 150,
+    maxWidth: 300,
+    resizable: true,
+    disableColumnMenu: false,
+    disableReorder: true,
+    filterable: false,
+    sortable: true,
+    ...DISABLED_ROW_SPANNING,
+    valueGetter: (value: any, row: RowData) => {
+      if (!filteredRows || !state) {
+        return '';
+      }
+      
+      // For modelsAsRows, we can get the dataset from the specific evaluation
+      if (row._pivot === 'modelsAsRows' && 'evaluationCallId' in row) {
+        const evaluationCall = state.summary.evaluationCalls[row.evaluationCallId];
+        if (evaluationCall) {
+          const evaluationObj = state.summary.evaluations[evaluationCall.evaluationRef];
+          if (evaluationObj && evaluationObj.datasetRef) {
+            const parsed = parseRefMaybe(evaluationObj.datasetRef);
+            return parsed?.artifactName || '';
+          }
+        }
+      }
+      
+      // For modelsAsColumns, find the first available dataset from the original rows
+      const matchingFilteredRow = filteredRows.find(
+        fr => fr.inputDigest === row.inputDigest
+      );
+      
+      if (matchingFilteredRow && matchingFilteredRow.originalRows && matchingFilteredRow.originalRows.length > 0) {
+        const firstOriginalRow = matchingFilteredRow.originalRows[0];
+        const evaluationCall = state.summary.evaluationCalls[firstOriginalRow.evaluationCallId];
+        if (evaluationCall) {
+          const evaluationObj = state.summary.evaluations[evaluationCall.evaluationRef];
+          if (evaluationObj && evaluationObj.datasetRef) {
+            const parsed = parseRefMaybe(evaluationObj.datasetRef);
+            return parsed?.artifactName || '';
+          }
+        }
+      }
+      
+      return '';
+    },
+    renderCell: (params: GridRenderCellParams<RowData>) => {
+      if (!filteredRows || !state) {
+        return <NotApplicable />;
+      }
+      
+      let datasetRef = null;
+      
+      // For modelsAsRows, we can get the dataset from the specific evaluation
+      if (params.row._pivot === 'modelsAsRows' && 'evaluationCallId' in params.row) {
+        const evaluationCall = state.summary.evaluationCalls[params.row.evaluationCallId];
+        if (evaluationCall) {
+          const evaluationObj = state.summary.evaluations[evaluationCall.evaluationRef];
+          if (evaluationObj && evaluationObj.datasetRef) {
+            const parsed = parseRefMaybe(evaluationObj.datasetRef);
+            if (parsed) {
+              datasetRef = parsed;
+            }
+          }
+        }
+      } else {
+        // For modelsAsColumns, find the first available dataset from the original rows
+        const matchingFilteredRow = filteredRows.find(
+          fr => fr.inputDigest === params.row.inputDigest
+        );
+        
+        if (matchingFilteredRow && matchingFilteredRow.originalRows && matchingFilteredRow.originalRows.length > 0) {
+          const firstOriginalRow = matchingFilteredRow.originalRows[0];
+          const evaluationCall = state.summary.evaluationCalls[firstOriginalRow.evaluationCallId];
+          if (evaluationCall) {
+            const evaluationObj = state.summary.evaluations[evaluationCall.evaluationRef];
+            if (evaluationObj && evaluationObj.datasetRef) {
+              const parsed = parseRefMaybe(evaluationObj.datasetRef);
+              if (parsed) {
+                datasetRef = parsed;
+              }
+            }
+          }
+        }
+      }
+      
+      if (!datasetRef) {
+        return <NotApplicable />;
+      }
+      
+      return (
+        <Box
+          style={{
+            height: '100%',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+          }}>
+          <SmallRef objRef={datasetRef} />
+        </Box>
+      );
+    },
+  } as GridColDef<RowData>;
+};
+
 const inputFields = (
   inputSubFields: string[],
   setSelectedInputDigest: (inputDigest: string) => void,
   onShowSplitView: () => void,
   columnWidths: {[key: string]: number},
-  lineClamp: number,
-  state?: EvaluationComparisonState,
-  filteredRows?: FilteredAggregateRows
+  lineClamp: number
 ): GridColDef<RowData>[] => [
   {
     field: 'inputDigest',
@@ -1022,81 +1133,6 @@ const inputFields = (
       );
     },
   },
-  ...(state ? [{
-    field: 'dataset',
-    headerName: 'Dataset',
-    width: 150,
-    maxWidth: 300,
-    resizable: true,
-    disableColumnMenu: false,
-    disableReorder: true,
-    filterable: false,
-    sortable: false,
-    renderCell: (params: GridRenderCellParams<RowData>) => {
-      if (!filteredRows || !state) {
-        return <NotApplicable />;
-      }
-      
-      // Find the filtered row that matches this input digest
-      const matchingFilteredRow = filteredRows.find(
-        fr => fr.inputDigest === params.row.inputDigest
-      );
-      
-      if (!matchingFilteredRow || !matchingFilteredRow.originalRows) {
-        return <NotApplicable />;
-      }
-      
-      // Collect all unique datasets from the original rows
-      const datasetNames = new Set<string>();
-      
-      // Look through all original rows to find which datasets they came from
-      matchingFilteredRow.originalRows.forEach(row => {
-        const evaluationCallId = row.evaluationCallId;
-        if (!evaluationCallId) return;
-        
-        const evaluationCall = state.summary.evaluationCalls[evaluationCallId];
-        if (!evaluationCall) return;
-        
-        const evaluationObj = state.summary.evaluations[evaluationCall.evaluationRef];
-        if (!evaluationObj || !evaluationObj.datasetRef) return;
-        
-        const parsed = parseRefMaybe(evaluationObj.datasetRef);
-        if (parsed && parsed.artifactName) {
-          datasetNames.add(parsed.artifactName);
-        }
-      });
-      
-      if (datasetNames.size === 0) {
-        return <NotApplicable />;
-      }
-      
-      // Sort dataset names for consistent display
-      const sortedDatasetNames = Array.from(datasetNames).sort();
-      const displayText = sortedDatasetNames.join(', ');
-      
-      return (
-        <Box
-          style={{
-            height: '100%',
-            width: '100%',
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 8px',
-          }}>
-          <span
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-            title={displayText}>
-            {displayText}
-          </span>
-        </Box>
-      );
-    },
-  } as GridColDef<RowData>] : []),
   ...inputSubFields.map(
     key =>
       ({
@@ -1236,16 +1272,16 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   const navigateToCall = useCallNavigation();
 
   const columns: GridColDef<RowData>[] = useMemo(() => {
+    const datasetCol = datasetField(props.state, filteredRows);
     const res: GridColDef<RowData>[] = [
       ...inputFields(
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView,
         inputWidths,
-        props.lineClamp,
-        props.state,
-        filteredRows
+        props.lineClamp
       ),
+      ...(datasetCol ? [datasetCol] : []),
       ...(onlyOneModel
         ? []
         : [
@@ -1596,7 +1632,6 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         groupId: 'inputs',
         headerName: 'Inputs',
         children: [
-          {field: 'dataset'},
           ...inputSubFields.inputSubFields.map(key => ({
             field: `inputs.${key}`,
           }))
@@ -1714,6 +1749,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         columns: {
           columnVisibilityModel: initialColumnVisibilityModel,
         },
+        sorting: {
+          sortModel: [{ field: 'dataset', sort: 'asc' }],
+        },
       }}
       sx={{
         ...styledDataGridStyleOverrides,
@@ -1802,16 +1840,16 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         )
       : null;
 
+    const datasetCol = datasetField(props.state, filteredRows);
     const res: GridColDef<RowData>[] = [
       ...inputFields(
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView,
         inputWidths,
-        props.lineClamp,
-        props.state,
-        filteredRows
+        props.lineClamp
       ),
+      ...(datasetCol ? [datasetCol] : []),
       ...(hasTrials
         ? [
             expansionField(
@@ -2261,7 +2299,6 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         groupId: 'inputs',
         headerName: 'Inputs',
         children: [
-          {field: 'dataset'},
           ...inputSubFields.inputSubFields.map(key => ({
             field: `inputs.${key}`,
           }))
@@ -2428,6 +2465,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       initialState={{
         columns: {
           columnVisibilityModel: initialColumnVisibilityModelAsColumns,
+        },
+        sorting: {
+          sortModel: [{ field: 'dataset', sort: 'asc' }],
         },
       }}
       sx={{
