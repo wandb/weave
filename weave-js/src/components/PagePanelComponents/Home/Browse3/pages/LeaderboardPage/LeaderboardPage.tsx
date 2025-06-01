@@ -1092,7 +1092,6 @@ const ResultExplorer: React.FC<{
             defaultHiddenScorerMetrics={defaultHiddenScorerMetrics}
             mergeDatasetResultsPerModel={hasMultipleDatasets}
             hideInputOutputColumns={true}
-            showDatasetColumn={hasMultipleDatasets}
           />
         </Box>
 
