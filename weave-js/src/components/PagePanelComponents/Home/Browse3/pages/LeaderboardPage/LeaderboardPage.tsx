@@ -34,7 +34,7 @@ import {ExampleCompareSectionDetailGuarded} from '../CompareEvaluationsPage/sect
 import {ExampleCompareSectionTable} from '../CompareEvaluationsPage/sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from '../CompareEvaluationsPage/sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from '../CompareEvaluationsPage/sections/ScorecardSection/ScorecardSection';
-import {SummaryPlotsSection} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
+import {SummaryPlotsSection, usePlotDataFromMetrics} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
 import {DeleteObjectButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
 import {
   useBaseObjectInstances,
@@ -1051,6 +1051,9 @@ const LeaderboardChartsSection: React.FC<{
 }> = ({leaderboardColumns}) => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const [hasInitialized, setHasInitialized] = useState(false);
+  
+  // Get the actual metric names that will be displayed in charts (including dataset suffixes)
+  const {allMetricNames} = usePlotDataFromMetrics(state);
 
   // Create a function to get metrics that should be shown by default (from leaderboard config)
   const getDefaultVisibleMetrics = useCallback(
@@ -1087,15 +1090,23 @@ const LeaderboardChartsSection: React.FC<{
       // Find available metrics that match our expected patterns
       availableMetrics.forEach(availableMetric => {
         const shouldBeVisible = Array.from(expectedMetricPatterns).some(pattern => {
+          // For dataset-suffixed metrics, extract the base metric name
+          // e.g., "exact_match (aime2025-lim10)" -> "exact_match"
+          const baseMetricName = availableMetric.replace(/\s*\([^)]+\)$/, '');
+          
           const isMatch = (
             // Exact match
             availableMetric === pattern ||
+            baseMetricName === pattern ||
             // Available metric ends with the pattern (for scorer-prefixed metrics)
             availableMetric.endsWith(`.${pattern}`) ||
+            baseMetricName.endsWith(`.${pattern}`) ||
             // Available metric starts with the pattern (for nested paths)
             availableMetric.startsWith(`${pattern}.`) ||
+            baseMetricName.startsWith(`${pattern}.`) ||
             // Pattern is contained in the available metric (for complex nested paths)
-            (pattern.includes('.') && availableMetric.includes(pattern))
+            (pattern.includes('.') && availableMetric.includes(pattern)) ||
+            (pattern.includes('.') && baseMetricName.includes(pattern))
           );
           
           if (isMatch) {
@@ -1121,32 +1132,20 @@ const LeaderboardChartsSection: React.FC<{
     console.log('[LeaderboardChartsSection] useEffect triggered');
     console.log('[LeaderboardChartsSection] hasInitialized:', hasInitialized);
     console.log('[LeaderboardChartsSection] state.selectedMetrics:', state.selectedMetrics);
-    console.log('[LeaderboardChartsSection] state.summary:', state.summary);
+    console.log('[LeaderboardChartsSection] allMetricNames:', Array.from(allMetricNames));
     
     if (!hasInitialized && (state.selectedMetrics === null || state.selectedMetrics === undefined)) {
       console.log('[LeaderboardChartsSection] Initializing metrics...');
       
-      // Get all available metrics from the state
-      const allMetrics = new Set<string>();
+      // Use the actual metric names from the charts (including dataset suffixes)
+      const availableMetrics = Array.from(allMetricNames);
       
-      // Extract metrics from summary metrics
-      Object.values(state.summary.summaryMetrics).forEach(metric => {
-        const metricPath = metric.metricSubPath.join('.');
-        allMetrics.add(metricPath);
-      });
-      
-      // Extract metrics from score metrics (if any)
-      Object.values(state.summary.scoreMetrics).forEach(metric => {
-        const metricPath = metric.metricSubPath.join('.');
-        allMetrics.add(metricPath);
-      });
-      
-      console.log('[LeaderboardChartsSection] allMetrics found:', Array.from(allMetrics));
+      console.log('[LeaderboardChartsSection] availableMetrics found:', availableMetrics);
       console.log('[LeaderboardChartsSection] leaderboardColumns.length:', leaderboardColumns.length);
       
       // Only proceed if we have metrics and leaderboard columns to work with
-      if (allMetrics.size > 0 && leaderboardColumns.length > 0) {
-        const defaultVisible = getDefaultVisibleMetrics(Array.from(allMetrics));
+      if (availableMetrics.length > 0 && leaderboardColumns.length > 0) {
+        const defaultVisible = getDefaultVisibleMetrics(availableMetrics);
         const initialMetrics: Record<string, boolean> = {};
         
         console.log('[LeaderboardChartsSection] Building initialMetrics...');
@@ -1154,7 +1153,7 @@ const LeaderboardChartsSection: React.FC<{
         // Only explicitly set metrics that should be hidden to false
         // Leave visible metrics undefined so they show by default
         // This approach is more compatible with the SummaryPlotsSection logic
-        allMetrics.forEach(metric => {
+        availableMetrics.forEach(metric => {
           if (!defaultVisible.has(metric)) {
             // Explicitly hide unused metrics
             console.log('[LeaderboardChartsSection] Hiding metric:', metric);
@@ -1178,12 +1177,12 @@ const LeaderboardChartsSection: React.FC<{
         
         setHasInitialized(true);
       } else {
-        console.log('[LeaderboardChartsSection] Not enough data to initialize - metrics:', allMetrics.size, 'columns:', leaderboardColumns.length);
+        console.log('[LeaderboardChartsSection] Not enough data to initialize - metrics:', availableMetrics.length, 'columns:', leaderboardColumns.length);
       }
     } else {
       console.log('[LeaderboardChartsSection] Skipping initialization - already initialized or selectedMetrics not null');
     }
-  }, [hasInitialized, state.selectedMetrics, state.summary, getDefaultVisibleMetrics, setSelectedMetrics, leaderboardColumns]);
+  }, [hasInitialized, state.selectedMetrics, allMetricNames, getDefaultVisibleMetrics, setSelectedMetrics, leaderboardColumns]);
 
   if (state.loadableComparisonResults.loading) {
     return (

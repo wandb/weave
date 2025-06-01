@@ -452,7 +452,7 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
     });
   }, [filteredData, state]);
 
-const usePlotDataFromMetrics = (
+export const usePlotDataFromMetrics = (
   state: EvaluationComparisonState
 ): {radarData: RadarPlotData; allMetricNames: Set<string>; datasetSplitInfo?: {[metric: string]: Set<string>}} => {
   const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} =
@@ -513,28 +513,7 @@ const usePlotDataFromMetrics = (
           evalScores,
         };
       });
-    const radarData = Object.fromEntries(
-      callIds.map(callId => {
-        const evalCall = state.summary.evaluationCalls[callId];
-        return [
-          evalCall.callId,
-          {
-            name: evalCall.name,
-            color: evalCall.color,
-            metrics: Object.fromEntries(
-              metrics.map(metric => {
-                return [
-                  metric.metricLabel,
-                  metric.evalScores[evalCall.callId] ?? 0,
-                ];
-              })
-            ),
-          },
-        ];
-      })
-    );
-    const allMetricNames = new Set(metrics.map(m => m.metricLabel));
-    
+
     // Track which metrics have multiple datasets
     const datasetSplitInfo: {[metric: string]: Set<string>} = {};
     metrics.forEach(metric => {
@@ -555,6 +534,60 @@ const usePlotDataFromMetrics = (
         datasetSplitInfo[metric.metricLabel] = datasets;
       }
     });
+
+    // Check if we should split by dataset (same logic as bar charts)
+    const shouldSplitByDataset = Object.values(datasetSplitInfo).some(datasets => datasets.size > 1);
+
+    // Build radar data with dataset-aware metric names if needed
+    const radarData = Object.fromEntries(
+      callIds.map(callId => {
+        const evalCall = state.summary.evaluationCalls[callId];
+        const evaluation = state.summary.evaluations[evalCall.evaluationRef];
+        const datasetName = evaluation?.datasetRef ? 
+          (evaluation.datasetRef.match(/object\/([^:]+)(?::|$)/)?.[1] || 'Unknown') : 
+          'Unknown';
+
+        return [
+          evalCall.callId,
+          {
+            name: evalCall.name,
+            color: evalCall.color,
+            metrics: Object.fromEntries(
+              metrics.map(metric => {
+                // Use dataset-aware metric names if we're splitting by dataset
+                const displayMetricName = shouldSplitByDataset ? 
+                  `${metric.metricLabel} (${datasetName})` : 
+                  metric.metricLabel;
+                
+                return [
+                  displayMetricName,
+                  metric.evalScores[evalCall.callId] ?? 0,
+                ];
+              })
+            ),
+          },
+        ];
+      })
+    );
+
+    // Update allMetricNames to include dataset suffixes when appropriate
+    const allMetricNames = new Set<string>();
+    if (shouldSplitByDataset) {
+      // Add all metric-dataset combinations
+      metrics.forEach(metric => {
+        const datasets = datasetSplitInfo[metric.metricLabel];
+        if (datasets) {
+          datasets.forEach(dataset => {
+            allMetricNames.add(`${metric.metricLabel} (${dataset})`);
+          });
+        }
+      });
+    } else {
+      // Add base metric names
+      metrics.forEach(metric => {
+        allMetricNames.add(metric.metricLabel);
+      });
+    }
     
     return {radarData, allMetricNames, datasetSplitInfo};
   }, [callIds, compositeMetrics, state.summary.evaluationCalls, state.summary.evaluations]);
