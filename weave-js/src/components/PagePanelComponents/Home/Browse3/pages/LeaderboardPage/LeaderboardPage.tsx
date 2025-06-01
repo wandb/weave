@@ -914,6 +914,17 @@ const LeaderboardResultsContent: React.FC<{
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
+  
+  // Check if there are multiple datasets
+  const hasMultipleDatasets = useMemo(() => {
+    const datasetRefs = new Set<string>();
+    Object.values(state.summary.evaluations).forEach(evaluation => {
+      if (evaluation.datasetRef) {
+        datasetRefs.add(evaluation.datasetRef);
+      }
+    });
+    return datasetRefs.size > 1;
+  }, [state.summary.evaluations]);
 
   // Create the set of visible scorers based on leaderboard columns
   const visibleScorers = useMemo(() => {
@@ -972,6 +983,7 @@ const LeaderboardResultsContent: React.FC<{
               state={state}
               height={height}
               defaultHiddenScorerMetrics={visibleScorers}
+              hasMultipleDatasets={hasMultipleDatasets}
             />
           );
         }}
@@ -984,7 +996,8 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
   defaultHiddenScorerMetrics?: Set<string>;
-}> = ({state, height, defaultHiddenScorerMetrics}) => {
+  hasMultipleDatasets: boolean;
+}> = ({state, height, defaultHiddenScorerMetrics, hasMultipleDatasets}) => {
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
     'table'
   );
@@ -1016,6 +1029,7 @@ const ResultExplorer: React.FC<{
             shouldHighlightSelectedRow={viewMode === 'split'}
             onShowSplitView={() => setViewMode('split')}
             defaultHiddenScorerMetrics={defaultHiddenScorerMetrics}
+            mergeDatasetResultsPerModel={hasMultipleDatasets}
           />
         </Box>
 
