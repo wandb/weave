@@ -43,8 +43,9 @@ export const MetricsSelector: React.FC<{
           variant="ghost"
           icon="settings"
           tooltip="Manage metrics"
-          onClick={onClick}
-        />
+          onClick={onClick}>
+          {numHidden > 0 && `${numHidden} hidden ${numHidden === 1 ? 'metric' : 'metrics'}`}
+        </Button>
       </span>
       <Popover
         id={id}
