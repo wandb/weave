@@ -111,7 +111,8 @@ const MEMOIZE_CACHE_SIZE = 10;
 export const useEvaluationComparisonSummary = (
   entity: string,
   project: string,
-  evaluationCallIds: string[]
+  evaluationCallIds: string[],
+  colorByModel?: boolean
 ): Loadable<EvaluationComparisonSummary> => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [data, setData] = useState<EvaluationComparisonSummary | null>(null);
@@ -125,7 +126,8 @@ export const useEvaluationComparisonSummary = (
       getTraceServerClient(),
       entity,
       project,
-      evaluationCallIdsMemo
+      evaluationCallIdsMemo,
+      colorByModel
     ).then(dataRes => {
       if (mounted) {
         evaluationCallIdsRef.current = evaluationCallIdsMemo;
@@ -135,7 +137,7 @@ export const useEvaluationComparisonSummary = (
     return () => {
       mounted = false;
     };
-  }, [entity, evaluationCallIdsMemo, project, getTraceServerClient]);
+  }, [entity, evaluationCallIdsMemo, project, getTraceServerClient, colorByModel]);
 
   return useMemo(() => {
     if (
@@ -207,7 +209,8 @@ const fetchEvaluationSummaryData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
   entity: string,
   project: string,
-  evaluationCallIds: string[]
+  evaluationCallIds: string[],
+  colorByModel?: boolean
 ): Promise<EvaluationComparisonSummary> => {
   const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonSummary = {
@@ -237,13 +240,19 @@ const fetchEvaluationSummaryData = async (
     Object.fromEntries(
       evalRes.calls.map(call => [call.id, call as EvaluationEvaluateCallSchema])
     );
+
+  // Assign colors based on model or evaluation call index (optional)
+  const assignedColors = colorByModel 
+    ? assignColorsForModels(evalRes.calls.map(call => ({model: call.inputs.model})))
+    : evalRes.calls.map((_, ndx) => pickColor(ndx));
+
   result.evaluationCalls = Object.fromEntries(
     evalRes.calls.map((call, ndx) => [
       call.id,
       {
         callId: call.id,
         name: call.display_name ?? EVALUATION_NAME_DEFAULT,
-        color: pickColor(ndx),
+        color: assignedColors[ndx],
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
         summaryMetrics: {}, // These cannot be filled out yet since we don't know the IDs yet
@@ -539,6 +548,21 @@ const totalTokensMetricDimension: MetricDefinition = {
 };
 const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
+};
+
+// Helper function to assign colors based on model refs instead of evaluation call index
+const assignColorsForModels = (calls: {model: string}[]): string[] => {
+  // Get unique model refs and sort them for deterministic color assignment
+  // This ensures that the same model always gets the same color regardless of filtering
+  const uniqueModelRefs = [...new Set(calls.map(call => call.model))].sort();
+  const modelColorMap = new Map<string, string>();
+  
+  uniqueModelRefs.forEach((modelRef, index) => {
+    modelColorMap.set(modelRef, pickColor(index));
+  });
+  
+  // Return colors for each call based on its model
+  return calls.map(call => modelColorMap.get(call.model)!);
 };
 
 const isBinaryScore = (score: any): score is boolean => {

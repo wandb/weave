@@ -699,7 +699,8 @@ export const LeaderboardPageContentInner: React.FC<
                 onEvaluationCallIdsUpdate={() => {}}
                 setComparisonDimensions={() => {}}
                 setSelectedInputDigest={() => {}}
-                filterToLatestEvaluationsPerModel={true}>
+                filterToLatestEvaluationsPerModel={true}
+                colorByModel={true}>
                 <CustomWeaveTypeProjectContext.Provider
                   value={{entity: props.entity, project: props.project}}>
                   <LeaderboardChartsSection
@@ -893,7 +894,8 @@ const LeaderboardResultsTab: React.FC<{
       setComparisonDimensions={setComparisonDimensionsAndClearInputDigest}
       selectedInputDigest={selectedInputDigest ?? undefined}
       setSelectedInputDigest={setSelectedInputDigest}
-      filterToLatestEvaluationsPerModel={true}>
+      filterToLatestEvaluationsPerModel={true}
+      colorByModel={true}>
       <CustomWeaveTypeProjectContext.Provider
         value={{entity: props.entity, project: props.project}}>
         <LeaderboardResultsContent

@@ -54,6 +54,7 @@ export const CompareEvaluationsProvider: React.FC<{
   comparisonDimensions?: ComparisonDimensionsType;
   selectedInputDigest?: string;
   filterToLatestEvaluationsPerModel?: boolean;
+  colorByModel?: boolean;
 }> = ({
   entity,
   project,
@@ -66,6 +67,7 @@ export const CompareEvaluationsProvider: React.FC<{
   comparisonDimensions,
   selectedInputDigest,
   filterToLatestEvaluationsPerModel = false,
+  colorByModel = false,
   children,
 }) => {
   const initialEvaluationCallIdsMemo = useDeepMemo(initialEvaluationCallIds);
@@ -86,7 +88,8 @@ export const CompareEvaluationsProvider: React.FC<{
     evaluationCallIds,
     comparisonDimensions,
     selectedInputDigest,
-    selectedMetrics ?? undefined
+    selectedMetrics ?? undefined,
+    colorByModel
   );
 
   // Here we use a ref instead of a state to avoid re-rendering the component when the cache is updated
@@ -155,6 +158,7 @@ export const CompareEvaluationsProvider: React.FC<{
     hiddenEvaluationIds,
     onEvaluationCallIdsUpdate,
     filterToLatestEvaluationsPerModel,
+    colorByModel,
   ]);
 
   if (!value) {
