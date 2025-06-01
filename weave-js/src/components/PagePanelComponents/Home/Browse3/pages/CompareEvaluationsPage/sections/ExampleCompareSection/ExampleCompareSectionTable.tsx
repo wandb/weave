@@ -315,6 +315,8 @@ interface ExampleCompareSectionTableProps {
   mergeDatasetResultsPerModel?: boolean;
   // When true, hides the Inputs and Outputs columns by default
   hideInputOutputColumns?: boolean;
+  // When true, disables baseline comparison stats in scorer columns
+  disableBaselineStats?: boolean;
 }
 
 /**
@@ -726,6 +728,7 @@ export const ExampleCompareSectionTable: React.FC<
         onlyOneModel={onlyOneModel}
         defaultHiddenScorerMetrics={props.defaultHiddenScorerMetrics}
         mergeDatasetResultsPerModel={props.mergeDatasetResultsPerModel}
+        disableBaselineStats={props.disableBaselineStats}
       />
     ) : (
       <ExampleCompareSectionTableModelsAsColumns
@@ -739,6 +742,7 @@ export const ExampleCompareSectionTable: React.FC<
         onlyOneModel={onlyOneModel}
         defaultHiddenScorerMetrics={props.defaultHiddenScorerMetrics}
         mergeDatasetResultsPerModel={props.mergeDatasetResultsPerModel}
+        disableBaselineStats={props.disableBaselineStats}
       />
     );
   return inner;
@@ -1586,7 +1590,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                     dimension,
                     compositeMetrics
                   );
-                  const baselineValue = lookupMetricValueDirect(
+                  const baselineValue = props.disableBaselineStats ? undefined : lookupMetricValueDirect(
                     params.row.scores,
                     props.state.evaluationCallIdsOrdered[0],
                     dimension,
@@ -1624,6 +1628,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     filteredRows,
     props.lineClamp,
     navigateToCall,
+    props.disableBaselineStats,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
@@ -2188,7 +2193,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                         }
                       }
                       
-                      const baselineValue = lookupMetricValueDirect(
+                      const baselineValue = props.disableBaselineStats ? undefined : lookupMetricValueDirect(
                         params.row.scores,
                         props.state.evaluationCallIdsOrdered[0],
                         dimension,
@@ -2241,7 +2246,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                           dimension,
                           compositeMetrics
                         );
-                        const baselineValue = lookupMetricValueDirect(
+                        const baselineValue = props.disableBaselineStats ? undefined : lookupMetricValueDirect(
                           params.row.scores,
                           props.state.evaluationCallIdsOrdered[0],
                           dimension,
@@ -2283,6 +2288,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     props.lineClamp,
     navigateToCall,
     props.mergeDatasetResultsPerModel,
+    props.disableBaselineStats,
   ]);
 
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
