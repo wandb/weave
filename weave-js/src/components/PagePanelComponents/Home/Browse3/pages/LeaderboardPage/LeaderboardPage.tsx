@@ -1048,11 +1048,12 @@ const LeaderboardChartsSection: React.FC<{
   leaderboardColumns: LeaderboardObjectVal['columns'];
 }> = ({leaderboardColumns}) => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  // Create a function to match actual metrics against leaderboard config
-  const getMatchingMetrics = useCallback(
+  // Create a function to get metrics that should be shown by default (from leaderboard config)
+  const getDefaultVisibleMetrics = useCallback(
     (availableMetrics: string[]): Set<string> => {
-      const allowedMetrics = new Set<string>();
+      const visibleMetrics = new Set<string>();
 
       leaderboardColumns.forEach(column => {
         if (column.summary_metric_path) {
@@ -1076,69 +1077,49 @@ const LeaderboardChartsSection: React.FC<{
                 availableMetric.startsWith(`${column.scorer_name}.`));
 
             if (isMatch) {
-              allowedMetrics.add(availableMetric);
+              visibleMetrics.add(availableMetric);
             }
           });
         }
       });
 
-      return allowedMetrics;
+      return visibleMetrics;
     },
     [leaderboardColumns]
   );
 
-  // Filter selectedMetrics to only include metrics shown in leaderboard
-  const filteredSetSelectedMetrics = useCallback(
-    (newMetrics: Record<string, boolean>) => {
-      const availableMetricKeys = Object.keys(newMetrics);
-      const allowedMetrics = getMatchingMetrics(availableMetricKeys);
-      const filtered: Record<string, boolean> = {};
-
-      // Only include metrics that match the leaderboard configuration
-      // But allow toggling any metric that was already present
-      Object.keys(newMetrics).forEach(metricKey => {
-        if (allowedMetrics.has(metricKey)) {
-          filtered[metricKey] = newMetrics[metricKey];
-        } else if (
-          state.selectedMetrics &&
-          state.selectedMetrics[metricKey] !== undefined
-        ) {
-          // Allow toggling metrics that were already in the state (to fix toggle issue)
-          const isInAllowed = getMatchingMetrics([metricKey]).has(metricKey);
-          if (isInAllowed) {
-            filtered[metricKey] = newMetrics[metricKey];
-          }
-        }
-      });
-
-      setSelectedMetrics(filtered);
-    },
-    [setSelectedMetrics, getMatchingMetrics, state.selectedMetrics]
-  );
-
-  // Override the initial selected metrics when state changes
+  // Initialize selected metrics only once when the component mounts
   useEffect(() => {
-    if (
-      state.selectedMetrics &&
-      Object.keys(state.selectedMetrics).length > 0
-    ) {
-      const availableMetricKeys = Object.keys(state.selectedMetrics);
-      const allowedMetrics = getMatchingMetrics(availableMetricKeys);
-      const filtered: Record<string, boolean> = {};
-
-      // Filter existing metrics to only show those that match leaderboard
-      Object.keys(state.selectedMetrics).forEach(metricKey => {
-        if (allowedMetrics.has(metricKey)) {
-          filtered[metricKey] = state.selectedMetrics![metricKey];
-        }
+    if (!hasInitialized && state.selectedMetrics === null) {
+      // Get all available metrics from the state
+      const allMetrics = new Set<string>();
+      
+      // Extract metrics from summary metrics
+      Object.values(state.summary.summaryMetrics).forEach(metric => {
+        const metricPath = metric.metricSubPath.join('.');
+        allMetrics.add(metricPath);
       });
-
-      // Only update if the filtered metrics are different
-      if (!_.isEqual(filtered, state.selectedMetrics)) {
-        setSelectedMetrics(filtered);
+      
+      // Extract metrics from score metrics (if any)
+      Object.values(state.summary.scoreMetrics).forEach(metric => {
+        const metricPath = metric.metricSubPath.join('.');
+        allMetrics.add(metricPath);
+      });
+      
+      if (allMetrics.size > 0) {
+        const defaultVisible = getDefaultVisibleMetrics(Array.from(allMetrics));
+        const initialMetrics: Record<string, boolean> = {};
+        
+        // Set all metrics to false by default, then enable only the ones in leaderboard
+        allMetrics.forEach(metric => {
+          initialMetrics[metric] = defaultVisible.has(metric);
+        });
+        
+        setSelectedMetrics(initialMetrics);
+        setHasInitialized(true);
       }
     }
-  }, [state.selectedMetrics, getMatchingMetrics, setSelectedMetrics]);
+  }, [hasInitialized, state.selectedMetrics, state.summary, getDefaultVisibleMetrics, setSelectedMetrics]);
 
   if (state.loadableComparisonResults.loading) {
     return (
@@ -1152,7 +1133,7 @@ const LeaderboardChartsSection: React.FC<{
     <div>
       <SummaryPlotsSection
         state={state}
-        setSelectedMetrics={filteredSetSelectedMetrics}
+        setSelectedMetrics={setSelectedMetrics}
         initialExpanded={true}
       />
       <ScorecardSection state={state} initialExpanded={false} />

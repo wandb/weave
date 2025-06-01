@@ -36,7 +36,7 @@ export const SummaryPlotsSection: React.FC<{
   initialExpanded?: boolean;
 }> = ({state, setSelectedMetrics, initialExpanded = false}) => {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
-  const {allMetricNames} = usePlotDataFromMetrics(state);
+  const {allMetricNames, datasetSplitInfo} = usePlotDataFromMetrics(state);
   const {selectedMetrics} = state;
 
   const toggleExpanded = () => {
@@ -102,21 +102,25 @@ export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 }> = ({state, setSelectedMetrics}) => {
-  const {radarData, allMetricNames} = usePlotDataFromMetrics(state);
+  const {radarData, allMetricNames, datasetSplitInfo} = usePlotDataFromMetrics(state);
   const {selectedMetrics} = state;
 
-  // Initialize selectedMetrics if null
-  useEffect(() => {
-    if (selectedMetrics == null) {
-      setSelectedMetrics(
-        Object.fromEntries(Array.from(allMetricNames).map(m => [m, true]))
-      );
-    }
-  }, [selectedMetrics, setSelectedMetrics, allMetricNames]);
+  // Don't initialize selectedMetrics here - let the parent component handle it
+  // This prevents conflicts with LeaderboardChartsSection's initialization
 
   const filteredData = useFilteredData(radarData, selectedMetrics);
   const normalizedRadarData = normalizeDataForRadarPlot(filteredData);
   const barPlotData = useBarPlotData(filteredData, state);
+  
+  // Filter bar plot data based on selectedMetrics
+  const filteredBarPlotData = useMemo(() => {
+    if (!selectedMetrics) return barPlotData;
+    
+    return barPlotData.filter(plot => {
+      const metricToCheck = plot.originalMetric || plot.metric;
+      return selectedMetrics[metricToCheck] !== false;
+    });
+  }, [barPlotData, selectedMetrics]);
 
   const handleCloseMetric = React.useCallback(
     (metric: string) => {
@@ -132,7 +136,7 @@ export const SummaryPlots: React.FC<{
 
   const allPlots = useAllPlots(
     normalizedRadarData,
-    barPlotData,
+    filteredBarPlotData,
     handleCloseMetric
   );
 
@@ -169,7 +173,7 @@ const RadarPlotBox: React.FC<{data: RadarPlotData}> = ({data}) => (
 );
 
 const BarPlotBox: React.FC<{
-  plot: {plotlyData: Plotly.Data; yRange: [number, number]; metric: string};
+  plot: BarPlotDataItem;
   onClose: (metric: string) => void;
 }> = ({plot, onClose}) => (
   <Box
@@ -199,7 +203,7 @@ const BarPlotBox: React.FC<{
         padding: 0,
         zIndex: 1,
       }}
-      onClick={() => onClose(plot.metric)}
+      onClick={() => onClose(plot.originalMetric || plot.metric)}
       icon="close"
       aria-label={`Hide ${plot.metric}`}
     />
@@ -213,11 +217,7 @@ const BarPlotBox: React.FC<{
 
 const useAllPlots = (
   filteredData: RadarPlotData,
-  barPlotData: Array<{
-    plotlyData: Plotly.Data;
-    yRange: [number, number];
-    metric: string;
-  }>,
+  barPlotData: BarPlotDataItem[],
   onClose: (metric: string) => void
 ) => {
   return useMemo(() => {
@@ -248,7 +248,9 @@ const useFilteredData = (
     for (const [callId, metricBin] of Object.entries(radarData)) {
       const metrics: {[metric: string]: number} = {};
       for (const [metric, value] of Object.entries(metricBin.metrics)) {
-        if (selectedMetrics?.[metric]) {
+        // Show metric if selectedMetrics is undefined or if metric is explicitly true
+        // Hide only if explicitly false
+        if (!selectedMetrics || selectedMetrics[metric] !== false) {
           metrics[metric] = value;
         }
       }
@@ -328,7 +330,15 @@ function normalizeDataForRadarPlot(
   return radarData;
 }
 
-const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationComparisonState) =>
+// Define the type for bar plot data
+type BarPlotDataItem = {
+  plotlyData: Plotly.Data;
+  yRange: [number, number];
+  metric: string;
+  originalMetric?: string;
+};
+
+const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationComparisonState): BarPlotDataItem[] =>
   useMemo(() => {
     const metrics: {
       [metric: string]: {
@@ -375,11 +385,7 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
     if (shouldSplitByDataset && state) {
       // Group metrics by dataset
       const metricsByDataset: {
-        [key: string]: {
-          plotlyData: Plotly.Data;
-          yRange: [number, number];
-          metric: string;
-        };
+        [key: string]: BarPlotDataItem;
       } = {};
 
       Object.entries(metrics).forEach(([metric, metricBin]) => {
@@ -413,7 +419,12 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
             marker: {color: group.colors},
           };
           const key = `${metric}-${dataset}`;
-          metricsByDataset[key] = {plotlyData, yRange: [minY, maxY] as [number, number], metric: key};
+          metricsByDataset[key] = {
+            plotlyData, 
+            yRange: [minY, maxY] as [number, number], 
+            metric: key,
+            originalMetric: metric
+          };
         });
       });
 
@@ -421,7 +432,8 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
     }
 
     // Original behavior when not splitting by dataset
-    return Object.entries(metrics).map(([metric, metricBin]) => {
+    return Object.entries(metrics)
+      .map(([metric, metricBin]) => {
       const maxY = Math.max(...metricBin.values) * 1.1;
       const minY = Math.min(...metricBin.values, 0);
       const plotlyData: Plotly.Data = {
@@ -442,7 +454,7 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
 
 const usePlotDataFromMetrics = (
   state: EvaluationComparisonState
-): {radarData: RadarPlotData; allMetricNames: Set<string>} => {
+): {radarData: RadarPlotData; allMetricNames: Set<string>; datasetSplitInfo?: {[metric: string]: Set<string>}} => {
   const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} =
     useCompareEvaluationsState();
   const compositeMetrics = useMemo(() => {
@@ -522,6 +534,28 @@ const usePlotDataFromMetrics = (
       })
     );
     const allMetricNames = new Set(metrics.map(m => m.metricLabel));
-    return {radarData, allMetricNames};
-  }, [callIds, compositeMetrics, state.summary.evaluationCalls]);
+    
+    // Track which metrics have multiple datasets
+    const datasetSplitInfo: {[metric: string]: Set<string>} = {};
+    metrics.forEach(metric => {
+      const datasets = new Set<string>();
+      callIds.forEach(callId => {
+        const evalCall = state.summary.evaluationCalls[callId];
+        if (evalCall) {
+          const evaluation = state.summary.evaluations[evalCall.evaluationRef];
+          if (evaluation && evaluation.datasetRef) {
+            const datasetMatch = evaluation.datasetRef.match(/object\/([^:]+)(?::|$)/);
+            if (datasetMatch) {
+              datasets.add(datasetMatch[1]);
+            }
+          }
+        }
+      });
+      if (datasets.size > 0) {
+        datasetSplitInfo[metric.metricLabel] = datasets;
+      }
+    });
+    
+    return {radarData, allMetricNames, datasetSplitInfo};
+  }, [callIds, compositeMetrics, state.summary.evaluationCalls, state.summary.evaluations]);
 };
