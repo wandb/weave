@@ -611,27 +611,27 @@ export const LeaderboardPageContentInner: React.FC<
           backgroundColor: 'white',
           borderBottom: `1px solid ${MOON_250}`,
           padding: '16px',
+          height: '44px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
         }}>
-        <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
+          <Box sx={{fontSize: '1.25rem', fontWeight: 600, marginRight: 'auto'}}>Edit leaderboard</Box>
+          <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
           <Button
-            variant="ghost"
-            size="medium"
-            icon="chevron-back"
-            onClick={() => setIsEditing(false)}
-            tooltip="Close editor"
-          />
-          <Box sx={{fontSize: '16px', fontWeight: 600}}>Edit Leaderboard</Box>
-        </Box>
-        <Button
           variant="ghost"
           size="medium"
           icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
           onClick={handleToggleFullscreen}
           tooltip={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
         />
+          <Button
+            variant="ghost"
+            size="medium"
+            icon="close"
+            onClick={() => setIsEditing(false)}
+            tooltip="Close editor"
+          />
+          </div>
       </Box>
     );
   }, [isEditing, setIsEditing, isFullscreen, handleToggleFullscreen]);
