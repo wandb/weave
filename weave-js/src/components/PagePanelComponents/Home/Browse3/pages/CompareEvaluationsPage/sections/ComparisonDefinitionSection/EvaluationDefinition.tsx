@@ -31,7 +31,7 @@ export const EvaluationCallLink: React.FC<{
   const showStatusChip = props.callStatus === 'running';
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
       <CallLink
         entityName={entity}
         projectName={project}
@@ -39,6 +39,7 @@ export const EvaluationCallLink: React.FC<{
         callId={props.callId}
         icon={<Icon name="filled-circle" color={evaluationCall.color} />}
         color={MOON_800}
+        allowWrap={true}
       />
       {showStatusChip && (
         <StatusChip
