@@ -7,6 +7,8 @@ import {
   GridSortDirection,
   GridSortItem,
 } from '@mui/x-data-grid-pro';
+import {WB_RUN_COLORS} from '@wandb/weave/common/css/color.styles';
+import {Icon} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
@@ -20,7 +22,9 @@ import {NotApplicable} from '../../NotApplicable';
 import {PaginationButtons} from '../../pages/CallsPage/CallsTableButtons';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_LEADERBOARD} from '../../pages/common/EmptyContent';
+import {Link} from '../../pages/common/Links';
 import {StatusChip} from '../../pages/common/StatusChip';
+import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {useGetTraceServerClientContext} from '../../pages/wfReactInterface/traceServerClientContext';
 import {ComputedCallStatusType} from '../../pages/wfReactInterface/traceServerClientTypes';
 import {projectIdFromParts} from '../../pages/wfReactInterface/tsDataModelHooks';
@@ -33,6 +37,122 @@ import {
 } from './query/leaderboardQuery';
 
 const USE_COMPARE_EVALUATIONS_PAGE = true;
+
+// Helper function to assign colors to models consistently
+const getModelColor = (modelRef: string, allModelRefs: string[]): string => {
+  // Sort model refs for deterministic color assignment
+  const sortedModelRefs = [...new Set(allModelRefs)].sort();
+  const modelIndex = sortedModelRefs.indexOf(modelRef);
+  return WB_RUN_COLORS[modelIndex % WB_RUN_COLORS.length];
+};
+
+
+// Custom component that renders like SmallRef but with colored indicator
+const SmallRefWithColoredIndicator: React.FC<{
+  objRef: any;
+  color: string;
+}> = ({objRef, color}) => {
+  const {peekingRouter} = useWeaveflowRouteContext();
+  const {useObjectVersion} = useWFHooks();
+  
+  const objectVersion = useObjectVersion({
+    key: {
+      scheme: 'weave',
+      entity: objRef.entityName,
+      project: objRef.projectName,
+      weaveKind: objRef.weaveKind,
+      objectId: objRef.artifactName,
+      versionHash: objRef.artifactVersion,
+      path: '',
+      refExtra: objRef.artifactRefExtra,
+    },
+    metadataOnly: true,
+  });
+
+  const error = objectVersion?.error ?? null;
+  if (objectVersion.loading && !error) {
+    return <Loading centered />;
+  }
+
+  const objVersion = objectVersion.result ?? {
+    baseObjectClass: undefined,
+    versionIndex: -1,
+  };
+  const {baseObjectClass, versionIndex} = objVersion;
+  const rootTypeName =
+    objRef.weaveKind === 'op' ? 'Op' : baseObjectClass ?? 'Object';
+
+  const url = peekingRouter.refUIUrl(
+    rootTypeName,
+    objRef,
+    objRef.weaveKind === 'op' ? 'OpVersion' : undefined
+  );
+  
+  // Get the label like SmallRef does
+  let label = objRef.artifactName + ':';
+  if (versionIndex >= 0) {
+    label += 'v' + versionIndex;
+  } else {
+    label += objRef.artifactVersion.slice(0, 6);
+  }
+  if (objRef.artifactRefExtra) {
+    label += '/' + objRef.artifactRefExtra;
+  }
+
+  // Custom content with colored circle instead of icon
+  const content = (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      fontWeight: 600,
+      gap: '2px',
+      cursor: 'pointer'
+    }}>
+      <div style={{
+        display: 'flex',
+        height: '22px',
+        width: '22px',
+        flexShrink: 0,
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <Icon name="filled-circle" color={color} style={{height: '20px', width: '20px'}} />
+      </div>
+      <div style={{
+        height: '22px',
+        minWidth: 0,
+        flex: 1,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+
+  if (error) {
+    return (
+      <div style={{width: '100%', textDecoration: 'line-through', cursor: 'default'}}>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link 
+      to={url} 
+      $variant="secondary"
+      style={{
+        width: '100%',
+        textDecoration: 'none'
+      }}
+    >
+      {content}
+    </Link>
+  );
+};
+
 export type LeaderboardColumnOrderType = Array<{
   datasetGroup: string;
   scorerGroup: string;
@@ -131,7 +251,7 @@ const getLatestEvaluationStatus = (
   // Find the latest evaluation record for this model
   Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
     Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
-      Object.values(scorerGroup.metricPathGroups).forEach((records: LeaderboardValueRecord[]) => {
+      Object.values(scorerGroup.metricPathGroups).forEach((records) => {
         records.forEach(record => {
           if (record.createdAt.getTime() > latestCreatedAt.getTime()) {
             latestCreatedAt = record.createdAt;
@@ -481,6 +601,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     return rowData;
   }, [processedData]);
 
+  // Get all model refs for consistent color assignment
+  const allModelRefs = useMemo(() => {
+    return rows.map(row => row.modelGroupName);
+  }, [rows]);
+
   const columns: Array<GridColDef<RowData>> = useMemo(
     () => [
       {
@@ -504,6 +629,9 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           );
           const showStatusChip = latestStatus === 'running';
 
+          // Get the color for this model
+          const modelColor = getModelColor(params.value, allModelRefs);
+
           if (modelRef) {
             return (
               <div
@@ -517,7 +645,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                   marginLeft: '10px',
                   gap: '8px',
                 }}>
-                <SmallRef objRef={modelRef} />
+                <SmallRefWithColoredIndicator objRef={modelRef} color={modelColor} />
                 {showStatusChip && (
                   <StatusChip
                     value="running"
@@ -630,6 +758,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       onCellClick,
       project,
       callStatuses,
+      allModelRefs,
     ]
   );
 
