@@ -116,7 +116,7 @@ export const SummaryPlots: React.FC<{
 
   const filteredData = useFilteredData(radarData, selectedMetrics);
   const normalizedRadarData = normalizeDataForRadarPlot(filteredData);
-  const barPlotData = useBarPlotData(filteredData);
+  const barPlotData = useBarPlotData(filteredData, state);
 
   const handleCloseMetric = React.useCallback(
     (metric: string) => {
@@ -328,7 +328,7 @@ function normalizeDataForRadarPlot(
   return radarData;
 }
 
-const useBarPlotData = (filteredData: RadarPlotData) =>
+const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationComparisonState) =>
   useMemo(() => {
     const metrics: {
       [metric: string]: {
@@ -336,6 +336,7 @@ const useBarPlotData = (filteredData: RadarPlotData) =>
         values: number[];
         name: string;
         colors: string[];
+        datasets?: string[];
       };
     } = {};
 
@@ -343,15 +344,83 @@ const useBarPlotData = (filteredData: RadarPlotData) =>
     for (const [callId, metricBin] of Object.entries(filteredData)) {
       for (const [metric, value] of Object.entries(metricBin.metrics)) {
         if (!metrics[metric]) {
-          metrics[metric] = {callIds: [], values: [], name: metric, colors: []};
+          metrics[metric] = {callIds: [], values: [], name: metric, colors: [], datasets: []};
         }
         metrics[metric].callIds.push(callId);
         metrics[metric].values.push(value);
         metrics[metric].colors.push(metricBin.color);
+        
+        // Add dataset information if state is available
+        if (state) {
+          const evalCall = state.summary.evaluationCalls[callId];
+          if (evalCall) {
+            const evaluation = state.summary.evaluations[evalCall.evaluationRef];
+            if (evaluation && evaluation.datasetRef) {
+              // Extract dataset name from ref
+              const datasetMatch = evaluation.datasetRef.match(/object\/([^:]+)(?::|$)/);
+              const datasetName = datasetMatch ? datasetMatch[1] : 'Unknown';
+              metrics[metric].datasets!.push(datasetName);
+            }
+          }
+        }
       }
     }
 
-    // Convert metrics object to Plotly data format
+    // Check if we should split by dataset
+    const shouldSplitByDataset = state && Object.values(metrics).some(m => {
+      const uniqueDatasets = new Set(m.datasets || []);
+      return uniqueDatasets.size > 1;
+    });
+
+    if (shouldSplitByDataset && state) {
+      // Group metrics by dataset
+      const metricsByDataset: {
+        [key: string]: {
+          plotlyData: Plotly.Data;
+          yRange: [number, number];
+          metric: string;
+        };
+      } = {};
+
+      Object.entries(metrics).forEach(([metric, metricBin]) => {
+        // Group by dataset
+        const datasetGroups: {[dataset: string]: {callIds: string[], values: number[], colors: string[]}} = {};
+        
+        metricBin.callIds.forEach((callId, idx) => {
+          const dataset = metricBin.datasets![idx] || 'Unknown';
+          if (!datasetGroups[dataset]) {
+            datasetGroups[dataset] = {callIds: [], values: [], colors: []};
+          }
+          datasetGroups[dataset].callIds.push(callId);
+          datasetGroups[dataset].values.push(metricBin.values[idx]);
+          datasetGroups[dataset].colors.push(metricBin.colors[idx]);
+        });
+
+        // Create separate plots for each dataset
+        Object.entries(datasetGroups).forEach(([dataset, group]) => {
+          const maxY = Math.max(...group.values) * 1.1;
+          const minY = Math.min(...group.values, 0);
+          const plotlyData: Plotly.Data = {
+            type: 'bar',
+            y: group.values,
+            x: group.callIds,
+            text: group.values.map(value =>
+              Number.isInteger(value) ? value.toString() : value.toFixed(3)
+            ),
+            textposition: 'outside',
+            textfont: {size: 12, color: 'black'},
+            name: `${metric} (${dataset})`,
+            marker: {color: group.colors},
+          };
+          const key = `${metric}-${dataset}`;
+          metricsByDataset[key] = {plotlyData, yRange: [minY, maxY] as [number, number], metric: key};
+        });
+      });
+
+      return Object.values(metricsByDataset);
+    }
+
+    // Original behavior when not splitting by dataset
     return Object.entries(metrics).map(([metric, metricBin]) => {
       const maxY = Math.max(...metricBin.values) * 1.1;
       const minY = Math.min(...metricBin.values, 0);
@@ -369,7 +438,7 @@ const useBarPlotData = (filteredData: RadarPlotData) =>
       };
       return {plotlyData, yRange: [minY, maxY] as [number, number], metric};
     });
-  }, [filteredData]);
+  }, [filteredData, state]);
 
 const usePlotDataFromMetrics = (
   state: EvaluationComparisonState
