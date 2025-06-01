@@ -98,8 +98,8 @@ export const buildCompositeMetricsMap = (
     const ref = refForMetric(metric);
     const keyPath = flattenedDimensionPath(metric);
 
-    if (selectedMetrics && !selectedMetrics[keyPath]) {
-      // Skip metrics that are not in the selectedMetrics map
+    if (selectedMetrics && selectedMetrics[keyPath] === false) {
+      // Skip metrics that are explicitly set to false in the selectedMetrics map
       return;
     }
 
