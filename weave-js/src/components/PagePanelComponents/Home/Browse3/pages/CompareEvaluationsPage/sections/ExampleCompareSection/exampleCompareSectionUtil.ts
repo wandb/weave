@@ -122,11 +122,12 @@ const rowIsSelected = (
   });
 };
 
-export type FilteredAggregateRows = {
+export type FilteredAggregateRow = {
   id: string;
   count: number;
   inputDigest: string;
   inputRef: ObjectRef | null;
+  inputRefs: Set<string>; // All unique input refs for this digest
   output: {
     [k: string]: {
       [k: string]: any;
@@ -138,7 +139,9 @@ export type FilteredAggregateRows = {
     };
   };
   originalRows: PivotedRow[];
-}[];
+};
+
+export type FilteredAggregateRows = FilteredAggregateRow[];
 
 export const useFilteredAggregateRows = (
   state: EvaluationComparisonState
@@ -238,48 +241,57 @@ export const useFilteredAggregateRows = (
 
   const aggregatedRows = useMemo(() => {
     const grouped = _.groupBy(pivotedRows, row => row.inputDigest);
-    return Object.fromEntries(
+    const result: {[inputDigest: string]: FilteredAggregateRow} = Object.fromEntries(
       Object.entries(grouped).map(([inputDigest, rows]) => {
-        return [
+        // Collect all unique input refs for this digest
+        const uniqueInputRefs = new Set<string>();
+        rows.forEach(row => {
+          if (row.inputRef) {
+            uniqueInputRefs.add(row.inputRef);
+          }
+        });
+        
+        const aggregatedRow: FilteredAggregateRow = {
+          id: inputDigest, // required for the data grid
+          count: rows.length,
           inputDigest,
-          {
-            id: inputDigest, // required for the data grid
-            count: rows.length,
-            inputDigest,
-            inputRef: parseRefMaybe(rows[0].inputRef), // Should be the same for all,
-            output: aggregateGroupedNestedRows(
-              rows,
-              'output',
-              vals => filterNones(vals)[0]
-            ),
-            scores: aggregateGroupedNestedRows(rows, 'scores', vals => {
-              const allVals = filterNones(vals);
-              if (allVals.length === 0) {
-                return undefined;
-              }
-              return _.mean(
-                allVals.map(v => {
-                  if (typeof v === 'number') {
-                    return v;
-                  } else if (typeof v === 'boolean') {
-                    return v ? 1 : 0;
-                  } else {
-                    return 0;
-                  }
-                })
-              );
-            }),
-            originalRows: rows,
-          },
-        ];
+          inputRef: parseRefMaybe(rows[0].inputRef), // Keep for backwards compatibility
+          inputRefs: uniqueInputRefs, // All unique input refs
+          output: aggregateGroupedNestedRows(
+            rows,
+            'output',
+            vals => filterNones(vals)[0]
+          ),
+          scores: aggregateGroupedNestedRows(rows, 'scores', vals => {
+            const allVals = filterNones(vals);
+            if (allVals.length === 0) {
+              return undefined;
+            }
+            return _.mean(
+              allVals.map(v => {
+                if (typeof v === 'number') {
+                  return v;
+                } else if (typeof v === 'boolean') {
+                  return v ? 1 : 0;
+                } else {
+                  return 0;
+                }
+              })
+            );
+          }),
+          originalRows: rows,
+        };
+        
+        return [inputDigest, aggregatedRow];
       })
     );
+    return result;
   }, [pivotedRows]);
 
-  const filteredRows = useMemo(() => {
+  const filteredRows = useMemo((): FilteredAggregateRows => {
     const aggregatedAsList = Object.values(aggregatedRows);
     const compareDims = state.comparisonDimensions;
-    let res = aggregatedAsList;
+    let res: FilteredAggregateRows = aggregatedAsList;
     if (compareDims != null && compareDims.length > 0) {
       const allowedDigests = Object.keys(aggregatedRows).filter(digest => {
         return rowIsSelected(

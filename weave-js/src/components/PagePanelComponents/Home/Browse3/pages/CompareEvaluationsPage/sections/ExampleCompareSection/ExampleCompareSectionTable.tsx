@@ -981,7 +981,9 @@ const inputFields = (
   setSelectedInputDigest: (inputDigest: string) => void,
   onShowSplitView: () => void,
   columnWidths: {[key: string]: number},
-  lineClamp: number
+  lineClamp: number,
+  state?: EvaluationComparisonState,
+  filteredRows?: FilteredAggregateRows
 ): GridColDef<RowData>[] => [
   {
     field: 'inputDigest',
@@ -1020,6 +1022,81 @@ const inputFields = (
       );
     },
   },
+  ...(state ? [{
+    field: 'dataset',
+    headerName: 'Dataset',
+    width: 150,
+    maxWidth: 300,
+    resizable: true,
+    disableColumnMenu: false,
+    disableReorder: true,
+    filterable: false,
+    sortable: false,
+    renderCell: (params: GridRenderCellParams<RowData>) => {
+      if (!filteredRows || !state) {
+        return <NotApplicable />;
+      }
+      
+      // Find the filtered row that matches this input digest
+      const matchingFilteredRow = filteredRows.find(
+        fr => fr.inputDigest === params.row.inputDigest
+      );
+      
+      if (!matchingFilteredRow || !matchingFilteredRow.originalRows) {
+        return <NotApplicable />;
+      }
+      
+      // Collect all unique datasets from the original rows
+      const datasetNames = new Set<string>();
+      
+      // Look through all original rows to find which datasets they came from
+      matchingFilteredRow.originalRows.forEach(row => {
+        const evaluationCallId = row.evaluationCallId;
+        if (!evaluationCallId) return;
+        
+        const evaluationCall = state.summary.evaluationCalls[evaluationCallId];
+        if (!evaluationCall) return;
+        
+        const evaluationObj = state.summary.evaluations[evaluationCall.evaluationRef];
+        if (!evaluationObj || !evaluationObj.datasetRef) return;
+        
+        const parsed = parseRefMaybe(evaluationObj.datasetRef);
+        if (parsed && parsed.artifactName) {
+          datasetNames.add(parsed.artifactName);
+        }
+      });
+      
+      if (datasetNames.size === 0) {
+        return <NotApplicable />;
+      }
+      
+      // Sort dataset names for consistent display
+      const sortedDatasetNames = Array.from(datasetNames).sort();
+      const displayText = sortedDatasetNames.join(', ');
+      
+      return (
+        <Box
+          style={{
+            height: '100%',
+            width: '100%',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 8px',
+          }}>
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={displayText}>
+            {displayText}
+          </span>
+        </Box>
+      );
+    },
+  } as GridColDef<RowData>] : []),
   ...inputSubFields.map(
     key =>
       ({
@@ -1165,7 +1242,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         setSelectedInputDigest,
         props.onShowSplitView,
         inputWidths,
-        props.lineClamp
+        props.lineClamp,
+        props.state,
+        filteredRows
       ),
       ...(onlyOneModel
         ? []
@@ -1516,9 +1595,12 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
       {
         groupId: 'inputs',
         headerName: 'Inputs',
-        children: inputSubFields.inputSubFields.map(key => ({
-          field: `inputs.${key}`,
-        })),
+        children: [
+          {field: 'dataset'},
+          ...inputSubFields.inputSubFields.map(key => ({
+            field: `inputs.${key}`,
+          }))
+        ],
       },
       {
         groupId: 'predictCall',
@@ -1726,7 +1808,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         setSelectedInputDigest,
         props.onShowSplitView,
         inputWidths,
-        props.lineClamp
+        props.lineClamp,
+        props.state,
+        filteredRows
       ),
       ...(hasTrials
         ? [
@@ -2176,9 +2260,12 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       {
         groupId: 'inputs',
         headerName: 'Inputs',
-        children: inputSubFields.inputSubFields.map(key => ({
-          field: `inputs.${key}`,
-        })),
+        children: [
+          {field: 'dataset'},
+          ...inputSubFields.inputSubFields.map(key => ({
+            field: `inputs.${key}`,
+          }))
+        ],
       },
       {
         groupId: 'predictCalls',
