@@ -40,7 +40,7 @@ export const SmallRefLoaded = ({
       )}>
       <SmallRefIcon icon={icon} />
       {label && (
-        <div className="h-[22px] min-w-0 flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap">
+        <div className="flex items-center h-[22px] min-w-0 flex-1 overflow-hidden overflow-ellipsis whitespace-nowrap">
           {label}
         </div>
       )}
