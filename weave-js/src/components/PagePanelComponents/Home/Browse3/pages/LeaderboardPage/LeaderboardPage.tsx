@@ -1009,6 +1009,7 @@ const ResultExplorer: React.FC<{
   >(null); // Store width before expanding
   const [isResizing, setIsResizing] = useState(false);
   const [wasAutoExpanded, setWasAutoExpanded] = useState(false); // Track if expansion was automatic
+  const [isAnimating, setIsAnimating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
 
@@ -1051,6 +1052,15 @@ const ResultExplorer: React.FC<{
     return undefined;
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
+  // Handle animation timing
+  useEffect(() => {
+    if (viewMode !== 'table') {
+      setIsAnimating(true);
+      const timer = setTimeout(() => setIsAnimating(false), 300); // Match transition duration
+      return () => clearTimeout(timer);
+    }
+  }, [viewMode]);
+
   return (
     <div
       ref={containerRef}
@@ -1088,7 +1098,7 @@ const ResultExplorer: React.FC<{
 
         {viewMode !== 'table' && (
           <Box
-            style={{
+            sx={{
               position: 'absolute',
               top: 0,
               right: 0,
@@ -1105,6 +1115,9 @@ const ResultExplorer: React.FC<{
               display: 'flex',
               flexDirection: 'row',
               zIndex: 1000,
+              transform: isAnimating ? 'translateX(100%)' : 'translateX(0)',
+              transition: 'transform 0.3s ease-out, width 0.3s ease-out',
+              opacity: isAnimating ? 0 : 1,
             }}>
             {viewMode !== 'detail' && (
               <div
@@ -1136,7 +1149,12 @@ const ResultExplorer: React.FC<{
             <Box style={{flex: 1, overflow: 'hidden'}}>
               <ExampleCompareSectionDetailGuarded
                 state={state}
-                onClose={() => setViewMode('table')}
+                onClose={() => {
+                  setIsAnimating(true);
+                  setTimeout(() => {
+                    setViewMode('table');
+                  }, 250); // Slightly shorter than animation duration to feel snappier
+                }}
                 onExpandToggle={() => {
                   if (viewMode === 'detail') {
                     // Collapsing from detail mode back to split mode
