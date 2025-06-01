@@ -230,8 +230,8 @@ const ScorecardContent: React.FC<{
         const datasetNameB = datasetRefB ? (parseRefMaybe(datasetRefB) as WeaveObjectRef)?.artifactName || datasetRefB : '';
         
         // Extract model names for comparison
-        const modelNameA = modelA?.properties?.name || evaluationCallA.modelRef;
-        const modelNameB = modelB?.properties?.name || evaluationCallB.modelRef;
+        const modelNameA = (modelA?.properties?.name as string) || evaluationCallA.modelRef;
+        const modelNameB = (modelB?.properties?.name as string) || evaluationCallB.modelRef;
         
         // First sort by dataset name
         const datasetComparison = datasetNameA.localeCompare(datasetNameB);
@@ -271,7 +271,7 @@ const ScorecardContent: React.FC<{
           props.state.summary.evaluations[evaluationCall.evaluationRef];
         return evaluationObj?.datasetRef;
       })
-      .filter(ref => ref != null);
+      .filter((ref): ref is string => ref != null);
   }, [
     evalCallIds,
     props.state.summary.evaluationCalls,
