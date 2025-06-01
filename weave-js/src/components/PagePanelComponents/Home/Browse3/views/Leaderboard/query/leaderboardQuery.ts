@@ -22,6 +22,7 @@ import {
 export type LeaderboardValueRecord = {
   datasetName: string;
   datasetVersion: string;
+  datasetRefUri?: string; // Original dataset ref URI from evaluation object
   metricType:
     | 'scorerMetric'
     | 'modelLatency'
@@ -208,7 +209,9 @@ const getLeaderboardGroupableData = async (
       return;
     }
 
-    const datasetRef = parseRefMaybe(evalObject.val.dataset ?? '');
+    const datasetRefUri = evalObject.val.dataset;
+    
+    const datasetRef = parseRefMaybe(datasetRefUri ?? '');
     if (!datasetRef) {
       console.warn('Skipping evaluation call with missing dataset ref', call);
       return;
@@ -235,6 +238,7 @@ const getLeaderboardGroupableData = async (
     > = {
       datasetName,
       datasetVersion,
+      datasetRefUri: datasetRefUri, // Store original dataset ref URI
       modelName,
       modelVersion,
       modelType,
@@ -648,6 +652,7 @@ const getLeaderboardObjectGroupableData = async (
           row: {
             datasetName: datasetRef.artifactName,
             datasetVersion: datasetRef.artifactVersion,
+            datasetRefUri: datasetRefUri, // Add original dataset ref URI
             metricType: 'scorerMetric',
             scorerName: scorerRef.artifactName,
             scorerVersion: scorerRef.artifactVersion,

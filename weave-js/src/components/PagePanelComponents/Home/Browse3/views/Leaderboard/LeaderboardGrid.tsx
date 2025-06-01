@@ -71,7 +71,7 @@ const useEvaluationCallStatuses = (
     Object.values(data.modelGroups).forEach(modelGroup => {
       Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
         Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
-          Object.values(scorerGroup.metricPathGroups).forEach(records => {
+          Object.values(scorerGroup.metricPathGroups).forEach((records: LeaderboardValueRecord[]) => {
             records.forEach(record => {
               if (record.sourceEvaluationCallId) {
                 callIds.add(record.sourceEvaluationCallId);
@@ -131,7 +131,7 @@ const getLatestEvaluationStatus = (
   // Find the latest evaluation record for this model
   Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
     Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
-      Object.values(scorerGroup.metricPathGroups).forEach(records => {
+      Object.values(scorerGroup.metricPathGroups).forEach((records: LeaderboardValueRecord[]) => {
         records.forEach(record => {
           if (record.createdAt.getTime() > latestCreatedAt.getTime()) {
             latestCreatedAt = record.createdAt;
@@ -192,6 +192,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     } = {};
     const datasetVersionMap: {[datasetName: string]: Set<string>} = {};
     const datasetLatestVersionMap: {[datasetName: string]: string} = {};
+    const datasetRefUriMap: {[datasetName: string]: string} = {}; // Track dataset ref URIs
     // Global scorer version tracking (since scorers are not dataset-specific)
     const globalScorerVersionMap: {[scorerName: string]: Set<string>} = {};
     const globalScorerLatestVersionMap: {[scorerName: string]: string} = {};
@@ -208,25 +209,25 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       )[0];
     };
 
-    // Helper function to get latest evaluation records per model for a specific metric
-    const getLatestEvaluationsPerModel = (
+    // Helper function to get latest evaluation records per model-dataset combination
+    const getLatestEvaluationsPerModelDataset = (
       records: LeaderboardValueRecord[]
     ): LeaderboardValueRecord[] => {
-      const modelGroups = new Map<string, LeaderboardValueRecord[]>();
+      const modelDatasetGroups = new Map<string, LeaderboardValueRecord[]>();
 
-      // Group by model
+      // Group by model AND dataset
       records.forEach(record => {
-        const modelKey = `${record.modelName}:${record.modelVersion}`;
-        if (!modelGroups.has(modelKey)) {
-          modelGroups.set(modelKey, []);
+        const key = `${record.modelName}:${record.modelVersion}__${record.datasetName}:${record.datasetVersion}`;
+        if (!modelDatasetGroups.has(key)) {
+          modelDatasetGroups.set(key, []);
         }
-        modelGroups.get(modelKey)!.push(record);
+        modelDatasetGroups.get(key)!.push(record);
       });
 
-      // Get latest evaluation for each model
+      // Get latest evaluation for each model-dataset combination
       const latestRecords: LeaderboardValueRecord[] = [];
-      modelGroups.forEach(modelRecords => {
-        const latest = getLatestRecord(modelRecords);
+      modelDatasetGroups.forEach(records => {
+        const latest = getLatestRecord(records);
         if (latest) {
           latestRecords.push(latest);
         }
@@ -314,8 +315,9 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       }
     });
 
-    // Filter to latest evaluations per model to check for inconsistencies
-    const latestRecordsOnly = getLatestEvaluationsPerModel(allRecords);
+    // Filter to latest evaluations per model-dataset combination to check for inconsistencies
+    const latestRecordsOnly = getLatestEvaluationsPerModelDataset(allRecords);
+    
 
     // Second pass: track dataset and scorer versions only from latest evaluations for inconsistency detection
     latestRecordsOnly.forEach(record => {
@@ -329,6 +331,15 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       if (datasetVersion) {
         datasetVersionMap[datasetName].add(datasetVersion);
         datasetLatestVersionMap[datasetName] = datasetVersion;
+        // Store the dataset ref URI from the latest record
+        if (record.datasetRefUri) {
+          datasetRefUriMap[datasetName] = record.datasetRefUri;
+        }
+      } else {
+        // Even without version, try to store the ref URI if available
+        if (record.datasetRefUri) {
+          datasetRefUriMap[datasetName] = record.datasetRefUri;
+        }
       }
 
       // Track scorer versions only from latest evaluations
@@ -418,6 +429,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       scorerLatestVersionMap,
       datasetVersionMap,
       datasetLatestVersionMap,
+      datasetRefUriMap,
       globalScorerVersionMap,
       globalScorerLatestVersionMap,
       globalScorerTypeMap,
@@ -640,8 +652,12 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
             const latestVersion =
               processedData.datasetLatestVersionMap[datasetName];
 
-            // Try to create a ref using the latest version we've seen
-            const ref = latestVersion
+            // Use the original dataset ref URI if available, otherwise try to construct one
+            const datasetRefUri = processedData.datasetRefUriMap[datasetName];
+            
+            const ref = datasetRefUri
+              ? parseRefMaybe(datasetRefUri)
+              : latestVersion
               ? parseRefMaybe(
                   `weave:///${entity}/${project}/object/${datasetName}:${latestVersion}`
                 )
@@ -758,6 +774,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     processedData.globalScorerVersionMap,
     processedData.globalScorerLatestVersionMap,
     processedData.globalScorerTypeMap,
+    processedData.datasetRefUriMap,
   ]);
 
   const [sortModel, setSortModel] = useState<GridSortItem[]>([]);
