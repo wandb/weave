@@ -31,9 +31,9 @@ export const MetricsSelector: React.FC<{
     ? allMetrics.filter(col => col.toLowerCase().includes(search.toLowerCase()))
     : allMetrics;
 
-  const shownMetrics = Object.values(selectedMetrics ?? {}).filter(Boolean);
-
-  const numHidden = allMetrics.length - shownMetrics.length;
+  // Count metrics that are explicitly hidden (set to false)
+  const hiddenMetrics = allMetrics.filter(metric => selectedMetrics?.[metric] === false);
+  const numHidden = hiddenMetrics.length;
   const buttonSuffix = search ? `(${filteredCols.length})` : 'all';
 
   return (
@@ -91,7 +91,7 @@ export const MetricsSelector: React.FC<{
               {Array.from(allMetrics).map((metric: string) => {
                 const value = metric;
                 const idSwitch = `toggle-vis_${value}`;
-                const checked = selectedMetrics?.[metric] ?? false;
+                const checked = selectedMetrics?.[metric] ?? true;
                 const label = metric;
                 const disabled = false;
                 if (
