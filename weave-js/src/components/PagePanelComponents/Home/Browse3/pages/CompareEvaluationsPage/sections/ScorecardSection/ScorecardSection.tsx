@@ -18,10 +18,10 @@ import {CellValue} from '../../../../../Browse2/CellValue';
 import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 import {NotApplicable} from '../../../../NotApplicable';
 import {SmallRef} from '../../../../smallRef/SmallRef';
+import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {useGetTraceServerClientContext} from '../../../wfReactInterface/traceServerClientContext';
 import {ComputedCallStatusType} from '../../../wfReactInterface/traceServerClientTypes';
 import {projectIdFromParts} from '../../../wfReactInterface/tsDataModelHooks';
-import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
@@ -80,6 +80,7 @@ export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
   initialExpanded?: boolean;
   sortColumnsByDatasetAndModel?: boolean;
+  disableBaselineStats?: boolean;
 }> = props => {
   const [isExpanded, setIsExpanded] = useState(props.initialExpanded ?? false);
 
@@ -128,6 +129,7 @@ export const ScorecardSection: React.FC<{
           <ScorecardContent 
             state={props.state} 
             sortColumnsByDatasetAndModel={props.sortColumnsByDatasetAndModel}
+            disableBaselineStats={props.disableBaselineStats}
           />
         </Box>
       )}
@@ -187,6 +189,7 @@ const useEvaluationCallStatuses = (
 const ScorecardContent: React.FC<{
   state: EvaluationComparisonState;
   sortColumnsByDatasetAndModel?: boolean;
+  disableBaselineStats?: boolean;
 }> = props => {
   const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} =
     useCompareEvaluationsState();
@@ -372,9 +375,9 @@ const ScorecardContent: React.FC<{
           display: 'grid',
           gridTemplateColumns,
           border: STANDARD_BORDER,
-          borderRadius: 'BOX_RADIUS',
           overflow: 'auto',
           backgroundColor: 'white',
+          borderRadius: '8px',
         }}>
         {/* Header Row */}
         <GridCell
@@ -685,7 +688,7 @@ const ScorecardContent: React.FC<{
                                 {group.metrics[metricKey]
                                   .scorerAgnosticMetricDef.unit ?? ''}
                               </HorizontalBox>
-                              {dataIsNumber && (
+                              {dataIsNumber && !props.disableBaselineStats && (
                                 <ComparisonPill
                                   value={value}
                                   baseline={baseline}

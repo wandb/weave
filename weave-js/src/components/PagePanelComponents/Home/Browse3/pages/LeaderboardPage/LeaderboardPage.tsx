@@ -1323,6 +1323,7 @@ const LeaderboardChartsSection: React.FC<{
         state={state} 
         initialExpanded={false} 
         sortColumnsByDatasetAndModel={true}
+        disableBaselineStats={true}
       />
     </div>
   );
