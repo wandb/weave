@@ -312,6 +312,8 @@ interface ExampleCompareSectionTableProps {
   defaultHiddenScorerMetrics?: Set<string>;
   // When true, merges results from the same model across different datasets into one column
   mergeDatasetResultsPerModel?: boolean;
+  // When true, hides the Inputs and Outputs columns by default
+  hideInputOutputColumns?: boolean;
 }
 
 /**
@@ -1571,7 +1573,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   const {columnsWithControlledWidths, onColumnWidthChange} =
     useColumnsWithControlledWidths(columns);
 
-  // Create initial column visibility model that conditionally hides scorer metrics
+  // Create initial column visibility model that conditionally hides scorer metrics and input/output columns
   const initialColumnVisibilityModel = useMemo(() => {
     const hiddenColumns: Record<string, boolean> = {};
 
@@ -1595,8 +1597,17 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     // If no defaultHiddenScorerMetrics provided (regular compare context),
     // show all scorer metrics by default (don't add them to hiddenColumns)
 
+    // Hide input and output columns if requested (for leaderboard context)
+    if (props.hideInputOutputColumns) {
+      columns.forEach(col => {
+        if (col.field.startsWith('inputs.') || col.field.startsWith('output.')) {
+          hiddenColumns[col.field] = false; // false means hidden in MUI DataGrid
+        }
+      });
+    }
+
     return hiddenColumns;
-  }, [columns, props.defaultHiddenScorerMetrics]);
+  }, [columns, props.defaultHiddenScorerMetrics, props.hideInputOutputColumns]);
 
   if (inputSubFields.loading || props.state.loadableComparisonResults.loading) {
     return <LoadingDots />;
@@ -2269,7 +2280,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
   const {columnsWithControlledWidths, onColumnWidthChange} =
     useColumnsWithControlledWidths(columns);
 
-  // Create initial column visibility model that conditionally hides scorer metrics
+  // Create initial column visibility model that conditionally hides scorer metrics and input/output columns
   const initialColumnVisibilityModelAsColumns = useMemo(() => {
     const hiddenColumns: Record<string, boolean> = {};
 
@@ -2295,8 +2306,17 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     // If no defaultHiddenScorerMetrics provided (regular compare context),
     // show all scorer metrics by default (don't add them to hiddenColumns)
 
+    // Hide input and output columns if requested (for leaderboard context)
+    if (props.hideInputOutputColumns) {
+      columns.forEach(col => {
+        if (col.field.startsWith('inputs.') || col.field.startsWith('output.')) {
+          hiddenColumns[col.field] = false; // false means hidden in MUI DataGrid
+        }
+      });
+    }
+
     return hiddenColumns;
-  }, [columns, props.defaultHiddenScorerMetrics]);
+  }, [columns, props.defaultHiddenScorerMetrics, props.hideInputOutputColumns]);
 
   if (inputSubFields.loading || props.state.loadableComparisonResults.loading) {
     return <LoadingDots />;

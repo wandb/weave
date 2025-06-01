@@ -1079,6 +1079,7 @@ const ResultExplorer: React.FC<{
             onShowSplitView={() => setViewMode('split')}
             defaultHiddenScorerMetrics={defaultHiddenScorerMetrics}
             mergeDatasetResultsPerModel={hasMultipleDatasets}
+            hideInputOutputColumns={true}
           />
         </Box>
 
