@@ -1055,44 +1055,77 @@ const LeaderboardChartsSection: React.FC<{
   // Create a function to get metrics that should be shown by default (from leaderboard config)
   const getDefaultVisibleMetrics = useCallback(
     (availableMetrics: string[]): Set<string> => {
+      console.log('[LeaderboardChartsSection] getDefaultVisibleMetrics called');
+      console.log('[LeaderboardChartsSection] availableMetrics:', availableMetrics);
+      console.log('[LeaderboardChartsSection] leaderboardColumns:', leaderboardColumns);
+      
       const visibleMetrics = new Set<string>();
 
+      // Build a set of expected metric patterns from leaderboard columns
+      const expectedMetricPatterns = new Set<string>();
+      
       leaderboardColumns.forEach(column => {
-        if (column.summary_metric_path) {
+        console.log('[LeaderboardChartsSection] Processing column:', column);
+        if (column.summary_metric_path && column.scorer_name) {
           const metricPath = column.summary_metric_path;
-
-          // Look for exact matches in available metrics
-          availableMetrics.forEach(availableMetric => {
-            // Check if this metric matches our leaderboard column
-            const isMatch =
-              // Exact match for the metric path
-              availableMetric === metricPath ||
-              // Ends with the metric path (for scorer-prefixed metrics)
-              availableMetric.endsWith(`.${metricPath}`) ||
-              // For nested paths, check if it contains the metric path
-              (metricPath.includes('.') &&
-                availableMetric.includes(metricPath)) ||
-              // Check if this is a scorer-only metric (no sub-path)
-              (column.scorer_name && availableMetric === column.scorer_name) ||
-              // Check if scorer name is part of the available metric
-              (column.scorer_name &&
-                availableMetric.startsWith(`${column.scorer_name}.`));
-
-            if (isMatch) {
-              visibleMetrics.add(availableMetric);
-            }
-          });
+          const scorerName = column.scorer_name;
+          
+          // Add different possible metric formats that could match this column
+          expectedMetricPatterns.add(metricPath); // Direct metric path
+          expectedMetricPatterns.add(`${scorerName}.${metricPath}`); // Scorer prefixed
+          expectedMetricPatterns.add(scorerName); // Just the scorer name
+          
+          // Handle nested metric paths
+          if (metricPath.includes('.')) {
+            expectedMetricPatterns.add(metricPath);
+          }
         }
       });
 
+      console.log('[LeaderboardChartsSection] expectedMetricPatterns:', Array.from(expectedMetricPatterns));
+
+      // Find available metrics that match our expected patterns
+      availableMetrics.forEach(availableMetric => {
+        const shouldBeVisible = Array.from(expectedMetricPatterns).some(pattern => {
+          const isMatch = (
+            // Exact match
+            availableMetric === pattern ||
+            // Available metric ends with the pattern (for scorer-prefixed metrics)
+            availableMetric.endsWith(`.${pattern}`) ||
+            // Available metric starts with the pattern (for nested paths)
+            availableMetric.startsWith(`${pattern}.`) ||
+            // Pattern is contained in the available metric (for complex nested paths)
+            (pattern.includes('.') && availableMetric.includes(pattern))
+          );
+          
+          if (isMatch) {
+            console.log('[LeaderboardChartsSection] Match found:', availableMetric, 'matches pattern:', pattern);
+          }
+          
+          return isMatch;
+        });
+
+        if (shouldBeVisible) {
+          visibleMetrics.add(availableMetric);
+        }
+      });
+
+      console.log('[LeaderboardChartsSection] Final visibleMetrics:', Array.from(visibleMetrics));
       return visibleMetrics;
     },
     [leaderboardColumns]
   );
 
-  // Initialize selected metrics only once when the component mounts
+  // Initialize selected metrics only once when the component mounts and data is available
   useEffect(() => {
-    if (!hasInitialized && state.selectedMetrics === null) {
+    console.log('[LeaderboardChartsSection] useEffect triggered');
+    console.log('[LeaderboardChartsSection] hasInitialized:', hasInitialized);
+    console.log('[LeaderboardChartsSection] state.selectedMetrics:', state.selectedMetrics);
+    console.log('[LeaderboardChartsSection] state.summary:', state.summary);
+    
+    if (!hasInitialized && (state.selectedMetrics === null || state.selectedMetrics === undefined)) {
+      console.log('[LeaderboardChartsSection] Initializing metrics...');
+      
       // Get all available metrics from the state
       const allMetrics = new Set<string>();
       
@@ -1108,20 +1141,49 @@ const LeaderboardChartsSection: React.FC<{
         allMetrics.add(metricPath);
       });
       
-      if (allMetrics.size > 0) {
+      console.log('[LeaderboardChartsSection] allMetrics found:', Array.from(allMetrics));
+      console.log('[LeaderboardChartsSection] leaderboardColumns.length:', leaderboardColumns.length);
+      
+      // Only proceed if we have metrics and leaderboard columns to work with
+      if (allMetrics.size > 0 && leaderboardColumns.length > 0) {
         const defaultVisible = getDefaultVisibleMetrics(Array.from(allMetrics));
         const initialMetrics: Record<string, boolean> = {};
         
-        // Set all metrics to false by default, then enable only the ones in leaderboard
+        console.log('[LeaderboardChartsSection] Building initialMetrics...');
+        
+        // Only explicitly set metrics that should be hidden to false
+        // Leave visible metrics undefined so they show by default
+        // This approach is more compatible with the SummaryPlotsSection logic
         allMetrics.forEach(metric => {
-          initialMetrics[metric] = defaultVisible.has(metric);
+          if (!defaultVisible.has(metric)) {
+            // Explicitly hide unused metrics
+            console.log('[LeaderboardChartsSection] Hiding metric:', metric);
+            initialMetrics[metric] = false;
+          } else {
+            console.log('[LeaderboardChartsSection] Keeping metric visible:', metric);
+          }
+          // Don't set visible metrics - let them show by default
         });
         
-        setSelectedMetrics(initialMetrics);
+        console.log('[LeaderboardChartsSection] Final initialMetrics:', initialMetrics);
+        
+        // Only apply the metric filtering if we actually found some metrics to hide
+        // This prevents setting an empty object which might interfere with the default "show all" behavior
+        if (Object.keys(initialMetrics).length > 0) {
+          console.log('[LeaderboardChartsSection] Setting selectedMetrics with filtering');
+          setSelectedMetrics(initialMetrics);
+        } else {
+          console.log('[LeaderboardChartsSection] No metrics to hide, not setting selectedMetrics');
+        }
+        
         setHasInitialized(true);
+      } else {
+        console.log('[LeaderboardChartsSection] Not enough data to initialize - metrics:', allMetrics.size, 'columns:', leaderboardColumns.length);
       }
+    } else {
+      console.log('[LeaderboardChartsSection] Skipping initialization - already initialized or selectedMetrics not null');
     }
-  }, [hasInitialized, state.selectedMetrics, state.summary, getDefaultVisibleMetrics, setSelectedMetrics]);
+  }, [hasInitialized, state.selectedMetrics, state.summary, getDefaultVisibleMetrics, setSelectedMetrics, leaderboardColumns]);
 
   if (state.loadableComparisonResults.loading) {
     return (
@@ -1130,6 +1192,8 @@ const LeaderboardChartsSection: React.FC<{
       </Box>
     );
   }
+
+  console.log('[LeaderboardChartsSection] Rendering with state.selectedMetrics:', state.selectedMetrics);
 
   return (
     <div>
