@@ -2759,7 +2759,7 @@ def test_tracing_enabled_context(client):
     # Test create_call with tracing enabled
     call = client.create_call(test_op, {})
     assert isinstance(call, Call)
-    assert call._op_name == "test_op"  # Use string literal instead of __name__
+    assert call.op_name.endswith("/test_op:epbtXLYvbWDYBxWnDKcKBp506QCJhrjEXswOgNShkQc")
     assert len(list(client.get_calls())) == 1  # Verify only one call was created
 
     # Test create_call with tracing disabled
