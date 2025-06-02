@@ -3,13 +3,13 @@
  * status values on or off in the filter.
  */
 
+import _ from 'lodash';
 import React from 'react';
 
 import {Button} from '../../../../Button';
 import {FILTER_TO_STATUS, StatusChip} from '../pages/common/StatusChip';
-
 type ValueInputStatusProps = {
-  value: string | undefined;
+  value: string | string[] | undefined;
   onSetValue: (value: string) => void;
 };
 
@@ -17,17 +17,21 @@ export const ValueInputStatus = ({
   value,
   onSetValue,
 }: ValueInputStatusProps) => {
-  const enabled = value ? value.split(',') : [];
+  const enabledValues = value
+    ? _.isArray(value)
+      ? value
+      : value.split(',')
+    : [];
   const onClick = (toToggle: string) => {
     if (value === toToggle) {
       // Can't remove the last selected status
       return;
     }
-    if (enabled.includes(toToggle)) {
-      onSetValue(enabled.filter(s => s !== toToggle).join(','));
+    if (enabledValues.includes(toToggle)) {
+      onSetValue(enabledValues.filter(s => s !== toToggle).join(','));
     } else {
       const newValue = Object.keys(FILTER_TO_STATUS)
-        .filter(s => enabled.includes(s) || toToggle === s)
+        .filter(s => enabledValues.includes(s) || toToggle === s)
         .join(',');
       onSetValue(newValue);
     }
@@ -39,9 +43,11 @@ export const ValueInputStatus = ({
           key={status}
           size="small"
           variant="ghost"
-          active={enabled.includes(status)}
+          active={enabledValues.includes(status)}
           onClick={() => onClick(status)}>
-          <StatusChip value={FILTER_TO_STATUS[status]} iconOnly />
+          <div className="night-aware">
+            <StatusChip value={FILTER_TO_STATUS[status]} iconOnly />
+          </div>
         </Button>
       ))}
     </div>

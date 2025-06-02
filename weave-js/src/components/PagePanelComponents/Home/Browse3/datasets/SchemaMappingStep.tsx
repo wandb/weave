@@ -5,7 +5,10 @@ import {Select} from '../../../../Form/Select';
 import {Icon} from '../../../../Icon';
 import {LoadingDots} from '../../../../LoadingDots';
 import {useWFHooks} from '../pages/wfReactInterface/context';
-import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+import {
+  ObjectVersionSchema,
+  WeaveObjectVersionKey,
+} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 import {DataPreviewTooltip} from './DataPreviewTooltip';
 import {ACTION_TYPES, useDatasetDrawer} from './DatasetDrawerContext';
 import {
@@ -14,7 +17,7 @@ import {
   denestData,
   extractSourceSchema,
   FieldMapping,
-  getNestedValue,
+  generateFieldPreviews,
 } from './schemaUtils';
 
 export interface SchemaMappingStepProps {
@@ -46,20 +49,18 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
     return selectedCalls.length > 0 ? extractSourceSchema(selectedCalls) : [];
   }, [selectedCalls]);
 
-  const selectedDatasetObjectVersion = useObjectVersion(
-    selectedDataset
-      ? {
-          scheme: 'weave',
-          weaveKind: 'object',
-          entity: selectedDataset.entity,
-          project: selectedDataset.project,
-          objectId: selectedDataset.objectId,
-          versionHash: selectedDataset.versionHash,
-          path: selectedDataset.path,
-        }
-      : null,
-    undefined
-  );
+  const objVersionKey = selectedDataset
+    ? {
+        scheme: 'weave' as WeaveObjectVersionKey['scheme'],
+        weaveKind: 'object' as WeaveObjectVersionKey['weaveKind'],
+        entity: selectedDataset.entity,
+        project: selectedDataset.project,
+        objectId: selectedDataset.objectId,
+        versionHash: selectedDataset.versionHash,
+        path: selectedDataset.path,
+      }
+    : null;
+  const selectedDatasetObjectVersion = useObjectVersion({key: objVersionKey});
 
   useEffect(() => {
     if (selectedDataset && selectedDatasetObjectVersion.result?.val) {
@@ -75,13 +76,12 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
     ?.split('/')
     ?.pop();
 
-  const tableRowsQuery = useTableRowsQuery(
-    entity || '',
-    project || '',
-    tableDigest || '',
-    undefined,
-    10 // This is an arbitrary limit to prevent loading too much data.
-  );
+  const tableRowsQuery = useTableRowsQuery({
+    entity: entity || '',
+    project: project || '',
+    digest: tableDigest || '',
+    limit: 10, // This is an arbitrary limit to prevent loading too much data.
+  });
 
   // Memoize denested row data to avoid redundant processing
   const denestedRows = useMemo(() => {
@@ -147,30 +147,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
   );
 
   const fieldPreviews = useMemo(() => {
-    const previews = new Map<string, Array<Record<string, any>>>();
-
-    sourceSchema.forEach(field => {
-      const fieldData = selectedCalls.map(call => {
-        let value: any;
-        if (field.name.startsWith('inputs.')) {
-          const path = field.name.slice(7).split('.');
-          value = getNestedValue(call.val.inputs, path);
-        } else if (field.name.startsWith('output.')) {
-          if (typeof call.val.output === 'object' && call.val.output !== null) {
-            const path = field.name.slice(7).split('.');
-            value = getNestedValue(call.val.output, path);
-          } else {
-            value = call.val.output;
-          }
-        } else {
-          const path = field.name.split('.');
-          value = getNestedValue(call.val, path);
-        }
-        return {[field.name]: value};
-      });
-      previews.set(field.name, fieldData);
-    });
-    return previews;
+    return generateFieldPreviews(sourceSchema, selectedCalls);
   }, [sourceSchema, selectedCalls]);
 
   const formatOptionLabel = useCallback(

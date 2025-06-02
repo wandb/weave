@@ -85,13 +85,21 @@ def _make_object_id_conditions_part(
 
 def format_metadata_objects_from_query_result(
     query_result: Iterator[tuple[Any, ...]],
+    include_storage_size: bool = False,
 ) -> list[SelectableCHObjSchema]:
     result = []
     for row in query_result:
         # Add an empty val_dump to the end of the row
         row_with_val_dump = row + ("{}",)
-        columns_with_val_dump = OBJECT_METADATA_COLUMNS + ["val_dump"]
+        columns_with_val_dump = list(OBJECT_METADATA_COLUMNS)
+
+        if include_storage_size:
+            columns_with_val_dump += ["size_bytes"]
+
+        columns_with_val_dump += ["val_dump"]
+
         row_dict = dict(zip(columns_with_val_dump, row_with_val_dump))
+
         row_model = SelectableCHObjSchema.model_validate(row_dict)
         result.append(row_model)
     return result
@@ -116,6 +124,7 @@ class ObjectMetadataQueryBuilder:
         self._offset: Optional[int] = None
         self._sort_by: list[tsi.SortBy] = []
         self._include_deleted: bool = include_deleted
+        self.include_storage_size: bool = False
 
     @property
     def conditions_part(self) -> str:
@@ -242,10 +251,36 @@ class ObjectMetadataQueryBuilder:
         self._include_deleted = include_deleted
 
     def make_metadata_query(self) -> str:
-        columns = ",\n    ".join(OBJECT_METADATA_COLUMNS)
+        columns = list(OBJECT_METADATA_COLUMNS)
+
+        main_table_alias = "main"
+
+        if self.include_storage_size:
+            columns += ["size_bytes"]
+        columns_str = ",\n    ".join(columns)
+
+        join_clause = ""
+        if self.include_storage_size:
+            join_clause = f"""
+            LEFT JOIN (
+                SELECT * FROM object_versions_stats WHERE object_versions_stats.project_id = {{project_id: String}}
+            ) as object_versions_stats ON object_versions_stats.digest = {main_table_alias}.digest
+            """
+
+        # Object versions are uniquely identified by (kind, project_id, object_id, digest).
+        # The first subquery selects a row to represent each object version. There are multiple rows
+        # for each object version if it has been deleted or recreated prior to a table merge.
+
+        # In the most nested order by (defining row_number), we follow this crucial logic:
+        # Prefer the most recent row. If there is a tie, prefer the row
+        # with non-null deleted_at, which represents the deletion event.
+        #
+        # Rows for the same object version may have the same created_at
+        # because deletion events inherit the created_at of the last
+        # non-deleted row for the object version.
         query = f"""
 SELECT
-    {columns}
+    {columns_str}
 FROM (
     SELECT
         project_id,
@@ -273,11 +308,6 @@ FROM (
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
     FROM (
-        --
-        -- Object versions are uniquely identified by (kind, project_id, object_id, digest).
-        -- This subquery selects a row to represent each object version. There are multiple rows
-        -- for each object version if it has been deleted or recreated prior to a table merge.
-        --
         SELECT
             project_id,
             object_id,
@@ -294,21 +324,15 @@ FROM (
                 kind,
                 object_id,
                 digest
-                --
-                -- Prefer the most recent row. If there is a tie, prefer the row
-                -- with non-null deleted_at, which represents the deletion event.
-                --
-                -- Rows for the same object version may have the same created_at
-                -- because deletion events inherit the created_at of the last
-                -- non-deleted row for the object version.
-                --
                 ORDER BY created_at DESC, (deleted_at IS NULL) ASC
             ) AS rn
         FROM object_versions
         WHERE project_id = {{project_id: String}}{self.object_id_conditions_part}
     )
     WHERE rn = 1
-)"""
+) as {main_table_alias}
+    {join_clause}
+"""
         if self.conditions_part:
             query += f"\n{self.conditions_part}"
         if self.sort_part:

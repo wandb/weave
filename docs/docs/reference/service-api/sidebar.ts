@@ -19,9 +19,28 @@ const sidebar: SidebarsConfig = {
         },
         {
           type: "doc",
+          id: "reference/service-api/read-version-version-get",
+          label: "Read Version",
+          className: "api-method get",
+        },
+        {
+          type: "doc",
           id: "reference/service-api/server-info-server-info-get",
           label: "Server Info",
           className: "api-method get",
+        },
+      ],
+    },
+    {
+      type: "category",
+      label: "OpenTelemetry",
+      collapsed: false,
+      items: [
+        {
+          type: "doc",
+          id: "reference/service-api/export-trace-otel-v-1-traces-post",
+          label: "Export Trace",
+          className: "api-method post",
         },
       ],
     },
@@ -103,6 +122,12 @@ const sidebar: SidebarsConfig = {
           label: "Objs Query",
           className: "api-method post",
         },
+        {
+          type: "doc",
+          id: "reference/service-api/obj-delete-obj-delete-post",
+          label: "Obj Delete",
+          className: "api-method post",
+        },
       ],
     },
     {
@@ -132,6 +157,12 @@ const sidebar: SidebarsConfig = {
           type: "doc",
           id: "reference/service-api/table-query-stats-table-query-stats-post",
           label: "Table Query Stats",
+          className: "api-method post",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/table-query-stats-batch-table-query-stats-batch-post",
+          label: "Table Query Stats Batch",
           className: "api-method post",
         },
       ],
@@ -164,6 +195,12 @@ const sidebar: SidebarsConfig = {
           type: "doc",
           id: "reference/service-api/file-content-file-content-post",
           label: "File Content",
+          className: "api-method post",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/files-stats-files-query-stats-post",
+          label: "Files Stats",
           className: "api-method post",
         },
       ],

@@ -4,6 +4,7 @@
 
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
+import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
@@ -17,8 +18,7 @@ import {
   WeaveflowPeekContext,
 } from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
-import {useEvaluationsFilter} from '../CallsPage/evaluationsFilter';
-import {SimplePageLayout} from '../common/SimplePageLayout';
+import {SimplePageLayout, SimpleTabView} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
   useCompareEvaluationsState,
@@ -28,9 +28,10 @@ import {EvaluationComparisonState} from './ecpState';
 import {ComparisonDimensionsType} from './ecpState';
 import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
-import {HorizontalBox, VerticalBox} from './Layout';
+import {VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
-import {ExampleCompareSection} from './sections/ExampleCompareSection/ExampleCompareSection';
+import {ExampleCompareSectionDetailGuarded} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
@@ -121,9 +122,7 @@ export const CompareEvaluationsPageContent: React.FC<
       setSelectedInputDigest={setSelectedInputDigest}>
       <CustomWeaveTypeProjectContext.Provider
         value={{entity: props.entity, project: props.project}}>
-        <AutoSizer style={{height: '100%', width: '100%'}}>
-          {({height, width}) => <CompareEvaluationsPageInner height={height} />}
-        </AutoSizer>
+        <CompareEvaluationsPageInner />
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
   );
@@ -149,10 +148,9 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 }) => {
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
-  const evaluationsFilter = useEvaluationsFilter(entity, project);
   const onClick = useCallback(() => {
-    history.push(router.callsUIUrl(entity, project, evaluationsFilter));
-  }, [entity, evaluationsFilter, history, project, router]);
+    history.push(router.evaluationsUIUrl(entity, project));
+  }, [entity, history, project, router]);
   return (
     <Box
       sx={{
@@ -175,75 +173,129 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
   );
 };
 
-const CompareEvaluationsPageInner: React.FC<{
-  height: number;
-}> = props => {
+const CompareEvaluationsPageInner: React.FC<{}> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  const showExampleFilter =
-    Object.keys(state.summary.evaluationCalls).length === 2;
   const showExamples =
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
+  const [tabValue, setTabValue] = useState('summary');
+
   return (
     <Box
       sx={{
-        height: props.height,
+        height: '100%',
         width: '100%',
         overflow: 'auto',
       }}>
-      <VerticalBox
-        sx={{
-          paddingTop: STANDARD_PADDING,
-          alignItems: 'flex-start',
-          gridGap: STANDARD_PADDING * 2,
-        }}>
-        <InvalidEvaluationBanner
-          evaluationCalls={Object.values(state.summary.evaluationCalls)}
-        />
-        <ComparisonDefinitionSection state={state} />
-        <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />
-        <ScorecardSection state={state} />
-        {resultsLoading ? (
-          <Box
-            sx={{
-              width: '100%',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              height: '50px',
-            }}>
-            <WaveLoader size="small" />
-          </Box>
-        ) : showExamples ? (
+      <SimpleTabView
+        headerContent={
           <>
-            {showExampleFilter && <ExampleFilterSection state={state} />}
-            <ResultExplorer state={state} height={props.height} />
+            <InvalidEvaluationBanner
+              evaluationCalls={Object.values(state.summary.evaluationCalls)}
+            />
+            <ComparisonDefinitionSection state={state} />
           </>
-        ) : (
-          <VerticalBox
-            sx={{
-              // alignItems: '',
-              paddingLeft: STANDARD_PADDING,
-              paddingRight: STANDARD_PADDING,
-              width: '100%',
-              overflow: 'auto',
-            }}>
-            <Box
-              sx={{
-                fontSize: '1.5em',
-                fontWeight: 'bold',
-              }}>
-              Examples
-            </Box>
-            <Alert severity="info">
-              The selected evaluations' datasets have 0 rows in common, try
-              comparing evaluations with datasets that have at least one row in
-              common.
-            </Alert>
-          </VerticalBox>
-        )}
-      </VerticalBox>
+        }
+        headerContainerSx={{
+          // Nice scrolling behavior
+          pr: 0,
+          pl: 0,
+        }}
+        tabs={[
+          {
+            value: 'summary',
+            label: 'Summary',
+            content: (
+              <VerticalBox
+                sx={{
+                  height: '100%',
+                  overflow: 'auto',
+                  paddingTop: STANDARD_PADDING / 2,
+                  alignItems: 'flex-start',
+                  gridGap: STANDARD_PADDING,
+                }}>
+                <SummaryPlots
+                  state={state}
+                  setSelectedMetrics={setSelectedMetrics}
+                />
+                <ScorecardSection state={state} />
+                <Tailwind style={{width: '100%'}}>
+                  <div className="px-16">
+                    <div className="flex w-full flex-col items-center gap-3 rounded-lg border border-dashed border-moon-300 bg-moon-50 p-16">
+                      <Icon name="table" size="large" color="moon-500 mb-4" />
+                      <div className="mb-4 flex flex-col items-center">
+                        <p className="text-center font-semibold">
+                          Looking for your evaluation results?
+                        </p>
+                        <p className="text-center text-moon-500">
+                          You can find it in our new results tab.
+                        </p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setTabValue('results')}>
+                        Review evaluation results
+                      </Button>
+                    </div>
+                    <div className="h-16"></div>
+                  </div>
+                </Tailwind>
+              </VerticalBox>
+            ),
+          },
+          {
+            value: 'results',
+            label: 'Results',
+            loading: resultsLoading,
+            content: (
+              <VerticalBox
+                sx={{
+                  height: '100%',
+                  overflow: 'auto',
+                  alignItems: 'flex-start',
+                  gridGap: STANDARD_PADDING * 2,
+                }}>
+                {resultsLoading ? (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      height: '50px',
+                    }}>
+                    <WaveLoader size="small" />
+                  </Box>
+                ) : showExamples ? (
+                  <AutoSizer style={{height: '100%', width: '100%'}}>
+                    {({height, width}) => {
+                      return <ResultExplorer state={state} height={height} />;
+                    }}
+                  </AutoSizer>
+                ) : (
+                  <VerticalBox
+                    sx={{
+                      paddingLeft: STANDARD_PADDING,
+                      paddingRight: STANDARD_PADDING,
+                      paddingTop: STANDARD_PADDING,
+                      width: '100%',
+                      overflow: 'auto',
+                    }}>
+                    <Alert severity="info">
+                      The selected evaluations' datasets have 0 rows in common,
+                      try comparing evaluations with datasets that have at least
+                      one row in common.
+                    </Alert>
+                  </VerticalBox>
+                )}
+              </VerticalBox>
+            ),
+          },
+        ]}
+        tabValue={tabValue}
+        handleTabChange={setTabValue}
+      />
     </Box>
   );
 };
@@ -252,35 +304,55 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
 }> = ({state, height}) => {
+  const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
+    'split'
+  );
+  const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
+
   return (
     <VerticalBox
       sx={{
+        height: '100%',
         width: '100%',
-        overflow: 'hidden',
+        overflow: 'auto',
       }}>
-      <HorizontalBox
-        sx={{
-          flex: '0 0 auto',
-          paddingLeft: STANDARD_PADDING,
-          paddingRight: STANDARD_PADDING,
-          width: '100%',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
+      {regressionFinderEnabled && <ExampleFilterSection state={state} />}
+      <Box
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          height: height,
+          borderTop: '1px solid #e0e0e0',
         }}>
         <Box
-          sx={{
-            fontSize: '1.5em',
-            fontWeight: 'bold',
+          style={{
+            flex: 1,
+            width: '50%',
+            display: viewMode !== 'detail' ? 'block' : 'none',
           }}>
-          Output Comparison
+          <ExampleCompareSectionTable
+            state={state}
+            shouldHighlightSelectedRow={viewMode === 'split'}
+            onShowSplitView={() => setViewMode('split')}
+          />
         </Box>
-      </HorizontalBox>
-      <Box
-        sx={{
-          height,
-          overflow: 'auto',
-        }}>
-        <ExampleCompareSection state={state} />
+
+        <Box
+          style={{
+            flex: 1,
+            width: '50%',
+            borderLeft: '1px solid #e0e0e0',
+            display: viewMode !== 'table' ? 'block' : 'none',
+          }}>
+          <ExampleCompareSectionDetailGuarded
+            state={state}
+            onClose={() => setViewMode('table')}
+            onExpandToggle={() =>
+              setViewMode(viewMode === 'detail' ? 'split' : 'detail')
+            }
+            isExpanded={viewMode === 'detail'}
+          />
+        </Box>
       </Box>
     </VerticalBox>
   );

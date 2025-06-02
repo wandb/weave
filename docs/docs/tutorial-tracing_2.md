@@ -87,7 +87,7 @@ Building on our [basic tracing example](/quickstart), we will now add additional
     import OpenAI from 'openai';
     import * as weave from 'weave';
 
-    const openai = weave.wrapOpenAI(new OpenAI());
+    const openai = new OpenAI();
 
     const extractDinos = weave.op(async (sentence: string) => {
       const response = await openai.chat.completions.create({
@@ -175,7 +175,7 @@ Continuing our example from above:
 :::note
 It's recommended to use metadata tracking to track metadata at run time, e.g. user ids or whether or not the call is part of the development process or is in production etc.
 
-To track system attributes, such as a System Prompt, we recommend using [weave Models](guides/core-types/models)
+To track system settings, such as a System Prompt, we recommend using [weave Models](guides/core-types/models)
 :::
 
 ## What's next?

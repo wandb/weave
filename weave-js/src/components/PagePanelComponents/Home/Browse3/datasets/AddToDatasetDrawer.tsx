@@ -9,6 +9,7 @@ import {useWeaveflowRouteContext} from '../context';
 import {ResizableDrawer} from '../pages/common/ResizableDrawer';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {useClientSideCallRefExpansion} from '../pages/wfReactInterface/tsDataModelHooksCallRefExpansion';
+import {CustomWeaveTypeProjectContext} from '../typeViews/CustomWeaveTypeDispatcher';
 import {
   ACTION_TYPES,
   DatasetDrawerProvider,
@@ -39,7 +40,13 @@ export const AddToDatasetDrawer: React.FC<AddToDatasetDrawerProps> = props => {
       onClose={props.onClose}
       entity={props.entity}
       project={props.project}>
-      <AddToDatasetDrawerInner {...props} />
+      <CustomWeaveTypeProjectContext.Provider
+        value={{
+          entity: props.entity,
+          project: props.project,
+        }}>
+        <AddToDatasetDrawerInner {...props} />
+      </CustomWeaveTypeProjectContext.Provider>
     </DatasetDrawerProvider>
   );
 };
@@ -93,15 +100,19 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
   const tableCreate = useTableCreate();
 
   // Fetch call data using the selectedCallIds
-  const callsData = useCalls(
+  const callsData = useCalls({
     entity,
     project,
-    {callIds: selectedCallIds},
-    selectedCallIds.length // limit to fetch all selected calls
-  );
+    filter: {callIds: selectedCallIds},
+    limit: selectedCallIds.length,
+    includeFeedback: true,
+  });
 
-  // Recursively expand all refs in inputs and output
-  const expandRefColumns = useMemo(() => new Set(['inputs', 'output']), []);
+  // Recursively expand all refs in inputs, output, and summary
+  const expandRefColumns = useMemo(
+    () => new Set(['inputs', 'output', 'summary']),
+    []
+  );
 
   // Use the enhanced useClientSideCallRefExpansion hook with recursiveUnwrap option,
   // but only for inputs.* fields
@@ -164,15 +175,12 @@ export const AddToDatasetDrawerInner: React.FC<AddToDatasetDrawerProps> = ({
     editorContext;
 
   // Fetch datasets on component mount
-  const objectVersions = useRootObjectVersions(
+  const objectVersions = useRootObjectVersions({
     entity,
     project,
-    {
-      baseObjectClasses: ['Dataset'],
-    },
-    undefined,
-    true
-  );
+    filter: {baseObjectClasses: ['Dataset']},
+    metadataOnly: true,
+  });
 
   // Update datasets when data is loaded
   useEffect(() => {

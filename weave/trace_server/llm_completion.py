@@ -1,4 +1,5 @@
-from typing import Callable, Optional
+from collections.abc import Iterator
+from typing import Any, Callable, Optional
 
 from pydantic import BaseModel
 
@@ -17,31 +18,21 @@ NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
 
 def lite_llm_completion(
-    api_key: str,
+    api_key: Optional[str],
     inputs: tsi.CompletionsCreateRequestInputs,
     provider: Optional[str] = None,
     base_url: Optional[str] = None,
     extra_headers: Optional[dict[str, str]] = None,
     return_type: Optional[str] = None,
 ) -> tsi.CompletionsCreateRes:
-    aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
-    azure_api_base, azure_api_version = None, None
-    if provider == "bedrock" or provider == "bedrock_converse":
-        aws_access_key_id, aws_secret_access_key, aws_region_name = (
-            get_bedrock_credentials(inputs.model)
-        )
-        # Nova models need the region in the model name
-        if any(x in inputs.model for x in NOVA_MODELS) and aws_region_name:
-            aws_inference_region = aws_region_name.split("-")[0]
-            inputs.model = "bedrock/" + aws_inference_region + "." + inputs.model
-    # XAI models don't support response_format
-    elif provider == "xai":
-        inputs.response_format = None
-        if "grok-3-mini" in inputs.model:
-            inputs.presence_penalty = None
-            inputs.frequency_penalty = None
-    elif provider == "azure" or provider == "azure_ai":
-        azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
+    # Setup provider-specific credentials and model modifications
+    (
+        aws_access_key_id,
+        aws_secret_access_key,
+        aws_region_name,
+        azure_api_base,
+        azure_api_version,
+    ) = _setup_provider_credentials_and_model(inputs, provider)
 
     import litellm
 
@@ -171,6 +162,43 @@ def get_azure_credentials(model_name: str) -> tuple[str, str]:
     return azure_api_base, azure_api_version
 
 
+def _setup_provider_credentials_and_model(
+    inputs: tsi.CompletionsCreateRequestInputs,
+    provider: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
+    """Setup provider-specific credentials and model modifications.
+
+    Returns: (aws_access_key_id, aws_secret_access_key, aws_region_name, azure_api_base, azure_api_version)
+    """
+    aws_access_key_id, aws_secret_access_key, aws_region_name = None, None, None
+    azure_api_base, azure_api_version = None, None
+
+    if provider == "bedrock" or provider == "bedrock_converse":
+        aws_access_key_id, aws_secret_access_key, aws_region_name = (
+            get_bedrock_credentials(inputs.model)
+        )
+        # Nova models need the region in the model name
+        if any(x in inputs.model for x in NOVA_MODELS) and aws_region_name:
+            aws_inference_region = aws_region_name.split("-")[0]
+            inputs.model = "bedrock/" + aws_inference_region + "." + inputs.model
+    # XAI models don't support response_format
+    elif provider == "xai":
+        inputs.response_format = None
+        if "grok-3-mini" in inputs.model:
+            inputs.presence_penalty = None
+            inputs.frequency_penalty = None
+    elif provider == "azure" or provider == "azure_ai":
+        azure_api_base, azure_api_version = get_azure_credentials(inputs.model)
+
+    return (
+        aws_access_key_id,
+        aws_secret_access_key,
+        aws_region_name,
+        azure_api_base,
+        azure_api_version,
+    )
+
+
 class CustomProviderInfo(BaseModel):
     base_url: str
     api_key: str
@@ -291,3 +319,77 @@ def get_custom_provider_info(
         return_type=return_type,
         actual_model_name=actual_model_name,
     )
+
+
+# ---------------------------------------------------------------------------
+# Streaming variant
+# ---------------------------------------------------------------------------
+
+
+def lite_llm_completion_stream(
+    api_key: Optional[str],
+    inputs: tsi.CompletionsCreateRequestInputs,
+    provider: Optional[str] = None,
+    base_url: Optional[str] = None,
+    extra_headers: Optional[dict[str, str]] = None,
+    return_type: Optional[str] = None,
+) -> Iterator[dict[str, Any]]:
+    """Stream completion chunks from the underlying LLM provider using litellm.
+
+    This mirrors :pyfunc:`lite_llm_completion` but sets ``stream=True`` and yields
+    dictionary chunks that can be serialized with ``json.dumps``.  Error handling
+    follows the non-streaming version: any exception is surfaced to the caller
+    as a single error chunk and the iterator terminates.
+    """
+    # Setup provider-specific credentials and model modifications
+    (
+        aws_access_key_id,
+        aws_secret_access_key,
+        aws_region_name,
+        azure_api_base,
+        azure_api_version,
+    ) = _setup_provider_credentials_and_model(inputs, provider)
+
+    import litellm
+
+    litellm.drop_params = True
+
+    # Helper to produce a generator of dicts from litellm chunks
+    def _generate_chunks() -> Iterator[dict[str, Any]]:
+        try:
+            if provider == "custom" and base_url:
+                headers = extra_headers or {}
+                stream = litellm.completion(
+                    **inputs.model_dump(exclude_none=True),
+                    api_key=api_key,
+                    api_base=base_url,
+                    extra_headers=headers,
+                    stream=True,
+                    stream_options={"include_usage": True},
+                )
+            else:
+                stream = litellm.completion(
+                    **inputs.model_dump(exclude_none=True),
+                    api_key=api_key,
+                    aws_access_key_id=aws_access_key_id,
+                    aws_secret_access_key=aws_secret_access_key,
+                    aws_region_name=aws_region_name,
+                    api_base=azure_api_base,
+                    api_version=azure_api_version,
+                    stream=True,
+                    stream_options={"include_usage": True},
+                )
+
+            for chunk in stream:
+                # ``chunk`` is a BaseModel (ChatCompletionChunk). Convert to dict.
+                if hasattr(chunk, "model_dump"):
+                    yield chunk.model_dump()
+                else:
+                    yield chunk  # type: ignore[return-value]
+        except Exception as e:
+            error_message = str(e).replace("litellm.", "")
+            yield {"error": error_message}
+
+    # If the caller wants a custom return type transformation (currently unused)
+    # they can wrap the generator themselves. We just return the raw iterator.
+    return _generate_chunks()

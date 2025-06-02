@@ -1,24 +1,30 @@
+import {isWeaveObjectRef, ObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
-import {useMemo} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 
 import {flattenObjectPreservingWeaveTypes} from '../../../../flattenObject';
+import {TraceServerClient} from '../../../wfReactInterface/traceServerClient';
+import {useGetTraceServerClientContext} from '../../../wfReactInterface/traceServerClientContext';
+import {TraceTableQueryReq} from '../../../wfReactInterface/traceServerClientTypes';
+import {projectIdFromParts} from '../../../wfReactInterface/tsDataModelHooks';
+import {CompareEvaluationContext} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
   CompositeScoreMetrics,
   resolvePeerDimension,
 } from '../../compositeMetricsUtil';
-import {getOrderedCallIds} from '../../ecpState';
-import {EvaluationComparisonState} from '../../ecpState';
+import {EvaluationComparisonState, getOrderedCallIds} from '../../ecpState';
 import {PredictAndScoreCall} from '../../ecpTypes';
-import {metricDefinitionId} from '../../ecpUtil';
-import {resolveScoreMetricValueForPASCall} from '../../ecpUtil';
+import {
+  metricDefinitionId,
+  resolveScoreMetricValueForPASCall,
+} from '../../ecpUtil';
 
 type RowBase = {
   id: string;
   evaluationCallId: string;
   inputDigest: string;
   inputRef: string;
-  input: {[inputKey: string]: any};
   path: string[];
   predictAndScore: PredictAndScoreCall;
 };
@@ -26,11 +32,12 @@ type RowBase = {
 type FlattenedRow = RowBase & {
   output: {[outputKey: string]: any};
   scores: {[scoreId: string]: number | boolean | undefined};
+  trialNdx: number;
 };
 
 export type PivotedRow = RowBase & {
   output: {[outputKey: string]: {[callId: string]: any}};
-  scores: {[scoreId: string]: {[callId: string]: number | boolean}};
+  scores: {[scoreId: string]: {[callId: string]: number | boolean | undefined}};
 };
 
 const aggregateGroupedNestedRows = <T>(
@@ -115,7 +122,31 @@ const rowIsSelected = (
   });
 };
 
-export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
+export type FilteredAggregateRows = {
+  id: string;
+  count: number;
+  inputDigest: string;
+  inputRef: ObjectRef | null;
+  output: {
+    [k: string]: {
+      [k: string]: any;
+    };
+  };
+  scores: {
+    [k: string]: {
+      [k: string]: number | undefined;
+    };
+  };
+  originalRows: PivotedRow[];
+}[];
+
+export const useFilteredAggregateRows = (
+  state: EvaluationComparisonState
+): {
+  filteredRows: FilteredAggregateRows;
+  outputColumnKeys: string[];
+  leafDims: string[];
+} => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
   const compositeMetricsMap = useMemo(
     () => buildCompositeMetricsMap(state.summary, 'score'),
@@ -129,43 +160,36 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     ).forEach(([rowDigest, rowCollection]) => {
       Object.values(rowCollection.evaluations).forEach(modelCollection => {
         Object.values(modelCollection.predictAndScores).forEach(
-          predictAndScoreRes => {
-            const datasetRow =
-              state.loadableComparisonResults.result?.inputs[
-                predictAndScoreRes.rowDigest
-              ];
-            if (datasetRow != null) {
-              const output = predictAndScoreRes._rawPredictTraceData?.output;
-              rows.push({
-                id: predictAndScoreRes.callId,
-                evaluationCallId: predictAndScoreRes.evaluationCallId,
-                inputDigest: datasetRow.digest,
-                inputRef: predictAndScoreRes.exampleRef,
-                input: flattenObjectPreservingWeaveTypes({
-                  input: datasetRow.val,
-                }),
-                output: flattenObjectPreservingWeaveTypes({output}),
-                scores: Object.fromEntries(
-                  [...Object.entries(state.summary.scoreMetrics)].map(
-                    ([scoreKey, scoreVal]) => {
-                      return [
-                        scoreKey,
-                        resolveScoreMetricValueForPASCall(
-                          scoreVal,
-                          predictAndScoreRes
-                        ),
-                      ];
-                    }
-                  )
-                ),
-                path: [
-                  rowDigest,
-                  predictAndScoreRes.evaluationCallId,
-                  predictAndScoreRes.callId,
-                ],
-                predictAndScore: predictAndScoreRes,
-              });
-            }
+          (predictAndScoreRes, trialNdx) => {
+            const output = predictAndScoreRes._rawPredictTraceData?.output;
+            rows.push({
+              id: predictAndScoreRes.callId,
+              evaluationCallId: predictAndScoreRes.evaluationCallId,
+              inputDigest: predictAndScoreRes.rowDigest,
+              inputRef: predictAndScoreRes.exampleRef,
+              // Note: this would be a possible location to record the raw predict_and_score inputs as the presumed data row.
+              output: flattenObjectPreservingWeaveTypes({output}),
+              scores: Object.fromEntries(
+                [...Object.entries(state.summary.scoreMetrics)].map(
+                  ([scoreKey, scoreVal]) => {
+                    return [
+                      scoreKey,
+                      resolveScoreMetricValueForPASCall(
+                        scoreVal,
+                        predictAndScoreRes
+                      ),
+                    ];
+                  }
+                )
+              ),
+              path: [
+                rowDigest,
+                predictAndScoreRes.evaluationCallId,
+                predictAndScoreRes.callId,
+              ],
+              predictAndScore: predictAndScoreRes,
+              trialNdx,
+            });
           }
         );
       });
@@ -173,7 +197,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     return rows;
   }, [
     state.loadableComparisonResults.result?.resultRows,
-    state.loadableComparisonResults.result?.inputs,
     state.summary.scoreMetrics,
   ]);
 
@@ -223,8 +246,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
             id: inputDigest, // required for the data grid
             count: rows.length,
             inputDigest,
-            inputRef: rows[0].inputRef, // Should be the same for all,
-            input: rows[0].input, // Should be the same for all
+            inputRef: parseRefMaybe(rows[0].inputRef), // Should be the same for all,
             output: aggregateGroupedNestedRows(
               rows,
               'output',
@@ -292,20 +314,6 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     return res;
   }, [aggregatedRows, compositeMetricsMap, state]);
 
-  const inputColumnKeys = useMemo(() => {
-    const keys = new Set<string>();
-    const keysList: string[] = [];
-    flattenedRows.forEach(row => {
-      Object.keys(row.input).forEach(key => {
-        if (!keys.has(key)) {
-          keys.add(key);
-          keysList.push(key);
-        }
-      });
-    });
-    return keysList;
-  }, [flattenedRows]);
-
   const outputColumnKeys = useMemo(() => {
     const keys = new Set<string>();
     const keysList: string[] = [];
@@ -323,9 +331,242 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
   return useMemo(() => {
     return {
       filteredRows,
-      inputColumnKeys,
       outputColumnKeys,
       leafDims,
     };
-  }, [filteredRows, inputColumnKeys, leafDims, outputColumnKeys]);
+  }, [filteredRows, leafDims, outputColumnKeys]);
+};
+
+/**
+ * The following functions are used to fetch data rows There are the following methods:
+ * * `useExampleCompareDataAndPrefetch` - This is used to fetch a target row and prefetch the adjacent rows.
+ *   * This is the primary exported hook from this section.
+ * * `useExampleCompareData` - This is used to fetch a single row.
+ * * `loadMissingRowDataIntoCache` - This is used to asynchronously load rows that are not yet in our cache.
+ * * Then there are a few helper functions that are used to make the above hooks work:
+ *   * `makePartialTableReq` - This is used to make a partial table request for a dataset.
+ *   * `usePartialTableRequest` - This is used to wrap the `makePartialTableReq` hook and provide a reactive partial table request.
+ *   * `loadRowDataIntoCache` - This is used to directly load rows into our cache.
+ *   * `getCachedRowData` - This is used to directly get a row from our cache.
+ */
+
+// React hook to wrap the `useExampleCompareData` and `prefetchRowData`
+// to provide a single hook that fetches the target row and prefetches the adjacent rows
+// This is a convenience hook for the `ExampleCompareSection` component
+export function useExampleCompareDataAndPrefetch(
+  ctx: CompareEvaluationContext,
+  filteredRows: Array<{
+    inputDigest: string;
+  }>,
+  targetIndex: number
+) {
+  const {state} = ctx;
+  // Step 1: Fetch the target row
+  const targetDigest = filteredRows[targetIndex].inputDigest;
+  const {targetRowValue, loading} = useExampleCompareData(ctx, targetDigest);
+
+  // Step 2: Prefetch the adjacent rows
+  const prefetchDigests = useMemo(() => {
+    const digests = [];
+    if (targetIndex > 0) {
+      digests.push(filteredRows[targetIndex - 1].inputDigest);
+    }
+    if (targetIndex < filteredRows.length - 1) {
+      digests.push(filteredRows[targetIndex + 1].inputDigest);
+    }
+    return digests;
+  }, [filteredRows, targetIndex]);
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const client = getTraceServerClient();
+  const partialTableRequest = usePartialTableRequest(state);
+
+  useEffect(() => {
+    (async () => {
+      // Nothing we can do if the partial table request is not set
+      if (partialTableRequest == null) {
+        return;
+      }
+      await loadMissingRowDataIntoCache(
+        client,
+        ctx,
+        prefetchDigests,
+        partialTableRequest
+      );
+    })();
+  }, [partialTableRequest, client, prefetchDigests, state, ctx]);
+
+  return {
+    targetRowValue,
+    loading,
+  };
+}
+
+// Primary method for fetching and caching a single row
+export function useExampleCompareData(
+  ctx: CompareEvaluationContext,
+  targetDigest: string
+) {
+  const {state} = ctx;
+  const initialValue = ctx.getCachedRowData(targetDigest);
+  const [loading, setLoading] = useState<boolean>(initialValue == null);
+  const [targetRowValue, setTargetRowValue] = useState<any>(
+    initialValue ? flattenObjectPreservingWeaveTypes(initialValue) : null
+  );
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const client = getTraceServerClient();
+  const partialTableRequest = usePartialTableRequest(state);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      let cachedRowData = ctx.getCachedRowData(targetDigest);
+      // If the value is already loaded, don't fetch again
+      if (cachedRowData != null) {
+        setTargetRowValue(flattenObjectPreservingWeaveTypes(cachedRowData));
+        return;
+      }
+      // Nothing we can do if the partial table request is not set
+      if (partialTableRequest == null) {
+        return;
+      }
+      // immediately fetch the current row
+      setLoading(true);
+
+      const singleRows = await loadRowDataIntoCache(
+        client,
+        ctx,
+        [targetDigest],
+        partialTableRequest
+      );
+      if (mounted) {
+        const data = singleRows[0];
+        if (data != null) {
+          setTargetRowValue(flattenObjectPreservingWeaveTypes(data));
+        }
+        setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [partialTableRequest, client, ctx, targetDigest]);
+
+  return {
+    targetRowValue,
+    loading,
+  };
+}
+
+// Helper to load rows that are not yet in our cache
+async function loadMissingRowDataIntoCache(
+  client: TraceServerClient,
+  ctx: CompareEvaluationContext,
+  rowDigests: string[],
+  partialTableRequest: PartialTableRequestType
+): Promise<any[]> {
+  const neededRows = rowDigests.filter(
+    row => ctx.getCachedRowData(row) == null
+  );
+
+  if (neededRows.length > 0) {
+    // we load the data into the cache, but don't trigger a re-render
+    await loadRowDataIntoCache(client, ctx, neededRows, partialTableRequest);
+  }
+
+  return rowDigests.map(row => ctx.getCachedRowData(row));
+}
+
+type PartialTableRequestType = Pick<
+  TraceTableQueryReq,
+  'project_id' | 'digest'
+>;
+
+// Get the table digest used in the dataset of the first evaluation,
+// which prepares a request for actually fetching the table rows later
+async function makePartialTableReq(
+  client: TraceServerClient,
+  datasetRef: string
+): Promise<PartialTableRequestType | null> {
+  const datasetObjRes = await client.readBatch({
+    refs: [datasetRef],
+  });
+  if (!datasetObjRes.vals[0]) {
+    console.error('Dataset not found');
+    return null;
+  }
+
+  const rowsRef = datasetObjRes.vals[0].rows;
+  const parsedRef = parseRefMaybe(rowsRef);
+  if (parsedRef == null) {
+    console.error('Invalid rows ref', rowsRef);
+    return null;
+  }
+  if (!isWeaveObjectRef(parsedRef)) {
+    console.error('Ref is not a weave object ref', rowsRef);
+    return null;
+  }
+  if (parsedRef.weaveKind !== 'table') {
+    console.error('Ref is not a table ref', rowsRef);
+    return null;
+  }
+
+  return {
+    project_id: projectIdFromParts({
+      entity: parsedRef.entityName,
+      project: parsedRef.projectName,
+    }),
+    digest: parsedRef.artifactVersion,
+  };
+}
+
+// React hook to wrap the `makePartialTableReq`
+const usePartialTableRequest = (state: EvaluationComparisonState) => {
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const client = getTraceServerClient();
+  const [partialTableRequest, setPartialTableRequest] =
+    useState<PartialTableRequestType | null>(null);
+
+  const datasetRef = useMemo(() => {
+    return Object.values(state.summary.evaluations)[0].datasetRef as string;
+  }, [state.summary.evaluations]);
+
+  useEffect(() => {
+    let mounted = true;
+    makePartialTableReq(client, datasetRef).then(res => {
+      if (mounted) {
+        setPartialTableRequest(res);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [client, datasetRef]);
+
+  return partialTableRequest;
+};
+
+// Helper to fetch and store row data in our state cache
+async function loadRowDataIntoCache(
+  client: TraceServerClient,
+  ctx: CompareEvaluationContext,
+  rowDigests: string[],
+  partialTableRequest: PartialTableRequestType
+): Promise<any[]> {
+  const rowsRes = await client.tableQuery({
+    ...partialTableRequest,
+    filter: {
+      row_digests: rowDigests,
+    },
+  });
+  for (const row of rowsRes.rows) {
+    ctx.setCachedRowData(row.digest, row.val);
+  }
+  return rowsRes.rows.map(row => row.val);
+}
+
+export const removePrefix = (key: string, prefix: string) => {
+  if (key.startsWith(prefix)) {
+    return key.slice(prefix.length);
+  }
+  return key;
 };

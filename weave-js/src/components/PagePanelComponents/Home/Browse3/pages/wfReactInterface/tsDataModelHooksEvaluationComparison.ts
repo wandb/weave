@@ -69,14 +69,17 @@
  *  across different datasets.
  */
 
-import {sum} from 'lodash';
-import _ from 'lodash';
+import _, {sum} from 'lodash';
 import {useEffect, useMemo, useRef, useState} from 'react';
 
 import {WB_RUN_COLORS} from '../../../../../../common/css/color.styles';
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {parseRef, WeaveObjectRef} from '../../../../../../react';
-import {PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC} from '../common/heuristics';
+import {
+  PREDICT_AND_SCORE_OP_NAME_JS,
+  PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC,
+  PREDICT_OP_NAME,
+} from '../common/heuristics';
 import {
   EvaluationComparisonResults,
   EvaluationComparisonSummary,
@@ -84,9 +87,9 @@ import {
 } from '../CompareEvaluationsPage/ecpTypes';
 import {
   EVALUATION_NAME_DEFAULT,
+  getScoreKeyNameFromScorerRef,
   metricDefinitionId,
 } from '../CompareEvaluationsPage/ecpUtil';
-import {getScoreKeyNameFromScorerRef} from '../CompareEvaluationsPage/ecpUtil';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {
@@ -94,7 +97,12 @@ import {
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
 import {Loadable} from '../wfReactInterface/wfDataModelHooksInterface';
+import {memoize} from './memoize';
 import {TraceCallSchema} from './traceServerClientTypes';
+
+// Configuration constants
+const CHUNK_SIZE = 250;
+const MEMOIZE_CACHE_SIZE = 10;
 
 /**
  * Primary react hook for fetching evaluation comparison data. This could be
@@ -282,93 +290,14 @@ const fetchEvaluationSummaryData = async (
       return;
     }
 
-    // Add the user-defined scores
-    evalObj.scorerRefs.forEach(scorerRef => {
-      const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
-      // TODO: REMOVE when sanitized scorer names have been released
-      // this is a hack to support previous unsanitized scorer names
-      // that have spaces.
-      let score = output[scorerKey];
-      if (score == null && scorerKey.includes('-')) {
-        // no score found, '-' means we probably sanitized an illegal character
-        const foundScorerNameMaybe = fuzzyMatchScorerName(
-          Object.keys(output),
-          scorerKey
-        );
-        if (foundScorerNameMaybe != null) {
-          score = output[foundScorerNameMaybe];
-        }
-      }
-      const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
-        if (isBinarySummaryScore(scoreVal)) {
-          const metricDimension: MetricDefinition = {
-            scoreType: 'binary',
-            metricSubPath: currPath,
-            source: 'scorer',
-            scorerOpOrObjRef: scorerRef,
-          };
-          const metricId = metricDefinitionId(metricDimension);
-          result.summaryMetrics[metricId] = metricDimension;
-          evalCall.summaryMetrics[metricId] = {
-            value: scoreVal.true_fraction,
-            // Later on this will be updated to the Summary or CustomScorer's Summary Call
-            sourceCallId: evalCallId,
-          };
-        } else if (isContinuousSummaryScore(scoreVal)) {
-          const metricDimension: MetricDefinition = {
-            scoreType: 'continuous',
-            metricSubPath: currPath,
-            source: 'scorer',
-            scorerOpOrObjRef: scorerRef,
-          };
-          const metricId = metricDefinitionId(metricDimension);
-          result.summaryMetrics[metricId] = metricDimension;
-          evalCall.summaryMetrics[metricId] = {
-            value: scoreVal.mean,
-            // Later on this will be updated to the Summary or CustomScorer's Summary Call
-            sourceCallId: evalCallId,
-          };
-        } else if (typeof scoreVal === 'boolean') {
-          const metricDimension: MetricDefinition = {
-            scoreType: 'binary',
-            metricSubPath: currPath,
-            source: 'scorer',
-            scorerOpOrObjRef: scorerRef,
-          };
-          const metricId = metricDefinitionId(metricDimension);
-          result.summaryMetrics[metricId] = metricDimension;
-          evalCall.summaryMetrics[metricId] = {
-            value: scoreVal,
-            // Later on this will be updated to the Summary or CustomScorer's Summary Call
-            sourceCallId: evalCallId,
-          };
-        } else if (typeof scoreVal === 'number') {
-          const metricDimension: MetricDefinition = {
-            scoreType: 'continuous',
-            metricSubPath: currPath,
-            source: 'scorer',
-            scorerOpOrObjRef: scorerRef,
-          };
-          const metricId = metricDefinitionId(metricDimension);
-          result.summaryMetrics[metricId] = metricDimension;
-          evalCall.summaryMetrics[metricId] = {
-            value: scoreVal,
-            // Later on this will be updated to the Summary or CustomScorer's Summary Call
-            sourceCallId: evalCallId,
-          };
-        } else if (
-          scoreVal != null &&
-          typeof scoreVal === 'object' &&
-          !Array.isArray(scoreVal)
-        ) {
-          Object.entries(scoreVal).forEach(([key, val]) => {
-            recursiveAddScore(val, [...currPath, key]);
-          });
-        }
-      };
-
-      recursiveAddScore(score, []);
-    });
+    const isImperative = isImperativeEvalCall(
+      evaluationCallCache[evalCall.callId]
+    );
+    if (isImperative) {
+      processImperativeEvaluationSummary(result, evalCall, evalCallId, output);
+    } else {
+      processEvaluationSummary(result, evalCall, evalCallId, evalObj, output);
+    }
 
     // Add the derived metrics
     // Model latency
@@ -455,76 +384,22 @@ const fetchEvaluationComparisonResults = async (
 ): Promise<EvaluationComparisonResults> => {
   const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonResults = {
-    inputs: {},
     resultRows: {},
   };
 
-  // Kick off the trace query to get the actual trace data
-  // Note: we split this into 2 steps to ensure we only get level 2 children
-  // of the evaluations. This avoids massive overhead of fetching gigantic traces
-  // for every evaluation.
-  const evalTraceIds = Object.values(summaryData.evaluationCalls).map(
-    call => call.traceId
+  const evalTraceRes = {
+    calls: await fetchEvalSubtreesParallel(
+      traceServerClient,
+      projectId,
+      evaluationCallIds
+    ),
+  };
+
+  // Calculate all necessary data first
+  const imperativeEvalCalls = evalTraceRes.calls.filter(isImperativeEvalCall);
+  const nonImperativeEvalCalls = evalTraceRes.calls.filter(
+    call => !isImperativeEvalCall(call)
   );
-  // First, get all the children of the evaluations (predictAndScoreCalls + summary)
-  const evalTraceResProm = traceServerClient
-    .callsStreamQuery({
-      project_id: projectId,
-      filter: {trace_ids: evalTraceIds, parent_ids: evaluationCallIds},
-    })
-    .then(predictAndScoreCallRes => {
-      // Then, get all the children of those calls (predictions + scores)
-      const predictAndScoreIds = predictAndScoreCallRes.calls.map(
-        call => call.id
-      );
-
-      return Promise.all(
-        _.chunk(predictAndScoreIds, 500).map(chunk => {
-          return traceServerClient
-            .callsStreamQuery({
-              project_id: projectId,
-              filter: {trace_ids: evalTraceIds, parent_ids: chunk},
-            })
-            .then(predictionsAndScoresCallsRes => {
-              return predictionsAndScoresCallsRes.calls;
-            });
-        })
-      ).then(predictionsAndScoresCallsResMany => {
-        return {
-          calls: [
-            ...predictAndScoreCallRes.calls,
-            ...predictionsAndScoresCallsResMany.flat(),
-          ],
-        };
-      });
-    });
-
-  // 3.5 Populate the inputs
-  // We only need 1 since we are going to effectively do an inner join on the rowDigest
-  const datasetRef = Object.values(summaryData.evaluations)[0]
-    .datasetRef as string;
-  const datasetObjRes = await traceServerClient.readBatch({refs: [datasetRef]});
-  // If the dataset has not been deleted, fetch rows
-  if (datasetObjRes.vals[0] != null) {
-    const rowsRef = datasetObjRes.vals[0].rows;
-    const parsedRowsRef = parseRef(rowsRef) as WeaveObjectRef;
-    const rowsQuery = await traceServerClient.tableQuery({
-      project_id: projectIdFromParts({
-        entity: parsedRowsRef.entityName,
-        project: parsedRowsRef.projectName,
-      }),
-      digest: parsedRowsRef.artifactVersion,
-    });
-    rowsQuery.rows.forEach(row => {
-      result.inputs[row.digest] = {
-        digest: row.digest,
-        val: row.val,
-      };
-    });
-  }
-
-  // 4. Populate the predictions and scores
-  const evalTraceRes = await evalTraceResProm;
 
   // Create a set of all of the scorer refs
   const scorerRefs = new Set(
@@ -536,8 +411,10 @@ const fetchEvaluationComparisonResults = async (
   // Create a map of all the predict_and_score_ops
   const predictAndScoreOps = Object.fromEntries(
     evalTraceRes.calls
-      .filter(call =>
-        call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
+      .filter(
+        call =>
+          call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC) ||
+          call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_JS)
       )
       .map(call => [call.id, call])
   );
@@ -573,6 +450,531 @@ const fetchEvaluationComparisonResults = async (
     evalCall => evalCall.modelRef
   );
 
+  // Now call both populate functions side by side
+  populatePredictionsAndScoresImperative(
+    {calls: imperativeEvalCalls},
+    result,
+    summaryData
+  );
+
+  populatePredictionsAndScoresNonImperative(
+    {calls: nonImperativeEvalCalls},
+    result,
+    summaryData,
+    summaryOps,
+    scorerRefs,
+    predictAndScoreOps,
+    modelRefs
+  );
+
+  // Filter out non-intersecting rows
+  result.resultRows = Object.fromEntries(
+    Object.entries(result.resultRows).filter(([digest, row]) => {
+      return (
+        Object.values(row.evaluations).length ===
+        Object.values(summaryData.evaluationCalls).length
+      );
+    })
+  );
+
+  return result;
+};
+
+/// Non exported helpers below
+
+const modelLatencyMetricDimension: MetricDefinition = {
+  source: 'derived',
+  scoreType: 'continuous',
+  metricSubPath: ['Latency'],
+  shouldMinimize: true,
+  unit: 's',
+};
+
+const totalTokensMetricDimension: MetricDefinition = {
+  source: 'derived',
+  scoreType: 'continuous',
+  metricSubPath: ['Total Tokens'],
+  shouldMinimize: true,
+  unit: '',
+};
+const pickColor = (ndx: number) => {
+  return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
+};
+
+const isBinaryScore = (score: any): score is boolean => {
+  return typeof score === 'boolean';
+};
+
+const isBinarySummaryScore = (score: any): score is BinarySummaryScore => {
+  return (
+    typeof score === 'object' &&
+    score != null &&
+    'true_count' in score &&
+    'true_fraction' in score
+  );
+};
+
+const isContinuousSummaryScore = (
+  score: any
+): score is ContinuousSummaryScore => {
+  return typeof score === 'object' && score != null && 'mean' in score;
+};
+
+const isContinuousScore = (score: any): score is number => {
+  return typeof score === 'number';
+};
+
+type BinarySummaryScore = {
+  true_count: number;
+  true_fraction: number;
+};
+
+type ContinuousSummaryScore = {
+  mean: number;
+};
+
+type EvaluationEvaluateCallSchema = TraceCallSchema & {
+  inputs: TraceCallSchema['inputs'] & {
+    self: string;
+    model: string;
+  };
+  output: TraceCallSchema['output'] & {
+    [scorer: string]: {
+      [score: string]: SummaryScore;
+    };
+  } & {
+    model_latency: ContinuousSummaryScore;
+  };
+  summary: TraceCallSchema['summary'] & {
+    usage?: {
+      [model: string]: {
+        requests?: number;
+        completion_tokens?: number;
+        prompt_tokens?: number;
+        total_tokens?: number;
+      };
+    };
+  };
+};
+type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
+
+function fuzzyMatchScorerName(
+  scoreNames: string[],
+  possibleScorerName: string
+) {
+  // anytime we see a '-' in possibleScorerName, it can be any illegal character
+  // in score names. Use a regex to find matches, and return the first match.
+  const regex = new RegExp(possibleScorerName.replace(/-/g, '.'));
+  return scoreNames.find(name => regex.test(name));
+}
+
+// Process summary data specifically for regular evaluations
+const processEvaluationSummary = (
+  result: EvaluationComparisonSummary,
+  evalCall: any,
+  evalCallId: string,
+  evalObj: any,
+  output: any
+): void => {
+  // Add the user-defined scores
+  evalObj.scorerRefs.forEach((scorerRef: string) => {
+    const scorerKey = getScoreKeyNameFromScorerRef(scorerRef);
+    // TODO: REMOVE when sanitized scorer names have been released
+    // this is a hack to support previous unsanitized scorer names
+    // that have spaces.
+    let score = output[scorerKey];
+    if (score == null && scorerKey.includes('-')) {
+      // no score found, '-' means we probably sanitized an illegal character
+      const foundScorerNameMaybe = fuzzyMatchScorerName(
+        Object.keys(output),
+        scorerKey
+      );
+      if (foundScorerNameMaybe != null) {
+        score = output[foundScorerNameMaybe];
+      }
+    }
+    const recursiveAddScore = (scoreVal: any, currPath: string[]) => {
+      if (isBinarySummaryScore(scoreVal)) {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'binary',
+          metricSubPath: currPath,
+          source: 'scorer',
+          scorerOpOrObjRef: scorerRef,
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: scoreVal.true_fraction,
+          // Later on this will be updated to the Summary or CustomScorer's Summary Call
+          sourceCallId: evalCallId,
+        };
+      } else if (isContinuousSummaryScore(scoreVal)) {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'continuous',
+          metricSubPath: currPath,
+          source: 'scorer',
+          scorerOpOrObjRef: scorerRef,
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: scoreVal.mean,
+          // Later on this will be updated to the Summary or CustomScorer's Summary Call
+          sourceCallId: evalCallId,
+        };
+      } else if (typeof scoreVal === 'boolean') {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'binary',
+          metricSubPath: currPath,
+          source: 'scorer',
+          scorerOpOrObjRef: scorerRef,
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: scoreVal,
+          // Later on this will be updated to the Summary or CustomScorer's Summary Call
+          sourceCallId: evalCallId,
+        };
+      } else if (typeof scoreVal === 'number') {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'continuous',
+          metricSubPath: currPath,
+          source: 'scorer',
+          scorerOpOrObjRef: scorerRef,
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: scoreVal,
+          // Later on this will be updated to the Summary or CustomScorer's Summary Call
+          sourceCallId: evalCallId,
+        };
+      } else if (
+        scoreVal != null &&
+        typeof scoreVal === 'object' &&
+        !Array.isArray(scoreVal)
+      ) {
+        Object.entries(scoreVal).forEach(([key, val]) => {
+          recursiveAddScore(val, [...currPath, key]);
+        });
+      }
+    };
+
+    recursiveAddScore(score, []);
+  });
+};
+
+// Process summary data specifically for imperative evaluations
+const processImperativeEvaluationSummary = (
+  result: EvaluationComparisonSummary,
+  evalCall: any,
+  evalCallId: string,
+  output: any
+): void => {
+  // In imperative evaluations, the metrics can appear directly in the output object
+  // We need to recursively process them to extract all metrics
+  const recursiveAddMetric = (metricVal: any, currPath: string[]) => {
+    if (typeof metricVal === 'boolean') {
+      const metricDimension: MetricDefinition = {
+        scoreType: 'binary',
+        metricSubPath: currPath,
+        source: 'derived', // Using 'derived' since we don't have a direct scorer reference
+      };
+      const metricId = metricDefinitionId(metricDimension);
+      result.summaryMetrics[metricId] = metricDimension;
+      evalCall.summaryMetrics[metricId] = {
+        value: metricVal,
+        sourceCallId: evalCallId,
+      };
+    } else if (typeof metricVal === 'number') {
+      const metricDimension: MetricDefinition = {
+        scoreType: 'continuous',
+        metricSubPath: currPath,
+        source: 'derived',
+      };
+      const metricId = metricDefinitionId(metricDimension);
+      result.summaryMetrics[metricId] = metricDimension;
+      evalCall.summaryMetrics[metricId] = {
+        value: metricVal,
+        sourceCallId: evalCallId,
+      };
+    } else if (
+      metricVal != null &&
+      typeof metricVal === 'object' &&
+      !Array.isArray(metricVal)
+    ) {
+      // Special case for auto-summarized binary scores
+      if (isBinarySummaryScore(metricVal)) {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'binary',
+          metricSubPath: currPath,
+          source: 'derived',
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: metricVal.true_fraction,
+          sourceCallId: evalCallId,
+        };
+      }
+      // Special case for auto-summarized continuous scores
+      else if (isContinuousSummaryScore(metricVal)) {
+        const metricDimension: MetricDefinition = {
+          scoreType: 'continuous',
+          metricSubPath: currPath,
+          source: 'derived',
+        };
+        const metricId = metricDefinitionId(metricDimension);
+        result.summaryMetrics[metricId] = metricDimension;
+        evalCall.summaryMetrics[metricId] = {
+          value: metricVal.mean,
+          sourceCallId: evalCallId,
+        };
+      }
+      // Otherwise, process nested objects
+      else {
+        Object.entries(metricVal).forEach(([key, val]) => {
+          recursiveAddMetric(val, [...currPath, key]);
+        });
+      }
+    }
+  };
+
+  // Start processing from the root of the output
+  Object.entries(output).forEach(([key, val]) => {
+    recursiveAddMetric(val, [key]);
+  });
+};
+
+export const isImperativeEvalCall = (call: TraceCallSchema) => {
+  return call.attributes?._weave_eval_meta?.imperative;
+};
+
+const generateStableDigest = (obj: any): string => {
+  if (obj === undefined || obj === null) {
+    return 'null'; // Return consistent string for null/undefined
+  }
+
+  try {
+    // Sort keys to ensure stable stringification
+    const sortObjectKeys = (val: any): any => {
+      if (val === null || val === undefined) {
+        return null;
+      }
+
+      if (typeof val !== 'object' || Array.isArray(val)) {
+        return val;
+      }
+
+      return Object.keys(val)
+        .sort()
+        .reduce((result: any, key) => {
+          result[key] = sortObjectKeys(val[key]);
+          return result;
+        }, {});
+    };
+
+    return JSON.stringify(sortObjectKeys(obj));
+  } catch (e) {
+    // In case of any JSON serialization errors, return a fallback value
+    console.warn('Error generating stable digest:', e);
+    return `digest_${Date.now()}`;
+  }
+};
+
+const populatePredictionsAndScoresImperative = (
+  evalTraceRes: {calls: TraceCallSchema[]},
+  result: EvaluationComparisonResults,
+  summaryData: EvaluationComparisonSummary
+) => {
+  const predictAndScoreCalls = evalTraceRes.calls.filter(call =>
+    call.op_name.includes(PREDICT_AND_SCORE_OP_NAME_POST_PYDANTIC)
+  );
+  const predictCalls = evalTraceRes.calls.filter(c =>
+    c.op_name.includes(PREDICT_OP_NAME)
+  );
+  const scoreCalls = evalTraceRes.calls.filter(
+    c => c.attributes?._weave_eval_meta?.score
+  );
+
+  const evalPredictCallsByParentId = _.groupBy(predictCalls, 'parent_id');
+  const evalScoreCallsByParentId = _.groupBy(scoreCalls, 'parent_id');
+
+  // Process imperative predict and score calls
+  predictAndScoreCalls.forEach(call => {
+    if (!call || !call.inputs) {
+      return;
+    }
+
+    try {
+      const example = call.inputs.example;
+      const modelRef = call.inputs.model;
+      const evaluationCallId = call.parent_id;
+
+      if (!evaluationCallId || !example) {
+        return;
+      }
+
+      // Generate a digest for the example
+      const digest = generateStableDigest(example);
+
+      // Create result entry if it doesn't exist
+      if (!result.resultRows[digest]) {
+        result.resultRows[digest] = {
+          evaluations: {},
+          // Store the original input data directly in the resultRows
+          rawDataRow: example,
+        };
+      } else if (!result.resultRows[digest].rawDataRow) {
+        // If the row exists but doesn't have originalInput yet, add it
+        result.resultRows[digest].rawDataRow = example;
+      }
+
+      // Add evaluation entry if it doesn't exist
+      if (!result.resultRows[digest].evaluations[evaluationCallId]) {
+        result.resultRows[digest].evaluations[evaluationCallId] = {
+          predictAndScores: {},
+        };
+      }
+
+      // Add predict_and_score entry
+      const predictAndScoreEntry: {
+        callId: string;
+        exampleRef: any;
+        rowDigest: string;
+        modelRef: any;
+        evaluationCallId: string;
+        scoreMetrics: {[key: string]: any};
+        _rawPredictAndScoreTraceData: any;
+        _rawPredictTraceData?: any;
+      } = {
+        callId: call.id,
+        exampleRef: example,
+        rowDigest: digest,
+        modelRef,
+        evaluationCallId,
+        scoreMetrics: {},
+        _rawPredictAndScoreTraceData: call,
+      };
+
+      // Find the corresponding predict call
+      const predictCalls = evalPredictCallsByParentId[call.id] ?? [];
+
+      if (predictCalls.length > 0) {
+        predictAndScoreEntry._rawPredictTraceData = predictCalls[0];
+
+        // Add model latency as a metric
+        if (predictCalls[0].started_at && predictCalls[0].ended_at) {
+          const modelLatencyMetricId = metricDefinitionId(
+            modelLatencyMetricDimension
+          );
+          const duration =
+            (convertISOToDate(predictCalls[0].ended_at).getTime() -
+              convertISOToDate(predictCalls[0].started_at).getTime()) /
+            1000;
+
+          predictAndScoreEntry.scoreMetrics[modelLatencyMetricId] = {
+            value: duration,
+            sourceCallId: predictCalls[0].id,
+          };
+        }
+
+        // Add token metrics
+        const totalTokensMetricId = metricDefinitionId(
+          totalTokensMetricDimension
+        );
+        const totalTokens = sum(
+          Object.values(predictCalls[0].summary?.usage ?? {}).map(
+            (x: any) => x?.total_tokens ?? 0
+          )
+        );
+
+        predictAndScoreEntry.scoreMetrics[totalTokensMetricId] = {
+          value: totalTokens,
+          sourceCallId: predictCalls[0].id,
+        };
+      }
+
+      // Find and add score calls
+      const scoreCalls = evalScoreCallsByParentId[call.id] ?? [];
+
+      scoreCalls.forEach(scoreCall => {
+        if (!scoreCall || !scoreCall.op_name) {
+          return;
+        }
+
+        const scorerRef = scoreCall.op_name;
+        const scoreOutput = scoreCall.output;
+
+        const processScoreOutput = (output: any, path: string[] = []) => {
+          if (typeof output === 'boolean') {
+            const metricDef: MetricDefinition = {
+              scoreType: 'binary',
+              metricSubPath: path,
+              source: 'scorer',
+              scorerOpOrObjRef: scorerRef,
+            };
+            const metricId = metricDefinitionId(metricDef);
+
+            // Store the binary metric ID in summary.scoreMetrics
+            // very important to ensure it gets included in the composite metrics map
+            summaryData.scoreMetrics[metricId] = metricDef;
+
+            predictAndScoreEntry.scoreMetrics[metricId] = {
+              sourceCallId: scoreCall.id,
+              value: output,
+            };
+          } else if (typeof output === 'number') {
+            // Similar update for continuous metrics
+            const metricDef: MetricDefinition = {
+              scoreType: 'continuous',
+              metricSubPath: path,
+              source: 'scorer',
+              scorerOpOrObjRef: scorerRef,
+            };
+            const metricId = metricDefinitionId(metricDef);
+
+            // Store the continuous metric ID in summary.scoreMetrics
+            summaryData.scoreMetrics[metricId] = metricDef;
+
+            predictAndScoreEntry.scoreMetrics[metricId] = {
+              sourceCallId: scoreCall.id,
+              value: output,
+            };
+          } else if (
+            output &&
+            typeof output === 'object' &&
+            !Array.isArray(output)
+          ) {
+            Object.entries(output).forEach(([key, value]) => {
+              processScoreOutput(value, [...path, key]);
+            });
+          }
+        };
+
+        processScoreOutput(scoreOutput);
+      });
+
+      // Add the entry to the result
+      result.resultRows[digest].evaluations[evaluationCallId].predictAndScores[
+        call.id
+      ] = predictAndScoreEntry;
+    } catch (e) {
+      console.warn('Error processing imperative evaluation:', e);
+    }
+  });
+};
+
+const populatePredictionsAndScoresNonImperative = (
+  evalTraceRes: {calls: TraceCallSchema[]},
+  result: EvaluationComparisonResults,
+  summaryData: EvaluationComparisonSummary,
+  summaryOps: TraceCallSchema[],
+  scorerRefs: Set<string>,
+  predictAndScoreOps: {[id: string]: TraceCallSchema},
+  modelRefs: string[]
+) => {
   // Next, we need to build the predictions object
   evalTraceRes.calls.forEach(traceCall => {
     // We are looking for 2 types of calls:
@@ -657,12 +1059,12 @@ const fetchEvaluationComparisonResults = async (
                     traceCall.ended_at ?? traceCall.started_at
                   ).getTime() -
                     convertISOToDate(traceCall.started_at).getTime()) /
-                  1000, // why is this different than the predictandscore model latency?
+                  1000,
                 sourceCallId: traceCall.id,
               };
 
               // Add total tokens
-              const totalTokensmetricId = metricDefinitionId(
+              const totalTokensMetricId = metricDefinitionId(
                 totalTokensMetricDimension
               );
               const totalTokens = sum(
@@ -670,13 +1072,12 @@ const fetchEvaluationComparisonResults = async (
                   (x: any) => x?.total_tokens ?? 0
                 )
               );
-              predictAndScoreFinal.scoreMetrics[totalTokensmetricId] = {
+              predictAndScoreFinal.scoreMetrics[totalTokensMetricId] = {
                 value: totalTokens,
                 sourceCallId: traceCall.id,
               };
             } else if (isProbablyScoreCall || isProbablyBoundScoreCall) {
               const results = traceCall.output as any;
-
               let scorerRef = traceCall.op_name;
               if (isProbablyBoundScoreCall) {
                 scorerRef = traceCall.inputs.self;
@@ -722,8 +1123,6 @@ const fetchEvaluationComparisonResults = async (
               };
 
               recursiveAddScore(results, []);
-            } else {
-              // pass
             }
           }
         }
@@ -754,104 +1153,81 @@ const fetchEvaluationComparisonResults = async (
       }
     }
   });
-
-  // Filter out non-intersecting rows
-  result.resultRows = Object.fromEntries(
-    Object.entries(result.resultRows).filter(([digest, row]) => {
-      return (
-        Object.values(row.evaluations).length ===
-        Object.values(summaryData.evaluationCalls).length
-      );
-    })
-  );
-
-  return result;
 };
 
-/// Non exported helpers below
+/**
+ * Fetches the subtree of calls for a single evaluation call.
+ * This includes all predict and score calls associated with the evaluation.
+ */
+const fetchEvalSubtree = async (
+  client: TraceServerClient,
+  projectId: string,
+  evalCallId: string
+): Promise<TraceCallSchema[]> => {
+  // First, get the count of expected calls (this is generally fast)
+  const predictAndScoreCallQueryBase = {
+    project_id: projectId,
+    filter: {parent_ids: [evalCallId]},
+  };
+  const predictAndScoreCallIdCount = (
+    await client.callsQueryStats(predictAndScoreCallQueryBase)
+  ).count;
 
-const modelLatencyMetricDimension: MetricDefinition = {
-  source: 'derived',
-  scoreType: 'continuous',
-  metricSubPath: ['Model Latency (avg)'],
-  shouldMinimize: true,
-  unit: 's',
+  // Next, fetch the results parallizing sub-batches
+  const fetchPredictAndScoreSubtreeBatch = async (
+    offset: number,
+    limit: number
+  ) => {
+    const predictAndScoreCalls = await client.callsStreamQuery({
+      ...predictAndScoreCallQueryBase,
+      offset,
+      limit,
+      sort_by: [
+        {
+          field: 'started_at',
+          direction: 'asc',
+        },
+      ],
+    });
+    const predictAndScoreIds = predictAndScoreCalls.calls.map(call => call.id);
+    const predictAndScoreChildren = await client.callsStreamQuery({
+      project_id: projectId,
+      filter: {parent_ids: predictAndScoreIds},
+    });
+    return [
+      ...predictAndScoreCalls.calls,
+      ...predictAndScoreChildren.calls.flat(),
+    ];
+  };
+  const proms = [];
+  for (let i = 0; i < predictAndScoreCallIdCount; i += CHUNK_SIZE) {
+    proms.push(fetchPredictAndScoreSubtreeBatch(i, CHUNK_SIZE));
+  }
+  const predictAndScoreCalls = await Promise.all(proms);
+
+  return predictAndScoreCalls.flat();
 };
 
-const totalTokensMetricDimension: MetricDefinition = {
-  source: 'derived',
-  scoreType: 'continuous',
-  metricSubPath: ['Total Tokens'],
-  shouldMinimize: true,
-  unit: '',
-};
-const pickColor = (ndx: number) => {
-  return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
-};
+const memoizedFetchEvalSubtree = memoize(
+  fetchEvalSubtree,
+  (client, projectId, evalCallId) => JSON.stringify({projectId, evalCallId}),
+  MEMOIZE_CACHE_SIZE
+);
 
-const isBinaryScore = (score: any): score is boolean => {
-  return typeof score === 'boolean';
-};
-
-const isBinarySummaryScore = (score: any): score is BinarySummaryScore => {
+/**
+ * Fetches subtrees for multiple evaluation calls in parallel.
+ * Uses memoization to prevent duplicate fetches of the same evaluation.
+ */
+const fetchEvalSubtreesParallel = async (
+  client: TraceServerClient,
+  projectId: string,
+  evalCallIds: string[]
+): Promise<TraceCallSchema[]> => {
   return (
-    typeof score === 'object' &&
-    score != null &&
-    'true_count' in score &&
-    'true_fraction' in score
-  );
+    await Promise.all(
+      evalCallIds.map(evalCallId =>
+        memoizedFetchEvalSubtree(client, projectId, evalCallId)
+      )
+    )
+  ).flat();
 };
-
-const isContinuousSummaryScore = (
-  score: any
-): score is ContinuousSummaryScore => {
-  return typeof score === 'object' && score != null && 'mean' in score;
-};
-
-const isContinuousScore = (score: any): score is number => {
-  return typeof score === 'number';
-};
-
-type BinarySummaryScore = {
-  true_count: number;
-  true_fraction: number;
-};
-
-type ContinuousSummaryScore = {
-  mean: number;
-};
-
-type EvaluationEvaluateCallSchema = TraceCallSchema & {
-  inputs: TraceCallSchema['inputs'] & {
-    self: string;
-    model: string;
-  };
-  output: TraceCallSchema['output'] & {
-    [scorer: string]: {
-      [score: string]: SummaryScore;
-    };
-  } & {
-    model_latency: ContinuousSummaryScore;
-  };
-  summary: TraceCallSchema['summary'] & {
-    usage?: {
-      [model: string]: {
-        requests?: number;
-        completion_tokens?: number;
-        prompt_tokens?: number;
-        total_tokens?: number;
-      };
-    };
-  };
-};
-type SummaryScore = BinarySummaryScore | ContinuousSummaryScore;
-
-function fuzzyMatchScorerName(
-  scoreNames: string[],
-  possibleScorerName: string
-) {
-  // anytime we see a '-' in possibleScorerName, it can be any illegal character
-  // in score names. Use a regex to find matches, and return the first match.
-  const regex = new RegExp(possibleScorerName.replace(/-/g, '.'));
-  return scoreNames.find(name => regex.test(name));
-}

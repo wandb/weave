@@ -64,7 +64,7 @@ export const FilterRow = ({
 
   const isOperatorDisabled =
     isWeaveRef(item.value) ||
-    ['id', 'status', 'user'].includes(getFieldType(item.field));
+    ['id', 'status', 'run', 'user'].includes(getFieldType(item.field));
 
   return (
     <>
@@ -75,7 +75,7 @@ export const FilterRow = ({
           onSelectField={onSelectField}
         />
       </div>
-      <div className="w-[140px]">
+      <div className="w-[165px]">
         {item.field && (
           <SelectOperator
             options={operatorOptions}

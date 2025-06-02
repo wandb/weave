@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import importlib
+import logging
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
+from urllib.parse import urlparse
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -14,6 +16,8 @@ if TYPE_CHECKING:
     from openai.types.responses import Response, ResponseStreamEvent
 
 _openai_patcher: MultiPatcher | None = None
+
+logger = logging.getLogger(__name__)
 
 
 def maybe_unwrap_api_response(value: Any) -> Any:
@@ -324,10 +328,14 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            def _wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
                 if kwargs.get("stream") and kwargs.get("stream_options") is None:
-                    kwargs["stream_options"] = {"include_usage": True}
-                return fn(*args, **kwargs)
+                    completion = self
+                    base_url = str(completion._client._base_url)
+                    # Only set stream_options if it targets the OpenAI endpoints
+                    if urlparse(base_url).hostname == "api.openai.com":
+                        kwargs["stream_options"] = {"include_usage": True}
+                return fn(self, *args, **kwargs)
 
             return _wrapper
 
@@ -338,6 +346,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
+
         op._set_on_input_handler(openai_on_input_handler)
         return _add_accumulator(
             op,  # type: ignore
@@ -360,10 +369,14 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            async def _wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
                 if kwargs.get("stream") and kwargs.get("stream_options") is None:
-                    kwargs["stream_options"] = {"include_usage": True}
-                return await fn(*args, **kwargs)
+                    completion = self
+                    base_url = str(completion._client._base_url)
+                    # Only set stream_options if it targets the OpenAI endpoints
+                    if urlparse(base_url).hostname == "api.openai.com":
+                        kwargs["stream_options"] = {"include_usage": True}
+                return await fn(self, *args, **kwargs)
 
             return _wrapper
 
@@ -424,13 +437,21 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         ResponseOutputItemDoneEvent,
         ResponseRefusalDeltaEvent,
         ResponseRefusalDoneEvent,
-        ResponseTextAnnotationDeltaEvent,
         ResponseTextDeltaEvent,
         ResponseTextDoneEvent,
         ResponseWebSearchCallCompletedEvent,
         ResponseWebSearchCallInProgressEvent,
         ResponseWebSearchCallSearchingEvent,
     )
+
+    # ResponseOutputTextAnnotationAddedEvent was introduced in openai 1.80.0
+    is_new_sdk = False
+    try:
+        from openai.types.responses import ResponseOutputTextAnnotationAddedEvent
+
+        is_new_sdk = True
+    except ImportError:
+        pass
 
     if acc is None:
         acc = Response(
@@ -475,6 +496,7 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         ),
     ):
         acc = _pad_output(acc, value)
+
         acc.output[value.output_index] += value.delta
 
     # 2b. Events without an output_index
@@ -488,11 +510,19 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
         # Not obvious how to handle these since there is no output_index
         if not acc.output:
             acc.output = [""]
-        acc.output[0] += value.delta
 
-    elif isinstance(value, ResponseTextAnnotationDeltaEvent):
-        # Not obvious how to handle this since there is no delta
-        ...
+        if value.delta is None:
+            # This is likely the case where not all event types are available in the SDK (ResponseOutputTextAnnotationAddedEvent)
+            logger.warning(
+                "Some responses could not be processed with your current version of the OpenAI SDK. Please upgrade to the latest version."
+            )
+        else:
+            acc.output[0] += value.delta
+
+    elif is_new_sdk:
+        if isinstance(value, ResponseOutputTextAnnotationAddedEvent):
+            # Not obvious how to handle this since there is no delta
+            ...
 
     # Everything else
     elif isinstance(
@@ -655,6 +685,12 @@ def get_openai_patcher(
     async_responses_create_settings = base.model_copy(
         update={"name": base.name or "openai.responses.create"}
     )
+    responses_parse_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.parse"}
+    )
+    async_responses_parse_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.parse"}
+    )
 
     _openai_patcher = MultiPatcher(
         [
@@ -713,6 +749,16 @@ def get_openai_patcher(
                 create_wrapper_responses_async(
                     settings=async_responses_create_settings
                 ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "Responses.parse",
+                create_wrapper_responses_sync(settings=responses_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "AsyncResponses.parse",
+                create_wrapper_responses_async(settings=async_responses_parse_settings),
             ),
         ]
     )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -23,7 +24,10 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace.term import configure_logger
 from weave.trace_server.interface.builtin_object_classes import leaderboard
+
+logger = logging.getLogger(__name__)
 
 _global_postprocess_inputs: PostprocessInputsFunc | None = None
 _global_postprocess_output: PostprocessOutputFunc | None = None
@@ -63,6 +67,8 @@ def init(
     Returns:
         A Weave client.
     """
+    configure_logger()
+
     parse_and_apply_settings(settings)
 
     global _global_postprocess_inputs
@@ -107,7 +113,7 @@ def local_client() -> Iterator[weave_client.WeaveClient]:
         inited_client.reset()
 
 
-def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
+def publish(obj: Any, name: str | None = None) -> ObjectRef:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
@@ -134,7 +140,7 @@ def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
 
     ref = client._save_object(obj, save_name, "latest")
 
-    if isinstance(ref, weave_client.ObjectRef):
+    if isinstance(ref, ObjectRef):
         if isinstance(ref, weave_client.OpRef):
             url = urls.op_version_path(
                 ref.entity,
@@ -157,11 +163,11 @@ def publish(obj: Any, name: str | None = None) -> weave_client.ObjectRef:
                 ref.name,
                 ref.digest,
             )
-        print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
+        logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
     return ref
 
 
-def ref(location: str) -> weave_client.ObjectRef:
+def ref(location: str) -> ObjectRef:
     """Construct a Ref to a Weave object.
 
     TODO: what happens if obj does not exist
@@ -187,12 +193,39 @@ def ref(location: str) -> weave_client.ObjectRef:
         location = str(client._ref_uri(name, version, "obj"))
 
     uri = parse_uri(location)
-    if not isinstance(uri, weave_client.ObjectRef):
+    if not isinstance(uri, ObjectRef):
         raise TypeError("Expected an object ref")
     return uri
 
 
-def obj_ref(obj: Any) -> weave_client.ObjectRef | None:
+def get(uri: str | ObjectRef) -> Any:
+    """A convenience function for getting an object from a URI.
+
+    Many objects logged by Weave are automatically registered with the Weave
+    server. This function allows you to retrieve those objects by their URI.
+
+    Args:
+        uri: A fully-qualified weave ref URI.
+
+    Returns:
+        The object.
+
+    Example:
+
+    ```python
+    weave.init("weave_get_example")
+    dataset = weave.Dataset(rows=[{"a": 1, "b": 2}])
+    ref = weave.publish(dataset)
+
+    dataset2 = weave.get(ref)  # same as dataset!
+    ```
+    """
+    if isinstance(uri, ObjectRef):
+        return uri.get()
+    return ref(uri).get()
+
+
+def obj_ref(obj: Any) -> ObjectRef | None:
     return weave_client.get_ref(obj)
 
 
@@ -236,6 +269,10 @@ def finish() -> None:
     """
     weave_init.finish()
 
+    # Flush any remaining calls
+    if wc := weave_client_context.get_weave_client():
+        wc.finish()
+
 
 # As of this writing, most important symbols are
 # re-exported in __init__.py.
@@ -261,4 +298,5 @@ __all__ = [
     "get_current_call",
     "weave_client_context",
     "require_current_call",
+    "get",
 ]

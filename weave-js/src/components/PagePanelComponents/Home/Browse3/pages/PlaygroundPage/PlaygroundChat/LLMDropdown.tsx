@@ -1,30 +1,33 @@
-import {Box} from '@mui/material';
 import {Select} from '@wandb/weave/components/Form/Select';
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
-import {useBaseObjectInstances} from '../../wfReactInterface/objectClassQuery';
+import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
+import {LLMMaxTokensKey} from '../llmMaxTokens';
+import {SavedPlaygroundModelState} from '../types';
 import {
-  LLM_MAX_TOKENS,
-  LLM_PROVIDER_LABELS,
-  LLMMaxTokensKey,
-} from '../llmMaxTokens';
-import {useConfiguredProviders} from '../useConfiguredProviders';
-import {
-  addProviderOption,
   CustomOption,
-  dividerOption,
+  LLMOption,
+  LLMOptionToSavedPlaygroundModelState,
   ProviderOption,
+  SAVED_MODEL_OPTION_VALUE,
 } from './LLMDropdownOptions';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
-
 interface LLMDropdownProps {
-  value: LLMMaxTokensKey;
-  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
+  value: LLMMaxTokensKey | string;
+  onChange: (
+    value: LLMMaxTokensKey | string,
+    maxTokens: number,
+    savedModel?: SavedPlaygroundModelState
+  ) => void;
   entity: string;
   project: string;
   isTeamAdmin: boolean;
-  onConfigureProvider: () => void;
+  refetchConfiguredProviders: () => void;
+  refetchCustomLLMs: () => void;
+  llmDropdownOptions: ProviderOption[];
+  areProvidersLoading: boolean;
+  customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
 }
 
 export const LLMDropdown: React.FC<LLMDropdownProps> = ({
@@ -33,120 +36,15 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   entity,
   project,
   isTeamAdmin,
-  onConfigureProvider,
+  refetchConfiguredProviders,
+  refetchCustomLLMs,
+  llmDropdownOptions,
+  areProvidersLoading,
+  customProvidersResult,
 }) => {
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
   const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-  const {
-    result: configuredProviders,
-    loading: configuredProvidersLoading,
-    refetch: refetchConfiguredProviders,
-  } = useConfiguredProviders(entity);
-
-  const {
-    result: customProvidersResult,
-    loading: customProvidersLoading,
-    refetch: refetchCustomProviders,
-  } = useBaseObjectInstances('Provider', {
-    project_id: `${entity}/${project}`,
-    filter: {
-      latest_only: true,
-    },
-  });
-
-  const {
-    result: customProviderModelsResult,
-    loading: customProviderModelsLoading,
-    refetch: refetchCustomProviderModels,
-  } = useBaseObjectInstances('ProviderModel', {
-    project_id: `${entity}/${project}`,
-    filter: {
-      latest_only: true,
-    },
-  });
-
-  const customLoading = customProvidersLoading || customProviderModelsLoading;
-
-  const options: ProviderOption[] = [];
-  const disabledOptions: ProviderOption[] = [];
-
-  if (configuredProvidersLoading) {
-    options.push({
-      label: 'Loading providers...',
-      value: 'loading',
-      llms: [],
-    });
-  } else {
-    Object.entries(configuredProviders).forEach(([provider, {status}]) => {
-      const providerLLMs = Object.entries(LLM_MAX_TOKENS)
-        .filter(([_, config]) => config.provider === provider)
-        .map(([llmKey]) => ({
-          label: llmKey,
-          value: llmKey as LLMMaxTokensKey,
-          max_tokens: LLM_MAX_TOKENS[llmKey as LLMMaxTokensKey].max_tokens,
-        }));
-
-      const option = {
-        label:
-          LLM_PROVIDER_LABELS[provider as keyof typeof LLM_PROVIDER_LABELS],
-        value: provider,
-        llms: status ? providerLLMs : [],
-        isDisabled: !status,
-      };
-
-      if (!status) {
-        disabledOptions.push(option);
-      } else {
-        options.push(option);
-      }
-    });
-  }
-
-  // Add custom providers
-  if (!customLoading) {
-    customProvidersResult?.forEach(provider => {
-      const providerName = provider.val.name || '';
-      const currentProviderModels =
-        customProviderModelsResult?.filter(
-          obj => obj.val.provider === provider.digest
-        ) || [];
-
-      const shortenedProviderLabel =
-        providerName.length > 20
-          ? providerName.slice(0, 2) + '...' + providerName.slice(-4)
-          : providerName;
-
-      const llmOptions = currentProviderModels.map(model => ({
-        label: shortenedProviderLabel + '/' + model.val.name,
-        value: (provider.val.name + '/' + model.val.name) as LLMMaxTokensKey,
-        max_tokens: model.val.max_tokens,
-      }));
-
-      if (llmOptions.length > 0) {
-        options.push({
-          label: providerName,
-          value: providerName,
-          llms: llmOptions,
-        });
-      }
-    });
-  }
-
-  // Combine enabled and disabled options
-  // Add a divider option before the add provider option
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const allOptions = [
-    ...options,
-    ...disabledOptions,
-    dividerOption,
-    addProviderOption,
-  ];
-
-  const refetch = useCallback(() => {
-    refetchCustomProviders();
-    refetchCustomProviderModels();
-  }, [refetchCustomProviders, refetchCustomProviderModels]);
 
   const handleCloseDrawer = () => {
     setIsAddProviderDrawerOpen(false);
@@ -154,6 +52,10 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   };
 
   const handleConfigureProvider = (provider: string) => {
+    if (provider === 'custom-provider') {
+      setIsAddProviderDrawerOpen(true);
+      return;
+    }
     setSelectedProvider(provider);
     setConfigDrawerOpen(true);
   };
@@ -162,41 +64,70 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     setConfigDrawerOpen(false);
     setSelectedProvider(null);
     refetchConfiguredProviders();
-    onConfigureProvider();
-  }, [refetchConfiguredProviders, onConfigureProvider]);
+  }, [refetchConfiguredProviders]);
 
-  const isValueAvailable = allOptions.find(
-    option =>
-      'llms' in option && option.llms?.some(llm => llm && llm.value === value)
+  const isValueAvailable = useMemo(
+    () =>
+      llmDropdownOptions.some(
+        (option: ProviderOption) =>
+          'llms' in option &&
+          option.llms?.some(llm => llm && llm.value === value)
+      ),
+    [llmDropdownOptions, value]
   );
 
   useEffect(() => {
-    if (!isValueAvailable && !configuredProvidersLoading) {
-      for (const option of allOptions) {
-        for (const llm of option.llms) {
-          if (llm && llm.value && llm.max_tokens) {
-            onChange(llm.value, llm.max_tokens);
+    if (!isValueAvailable && !areProvidersLoading) {
+      let firstAvailableLlm: LLMOption | null = null;
+
+      // Check if the value is a saved model
+      const savedModelOption = llmDropdownOptions.find(
+        option => option.value === SAVED_MODEL_OPTION_VALUE
+      );
+      if (savedModelOption) {
+        firstAvailableLlm =
+          savedModelOption.llms.find(
+            llm => llm.objectId === value && llm.isLatest
+          ) ?? null;
+      }
+
+      // If the value is not a saved model, check if theres any available LLM
+      if (!firstAvailableLlm) {
+        for (const option of llmDropdownOptions) {
+          if (
+            'llms' in option &&
+            !option.isDisabled &&
+            option.llms.length > 0
+          ) {
+            firstAvailableLlm = option.llms[0];
             break;
           }
         }
       }
+      if (firstAvailableLlm) {
+        onChange(
+          firstAvailableLlm.value,
+          firstAvailableLlm.max_tokens,
+          LLMOptionToSavedPlaygroundModelState(firstAvailableLlm)
+        );
+      }
     }
   }, [
     isValueAvailable,
-    allOptions,
+    llmDropdownOptions,
     onChange,
     value,
-    configuredProvidersLoading,
+    areProvidersLoading,
   ]);
 
   return (
-    <Box sx={{width: '300px'}}>
+    <div className="w-[300px]">
       <Select
-        isDisabled={configuredProvidersLoading}
+        isDisabled={areProvidersLoading}
         placeholder={
-          configuredProvidersLoading ? 'Loading providers...' : 'Select a model'
+          areProvidersLoading ? 'Loading providers...' : 'Select a model'
         }
-        value={allOptions.find(
+        value={llmDropdownOptions.find(
           option =>
             'llms' in option && option.llms?.some(llm => llm.value === value)
         )}
@@ -213,7 +144,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
             const selectedOption = option as ProviderOption;
 
             // Check if the "Add AI provider" option was selected
-            if (selectedOption.value === 'add-provider') {
+            if (selectedOption.value === 'configure-provider') {
               setIsAddProviderDrawerOpen(true);
               return;
             }
@@ -224,7 +155,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
             }
           }
         }}
-        options={allOptions}
+        options={llmDropdownOptions}
         maxMenuHeight={500}
         components={{
           Option: props => (
@@ -258,7 +189,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
         projectName={project}
         isOpen={isAddProviderDrawerOpen}
         onClose={handleCloseDrawer}
-        refetch={refetch}
+        refetch={refetchCustomLLMs}
         projectId={`${entity}/${project}`}
         providers={customProvidersResult?.map(p => p.val.name || '') || []}
       />
@@ -271,6 +202,6 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
           defaultProvider={selectedProvider}
         />
       )}
-    </Box>
+    </div>
   );
 };

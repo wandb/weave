@@ -11,7 +11,7 @@ from weave.trace.settings import max_calls_queue_size
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.utils.retry import with_retry
+from weave.utils.retry import _is_retryable_exception, with_retry
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,29 @@ class ServerInfoRes(BaseModel):
 REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
+
+
+def _log_dropped_call_batch(
+    batch: list[Union[StartBatchItem, EndBatchItem]], e: Exception
+) -> None:
+    logger.error(f"Error sending batch of {len(batch)} call events to server")
+    dropped_start_ids = []
+    dropped_end_ids = []
+    for item in batch:
+        if isinstance(item, StartBatchItem):
+            dropped_start_ids.append(item.req.start.id)
+        elif isinstance(item, EndBatchItem):
+            dropped_end_ids.append(item.req.end.id)
+    if dropped_start_ids:
+        logger.error(f"dropped call start ids: {dropped_start_ids}")
+    if dropped_end_ids:
+        logger.error(f"dropped call end ids: {dropped_end_ids}")
+    if isinstance(e, requests.HTTPError) and e.response is not None:
+        logger.error(f"status code: {e.response.status_code}")
+        logger.error(f"reason: {e.response.reason}")
+        logger.error(f"text: {e.response.text}")
+    else:
+        logger.error(f"error: {e}")
 
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
@@ -139,31 +162,41 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        # If a single item is too large, we can't send it -- log an error and drop it
+        # If a single item is too large, we can't send it -- raise an error
         if encoded_bytes > self.remote_request_bytes_limit and len(batch) == 1:
-            logger.error(
+            error_message = (
                 f"Single call size ({encoded_bytes} bytes) is too large to send. "
                 f"The maximum size is {self.remote_request_bytes_limit} bytes."
             )
+            logger.error(error_message)
+            # If we get down to here we have recursed to size 1
+            # We don't want to error the whole process, just drop the call that is too large
+            return
 
         try:
             self._send_batch_to_server(encoded_data)
-        except Exception:
-            # Add items back to the queue for later processing
-            logger.warning(
-                f"Batch failed after max retries, requeueing batch with {len(batch)=} for later processing",
-            )
+        except Exception as e:
+            if not _is_retryable_exception(e):
+                _log_dropped_call_batch(batch, e)
+            else:
+                # Add items back to the queue for later processing, but only if the processor is still accepting work
+                logger.warning(
+                    f"Batch failed after max retries, requeueing batch with {len(batch)=} for later processing",
+                )
 
-            # only if debug mode
-            if logger.isEnabledFor(logging.DEBUG):
-                ids = []
-                for item in batch:
-                    if isinstance(item, StartBatchItem):
-                        ids.append(f"{item.req.start.id}-start")
-                    elif isinstance(item, EndBatchItem):
-                        ids.append(f"{item.req.end.id}-end")
-                logger.debug(f"Requeueing batch with {ids=}")
-            self.call_processor.enqueue(batch)
+                # only if debug mode
+                if logger.isEnabledFor(logging.DEBUG):
+                    ids = []
+                    for item in batch:
+                        if isinstance(item, StartBatchItem):
+                            ids.append(f"{item.req.start.id}-start")
+                        elif isinstance(item, EndBatchItem):
+                            ids.append(f"{item.req.end.id}-end")
+                    logger.debug(f"Requeueing batch with {ids=}")
+
+                # Only requeue if the processor is still accepting work
+                if self.call_processor and self.call_processor.is_accepting_new_work():
+                    self.call_processor.enqueue(batch)
 
     @with_retry
     def _generic_request_executor(
@@ -451,6 +484,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
         )
 
+    def table_query_stats_batch(
+        self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
+    ) -> tsi.TableQueryStatsRes:
+        return self._generic_request(
+            "/table/query_stats_batch",
+            req,
+            tsi.TableQueryStatsBatchReq,
+            tsi.TableQueryStatsBatchRes,
+        )
+
     def refs_read_batch(
         self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
     ) -> tsi.RefsReadBatchRes:
@@ -484,6 +527,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         bytes.writelines(r.iter_content())
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
+
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        return self._generic_request(
+            "/files/stats", req, tsi.FilesStatsReq, tsi.FilesStatsRes
+        )
 
     def feedback_create(
         self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
@@ -553,6 +601,19 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             req,
             tsi.CompletionsCreateReq,
             tsi.CompletionsCreateRes,
+        )
+
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        # For remote servers, streaming is not implemented
+        # Fall back to non-streaming completion
+        response = self.completions_create(req)
+        yield {"response": response.response, "weave_call_id": response.weave_call_id}
+
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        return self._generic_request(
+            "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
         )
 
 

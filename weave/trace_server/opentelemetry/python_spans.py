@@ -5,6 +5,7 @@ trace protocol buffer definitions from opentelemetry.proto.trace.v1.trace_pb2.
 """
 
 import datetime
+import hashlib
 from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -30,10 +31,18 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 
 from weave.trace_server import trace_server_interface as tsi
-
-from .attributes import (
-    Attributes,
-    AttributesFactory,
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
+from weave.trace_server.opentelemetry.attributes import (
+    SpanEvent,
+    get_span_overrides,
+    get_wandb_attributes,
+    get_weave_attributes,
+    get_weave_inputs,
+    get_weave_outputs,
+    get_weave_usage,
+)
+from weave.trace_server.opentelemetry.helpers import (
+    shorten_name,
     to_json_serializable,
     unflatten_key_values,
 )
@@ -123,6 +132,14 @@ class Event:
             dropped_attributes_count=proto_event.dropped_attributes_count,
         )
 
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "timestamp": self.datetime,
+            "attributes": self.attributes,
+            "dropped_attributes_count": self.dropped_attributes_count,
+        }
+
 
 @dataclass
 class Link:
@@ -180,7 +197,7 @@ class Span:
     span_id: str
     start_time_unix_nano: int
     end_time_unix_nano: int
-    attributes: Attributes
+    attributes: dict[str, Any] = field(default_factory=dict)
     kind: SpanKind = SpanKind.UNSPECIFIED
     parent_id: Optional[str] = None
     trace_state: str = ""
@@ -233,7 +250,7 @@ class Span:
             parent_id=parent_id,
             trace_state=proto_span.trace_state,
             flags=proto_span.flags,
-            attributes=AttributesFactory().from_proto(key_values=proto_span.attributes),
+            attributes=unflatten_key_values(proto_span.attributes),
             dropped_attributes_count=proto_span.dropped_attributes_count,
             events=[Event.from_proto(e) for e in proto_span.events],
             dropped_events_count=proto_span.dropped_events_count,
@@ -258,7 +275,7 @@ class Span:
                 "start_time": self.start_time,
                 "end_time": self.end_time,
                 "status": self.status.as_dict(),
-                "attributes": self.attributes._attributes,
+                "attributes": self.attributes,
                 "events": self.events,
                 "links": self.links,
                 "resource": self.resource.as_dict() if self.resource else None,
@@ -268,23 +285,91 @@ class Span:
     def to_call(
         self, project_id: str
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
-        summary_insert_map = self.attributes.get_weave_summary()
-        inputs = self.attributes.get_weave_inputs()
-        outputs = self.attributes.get_weave_outputs()
-        attributes = self.attributes.get_weave_attributes(
-            extra={"otel_span": self.as_dict()}
+        events = [SpanEvent(e.as_dict()) for e in self.events]
+        usage = get_weave_usage(self.attributes) or {}
+
+        inputs = get_weave_inputs(events, self.attributes) or {}
+        # Only de-nest if we have one key
+        if len(inputs) == 1:
+            nested_top_level_input = inputs.get("inputs") or inputs.get("input")
+            # If it isn't a dict we just have to nest it under the key
+            if nested_top_level_input is not None and isinstance(
+                nested_top_level_input, (dict)
+            ):
+                if all(type(key) == str for key in nested_top_level_input.keys()):
+                    inputs = to_json_serializable(nested_top_level_input)
+
+        outputs = get_weave_outputs(events, self.attributes) or {}
+        # Only de-nest if we have one key
+        if len(outputs) == 1:
+            nested_top_level_output = outputs.get("outputs") or outputs.get("output")
+            if nested_top_level_output is not None:
+                outputs = to_json_serializable(nested_top_level_output)
+
+        attributes = get_weave_attributes(self.attributes) or {}
+        wandb_attributes = get_wandb_attributes(self.attributes) or {}
+        overrides = get_span_overrides(self.attributes) or {}
+
+        start_time = overrides.get("start_time") or self.start_time
+        end_time = overrides.get("end_time") or self.end_time
+
+        llm_usage = tsi.LLMUsageSchema(
+            input_tokens=usage.get("input_tokens"),
+            output_tokens=usage.get("output_tokens"),
+            completion_tokens=usage.get("completion_tokens"),
+            prompt_tokens=usage.get("prompt_tokens"),
+            total_tokens=usage.get("total_tokens"),
+            requests=usage.get("requests"),
         )
 
-        # Options: set
+        # Read the model name from attributes to load cost info
+        model = attributes.get("model")
+        if not model:
+            model_parameters = attributes.get("model_parameters")
+            if model_parameters:
+                model = model_parameters.get("model")
+
+        usage_key = model or "usage"
+        summary_insert_map = tsi.SummaryInsertMap(usage={usage_key: llm_usage})
+
+        has_attributes = len(attributes) > 0
+        has_inputs = len(inputs) > 0
+        # Ouputs might be str, int, bytes
+        has_outputs = isinstance(outputs, int) or len(outputs) > 0
+        has_usage = len(usage) > 0
+
+        # We failed to load any of the Weave attributes, dump all attributes
+        if not has_attributes and not has_inputs and not has_outputs and not has_usage:
+            attributes = to_json_serializable(self.attributes)
+
+        attributes["otel_span"] = self.as_dict()
+        op_name = self.name
+
+        display_name = wandb_attributes.get("display_name")
+        if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
+            display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
+
+        if len(op_name) >= MAX_OP_NAME_LENGTH:
+            # Since op_name will typically be what is displayed, we don't want to just truncate
+            # Create an identifier abbreviation so similar long names can be distinguished
+            identifier = hashlib.sha256(op_name.encode("utf-8")).hexdigest()[:4]
+            op_name = shorten_name(
+                op_name,
+                MAX_OP_NAME_LENGTH,
+                abbrv=f":{identifier}",
+                use_delimiter_in_abbr=False,
+            )
+
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
-            op_name=self.name,
+            op_name=op_name,
             trace_id=self.trace_id,
             parent_id=self.parent_id,
-            started_at=self.start_time,
+            started_at=start_time,
             attributes=attributes,
             inputs=inputs,
+            display_name=display_name,
             wb_user_id=None,
             wb_run_id=None,
         )
@@ -295,7 +380,7 @@ class Span:
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
-            ended_at=self.end_time,
+            ended_at=end_time,
             exception=exception_msg,
             output=outputs,
             summary=summary_insert_map,

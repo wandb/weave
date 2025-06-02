@@ -194,7 +194,11 @@ export const ConfirmDeleteModal: FC<{
     Object.keys(projectGroups).forEach(projectKey => {
       const [entity, project] = projectKey.split('/');
       deletePromises.push(
-        callsDelete(entity, project, projectGroups[projectKey])
+        callsDelete({
+          entity,
+          project,
+          callIDs: projectGroups[projectKey],
+        })
       );
     });
     Promise.all(deletePromises)

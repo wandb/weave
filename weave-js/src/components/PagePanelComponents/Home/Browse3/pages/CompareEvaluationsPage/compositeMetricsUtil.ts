@@ -13,10 +13,12 @@
  */
 import _ from 'lodash';
 
-import {EvaluationComparisonSummary, MetricDefinition} from './ecpTypes';
-import {MetricType} from './ecpTypes';
-import {getScoreKeyNameFromScorerRef} from './ecpUtil';
-import {flattenedDimensionPath} from './ecpUtil';
+import {
+  EvaluationComparisonSummary,
+  MetricDefinition,
+  MetricType,
+} from './ecpTypes';
+import {flattenedDimensionPath, getScoreKeyNameFromScorerRef} from './ecpUtil';
 
 export const DERIVED_SCORER_REF_PLACEHOLDER = '__DERIVED__';
 
@@ -178,9 +180,46 @@ export const resolveDimension = (
   groupName: string,
   keyPath: string
 ): MetricDefinition | undefined => {
-  return Object.values(
-    compositeScoreMetrics[groupName].metrics[keyPath].scorerRefs
-  ).find(scorerRef => scorerRef.evalCallIds.includes(evalCallId))?.metric;
+  // Check if the metric group exists
+  if (!compositeScoreMetrics[groupName]) {
+    console.warn(`Group not found: ${groupName}`);
+    return undefined;
+  }
+
+  // Check if the metrics keypath exists in this group
+  if (!compositeScoreMetrics[groupName].metrics[keyPath]) {
+    console.warn(`Metric path not found: ${groupName}/${keyPath}`);
+    return undefined;
+  }
+
+  // Try to find a scorer ref with this eval call ID
+  const metricPath = compositeScoreMetrics[groupName].metrics[keyPath];
+  const matchingScorerRef = Object.values(metricPath.scorerRefs).find(
+    scorerRef => scorerRef.evalCallIds.includes(evalCallId)
+  );
+
+  if (matchingScorerRef) {
+    return matchingScorerRef.metric;
+  }
+
+  // Special handling for derived/imperative evals when no direct reference is found
+  if (groupName === DERIVED_SCORER_REF_PLACEHOLDER) {
+    // For derived metrics, use the scorer-agnostic definition
+    return {
+      ...metricPath.scorerAgnosticMetricDef,
+      source: 'derived',
+    };
+  }
+
+  // For non-derived metrics where no direct match was found
+  const anyRef = Object.values(metricPath.scorerRefs)[0];
+  if (anyRef) {
+    // Clone the metric from any available reference as a fallback
+    return anyRef.metric;
+  }
+
+  console.warn(`No metric found for ${evalCallId} in ${groupName}/${keyPath}`);
+  return undefined;
 };
 
 /**
@@ -203,7 +242,7 @@ export const evalCallIdToScorerRefs = (
 
 // Helper Functions
 
-const groupNameForMetric = (metric: MetricDefinition): string => {
+export const groupNameForMetric = (metric: MetricDefinition): string => {
   let groupName = '';
 
   if (metric.source === 'derived') {

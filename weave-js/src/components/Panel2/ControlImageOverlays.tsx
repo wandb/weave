@@ -1,4 +1,3 @@
-import {WBIcon} from '@wandb/ui';
 import HelpPopup from '@wandb/weave/common/components/elements/HelpPopup';
 import {BoundingBoxSliderControl} from '@wandb/weave/common/components/MediaCard';
 import {ShowMoreContainer} from '@wandb/weave/common/components/showMoreContainer';
@@ -7,9 +6,10 @@ import {fuzzyMatchRegex} from '@wandb/weave/common/util/fuzzyMatch';
 import {CompareOp} from '@wandb/weave/common/util/ops';
 import classNames from 'classnames';
 import * as _ from 'lodash';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {Button, ButtonGroup} from 'semantic-ui-react';
 
+import {Icon} from '../Icon';
 import {ControlsBox} from './ControlBox';
 import * as S from './ControlImageOverlays.styles';
 import {ControlsMask} from './ControlMask';
@@ -23,10 +23,7 @@ import {
   LabelToggle,
   SearchInput,
 } from './ControlsUtil';
-import {
-  DEFAULT_ALL_MASK_CONTROL,
-  DEFAULT_TILE_LAYOUT,
-} from './ImageWithOverlays';
+import {DEFAULT_TILE_LAYOUT} from './ImageWithOverlays';
 
 type BoxSliderControlsProps = {
   boxes: {[boxGroup: string]: BoundingBox2D[]};
@@ -192,7 +189,7 @@ const TileLayoutButtons: React.FC<TileLayoutButtonsProps> = ({
             'action-button--active': tileLayout === 'ALL_STACKED',
           })}
           onClick={() => setLayoutType('ALL_STACKED')}>
-          <WBIcon name="overlay-stack" />
+          <Icon name="overlay-stack" />
         </Button>
         <Button
           size="tiny"
@@ -201,7 +198,7 @@ const TileLayoutButtons: React.FC<TileLayoutButtonsProps> = ({
             'action-button--active': tileLayout === 'MASKS_NEXT_TO_IMAGE',
           })}
           onClick={() => setLayoutType('MASKS_NEXT_TO_IMAGE')}>
-          <WBIcon name={'overlay-2-column'} />
+          <Icon name={'overlay-2-column'} />
         </Button>
         {maskCount > 1 && (
           <Button
@@ -211,7 +208,7 @@ const TileLayoutButtons: React.FC<TileLayoutButtonsProps> = ({
               'action-button--active': tileLayout === 'ALL_SPLIT',
             })}
             onClick={() => setLayoutType('ALL_SPLIT')}>
-            <WBIcon name="overlay-3-column" />
+            <Icon name="overlay-3-column" />
           </Button>
         )}
       </ButtonGroup>
@@ -251,6 +248,26 @@ export const ControlsImageOverlays: React.FC<
     boxSliders,
     tileLayout = DEFAULT_TILE_LAYOUT,
   } = controls ?? {};
+
+  const [allClassToggleByControlID, setAllClassToggleByControlID] = useState<{
+    [controlID: string]: boolean;
+  }>({});
+
+  const haveAllClassTogglesBeenInitialized = React.useRef(false);
+  useEffect(() => {
+    if (!haveAllClassTogglesBeenInitialized.current && overlayControls) {
+      const initialState = Object.keys(overlayControls).reduce(
+        (acc, controlId) => {
+          acc[controlId] = false;
+          return acc;
+        },
+        {} as {[controlID: string]: boolean}
+      );
+
+      setAllClassToggleByControlID(initialState);
+      haveAllClassTogglesBeenInitialized.current = true;
+    }
+  }, [overlayControls]);
 
   const setControls = (controlId: string, newControl: Controls.OverlayState) =>
     updateControls({
@@ -307,24 +324,9 @@ export const ControlsImageOverlays: React.FC<
           return null;
         }
 
-        const allClass =
-          control.classOverlayStates?.all ?? DEFAULT_ALL_MASK_CONTROL;
-
         const updateControl: Controls.UpdateControl = newControl => {
           const mergedControl = {...control, ...newControl};
           setControls(controlId, mergedControl);
-        };
-
-        const toggleControlVisibility = () => {
-          updateControl({
-            classOverlayStates: {
-              ...control.classOverlayStates,
-              all: {
-                ...allClass,
-                disabled: !allClass.disabled,
-              },
-            },
-          });
         };
 
         const setClassSearch = (newClassSearch: string) => {
@@ -357,8 +359,16 @@ export const ControlsImageOverlays: React.FC<
               <S.VisibilityToggleWrapper>
                 <ClassToggle
                   name="all"
-                  disabled={allClass.disabled}
-                  onClick={toggleControlVisibility}
+                  disabled={allClassToggleByControlID[controlId]}
+                  onClick={() => {
+                    const updatedAreAllClassesDisabled =
+                      !allClassToggleByControlID[controlId];
+                    setAllClasses(updatedAreAllClassesDisabled);
+                    setAllClassToggleByControlID(prev => ({
+                      ...prev,
+                      [controlId]: updatedAreAllClassesDisabled,
+                    }));
+                  }}
                 />
               </S.VisibilityToggleWrapper>
               <S.TitleWrapper>

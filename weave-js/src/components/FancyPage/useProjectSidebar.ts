@@ -139,14 +139,7 @@ export const useProjectSidebar = (
             type: 'menuPlaceholder' as const,
             isShown: isShowAll,
             key: 'moreModels',
-            menu: [
-              'jobs',
-              'automations',
-              'sweeps',
-              'reportlist',
-              'artifacts',
-              'overview',
-            ],
+            menu: ['jobs', 'automations', 'sweeps', 'reportlist', 'artifacts'],
           },
           {
             type: 'divider' as const,
@@ -177,7 +170,7 @@ export const useProjectSidebar = (
             name: 'Playground',
             slug: 'weave/playground',
             isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.RobotServiceMember,
+            iconName: IconNames.VideoPlay,
           },
           {
             type: 'button' as const,

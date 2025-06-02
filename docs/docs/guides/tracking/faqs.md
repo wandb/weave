@@ -27,7 +27,7 @@ A function can be designated as a Weave [Op](/guides/tracking/ops) either manual
 
 - **Derived information** - Weave may compute derived information from the raw information logged, for example a cost estimate may be calculated based on token usage and knowledge of the model used. Weave also aggregates some information over calls.
 
-- **Additional information you choose** - You can choose to log [custom attributes](/guides/core-types/models#track-production-calls) as part of your call or attach [feedback](/guides/tracking/feedback#add-feedback-to-a-call) to a call.
+- **Additional information you choose** - You can choose to log [custom metadata with `weave.attributes`](/guides/core-types/models#track-production-calls) as part of your call or attach [feedback](/guides/tracking/feedback#add-feedback-to-a-call) to a call.
 
 ## How can I disable code capture?
 
@@ -48,7 +48,7 @@ Use Python’s `datetime.datetime` (with timezone info), and publish the object 
 
 ## How do I render Markdown in the UI?
 
-Wrap your string with `weave.Markdown(...)` before saving, and use `weave.publish(...)` to store it. Weave uses the object’s type to determine rendering, and `weave.Markdown` maps to a known UI renderer.  The value will be shown as a formatted Markdown object in the UI.
+Wrap your string with `weave.Markdown(...)` before saving, and use `weave.publish(...)` to store it. Weave uses the object’s type to determine rendering, and `weave.Markdown` maps to a known UI renderer.  The value will be shown as a formatted Markdown object in the UI. For a full code sample, see [Viewing calls](./tracing.mdx#viewing-calls).
 
 ## Will Weave affect my function's execution speed?
 

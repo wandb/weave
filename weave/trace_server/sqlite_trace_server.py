@@ -260,7 +260,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallReadRes(call=calls[0] if calls else None)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        print("REQ", req)
         conn, cursor = get_conn_cursor(self.db_path)
         conds = []
         filter = req.filter
@@ -325,6 +324,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if filter.wb_run_ids:
                 in_expr = ", ".join(f"'{x}'" for x in filter.wb_run_ids)
                 conds += [f"wb_run_id IN ({in_expr})"]
+            if filter.wb_user_ids:
+                in_expr = ", ".join(f"'{x}'" for x in filter.wb_user_ids)
+                conds += [f"wb_user_id IN ({in_expr})"]
 
         if req.query:
             # This is the mongo-style query
@@ -504,6 +506,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                             CASE
                                 WHEN exception IS NOT NULL THEN 'error'
                                 WHEN ended_at IS NULL THEN 'running'
+                                WHEN json_extract(summary, '$.status_counts.error') > 0 THEN 'descendant_error'
                                 ELSE 'success'
                             END
                         """
@@ -513,7 +516,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         field = """
                             CASE
                                 WHEN ended_at IS NOT NULL THEN
-                                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS INTEGER)
+                                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS FLOAT)
                                 ELSE 0
                             END
                         """
@@ -562,8 +565,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if limit is None:
                 query += " LIMIT -1"
             query += f" OFFSET {req.offset}"
-
-        print("QUERY", query)
 
         cursor.execute(query)
 
@@ -641,6 +642,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
             set_nested_key(data, col, derefed_val)
+            ref_col = f"{col}._ref"
+            set_nested_key(data, ref_col, val)
 
         return data
 
@@ -648,15 +651,24 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return iter(self.calls_query(req).calls)
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+        if req.limit is not None and req.limit < 1:
+            raise ValueError("Limit must be a positive integer")
         calls = self.calls_query(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
                 filter=req.filter,
                 query=req.query,
+                limit=req.limit,
+                include_total_storage_size=req.include_total_storage_size,
             )
         ).calls
         return tsi.CallsQueryStatsRes(
             count=len(calls),
+            total_storage_size_bytes=sum(
+                call.total_storage_size_bytes
+                for call in calls
+                if call.total_storage_size_bytes is not None
+            ),
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
@@ -1127,26 +1139,49 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ]
         )
 
+    # This is a legacy endpoint, it should be removed once the client is mostly updated
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
-        parameters: list[Any] = [req.project_id, req.digest]
+        batch_req = tsi.TableQueryStatsBatchReq(
+            project_id=req.project_id, digests=[req.digest]
+        )
 
-        query = """
-        SELECT json_array_length(row_digests)
+        res = self.table_query_stats_batch(batch_req)
+
+        if len(res.tables) != 1:
+            raise RuntimeError("Unexpected number of results", res)
+
+        count = res.tables[0].count
+        return tsi.TableQueryStatsRes(count=count)
+
+    def table_query_stats_batch(
+        self, req: tsi.TableQueryStatsBatchReq
+    ) -> tsi.TableQueryStatsBatchRes:
+        parameters: list[Any] = [req.project_id] + list(req.digests or [])
+
+        placeholders = ",".join(["?" for _ in (req.digests or [])])
+
+        query = f"""
+        SELECT digest, json_array_length(row_digests)
         FROM
             tables
         WHERE
             tables.project_id = ? AND
-            tables.digest = ?
+            tables.digest in ({placeholders})
         """
 
         conn, cursor = get_conn_cursor(self.db_path)
         cursor.execute(query, parameters)
-        row = cursor.fetchone()
-        count = 0
-        if row is not None:
-            count = row[0]
 
-        return tsi.TableQueryStatsRes(count=count)
+        query_result = cursor.fetchall()
+
+        tables = []
+
+        for row in query_result:
+            count = row[1]
+            digest = row[0]
+            tables.append(tsi.TableStatsRow(count=count, digest=digest))
+
+        return tsi.TableQueryStatsBatchRes(tables=tables)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
@@ -1345,6 +1380,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise NotFoundError(f"File {req.digest} not found")
         return tsi.FileContentReadRes(content=query_result[0])
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        print("files_stats is not implemented for SQLite trace server", req)
+        return tsi.FilesStatsRes(total_size_bytes=-1)
+
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         print("COST CREATE is not implemented for local sqlite", req)
         return tsi.CostCreateRes()
@@ -1360,8 +1399,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        print("COMPLETIONS CREATE is not implemented for local sqlite", req)
-        return tsi.CompletionsCreateRes()
+        # TODO: This is not implemented for the sqlite trace server
+        # Currently, this will only be called from the weave file, so we return an empty dict for now
+        return tsi.CompletionsCreateRes(response={})
+
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        # TODO: This is not implemented for the sqlite trace server
+        # Fall back to non-streaming completion
+        response = self.completions_create(req)
+        yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -1390,6 +1438,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         # Return the empty ExportTraceServiceResponse as per the OTLP spec
         return tsi.OtelExportRes()
+
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        raise NotImplementedError(
+            "project_stats is not implemented for SQLite trace server"
+        )
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1540,6 +1593,25 @@ def _transform_external_calls_field_to_internal_calls_field(
         else:
             json_path = quote_json_path(field[len("attributes.") :])
         field = "attributes"
+    elif field == "summary.weave.latency_ms":
+        # Special handling for latency to match sorting behavior
+        field = """
+            CASE
+                WHEN ended_at IS NOT NULL THEN
+                    CAST((julianday(ended_at) - julianday(started_at)) * 86400000 AS FLOAT)
+                ELSE 0
+            END
+        """
+        json_path = None
+    elif field == "summary.weave.status":
+        field = """
+                            CASE
+                                WHEN exception IS NOT NULL THEN 'error'
+                                WHEN ended_at IS NULL THEN 'running'
+                                WHEN json_extract(summary, '$.status_counts.error') > 0 THEN 'descendant_error'
+                                ELSE 'success'
+                            END
+                        """
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"

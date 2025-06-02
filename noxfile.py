@@ -3,28 +3,36 @@ import os
 import nox
 
 nox.options.default_venv_backend = "uv"
+nox.options.reuse_existing_virtualenvs = True
+nox.options.stop_on_first_error = True
+
 
 SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
 PY313_INCOMPATIBLE_SHARDS = [
     "anthropic",
     "cohere",
     "dspy",
-    "langchain",
-    "langchain_nvidia_ai_endpoints",
-    "litellm",
     "notdiamond",
-    "google_ai_studio",
-    "bedrock",
-    "scorers",
     "crewai",
 ]
-PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp"]
+PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents", "dspy"]
 
 
 @nox.session
 def lint(session):
     session.install("pre-commit", "jupyter")
-    session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
+    dry_run = session.posargs and "dry-run" in session.posargs
+    if dry_run:
+        session.run(
+            "pre-commit",
+            "run",
+            "--hook-stage",
+            "pre-push",
+            "--files",
+            "./weave/__init__.py",
+        )
+    else:
+        session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
@@ -38,7 +46,9 @@ def lint(session):
         #   nox -e "tests-3.12(shard='custom')" -- test_your_thing.py
         "custom",
         "trace",
+        "flow",
         "trace_server",
+        "trace_server_bindings",
         "anthropic",
         "cerebras",
         "cohere",
@@ -62,6 +72,7 @@ def lint(session):
         "scorers",
         "pandas-test",
         "huggingface",
+        "smolagents",
         "mcp",
     ],
 )
@@ -113,7 +124,9 @@ def tests(session, shard):
     test_dirs_dict = {
         "custom": [],
         "trace": ["trace/"],
+        "flow": ["flow/"],
         "trace_server": ["trace_server/"],
+        "trace_server_bindings": ["trace_server_bindings"],
         "mistral0": ["integrations/mistral/v0/"],
         "mistral1": ["integrations/mistral/v1/"],
         "scorers": ["scorers/"],
@@ -127,6 +140,7 @@ def tests(session, shard):
 
     session.run(
         "pytest",
+        "--durations=20",
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
@@ -135,8 +149,3 @@ def tests(session, shard):
         *test_dirs,
         env=env,
     )
-
-
-# Configure pytest
-nox.options.reuse_existing_virtualenvs = True
-nox.options.stop_on_first_error = True

@@ -6,13 +6,7 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {
-  Autocomplete,
-  Chip,
-  FormControl,
-  ListItem,
-  Tooltip,
-} from '@mui/material';
+import {Autocomplete, FormControl, ListItem, Tooltip} from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
@@ -26,6 +20,7 @@ import {
 import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
+import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {
   Icon,
   IconNotVisible,
@@ -33,6 +28,7 @@ import {
   IconSortAscending,
   IconSortDescending,
 } from '@wandb/weave/components/Icon';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {
   FC,
   useCallback,
@@ -45,6 +41,8 @@ import React, {
 import {useHistory} from 'react-router-dom';
 
 import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
+import {RemovableTag} from '../../../../../Tag';
+import {RemoveAction} from '../../../../../Tag/RemoveAction';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {
@@ -56,7 +54,7 @@ import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
-import {OnAddFilter} from '../../filters/CellFilterWrapper';
+import {OnUpdateFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
@@ -67,12 +65,7 @@ import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
-import {
-  truncateID,
-  useControllableState,
-  useURLSearchParamsDict,
-} from '../util';
-import {useWFHooks} from '../wfReactInterface/context';
+import {useControllableState, useURLSearchParamsDict} from '../util';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
@@ -105,12 +98,18 @@ import {CallsTableNoRowsOverlay} from './CallsTableNoRowsOverlay';
 import {DEFAULT_FILTER_CALLS, useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import {ParentFilterTag} from './ParentFilterTag';
 
 const MAX_SELECT = 100;
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
   'summary.weave.feedback',
+  'summary.status_counts',
+  // attributes.python was logged for a short period of time
+  // accidentally in v0.51.47. We can hide it for a while
+  // and remove this after a few months (say Sept 2025)
+  'attributes.python',
   'wb_run_id',
   'attributes.otel_span',
 ];
@@ -134,6 +133,25 @@ export const filterHasCalledAfterDateFilter = (filter: GridFilterModel) => {
 export const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   pageSize: DEFAULT_PAGE_SIZE,
   page: 0,
+};
+
+const CustomLoadingOverlay: React.FC = () => {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        display: 'flex',
+        justifyContent: 'center',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+        zIndex: 1,
+      }}>
+      <WaveLoader size="huge" />
+    </div>
+  );
 };
 
 export const CallsTable: FC<{
@@ -165,6 +183,8 @@ export const CallsTable: FC<{
 
   // Can include glob for prefix match, e.g. "inputs.*"
   allowedColumnPatterns?: string[];
+
+  currentViewId?: string;
 }> = ({
   entity,
   project,
@@ -184,6 +204,7 @@ export const CallsTable: FC<{
   paginationModel,
   setPaginationModel,
   allowedColumnPatterns,
+  currentViewId,
 }) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isMetricsChecked, setMetricsChecked] = useState(false);
@@ -266,6 +287,7 @@ export const CallsTable: FC<{
   );
 
   const shouldIncludeTotalStorageSize = effectiveFilter.traceRootsOnly;
+  const currentViewIdResolved = currentViewId ?? '';
 
   // Fetch the calls
   const calls = useCallsForQuery(
@@ -297,11 +319,18 @@ export const CallsTable: FC<{
   const [callsResult, setCallsResult] = useState(calls.result);
   const [callsTotal, setCallsTotal] = useState(calls.total);
   const callsEffectiveFilter = useRef(effectiveFilter);
+  const prevViewIdRef = useRef(currentViewIdResolved);
+  // A structural change is one where we don't want the set of columns to persist.
+  // This can be because of a view change or effective filter (e.g. selected Op) change.
+  const hasStructuralChange =
+    callsEffectiveFilter.current !== effectiveFilter ||
+    prevViewIdRef.current !== currentViewIdResolved;
   useEffect(() => {
-    if (callsEffectiveFilter.current !== effectiveFilter) {
+    if (hasStructuralChange) {
       setCallsResult([]);
       setCallsTotal(0);
       callsEffectiveFilter.current = effectiveFilter;
+      prevViewIdRef.current = currentViewIdResolved;
       // Refetch the calls IFF the filter has changed, this is a
       // noop if the calls query is already loading, but if the filter
       // has no effective impact (frozen vs. not frozen) we need to
@@ -311,13 +340,15 @@ export const CallsTable: FC<{
       setCallsResult(calls.result);
       setCallsTotal(calls.total);
       callsEffectiveFilter.current = effectiveFilter;
+      prevViewIdRef.current = currentViewIdResolved;
     }
-  }, [calls, effectiveFilter]);
+  }, [calls, effectiveFilter, currentViewIdResolved, hasStructuralChange]);
 
   // Construct Flattened Table Data
   const tableData: FlattenedCallData[] = useMemo(
-    () => prepareFlattenedCallDataForTable(callsResult),
-    [callsResult]
+    () =>
+      prepareFlattenedCallDataForTable(hasStructuralChange ? [] : callsResult),
+    [callsResult, hasStructuralChange]
   );
 
   // This is a specific helper that is used when the user attempts to option-click
@@ -371,9 +402,7 @@ export const CallsTable: FC<{
     [callsResult, columnIsRefExpanded, expandedRefCols]
   );
 
-  // TODO: Despite the name, this has changed to be slightly more sophisticated,
-  //       where it may replace or toggle a filter off. We should consider renaming.
-  const onAddFilter: OnAddFilter | undefined =
+  const onUpdateFilter: OnUpdateFilter | undefined =
     filterModel && setFilterModel
       ? (field: string, operator: string | null, value: any, rowId: string) => {
           // This condition is used to filter by the parent ref itself, not the child cell.
@@ -388,13 +417,23 @@ export const CallsTable: FC<{
           }
           const op = operator ? operator : getDefaultOperatorForValue(value);
 
+          // All values added to the filter model should be strings, we
+          // only allow text-field input in the filter bar (even for numeric)
+          // They are converted during the backend mongo-style filter creation
+          let strVal: string;
+          if (typeof value !== 'string') {
+            strVal = JSON.stringify(value);
+          } else {
+            strVal = value;
+          }
+
           // Check if there is an exact match for field, operator, and value in filterModel.items
           // If an exact match exists, remove it instead of adding a duplicate.
           const existingFullMatchIndex = filterModel.items.findIndex(
             item =>
               item.field === field &&
               item.operator === op &&
-              JSON.stringify(item.value) === JSON.stringify(value)
+              item.value === strVal
           );
           if (existingFullMatchIndex !== -1) {
             const newItems = [...filterModel.items];
@@ -415,7 +454,7 @@ export const CallsTable: FC<{
             const newItems = [...filterModel.items];
             newItems[existingFieldOpMatchIndex] = {
               ...newItems[existingFieldOpMatchIndex],
-              value,
+              value: strVal,
             };
             setFilterModel({
               ...filterModel,
@@ -433,7 +472,7 @@ export const CallsTable: FC<{
                 id: filterModel.items.length,
                 field,
                 operator: op,
-                value,
+                value: strVal,
               },
             ],
           };
@@ -446,17 +485,20 @@ export const CallsTable: FC<{
     entity,
     project,
     effectiveFilter,
+    currentViewIdResolved,
     tableData,
     expandedRefCols,
     onCollapse,
     onExpand,
     columnIsRefExpanded,
     allowedColumnPatterns,
-    onAddFilter,
+    onUpdateFilter,
     calls.costsLoading,
+    !!calls.costsError,
     shouldIncludeTotalStorageSize,
     shouldIncludeTotalStorageSize ? calls.storageSizeResults : null,
-    shouldIncludeTotalStorageSize && calls.storageSizeLoading
+    shouldIncludeTotalStorageSize && calls.storageSizeLoading,
+    !!calls.storageSizeError
   );
 
   // This contains columns which are suitable for selection and raw data
@@ -518,14 +560,15 @@ export const CallsTable: FC<{
       : null;
   }, [effectiveFilter.outputObjectVersionRefs, outputObjectVersionOptions]);
 
-  // 4. Parent ID
-  const parentIdOptions = useParentIdOptions(entity, project, effectiveFilter);
-  const selectedParentId = useMemo(
-    () =>
-      effectiveFilter.parentId
-        ? parentIdOptions[effectiveFilter.parentId]
-        : null,
-    [effectiveFilter.parentId, parentIdOptions]
+  // 4. Parent ID - UI delegated to ParentFilterTag
+  const onSetParentFilter = useCallback(
+    (parentId: string | undefined) => {
+      setFilter({
+        ...filter,
+        parentId,
+      });
+    },
+    [setFilter, filter]
   );
 
   // DataGrid Model Management
@@ -690,6 +733,19 @@ export const CallsTable: FC<{
     return cols;
   }, [columns.cols, selectedCalls, tableData]);
 
+  // MUI data grid is unhappy if you pass it a sort model
+  // that references columns that aren't in the grid - it triggers an
+  // infinite loop.
+  const sortModelFiltered = useMemo(() => {
+    // Get all valid column fields from muiColumns
+    const validColumnFields = new Set(muiColumns.map(col => col.field));
+
+    // Filter out any sort items that reference columns not in muiColumns
+    return sortModelResolved.filter(sortItem =>
+      validColumnFields.has(sortItem.field)
+    );
+  }, [muiColumns, sortModelResolved]);
+
   // Register Compare Evaluations Button
   const history = useHistory();
   const router = useWeaveflowCurrentRouteContext();
@@ -702,8 +758,15 @@ export const CallsTable: FC<{
     tableData.forEach(row => {
       Object.keys(row).forEach(key => keysSet.add(key));
     });
+    // `storage_size_bytes` is never shown in the table view, so don't include it
+    keysSet.delete('storage_size_bytes');
+    // set the `total_storage_size_bytes` based on whether we are showing trace roots only
+    if (!effectiveFilter.traceRootsOnly) {
+      keysSet.delete('total_storage_size_bytes');
+    }
+
     return Array.from(keysSet);
-  }, [tableData]);
+  }, [tableData, effectiveFilter]);
 
   const visibleColumns = useMemo(() => {
     return tableData.length > 0
@@ -770,6 +833,41 @@ export const CallsTable: FC<{
     },
     [callsLoading, setPaginationModel]
   );
+
+  const noRowsOverlay = useCallback(() => {
+    if (calls.primaryError) {
+      return (
+        <ErrorPanel
+          title="Oh no! Unable to load traces..."
+          error={calls.primaryError}
+        />
+      );
+    }
+    return (
+      <CallsTableNoRowsOverlay
+        entity={entity}
+        project={project}
+        callsLoading={callsLoading}
+        callsResult={callsResult}
+        isEvaluateTable={isEvaluateTable}
+        effectiveFilter={effectiveFilter}
+        filterModelResolved={filterModelResolved}
+        clearFilters={clearFilters}
+        setFilterModel={setFilterModel}
+      />
+    );
+  }, [
+    calls.primaryError,
+    callsLoading,
+    callsResult,
+    clearFilters,
+    effectiveFilter,
+    filterModelResolved,
+    isEvaluateTable,
+    setFilterModel,
+    entity,
+    project,
+  ]);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -839,6 +937,7 @@ export const CallsTable: FC<{
               </div>
               {isEvaluateTable ? (
                 <CompareEvaluationsTableButton
+                  tooltipText="Compare metrics and examples for selected evaluations"
                   onClick={() => {
                     history.push(
                       router.compareEvaluationsUri(
@@ -867,13 +966,15 @@ export const CallsTable: FC<{
                       onClick={() => setAddToDatasetModalOpen(true)}
                       disabled={selectedCalls.length === 0}
                     />
-                    <AddToDatasetDrawer
-                      entity={entity}
-                      project={project}
-                      open={addToDatasetModalOpen}
-                      onClose={() => setAddToDatasetModalOpen(false)}
-                      selectedCallIds={selectedCalls}
-                    />
+                    {addToDatasetModalOpen && (
+                      <AddToDatasetDrawer
+                        entity={entity}
+                        project={project}
+                        open={true}
+                        onClose={() => setAddToDatasetModalOpen(false)}
+                        selectedCallIds={selectedCalls}
+                      />
+                    )}
                   </div>
                   <div className="flex-none">
                     <BulkDeleteButton
@@ -897,42 +998,49 @@ export const CallsTable: FC<{
           )}
           <div className="ml-auto flex items-center gap-8">
             {selectedInputObjectVersion && (
-              <Chip
+              <RemovableTag
+                color="moon"
                 label={`Input: ${objectVersionNiceString(
                   selectedInputObjectVersion
                 )}`}
-                onDelete={() => {
-                  setFilter({
-                    ...filter,
-                    inputObjectVersionRefs: undefined,
-                  });
-                }}
+                removeAction={
+                  <RemoveAction
+                    onClick={(e: React.SyntheticEvent) => {
+                      e.stopPropagation();
+                      setFilter({
+                        ...filter,
+                        inputObjectVersionRefs: undefined,
+                      });
+                    }}
+                  />
+                }
               />
             )}
             {selectedOutputObjectVersion && (
-              <Chip
+              <RemovableTag
+                color="moon"
                 label={`Output: ${objectVersionNiceString(
                   selectedOutputObjectVersion
                 )}`}
-                onDelete={() => {
-                  setFilter({
-                    ...filter,
-                    outputObjectVersionRefs: undefined,
-                  });
-                }}
+                removeAction={
+                  <RemoveAction
+                    onClick={(e: React.SyntheticEvent) => {
+                      e.stopPropagation();
+                      setFilter({
+                        ...filter,
+                        outputObjectVersionRefs: undefined,
+                      });
+                    }}
+                  />
+                }
               />
             )}
-            {selectedParentId && (
-              <Chip
-                label={`Parent: ${selectedParentId}`}
-                onDelete={() => {
-                  setFilter({
-                    ...filter,
-                    parentId: undefined,
-                  });
-                }}
-              />
-            )}
+            <ParentFilterTag
+              entity={entity}
+              project={project}
+              parentId={effectiveFilter.parentId}
+              onSetParentFilter={onSetParentFilter}
+            />
             <div className="flex items-center gap-6">
               <Button
                 variant="ghost"
@@ -1002,12 +1110,12 @@ export const CallsTable: FC<{
         columnVisibilityModel={columnVisibilityModel}
         // SORT SECTION START
         sortingMode="server"
-        sortModel={sortModel}
+        sortModel={sortModelFiltered}
         onSortModelChange={onSortModelChange}
         // SORT SECTION END
         // PAGINATION SECTION START
         pagination
-        rowCount={callsTotal}
+        rowCount={calls.primaryError ? 0 : callsTotal}
         paginationMode="server"
         paginationModel={paginationModel}
         onPaginationModelChange={onPaginationModelChange}
@@ -1041,19 +1149,7 @@ export const CallsTable: FC<{
           },
         }}
         slots={{
-          noRowsOverlay: () => (
-            <CallsTableNoRowsOverlay
-              entity={entity}
-              project={project}
-              callsLoading={callsLoading}
-              callsResult={callsResult}
-              isEvaluateTable={isEvaluateTable}
-              effectiveFilter={effectiveFilter}
-              filterModelResolved={filterModelResolved}
-              clearFilters={clearFilters}
-              setFilterModel={setFilterModel}
-            />
-          ),
+          noRowsOverlay,
           columnMenu: CallsCustomColumnMenu,
           pagination: () => <PaginationButtons hideControls={hideControls} />,
           columnMenuSortDescendingIcon: IconSortDescending,
@@ -1063,7 +1159,9 @@ export const CallsTable: FC<{
             <IconPinToRight style={{transform: 'scaleX(-1)'}} />
           ),
           columnMenuPinRightIcon: IconPinToRight,
+          loadingOverlay: CustomLoadingOverlay,
         }}
+        className="tw-style"
       />
     </FilterLayoutTemplate>
   );
@@ -1173,33 +1271,6 @@ const OpSelector = ({
       </ListItem>
     </div>
   );
-};
-
-const useParentIdOptions = (
-  entity: string,
-  project: string,
-  effectiveFilter: WFHighLevelCallFilter
-) => {
-  const {useCall} = useWFHooks();
-  const parentCall = useCall(
-    effectiveFilter.parentId
-      ? {
-          entity,
-          project,
-          callId: effectiveFilter.parentId,
-        }
-      : null
-  );
-  return useMemo(() => {
-    if (parentCall.loading || parentCall.result == null) {
-      return {};
-    }
-    return {
-      [parentCall.result.callId]: `${parentCall.result.spanName} (${truncateID(
-        parentCall.result.callId
-      )})`,
-    };
-  }, [parentCall.loading, parentCall.result]);
 };
 
 // Get the tail of the peekPath (ignore query params)

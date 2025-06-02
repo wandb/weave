@@ -1,4 +1,5 @@
 import pytest
+import sqlparse
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.objects_query_builder import (
@@ -177,11 +178,6 @@ FROM (
         ) AS row_num,
         if (row_num = 1, 1, 0) AS is_latest
     FROM (
-        --
-        -- Object versions are uniquely identified by (kind, project_id, object_id, digest).
-        -- This subquery selects a row to represent each object version. There are multiple rows
-        -- for each object version if it has been deleted or recreated prior to a table merge.
-        --
         SELECT
             project_id,
             object_id,
@@ -198,17 +194,16 @@ FROM (
                 kind,
                 object_id,
                 digest
-                --
-                -- Prefer the most recent row. If there is a tie, prefer the row
-                -- with non-null deleted_at, which represents the deletion event.
-                --
-                -- Rows for the same object version may have the same created_at
-                -- because deletion events inherit the created_at of the last
-                -- non-deleted row for the object version.
-                --
                 ORDER BY created_at DESC, (deleted_at IS NULL) ASC
             ) AS rn
         FROM object_versions"""
+
+
+def assert_sql(exp_query, actual_query):
+    exp_formatted = sqlparse.format(exp_query, reindent=True)
+    actual_formatted = sqlparse.format(actual_query, reindent=True)
+
+    assert exp_formatted == actual_formatted
 
 
 def test_object_query_builder_metadata_query_basic():
@@ -222,11 +217,11 @@ def test_object_query_builder_metadata_query_basic():
         WHERE project_id = {{project_id: String}}
     )
     WHERE rn = 1
-)
+) as main
 WHERE ((is_latest = 1) AND (deleted_at IS NULL))
 ORDER BY created_at ASC"""
 
-    assert query == expected_query
+    assert_sql(query, expected_query)
     assert parameters == {"project_id": "test_project"}
 
 
@@ -250,13 +245,13 @@ def test_object_query_builder_metadata_query_with_limit_offset_sort():
         WHERE project_id = {{project_id: String}} AND object_id = {{object_id: String}}
     )
     WHERE rn = 1
-)
+) as main
 WHERE ((((digest = {{version_digest_0: String}}) OR (digest = {{version_digest_1: String}}) OR (version_index = {{version_index_2: Int64}}))) AND (base_object_class IN {{base_object_classes: Array(String)}}) AND (deleted_at IS NULL))
 ORDER BY created_at DESC
 LIMIT 10
 OFFSET 5"""
 
-    assert query == expected_query
+    assert_sql(query, expected_query)
     assert parameters == {
         "project_id": "test_project",
         "object_id": "object_1",
@@ -280,11 +275,11 @@ def test_objects_query_metadata_op():
         WHERE project_id = {{project_id: String}} AND object_id = {{object_id: String}}
     )
     WHERE rn = 1
-)
+) as main
 WHERE ((is_op = 1) AND (version_index = {{version_index_0: Int64}}) AND (deleted_at IS NULL))
 ORDER BY created_at ASC"""
 
-    assert query == expected_query
+    assert_sql(query, expected_query)
     assert parameters == {
         "project_id": "test_project",
         "object_id": "my_op",
@@ -310,7 +305,7 @@ def test_make_objects_val_query_and_parameters():
         GROUP BY object_id, digest
     """
 
-    assert query == expected_query
+    assert_sql(query, expected_query)
     assert parameters == {
         "project_id": "test_project",
         "object_ids": ["object_1"],

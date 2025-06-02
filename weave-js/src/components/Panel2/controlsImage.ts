@@ -85,7 +85,7 @@ function createBaseControls(
 export function createMaskControls(
   ...args: Parameters<typeof createBaseControls>
 ): MaskControlState {
-  return {...createBaseControls(...args), type: 'mask'};
+  return {...createBaseControls(...args), type: 'mask', hideImage: false};
 }
 
 export function createBoxControls(
@@ -145,8 +145,20 @@ export const useImageControls = (
       {} as ClassSetControls
     );
 
+    let defaultMaskSets: ClassSetControls = {};
+    if (_.isEmpty(classSetsFromLabels)) {
+      const maskLayers = usableType.maskLayers ?? {};
+      defaultMaskSets = _.fromPairs(
+        _.keys(maskLayers).map(maskId => [
+          `mask-${maskId}`,
+          {classes: defaultClassSet},
+        ])
+      );
+    }
+
     return {
       [defaultClassSetID]: {classes: defaultClassSet},
+      ...defaultMaskSets,
       ...classSetsFromLabels,
     } as ClassSetControls;
   }, [usableType, maskClassLabels]);

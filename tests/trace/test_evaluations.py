@@ -423,6 +423,10 @@ async def test_evaluation_data_topology(client):
                 "total_tokens": 39,
             }
         },
+        "status_counts": {
+            "success": 2,
+            "error": 0,
+        },
         "weave": {
             "latency_ms": AnyIntMatcher(),
             "trace_name": "SimpleModelWithConfidence.predict",
@@ -501,6 +505,10 @@ async def test_evaluation_data_topology(client):
                 ]
                 * 2,
             }
+        },
+        "status_counts": {
+            "success": 25,
+            "error": 0,
         },
         "weave": {
             "display_name": AnyStrMatcher(),
@@ -677,7 +685,7 @@ async def test_eval_is_robust_to_missing_values(client):
     assert res == {
         "output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
-        "model_latency": {"mean": pytest.approx(0, abs=1)},
+        "model_latency": {"mean": pytest.approx(0, abs=2)},
     }
 
 

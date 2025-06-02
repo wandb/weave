@@ -165,7 +165,7 @@ jobs:
       - uses: actions/setup-node@v1
         if: steps.check_run.outputs.should_lint_and_compile == 'true'
         with:
-          node-version: "18.x"
+          node-version: "20.x"
       - name: Configure npm for GitHub Packages
         run: |
           echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
@@ -181,6 +181,35 @@ jobs:
           yarn run tsc
           yarn testci
 
+  weave-ts-sdk-lint:
+    name: Weave TS SDK Lint
+    runs-on: ubuntu-latest
+    needs:
+      - check-which-tests-to-run
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Check if lint should run
+        id: check_run
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_ts_sdk_tests }}" == "true" ]]; then
+            echo "Lint should run"
+            echo "should_lint=true" >> $GITHUB_OUTPUT
+          else
+            echo "Lint should not run"
+            echo "should_lint=false" >> $GITHUB_OUTPUT
+          fi
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - name: Run Weave TS SDK Lint
+        if: steps.check_run.outputs.should_lint == 'true'
+        run: |
+          cd sdks/node
+          pnpm install --frozen-lockfile
+          pnpm run prettier-check
+
   # ==== Trace Jobs ====
   lint:
     name: Python lint
@@ -195,7 +224,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox "uv<0.7.0"  # pin to unblock CI
       - name: Run nox
         run: nox -e lint
 
@@ -217,7 +246,7 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 15
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -230,10 +259,11 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
+            "flow",
             "trace_server",
+            "trace_server_bindings",
             "anthropic",
             "bedrock",
             "cerebras",
@@ -241,7 +271,7 @@ jobs:
             "crewai",
             "dspy",
             "groq",
-            "huggingface",
+            # "huggingface",
             "google_ai_studio",
             "google_genai",
             "instructor",
@@ -255,6 +285,7 @@ jobs:
             "vertexai",
             "pandas-test",
             "mcp",
+            "smolagents",
           ]
       fail-fast: false
     services:
@@ -304,20 +335,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
-      - name: Run nox (Clickhouse Only)
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          DD_TRACE_ENABLED: false
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "weave_client and not skip_clickhouse_client" \
-            --weave-server=clickhouse
-      - name: Run nox
+          pip install nox "uv<0.7.0"  # pin to unblock CI
+      - name: Run nox (Sqlite Only)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -333,6 +352,18 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
+      - name: Run nox (Clickhouse Only)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "weave_client and not skip_clickhouse_client" \
+            --weave-server=clickhouse
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 

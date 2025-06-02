@@ -1,17 +1,24 @@
-import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
-import {Pill} from '@wandb/weave/components/Tag/Pill';
-import React, {useEffect, useMemo, useState} from 'react';
+import {Button} from '@wandb/weave/components/Button';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import React, {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
+import {normalizeChatTraceCall} from '../ChatView/hooks';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
+import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
-import {
-  DEFAULT_SYSTEM_MESSAGE,
-  parseTraceCall,
-  usePlaygroundState,
-} from './usePlaygroundState';
+import {useConfiguredProviders} from './useConfiguredProviders';
+import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
   entity: string;
@@ -19,28 +26,15 @@ export type PlaygroundPageProps = {
   callId: string;
 };
 
-export const PlaygroundPage = (props: PlaygroundPageProps) => {
-  return (
-    <SimplePageLayoutWithHeader
-      title={
-        <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-          Playground
-          <Pill label="Preview" color="moon" />
-        </Box>
-      }
-      hideTabsIfSingle
-      headerContent={null}
-      tabs={[
-        {
-          label: 'main',
-          content: <PlaygroundPageInner {...props} />,
-        },
-      ]}
-    />
-  );
-};
+type PlaygroundPageInnerProps = PlaygroundPageProps &
+  ReturnType<typeof usePlaygroundState> & {
+    settingsTab: number | null;
+    setSettingsTab: Dispatch<SetStateAction<number | null>>;
+  };
 
-export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
+export const PlaygroundPage = (props: PlaygroundPageProps) => {
+  const [settingsTab, setSettingsTab] = useState<number | null>(null);
+
   const {
     setPlaygroundStates,
     playgroundStates,
@@ -48,39 +42,130 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     setPlaygroundStateFromTraceCall,
   } = usePlaygroundState();
 
+  return (
+    <SimplePageLayoutWithHeader
+      title="Playground"
+      hideTabsIfSingle
+      headerContent={null}
+      tabs={[
+        {
+          label: 'main',
+          content: (
+            <Tailwind style={{width: '100%', height: '100%'}}>
+              <PlaygroundPageInner
+                setPlaygroundStates={setPlaygroundStates}
+                playgroundStates={playgroundStates}
+                setPlaygroundStateField={setPlaygroundStateField}
+                setPlaygroundStateFromTraceCall={
+                  setPlaygroundStateFromTraceCall
+                }
+                settingsTab={settingsTab}
+                setSettingsTab={setSettingsTab}
+                {...props}
+              />
+            </Tailwind>
+          ),
+        },
+      ]}
+      headerExtra={
+        <Button
+          variant="ghost"
+          size="medium"
+          icon="add-new"
+          onClick={() => {
+            setPlaygroundStates([
+              ...playgroundStates,
+              JSON.parse(JSON.stringify(playgroundStates[settingsTab ?? 0])),
+            ]);
+          }}>
+          Add model
+        </Button>
+      }
+    />
+  );
+};
+
+export const PlaygroundPageInner = ({
+  playgroundStates,
+  setPlaygroundStateField,
+  setPlaygroundStateFromTraceCall,
+  settingsTab,
+  setSettingsTab,
+  setPlaygroundStates,
+  entity,
+  project,
+  callId,
+}: PlaygroundPageInnerProps) => {
   const {useCall, useCalls} = useWFHooks();
-  const [settingsTab, setSettingsTab] = useState<number | null>(0);
+  const projectId = useMemo(
+    () => projectIdFromParts({entity, project}),
+    [entity, project]
+  );
   const callKey = useMemo(() => {
-    return props.callId
+    return callId
       ? {
-          entity: props.entity,
-          project: props.project,
-          callId: props.callId,
+          entity,
+          project,
+          callId,
         }
       : null;
-  }, [props.entity, props.project, props.callId]);
+  }, [entity, project, callId]);
 
-  const call = useCall(callKey);
-  const callWithCosts = useCall(callKey, {
+  const call = useCall({key: callKey});
+  const callWithCosts = useCall({key: callKey, includeCosts: true});
+
+  const {result: calls} = useCalls({
+    entity,
+    project,
+    filter: {
+      callIds: playgroundStates.map(state => state.traceCall.id || ''),
+    },
     includeCosts: true,
   });
 
-  const {result: calls} = useCalls(
-    props.entity,
-    props.project,
-    {
-      callIds: playgroundStates.map(state => state.traceCall.id || ''),
+  const {
+    result: configuredProviders,
+    loading: configuredProvidersLoading,
+    refetch: refetchConfiguredProviders,
+  } = useConfiguredProviders(entity);
+
+  const {
+    result: customProvidersResult,
+    loading: customProvidersLoading,
+    refetch: refetchCustomProviders,
+  } = useBaseObjectInstances('Provider', {
+    project_id: projectId,
+    filter: {
+      latest_only: true,
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    {
-      includeCosts: true,
-    }
-  );
+  });
+
+  const {
+    result: customProviderModelsResult,
+    loading: customProviderModelsLoading,
+    refetch: refetchCustomProviderModels,
+  } = useBaseObjectInstances('ProviderModel', {
+    project_id: projectId,
+    filter: {
+      latest_only: true,
+    },
+  });
+
+  const {
+    result: savedModelsResult,
+    loading: savedModelsLoading,
+    refetch: refetchSavedModels,
+  } = useBaseObjectInstances('LLMStructuredCompletionModel', {
+    project_id: projectId,
+  });
+
+  const refetchCustomLLMs = useCallback(() => {
+    refetchCustomProviders();
+    refetchCustomProviderModels();
+  }, [refetchCustomProviders, refetchCustomProviderModels]);
+
+  const areCustomProvidersLoading =
+    customProvidersLoading || customProviderModelsLoading;
 
   useEffect(() => {
     if (!call.loading && call.result) {
@@ -95,7 +180,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
         inputs: {
           messages: [DEFAULT_SYSTEM_MESSAGE],
         },
-        project_id: `${props.entity}/${props.project}`,
+        project_id: projectId,
       });
     }
     // Only set the call the first time the page loads, and we get the call
@@ -120,7 +205,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           if (state.traceCall.id === c.callId) {
             newStates[idx] = {
               ...state,
-              traceCall: parseTraceCall(c.traceCall || {}),
+              traceCall: normalizeChatTraceCall(c.traceCall || {}),
             };
             break;
           }
@@ -131,31 +216,30 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   }, [calls, setPlaygroundStates]);
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        height: '100%',
-        width: '100%',
-      }}>
+    <div className="flex h-full w-full">
       {call.loading ? (
-        <Box
-          sx={{
-            display: 'flex',
-            height: '100%',
-            width: '100%',
-          }}>
+        <div className="flex h-full w-full">
           <WeaveLoader />
-        </Box>
+        </div>
       ) : (
         <PlaygroundChat
           playgroundStates={playgroundStates}
           setPlaygroundStates={setPlaygroundStates}
           setPlaygroundStateField={setPlaygroundStateField}
-          entity={props.entity}
-          project={props.project}
+          entity={entity}
+          project={project}
           setSettingsTab={setSettingsTab}
           settingsTab={settingsTab}
           isOpenInPlayground={!!call.result}
+          configuredProvidersLoading={configuredProvidersLoading}
+          refetchConfiguredProviders={refetchConfiguredProviders}
+          areCustomProvidersLoading={areCustomProvidersLoading}
+          refetchCustomLLMs={refetchCustomLLMs}
+          customProvidersResult={customProvidersResult || []}
+          customProviderModelsResult={customProviderModelsResult || []}
+          configuredProviders={configuredProviders}
+          savedModelsResult={savedModelsResult || []}
+          savedModelsLoading={savedModelsLoading}
         />
       )}
       {settingsTab !== null && (
@@ -164,8 +248,10 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           setPlaygroundStateField={setPlaygroundStateField}
           settingsTab={settingsTab}
           setSettingsTab={setSettingsTab}
+          projectId={projectId}
+          refetchSavedModels={refetchSavedModels}
         />
       )}
-    </Box>
+    </div>
   );
 };

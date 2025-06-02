@@ -18,6 +18,8 @@ import {
   CallData,
   createProcessedRowsMap,
   createTargetSchema,
+  FIELD_NAME,
+  FIELD_PREFIX,
   FieldMapping,
   mapCallsToDatasetRows,
   suggestFieldMappings,
@@ -310,7 +312,6 @@ function datasetDrawerReducer(
       }
 
       const {selectedCalls} = action.payload;
-      const isNewDataset = state.selectedDataset === null;
 
       try {
         // Map calls to dataset rows
@@ -318,23 +319,6 @@ function datasetDrawerReducer(
           selectedCalls,
           state.fieldMappings
         );
-
-        // Apply filtering for new datasets
-        if (isNewDataset) {
-          const targetFields = new Set(
-            state.fieldMappings.map(m => m.targetField)
-          );
-          mappedRows = mappedRows.map(row => {
-            const {___weave, ...rest} = row;
-            const filteredData = Object.fromEntries(
-              Object.entries(rest).filter(([key]) => targetFields.has(key))
-            );
-            return {
-              ___weave,
-              ...filteredData,
-            };
-          });
-        }
 
         // Process rows with schema-based filtering
         const processedRowsMap = createProcessedRowsMap(
@@ -639,10 +623,24 @@ const DatasetDrawerProviderInner: React.FC<DatasetDrawerProviderProps> = ({
         rows: [],
         schema: state.fieldConfigs
           .filter(config => config.included)
-          .map(config => ({
-            name: config.targetField,
-            type: 'string', // Default type
-          })),
+          .map(config => {
+            // Determine field type based on prefix if possible
+            let fieldType = 'string'; // Default type
+            if (
+              config.sourceField.startsWith(FIELD_PREFIX.ANNOTATIONS) ||
+              config.sourceField === FIELD_NAME.NOTES ||
+              config.sourceField === FIELD_NAME.REACTIONS
+            ) {
+              fieldType = 'string';
+            } else if (config.sourceField.startsWith(FIELD_PREFIX.SCORER)) {
+              fieldType = 'object';
+            }
+
+            return {
+              name: config.targetField,
+              type: fieldType,
+            };
+          }),
       };
       dispatch({
         type: ACTION_TYPES.SET_DATASET_OBJECT,
