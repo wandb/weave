@@ -842,10 +842,10 @@ class CallsQuery(BaseModel):
         {id_mask_sql}
         {id_subquery_sql}
         {sortable_datetime_sql}
+        {trace_id_sql}
         {trace_roots_only_sql}
         {parent_ids_filter_sql}
         {op_name_sql}
-        {trace_id_sql}
         {str_filter_opt_sql}
         {ref_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)

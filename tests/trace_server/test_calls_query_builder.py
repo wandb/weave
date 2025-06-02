@@ -273,10 +273,10 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
                 calls_merged.id AS id
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_3:String}
-                AND ((calls_merged.op_name IN {pb_1:Array(String)})
-                    OR (calls_merged.op_name IS NULL))
                 AND (calls_merged.trace_id = {pb_2:String}
                     OR calls_merged.trace_id IS NULL)
+                AND ((calls_merged.op_name IN {pb_1:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
                 ((any(calls_merged.wb_user_id) = {pb_0:String}))
@@ -2035,17 +2035,17 @@ def test_trace_id_filter_eq():
             calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_2:String}
-            AND ((calls_merged.op_name IN {pb_0:Array(String)})
-                OR (calls_merged.op_name IS NULL))
             AND (calls_merged.trace_id = {pb_1:String}
                 OR calls_merged.trace_id IS NULL)
+            AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                OR (calls_merged.op_name IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
         {
-            "pb_1": "111111111111",
             "pb_0": ["weave-trace-internal:///%"],
+            "pb_1": "111111111111",
             "pb_2": "project",
         },
     )
