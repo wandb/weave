@@ -120,14 +120,9 @@ def test_health_check_functionality_and_logging():
             processor.health_check_thread, "is_alive", return_value=False
         ):
             processor.enqueue([1])  # Fills the queue
-            processor.enqueue(
-                [2]
-            )  # Should trigger Full exception and health check revival
+            processor.enqueue([2])  # Should trigger Full exception
 
-            mock_logger.warning.assert_any_call(
-                "Health check thread died, attempting to revive it"
-            )
-            mock_logger.info.assert_any_call("Health check thread successfully revived")
+            assert processor.health_check_thread.is_alive()
 
         # Test 3: Health check stops when not accepting work
         assert processor.health_check_thread.is_alive()
@@ -232,17 +227,13 @@ def test_realistic_health_check_revival_scenario():
             # The processing thread should be different (new thread created)
             assert processor.processing_thread != original_processing_thread
             assert processor.processing_thread.is_alive()
+            # Health check alive
+            assert processor.health_check_thread.is_alive()
 
             # The queued item should have been processed
             assert len(processed_items) == 6
             assert processed_items[-1] == 6  # Item 6 was processed
             assert processor.num_outstanding_jobs == 0  # Queue is empty
-
-            # Check that revival was logged
-            mock_logger.warning.assert_any_call(
-                "Processing thread died, attempting to revive it"
-            )
-            mock_logger.info.assert_any_call("Processing thread successfully revived")
 
             # Step 7: Test that everything continues to work normally
             processor.enqueue([7, 8, 9])
