@@ -1291,12 +1291,6 @@ def process_calls_filter_to_conditions(
             f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
-    if filter.parent_ids:
-        assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
-        conditions.append(
-            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
-        )
-
     if filter.call_ids:
         assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
