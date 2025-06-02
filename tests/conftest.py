@@ -195,8 +195,7 @@ def client_with_throwing_server(client):
         client.server = curr_server
 
 
-@pytest.fixture(scope="session")
-def clickhouse_server():
+def clickhouse_server_direct() -> Callable[[], None]:
     """
     ClickHouse server fixture that automatically starts a server if one isn't already running.
 
@@ -267,15 +266,21 @@ def clickhouse_server():
             pytest.fail(
                 f"ClickHouse server failed to start and become healthy on {host}:{port}"
             )
-
-    try:
-        yield
-    finally:
-        # Clean up: stop the container if we started it
+    def cleanup():
         if started_container:
             subprocess.run(
                 ["docker", "stop", started_container], capture_output=True, check=False
             )
+    return cleanup
+
+
+
+
+@pytest.fixture(scope="session")
+def clickhouse_server():
+    cleanup = clickhouse_server_direct() 
+    yield
+    cleanup()
 
 
 @pytest.fixture(scope="session")
@@ -609,6 +614,9 @@ def create_client(
     server: tsi.TraceServerInterface
     entity = "shawn"
     project = "test-project"
+    def cleanup_no_op():
+        pass
+    cleanup = cleanup_no_op
     if weave_server_flag == "sqlite":
         sqlite_server = sqlite_trace_server.SqliteTraceServer(
             "file::memory:?cache=shared"
@@ -619,19 +627,17 @@ def create_client(
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
-        # Ensure ClickHouse server is running if needed
-        weave_server_flag = request.config.getoption("--weave-server")
-        if weave_server_flag == "clickhouse":
-            # Invoke the clickhouse_server fixture manually
-            with request.getfixturevalue("clickhouse_trace_server") as ch_server:
-                ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-                ch_server.ch_client.command(
-                    f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
-                )
-                ch_server._run_migrations()
-                server = TestOnlyUserInjectingExternalTraceServer(
-                    ch_server, DummyIdConverter(), entity
-                )
+        # Invoke the clickhouse_server fixture manually
+        cleanup = clickhouse_server_direct() 
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
+        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
+        ch_server.ch_client.command(
+            f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
+        )
+        ch_server._run_migrations()
+        server = TestOnlyUserInjectingExternalTraceServer(
+            ch_server, DummyIdConverter(), entity
+        )
     elif weave_server_flag.startswith("http"):
         remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
             weave_server_flag
@@ -653,7 +659,7 @@ def create_client(
         if global_attributes is not None:
             weave.trace.api._global_attributes = global_attributes
 
-    return inited_client
+    return inited_client, cleanup
 
 
 @pytest.fixture
@@ -666,10 +672,11 @@ def zero_stack():
 def client(zero_stack, request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
-    inited_client = create_client(request)
+    inited_client, cleanup = create_client(request)
     try:
         yield inited_client.client
     finally:
+        cleanup()
         inited_client.reset()
         autopatch.reset_autopatch()
 
@@ -686,7 +693,7 @@ def client_creator(zero_stack, request):
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        inited_client = create_client(request, autopatch_settings, global_attributes)
+        inited_client, cleanup = create_client(request, autopatch_settings, global_attributes)
         try:
             yield inited_client.client
         finally:
