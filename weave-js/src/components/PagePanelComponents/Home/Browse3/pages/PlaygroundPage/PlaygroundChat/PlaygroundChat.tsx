@@ -1,5 +1,3 @@
-import {WHITE} from '@wandb/weave/common/css/color.styles';
-import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
@@ -222,11 +220,7 @@ export const PlaygroundChat = ({
                     : 'border-moon-200'
                 }`}>
                 {state.loading && (
-                  <div
-                    className={`absolute bottom-0 left-0 right-0 top-0 z-[100] flex items-center justify-center bg-[${hexToRGB(
-                      WHITE,
-                      0.7
-                    )}] pointer-events-none`}>
+                  <div className="absolute bottom-0 left-0 right-0 top-0 z-[100] flex items-center justify-center bg-white/20">
                     <WaveLoader size="small" />
                   </div>
                 )}
