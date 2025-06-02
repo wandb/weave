@@ -258,7 +258,7 @@ export const PlaygroundChat = ({
                       <PlaygroundContext.Provider
                         value={{
                           isPlayground: true,
-                          isStreaming: isAnyLoading,
+                          isStreaming: state.loading,
                           deleteMessage: (messageIndex, responseIndexes) =>
                             deleteMessage(idx, messageIndex, responseIndexes),
                           editMessage: (messageIndex, newMessage) =>
