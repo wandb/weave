@@ -2232,7 +2232,6 @@ class WeaveClient:
             server = cast(RemoteHTTPTraceServer, self.server)
             assert server.call_processor is not None
             call_processor_jobs = server.call_processor.num_outstanding_jobs
-
         return PendingJobCounts(
             main_jobs=main_jobs,
             fastlane_jobs=fastlane_jobs,

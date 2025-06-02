@@ -205,6 +205,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         req: BaseModel,
         stream: bool = False,
     ) -> requests.Response:
+        print(f"{url=} {req=}")
         r = requests.post(
             self.trace_server_url + url,
             # `by_alias` is required since we have Mongo-style properties in the
