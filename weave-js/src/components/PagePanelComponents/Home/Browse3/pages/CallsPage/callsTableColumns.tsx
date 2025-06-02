@@ -67,6 +67,7 @@ import {
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {FlattenedCallData} from './CallsTable';
 import {
+  FIELD_ID_PATH_SEPARATOR,
   insertPath,
   isDynamicCallColumn,
   Path,
@@ -127,7 +128,7 @@ export const useCallsTableColumns = (
       const columnsWithRefsList = Array.from(columnsWithRefs);
       // Captures the case where the column has just been expanded.
       for (const refCol of columnsWithRefsList) {
-        if (col.startsWith(refCol + '.')) {
+        if (col.startsWith(refCol + FIELD_ID_PATH_SEPARATOR)) {
           return true;
         }
       }
@@ -285,7 +286,10 @@ function buildCallsTableColumns(
   // Sort attributes after inputs and outputs.
   const filteredDynamicColumnNames = allDynamicColumnNames
     .filter(
-      c => !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p => c.startsWith(p + '.'))
+      c =>
+        !HIDDEN_DYNAMIC_COLUMN_PREFIXES.some(p =>
+          c.startsWith(p + FIELD_ID_PATH_SEPARATOR)
+        )
     )
     .sort((a, b) => {
       const prefixes = ['inputs.', 'output.', 'attributes.'];
@@ -484,10 +488,12 @@ function buildCallsTableColumns(
       const parsed = parseScorerFeedbackField(colName);
       if (parsed) {
         const scorerName = parsed.scorerName;
-        const pathParts = parsed.scorePath.replace(/^\./, '').split('.');
+        const pathParts = parsed.scorePath.split(FIELD_ID_PATH_SEPARATOR);
         // Only create a group path if there are multiple parts
         const groupPath =
-          pathParts.length > 1 ? pathParts.slice(0, -1).join('.') : '';
+          pathParts.length > 1
+            ? pathParts.slice(0, -1).join(FIELD_ID_PATH_SEPARATOR)
+            : '';
 
         if (!scorerGroups.has(scorerName)) {
           scorerGroups.set(scorerName, new Map());
@@ -561,7 +567,7 @@ function buildCallsTableColumns(
           scorerGroup?.children.push({field});
 
           const leafName =
-            parsed.scorePath.split('.').pop()?.replace(/^\./, '') ||
+            parsed.scorePath.split(FIELD_ID_PATH_SEPARATOR).pop() ||
             parsed.scorePath;
 
           scoreColumns.push({

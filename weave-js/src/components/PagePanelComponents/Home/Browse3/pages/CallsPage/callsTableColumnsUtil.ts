@@ -6,12 +6,14 @@
 export type Path = string[];
 export type PathList = Path[];
 
+export const FIELD_ID_PATH_SEPARATOR = '_SOMETHING_SUPER_CRAZY_';
+
 export function stringToPath(str: string): Path {
-  return str.split('_SUPER_CRAZY_SEPARATOR_');
+  return str.split(FIELD_ID_PATH_SEPARATOR);
 }
 
 export function pathToString(path: Path): string {
-  return path.join('_SUPER_CRAZY_SEPARATOR_');
+  return path.join(FIELD_ID_PATH_SEPARATOR);
 }
 
 export function isDynamicCallColumn(path: Path): boolean {
