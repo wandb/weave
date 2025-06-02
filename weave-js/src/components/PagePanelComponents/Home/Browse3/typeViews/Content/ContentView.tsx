@@ -4,8 +4,8 @@ import {Icon} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
-import {handleMimetype} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/ContentHandler';
-import {getIconName, ContentTooltipWrapper, ContentMetadataTooltip} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/Shared';
+import {getContentHandler} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/ContentHandler';
+import {getIconName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/Shared';
 import { AutoSizer } from 'react-virtualized';
 
 // Save a Blob as a content in the user's downloads folder in a
@@ -205,20 +205,5 @@ const ContentViewMetadataLoaded = ({
     ) => updateVideoPlaybackState(content, newState),
   };
 
-  const {body, tooltipHint, tooltipPreview} = handleMimetype(handlerProps);
-
-  return (
-    <ContentTooltipWrapper
-      showPreview={showPreview}
-      tooltipHint={tooltipHint}
-      tooltipPreview={tooltipPreview}
-      body={body}
-    >
-      <ContentMetadataTooltip
-        filename={filename}
-        mimetype={mimetype}
-        size={size}
-      />
-    </ContentTooltipWrapper>
-  );
+  return getContentHandler(handlerProps);
 };

@@ -5,7 +5,7 @@ import React, {useEffect} from 'react';
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {ImageThumbnail, ImageViewport} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
-import {HandlerProps, HandlerReturnType} from './Shared';
+import {HandlerProps, ContentTooltipWrapper, ContentMetadataTooltip} from './Shared';
 
 
 type CreateToolTipPreviewProps = {
@@ -52,16 +52,18 @@ const DownloadButton = ({
   );
 };
 
-export const handleImageMimetype = ({
+export const ImageHandler = ({
   iconStart,
   filename,
+  mimetype,
+  size,
   showPreview,
   contentResult,
   setShowPreview,
   setIsDownloading,
   doSave,
   isDownloading,
-}: HandlerProps): HandlerReturnType => {
+}: HandlerProps) => {
   const onTextClick = () => {
     setShowPreview(true);
     if (!contentResult) {
@@ -113,9 +115,19 @@ export const handleImageMimetype = ({
       contentResult={contentResult}
     />
   );
-  return {
-    body,
-    tooltipHint: 'Click icon or filename to preview, button to download',
-    tooltipPreview,
-  };
+
+  return (
+    <ContentTooltipWrapper
+      showPreview={showPreview}
+      tooltipHint="Click icon or filename to preview, button to download"
+      tooltipPreview={tooltipPreview}
+      body={body}
+    >
+      <ContentMetadataTooltip
+        filename={filename}
+        mimetype={mimetype}
+        size={size}
+      />
+    </ContentTooltipWrapper>
+  );
 };

@@ -5,7 +5,7 @@ import React, {useEffect, useContext} from 'react';
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {VideoPopup, VideoThumbnail} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
-import {HandlerProps, HandlerReturnType} from './Shared';
+import {HandlerProps, ContentTooltipWrapper, ContentMetadataTooltip} from './Shared';
 import { WeaveflowPeekContext } from '../../../context';
 
 type CreateToolTipPreviewProps = {
@@ -52,9 +52,11 @@ const DownloadButton = ({
   );
 };
 
-export const showVideoText = ({
+const VideoHandlerComponent = ({
   iconStart,
   filename,
+  mimetype,
+  size,
   showPreview,
   contentResult,
   setShowPreview,
@@ -63,7 +65,7 @@ export const showVideoText = ({
   isDownloading,
   videoPlaybackState,
   updateVideoPlaybackState,
-}: HandlerProps): HandlerReturnType => {
+}: HandlerProps) => {
   const onTextClick = () => {
     setShowPreview(true);
     if (!contentResult) {
@@ -126,14 +128,23 @@ export const showVideoText = ({
     </TailwindContents>
   );
 
-  return {
-    body,
-    tooltipHint: 'Click icon or filename to preview, button to download',
-    tooltipPreview,
-  };
-}
+  return (
+    <ContentTooltipWrapper
+      showPreview={showPreview}
+      tooltipHint="Click icon or filename to preview, button to download"
+      tooltipPreview={tooltipPreview}
+      body={body}
+    >
+      <ContentMetadataTooltip
+        filename={filename}
+        mimetype={mimetype}
+        size={size}
+      />
+    </ContentTooltipWrapper>
+  );
+};
 
-export const handleVideoMimetype = (props: HandlerProps): HandlerReturnType => {
+export const VideoHandler = (props: HandlerProps) => {
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  return showVideoText(props);
+  return <VideoHandlerComponent {...props} />;
 };

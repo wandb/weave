@@ -44,11 +44,6 @@ export type HandlerProps = {
 };
 
 
-export type HandlerReturnType = {
-  body: React.ReactNode;
-  tooltipHint: string;
-  tooltipPreview?: React.ReactNode;
-};
 
 type ContentTooltipWrapperProps = {
   showPreview: boolean;

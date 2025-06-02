@@ -1,11 +1,11 @@
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import React, {useEffect} from 'react';
 
-import {handlePDFMimetype} from './PDFHandler';
-import {handleAudioMimetype} from './AudioHandler';
-import {handleVideoMimetype} from './VideoHandler';
-import {handleImageMimetype} from './ImageHandler';
-import {handleGenericMimetype} from './GenericHandler';
+import {PDFHandler} from './PDFHandler';
+import {AudioHandler} from './AudioHandler';
+import {VideoHandler} from './VideoHandler';
+import {ImageHandler} from './ImageHandler';
+import {GenericHandler} from './GenericHandler';
 import {HandlerProps} from './Shared';
 
 type CreateToolTipPreviewProps = {
@@ -35,26 +35,19 @@ export const CreateToolTipPreview = ({
   );
 };
 
-type HandlerReturnType = {
-  body: React.ReactNode;
-  tooltipHint: string;
-  tooltipPreview?: React.ReactNode;
-};
-
-
-export const handleMimetype = ({
+export const getContentHandler = ({
   mimetype,
   ...handlerProps
-}: HandlerProps): HandlerReturnType => {
+}: HandlerProps) => {
   if (mimetype === 'application/pdf') {
-    return handlePDFMimetype({mimetype, ...handlerProps});
+    return <PDFHandler mimetype={mimetype} {...handlerProps} />;
   } else if (mimetype.startsWith('audio/')) {
-    return handleAudioMimetype({mimetype, ...handlerProps});
+    return <AudioHandler mimetype={mimetype} {...handlerProps} />;
   } else if (mimetype.startsWith('video/')) {
-    return handleVideoMimetype({mimetype, ...handlerProps});
+    return <VideoHandler mimetype={mimetype} {...handlerProps} />;
   } else if (mimetype.startsWith('image/')) {
-    return handleImageMimetype({mimetype, ...handlerProps});
+    return <ImageHandler mimetype={mimetype} {...handlerProps} />;
   } else {
-    return handleGenericMimetype({mimetype, ...handlerProps});
+    return <GenericHandler mimetype={mimetype} {...handlerProps} />;
   }
 };

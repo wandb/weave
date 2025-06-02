@@ -2,7 +2,7 @@ import {Button} from '@wandb/weave/components/Button';
 import React from 'react';
 
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
-import {HandlerProps, HandlerReturnType} from './Shared';
+import {HandlerProps, ContentTooltipWrapper, ContentMetadataTooltip} from './Shared';
 
 const DownloadButton = ({
   isDownloading,
@@ -21,12 +21,15 @@ const DownloadButton = ({
   );
 };
 
-export const handleGenericMimetype = ({
+export const GenericHandler = ({
   iconStart,
   filename,
+  mimetype,
+  size,
   isDownloading,
   doSave,
-}: HandlerProps): HandlerReturnType => {
+  showPreview,
+}: HandlerProps) => {
   const iconAndText = (
     <>
       {iconStart}
@@ -45,8 +48,17 @@ export const handleGenericMimetype = ({
     </TailwindContents>
   );
 
-  return {
-    body,
-    tooltipHint: 'Click button to download',
-  };
+  return (
+    <ContentTooltipWrapper
+      showPreview={showPreview}
+      tooltipHint="Click button to download"
+      body={body}
+    >
+      <ContentMetadataTooltip
+        filename={filename}
+        mimetype={mimetype}
+        size={size}
+      />
+    </ContentTooltipWrapper>
+  );
 };
