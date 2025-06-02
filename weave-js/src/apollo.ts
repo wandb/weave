@@ -6,6 +6,7 @@ import {
   Operation,
 } from '@apollo/client';
 import Observable from 'zen-observable';
+import { getCookie } from './common/util/cookie';
 
 const makeHttpLink = (uri: string) =>
   createHttpLink({
@@ -27,12 +28,20 @@ const authMiddleware = new ApolloLink((operation, forward) => {
   });
 });
 
+const adminPrivilegesMiddleware = new ApolloLink((operation, forward) => {
+  const adminPrivileges = getCookie('use_admin_privileges') === 'true';
+  if (adminPrivileges) {
+    setHeader(operation, 'use-admin-privileges', 'true');
+  }
+  return forward!(operation);
+});
 export const makeGorillaApolloClient = (
   gorillaApolloEndpoint: string = `${window.WEAVE_CONFIG.WANDB_BASE_URL}/graphql`
 ) => {
   return new ApolloClient({
     link: ApolloLink.from([
       authMiddleware,
+      adminPrivilegesMiddleware,
       makeHttpLink(gorillaApolloEndpoint),
     ]),
     cache: new InMemoryCache(),

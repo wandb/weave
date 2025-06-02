@@ -43,7 +43,7 @@ export const RedirectToLastView = ({
     );
   }
   if (!projectInfo) {
-    return <Alert severity="error">Invalid project!: {project}</Alert>;
+    return <Alert severity="error">Invalid project: {project}</Alert>;
   }
 
   // Traces table might be under 'calls'

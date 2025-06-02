@@ -1,10 +1,10 @@
 import React from 'react';
 
-import {useProjectInfo} from '../../../../../../common/hooks/useProjectInfo';
-import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
-import {Alert} from '../../../../../Alert';
-import {WaveLoader} from '../../../../../Loaders/WaveLoader';
-import {CallsPageLoadViewWithUser} from './CallsPageLoadViewWithUser';
+import { useProjectInfo } from '../../../../../../common/hooks/useProjectInfo';
+import { useViewerInfo } from '../../../../../../common/hooks/useViewerInfo';
+import { Alert } from '../../../../../Alert';
+import { WaveLoader } from '../../../../../Loaders/WaveLoader';
+import { CallsPageLoadViewWithUser } from './CallsPageLoadViewWithUser';
 
 type CallsPageLoadViewProps = {
   entity: string;
@@ -19,8 +19,8 @@ export const CallsPageLoadView = ({
   tab,
   view,
 }: CallsPageLoadViewProps) => {
-  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const {loading: loadingProjectInfo, projectInfo} = useProjectInfo(
+  const { loading: loadingUserInfo, userInfo } = useViewerInfo();
+  const { loading: loadingProjectInfo, projectInfo } = useProjectInfo(
     entity,
     project
   );
@@ -44,8 +44,9 @@ export const CallsPageLoadView = ({
       </div>
     );
   }
+
   if (!projectInfo) {
-    return <Alert severity="error">Invalid project!!: {project}</Alert>;
+    return <Alert severity="error">Invalid project: {project}</Alert>;
   }
 
   return (
