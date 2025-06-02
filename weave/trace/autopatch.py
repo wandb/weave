@@ -56,6 +56,7 @@ class AutopatchSettings(BaseModel):
     vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     chatnvidia: IntegrationSettings = Field(default_factory=IntegrationSettings)
     smolagents: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    verdict: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
 
 @validate_call
@@ -94,6 +95,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
     from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
+    from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
 
     get_openai_patcher(settings.openai).attempt_patch()
     get_mistral_patcher(settings.mistral).attempt_patch()
@@ -115,6 +117,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_huggingface_patcher(settings.huggingface).attempt_patch()
     get_smolagents_patcher(settings.smolagents).attempt_patch()
     get_openai_agents_patcher(settings.openai_agents).attempt_patch()
+    get_verdict_patcher(settings.verdict).attempt_patch()
 
     llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
@@ -150,6 +153,7 @@ def reset_autopatch() -> None:
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
     from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
+    from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
 
     get_openai_patcher().undo_patch()
     get_mistral_patcher().undo_patch()
@@ -171,6 +175,7 @@ def reset_autopatch() -> None:
     get_huggingface_patcher().undo_patch()
     get_smolagents_patcher().undo_patch()
     get_openai_agents_patcher().undo_patch()
+    get_verdict_patcher().undo_patch()
 
     llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()
