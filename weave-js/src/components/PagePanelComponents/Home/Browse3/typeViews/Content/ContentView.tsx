@@ -1,14 +1,11 @@
-import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useCallback, useEffect, useState} from 'react';
 
-import {convertBytes} from '@wandb/weave/util';
 import {Icon} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {handleMimetype} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/ContentHandler';
-import {getIconName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/Shared';
+import {getIconName, ContentTooltipWrapper, ContentMetadataTooltip} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/Shared';
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
@@ -192,32 +189,18 @@ const ContentViewMetadataLoaded = ({
 
   const {body, tooltipHint, tooltipPreview} = handleMimetype(handlerProps);
 
-  const tooltip = (
-    <TailwindContents>
-      {tooltipPreview && (
-        <div className="flex justify-center">{tooltipPreview}</div>
-      )}
-      {!tooltipPreview && (
-        <div className="grid grid-cols-[auto_auto] items-center gap-x-2 gap-y-1">
-          <div className="text-right font-bold">Name</div>
-          <div>{filename}</div>
-          <div className="text-right font-bold">MIME type</div>
-          <div>{mimetype}</div>
-          <div className="text-right font-bold">Size</div>
-          <div>{convertBytes(size)}</div>
-        </div>
-      )}
-      {tooltipHint && (
-        <div className="text-sm">
-          <div className="mt-8 text-center text-xs">{tooltipHint}</div>
-        </div>
-      )}
-    </TailwindContents>
-  );
   return (
-    <>
-      {showPreview && body}
-      {!showPreview && <Tooltip trigger={body} content={tooltip} />}
-    </>
+    <ContentTooltipWrapper
+      showPreview={showPreview}
+      tooltipHint={tooltipHint}
+      tooltipPreview={tooltipPreview}
+      body={body}
+    >
+      <ContentMetadataTooltip
+        filename={filename}
+        mimetype={mimetype}
+        size={size}
+      />
+    </ContentTooltipWrapper>
   );
 };
