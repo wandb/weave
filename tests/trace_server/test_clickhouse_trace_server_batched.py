@@ -80,6 +80,7 @@ def test_clickhouse_storage_size_schema_conversion():
         "summary_dump": None,
         "cost": None,
         "wb_run_id": None,
+        "wb_run_step": None,
         "wb_user_id": None,
     }
 
@@ -111,6 +112,7 @@ def test_clickhouse_storage_size_null_handling():
         "summary_dump": None,
         "cost": None,
         "wb_run_id": None,
+        "wb_run_step": None,
         "wb_user_id": None,
     }
 

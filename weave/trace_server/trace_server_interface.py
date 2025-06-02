@@ -122,6 +122,7 @@ class CallSchema(BaseModel):
     # WB Metadata
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
     deleted_at: Optional[datetime.datetime] = None
 
@@ -164,6 +165,7 @@ class StartedCallSchemaForInsert(BaseModel):
     # WB Metadata
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
 
 class EndedCallSchemaForInsert(BaseModel):

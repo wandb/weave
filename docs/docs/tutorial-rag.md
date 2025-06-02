@@ -177,7 +177,7 @@ Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.
             modelName?: string;
             articleEmbeddings: Article[];
         }) {
-            this.openai = weave.wrapOpenAI(new OpenAI());
+            this.openai = new OpenAI();
             this.systemMessage = config.systemMessage;
             this.modelName = config.modelName || "gpt-3.5-turbo-1106";
             this.articleEmbeddings = config.articleEmbeddings;
@@ -622,7 +622,7 @@ Here, we show the code in it's entirety.
             modelName?: string;
             articleEmbeddings: Article[];
         }) {
-            this.openai = weave.wrapOpenAI(new OpenAI());
+            this.openai = new OpenAI();
             this.systemMessage = config.systemMessage;
             this.modelName = config.modelName || "gpt-3.5-turbo-1106";
             this.articleEmbeddings = config.articleEmbeddings;
