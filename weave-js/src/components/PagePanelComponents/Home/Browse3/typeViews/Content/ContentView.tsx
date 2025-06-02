@@ -1,13 +1,13 @@
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useCallback, useEffect, useState} from 'react';
 
-import {convertBytes} from '../../../../../../util';
-import {Icon} from '../../../../../Icon';
-import {LoadingDots} from '../../../../../LoadingDots';
-import {TailwindContents} from '../../../../../Tailwind';
-import {useWFHooks} from '../../pages/wfReactInterface/context';
-import {CustomWeaveTypePayload} from '../customWeaveType.types';
-import {getIconName, handleMimetype} from './Handlers';
+import {convertBytes} from '@wandb/weave/util';
+import {Icon} from '@wandb/weave/components/Icon';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {TailwindContents} from '@wandb/weave/components/Tailwind';
+import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
+import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
+import {getIconName, handleMimetype} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers';
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.

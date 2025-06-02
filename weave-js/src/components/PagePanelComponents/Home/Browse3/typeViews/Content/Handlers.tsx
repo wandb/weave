@@ -2,9 +2,9 @@ import {Button} from '@wandb/weave/components/Button';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import React, {useEffect} from 'react';
 
-import {IconName, IconNames} from '../../../../../Icon';
-import {TailwindContents} from '../../../../../Tailwind';
-import {CustomLink} from '../../pages/common/Links';
+import {IconName, IconNames} from '@wandb/weave/components/Icon';
+import {TailwindContents} from '@wandb/weave/components/Tailwind';
+import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {
   PDFView,
   ImageThumbnail,
@@ -12,7 +12,7 @@ import {
   MiniAudioViewer,
   VideoPopup,
   VideoThumbnail,
-} from './Views';
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
 
 const ICON_MAP: Record<string, IconName> = {
   'application/json': IconNames.JobProgramCode,

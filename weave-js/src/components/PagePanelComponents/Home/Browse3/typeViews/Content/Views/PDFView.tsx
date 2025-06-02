@@ -9,9 +9,9 @@ import Counter from 'yet-another-react-lightbox/plugins/counter';
 import Download from 'yet-another-react-lightbox/plugins/download';
 import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
 
-import {WaveLoader} from '../../../../../Loaders/WaveLoader';
-import {LoadingDots} from '../../../../../LoadingDots';
-import {Tailwind} from '../../../../../Tailwind';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 
 type PDFViewProps = {
   blob: Blob;
