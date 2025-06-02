@@ -727,14 +727,14 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
-        trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
+        # ref filters also have group by filters, because output_refs exist on the
+        # call end parts.
+        ref_filter_opt_sql = process_ref_filters_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
         )
-        # ref filters also have group by filters, because output_refs exist on the
-        # call end parts.
-        ref_filter_opt_sql = process_ref_filters_to_sql(
+        trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
