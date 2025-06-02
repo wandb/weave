@@ -155,8 +155,10 @@ const useCallNavigation = () => {
  * Custom footer component that includes controls and pagination
  */
 interface CustomFooterProps {
-  increaseRowHeight: () => void;
-  decreaseRowHeight: () => void;
+  setRowHeightToSingle: () => void;
+  setRowHeightToThree: () => void;
+  setRowHeightToSix: () => void;
+  currentRowHeight: number;
   onlyOneModel: boolean;
   setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
   shouldHighlightSelectedRow?: boolean;
@@ -176,6 +178,11 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
     setColumnMenuAnchorEl(null);
   };
 
+  // Determine which row height option is currently active
+  const isSingleRowActive = props.currentRowHeight === 32;
+  const isThreeRowsActive = props.currentRowHeight === 32 + 17 * 2; // 66
+  const isSixRowsActive = props.currentRowHeight === 32 + 17 * 5; // 117
+
   return (
     <GridFooterContainer>
       <HorizontalBox
@@ -187,18 +194,32 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
           height: '40px',
         }}>
         <Tooltip
-          content="Increase row height"
+          content="Single row"
           trigger={
-            <IconButton onClick={props.increaseRowHeight}>
-              <Icon name="row-height-small" />
+            <IconButton 
+              onClick={props.setRowHeightToSingle}
+            >
+              <Icon name="row-height-xlarge" />
             </IconButton>
           }
         />
         <Tooltip
-          content="Decrease row height"
+          content="3 rows"
           trigger={
-            <IconButton onClick={props.decreaseRowHeight}>
-              <Icon name="row-height-large" />
+            <IconButton 
+              onClick={props.setRowHeightToThree}
+            >
+              <Icon name="row-height-medium" />
+            </IconButton>
+          }
+        />
+        <Tooltip
+          content="6 rows"
+          trigger={
+            <IconButton 
+              onClick={props.setRowHeightToSix}
+            >
+              <Icon name="row-height-small" />
             </IconButton>
           }
         />
@@ -662,20 +683,19 @@ export const ExampleCompareSectionTable: React.FC<
   const [rowHeight, setRowHeight] = useState(32);
   const [lineClamp, setLineClamp] = useState(1);
 
-  const increaseRowHeight = useCallback(() => {
-    setRowHeight(v => {
-      const newHeight = Math.min(v + 17, 32 + 17 * 7); // Max 8 lines
-      return newHeight;
-    });
-    setLineClamp(v => Math.min(v + 1, 8));
+  const setRowHeightToSingle = useCallback(() => {
+    setRowHeight(32); // 1 line
+    setLineClamp(1);
   }, []);
 
-  const decreaseRowHeight = useCallback(() => {
-    setRowHeight(v => {
-      const newHeight = Math.max(v - 17, 32); // Min 1 line
-      return newHeight;
-    });
-    setLineClamp(v => Math.max(v - 1, 1));
+  const setRowHeightToThree = useCallback(() => {
+    setRowHeight(32 + 17 * 2); // 3 lines
+    setLineClamp(3);
+  }, []);
+
+  const setRowHeightToSix = useCallback(() => {
+    setRowHeight(32 + 17 * 5); // 6 lines
+    setLineClamp(6);
   }, []);
 
   // Filter out hidden evaluations and keep only latest for each model (if in leaderboard mode)
@@ -722,8 +742,9 @@ export const ExampleCompareSectionTable: React.FC<
         state={filteredState}
         rowHeight={rowHeight}
         lineClamp={lineClamp}
-        increaseRowHeight={increaseRowHeight}
-        decreaseRowHeight={decreaseRowHeight}
+        setRowHeightToSingle={setRowHeightToSingle}
+        setRowHeightToThree={setRowHeightToThree}
+        setRowHeightToSix={setRowHeightToSix}
         setModelsAsRows={setModelsAsRows}
         onlyOneModel={onlyOneModel}
         defaultHiddenScorerMetrics={props.defaultHiddenScorerMetrics}
@@ -736,8 +757,9 @@ export const ExampleCompareSectionTable: React.FC<
         state={filteredState}
         rowHeight={rowHeight}
         lineClamp={lineClamp}
-        increaseRowHeight={increaseRowHeight}
-        decreaseRowHeight={decreaseRowHeight}
+        setRowHeightToSingle={setRowHeightToSingle}
+        setRowHeightToThree={setRowHeightToThree}
+        setRowHeightToSix={setRowHeightToSix}
         setModelsAsRows={setModelsAsRows}
         onlyOneModel={onlyOneModel}
         defaultHiddenScorerMetrics={props.defaultHiddenScorerMetrics}
@@ -1234,8 +1256,9 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
   ExampleCompareSectionTableProps & {
     rowHeight: number;
     lineClamp: number;
-    increaseRowHeight: () => void;
-    decreaseRowHeight: () => void;
+    setRowHeightToSingle: () => void;
+    setRowHeightToThree: () => void;
+    setRowHeightToSix: () => void;
     setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
     onlyOneModel: boolean;
     defaultHiddenScorerMetrics?: Set<string>;
@@ -1766,8 +1789,10 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         columnsPanel: ColumnsManagementPanel,
         footer: () => (
           <CustomFooter
-            increaseRowHeight={props.increaseRowHeight}
-            decreaseRowHeight={props.decreaseRowHeight}
+            setRowHeightToSingle={props.setRowHeightToSingle}
+            setRowHeightToThree={props.setRowHeightToThree}
+            setRowHeightToSix={props.setRowHeightToSix}
+            currentRowHeight={props.rowHeight}
             onlyOneModel={props.onlyOneModel}
             setModelsAsRows={props.setModelsAsRows}
             shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}
@@ -1798,8 +1823,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
   ExampleCompareSectionTableProps & {
     rowHeight: number;
     lineClamp: number;
-    increaseRowHeight: () => void;
-    decreaseRowHeight: () => void;
+    setRowHeightToSingle: () => void;
+    setRowHeightToThree: () => void;
+    setRowHeightToSix: () => void;
     setModelsAsRows: (value: React.SetStateAction<boolean>) => void;
     onlyOneModel: boolean;
     defaultHiddenScorerMetrics?: Set<string>;
@@ -2484,8 +2510,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         columnsPanel: ColumnsManagementPanel,
         footer: () => (
           <CustomFooter
-            increaseRowHeight={props.increaseRowHeight}
-            decreaseRowHeight={props.decreaseRowHeight}
+            setRowHeightToSingle={props.setRowHeightToSingle}
+            setRowHeightToThree={props.setRowHeightToThree}
+            setRowHeightToSix={props.setRowHeightToSix}
+            currentRowHeight={props.rowHeight}
             onlyOneModel={props.onlyOneModel}
             setModelsAsRows={props.setModelsAsRows}
             shouldHighlightSelectedRow={props.shouldHighlightSelectedRow}

@@ -9,6 +9,8 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import ReactMarkdown from 'react-markdown';
 import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {Icon} from '@wandb/weave/components/Icon';
 
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
@@ -662,17 +664,23 @@ export const LeaderboardPageContentInner: React.FC<
         <Box display="block">
           {/* Running Evaluations Banner */}
           {hasRunningEvaluations && (
-            <Box
-              sx={{
-                padding: '12px 16px',
-                backgroundColor: 'white',
-                marginBottom: '1px',
-              }}>
-              <Alert severity="info" sx={{margin: 0}}>
-                Some models have evaluations currently running. Results will
-                update automatically when evaluations complete.
-              </Alert>
-            </Box>
+            <Tailwind style={{width: '100%', paddingTop: '16px', backgroundColor: 'white'}}>
+              <div className="px-16">
+                <div className="flex flex w-full items-center gap-3 rounded-lg bg-moon-100 px-16 py-8">
+                  <Icon name="randomize-reset-reload" size="large" color="moon-800" />
+                  <p className="ml-[8px] text-[14px] font-semibold text-moon-800">
+                    Evaluation in progress
+                  </p>
+                  <p className="ml-[8px] mr-auto text-[14px] text-moon-800">
+                    View your leaderboard updates here.
+                  </p>
+                  <Button variant="ghost">
+                    View updates
+                  </Button>
+                </div>
+                <div className="h-16"></div>
+              </div>
+            </Tailwind>
           )}
 
           {/* Leaderboard Table */}
