@@ -1,77 +1,60 @@
-# 📝 Weave Leaderboards: General Guide
+# Leaderboards
 
-Weave Leaderboards make it easy to evaluate and compare multiple models against multiple criteria — whether you're testing raw accuracy, numerical prediction quality, or subjective reasoning. They’re ideal for:
+Weave Leaderboards make it easy to evaluate and compare multiple models against multiple criteria, whether you're testing raw accuracy, numerical prediction quality, or subjective reasoning. They’re ideal for:
 
-* Prompt engineering comparisons
-* RAG + fine-tuned model evaluation
-* Tracking performance over time
-* Aligning team-wide benchmarks
+- Prompt engineering comparisons
+- RAG and fine-tuned model evaluation
+- Tracking performance over time
+- Aligning team-wide benchmarks
 
-Explore the [Leaderboard Quickstart Notebook](https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart) to follow a complete, runnable example.
+:::tip
+Looking for a runnable example? See the [Leaderboard Quickstart Notebook](https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart).
+:::
 
+## Build a Leaderboard
 
-## How to Build a Leaderboard
+### Set up
 
-### 1. **Create a Dataset**
+1. First, create a test dataset. You can either [use the built-in Weave `Dataset`](./datasets.md), or create a list of objects:
 
-```python
-dataset = [
-    {"input": "some_input", "target": "expected_output"},
-    # Add your data rows here
-]
-```
+    ```python
+    dataset = [
+        {"input": "some_input", "target": "expected_output"},
+        # Add your data rows here
+    ]
+    ```
 
-Wrap this in a `weave.Evaluation`:
+2. Create an [`Evaluation`](../core-types/evaluations.md) that uses the dataset:
 
-```python
-import weave
+    ```python
+    evaluation = Evaluation(
+        name="My Evaluation",
+        dataset=dataset,
+        scorers=[...],  # Define below
+    )
+    ```
 
-evaluation = weave.Evaluation(
-    name="My Evaluation",
-    dataset=dataset,
-    scorers=[...],  # Define below
-)
-```
+3. Define the [scoring function(s)](../evaluation/scorers.md) for your Evaluation: 
 
----
+    ```python
+    @weave.op
+    def simple_accuracy(target, output):
+        return target == output
+    ```
 
-### 2. **Write Scoring Functions**
+4. Define any number of models and run them against the evaluation:
 
-Scoring functions evaluate how well a model performed. Each must be a `@weave.op`.
+    ```python
+    @weave.op
+    def my_model(input):
+        return some_output_based_on(input)
 
-**Example:**
-
-```python
-@weave.op
-def simple_accuracy(target, output):
-    return target == output
-```
-
-You can return:
-
-* Booleans (`True`/`False`)
-* Numeric errors
-* Dicts with structured results
-
----
-
-### 3. **Evaluate Models**
-
-Define any number of models and run them against the evaluation:
-
-```python
-@weave.op
-def my_model(input):
-    return some_output_based_on(input)
-
-await evaluation.evaluate(my_model)
-```
+    await evaluation.evaluate(my_model)
+    ```
 
 All evaluations are logged and tracked in Weave automatically.
 
----
-
-### 4. **Create a Leaderboard**
+### Create the Leaderboard
 
 Once you have evaluations, define a leaderboard that compares them across one or more metrics.
 
@@ -94,45 +77,45 @@ my_leaderboard = leaderboard.Leaderboard(
 weave.publish(my_leaderboard)
 ```
 
----
 
-### 5. **View in the UI**
+### View a Leaderboard in the UI
 
 Your leaderboard is now visible in the Weave UI:
 
-📍 Navigate to **"Leaderboards"** in the sidebar to:
+Navigate to **"Leaderboards"** in the sidebar to:
 
-* View and sort by metric values
-* Inspect individual model evaluations
-* Edit leaderboard structure via the UI or code
+- View and sort by metric values
+- Inspect individual model evaluations
+- Edit leaderboard structure via the UI or code
 
----
 
-## 🤮 Interpreting the Leaderboard
+## Interpret the Leaderboard
 
 Once your leaderboard is defined and published, the Weave UI presents a side-by-side comparison of models, datasets, and evaluation metrics — all in one table.
 
-### 📋 Rows: Models
+### Rows: Models
 
 Each row represents a model you’ve evaluated. The model names are pulled from the `@weave.op` function names you used during evaluation.
 
-> 💡 **Tip:** Use meaningful model names like `gpt_4_tuned_v1` or `no_rag_baseline` to make results easier to scan.
+:::tip
+Use meaningful model names like `gpt_4_tuned_v1` or `no_rag_baseline` to make results easier to scan.
+:::
 
-### 🧱 Columns: Metrics
+### Columns: Metrics
 
 Each column represents a specific combination of:
 
-* ✅ **Evaluation** (e.g., a dataset or task)
-* ✅ **Scorer** (a function that computes correctness/error)
-* ✅ **Summary Metric** (a field path like `"true_fraction"` or `"mean"`)
+- ✅ **Evaluation** (e.g., a dataset or task)
+- ✅ **Scorer** (a function that computes correctness/error)
+- ✅ **Summary Metric** (a field path like `"true_fraction"` or `"mean"`)
 
 You configure these using `LeaderboardColumn`.
 
-### 🎯 Metric Values
+### Metric values
 
 Each cell shows the result of a specific model on a specific evaluation metric.
 
-#### 🔍 UI Features:
+#### UI features:
 
 * **Color-coded performance**: Green = better performance (e.g., higher accuracy or lower error).
 * **Sort arrows**: Click column headers to sort models by metric value.
@@ -158,8 +141,8 @@ Imagine this simplified leaderboard:
 
 | Model     | Accuracy (↑) | Latency (↓) |
 | --------- | ------------ | ----------- |
-| `model_a` | 92% ✅        | 150ms ⚠️    |
-| `model_b` | 88% ⚠️       | 75ms ✅      |
+| `model_a` | 92%         | 150ms     |
+| `model_b` | 88%        | 75ms       |
 
 * `model_a` performs better on accuracy but is slower.
 * `model_b` is faster but less accurate — a trade-off.
@@ -167,7 +150,7 @@ Imagine this simplified leaderboard:
 
 ---
 
-###  Best Practices
+###  Best practices
 
 | Practice                         | Why It Helps                                |
 | -------------------------------- | ------------------------------------------- |
@@ -179,7 +162,7 @@ Imagine this simplified leaderboard:
 
 ---
 
-##  Learn More
+##  Learn more
 
 *  [Leaderboard Quickstart Notebook](https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart)
 *  [Evaluation API Reference](https://weave-docs.wandb.ai/guides/evaluation/)
