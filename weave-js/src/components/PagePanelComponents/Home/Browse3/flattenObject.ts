@@ -1,3 +1,5 @@
+import {FIELD_ID_PATH_SEPARATOR} from './pages/CallsPage/callsTableColumnsUtil';
+
 /**
  * Flatten an object, but preserve any object that has a `_type` field.
  * This is critical for handling "Weave Types" - payloads that should be
@@ -33,7 +35,9 @@ const flattenObject = (
     if (!obj.hasOwnProperty(key)) {
       return;
     }
-    const newKey = parentKey ? `${parentKey}.${key}` : key;
+    const newKey = parentKey
+      ? `${parentKey}${FIELD_ID_PATH_SEPARATOR}${key}`
+      : key;
     if (Array.isArray(obj[key])) {
       result[newKey] = obj[key];
     } else if (

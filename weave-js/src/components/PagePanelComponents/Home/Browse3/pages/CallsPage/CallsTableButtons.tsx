@@ -34,7 +34,7 @@ import {
   fileExtensions,
 } from '../wfReactInterface/traceServerClientTypes';
 import {CallFilter} from '../wfReactInterface/wfDataModelHooksInterface';
-import { FIELD_ID_PATH_SEPARATOR } from './callsTableColumns';
+import {FIELD_ID_PATH_SEPARATOR} from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
@@ -173,7 +173,8 @@ export const ExportSelector = ({
         numExpandedColumns: refColumnsToExpand.length,
         // the most nested refColumn to expand
         maxDepth: refColumnsToExpand.reduce(
-          (max, col) => Math.max(max, col.split(FIELD_ID_PATH_SEPARATOR).length),
+          (max, col) =>
+            Math.max(max, col.split(FIELD_ID_PATH_SEPARATOR).length),
           0
         ),
         type: contentType,

@@ -214,6 +214,8 @@ export const useCallsTableColumns = (
     ]
   );
 
+  console.log('columns', columns);
+
   return useMemo(() => {
     return {
       columns,
@@ -256,6 +258,29 @@ const CallLinkCell: FC<{
   );
 };
 
+const ATTRIBUTES_FIELD_NAME = 'attributes';
+
+const pathDFSComparator = (a: string, b: string) => {
+  const aParts = a.split(FIELD_ID_PATH_SEPARATOR);
+  const bParts = b.split(FIELD_ID_PATH_SEPARATOR);
+  const minLength = Math.min(aParts.length, bParts.length);
+  for (let i = 0; i < minLength; i++) {
+    if (aParts[i] !== bParts[i]) {
+      if (i === 0) {
+        // Attributes should be last, breaking the locale sort
+        if (aParts[i] === ATTRIBUTES_FIELD_NAME) {
+          return 1; // last
+        }
+        if (bParts[i] === ATTRIBUTES_FIELD_NAME) {
+          return -1; // first
+        }
+      }
+      return aParts[i].localeCompare(bParts[i]);
+    }
+  }
+  return aParts.length - bParts.length;
+};
+
 function buildCallsTableColumns(
   entity: string,
   project: string,
@@ -291,17 +316,18 @@ function buildCallsTableColumns(
           c.startsWith(p + FIELD_ID_PATH_SEPARATOR)
         )
     )
-    .sort((a, b) => {
-      const prefixes = ['inputs.', 'output.', 'attributes.'];
-      const aPrefix =
-        a === 'output' ? 'output.' : prefixes.find(p => a.startsWith(p)) ?? '';
-      const bPrefix =
-        b === 'output' ? 'output.' : prefixes.find(p => b.startsWith(p)) ?? '';
-      if (aPrefix !== bPrefix) {
-        return prefixes.indexOf(aPrefix) - prefixes.indexOf(bPrefix);
-      }
-      return a.localeCompare(b);
-    });
+    .sort(pathDFSComparator);
+  // .sort((a, b) => {
+  //   const prefixes = [inputPrefix, outputPrefix, attributesPrefix];
+  //   const aPrefix =
+  //     a === 'output' ? outputPrefix : prefixes.find(p => a.startsWith(p)) ?? '';
+  //   const bPrefix =
+  //     b === 'output' ? outputPrefix : prefixes.find(p => b.startsWith(p)) ?? '';
+  //   if (aPrefix !== bPrefix) {
+  //     return prefixes.indexOf(aPrefix) - prefixes.indexOf(bPrefix);
+  //   }
+  //   return a.localeCompare(b);
+  // });
 
   const cols: Array<GridColDef<TraceCallSchema>> = [
     {

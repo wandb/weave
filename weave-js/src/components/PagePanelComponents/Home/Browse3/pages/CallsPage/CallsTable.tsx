@@ -104,15 +104,15 @@ import {ParentFilterTag} from './ParentFilterTag';
 const MAX_SELECT = 100;
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
-  'attributes.weave',
-  'summary.weave.feedback',
-  'summary.status_counts',
+  `attributes${FIELD_ID_PATH_SEPARATOR}weave`,
+  `summary${FIELD_ID_PATH_SEPARATOR}weave${FIELD_ID_PATH_SEPARATOR}feedback`,
+  `summary${FIELD_ID_PATH_SEPARATOR}status_counts`,
   // attributes.python was logged for a short period of time
   // accidentally in v0.51.47. We can hide it for a while
   // and remove this after a few months (say Sept 2025)
-  'attributes.python',
+  `attributes${FIELD_ID_PATH_SEPARATOR}python`,
   'wb_run_id',
-  'attributes.otel_span',
+  `attributes${FIELD_ID_PATH_SEPARATOR}otel_span`,
 ];
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];

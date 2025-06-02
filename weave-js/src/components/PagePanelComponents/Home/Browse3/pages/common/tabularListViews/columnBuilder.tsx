@@ -109,7 +109,10 @@ export function prepareFlattenedDataForTable<T>(
       }
 
       // Finally, we remove any keys that start with underscore
-      if (newKey.includes('._') || newKey.startsWith('_')) {
+      if (
+        newKey.includes(FIELD_ID_PATH_SEPARATOR + '_') ||
+        newKey.startsWith('_')
+      ) {
         return;
       }
 
@@ -117,7 +120,8 @@ export function prepareFlattenedDataForTable<T>(
       cleaned[newKey] = flattened[key];
     });
 
-    return {...r, ...cleaned} as T & {[key: string]: string};
+    return cleaned as T & {[key: string]: string};
+    // return {...r, ...cleaned} as T & {[key: string]: string};
   });
 }
 /**
