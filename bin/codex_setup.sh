@@ -42,9 +42,9 @@ install_docker_engine() {
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     
     # Configure Docker for current user
-    sudo usermod -aG docker $USER
-    sudo systemctl start docker
-    sudo systemctl enable docker
+    # sudo usermod -aG docker $USER
+    # sudo systemctl start docker
+    # sudo systemctl enable docker
     
     echo "✓ Docker installed successfully"
     echo "Note: You may need to log out and back in for docker group membership to take effect"
