@@ -137,7 +137,13 @@ export const useEvaluationComparisonSummary = (
     return () => {
       mounted = false;
     };
-  }, [entity, evaluationCallIdsMemo, project, getTraceServerClient, colorByModel]);
+  }, [
+    entity,
+    evaluationCallIdsMemo,
+    project,
+    getTraceServerClient,
+    colorByModel,
+  ]);
 
   return useMemo(() => {
     if (
@@ -242,8 +248,10 @@ const fetchEvaluationSummaryData = async (
     );
 
   // Assign colors based on model or evaluation call index (optional)
-  const assignedColors = colorByModel 
-    ? assignColorsForModels(evalRes.calls.map(call => ({model: call.inputs.model})))
+  const assignedColors = colorByModel
+    ? assignColorsForModels(
+        evalRes.calls.map(call => ({model: call.inputs.model}))
+      )
     : evalRes.calls.map((_, ndx) => pickColor(ndx));
 
   result.evaluationCalls = Object.fromEntries(
@@ -508,18 +516,23 @@ const fetchEvaluationComparisonResults = async (
     result.resultRows = Object.fromEntries(
       Object.entries(result.resultRows).filter(([digest, row]) => {
         // For each dataset group, check if the row exists in all evaluations of that dataset
-        for (const [datasetRef, evalCallIds] of Object.entries(evaluationsByDataset)) {
-          const rowEvalsForDataset = evalCallIds.filter(callId => 
-            row.evaluations[callId] !== undefined
+        for (const [datasetRef, evalCallIds] of Object.entries(
+          evaluationsByDataset
+        )) {
+          const rowEvalsForDataset = evalCallIds.filter(
+            callId => row.evaluations[callId] !== undefined
           );
-          
+
           // If this row has data from this dataset, it must have data from ALL evaluations
           // that use this dataset
-          if (rowEvalsForDataset.length > 0 && rowEvalsForDataset.length !== evalCallIds.length) {
+          if (
+            rowEvalsForDataset.length > 0 &&
+            rowEvalsForDataset.length !== evalCallIds.length
+          ) {
             return false;
           }
         }
-        
+
         // The row must exist in at least one evaluation
         return Object.values(row.evaluations).length > 0;
       })
@@ -556,11 +569,11 @@ const assignColorsForModels = (calls: {model: string}[]): string[] => {
   // This ensures that the same model always gets the same color regardless of filtering
   const uniqueModelRefs = [...new Set(calls.map(call => call.model))].sort();
   const modelColorMap = new Map<string, string>();
-  
+
   uniqueModelRefs.forEach((modelRef, index) => {
     modelColorMap.set(modelRef, pickColor(index));
   });
-  
+
   // Return colors for each call based on its model
   return calls.map(call => modelColorMap.get(call.model)!);
 };

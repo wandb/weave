@@ -18,7 +18,6 @@ import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
-import {SmallRef} from '../../../../smallRef/SmallRef';
 
 import {
   HIDE_TRACETREE_PARAM,
@@ -27,6 +26,7 @@ import {
   useWeaveflowRouteContext,
 } from '../../../../context';
 import {NotApplicable} from '../../../../NotApplicable';
+import {SmallRef} from '../../../../smallRef/SmallRef';
 import {StyledDataGrid} from '../../../../StyledDataGrid';
 import {IdPanel} from '../../../common/Id';
 import {CallLink} from '../../../common/Links';

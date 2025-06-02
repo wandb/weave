@@ -102,7 +102,8 @@ export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 }> = ({state, setSelectedMetrics}) => {
-  const {radarData, allMetricNames, datasetSplitInfo} = usePlotDataFromMetrics(state);
+  const {radarData, allMetricNames, datasetSplitInfo} =
+    usePlotDataFromMetrics(state);
   const {selectedMetrics} = state;
 
   // Don't initialize selectedMetrics here - let the parent component handle it
@@ -111,11 +112,11 @@ export const SummaryPlots: React.FC<{
   const filteredData = useFilteredData(radarData, selectedMetrics);
   const normalizedRadarData = normalizeDataForRadarPlot(filteredData);
   const barPlotData = useBarPlotData(filteredData, state);
-  
+
   // Filter bar plot data based on selectedMetrics
   const filteredBarPlotData = useMemo(() => {
     if (!selectedMetrics) return barPlotData;
-    
+
     return barPlotData.filter(plot => {
       const metricToCheck = plot.originalMetric || plot.metric;
       return selectedMetrics[metricToCheck] !== false;
@@ -338,7 +339,10 @@ type BarPlotDataItem = {
   originalMetric?: string;
 };
 
-const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationComparisonState): BarPlotDataItem[] =>
+const useBarPlotData = (
+  filteredData: RadarPlotData,
+  state?: EvaluationComparisonState
+): BarPlotDataItem[] =>
   useMemo(() => {
     const metrics: {
       [metric: string]: {
@@ -354,20 +358,29 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
     for (const [callId, metricBin] of Object.entries(filteredData)) {
       for (const [metric, value] of Object.entries(metricBin.metrics)) {
         if (!metrics[metric]) {
-          metrics[metric] = {callIds: [], values: [], name: metric, colors: [], datasets: []};
+          metrics[metric] = {
+            callIds: [],
+            values: [],
+            name: metric,
+            colors: [],
+            datasets: [],
+          };
         }
         metrics[metric].callIds.push(callId);
         metrics[metric].values.push(value);
         metrics[metric].colors.push(metricBin.color);
-        
+
         // Add dataset information if state is available
         if (state) {
           const evalCall = state.summary.evaluationCalls[callId];
           if (evalCall) {
-            const evaluation = state.summary.evaluations[evalCall.evaluationRef];
+            const evaluation =
+              state.summary.evaluations[evalCall.evaluationRef];
             if (evaluation && evaluation.datasetRef) {
               // Extract dataset name from ref
-              const datasetMatch = evaluation.datasetRef.match(/object\/([^:]+)(?::|$)/);
+              const datasetMatch = evaluation.datasetRef.match(
+                /object\/([^:]+)(?::|$)/
+              );
               const datasetName = datasetMatch ? datasetMatch[1] : 'Unknown';
               metrics[metric].datasets!.push(datasetName);
             }
@@ -377,10 +390,12 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
     }
 
     // Check if we should split by dataset
-    const shouldSplitByDataset = state && Object.values(metrics).some(m => {
-      const uniqueDatasets = new Set(m.datasets || []);
-      return uniqueDatasets.size > 1;
-    });
+    const shouldSplitByDataset =
+      state &&
+      Object.values(metrics).some(m => {
+        const uniqueDatasets = new Set(m.datasets || []);
+        return uniqueDatasets.size > 1;
+      });
 
     if (shouldSplitByDataset && state) {
       // Group metrics by dataset
@@ -390,8 +405,14 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
 
       Object.entries(metrics).forEach(([metric, metricBin]) => {
         // Group by dataset
-        const datasetGroups: {[dataset: string]: {callIds: string[], values: number[], colors: string[]}} = {};
-        
+        const datasetGroups: {
+          [dataset: string]: {
+            callIds: string[];
+            values: number[];
+            colors: string[];
+          };
+        } = {};
+
         metricBin.callIds.forEach((callId, idx) => {
           const dataset = metricBin.datasets![idx] || 'Unknown';
           if (!datasetGroups[dataset]) {
@@ -420,10 +441,10 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
           };
           const key = `${metric}-${dataset}`;
           metricsByDataset[key] = {
-            plotlyData, 
-            yRange: [minY, maxY] as [number, number], 
+            plotlyData,
+            yRange: [minY, maxY] as [number, number],
             metric: key,
-            originalMetric: metric
+            originalMetric: metric,
           };
         });
       });
@@ -432,8 +453,7 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
     }
 
     // Original behavior when not splitting by dataset
-    return Object.entries(metrics)
-      .map(([metric, metricBin]) => {
+    return Object.entries(metrics).map(([metric, metricBin]) => {
       const maxY = Math.max(...metricBin.values) * 1.1;
       const minY = Math.min(...metricBin.values, 0);
       const plotlyData: Plotly.Data = {
@@ -454,7 +474,11 @@ const useBarPlotData = (filteredData: RadarPlotData, state?: EvaluationCompariso
 
 export const usePlotDataFromMetrics = (
   state: EvaluationComparisonState
-): {radarData: RadarPlotData; allMetricNames: Set<string>; datasetSplitInfo?: {[metric: string]: Set<string>}} => {
+): {
+  radarData: RadarPlotData;
+  allMetricNames: Set<string>;
+  datasetSplitInfo?: {[metric: string]: Set<string>};
+} => {
   const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} =
     useCompareEvaluationsState();
   const compositeMetrics = useMemo(() => {
@@ -523,7 +547,9 @@ export const usePlotDataFromMetrics = (
         if (evalCall) {
           const evaluation = state.summary.evaluations[evalCall.evaluationRef];
           if (evaluation && evaluation.datasetRef) {
-            const datasetMatch = evaluation.datasetRef.match(/object\/([^:]+)(?::|$)/);
+            const datasetMatch = evaluation.datasetRef.match(
+              /object\/([^:]+)(?::|$)/
+            );
             if (datasetMatch) {
               datasets.add(datasetMatch[1]);
             }
@@ -536,16 +562,19 @@ export const usePlotDataFromMetrics = (
     });
 
     // Check if we should split by dataset (same logic as bar charts)
-    const shouldSplitByDataset = Object.values(datasetSplitInfo).some(datasets => datasets.size > 1);
+    const shouldSplitByDataset = Object.values(datasetSplitInfo).some(
+      datasets => datasets.size > 1
+    );
 
     // Build radar data with dataset-aware metric names if needed
     const radarData = Object.fromEntries(
       callIds.map(callId => {
         const evalCall = state.summary.evaluationCalls[callId];
         const evaluation = state.summary.evaluations[evalCall.evaluationRef];
-        const datasetName = evaluation?.datasetRef ? 
-          (evaluation.datasetRef.match(/object\/([^:]+)(?::|$)/)?.[1] || 'Unknown') : 
-          'Unknown';
+        const datasetName = evaluation?.datasetRef
+          ? evaluation.datasetRef.match(/object\/([^:]+)(?::|$)/)?.[1] ||
+            'Unknown'
+          : 'Unknown';
 
         return [
           evalCall.callId,
@@ -555,10 +584,10 @@ export const usePlotDataFromMetrics = (
             metrics: Object.fromEntries(
               metrics.map(metric => {
                 // Use dataset-aware metric names if we're splitting by dataset
-                const displayMetricName = shouldSplitByDataset ? 
-                  `${metric.metricLabel} (${datasetName})` : 
-                  metric.metricLabel;
-                
+                const displayMetricName = shouldSplitByDataset
+                  ? `${metric.metricLabel} (${datasetName})`
+                  : metric.metricLabel;
+
                 return [
                   displayMetricName,
                   metric.evalScores[evalCall.callId] ?? 0,
@@ -588,7 +617,12 @@ export const usePlotDataFromMetrics = (
         allMetricNames.add(metric.metricLabel);
       });
     }
-    
+
     return {radarData, allMetricNames, datasetSplitInfo};
-  }, [callIds, compositeMetrics, state.summary.evaluationCalls, state.summary.evaluations]);
+  }, [
+    callIds,
+    compositeMetrics,
+    state.summary.evaluationCalls,
+    state.summary.evaluations,
+  ]);
 };

@@ -259,12 +259,12 @@ export const ExampleCompareSectionDetail: React.FC<{
   // Filter orderedCallIds to only include those that have data for the current row
   const filteredOrderedCallIds = useMemo(() => {
     if (!target) return orderedCallIds;
-    
+
     // Get all evaluation call IDs that have data for this row
     const callIdsWithData = new Set(
       target.originalRows.map(row => row.evaluationCallId)
     );
-    
+
     // Filter orderedCallIds to only include those with data
     return orderedCallIds.filter(callId => callIdsWithData.has(callId));
   }, [orderedCallIds, target]);

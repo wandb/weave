@@ -126,8 +126,8 @@ export const ScorecardSection: React.FC<{
             borderTop: 'none',
             borderRadius: '0 0 8px 8px',
           }}>
-          <ScorecardContent 
-            state={props.state} 
+          <ScorecardContent
+            state={props.state}
             sortColumnsByDatasetAndModel={props.sortColumnsByDatasetAndModel}
             disableBaselineStats={props.disableBaselineStats}
           />
@@ -218,37 +218,52 @@ const ScorecardContent: React.FC<{
       filteredCallIds = filteredCallIds.slice().sort((a, b) => {
         const evaluationCallA = props.state.summary.evaluationCalls[a];
         const evaluationCallB = props.state.summary.evaluationCalls[b];
-        
-        const evaluationA = props.state.summary.evaluations[evaluationCallA.evaluationRef];
-        const evaluationB = props.state.summary.evaluations[evaluationCallB.evaluationRef];
-        
+
+        const evaluationA =
+          props.state.summary.evaluations[evaluationCallA.evaluationRef];
+        const evaluationB =
+          props.state.summary.evaluations[evaluationCallB.evaluationRef];
+
         const modelA = props.state.summary.models[evaluationCallA.modelRef];
         const modelB = props.state.summary.models[evaluationCallB.modelRef];
-        
+
         // Extract dataset names for comparison
         const datasetRefA = evaluationA?.datasetRef;
         const datasetRefB = evaluationB?.datasetRef;
-        
-        const datasetNameA = datasetRefA ? (parseRefMaybe(datasetRefA) as WeaveObjectRef)?.artifactName || datasetRefA : '';
-        const datasetNameB = datasetRefB ? (parseRefMaybe(datasetRefB) as WeaveObjectRef)?.artifactName || datasetRefB : '';
-        
+
+        const datasetNameA = datasetRefA
+          ? (parseRefMaybe(datasetRefA) as WeaveObjectRef)?.artifactName ||
+            datasetRefA
+          : '';
+        const datasetNameB = datasetRefB
+          ? (parseRefMaybe(datasetRefB) as WeaveObjectRef)?.artifactName ||
+            datasetRefB
+          : '';
+
         // Extract model names for comparison
-        const modelNameA = (modelA?.properties?.name as string) || evaluationCallA.modelRef;
-        const modelNameB = (modelB?.properties?.name as string) || evaluationCallB.modelRef;
-        
+        const modelNameA =
+          (modelA?.properties?.name as string) || evaluationCallA.modelRef;
+        const modelNameB =
+          (modelB?.properties?.name as string) || evaluationCallB.modelRef;
+
         // First sort by dataset name
         const datasetComparison = datasetNameA.localeCompare(datasetNameB);
         if (datasetComparison !== 0) {
           return datasetComparison;
         }
-        
+
         // Then sort by model name
         return modelNameA.localeCompare(modelNameB);
       });
     }
 
     return filteredCallIds;
-  }, [props.state, hiddenEvaluationIds, filterToLatestEvaluationsPerModel, props.sortColumnsByDatasetAndModel]);
+  }, [
+    props.state,
+    hiddenEvaluationIds,
+    filterToLatestEvaluationsPerModel,
+    props.sortColumnsByDatasetAndModel,
+  ]);
 
   const modelRefs = useMemo(() => {
     // Get all model refs from visible evaluations only
@@ -395,8 +410,8 @@ const ScorecardContent: React.FC<{
               style={{
                 fontWeight: '600',
               }}>
-              <EvaluationCallLink 
-                callId={evalCallId} 
+              <EvaluationCallLink
+                callId={evalCallId}
                 state={props.state}
                 callStatus={callStatuses[evalCallId]}
               />
@@ -430,7 +445,13 @@ const ScorecardContent: React.FC<{
               gridColumnEnd: 'span 2',
             }}>
             {datasetVariation ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  justifyContent: 'flex-end',
+                }}>
                 Dataset
                 <Tooltip
                   trigger={
@@ -571,7 +592,13 @@ const ScorecardContent: React.FC<{
                     {scorersAreComparable ? (
                       scorerRefParsed && <SmallRef objRef={scorerRefParsed} />
                     ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          justifyContent: 'flex-end',
+                        }}>
                         Scorer
                         <Tooltip
                           trigger={

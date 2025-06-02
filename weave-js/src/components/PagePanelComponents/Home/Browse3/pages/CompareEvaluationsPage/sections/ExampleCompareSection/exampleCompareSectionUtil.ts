@@ -241,50 +241,51 @@ export const useFilteredAggregateRows = (
 
   const aggregatedRows = useMemo(() => {
     const grouped = _.groupBy(pivotedRows, row => row.inputDigest);
-    const result: {[inputDigest: string]: FilteredAggregateRow} = Object.fromEntries(
-      Object.entries(grouped).map(([inputDigest, rows]) => {
-        // Collect all unique input refs for this digest
-        const uniqueInputRefs = new Set<string>();
-        rows.forEach(row => {
-          if (row.inputRef) {
-            uniqueInputRefs.add(row.inputRef);
-          }
-        });
-        
-        const aggregatedRow: FilteredAggregateRow = {
-          id: inputDigest, // required for the data grid
-          count: rows.length,
-          inputDigest,
-          inputRef: parseRefMaybe(rows[0].inputRef), // Keep for backwards compatibility
-          inputRefs: uniqueInputRefs, // All unique input refs
-          output: aggregateGroupedNestedRows(
-            rows,
-            'output',
-            vals => filterNones(vals)[0]
-          ),
-          scores: aggregateGroupedNestedRows(rows, 'scores', vals => {
-            const allVals = filterNones(vals);
-            if (allVals.length === 0) {
-              return undefined;
+    const result: {[inputDigest: string]: FilteredAggregateRow} =
+      Object.fromEntries(
+        Object.entries(grouped).map(([inputDigest, rows]) => {
+          // Collect all unique input refs for this digest
+          const uniqueInputRefs = new Set<string>();
+          rows.forEach(row => {
+            if (row.inputRef) {
+              uniqueInputRefs.add(row.inputRef);
             }
-            return _.mean(
-              allVals.map(v => {
-                if (typeof v === 'number') {
-                  return v;
-                } else if (typeof v === 'boolean') {
-                  return v ? 1 : 0;
-                } else {
-                  return 0;
-                }
-              })
-            );
-          }),
-          originalRows: rows,
-        };
-        
-        return [inputDigest, aggregatedRow];
-      })
-    );
+          });
+
+          const aggregatedRow: FilteredAggregateRow = {
+            id: inputDigest, // required for the data grid
+            count: rows.length,
+            inputDigest,
+            inputRef: parseRefMaybe(rows[0].inputRef), // Keep for backwards compatibility
+            inputRefs: uniqueInputRefs, // All unique input refs
+            output: aggregateGroupedNestedRows(
+              rows,
+              'output',
+              vals => filterNones(vals)[0]
+            ),
+            scores: aggregateGroupedNestedRows(rows, 'scores', vals => {
+              const allVals = filterNones(vals);
+              if (allVals.length === 0) {
+                return undefined;
+              }
+              return _.mean(
+                allVals.map(v => {
+                  if (typeof v === 'number') {
+                    return v;
+                  } else if (typeof v === 'boolean') {
+                    return v ? 1 : 0;
+                  } else {
+                    return 0;
+                  }
+                })
+              );
+            }),
+            originalRows: rows,
+          };
+
+          return [inputDigest, aggregatedRow];
+        })
+      );
     return result;
   }, [pivotedRows]);
 
@@ -398,10 +399,11 @@ export function useExampleCompareDataAndPrefetch(
       if (Object.keys(partialTableRequests).length === 0) {
         return;
       }
-      
+
       // For each prefetch digest, determine its dataset and load if needed
       for (const digest of prefetchDigests) {
-        const rowData = state.loadableComparisonResults.result?.resultRows?.[digest];
+        const rowData =
+          state.loadableComparisonResults.result?.resultRows?.[digest];
         if (!rowData) continue;
 
         // Find the dataset ref for this row
@@ -411,7 +413,8 @@ export function useExampleCompareDataAndPrefetch(
         const evaluationCall = state.summary.evaluationCalls[evalCallId];
         if (!evaluationCall) continue;
 
-        const evaluation = state.summary.evaluations[evaluationCall.evaluationRef];
+        const evaluation =
+          state.summary.evaluations[evaluationCall.evaluationRef];
         const datasetRef = evaluation?.datasetRef;
         if (!datasetRef) continue;
 
@@ -452,7 +455,8 @@ export function useExampleCompareData(
   // Determine which dataset to use for this row by checking which evaluations have data for it
   const datasetRefForRow = useMemo(() => {
     // Check which evaluations have data for this digest
-    const rowData = state.loadableComparisonResults.result?.resultRows?.[targetDigest];
+    const rowData =
+      state.loadableComparisonResults.result?.resultRows?.[targetDigest];
     if (!rowData) return null;
 
     // Find the first evaluation that has data for this row
@@ -476,7 +480,7 @@ export function useExampleCompareData(
         setTargetRowValue(flattenObjectPreservingWeaveTypes(cachedRowData));
         return;
       }
-      
+
       // If we couldn't determine the dataset ref, we can't fetch the row
       if (!datasetRefForRow) {
         setLoading(false);
@@ -489,7 +493,7 @@ export function useExampleCompareData(
         // Partial table request not ready yet
         return;
       }
-      
+
       // immediately fetch the current row
       setLoading(true);
 
@@ -585,8 +589,9 @@ async function makePartialTableReq(
 const usePartialTableRequests = (state: EvaluationComparisonState) => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const client = getTraceServerClient();
-  const [partialTableRequests, setPartialTableRequests] =
-    useState<{[datasetRef: string]: PartialTableRequestType}>({});
+  const [partialTableRequests, setPartialTableRequests] = useState<{
+    [datasetRef: string]: PartialTableRequestType;
+  }>({});
 
   const datasetRefs = useMemo(() => {
     // Get all unique dataset refs from all evaluations
@@ -601,7 +606,7 @@ const usePartialTableRequests = (state: EvaluationComparisonState) => {
 
   useEffect(() => {
     let mounted = true;
-    
+
     // Fetch partial table requests for all datasets
     Promise.all(
       datasetRefs.map(async datasetRef => {
@@ -619,7 +624,7 @@ const usePartialTableRequests = (state: EvaluationComparisonState) => {
         setPartialTableRequests(newRequests);
       }
     });
-    
+
     return () => {
       mounted = false;
     };

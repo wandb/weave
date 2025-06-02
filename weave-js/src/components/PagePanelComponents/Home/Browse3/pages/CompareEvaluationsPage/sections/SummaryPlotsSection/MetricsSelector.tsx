@@ -32,7 +32,9 @@ export const MetricsSelector: React.FC<{
     : allMetrics;
 
   // Count metrics that are explicitly hidden (set to false)
-  const hiddenMetrics = allMetrics.filter(metric => selectedMetrics?.[metric] === false);
+  const hiddenMetrics = allMetrics.filter(
+    metric => selectedMetrics?.[metric] === false
+  );
   const numHidden = hiddenMetrics.length;
   const buttonSuffix = search ? `(${filteredCols.length})` : 'all';
 
@@ -44,7 +46,8 @@ export const MetricsSelector: React.FC<{
           icon="settings"
           tooltip="Manage metrics"
           onClick={onClick}>
-          {numHidden > 0 && `${numHidden} more ${numHidden === 1 ? 'metric' : 'metrics'}`}
+          {numHidden > 0 &&
+            `${numHidden} more ${numHidden === 1 ? 'metric' : 'metrics'}`}
         </Button>
       </span>
       <Popover

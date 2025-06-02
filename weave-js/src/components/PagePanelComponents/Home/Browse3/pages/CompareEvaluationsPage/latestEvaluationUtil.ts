@@ -113,7 +113,7 @@ export function getLatestEvaluationsPerModelDataset(
     if (!datasetParsed || datasetParsed.scheme !== 'weave') return;
 
     const datasetName = datasetParsed.artifactName;
-    
+
     // Create a composite key that includes both model and dataset
     const modelDatasetKey = `${modelKey}__${datasetName}`;
 

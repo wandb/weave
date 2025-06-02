@@ -46,7 +46,6 @@ const getModelColor = (modelRef: string, allModelRefs: string[]): string => {
   return WB_RUN_COLORS[modelIndex % WB_RUN_COLORS.length];
 };
 
-
 // Custom component that renders like SmallRef but with colored indicator
 const SmallRefWithColoredIndicator: React.FC<{
   objRef: any;
@@ -54,7 +53,7 @@ const SmallRefWithColoredIndicator: React.FC<{
 }> = ({objRef, color}) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const {useObjectVersion} = useWFHooks();
-  
+
   const objectVersion = useObjectVersion({
     key: {
       scheme: 'weave',
@@ -87,7 +86,7 @@ const SmallRefWithColoredIndicator: React.FC<{
     objRef,
     objRef.weaveKind === 'op' ? 'OpVersion' : undefined
   );
-  
+
   // Get the label like SmallRef does
   let label = objRef.artifactName + ':';
   if (versionIndex >= 0) {
@@ -101,31 +100,38 @@ const SmallRefWithColoredIndicator: React.FC<{
 
   // Custom content with colored circle instead of icon
   const content = (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      fontWeight: 600,
-      gap: '2px',
-      cursor: 'pointer'
-    }}>
-      <div style={{
+    <div
+      style={{
         display: 'flex',
-        height: '22px',
-        width: '22px',
-        flexShrink: 0,
         alignItems: 'center',
-        justifyContent: 'center'
+        fontWeight: 600,
+        gap: '2px',
+        cursor: 'pointer',
       }}>
-        <Icon name="filled-circle" color={color} style={{height: '20px', width: '20px'}} />
+      <div
+        style={{
+          display: 'flex',
+          height: '22px',
+          width: '22px',
+          flexShrink: 0,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Icon
+          name="filled-circle"
+          color={color}
+          style={{height: '20px', width: '20px'}}
+        />
       </div>
-      <div style={{
-        height: '22px',
-        minWidth: 0,
-        flex: 1,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
-      }}>
+      <div
+        style={{
+          height: '22px',
+          minWidth: 0,
+          flex: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
         {label}
       </div>
     </div>
@@ -133,21 +139,25 @@ const SmallRefWithColoredIndicator: React.FC<{
 
   if (error) {
     return (
-      <div style={{width: '100%', textDecoration: 'line-through', cursor: 'default'}}>
+      <div
+        style={{
+          width: '100%',
+          textDecoration: 'line-through',
+          cursor: 'default',
+        }}>
         {content}
       </div>
     );
   }
 
   return (
-    <Link 
-      to={url} 
+    <Link
+      to={url}
       $variant="secondary"
       style={{
         width: '100%',
-        textDecoration: 'none'
-      }}
-    >
+        textDecoration: 'none',
+      }}>
       {content}
     </Link>
   );
@@ -191,13 +201,15 @@ const useEvaluationCallStatuses = (
     Object.values(data.modelGroups).forEach(modelGroup => {
       Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
         Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
-          Object.values(scorerGroup.metricPathGroups).forEach((records: LeaderboardValueRecord[]) => {
-            records.forEach(record => {
-              if (record.sourceEvaluationCallId) {
-                callIds.add(record.sourceEvaluationCallId);
-              }
-            });
-          });
+          Object.values(scorerGroup.metricPathGroups).forEach(
+            (records: LeaderboardValueRecord[]) => {
+              records.forEach(record => {
+                if (record.sourceEvaluationCallId) {
+                  callIds.add(record.sourceEvaluationCallId);
+                }
+              });
+            }
+          );
         });
       });
     });
@@ -251,7 +263,7 @@ const getLatestEvaluationStatus = (
   // Find the latest evaluation record for this model
   Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
     Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
-      Object.values(scorerGroup.metricPathGroups).forEach((records) => {
+      Object.values(scorerGroup.metricPathGroups).forEach(records => {
         records.forEach(record => {
           if (record.createdAt.getTime() > latestCreatedAt.getTime()) {
             latestCreatedAt = record.createdAt;
@@ -408,7 +420,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       scorerRecordCounts[scorerName] =
         (scorerRecordCounts[scorerName] || 0) + 1;
 
-
       // Track scorer versions and types globally
       if (scorerVersion && scorerType) {
         if (!globalScorerVersionMap[scorerName]) {
@@ -437,7 +448,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
     // Filter to latest evaluations per model-dataset combination to check for inconsistencies
     const latestRecordsOnly = getLatestEvaluationsPerModelDataset(allRecords);
-    
 
     // Second pass: track dataset and scorer versions only from latest evaluations for inconsistency detection
     latestRecordsOnly.forEach(record => {
@@ -645,7 +655,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                   marginLeft: '10px',
                   gap: '8px',
                 }}>
-                <SmallRefWithColoredIndicator objRef={modelRef} color={modelColor} />
+                <SmallRefWithColoredIndicator
+                  objRef={modelRef}
+                  color={modelColor}
+                />
                 {showStatusChip && (
                   <StatusChip
                     value="running"
@@ -783,7 +796,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
             // Use the original dataset ref URI if available, otherwise try to construct one
             const datasetRefUri = processedData.datasetRefUriMap[datasetName];
-            
+
             const ref = datasetRefUri
               ? parseRefMaybe(datasetRefUri)
               : latestVersion
@@ -838,7 +851,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                 const scorerType =
                   processedData.globalScorerTypeMap[scorerGroupName] || 'op';
 
-
                 // Construct a proper WeaveObjectRef for the scorer
                 // The parseRefMaybe function needs the full URI format
                 // Skip creating refs for Summary scorers which don't have versions
@@ -847,7 +859,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                     ? `weave:///${entity}/${project}/${scorerType}/${scorerGroupName}:${scorerVersion}`
                     : null;
                 const ref = scorerUri ? parseRefMaybe(scorerUri) : null;
-
 
                 return (
                   <div

@@ -2,15 +2,15 @@ import {Alert, Box} from '@mui/material';
 import {MOON_100, MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
+import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Loading} from '@wandb/weave/components/Loading';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import ReactMarkdown from 'react-markdown';
 import {AutoSizer} from 'react-virtualized';
 import styled from 'styled-components';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {Icon} from '@wandb/weave/components/Icon';
 
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';

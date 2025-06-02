@@ -210,7 +210,7 @@ const getLeaderboardGroupableData = async (
     }
 
     const datasetRefUri = evalObject.val.dataset;
-    
+
     const datasetRef = parseRefMaybe(datasetRefUri ?? '');
     if (!datasetRef) {
       console.warn('Skipping evaluation call with missing dataset ref', call);
