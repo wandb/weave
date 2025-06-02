@@ -6,6 +6,8 @@ from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
 from typing import Callable, Generic, TypeVar
 
+import sentry_sdk
+
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 
 T = TypeVar("T")
@@ -76,11 +78,11 @@ class AsyncBatchProcessor(Generic[T]):
                 try:
                     self.queue.put_nowait(item)
                 except Full:
-                    item_id = id(item)
                     # TODO: This is probably not what you want, but it will prevent OOM for now.
-                    logger.warning(
-                        f"Queue is full.  Dropping item. Item ID: {item_id}.  Max queue size: {self.queue.maxsize}"
-                    )
+                    item_id = id(item)
+                    error_message = f"Queue is full. Dropping item. Item ID: {item_id}. Max queue size: {self.queue.maxsize}"
+                    logger.exception(error_message)
+                    sentry_sdk.capture_message(error_message, level="error")
 
     def _get_next_batch(self) -> list[T]:
         batch: list[T] = []
@@ -140,13 +142,15 @@ class AsyncBatchProcessor(Generic[T]):
 
         if self.failure_counts[item_id] >= self.max_retries_per_item:
             # Poison pill detected - log big error and drop the item
-            logger.error(
+            error_message = (
                 f"Unprocessable item detected: Item failed {self.failure_counts[item_id]} times "
                 f"(max retries: {self.max_retries_per_item}). Dropping item permanently. "
                 f"Item ID: {item_id}, Error: {error}"
             )
+            logger.exception(error_message)
+            sentry_sdk.capture_message(error_message, level="error")
             del self.failure_counts[item_id]
-            return True  # Drop the item
+            return True  # Drop the item!
         else:
             logger.warning(
                 f"Item processing failed (attempt {self.failure_counts[item_id]}/{self.max_retries_per_item}). "
@@ -161,10 +165,12 @@ class AsyncBatchProcessor(Generic[T]):
         try:
             self.queue.put_nowait(item)
         except Full:
-            logger.warning(
+            error_message = (
                 f"Queue is full when trying to retry failed item. "
-                f"Item ID: {id(item)} will be dropped."
+                f"Item ID: {id(item)} will be permanently dropped."
             )
+            logger.exception(error_message)
+            sentry_sdk.capture_message(error_message, level="error")
             self.queue.task_done()
 
     def _process_batch_individually(self, batch: list[T]) -> None:
