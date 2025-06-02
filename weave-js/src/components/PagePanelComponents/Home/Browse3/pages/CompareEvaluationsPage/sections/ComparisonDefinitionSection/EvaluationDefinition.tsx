@@ -31,7 +31,13 @@ export const EvaluationCallLink: React.FC<{
   const showStatusChip = props.callStatus === 'running';
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        flexWrap: 'wrap',
+      }}>
       <CallLink
         entityName={entity}
         projectName={project}

@@ -36,7 +36,10 @@ import {ExampleCompareSectionDetailGuarded} from '../CompareEvaluationsPage/sect
 import {ExampleCompareSectionTable} from '../CompareEvaluationsPage/sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from '../CompareEvaluationsPage/sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from '../CompareEvaluationsPage/sections/ScorecardSection/ScorecardSection';
-import {SummaryPlotsSection, usePlotDataFromMetrics} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
+import {
+  SummaryPlotsSection,
+  usePlotDataFromMetrics,
+} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
 import {DeleteObjectButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
 import {
   useBaseObjectInstances,
@@ -403,7 +406,7 @@ export const LeaderboardPageContent: React.FC<
   const handleLeaderboardSaved = useCallback(() => {
     // Refetch the leaderboard instances to get the latest data
     leaderboardInstances.refetch();
-    
+
     // Call parent callback if provided
     if (props.onLeaderboardSaved) {
       props.onLeaderboardSaved();
@@ -547,7 +550,7 @@ export const LeaderboardPageContentInner: React.FC<
           setLeaderboardVal(workingLeaderboardValCopy);
           setWorkingLeaderboardValCopy(workingLeaderboardValCopy);
           setSaving(false);
-          
+
           // Update the parent component's state if the setter functions are available
           if (props.setLeaderboardVal) {
             props.setLeaderboardVal(workingLeaderboardValCopy);
@@ -555,7 +558,7 @@ export const LeaderboardPageContentInner: React.FC<
           if (props.setName) {
             props.setName(workingLeaderboardValCopy.name ?? '');
           }
-          
+
           // Trigger the saved callback to refresh data
           if (props.onLeaderboardSaved) {
             // Small delay to ensure the server has updated
@@ -617,15 +620,17 @@ export const LeaderboardPageContentInner: React.FC<
           display: 'flex',
           alignItems: 'center',
         }}>
-          <Box sx={{fontSize: '1.25rem', fontWeight: 600, marginRight: 'auto'}}>Edit leaderboard</Box>
-          <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+        <Box sx={{fontSize: '1.25rem', fontWeight: 600, marginRight: 'auto'}}>
+          Edit leaderboard
+        </Box>
+        <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
           <Button
-          variant="ghost"
-          size="medium"
-          icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
-          onClick={handleToggleFullscreen}
-          tooltip={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-        />
+            variant="ghost"
+            size="medium"
+            icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
+            onClick={handleToggleFullscreen}
+            tooltip={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          />
           <Button
             variant="ghost"
             size="medium"
@@ -633,7 +638,7 @@ export const LeaderboardPageContentInner: React.FC<
             onClick={() => setIsEditing(false)}
             tooltip="Close editor"
           />
-          </div>
+        </div>
       </Box>
     );
   }, [isEditing, setIsEditing, isFullscreen, handleToggleFullscreen]);
@@ -664,19 +669,26 @@ export const LeaderboardPageContentInner: React.FC<
         <Box display="block">
           {/* Running Evaluations Banner */}
           {hasRunningEvaluations && (
-            <Tailwind style={{width: '100%', paddingTop: '16px', backgroundColor: 'white'}}>
+            <Tailwind
+              style={{
+                width: '100%',
+                paddingTop: '16px',
+                backgroundColor: 'white',
+              }}>
               <div className="px-16">
                 <div className="flex flex w-full items-center gap-3 rounded-lg bg-moon-100 px-16 py-8">
-                  <Icon name="randomize-reset-reload" size="large" color="moon-800" />
+                  <Icon
+                    name="randomize-reset-reload"
+                    size="large"
+                    color="moon-800"
+                  />
                   <p className="ml-[8px] text-[14px] font-semibold text-moon-800">
                     Evaluation in progress
                   </p>
                   <p className="ml-[8px] mr-auto text-[14px] text-moon-800">
                     View your leaderboard updates here.
                   </p>
-                  <Button variant="ghost">
-                    View updates
-                  </Button>
+                  <Button variant="ghost">View updates</Button>
                 </div>
                 <div className="h-16"></div>
               </div>
@@ -922,7 +934,7 @@ const LeaderboardResultsContent: React.FC<{
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
-  
+
   // Check if there are multiple datasets
   const hasMultipleDatasets = useMemo(() => {
     const datasetRefs = new Set<string>();
@@ -931,8 +943,14 @@ const LeaderboardResultsContent: React.FC<{
         datasetRefs.add(evaluation.datasetRef);
       }
     });
-    console.log('[LeaderboardResultsContent] Dataset refs found:', Array.from(datasetRefs));
-    console.log('[LeaderboardResultsContent] Has multiple datasets:', datasetRefs.size > 1);
+    console.log(
+      '[LeaderboardResultsContent] Dataset refs found:',
+      Array.from(datasetRefs)
+    );
+    console.log(
+      '[LeaderboardResultsContent] Has multiple datasets:',
+      datasetRefs.size > 1
+    );
     return datasetRefs.size > 1;
   }, [state.summary.evaluations]);
 
@@ -1016,7 +1034,6 @@ const ResultExplorer: React.FC<{
     number | null
   >(null); // Store width before expanding
   const [isResizing, setIsResizing] = useState(false);
-  const [wasAutoExpanded, setWasAutoExpanded] = useState(false); // Track if expansion was automatic
   const [isAnimating, setIsAnimating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
@@ -1169,12 +1186,10 @@ const ResultExplorer: React.FC<{
                     setViewMode('split');
                     // Restore the previous width
                     setSidebarWidth(previousSidebarWidth);
-                    setWasAutoExpanded(false); // Clear auto-expanded flag
                   } else {
                     // Expanding to detail mode
                     setPreviousSidebarWidth(sidebarWidth);
                     setViewMode('detail');
-                    setWasAutoExpanded(false); // This was manual expansion
                   }
                 }}
                 isExpanded={viewMode === 'detail'}
@@ -1198,28 +1213,28 @@ const LeaderboardChartsSection: React.FC<{
 }> = ({leaderboardColumns}) => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const [hasInitialized, setHasInitialized] = useState(false);
-  
+
   // Get the actual metric names that will be displayed in charts (including dataset suffixes)
   const {allMetricNames} = usePlotDataFromMetrics(state);
 
   // Create a function to get metrics that should be shown by default (from leaderboard config)
   const getDefaultVisibleMetrics = useCallback(
-    (availableMetrics: string[]): Set<string> => {      
+    (availableMetrics: string[]): Set<string> => {
       const visibleMetrics = new Set<string>();
 
       // Build a set of expected metric patterns from leaderboard columns
       const expectedMetricPatterns = new Set<string>();
-      
+
       leaderboardColumns.forEach(column => {
         if (column.summary_metric_path && column.scorer_name) {
           const metricPath = column.summary_metric_path;
           const scorerName = column.scorer_name;
-          
+
           // Add different possible metric formats that could match this column
           expectedMetricPatterns.add(metricPath); // Direct metric path
           expectedMetricPatterns.add(`${scorerName}.${metricPath}`); // Scorer prefixed
           expectedMetricPatterns.add(scorerName); // Just the scorer name
-          
+
           // Handle nested metric paths
           if (metricPath.includes('.')) {
             expectedMetricPatterns.add(metricPath);
@@ -1227,30 +1242,30 @@ const LeaderboardChartsSection: React.FC<{
         }
       });
 
-
       // Find available metrics that match our expected patterns
       availableMetrics.forEach(availableMetric => {
-        const shouldBeVisible = Array.from(expectedMetricPatterns).some(pattern => {
-          // For dataset-suffixed metrics, extract the base metric name
-          // e.g., "exact_match (aime2025-lim10)" -> "exact_match"
-          const baseMetricName = availableMetric.replace(/\s*\([^)]+\)$/, '');
-          
-          const isMatch = (
-            // Exact match
-            availableMetric === pattern ||
-            baseMetricName === pattern ||
-            // Available metric ends with the pattern (for scorer-prefixed metrics)
-            availableMetric.endsWith(`.${pattern}`) ||
-            baseMetricName.endsWith(`.${pattern}`) ||
-            // Available metric starts with the pattern (for nested paths)
-            availableMetric.startsWith(`${pattern}.`) ||
-            baseMetricName.startsWith(`${pattern}.`) ||
-            // Pattern is contained in the available metric (for complex nested paths)
-            (pattern.includes('.') && availableMetric.includes(pattern)) ||
-            (pattern.includes('.') && baseMetricName.includes(pattern))
-          );          
-          return isMatch;
-        });
+        const shouldBeVisible = Array.from(expectedMetricPatterns).some(
+          pattern => {
+            // For dataset-suffixed metrics, extract the base metric name
+            // e.g., "exact_match (aime2025-lim10)" -> "exact_match"
+            const baseMetricName = availableMetric.replace(/\s*\([^)]+\)$/, '');
+
+            const isMatch =
+              // Exact match
+              availableMetric === pattern ||
+              baseMetricName === pattern ||
+              // Available metric ends with the pattern (for scorer-prefixed metrics)
+              availableMetric.endsWith(`.${pattern}`) ||
+              baseMetricName.endsWith(`.${pattern}`) ||
+              // Available metric starts with the pattern (for nested paths)
+              availableMetric.startsWith(`${pattern}.`) ||
+              baseMetricName.startsWith(`${pattern}.`) ||
+              // Pattern is contained in the available metric (for complex nested paths)
+              (pattern.includes('.') && availableMetric.includes(pattern)) ||
+              (pattern.includes('.') && baseMetricName.includes(pattern));
+            return isMatch;
+          }
+        );
 
         if (shouldBeVisible) {
           visibleMetrics.add(availableMetric);
@@ -1264,18 +1279,18 @@ const LeaderboardChartsSection: React.FC<{
 
   // Initialize selected metrics only once when the component mounts and data is available
   useEffect(() => {
-    
-    if (!hasInitialized && (state.selectedMetrics === null || state.selectedMetrics === undefined)) {
-      
+    if (
+      !hasInitialized &&
+      (state.selectedMetrics === null || state.selectedMetrics === undefined)
+    ) {
       // Use the actual metric names from the charts (including dataset suffixes)
       const availableMetrics = Array.from(allMetricNames);
-      
+
       // Only proceed if we have metrics and leaderboard columns to work with
       if (availableMetrics.length > 0 && leaderboardColumns.length > 0) {
         const defaultVisible = getDefaultVisibleMetrics(availableMetrics);
         const initialMetrics: Record<string, boolean> = {};
-        
-        
+
         // Only explicitly set metrics that should be hidden to false
         // Leave visible metrics undefined so they show by default
         // This approach is more compatible with the SummaryPlotsSection logic
@@ -1286,18 +1301,24 @@ const LeaderboardChartsSection: React.FC<{
           }
           // Don't set visible metrics - let them show by default
         });
-        
-        
+
         // Only apply the metric filtering if we actually found some metrics to hide
         // This prevents setting an empty object which might interfere with the default "show all" behavior
         if (Object.keys(initialMetrics).length > 0) {
           setSelectedMetrics(initialMetrics);
         }
-        
+
         setHasInitialized(true);
       }
     }
-  }, [hasInitialized, state.selectedMetrics, allMetricNames, getDefaultVisibleMetrics, setSelectedMetrics, leaderboardColumns]);
+  }, [
+    hasInitialized,
+    state.selectedMetrics,
+    allMetricNames,
+    getDefaultVisibleMetrics,
+    setSelectedMetrics,
+    leaderboardColumns,
+  ]);
 
   if (state.loadableComparisonResults.loading) {
     return (
@@ -1313,9 +1334,9 @@ const LeaderboardChartsSection: React.FC<{
         setSelectedMetrics={setSelectedMetrics}
         initialExpanded={true}
       />
-      <ScorecardSection 
-        state={state} 
-        initialExpanded={false} 
+      <ScorecardSection
+        state={state}
+        initialExpanded={false}
         sortColumnsByDatasetAndModel={true}
         disableBaselineStats={true}
       />

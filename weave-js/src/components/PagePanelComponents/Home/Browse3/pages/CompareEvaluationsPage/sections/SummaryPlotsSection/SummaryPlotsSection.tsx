@@ -1,7 +1,7 @@
 import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useMemo, useState} from 'react';
 
 import {
   MOON_100,
@@ -36,7 +36,7 @@ export const SummaryPlotsSection: React.FC<{
   initialExpanded?: boolean;
 }> = ({state, setSelectedMetrics, initialExpanded = false}) => {
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
-  const {allMetricNames, datasetSplitInfo} = usePlotDataFromMetrics(state);
+  const {allMetricNames} = usePlotDataFromMetrics(state);
   const {selectedMetrics} = state;
 
   const toggleExpanded = () => {
@@ -102,8 +102,7 @@ export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
 }> = ({state, setSelectedMetrics}) => {
-  const {radarData, allMetricNames, datasetSplitInfo} =
-    usePlotDataFromMetrics(state);
+  const {radarData, allMetricNames} = usePlotDataFromMetrics(state);
   const {selectedMetrics} = state;
 
   // Don't initialize selectedMetrics here - let the parent component handle it

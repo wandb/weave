@@ -516,9 +516,7 @@ const fetchEvaluationComparisonResults = async (
     result.resultRows = Object.fromEntries(
       Object.entries(result.resultRows).filter(([digest, row]) => {
         // For each dataset group, check if the row exists in all evaluations of that dataset
-        for (const [datasetRef, evalCallIds] of Object.entries(
-          evaluationsByDataset
-        )) {
+        for (const [, evalCallIds] of Object.entries(evaluationsByDataset)) {
           const rowEvalsForDataset = evalCallIds.filter(
             callId => row.evaluations[callId] !== undefined
           );

@@ -158,7 +158,6 @@ export const CompareEvaluationsProvider: React.FC<{
     hiddenEvaluationIds,
     onEvaluationCallIdsUpdate,
     filterToLatestEvaluationsPerModel,
-    colorByModel,
   ]);
 
   if (!value) {

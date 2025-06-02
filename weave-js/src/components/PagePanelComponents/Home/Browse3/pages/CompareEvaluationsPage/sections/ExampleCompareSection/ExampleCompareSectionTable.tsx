@@ -178,11 +178,6 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
     setColumnMenuAnchorEl(null);
   };
 
-  // Determine which row height option is currently active
-  const isSingleRowActive = props.currentRowHeight === 32;
-  const isThreeRowsActive = props.currentRowHeight === 32 + 17 * 2; // 66
-  const isSixRowsActive = props.currentRowHeight === 32 + 17 * 5; // 117
-
   return (
     <GridFooterContainer>
       <HorizontalBox
@@ -196,9 +191,7 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
         <Tooltip
           content="Single row"
           trigger={
-            <IconButton 
-              onClick={props.setRowHeightToSingle}
-            >
+            <IconButton onClick={props.setRowHeightToSingle}>
               <Icon name="row-height-xlarge" />
             </IconButton>
           }
@@ -206,9 +199,7 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
         <Tooltip
           content="3 rows"
           trigger={
-            <IconButton 
-              onClick={props.setRowHeightToThree}
-            >
+            <IconButton onClick={props.setRowHeightToThree}>
               <Icon name="row-height-medium" />
             </IconButton>
           }
@@ -216,9 +207,7 @@ const CustomFooter: React.FC<CustomFooterProps> = props => {
         <Tooltip
           content="6 rows"
           trigger={
-            <IconButton 
-              onClick={props.setRowHeightToSix}
-            >
+            <IconButton onClick={props.setRowHeightToSix}>
               <Icon name="row-height-small" />
             </IconButton>
           }
@@ -355,21 +344,21 @@ const groupEvaluationsByModel = (
   evaluationCalls: any
 ): Map<string, string[]> => {
   const modelGroups = new Map<string, string[]>();
-  
+
   evaluationCallIds.forEach(callId => {
     const evalCall = evaluationCalls[callId];
     if (!evalCall || !evalCall.modelRef) return;
-    
+
     // Parse the model ref to extract the model name
     const modelRef = parseRefMaybe(evalCall.modelRef);
     const modelName = modelRef?.artifactName || 'Unknown Model';
-    
+
     if (!modelGroups.has(modelName)) {
       modelGroups.set(modelName, []);
     }
     modelGroups.get(modelName)!.push(callId);
   });
-  
+
   return modelGroups;
 };
 
@@ -1008,7 +997,7 @@ const datasetField = (
   filteredRows?: FilteredAggregateRows
 ): GridColDef<RowData> | null => {
   if (!state) return null;
-  
+
   return {
     field: 'dataset',
     headerName: 'Dataset',
@@ -1024,50 +1013,63 @@ const datasetField = (
       if (!filteredRows || !state) {
         return '';
       }
-      
+
       // For modelsAsRows, we can get the dataset from the specific evaluation
       if (row._pivot === 'modelsAsRows' && 'evaluationCallId' in row) {
-        const evaluationCall = state.summary.evaluationCalls[row.evaluationCallId];
+        const evaluationCall =
+          state.summary.evaluationCalls[row.evaluationCallId];
         if (evaluationCall) {
-          const evaluationObj = state.summary.evaluations[evaluationCall.evaluationRef];
+          const evaluationObj =
+            state.summary.evaluations[evaluationCall.evaluationRef];
           if (evaluationObj && evaluationObj.datasetRef) {
             const parsed = parseRefMaybe(evaluationObj.datasetRef);
             return parsed?.artifactName || '';
           }
         }
       }
-      
+
       // For modelsAsColumns, find the first available dataset from the original rows
       const matchingFilteredRow = filteredRows.find(
         fr => fr.inputDigest === row.inputDigest
       );
-      
-      if (matchingFilteredRow && matchingFilteredRow.originalRows && matchingFilteredRow.originalRows.length > 0) {
+
+      if (
+        matchingFilteredRow &&
+        matchingFilteredRow.originalRows &&
+        matchingFilteredRow.originalRows.length > 0
+      ) {
         const firstOriginalRow = matchingFilteredRow.originalRows[0];
-        const evaluationCall = state.summary.evaluationCalls[firstOriginalRow.evaluationCallId];
+        const evaluationCall =
+          state.summary.evaluationCalls[firstOriginalRow.evaluationCallId];
         if (evaluationCall) {
-          const evaluationObj = state.summary.evaluations[evaluationCall.evaluationRef];
+          const evaluationObj =
+            state.summary.evaluations[evaluationCall.evaluationRef];
           if (evaluationObj && evaluationObj.datasetRef) {
             const parsed = parseRefMaybe(evaluationObj.datasetRef);
             return parsed?.artifactName || '';
           }
         }
       }
-      
+
       return '';
     },
     renderCell: (params: GridRenderCellParams<RowData>) => {
       if (!filteredRows || !state) {
         return <NotApplicable />;
       }
-      
+
       let datasetRef = null;
-      
+
       // For modelsAsRows, we can get the dataset from the specific evaluation
-      if (params.row._pivot === 'modelsAsRows' && 'evaluationCallId' in params.row) {
-        const evaluationCall = state.summary.evaluationCalls[params.row.evaluationCallId];
+      if (
+        params.row._pivot === 'modelsAsRows' &&
+        'evaluationCallId' in params.row
+      ) {
+        const evaluationCall =
+          state.summary.evaluationCalls[params.row.evaluationCallId];
         if (evaluationCall) {
-          const evaluationObj = state.summary.evaluations[evaluationCall.evaluationRef];
+          const evaluationObj =
+            state.summary.evaluations[evaluationCall.evaluationRef];
           if (evaluationObj && evaluationObj.datasetRef) {
             const parsed = parseRefMaybe(evaluationObj.datasetRef);
             if (parsed) {
@@ -1080,12 +1082,18 @@ const datasetField = (
         const matchingFilteredRow = filteredRows.find(
           fr => fr.inputDigest === params.row.inputDigest
         );
-        
-        if (matchingFilteredRow && matchingFilteredRow.originalRows && matchingFilteredRow.originalRows.length > 0) {
+
+        if (
+          matchingFilteredRow &&
+          matchingFilteredRow.originalRows &&
+          matchingFilteredRow.originalRows.length > 0
+        ) {
           const firstOriginalRow = matchingFilteredRow.originalRows[0];
-          const evaluationCall = state.summary.evaluationCalls[firstOriginalRow.evaluationCallId];
+          const evaluationCall =
+            state.summary.evaluationCalls[firstOriginalRow.evaluationCallId];
           if (evaluationCall) {
-            const evaluationObj = state.summary.evaluations[evaluationCall.evaluationRef];
+            const evaluationObj =
+              state.summary.evaluations[evaluationCall.evaluationRef];
             if (evaluationObj && evaluationObj.datasetRef) {
               const parsed = parseRefMaybe(evaluationObj.datasetRef);
               if (parsed) {
@@ -1095,11 +1103,11 @@ const datasetField = (
           }
         }
       }
-      
+
       if (!datasetRef) {
         return <NotApplicable />;
       }
-      
+
       return (
         <Box
           style={{
@@ -1613,12 +1621,14 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                     dimension,
                     compositeMetrics
                   );
-                  const baselineValue = props.disableBaselineStats ? undefined : lookupMetricValueDirect(
-                    params.row.scores,
-                    props.state.evaluationCallIdsOrdered[0],
-                    dimension,
-                    compositeMetrics
-                  );
+                  const baselineValue = props.disableBaselineStats
+                    ? undefined
+                    : lookupMetricValueDirect(
+                        params.row.scores,
+                        props.state.evaluationCallIdsOrdered[0],
+                        dimension,
+                        compositeMetrics
+                      );
 
                   return evalAggScorerMetricCompGeneric(
                     dimension,
@@ -1662,7 +1672,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         children: [
           ...inputSubFields.inputSubFields.map(key => ({
             field: `inputs.${key}`,
-          }))
+          })),
         ],
       },
       {
@@ -1745,7 +1755,10 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     // Hide input and output columns if requested (for leaderboard context)
     if (props.hideInputOutputColumns) {
       columns.forEach(col => {
-        if (col.field.startsWith('inputs.') || col.field.startsWith('output.')) {
+        if (
+          col.field.startsWith('inputs.') ||
+          col.field.startsWith('output.')
+        ) {
           hiddenColumns[col.field] = false; // false means hidden in MUI DataGrid
         }
       });
@@ -1778,7 +1791,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
           columnVisibilityModel: initialColumnVisibilityModel,
         },
         sorting: {
-          sortModel: [{ field: 'dataset', sort: 'asc' }],
+          sortModel: [{field: 'dataset', sort: 'asc'}],
         },
       }}
       sx={{
@@ -1962,7 +1975,11 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                                 cursor: 'pointer',
                               }}
                               onClick={() =>
-                                navigateToCall(trialEntity, trialProject, trialCallId)
+                                navigateToCall(
+                                  trialEntity,
+                                  trialProject,
+                                  trialCallId
+                                )
                               }>
                               <CallLink
                                 entityName={trialEntity}
@@ -2047,7 +2064,11 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                               cursor: 'pointer',
                             }}
                             onClick={() =>
-                              navigateToCall(trialEntity, trialProject, trialCallId)
+                              navigateToCall(
+                                trialEntity,
+                                trialProject,
+                                trialCallId
+                              )
                             }>
                             <CallLink
                               entityName={trialEntity}
@@ -2068,53 +2089,55 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       ...outputColumnKeys.flatMap(key => {
         if (modelGroups) {
           // When merging by model, create one column per model per output key
-          return Array.from(modelGroups.entries()).map(([modelName, evalCallIds]) => {
-            return {
-              field: `output.${key}.${modelName}`,
-              headerName: `${key}`,
-              width: outputWidths[key],
-              maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
-              ...DISABLED_ROW_SPANNING,
-              disableColumnMenu: false,
-              disableReorder: true,
-              renderHeader: () => {
-                return (
-                  <EvaluationModelLink
-                    callId={evalCallIds[0]}
-                    state={props.state}
-                  />
-                );
-              },
-              valueGetter: (value: any, row: RowData) => {
-                // Return the first non-null value from any evaluation in this model group
-                for (const evalCallId of evalCallIds) {
-                  const val = row.output?.[key]?.[evalCallId];
-                  if (val != null) {
-                    return val;
+          return Array.from(modelGroups.entries()).map(
+            ([modelName, evalCallIds]) => {
+              return {
+                field: `output.${key}.${modelName}`,
+                headerName: `${key}`,
+                width: outputWidths[key],
+                maxWidth: DYNAMIC_COLUMN_MAX_WIDTH,
+                ...DISABLED_ROW_SPANNING,
+                disableColumnMenu: false,
+                disableReorder: true,
+                renderHeader: () => {
+                  return (
+                    <EvaluationModelLink
+                      callId={evalCallIds[0]}
+                      state={props.state}
+                    />
+                  );
+                },
+                valueGetter: (value: any, row: RowData) => {
+                  // Return the first non-null value from any evaluation in this model group
+                  for (const evalCallId of evalCallIds) {
+                    const val = row.output?.[key]?.[evalCallId];
+                    if (val != null) {
+                      return val;
+                    }
                   }
-                }
-                return null;
-              },
-              renderCell: (params: GridRenderCellParams<RowData>) => {
-                // Find first non-null value from any evaluation in this model group
-                let valueToShow = null;
-                for (const evalCallId of evalCallIds) {
-                  const val = params.row.output?.[key]?.[evalCallId];
-                  if (val != null) {
-                    valueToShow = val;
-                    break;
+                  return null;
+                },
+                renderCell: (params: GridRenderCellParams<RowData>) => {
+                  // Find first non-null value from any evaluation in this model group
+                  let valueToShow = null;
+                  for (const evalCallId of evalCallIds) {
+                    const val = params.row.output?.[key]?.[evalCallId];
+                    if (val != null) {
+                      valueToShow = val;
+                      break;
+                    }
                   }
-                }
-                
-                return (
-                  <DenseCellValue
-                    value={valueToShow}
-                    lineClamp={props.lineClamp}
-                  />
-                );
-              },
-            } as GridColDef<RowData>;
-          });
+
+                  return (
+                    <DenseCellValue
+                      value={valueToShow}
+                      lineClamp={props.lineClamp}
+                    />
+                  );
+                },
+              } as GridColDef<RowData>;
+            }
+          );
         } else {
           // Original logic when not merging
           return props.state.evaluationCallIdsOrdered.map(evaluationCallId => {
@@ -2164,76 +2187,82 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             ([keyPath, metricDef]) => {
               if (modelGroups) {
                 // When merging by model, create one column per model per metric
-                return Array.from(modelGroups.entries()).map(([modelName, evalCallIds]) => {
-                  const metricSubpath = Object.values(metricDef.scorerRefs)[0]
-                    .metric.metricSubPath;
-                  return {
-                    field: `scores.${keyPath}.${modelName}`,
-                    headerName:
-                      metricSubpath.length > 0 ? metricSubpath.join('.') : keyPath,
-                    ...SCORE_COLUMN_SETTINGS,
-                    ...DISABLED_ROW_SPANNING,
-                    disableColumnMenu: false,
-                    disableReorder: true,
-                    renderHeader: () => {
-                      return (
-                        <EvaluationModelLink
-                          callId={evalCallIds[0]}
-                          state={props.state}
-                        />
-                      );
-                    },
-                    valueGetter: (value: any, row: RowData) => {
-                      const dimension = Object.values(metricDef.scorerRefs)[0]
-                        .metric;
-                      // Return the first non-null value from any evaluation in this model group
-                      for (const evalCallId of evalCallIds) {
-                        const val = lookupMetricValueDirect(
-                          row.scores,
-                          evalCallId,
-                          dimension,
-                          compositeMetrics
+                return Array.from(modelGroups.entries()).map(
+                  ([modelName, evalCallIds]) => {
+                    const metricSubpath = Object.values(metricDef.scorerRefs)[0]
+                      .metric.metricSubPath;
+                    return {
+                      field: `scores.${keyPath}.${modelName}`,
+                      headerName:
+                        metricSubpath.length > 0
+                          ? metricSubpath.join('.')
+                          : keyPath,
+                      ...SCORE_COLUMN_SETTINGS,
+                      ...DISABLED_ROW_SPANNING,
+                      disableColumnMenu: false,
+                      disableReorder: true,
+                      renderHeader: () => {
+                        return (
+                          <EvaluationModelLink
+                            callId={evalCallIds[0]}
+                            state={props.state}
+                          />
                         );
-                        if (val != null) {
-                          return val;
+                      },
+                      valueGetter: (value: any, row: RowData) => {
+                        const dimension = Object.values(metricDef.scorerRefs)[0]
+                          .metric;
+                        // Return the first non-null value from any evaluation in this model group
+                        for (const evalCallId of evalCallIds) {
+                          const val = lookupMetricValueDirect(
+                            row.scores,
+                            evalCallId,
+                            dimension,
+                            compositeMetrics
+                          );
+                          if (val != null) {
+                            return val;
+                          }
                         }
-                      }
-                      return null;
-                    },
-                    renderCell: (params: GridRenderCellParams<RowData>) => {
-                      const dimension = Object.values(metricDef.scorerRefs)[0]
-                        .metric;
-                      
-                      // Find first non-null value from any evaluation in this model group
-                      let summaryValue = null;
-                      for (const evalCallId of evalCallIds) {
-                        const val = lookupMetricValueDirect(
-                          params.row.scores,
-                          evalCallId,
-                          dimension,
-                          compositeMetrics
-                        );
-                        if (val != null) {
-                          summaryValue = val;
-                          break;
-                        }
-                      }
-                      
-                      const baselineValue = props.disableBaselineStats ? undefined : lookupMetricValueDirect(
-                        params.row.scores,
-                        props.state.evaluationCallIdsOrdered[0],
-                        dimension,
-                        compositeMetrics
-                      );
+                        return null;
+                      },
+                      renderCell: (params: GridRenderCellParams<RowData>) => {
+                        const dimension = Object.values(metricDef.scorerRefs)[0]
+                          .metric;
 
-                      return evalAggScorerMetricCompGeneric(
-                        dimension,
-                        summaryValue ?? undefined,
-                        baselineValue
-                      );
-                    },
-                  } as GridColDef<RowData>;
-                });
+                        // Find first non-null value from any evaluation in this model group
+                        let summaryValue = null;
+                        for (const evalCallId of evalCallIds) {
+                          const val = lookupMetricValueDirect(
+                            params.row.scores,
+                            evalCallId,
+                            dimension,
+                            compositeMetrics
+                          );
+                          if (val != null) {
+                            summaryValue = val;
+                            break;
+                          }
+                        }
+
+                        const baselineValue = props.disableBaselineStats
+                          ? undefined
+                          : lookupMetricValueDirect(
+                              params.row.scores,
+                              props.state.evaluationCallIdsOrdered[0],
+                              dimension,
+                              compositeMetrics
+                            );
+
+                        return evalAggScorerMetricCompGeneric(
+                          dimension,
+                          summaryValue ?? undefined,
+                          baselineValue
+                        );
+                      },
+                    } as GridColDef<RowData>;
+                  }
+                );
               } else {
                 // Original logic when not merging
                 return props.state.evaluationCallIdsOrdered.map(
@@ -2244,7 +2273,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                       ...DISABLED_ROW_SPANNING,
                       disableColumnMenu: false,
                       disableReorder: true,
-                      renderHeader: (params: GridColumnHeaderParams<RowData>) => {
+                      renderHeader: (
+                        params: GridColumnHeaderParams<RowData>
+                      ) => {
                         return (
                           <EvaluationModelLink
                             callId={evaluationCallId}
@@ -2272,12 +2303,14 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                           dimension,
                           compositeMetrics
                         );
-                        const baselineValue = props.disableBaselineStats ? undefined : lookupMetricValueDirect(
-                          params.row.scores,
-                          props.state.evaluationCallIdsOrdered[0],
-                          dimension,
-                          compositeMetrics
-                        );
+                        const baselineValue = props.disableBaselineStats
+                          ? undefined
+                          : lookupMetricValueDirect(
+                              params.row.scores,
+                              props.state.evaluationCallIdsOrdered[0],
+                              dimension,
+                              compositeMetrics
+                            );
 
                         return evalAggScorerMetricCompGeneric(
                           dimension,
@@ -2333,7 +2366,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         children: [
           ...inputSubFields.inputSubFields.map(key => ({
             field: `inputs.${key}`,
-          }))
+          })),
         ],
       },
       {
@@ -2344,11 +2377,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
           ? Array.from(modelGroups.keys()).map(modelName => ({
               field: `predictCall.${modelName}`,
             }))
-          : props.state.evaluationCallIdsOrdered.map(
-              evaluationCallId => ({
-                field: `predictCall.${evaluationCallId}`,
-              })
-            ),
+          : props.state.evaluationCallIdsOrdered.map(evaluationCallId => ({
+              field: `predictCall.${evaluationCallId}`,
+            })),
       },
       {
         groupId: 'output',
@@ -2362,11 +2393,9 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
               ? Array.from(modelGroups.keys()).map(modelName => ({
                   field: `output.${key}.${modelName}`,
                 }))
-              : props.state.evaluationCallIdsOrdered.map(
-                  evaluationCallId => ({
-                    field: `output.${key}.${evaluationCallId}`,
-                  })
-                ),
+              : props.state.evaluationCallIdsOrdered.map(evaluationCallId => ({
+                  field: `output.${key}.${evaluationCallId}`,
+                })),
           };
         }),
       },
@@ -2465,7 +2494,10 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     // Hide input and output columns if requested (for leaderboard context)
     if (props.hideInputOutputColumns) {
       columns.forEach(col => {
-        if (col.field.startsWith('inputs.') || col.field.startsWith('output.')) {
+        if (
+          col.field.startsWith('inputs.') ||
+          col.field.startsWith('output.')
+        ) {
           hiddenColumns[col.field] = false; // false means hidden in MUI DataGrid
         }
       });
@@ -2499,7 +2531,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
           columnVisibilityModel: initialColumnVisibilityModelAsColumns,
         },
         sorting: {
-          sortModel: [{ field: 'dataset', sort: 'asc' }],
+          sortModel: [{field: 'dataset', sort: 'asc'}],
         },
       }}
       sx={{

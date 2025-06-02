@@ -54,7 +54,6 @@ export const SCORER_VARIATION_WARNING_TITLE = 'Scoring inconsistency detected';
 export const SCORER_VARIATION_WARNING_EXPLANATION =
   'The scoring logic varies between evaluations. Take precaution when comparing results.';
 
-const DATASET_VARIATION_WARNING_TITLE = 'Dataset inconsistency detected';
 const DATASET_VARIATION_WARNING_EXPLANATION =
   'The dataset varies between evaluations therefore aggregate metrics may not be directly comparable. Examples are limited to the intersection of the datasets.';
 
