@@ -87,7 +87,7 @@ def ensure_clickhouse_db_instance_running(
     return cleanup
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def ensure_clickhouse_db():
     host, port = ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
     cleanup = ensure_clickhouse_db_instance_running(
