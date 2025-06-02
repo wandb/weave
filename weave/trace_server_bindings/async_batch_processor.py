@@ -1,7 +1,9 @@
 import atexit
+import json
 import logging
 import time
 from collections import defaultdict
+from pathlib import Path
 from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
 from typing import Callable, Generic, TypeVar
@@ -12,6 +14,9 @@ from weave.trace.context.tests_context import get_raise_on_captured_errors
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
+
+MAX_LOGFILES = 3
+MAX_LOG_FILE_SIZE_BYTES = 1024 * 1024 * 512  # 512MB
 
 
 class AsyncBatchProcessor(Generic[T]):
@@ -24,6 +29,8 @@ class AsyncBatchProcessor(Generic[T]):
         min_batch_interval: float = 1.0,
         max_queue_size: int = 10_000,
         max_retries_per_item: int = 5,
+        enable_disk_fallback: bool = False,
+        disk_fallback_path: str = ".weave_client_dropped_items_log.jsonl",
     ) -> None:
         """
         Initializes an instance of AsyncBatchProcessor.
@@ -34,11 +41,15 @@ class AsyncBatchProcessor(Generic[T]):
             min_batch_interval (float, optional): The minimum interval between processing batches. Defaults to 1.0.
             max_queue_size (int, optional): The maximum number of items to hold in the queue. Defaults to 10_000.  0 means no limit.
             max_retries_per_item (int, optional): Maximum number of times to retry a failing item before dropping it. Defaults to 5.
+            enable_disk_fallback (bool, optional): Whether to write dropped items to disk instead of discarding them. Defaults to False.
+            disk_fallback_path (str, optional): Path to the JSON Lines file for dropped items.
         """
         self.processor_fn = processor_fn
         self.max_batch_size = max_batch_size
         self.min_batch_interval = min_batch_interval
         self.max_retries_per_item = max_retries_per_item
+        self.enable_disk_fallback = enable_disk_fallback
+        self.disk_fallback_path = Path(disk_fallback_path)
         self.queue: Queue[T] = Queue(maxsize=max_queue_size)
         self.lock = Lock()
         self.stop_accepting_work_event = Event()
@@ -83,6 +94,26 @@ class AsyncBatchProcessor(Generic[T]):
                     error_message = f"Queue is full. Dropping item. Item ID: {item_id}. Max queue size: {self.queue.maxsize}"
                     logger.warning(error_message)
                     sentry_sdk.capture_message(error_message, level="warning")
+                    self._write_item_to_disk(item, error_message)
+
+    def stop_accepting_new_work_and_flush_queue(self) -> None:
+        """Stops accepting new work and begins gracefully shutting down.
+
+        Any new items enqueued after this call will not be processed!"""
+        self.stop_accepting_work_event.set()
+        self.processing_thread.join()
+
+    def accept_new_work(self) -> None:
+        """Resumes accepting new work."""
+        self.stop_accepting_work_event.clear()
+        # Start a new processing thread
+        self.processing_thread = Thread(target=self._process_batches)
+        self.processing_thread.daemon = True
+        self.processing_thread.start()
+
+    def is_accepting_new_work(self) -> bool:
+        """Returns True if the processor is accepting new work."""
+        return not self.stop_accepting_work_event.is_set()
 
     def _get_next_batch(self) -> list[T]:
         batch: list[T] = []
@@ -109,7 +140,8 @@ class AsyncBatchProcessor(Generic[T]):
                     logger.warning(
                         f"Batch processing failed, processing items individually. Error: {e}"
                     )
-                    # Process each item individually to identify poison pills
+                    # Process each item individually to identify unprocessable items, this can be
+                    # costly for large batches!
                     self._process_batch_individually(current_batch)
 
             if self.stop_accepting_work_event.is_set() and self.queue.empty():
@@ -135,13 +167,13 @@ class AsyncBatchProcessor(Generic[T]):
             error: The exception that occurred
 
         Returns:
-            bool: True if item should be dropped (poison pill), False if it should be retried
+            bool: True if item should be dropped (unprocessable), False if it should be retried
         """
         item_id = id(item)
         self.failure_counts[item_id] += 1
 
         if self.failure_counts[item_id] >= self.max_retries_per_item:
-            # Poison pill detected - log big error and drop the item
+            # Poison pill detected - log big error, write to disk, and drop the item
             error_message = (
                 f"Unprocessable item detected: Item failed {self.failure_counts[item_id]} times "
                 f"(max retries: {self.max_retries_per_item}). Dropping item permanently. "
@@ -150,6 +182,8 @@ class AsyncBatchProcessor(Generic[T]):
             logger.exception(error_message)
             sentry_sdk.capture_message(error_message, level="error")
             del self.failure_counts[item_id]
+            self._write_item_to_disk(item, error_message)
+
             return True  # Drop the item!
         else:
             logger.warning(
@@ -171,6 +205,8 @@ class AsyncBatchProcessor(Generic[T]):
             )
             logger.exception(error_message)
             sentry_sdk.capture_message(error_message, level="error")
+
+            self._write_item_to_disk(item, error_message)
             self.queue.task_done()
 
     def _process_batch_individually(self, batch: list[T]) -> None:
@@ -199,21 +235,74 @@ class AsyncBatchProcessor(Generic[T]):
             return self._handle_item_failure(item, e)
         return True
 
-    def stop_accepting_new_work_and_flush_queue(self) -> None:
-        """Stops accepting new work and begins gracefully shutting down.
+    def _rotate_log_file_if_needed(self) -> None:
+        """
+        Rotate the log file if it exceeds the maximum size limit.
 
-        Any new items enqueued after this call will not be processed!"""
-        self.stop_accepting_work_event.set()
-        self.processing_thread.join()
+        This creates backup files with numbered suffixes (.1, .2, etc.) and removes
+        old backups beyond the max_backup_files limit.
+        """
+        if not self.disk_fallback_path.exists():
+            return
 
-    def accept_new_work(self) -> None:
-        """Resumes accepting new work."""
-        self.stop_accepting_work_event.clear()
-        # Start a new processing thread
-        self.processing_thread = Thread(target=self._process_batches)
-        self.processing_thread.daemon = True
-        self.processing_thread.start()
+        try:
+            file_size = self.disk_fallback_path.stat().st_size
+            if file_size < MAX_LOG_FILE_SIZE_BYTES:
+                return
 
-    def is_accepting_new_work(self) -> bool:
-        """Returns True if the processor is accepting new work."""
-        return not self.stop_accepting_work_event.is_set()
+            # Rotate existing backup files
+            for i in range(MAX_LOGFILES - 1, 0, -1):
+                old_backup = self.disk_fallback_path.with_suffix(f".{i}")
+                new_backup = self.disk_fallback_path.with_suffix(f".{i + 1}")
+
+                if old_backup.exists():
+                    if i == MAX_LOGFILES - 1:
+                        # Remove the oldest backup
+                        old_backup.unlink()
+                    else:
+                        old_backup.rename(new_backup)
+
+            # Move current log to .1
+            backup_path = self.disk_fallback_path.with_suffix(".1")
+            self.disk_fallback_path.rename(backup_path)
+        except Exception as e:
+            error_message = f"Failed to rotate log file {self.disk_fallback_path}: {e}"
+            logger.exception(error_message)
+            sentry_sdk.capture_message(error_message, level="error")
+
+    def _write_item_to_disk(self, item: T, error_message: str) -> None:
+        """
+        Write a dropped item to disk in JSON Lines format.
+
+        Args:
+            item: The item to write to disk
+            error_message: The reason why the item was dropped
+        """
+        if not self.enable_disk_fallback:
+            return
+
+        item_id = id(item)
+
+        try:
+            # Create the directory if it doesn't exist
+            self.disk_fallback_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Check if rotation is needed before writing
+            self._rotate_log_file_if_needed()
+
+            # Prepare the record with metadata
+            record = {
+                "timestamp": time.time(),
+                "error_message": error_message,
+                "item_id": item_id,
+                "item": item,
+            }
+
+            # Write to JSON Lines file
+            with open(self.disk_fallback_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, default=str) + "\n")
+
+        except Exception as e:
+            error_message = f"Failed to write dropped item {item_id} to disk: {e}"
+            logger.exception(error_message)
+            sentry_sdk.capture_message(error_message, level="error")
