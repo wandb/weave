@@ -125,10 +125,8 @@ await testClassInstance.logImage(image);
 Weave provides an integration with OpenAI, allowing you to trace API calls made to OpenAI's services seamlessly.
 
 ```javascript
-import {wrapOpenAI} from 'weave/integrations/openai';
-
 // Create a patched instance of OpenAI
-const openai = wrapOpenAI();
+const openai = new OpenAI();
 
 // Use the OpenAI instance as usual
 openai.chat.completions.create({
@@ -145,6 +143,8 @@ openai.images.generate({
   response_format: 'b64_json',
 });
 ```
+
+Please also see [TypeScript SDK: Third-Party Integration Guide](https://weave-docs.wandb.ai/guides/integrations/js) for setup guide for ESM projects.
 
 ### Evaluations
 
