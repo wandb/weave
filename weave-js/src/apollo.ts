@@ -6,6 +6,7 @@ import {
   Operation,
 } from '@apollo/client';
 import Observable from 'zen-observable';
+
 import { getCookie } from './common/util/cookie';
 
 const makeHttpLink = (uri: string) =>
