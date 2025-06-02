@@ -712,7 +712,7 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
-        # The op_name, trace_id, trace_roots, parent_id conditions REQUIRE
+        # The op_name, trace_id, and trace_roots conditions REQUIRE
         # conditioning on the started_at field after grouping in the HAVING clause.
         # These filters remove call starts before grouping, creating orphan call ends.
         # By conditioning on `NOT any(started_at) is NULL`, we filter out orphaned
@@ -727,6 +727,11 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
+        trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
         # ref filters also have group by filters, because output_refs exist on the
         # call end parts.
         ref_filter_opt_sql = process_ref_filters_to_sql(
@@ -734,12 +739,9 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
-        parent_id_filter_sql = process_parent_id_filter_to_sql(
-            self.hardcoded_filter,
-            pb,
-            table_alias,
-        )
-        trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
+        # parent_id is valid as null, so we must always include the HAVING filter
+        # in addition to this optimization
+        parent_ids_filter_sql = process_parent_ids_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -829,7 +831,7 @@ class CallsQuery(BaseModel):
         {id_subquery_sql}
         {sortable_datetime_sql}
         {trace_roots_only_sql}
-        {parent_id_filter_sql}
+        {parent_ids_filter_sql}
         {op_name_sql}
         {trace_id_sql}
         {str_filter_opt_sql}
@@ -1200,7 +1202,7 @@ def process_trace_roots_only_filter_to_sql(
     return f"AND ({parent_id_field_sql} IS NULL)"
 
 
-def process_parent_id_filter_to_sql(
+def process_parent_ids_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
     table_alias: str,
@@ -1217,9 +1219,9 @@ def process_parent_id_filter_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
-    parent_id_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
+    parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
 
-    return f"AND ({parent_id_sql} OR {parent_id_field_sql} IS NULL)"
+    return f"AND ({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
 
 
 def process_ref_filters_to_sql(
@@ -1295,6 +1297,12 @@ def process_calls_filter_to_conditions(
         assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
             f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+        )
+
+    if filter.parent_ids:
+        assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
+        conditions.append(
+            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
     if filter.wb_user_ids:
