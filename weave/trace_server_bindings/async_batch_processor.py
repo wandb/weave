@@ -81,8 +81,8 @@ class AsyncBatchProcessor(Generic[T]):
                     # TODO: This is probably not what you want, but it will prevent OOM for now.
                     item_id = id(item)
                     error_message = f"Queue is full. Dropping item. Item ID: {item_id}. Max queue size: {self.queue.maxsize}"
-                    logger.exception(error_message)
-                    sentry_sdk.capture_message(error_message, level="error")
+                    logger.warning(error_message)
+                    sentry_sdk.capture_message(error_message, level="warning")
 
     def _get_next_batch(self) -> list[T]:
         batch: list[T] = []
@@ -107,7 +107,7 @@ class AsyncBatchProcessor(Generic[T]):
                     if get_raise_on_captured_errors():
                         raise
                     logger.warning(
-                        f"Batch processing failed, processing items individually: {e}"
+                        f"Batch processing failed, processing items individually. Error: {e}"
                     )
                     # Process each item individually to identify poison pills
                     self._process_batch_individually(current_batch)
