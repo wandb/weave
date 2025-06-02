@@ -7,7 +7,8 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
-import {getIconName, handleMimetype} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers';
+import {handleMimetype} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/ContentHandler';
+import {getIconName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/Shared';
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
@@ -103,8 +104,6 @@ const ContentViewMetadataLoaded = ({
 
   const {useFileContent} = useWFHooks();
   const {filename, size, mimetype} = metadata;
-
-  const iconStart = <Icon name={getIconName(mimetype)} />;
   const contentContent = useFileContent({
     entity,
     project,
@@ -169,6 +168,8 @@ const ContentViewMetadataLoaded = ({
     },
     []
   );
+
+  const iconStart = <Icon name={getIconName(mimetype)} />;
 
   const handlerProps = {
     mimetype,
