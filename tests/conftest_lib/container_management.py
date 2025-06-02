@@ -1,6 +1,8 @@
-import requests
-import urllib
 import time
+import urllib
+
+import requests
+
 
 def check_server_up(host, port, num_retries=30) -> bool:
     """Check if a server is up and healthy at the given host:port.
@@ -37,5 +39,3 @@ def _check_server_health(
         f"Server not healthy @ {urllib.parse.urljoin(base_url, endpoint)}: no response"
     )
     return False
-
-

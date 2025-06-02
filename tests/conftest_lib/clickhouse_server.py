@@ -1,13 +1,15 @@
-
-
 import subprocess
 import typing
+
 import pytest
 
 from tests.conftest_lib.container_management import check_server_up
 from weave.trace_server import environment as ts_env
 
-def ensure_clickhouse_db_instance_running(host: str, port: int) -> typing.Callable[[], None]:
+
+def ensure_clickhouse_db_instance_running(
+    host: str, port: int
+) -> typing.Callable[[], None]:
     """
     ClickHouse server fixture that automatically starts a server if one isn't already running.
 
@@ -16,7 +18,6 @@ def ensure_clickhouse_db_instance_running(host: str, port: int) -> typing.Callab
 
     The fixture handles cleanup by stopping the Docker container when the test session ends.
     """
-
     server_up = check_server_up(host, port, 0)
     started_container = None
 
