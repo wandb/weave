@@ -198,7 +198,8 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/crewai",
             "guides/integrations/smolagents",
             "guides/integrations/pydantic_ai",
-            "guides/integrations/google_adk"
+            "guides/integrations/google_adk",
+            "guides/integrations/js"
           ],
         },
         {
