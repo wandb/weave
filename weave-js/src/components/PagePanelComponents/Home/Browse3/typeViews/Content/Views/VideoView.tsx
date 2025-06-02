@@ -21,6 +21,8 @@ type VideoContentProps = {
 
 type VideoPreviewProps = {
   onClick: () => void;
+  height?: number | string;
+  width?: number | string;
 } & VideoProps;
 
 type VideoPopupProps = {

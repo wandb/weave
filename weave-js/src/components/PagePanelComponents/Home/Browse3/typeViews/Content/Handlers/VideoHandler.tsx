@@ -1,11 +1,12 @@
 import {Button} from '@wandb/weave/components/Button';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import React, {useEffect} from 'react';
+import React, {useEffect, useContext} from 'react';
 
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {VideoPopup, VideoThumbnail} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
 import {HandlerProps, HandlerReturnType} from './Shared';
+import { WeaveflowPeekContext } from '../../../context';
 
 type CreateToolTipPreviewProps = {
   contentResult: Blob | null;
@@ -51,7 +52,7 @@ const DownloadButton = ({
   );
 };
 
-export const handleVideoMimetype = ({
+export const showVideoText = ({
   iconStart,
   filename,
   showPreview,
@@ -96,6 +97,7 @@ export const handleVideoMimetype = ({
       onMuteChange={muted => updateVideoPlaybackState?.({muted})}
     />
   );
+
   const previewComponent = (result: Blob) => {
     return <VideoThumbnail src={result} onClick={onTextClick} />;
   };
@@ -129,4 +131,9 @@ export const handleVideoMimetype = ({
     tooltipHint: 'Click icon or filename to preview, button to download',
     tooltipPreview,
   };
+}
+
+export const handleVideoMimetype = (props: HandlerProps): HandlerReturnType => {
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  return showVideoText(props);
 };

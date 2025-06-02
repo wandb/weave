@@ -6,6 +6,7 @@ import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {handleMimetype} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/ContentHandler';
 import {getIconName, ContentTooltipWrapper, ContentMetadataTooltip} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/Shared';
+import { AutoSizer } from 'react-virtualized';
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
@@ -58,7 +59,7 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
   }
 
   // Convert ArrayBuffer to JSON
-  let metadataJson;
+  let metadataJson: ContentMetadata;
   try {
     const decoder = new TextDecoder();
     const jsonString = decoder.decode(metadata.result);
@@ -69,13 +70,25 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
   }
 
   const content = data.files['content'];
+
   return (
-    <ContentViewMetadataLoaded
-      entity={entity}
-      project={project}
-      metadata={metadataJson}
-      content={content}
-    />
+    <AutoSizer style={{height: '100%', width: '100%'}}>
+      {({width, height}) => {
+        if (width === 0 || height === 0) {
+          return null;
+        }
+        return (
+          <ContentViewMetadataLoaded
+            entity={entity}
+            project={project}
+            metadata={metadataJson}
+            content={content}
+            containerWidth={width}
+            containerHeight={height}
+          />
+        );
+      }}
+    </AutoSizer>
   );
 };
 
@@ -84,6 +97,8 @@ type ContentViewMetadataLoadedProps = {
   project: string;
   metadata: ContentMetadata;
   content: string;
+  containerWidth: number;
+  containerHeight: number;
 };
 
 const ContentViewMetadataLoaded = ({
@@ -91,6 +106,8 @@ const ContentViewMetadataLoaded = ({
   project,
   metadata,
   content,
+  containerWidth,
+  containerHeight
 }: ContentViewMetadataLoadedProps) => {
   const [contentResult, setContentResult] = useState<Blob | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -98,7 +115,6 @@ const ContentViewMetadataLoaded = ({
   const [videoPlaybackStates, setVideoPlaybackStates] = useState<
     Record<string, {currentTime: number; volume: number; muted: boolean}>
   >({});
-
   const {useFileContent} = useWFHooks();
   const {filename, size, mimetype} = metadata;
   const contentContent = useFileContent({
@@ -172,6 +188,8 @@ const ContentViewMetadataLoaded = ({
     mimetype,
     filename,
     size,
+    containerHeight,
+    containerWidth,
     iconStart,
     showPreview,
     isDownloading,
