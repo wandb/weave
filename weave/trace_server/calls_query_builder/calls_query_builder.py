@@ -712,11 +712,11 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
-        # The op_name, trace_id, and trace_roots conditions REQUIRE
-        # conditioning on the started_at field after grouping in the HAVING clause.
-        # These filters remove call starts before grouping, creating orphan call ends.
-        # By conditioning on `NOT any(started_at) is NULL`, we filter out orphaned
-        # call ends, ensuring all rows returned at least have a call start.
+        # The op_name, trace_id, trace_roots conditions REQUIRE conditioning on the
+        # started_at field after grouping in the HAVING clause. These filters remove
+        # call starts before grouping, creating orphan call ends. By conditioning
+        # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
+        # all rows returned at least have a call start.
         op_name_sql = process_op_name_filter_to_sql(
             self.hardcoded_filter,
             pb,
@@ -1293,16 +1293,16 @@ def process_calls_filter_to_conditions(
             f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
-    if filter.call_ids:
-        assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
-        conditions.append(
-            f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
-        )
-
     if filter.parent_ids:
         assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
         conditions.append(
             f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
+        )
+
+    if filter.call_ids:
+        assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
+        conditions.append(
+            f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
 
     if filter.wb_user_ids:
