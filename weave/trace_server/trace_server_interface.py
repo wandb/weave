@@ -1092,5 +1092,13 @@ class TraceServerInterface(Protocol):
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
 
+    # Execute LLM API (Streaming)
+    # Returns an iterator of JSON-serializable chunks that together form the streamed
+    # response from the model provider. Each element must be a dictionary that can
+    # be serialized with ``json.dumps``.
+    def completions_create_stream(
+        self, req: CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]: ...
+
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...

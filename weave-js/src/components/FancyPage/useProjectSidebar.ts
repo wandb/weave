@@ -170,7 +170,7 @@ export const useProjectSidebar = (
             name: 'Playground',
             slug: 'weave/playground',
             isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.RobotServiceMember,
+            iconName: IconNames.VideoPlay,
           },
           {
             type: 'button' as const,
