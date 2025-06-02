@@ -266,19 +266,19 @@ def clickhouse_server_direct() -> Callable[[], None]:
             pytest.fail(
                 f"ClickHouse server failed to start and become healthy on {host}:{port}"
             )
+
     def cleanup():
         if started_container:
             subprocess.run(
                 ["docker", "stop", started_container], capture_output=True, check=False
             )
+
     return cleanup
-
-
 
 
 @pytest.fixture(scope="session")
 def clickhouse_server():
-    cleanup = clickhouse_server_direct() 
+    cleanup = clickhouse_server_direct()
     yield
     cleanup()
 
@@ -614,8 +614,10 @@ def create_client(
     server: tsi.TraceServerInterface
     entity = "shawn"
     project = "test-project"
+
     def cleanup_no_op():
         pass
+
     cleanup = cleanup_no_op
     if weave_server_flag == "sqlite":
         sqlite_server = sqlite_trace_server.SqliteTraceServer(
@@ -628,7 +630,7 @@ def create_client(
         )
     elif weave_server_flag == "clickhouse":
         # Invoke the clickhouse_server fixture manually
-        cleanup = clickhouse_server_direct() 
+        cleanup = clickhouse_server_direct()
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command(
@@ -693,7 +695,9 @@ def client_creator(zero_stack, request):
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        inited_client, cleanup = create_client(request, autopatch_settings, global_attributes)
+        inited_client, cleanup = create_client(
+            request, autopatch_settings, global_attributes
+        )
         try:
             yield inited_client.client
         finally:
