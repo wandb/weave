@@ -43,11 +43,10 @@ install_docker_engine() {
     
     # Configure Docker for current user
     # sudo usermod -aG docker $USER
-    # sudo systemctl start docker
-    # sudo systemctl enable docker
+    sudo systemctl start docker
+    sudo systemctl enable docker
     
     echo "✓ Docker installed successfully"
-    echo "Note: You may need to log out and back in for docker group membership to take effect"
 }
 
 install_docker() {
