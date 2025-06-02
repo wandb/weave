@@ -2747,6 +2747,7 @@ def test_calls_query_sort_by_display_name_prioritized(client):
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
 
 
+@pytest.mark.asyncio
 async def test_tracing_enabled_context(client):
     """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
     from weave.trace.weave_client import Call
