@@ -2,19 +2,16 @@ import base64
 import contextlib
 import logging
 import os
-import subprocess
-import time
 import typing
-import urllib
 from collections.abc import Iterator
 
 import pytest
-import requests
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import weave
-from tests.trace.util import DummyTestException, client_is_sqlite
+from tests.conftest_lib.clickhouse_server import ensure_clickhouse_db
+from tests.trace.util import DummyTestException
 from weave.trace import autopatch, weave_client, weave_init
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import (
@@ -84,7 +81,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--weave-server",
         action="store",
-        default="clickhouse",
+        default="sqlite",
         help="Specify the client object to use: sqlite or clickhouse",
     )
 
@@ -193,142 +190,6 @@ def client_with_throwing_server(client):
         yield client
     finally:
         client.server = curr_server
-
-
-def clickhouse_server_direct() -> Callable[[], None]:
-    """
-    ClickHouse server fixture that automatically starts a server if one isn't already running.
-
-    This fixture checks if a ClickHouse server is already running on the configured host/port.
-    If not, it automatically starts a Docker-based ClickHouse server for testing.
-
-    The fixture handles cleanup by stopping the Docker container when the test session ends.
-    """
-    host = ts_env.wf_clickhouse_host()
-    port = ts_env.wf_clickhouse_port()
-
-    server_up = _check_server_up(host, port)
-    started_container = None
-
-    if not server_up:
-        # Try to start a ClickHouse server using Docker
-        container_name = "weave-python-test-clickhouse-server"
-
-        # First, ensure any existing container is stopped and removed
-        subprocess.run(
-            ["docker", "stop", container_name], capture_output=True, check=False
-        )
-        subprocess.run(
-            ["docker", "rm", container_name], capture_output=True, check=False
-        )
-
-        # Start the ClickHouse container
-        process = subprocess.Popen(
-            [
-                "docker",
-                "run",
-                "-d",
-                "--rm",
-                "-e",
-                "CLICKHOUSE_DB=default",
-                "-e",
-                "CLICKHOUSE_USER=default",
-                "-e",
-                "CLICKHOUSE_PASSWORD=",
-                "-e",
-                "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
-                "-p",
-                f"{port}:8123",
-                "--name",
-                container_name,
-                "--ulimit",
-                "nofile=262144:262144",
-                "clickhouse/clickhouse-server",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        # Wait for the process to complete and get the container ID
-        stdout, stderr = process.communicate()
-        if process.returncode != 0:
-            pytest.fail(f"Failed to start ClickHouse container: {stderr.decode()}")
-
-        started_container = container_name
-
-        # Wait for the server to be healthy
-        server_up = _check_server_up(host, port)
-        if not server_up:
-            # Clean up the container if server didn't start properly
-            subprocess.run(
-                ["docker", "stop", container_name], capture_output=True, check=False
-            )
-            pytest.fail(
-                f"ClickHouse server failed to start and become healthy on {host}:{port}"
-            )
-
-    def cleanup():
-        if started_container:
-            subprocess.run(
-                ["docker", "stop", started_container], capture_output=True, check=False
-            )
-
-    return cleanup
-
-
-@pytest.fixture(scope="session")
-def clickhouse_server():
-    cleanup = clickhouse_server_direct()
-    yield
-    cleanup()
-
-
-@pytest.fixture(scope="session")
-def clickhouse_trace_server(clickhouse_server):
-    clickhouse_trace_server = (
-        clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
-    )
-    clickhouse_trace_server._run_migrations()
-    yield clickhouse_trace_server
-
-
-def _check_server_health(
-    base_url: str, endpoint: str, num_retries: int = 1, sleep_time: int = 1
-) -> bool:
-    for _ in range(num_retries):
-        try:
-            response = requests.get(urllib.parse.urljoin(base_url, endpoint))
-            if response.status_code == 200:
-                return True
-            time.sleep(sleep_time)
-        except requests.exceptions.ConnectionError:
-            time.sleep(sleep_time)
-
-    print(
-        f"Server not healthy @ {urllib.parse.urljoin(base_url, endpoint)}: no response"
-    )
-    return False
-
-
-def _check_server_up(host, port, num_retries=30) -> bool:
-    """Check if a server is up and healthy at the given host:port.
-
-    Args:
-        host: The hostname to check
-        port: The port to check
-        num_retries: Number of retries to attempt (default 30)
-
-    Returns:
-        bool: True if server is healthy, False otherwise
-    """
-    base_url = f"http://{host}:{port}/"
-    endpoint = "ping"
-
-    return _check_server_health(
-        base_url=base_url, endpoint=endpoint, num_retries=num_retries
-    )
 
 
 class TwoWayMapping:
@@ -615,10 +476,6 @@ def create_client(
     entity = "shawn"
     project = "test-project"
 
-    def cleanup_no_op():
-        pass
-
-    cleanup = cleanup_no_op
     if weave_server_flag == "sqlite":
         sqlite_server = sqlite_trace_server.SqliteTraceServer(
             "file::memory:?cache=shared"
@@ -629,9 +486,13 @@ def create_client(
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
-        # Invoke the clickhouse_server fixture manually
-        cleanup = clickhouse_server_direct()
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
+        assert ensure_clickhouse_db is not None
+        host, port = request.getfixturevalue("ensure_clickhouse_db")
+
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
+            host=host,
+            port=port,
+        )
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command(
             f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
@@ -661,7 +522,7 @@ def create_client(
         if global_attributes is not None:
             weave.trace.api._global_attributes = global_attributes
 
-    return inited_client, cleanup
+    return inited_client
 
 
 @pytest.fixture
@@ -674,11 +535,10 @@ def zero_stack():
 def client(zero_stack, request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
-    inited_client, cleanup = create_client(request)
+    inited_client = create_client(request)
     try:
         yield inited_client.client
     finally:
-        cleanup()
         inited_client.reset()
         autopatch.reset_autopatch()
 
@@ -695,9 +555,7 @@ def client_creator(zero_stack, request):
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        inited_client, cleanup = create_client(
-            request, autopatch_settings, global_attributes
-        )
+        inited_client = create_client(request, autopatch_settings, global_attributes)
         try:
             yield inited_client.client
         finally:
@@ -762,12 +620,3 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
-
-
-@pytest.fixture
-def clickhouse_client(client):
-    if client_is_sqlite(client):
-        return None
-
-    ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
-    return ch_server.ch_client

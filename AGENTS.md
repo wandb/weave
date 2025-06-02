@@ -47,6 +47,9 @@ Focus on these primary test shards:
 - `tests-3.12(shard='trace_server_bindings')` - Server bindings
 
 ### Running Tests
+
+**IMPORTANT**: Any test depending on the `client` fixture runs agains either SQLite backend or Clickhouse. By default it will run againt SQLite for performance. However, it is critical to test both. Use the pytest custom flag `--weave-server=clickhouse` to run tests against the clickhouse implementation.
+
 1. Run all tests in a specific shard: `nox --no-install -e "tests-3.12(shard='trace')"`
 2. Run a specific test by appending `-- [test]` like so: `nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::test_simple_op`
 3. Run linting: `nox --no-install -e lint` (Note: This will modify files)
