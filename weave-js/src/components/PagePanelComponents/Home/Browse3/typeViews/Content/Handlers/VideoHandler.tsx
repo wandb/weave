@@ -180,8 +180,8 @@ const VideoPreview = ({
     return <LoadingDots />;
   }
 
-  console.log(height)
-  if (height < 24) {
+  // 20 seems to be the height for an actual Cell while ~24 seems to be the height for a large output
+  if (height <= 21) {
     const thumbnailComponent = (
       <div
         style={{
