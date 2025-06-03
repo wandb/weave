@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useState, memo, useMemo} from 'react';
 
-import {Icon} from '@wandb/weave/components/Icon';
+import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
@@ -95,22 +95,23 @@ const IconWithText = memo(({
   isClickable,
   onClick
 }: {
-  iconName: string; 
+  iconName: IconName; 
   filename: string; 
   isClickable?: boolean;
   onClick?: () => void;
 }) => {
-  if (isClickable && onClick) {
+  const icon = <Icon name={iconName} />;
+  if (onClick) {
     return (
       <CustomLink
         variant="secondary"
-        icon={<Icon name={iconName} />}
+        icon={icon}
         onClick={onClick}
         text={filename}
       />
     );
   }
-  
+
   return (
     <div className="flex items-center gap-2">
       <Icon name={iconName} />
@@ -216,19 +217,11 @@ const ContentViewMetadataLoaded = ({
 
   // Memoize the icon name so it doesn't recalculate on every render
   const iconName = useMemo(() => getIconName(mimetype), [mimetype]);
-  
-  // Determine if this content type should have clickable styling
-  const isClickable = useMemo(() => {
-    return mimetype === 'application/pdf' || 
-           mimetype.startsWith('audio/') || 
-           mimetype.startsWith('video/') || 
-           mimetype.startsWith('image/');
-  }, [mimetype]);
-  
+
   // Create the IconWithText component that won't re-render on size changes
   const iconWithText = useMemo(
-    () => <IconWithText iconName={iconName} filename={filename} isClickable={isClickable} onClick={openPreview} />,
-    [iconName, filename, isClickable, openPreview]
+    () => <IconWithText iconName={iconName} filename={filename} onClick={openPreview} />,
+    [iconName, filename, openPreview]
   );
 
   return (
