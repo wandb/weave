@@ -1,8 +1,10 @@
+import datetime
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 
 class MockObjectReadError(Exception):
@@ -124,13 +126,6 @@ def test_clickhouse_storage_size_null_handling():
 
 def test_completions_create_stream_custom_provider():
     """Test completions_create_stream for a custom provider (no call tracking)."""
-    import datetime
-    from unittest.mock import MagicMock, patch
-
-    from weave.trace_server import clickhouse_trace_server_batched as chts
-    from weave.trace_server import trace_server_interface as tsi
-    from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
-
     # Mock chunks to be returned by the stream
     mock_chunks = [
         {
@@ -189,7 +184,7 @@ def test_completions_create_stream_custom_provider():
                 "return_type": "openai",
                 "api_base": "https://api.custom.com",
             },
-            created_at=datetime.datetime.now(),
+            created_at=datetime.now(),
             version_index=1,
             is_latest=1,
             kind="object",
@@ -208,7 +203,7 @@ def test_completions_create_stream_custom_provider():
                 "max_tokens": 4096,
                 "mode": "chat",
             },
-            created_at=datetime.datetime.now(),
+            created_at=datetime.now(),
             version_index=1,
             is_latest=1,
             kind="object",
@@ -265,13 +260,6 @@ def test_completions_create_stream_custom_provider():
 
 def test_completions_create_stream_custom_provider_with_tracking():
     """Test completions_create_stream for a custom provider with call tracking enabled."""
-    import datetime
-    from unittest.mock import MagicMock, patch
-
-    from weave.trace_server import clickhouse_trace_server_batched as chts
-    from weave.trace_server import trace_server_interface as tsi
-    from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
-
     # Mock chunks to be returned by the stream
     mock_chunks = [
         {
@@ -331,7 +319,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
                 "return_type": "openai",
                 "api_base": "https://api.custom.com",
             },
-            created_at=datetime.datetime.now(),
+            created_at=datetime.now(),
             version_index=1,
             is_latest=1,
             kind="object",
@@ -350,7 +338,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
                 "max_tokens": 4096,
                 "mode": "chat",
             },
-            created_at=datetime.datetime.now(),
+            created_at=datetime.now(),
             version_index=1,
             is_latest=1,
             kind="object",
@@ -414,3 +402,8 @@ def test_completions_create_stream_custom_provider_with_tracking():
             assert call_args["extra_headers"] == {"X-Custom": "value"}
         finally:
             _secret_fetcher_context.reset(token)
+
+
+# Shared test constants
+TEST_PROJECT_ID = "dGVzdF9wcm9qZWN0"  # base64 encoded "test_project"
+FIXED_DATETIME = datetime(2024, 1, 1, 12, 0, 0)
