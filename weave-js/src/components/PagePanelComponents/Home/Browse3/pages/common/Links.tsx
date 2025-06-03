@@ -296,7 +296,6 @@ export const CallLink: React.FC<{
   noName?: boolean;
   color?: string;
   isEval?: boolean;
-  allowWrap?: boolean;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
 
@@ -355,8 +354,7 @@ export const CallLink: React.FC<{
               style={{
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                whiteSpace: props.allowWrap ? 'normal' : 'nowrap',
-                wordBreak: props.allowWrap ? 'break-word' : 'normal',
+                whiteSpace: 'nowrap',
                 flexGrow: 1,
                 flexShrink: 1,
               }}>

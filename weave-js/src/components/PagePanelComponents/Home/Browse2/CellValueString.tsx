@@ -42,6 +42,7 @@ type CellValueStringProps = {
 const Collapsed = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
 `;
 Collapsed.displayName = 'S.Collapsed';
@@ -86,7 +87,7 @@ Spacer.displayName = 'S.Spacer';
 const CellValueStringWithPopup = ({value, style}: CellValueStringProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const onClick = (_event: React.MouseEvent<HTMLElement>) => {
+  const onClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(anchorEl ? null : ref.current);
   };
 
