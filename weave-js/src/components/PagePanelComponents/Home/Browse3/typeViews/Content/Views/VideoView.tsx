@@ -20,7 +20,7 @@ type VideoContentProps = {
 } & VideoProps;
 
 type VideoPreviewProps = {
-  onClick: () => void;
+  onClick?: () => void;
   height?: number | string;
   width?: number | string;
 } & VideoProps;
@@ -36,7 +36,7 @@ type VideoPopupProps = {
   onVolumeChange?: (volume: number) => void;
 } & VideoProps;
 
-const VideoContent: React.FC<VideoContentProps> = ({
+export const VideoContent: React.FC<VideoContentProps> = ({
   src,
   isThumbnail,
   videoRef,
@@ -87,6 +87,8 @@ const VideoContent: React.FC<VideoContentProps> = ({
         }
         if (initialMuted !== undefined) {
           videoElement.muted = initialMuted;
+        } else {
+          videoElement.muted = true; // Default to muted
         }
       }
 
@@ -131,7 +133,8 @@ const VideoContent: React.FC<VideoContentProps> = ({
         }}
         controls={!isThumbnail}
         autoPlay={autoplay ?? false}
-        muted={isThumbnail ? true : initialMuted ?? true}
+        muted={false}
+        // muted={isThumbnail ? true : initialMuted ?? true}
         loop={isThumbnail}
         onLoadedData={() => {
           if (videoRef.current) {
@@ -150,7 +153,7 @@ const VideoContent: React.FC<VideoContentProps> = ({
   );
 };
 
-const VideoPopup: React.FC<VideoPopupProps> = ({
+export const VideoPopup: React.FC<VideoPopupProps> = ({
   src,
   isOpen,
   onClose,
@@ -184,26 +187,59 @@ const VideoPopup: React.FC<VideoPopupProps> = ({
     </Dialog.Root>
   );
 };
-const VideoThumbnail: React.FC<VideoPreviewProps> = ({src, onClick}) => {
+
+export const VideoPlayerThumbnail: React.FC<VideoPreviewProps> = ({src}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const thumbnailHeight = 38 * 3; // Default height of the cell row
-  const thumbnailWidth = 68 * 3; // 16:9-ish ratio
+  const [isThumbnail, setIsThumbnail] = useState(true)
   return (
     <Tailwind>
       <div
         className="relative flex h-full w-full items-center justify-start"
         style={{cursor: 'pointer'}}
-        onClick={onClick}>
+        onClick={() => setIsThumbnail(false)}>
+        <div className="relative">
+          <VideoContent src={src} videoRef={videoRef} isThumbnail={isThumbnail} />
+          {isThumbnail && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 transition-all duration-200 hover:bg-black/20">
+              <IconPlay className="text-white" />
+            </div>
+          )}
+        </div>
+      </div>
+    </Tailwind>
+  );
+}
+
+export const VideoThumbnail: React.FC<VideoPreviewProps> = ({src, width, height, onClick}) => {
+  const thumbnailHeight = height ?? 38 * 3; // Default height of the cell row
+  const thumbnailWidth = width ?? 68 * 3; // 16:9-ish ratio
+  const [isThumbnail, setIsThumbnail] = useState(true);
+
+  const videoPlayer = (
+    <>
+    {isThumbnail && (
+      <div>
+        <VideoContent src={src} videoRef={useRef<HTMLVideoElement>(null)} isThumbnail={isThumbnail} />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30 transition-all duration-200 hover:bg-black/20">
+          <IconPlay className="text-white" />
+        </div>
+      </div>
+    )}
+    {!isThumbnail && (<VideoContent src={src} videoRef={useRef<HTMLVideoElement>(null)} isThumbnail={isThumbnail} autoplay={true}/>)}
+    </>
+  )
+  return (
+    <Tailwind>
+      <div
+        className="relative flex h-full w-full items-center justify-start"
+        style={{cursor: 'pointer'}}
+        onClick={onClick ?? (() => setIsThumbnail(false))}>
         <div
           style={{height: thumbnailHeight, width: thumbnailWidth}}
           className="relative">
-          <VideoContent src={src} videoRef={videoRef} isThumbnail={true} />
-          <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 transition-all duration-200 hover:bg-oblivion/10">
-            <IconPlay className="text-white" />
-          </div>
+          {videoPlayer}
         </div>
       </div>
     </Tailwind>
   );
 };
-export {VideoPopup, VideoThumbnail};
