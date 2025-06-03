@@ -111,7 +111,7 @@ install_clickhouse_packages() {
 
 install_clickhouse() {
     echo "Installing ClickHouse database..."
-    install_clickhouse_prerequisites
+    # install_clickhouse_prerequisites
     setup_clickhouse_repository
     install_clickhouse_packages
     echo "✓ ClickHouse installation completed"
