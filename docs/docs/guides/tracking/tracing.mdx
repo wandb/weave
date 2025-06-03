@@ -391,6 +391,39 @@ However, often LLM applications have additional logic (such as pre/post processi
   </TabItem>
 </Tabs>
 
+#### Trace parallel (multi-threaded) function calls
+
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    By default, parallel calls all show up in Weave as separate root calls. To get correct nesting under the same parent `op`, use [`ThreadPoolExecutor`](../../reference/python-sdk/weave/trace/weave.trace.util/#class-contextawarethreadpoolexecutor).
+
+    The following code sample demonstrates the use of `ThreadPoolExecutor`. 
+    The first function, `func`, is a simple `op` that takes `x` and returns `x+1`. The second function, `outer`, is another `op` that accepts a list of inputs.
+    Inside `outer`, the use of `ThreadPoolExecutor` and `exc.map(func, inputs)` means that each call to `func` still carries the same parent trace context. 
+
+    ```python
+    import weave
+
+    @weave.op
+    def func(x):
+        return x+1
+
+    @weave.op
+    def outer(inputs):
+        with weave.ThreadPoolExecutor() as exc:
+            exc.map(func, inputs)
+
+    # Update your Weave project name  
+    client = weave.init('my-weave-project')
+    outer([1,2,3,4,5])
+    ```
+
+    In the Weave UI, this produces a single parent call with five nested child calls, so that you get a fully hierarchical trace even though the increments run in parallel.
+
+    ![The Trace UI, showing a single parent call for `outer`, with five nested child calls.](imgs/threadpoolexecutor.png)
+  </TabItem>
+</Tabs>
+
 ### 3. Manual Call tracking
 
 You can also manually create Calls using the API directly.
