@@ -105,7 +105,13 @@ setup_clickhouse_repository() {
 
 install_clickhouse_packages() {
     echo "Installing ClickHouse server and client..."
-    sudo apt-get install -y clickhouse-server clickhouse-client
+    
+    # Pre-configure ClickHouse with empty password to avoid interactive prompts
+    echo "clickhouse-server clickhouse-server/default-password password ''" | sudo debconf-set-selections
+    
+    # Install with non-interactive frontend to prevent hanging on prompts
+    DEBIAN_FRONTEND=noninteractive sudo apt-get install -y clickhouse-server clickhouse-client
+    
     echo "✓ ClickHouse packages installed"
 }
 
@@ -193,6 +199,10 @@ main() {
     echo "  • Test environments for all shards"
     echo "  • Lint environment configured"
     echo "  • ClickHouse database server"
+    echo ""
+    echo "  🗃️  ClickHouse quick start:"
+    echo "  • Connect: clickhouse-client"
+    echo "  • Default user: default (no password set)"
     echo ""
     echo "Happy coding! 🚀"
 }
