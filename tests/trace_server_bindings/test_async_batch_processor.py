@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import tempfile
 import time
 from pathlib import Path
@@ -150,7 +149,6 @@ def test_processing_thread_exception_handling():
             failing_processor_fn,
             max_batch_size=100,
             min_batch_interval=0.1,
-            max_retries_per_item=2,
         )
 
         # Enqueue some items
@@ -195,7 +193,6 @@ def test_realistic_health_check_revival_scenario():
                 tracking_processor_fn,
                 max_batch_size=10,
                 min_batch_interval=0.1,
-                max_retries_per_item=2,
             )
 
             # Step 1: Process 5 items successfully
@@ -252,8 +249,8 @@ def test_realistic_health_check_revival_scenario():
 
 
 @pytest.mark.disable_logging_error_check
-def test_poison_pill_detection_and_retry_logic():
-    """Test poison pill detection, retry logic, and individual item processing."""
+def test_poison_pill_detection_and_immediate_drop():
+    """Test poison pill detection and immediate dropping of failed items."""
     # Track what gets processed successfully
     successful_items = []
 
@@ -282,7 +279,6 @@ def test_poison_pill_detection_and_retry_logic():
             max_batch_size=10,
             min_batch_interval=0.1,
             max_queue_size=5,
-            max_retries_per_item=2,  # Low retry count for faster testing
             enable_disk_fallback=True,
             disk_fallback_path=str(log_path),
         )
@@ -292,36 +288,39 @@ def test_poison_pill_detection_and_retry_logic():
         time.sleep(0.2)
         assert successful_items == ["good1", "good2"]
 
-        # Test 2: Batch failure triggers individual processing - some items succeed, poison pill gets retried
+        # Test 2: Batch failure triggers individual processing - some items succeed, poison pills are immediately dropped
         processor.enqueue(["good3", poison_const, batch_killer_const, "good4"])
         time.sleep(0.3)
 
-        # good3 and good4 should succeed, poison_pill and batch_killer should be retried
+        # good3 and good4 should succeed, poison_pill and batch_killer should be immediately dropped
         assert successful_items == ["good1", "good2", "good3", "good4"]
 
-        # Test 3: Wait for poison pill to exceed max retries and get written to disk
-        time.sleep(0.5)  # Allow multiple retry cycles
-
-        # Check poison pill was written to disk after max retries exceeded
+        # Test 3: Check poison pills were written to disk immediately
         assert log_path.exists()
         with open(log_path) as f:
             log_content = f.read()
-            assert "Unprocessable item detected" in log_content
+            assert "Poison pill detected" in log_content
+            # Should have two poison pills logged (poison_const and batch_killer_const)
+            assert log_content.count("Poison pill detected") == 2
 
-        # Test 4: Queue full during retry - item gets written to disk instead of requeued
+        # Test 4: Queue full - items get written to disk instead of being enqueued
         processor.enqueue(
             ["fill1", "fill2", "fill3", "fill4", "fill5", "fill6", "fill7"]
         )  # Fill the small queue (maxsize=5)
-        # Confirm extras got pushed log
+        # Confirm extras got written to disk
         with open(log_path) as f:
             log_content = f.read().splitlines()
-            assert json.loads(log_content[2])["item"] == "fill6"
-            assert json.loads(log_content[3])["item"] == "fill7"
+            # Should have at least 4 log entries (2 poison pills + 2 queue full items)
+            assert len(log_content) >= 4
+            # Check that queue full items were logged
+            queue_full_entries = [
+                line for line in log_content if "Queue is full" in line
+            ]
+            assert len(queue_full_entries) >= 2
 
         # Test 5: Disk fallback disabled - no files should be written
         processor_no_disk = AsyncBatchProcessor(
             selective_failing_processor,
-            max_retries_per_item=1,
             enable_disk_fallback=False,  # Disabled
             disk_fallback_path=str(Path(temp_dir) / "should_not_exist.jsonl"),
         )

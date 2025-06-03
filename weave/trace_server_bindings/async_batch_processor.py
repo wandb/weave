@@ -2,7 +2,6 @@ import atexit
 import json
 import logging
 import time
-from collections import defaultdict
 from pathlib import Path
 from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
@@ -29,7 +28,6 @@ class AsyncBatchProcessor(Generic[T]):
         max_batch_size: int = 100,
         min_batch_interval: float = 1.0,
         max_queue_size: int = 10_000,
-        max_retries_per_item: int = 5,
         enable_disk_fallback: bool = False,
         disk_fallback_path: str = ".weave_client_dropped_items_log.jsonl",
     ) -> None:
@@ -41,20 +39,17 @@ class AsyncBatchProcessor(Generic[T]):
             max_batch_size (int, optional): The maximum size of each batch. Defaults to 100.
             min_batch_interval (float, optional): The minimum interval between processing batches. Defaults to 1.0.
             max_queue_size (int, optional): The maximum number of items to hold in the queue. Defaults to 10_000.  0 means no limit.
-            max_retries_per_item (int, optional): Maximum number of times to retry a failing item before dropping it. Defaults to 5.
             enable_disk_fallback (bool, optional): Whether to write dropped items to disk instead of discarding them. Defaults to False.
             disk_fallback_path (str, optional): Path to the JSON Lines file for dropped items.
         """
         self.processor_fn = processor_fn
         self.max_batch_size = max_batch_size
         self.min_batch_interval = min_batch_interval
-        self.max_retries_per_item = max_retries_per_item
         self.enable_disk_fallback = enable_disk_fallback
         self.disk_fallback_path = Path(disk_fallback_path)
         self.queue: Queue[T] = Queue(maxsize=max_queue_size)
         self.lock = Lock()
         self.stop_accepting_work_event = Event()
-        self._failure_counts: dict[int, int] = defaultdict(int)
 
         # Processing Thread
         self.processing_thread = start_thread(self._process_batches)
@@ -134,7 +129,7 @@ class AsyncBatchProcessor(Generic[T]):
                 try:
                     self.processor_fn(current_batch)
                     for item in current_batch:
-                        self._mark_item_completed(item)
+                        self.queue.task_done()
                 except Exception as e:
                     if get_raise_on_captured_errors():
                         raise
@@ -152,89 +147,37 @@ class AsyncBatchProcessor(Generic[T]):
             if not self.stop_accepting_work_event.is_set():
                 time.sleep(self.min_batch_interval)
 
-    def _mark_item_completed(self, item: T) -> None:
-        """Mark an item as successfully completed - clear failure count and mark task done."""
-        item_id = id(item)
-        if item_id in self._failure_counts:
-            del self._failure_counts[item_id]
-        self.queue.task_done()
-
-    def _handle_item_failure(self, item: T, error: Exception) -> bool:
+    def _handle_item_failure(self, item: T, error: Exception) -> None:
         """
-        Handle a failed item, tracking failures and deciding whether to retry or drop.
+        Handle a failed item by treating it as a poison pill and dropping it.
 
         Args:
             item: The failed item
             error: The exception that occurred
-
-        Returns:
-            bool: True if item should be dropped (unprocessable), False if it should be retried
         """
         item_id = id(item)
-        self._failure_counts[item_id] += 1
 
-        if self._failure_counts[item_id] >= self.max_retries_per_item:
-            # Poison pill detected - log big error, write to disk, and drop the item
-            error_message = (
-                f"Unprocessable item detected: Item failed {self._failure_counts[item_id]} times "
-                f"(max retries: {self.max_retries_per_item}). Dropping item permanently. "
-                f"Item ID: {item_id}, Error: {error}"
-            )
-            logger.exception(error_message)
-            sentry_sdk.capture_message(error_message, level="error")
-            del self._failure_counts[item_id]
-            self._write_item_to_disk(item, error_message)
-
-            return True  # Drop the item!
-        else:
-            logger.warning(
-                f"Item processing failed (attempt {self._failure_counts[item_id]}/{self.max_retries_per_item}). "
-                f"Item ID: {item_id}, Error: {error}"
-            )
-            if get_raise_on_captured_errors():
-                raise
-            return False  # Retry the item
-
-    def _requeue_or_drop_item(self, item: T) -> None:
-        """Try to requeue a failed item, or drop it if queue is full."""
-        try:
-            self.queue.put_nowait(item)
-        except Full:
-            error_message = (
-                f"Queue is full when trying to retry failed item. "
-                f"Item ID: {id(item)} will be permanently dropped."
-            )
-            logger.exception(error_message)
-            sentry_sdk.capture_message(error_message, level="error")
-
-            self._write_item_to_disk(item, error_message)
-            self.queue.task_done()
+        # All failed items are treated as poison pills - log and drop immediately
+        error_message = (
+            f"Unprocessable item detected: Item failed processing and will be dropped permanently. "
+            f"Item ID: {item_id}, Error: {error}"
+        )
+        logger.exception(error_message)
+        sentry_sdk.capture_message(error_message, level="error")
+        self._write_item_to_disk(item, error_message)
 
     def _process_batch_individually(self, batch: list[T]) -> None:
         """Process each item in a batch individually, handling failures appropriately."""
         for item in batch:
-            if self._process_single_item(item):
-                # Item succeeded or was dropped as poison pill
-                self._mark_item_completed(item)
-            else:
-                # Item failed but should be retried
-                self._requeue_or_drop_item(item)
-
-    def _process_single_item(self, item: T) -> bool:
-        """
-        Process a single item and return True if successful, False if it should be retried.
-
-        Args:
-            item: The item to process
-
-        Returns:
-            bool: True if processing succeeded, False if it failed and should be retried
-        """
-        try:
-            self.processor_fn([item])
-        except Exception as e:
-            return self._handle_item_failure(item, e)
-        return True
+            try:
+                self.processor_fn([item])
+                self.queue.task_done()
+            except Exception as e:
+                if get_raise_on_captured_errors():
+                    raise
+                # Item failed - treat as poison pill and drop it
+                self._handle_item_failure(item, e)
+                self.queue.task_done()
 
     def _rotate_log_file_if_needed(self) -> None:
         """
