@@ -3,8 +3,7 @@ import {MOON_100, MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
-import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import {Loading} from '@wandb/weave/components/Loading';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
@@ -414,7 +413,17 @@ export const LeaderboardPageContent: React.FC<
   }, [leaderboardInstances, props]);
 
   if (leaderboardInstances.loading) {
-    return <Loading centered />;
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '50vh',
+        }}>
+        <LoadingDots />
+      </Box>
+    );
   }
 
   if (
@@ -1004,7 +1013,7 @@ const LeaderboardResultsContent: React.FC<{
           alignItems: 'center',
           height: '200px',
         }}>
-        <WaveLoader size="small" />
+        <LoadingDots />
       </Box>
     );
   }
@@ -1347,7 +1356,7 @@ const LeaderboardChartsSection: React.FC<{
   if (state.loadableComparisonResults.loading) {
     return (
       <Box sx={{textAlign: 'center', py: 4}}>
-        <WaveLoader size="small" />
+        <LoadingDots />
       </Box>
     );
   }

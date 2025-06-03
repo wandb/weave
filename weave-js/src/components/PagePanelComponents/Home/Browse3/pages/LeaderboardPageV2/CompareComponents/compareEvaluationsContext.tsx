@@ -2,8 +2,7 @@ import {Box} from '@material-ui/core';
 import {useDeepMemo} from '@wandb/weave/hookUtils';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 
-import {WeaveLoader} from '../../../../../../../common/components/WeaveLoader';
-import {LinearProgress} from '../../../../../../LinearProgress';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {useEvaluationComparisonState} from './ecpState';
 import {EvaluationComparisonState} from './ecpState';
 import {ComparisonDimensionsType} from './ecpState';
@@ -162,9 +161,15 @@ export const CompareEvaluationsProvider: React.FC<{
 
   if (!value) {
     return (
-      <Box>
-        <WeaveLoader />
-        <LinearProgress variant="indeterminate" />
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 2,
+          py: 4,
+        }}>
+        <LoadingDots />
       </Box>
     );
   }

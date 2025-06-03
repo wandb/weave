@@ -9,7 +9,7 @@ import {
 } from '@mui/x-data-grid-pro';
 import {WB_RUN_COLORS} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
-import {Loading} from '@wandb/weave/components/Loading';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
@@ -70,7 +70,17 @@ const SmallRefWithColoredIndicator: React.FC<{
 
   const error = objectVersion?.error ?? null;
   if (objectVersion.loading && !error) {
-    return <Loading centered />;
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '200px',
+        }}>
+        <LoadingDots />
+      </Box>
+    );
   }
 
   const objVersion = objectVersion.result ?? {
@@ -951,7 +961,17 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   }, [columns, defaultSortModel, loading]);
 
   if (loading) {
-    return <Loading centered />;
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '200px',
+        }}>
+        <LoadingDots />
+      </Box>
+    );
   }
 
   if (rows.length === 0) {

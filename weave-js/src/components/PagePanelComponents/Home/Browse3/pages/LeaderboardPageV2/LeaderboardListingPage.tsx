@@ -1,6 +1,6 @@
 import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button/Button';
-import {Loading} from '@wandb/weave/components/Loading';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import React, {FC, useCallback} from 'react';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
@@ -127,7 +127,17 @@ const LeaderboardTable: React.FC<{
   );
 
   if (leaderboardQuery.loading) {
-    return <Loading centered />;
+    return (
+      <Box
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '50vh',
+        }}>
+        <LoadingDots />
+      </Box>
+    );
   }
 
   const isEmpty = leaderboardObjectVersions.length === 0;
