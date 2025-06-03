@@ -219,11 +219,6 @@ export const PlaygroundChat = ({
                     ? 'border-teal-400 outline outline-[1.5px] outline-teal-400'
                     : 'border-moon-200'
                 }`}>
-                {state.loading && (
-                  <div className="absolute bottom-0 left-0 right-0 top-0 z-[100] flex items-center justify-center bg-white/20">
-                    <WaveLoader size="small" />
-                  </div>
-                )}
                 <div className="absolute top-0 z-[10] w-full rounded-t-[4px] bg-white px-[16px] py-[8px]">
                   <PlaygroundChatTopBar
                     idx={idx}
@@ -292,7 +287,12 @@ export const PlaygroundChat = ({
                     )}
                   </div>
                 </div>
-                <div className="mx-auto mb-[8px] w-full max-w-[800px] p-[8px] pl-[12px]">
+                <div className="relative mx-auto w-full max-w-[800px] p-[8px] pl-[12px]">
+                  {state.loading && (
+                    <div className="absolute bottom-[16px] left-[16px] z-[100] flex">
+                      <WaveLoader size="small" />
+                    </div>
+                  )}
                   {state.traceCall.summary && (
                     <PlaygroundCallStats
                       call={state.traceCall as TraceCallSchema}

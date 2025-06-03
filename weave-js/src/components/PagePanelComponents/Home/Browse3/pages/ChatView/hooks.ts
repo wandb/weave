@@ -310,5 +310,5 @@ export const useAnimatedText = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, shouldAnimate, speed]);
 
-  return {displayedText};
+  return {displayedText, isAnimating: isAnimatingRef.current};
 };
