@@ -785,8 +785,9 @@ class CallsQuery(BaseModel):
         feedback_join_sql = ""
         if needs_feedback:
             feedback_join_sql = f"""
-            LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
+            LEFT JOIN feedback ON (
+                feedback.project_id = {param_slot(project_param, "String")} AND
+                feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
 
         storage_size_sql = ""
