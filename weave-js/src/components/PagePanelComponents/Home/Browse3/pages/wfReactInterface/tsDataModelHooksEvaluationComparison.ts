@@ -111,8 +111,7 @@ const MEMOIZE_CACHE_SIZE = 10;
 export const useEvaluationComparisonSummary = (
   entity: string,
   project: string,
-  evaluationCallIds: string[],
-  colorByModel?: boolean
+  evaluationCallIds: string[]
 ): Loadable<EvaluationComparisonSummary> => {
   const getTraceServerClient = useGetTraceServerClientContext();
   const [data, setData] = useState<EvaluationComparisonSummary | null>(null);
@@ -126,8 +125,7 @@ export const useEvaluationComparisonSummary = (
       getTraceServerClient(),
       entity,
       project,
-      evaluationCallIdsMemo,
-      colorByModel
+      evaluationCallIdsMemo
     ).then(dataRes => {
       if (mounted) {
         evaluationCallIdsRef.current = evaluationCallIdsMemo;
@@ -137,13 +135,7 @@ export const useEvaluationComparisonSummary = (
     return () => {
       mounted = false;
     };
-  }, [
-    entity,
-    evaluationCallIdsMemo,
-    project,
-    getTraceServerClient,
-    colorByModel,
-  ]);
+  }, [entity, evaluationCallIdsMemo, project, getTraceServerClient]);
 
   return useMemo(() => {
     if (
@@ -215,8 +207,7 @@ const fetchEvaluationSummaryData = async (
   traceServerClient: TraceServerClient, // TODO: Bad that this is leaking into user-land
   entity: string,
   project: string,
-  evaluationCallIds: string[],
-  colorByModel?: boolean
+  evaluationCallIds: string[]
 ): Promise<EvaluationComparisonSummary> => {
   const projectId = projectIdFromParts({entity, project});
   const result: EvaluationComparisonSummary = {
@@ -246,26 +237,17 @@ const fetchEvaluationSummaryData = async (
     Object.fromEntries(
       evalRes.calls.map(call => [call.id, call as EvaluationEvaluateCallSchema])
     );
-
-  // Assign colors based on model or evaluation call index (optional)
-  const assignedColors = colorByModel
-    ? assignColorsForModels(
-        evalRes.calls.map(call => ({model: call.inputs.model}))
-      )
-    : evalRes.calls.map((_, ndx) => pickColor(ndx));
-
   result.evaluationCalls = Object.fromEntries(
     evalRes.calls.map((call, ndx) => [
       call.id,
       {
         callId: call.id,
         name: call.display_name ?? EVALUATION_NAME_DEFAULT,
-        color: assignedColors[ndx],
+        color: pickColor(ndx),
         evaluationRef: call.inputs.self,
         modelRef: call.inputs.model,
         summaryMetrics: {}, // These cannot be filled out yet since we don't know the IDs yet
         traceId: call.trace_id,
-        startedAt: call.started_at,
       },
     ])
   );
@@ -485,57 +467,15 @@ const fetchEvaluationComparisonResults = async (
     modelRefs
   );
 
-  // Group evaluations by dataset to handle cases where we're comparing evaluations with different datasets
-  const evaluationsByDataset: {[datasetRef: string]: string[]} = {};
-  Object.entries(summaryData.evaluationCalls).forEach(([callId, evalCall]) => {
-    const evaluation = summaryData.evaluations[evalCall.evaluationRef];
-    if (evaluation) {
-      const datasetRef = evaluation.datasetRef;
-      if (!evaluationsByDataset[datasetRef]) {
-        evaluationsByDataset[datasetRef] = [];
-      }
-      evaluationsByDataset[datasetRef].push(callId);
-    }
-  });
-
-  // If all evaluations use the same dataset, use the original strict intersection logic
-  const datasetCount = Object.keys(evaluationsByDataset).length;
-  if (datasetCount === 1) {
-    // Filter out non-intersecting rows (original behavior)
-    result.resultRows = Object.fromEntries(
-      Object.entries(result.resultRows).filter(([digest, row]) => {
-        return (
-          Object.values(row.evaluations).length ===
-          Object.values(summaryData.evaluationCalls).length
-        );
-      })
-    );
-  } else {
-    // When comparing evaluations with different datasets, only require that rows
-    // exist in all evaluations that share the same dataset
-    result.resultRows = Object.fromEntries(
-      Object.entries(result.resultRows).filter(([digest, row]) => {
-        // For each dataset group, check if the row exists in all evaluations of that dataset
-        for (const [, evalCallIds] of Object.entries(evaluationsByDataset)) {
-          const rowEvalsForDataset = evalCallIds.filter(
-            callId => row.evaluations[callId] !== undefined
-          );
-
-          // If this row has data from this dataset, it must have data from ALL evaluations
-          // that use this dataset
-          if (
-            rowEvalsForDataset.length > 0 &&
-            rowEvalsForDataset.length !== evalCallIds.length
-          ) {
-            return false;
-          }
-        }
-
-        // The row must exist in at least one evaluation
-        return Object.values(row.evaluations).length > 0;
-      })
-    );
-  }
+  // Filter out non-intersecting rows
+  result.resultRows = Object.fromEntries(
+    Object.entries(result.resultRows).filter(([digest, row]) => {
+      return (
+        Object.values(row.evaluations).length ===
+        Object.values(summaryData.evaluationCalls).length
+      );
+    })
+  );
 
   return result;
 };
@@ -559,21 +499,6 @@ const totalTokensMetricDimension: MetricDefinition = {
 };
 const pickColor = (ndx: number) => {
   return WB_RUN_COLORS[ndx % WB_RUN_COLORS.length];
-};
-
-// Helper function to assign colors based on model refs instead of evaluation call index
-const assignColorsForModels = (calls: {model: string}[]): string[] => {
-  // Get unique model refs and sort them for deterministic color assignment
-  // This ensures that the same model always gets the same color regardless of filtering
-  const uniqueModelRefs = [...new Set(calls.map(call => call.model))].sort();
-  const modelColorMap = new Map<string, string>();
-
-  uniqueModelRefs.forEach((modelRef, index) => {
-    modelColorMap.set(modelRef, pickColor(index));
-  });
-
-  // Return colors for each call based on its model
-  return calls.map(call => modelColorMap.get(call.model)!);
 };
 
 const isBinaryScore = (score: any): score is boolean => {

@@ -22,7 +22,6 @@ import {
 export type LeaderboardValueRecord = {
   datasetName: string;
   datasetVersion: string;
-  datasetRefUri?: string; // Original dataset ref URI from evaluation object
   metricType:
     | 'scorerMetric'
     | 'modelLatency'
@@ -33,7 +32,6 @@ export type LeaderboardValueRecord = {
     | 'modelErrors';
   scorerName: string; // modelMetrics repeat the type here
   scorerVersion: string; // modelMetrics repeat the type here
-  scorerType?: 'object' | 'op'; // Track whether scorer is an op or object
   metricPath: string; // modelMetrics repeat the type here
   metricValue: number | string | boolean | null | Date;
   modelName: string;
@@ -209,9 +207,7 @@ const getLeaderboardGroupableData = async (
       return;
     }
 
-    const datasetRefUri = evalObject.val.dataset;
-
-    const datasetRef = parseRefMaybe(datasetRefUri ?? '');
+    const datasetRef = parseRefMaybe(evalObject.val.dataset ?? '');
     if (!datasetRef) {
       console.warn('Skipping evaluation call with missing dataset ref', call);
       return;
@@ -238,7 +234,6 @@ const getLeaderboardGroupableData = async (
     > = {
       datasetName,
       datasetVersion,
-      datasetRefUri: datasetRefUri, // Store original dataset ref URI
       modelName,
       modelVersion,
       modelType,
@@ -275,7 +270,6 @@ const getLeaderboardGroupableData = async (
           metricType: 'scorerMetric',
           scorerName,
           scorerVersion,
-          scorerType: scorerRef.weaveKind === 'op' ? 'op' : 'object',
           metricPath,
           metricValue,
         };
@@ -652,11 +646,9 @@ const getLeaderboardObjectGroupableData = async (
           row: {
             datasetName: datasetRef.artifactName,
             datasetVersion: datasetRef.artifactVersion,
-            datasetRefUri: datasetRefUri, // Add original dataset ref URI
             metricType: 'scorerMetric',
             scorerName: scorerRef.artifactName,
             scorerVersion: scorerRef.artifactVersion,
-            scorerType: scorerRef.weaveKind === 'op' ? 'op' : 'object',
             metricPath: col.summary_metric_path,
             metricValue: value as any,
             modelName: modelRef.artifactName,
