@@ -4,27 +4,16 @@
 
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
-import {MOON_100} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import React, {
-  FC,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 import {AutoSizer} from 'react-virtualized';
 
 import {Button} from '../../../../../Button';
 import {
-  usePeekLocation,
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
@@ -41,11 +30,11 @@ import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
-import {ExampleCompareSectionDetail} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {ExampleCompareSectionDetailGuarded} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
 import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
-import {SummaryPlotsSection} from './sections/SummaryPlotsSection/SummaryPlotsSection';
+import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
 
 type CompareEvaluationsPageProps = {
   entity: string;
@@ -63,8 +52,8 @@ export const CompareEvaluationsPage: React.FC<
     <SimplePageLayout
       title={
         props.evaluationCallIds.length === 1
-          ? 'Evaluation results'
-          : 'Compare evaluations'
+          ? 'Evaluation Results'
+          : 'Compare Evaluations'
       }
       hideTabsIfSingle
       tabs={[
@@ -218,31 +207,33 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
             value: 'summary',
             label: 'Summary',
             content: (
-              <div
-                style={{
-                  marginTop: '-1px',
-                  minHeight: '100vh',
-                  backgroundColor: MOON_100,
+              <VerticalBox
+                sx={{
+                  height: '100%',
                   overflow: 'auto',
+                  paddingTop: STANDARD_PADDING / 2,
+                  alignItems: 'flex-start',
+                  gridGap: STANDARD_PADDING,
                 }}>
-                <SummaryPlotsSection
+                <SummaryPlots
                   state={state}
                   setSelectedMetrics={setSelectedMetrics}
-                  initialExpanded={true}
                 />
-                <ScorecardSection state={state} initialExpanded={true} />
-                <Tailwind style={{width: '100%', backgroundColor: MOON_100}}>
+                <ScorecardSection state={state} />
+                <Tailwind style={{width: '100%'}}>
                   <div className="px-16">
-                    <div className="flex flex w-full items-center gap-3 rounded-lg bg-white px-16 py-8">
+                    <div className="flex w-full flex-col items-center gap-3 rounded-lg border border-dashed border-moon-300 bg-moon-50 p-16">
                       <Icon name="table" size="large" color="moon-500 mb-4" />
-                      <p className="ml-[8px] text-[14px] font-semibold">
-                        Looking for your evaluation results?
-                      </p>
-                      <p className="ml-[8px] mr-auto text-[14px] text-moon-500">
-                        You can find it in our new results tab.
-                      </p>
+                      <div className="mb-4 flex flex-col items-center">
+                        <p className="text-center font-semibold">
+                          Looking for your evaluation results?
+                        </p>
+                        <p className="text-center text-moon-500">
+                          You can find it in our new results tab.
+                        </p>
+                      </div>
                       <Button
-                        variant="ghost"
+                        variant="secondary"
                         onClick={() => setTabValue('results')}>
                         Review evaluation results
                       </Button>
@@ -250,19 +241,12 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
                     <div className="h-16"></div>
                   </div>
                 </Tailwind>
-              </div>
+              </VerticalBox>
             ),
           },
           {
             value: 'results',
-            label: (
-              <>
-                Results
-                <Tailwind>
-                  <Pill label="New" color="purple" className="ml-2" />
-                </Tailwind>
-              </>
-            ) as any,
+            label: 'Results',
             loading: resultsLoading,
             content: (
               <VerticalBox
@@ -320,95 +304,17 @@ const ResultExplorer: React.FC<{
   state: EvaluationComparisonState;
   height: number;
 }> = ({state, height}) => {
-  const {hiddenEvaluationIds} = useCompareEvaluationsState();
-  const peekLocation = usePeekLocation();
-  const isPeekDrawerOpen = peekLocation != null;
-
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
-    'table'
+    'split'
   );
-  const [sidebarWidth, setSidebarWidth] = useState<number | null>(null); // null means use default calc(100% - 160px)
-  const [previousSidebarWidth, setPreviousSidebarWidth] = useState<
-    number | null
-  >(null); // Store width before expanding
-  const [isResizing, setIsResizing] = useState(false);
-  const [wasAutoExpanded, setWasAutoExpanded] = useState(false); // Track if expansion was automatic
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Only enable regression finder if exactly 2 evaluations are visible
-  const visibleEvaluationCount = state.evaluationCallIdsOrdered.filter(
-    id => !hiddenEvaluationIds.has(id)
-  ).length;
-  const regressionFinderEnabled = visibleEvaluationCount === 2;
-
-  // When peek drawer opens and we're in split view, automatically expand to detail view
-  // When peek drawer closes and we're in detail view, automatically collapse back to split view
-  useEffect(() => {
-    if (isPeekDrawerOpen && viewMode === 'split') {
-      setPreviousSidebarWidth(sidebarWidth);
-      setViewMode('detail');
-      setWasAutoExpanded(true);
-    } else if (!isPeekDrawerOpen && viewMode === 'detail' && wasAutoExpanded) {
-      // Only collapse back if we auto-expanded
-      setViewMode('split');
-      setSidebarWidth(previousSidebarWidth);
-      setWasAutoExpanded(false);
-    }
-  }, [
-    isPeekDrawerOpen,
-    viewMode,
-    sidebarWidth,
-    previousSidebarWidth,
-    wasAutoExpanded,
-  ]);
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (isResizing && containerRef.current) {
-        e.preventDefault();
-        const containerRect = containerRef.current.getBoundingClientRect();
-        const newWidthPx = containerRect.right - e.clientX;
-        setSidebarWidth(
-          Math.min(Math.max(newWidthPx, 200), containerRect.width - 160)
-        ); // Constrain between 200px and container width - 2
-      }
-    },
-    [isResizing]
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  }, []);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, []);
-
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-    return undefined;
-  }, [isResizing, handleMouseMove, handleMouseUp]);
+  const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
 
   return (
-    <div
-      ref={containerRef}
-      style={{
+    <VerticalBox
+      sx={{
         height: '100%',
         width: '100%',
         overflow: 'auto',
-        position: 'relative',
       }}>
       {regressionFinderEnabled && <ExampleFilterSection state={state} />}
       <Box
@@ -416,95 +322,39 @@ const ResultExplorer: React.FC<{
           display: 'flex',
           flexDirection: 'row',
           height: height,
-          position: 'relative',
+          borderTop: '1px solid #e0e0e0',
         }}>
         <Box
           style={{
             flex: 1,
-            width: '100%',
+            width: '50%',
+            display: viewMode !== 'detail' ? 'block' : 'none',
           }}>
           <ExampleCompareSectionTable
             state={state}
-            shouldHighlightSelectedRow={
-              viewMode === 'split' || viewMode === 'detail'
-            }
+            shouldHighlightSelectedRow={viewMode === 'split'}
             onShowSplitView={() => setViewMode('split')}
           />
         </Box>
 
-        {viewMode !== 'table' && (
-          <Box
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              width:
-                viewMode === 'detail'
-                  ? '100%'
-                  : sidebarWidth !== null
-                  ? `${sidebarWidth}px`
-                  : 'calc(100% - 160px)',
-              height: '100%',
-              backgroundColor: 'white',
-              boxShadow:
-                '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-              display: 'flex',
-              flexDirection: 'row',
-              zIndex: 1000,
-            }}>
-            {viewMode !== 'detail' && (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: -3,
-                  top: 0,
-                  bottom: 0,
-                  width: 5,
-                  cursor: 'col-resize',
-                  backgroundColor: isResizing ? '#13A9BA' : 'transparent',
-                  transition: isResizing ? 'none' : 'background-color 0.2s',
-                  zIndex: 1001,
-                }}
-                onMouseDown={handleMouseDown}
-                onMouseEnter={e => {
-                  if (!isResizing) {
-                    e.currentTarget.style.backgroundColor =
-                      'rgba(169, 237, 242, 0.5)';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!isResizing) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              />
-            )}
-            <Box style={{flex: 1, overflow: 'hidden'}}>
-              <ExampleCompareSectionDetail
-                state={state}
-                onClose={() => setViewMode('table')}
-                onExpandToggle={() => {
-                  if (viewMode === 'detail') {
-                    // Collapsing from detail mode back to split mode
-                    setViewMode('split');
-                    // Restore the previous width
-                    setSidebarWidth(previousSidebarWidth);
-                    setWasAutoExpanded(false); // Clear auto-expanded flag
-                  } else {
-                    // Expanding to detail mode
-                    setPreviousSidebarWidth(sidebarWidth);
-                    setViewMode('detail');
-                    setWasAutoExpanded(false); // This was manual expansion
-                  }
-                }}
-                isExpanded={viewMode === 'detail'}
-                isPeekDrawerOpen={isPeekDrawerOpen}
-              />
-            </Box>
-          </Box>
-        )}
+        <Box
+          style={{
+            flex: 1,
+            width: '50%',
+            borderLeft: '1px solid #e0e0e0',
+            display: viewMode !== 'table' ? 'block' : 'none',
+          }}>
+          <ExampleCompareSectionDetailGuarded
+            state={state}
+            onClose={() => setViewMode('table')}
+            onExpandToggle={() =>
+              setViewMode(viewMode === 'detail' ? 'split' : 'detail')
+            }
+            isExpanded={viewMode === 'detail'}
+          />
+        </Box>
       </Box>
-    </div>
+    </VerticalBox>
   );
 };
 

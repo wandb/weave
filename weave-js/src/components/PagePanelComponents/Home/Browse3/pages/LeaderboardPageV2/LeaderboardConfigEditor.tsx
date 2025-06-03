@@ -27,21 +27,8 @@ export const LeaderboardConfigEditor: React.FC<{
   entity: string;
   project: string;
   leaderboardVal: LeaderboardObjectVal;
-  saving: boolean;
-  isDirty: boolean;
   setWorkingCopy: (leaderboardVal: LeaderboardObjectVal) => void;
-  discardChanges: () => void;
-  commitChanges: () => void;
-}> = ({
-  entity,
-  project,
-  leaderboardVal,
-  saving,
-  isDirty,
-  setWorkingCopy,
-  discardChanges,
-  commitChanges,
-}) => {
+}> = ({entity, project, leaderboardVal, setWorkingCopy}) => {
   const handleNameChange = (value: string) => {
     setWorkingCopy({...leaderboardVal, name: value});
   };
@@ -157,26 +144,6 @@ export const LeaderboardConfigEditor: React.FC<{
 
         <Button icon="add-new" variant="ghost" onClick={addColumn}>
           Add Column
-        </Button>
-      </Box>
-      <Box
-        flexShrink={0}
-        p={2}
-        borderTop={1}
-        borderColor="divider"
-        height="52px"
-        display="flex"
-        alignItems="center"
-        justifyContent="flex-end">
-        <Button
-          variant="ghost"
-          onClick={discardChanges}
-          disabled={saving}
-          style={{marginRight: 8}}>
-          {isDirty ? 'Discard' : 'Close'}
-        </Button>
-        <Button onClick={commitChanges} disabled={!isDirty || saving}>
-          {saving ? 'Saving...' : isDirty ? 'Save' : 'Saved'}
         </Button>
       </Box>
     </Box>

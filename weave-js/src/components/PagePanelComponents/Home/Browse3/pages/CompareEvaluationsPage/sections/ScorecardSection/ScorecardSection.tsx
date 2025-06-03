@@ -1,15 +1,13 @@
-import {Box} from '@material-ui/core';
-import {Button} from '@wandb/weave/components/Button';
-import {IconOnlyPill} from '@wandb/weave/components/Tag';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {Box, Tooltip} from '@material-ui/core';
+import {Alert} from '@mui/material';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 import styled from 'styled-components';
 
 import {
   MOON_100,
   MOON_300,
+  MOON_600,
 } from '../../../../../../../../common/css/color.styles';
 import {parseRefMaybe, WeaveObjectRef} from '../../../../../../../../react';
 import {Checkbox} from '../../../../../../..';
@@ -19,10 +17,6 @@ import {CellValueBoolean} from '../../../../../Browse2/CellValueBoolean';
 import {NotApplicable} from '../../../../NotApplicable';
 import {SmallRef} from '../../../../smallRef/SmallRef';
 import {ValueViewNumber} from '../../../CallPage/ValueViewNumber';
-import {useGetTraceServerClientContext} from '../../../wfReactInterface/traceServerClientContext';
-import {ComputedCallStatusType} from '../../../wfReactInterface/traceServerClientTypes';
-import {projectIdFromParts} from '../../../wfReactInterface/tsDataModelHooks';
-import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
   CompositeScoreMetrics,
@@ -31,18 +25,19 @@ import {
   resolveDimension,
 } from '../../compositeMetricsUtil';
 import {
+  BOX_RADIUS,
   SIGNIFICANT_DIGITS,
   STANDARD_BORDER,
   STANDARD_PADDING,
 } from '../../ecpConstants';
 import {
   EvaluationComparisonState,
+  getBaselineCallId,
   getOrderedCallIds,
   getOrderedModelRefs,
 } from '../../ecpState';
 import {resolveSummaryMetricResultForEvaluateCall} from '../../ecpUtil';
 import {usePeekCall} from '../../hooks';
-import {filterLatestCallIdsPerModelDataset} from '../../latestEvaluationUtil';
 import {HorizontalBox} from '../../Layout';
 import {
   EvaluationCallLink,
@@ -54,6 +49,7 @@ export const SCORER_VARIATION_WARNING_TITLE = 'Scoring inconsistency detected';
 export const SCORER_VARIATION_WARNING_EXPLANATION =
   'The scoring logic varies between evaluations. Take precaution when comparing results.';
 
+const DATASET_VARIATION_WARNING_TITLE = 'Dataset inconsistency detected';
 const DATASET_VARIATION_WARNING_EXPLANATION =
   'The dataset varies between evaluations therefore aggregate metrics may not be directly comparable. Examples are limited to the intersection of the datasets.';
 
@@ -62,7 +58,6 @@ const GridCell = styled.div<{
 }>`
   padding: 6px 16px;
   min-width: 100px;
-  font-size: 14px;
   ${props =>
     props.button &&
     `
@@ -77,245 +72,19 @@ GridCell.displayName = 'S.GridCell';
 
 export const ScorecardSection: React.FC<{
   state: EvaluationComparisonState;
-  initialExpanded?: boolean;
-  sortColumnsByDatasetAndModel?: boolean;
-  disableBaselineStats?: boolean;
 }> = props => {
-  const [isExpanded, setIsExpanded] = useState(props.initialExpanded ?? false);
-
-  const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
-  };
-
-  return (
-    <div
-      style={{backgroundColor: MOON_100, width: '100%', paddingBottom: '16px'}}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          borderTop: `1px solid ${MOON_300}`,
-          borderBottom: !isExpanded ? `1px solid ${MOON_300}` : 'none',
-          paddingLeft: STANDARD_PADDING,
-          paddingRight: STANDARD_PADDING,
-          paddingTop: '8px',
-          paddingBottom: '8px',
-        }}
-        style={{
-          backgroundColor: 'transparent',
-        }}>
-        <Tailwind>
-          <div className="flex items-center gap-8">
-            <Button
-              variant="ghost"
-              icon={isExpanded ? 'chevron-down' : 'chevron-next'}
-              size="small"
-              onClick={e => {
-                e.stopPropagation();
-                toggleExpanded();
-              }}
-            />
-            <h3 className="m-0 text-lg">Evaluation details</h3>
-          </div>
-        </Tailwind>
-      </Box>
-      {isExpanded && (
-        <Box
-          sx={{
-            borderTop: 'none',
-            borderRadius: '0 0 8px 8px',
-          }}>
-          <ScorecardContent
-            state={props.state}
-            sortColumnsByDatasetAndModel={props.sortColumnsByDatasetAndModel}
-            disableBaselineStats={props.disableBaselineStats}
-          />
-        </Box>
-      )}
-    </div>
+  const modelRefs = useMemo(
+    () => getOrderedModelRefs(props.state),
+    [props.state]
   );
-};
-
-// Hook to fetch call statuses for evaluation calls in compare evaluations
-const useEvaluationCallStatuses = (
-  entity: string,
-  project: string,
-  evalCallIds: string[]
-): Record<string, ComputedCallStatusType> => {
-  const getClient = useGetTraceServerClientContext();
-  const [callStatuses, setCallStatuses] = useState<
-    Record<string, ComputedCallStatusType>
-  >({});
-
-  useEffect(() => {
-    if (evalCallIds.length === 0) {
-      setCallStatuses({});
-      return;
-    }
-
-    const client = getClient();
-    const fetchCallStatuses = async () => {
-      try {
-        const response = await client.callsStreamQuery({
-          project_id: projectIdFromParts({entity, project}),
-          filter: {
-            call_ids: evalCallIds,
-          },
-          limit: evalCallIds.length,
-        });
-
-        const statuses: Record<string, ComputedCallStatusType> = {};
-        response.calls.forEach(call => {
-          // Extract status from the call summary or default to 'success' if finished
-          const status =
-            call.summary?.status || (call.ended_at ? 'success' : 'running');
-          statuses[call.id] = status;
-        });
-
-        setCallStatuses(statuses);
-      } catch (error) {
-        console.error('Error fetching call statuses:', error);
-        setCallStatuses({});
-      }
-    };
-
-    fetchCallStatuses();
-  }, [entity, project, evalCallIds, getClient]);
-
-  return callStatuses;
-};
-
-const ScorecardContent: React.FC<{
-  state: EvaluationComparisonState;
-  sortColumnsByDatasetAndModel?: boolean;
-  disableBaselineStats?: boolean;
-}> = props => {
-  const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} =
-    useCompareEvaluationsState();
-
-  const evalCallIds = useMemo(() => {
-    const allCallIds = getOrderedCallIds(props.state).filter(
-      id => !hiddenEvaluationIds.has(id)
-    );
-
-    let filteredCallIds = allCallIds;
-
-    // Only apply latest evaluation filtering if we're in leaderboard mode
-    if (filterToLatestEvaluationsPerModel) {
-      // Filter to keep only the latest evaluation for each model-dataset combination
-      filteredCallIds = filterLatestCallIdsPerModelDataset(
-        allCallIds,
-        props.state.summary.evaluationCalls,
-        props.state.summary.evaluations,
-        {},
-        true
-      );
-    }
-
-    // Apply sorting by dataset name and then model name if requested
-    if (props.sortColumnsByDatasetAndModel) {
-      filteredCallIds = filteredCallIds.slice().sort((a, b) => {
-        const evaluationCallA = props.state.summary.evaluationCalls[a];
-        const evaluationCallB = props.state.summary.evaluationCalls[b];
-
-        const evaluationA =
-          props.state.summary.evaluations[evaluationCallA.evaluationRef];
-        const evaluationB =
-          props.state.summary.evaluations[evaluationCallB.evaluationRef];
-
-        const modelA = props.state.summary.models[evaluationCallA.modelRef];
-        const modelB = props.state.summary.models[evaluationCallB.modelRef];
-
-        // Extract dataset names for comparison
-        const datasetRefA = evaluationA?.datasetRef;
-        const datasetRefB = evaluationB?.datasetRef;
-
-        const datasetNameA = datasetRefA
-          ? (parseRefMaybe(datasetRefA) as WeaveObjectRef)?.artifactName ||
-            datasetRefA
-          : '';
-        const datasetNameB = datasetRefB
-          ? (parseRefMaybe(datasetRefB) as WeaveObjectRef)?.artifactName ||
-            datasetRefB
-          : '';
-
-        // Extract model names for comparison
-        const modelNameA =
-          (modelA?.properties?.name as string) || evaluationCallA.modelRef;
-        const modelNameB =
-          (modelB?.properties?.name as string) || evaluationCallB.modelRef;
-
-        // First sort by dataset name
-        const datasetComparison = datasetNameA.localeCompare(datasetNameB);
-        if (datasetComparison !== 0) {
-          return datasetComparison;
-        }
-
-        // Then sort by model name
-        return modelNameA.localeCompare(modelNameB);
-      });
-    }
-
-    return filteredCallIds;
-  }, [
-    props.state,
-    hiddenEvaluationIds,
-    filterToLatestEvaluationsPerModel,
-    props.sortColumnsByDatasetAndModel,
-  ]);
-
-  const modelRefs = useMemo(() => {
-    // Get all model refs from visible evaluations only
-    const visibleEvalCalls = evalCallIds.map(
-      id => props.state.summary.evaluationCalls[id]
-    );
-    const visibleModelRefs = new Set(
-      visibleEvalCalls.map(call => call.modelRef)
-    );
-    // Keep the ordering from getOrderedModelRefs but filter to only visible ones
-    return getOrderedModelRefs(props.state).filter(ref =>
-      visibleModelRefs.has(ref)
-    );
-  }, [props.state, evalCallIds]);
-
-  const datasetRefs = useMemo(() => {
-    // Use filtered evalCallIds instead of all evaluations to respect filtering
-    return evalCallIds
-      .map(callId => {
-        const evaluationCall = props.state.summary.evaluationCalls[callId];
-        if (!evaluationCall) return null;
-        const evaluationObj =
-          props.state.summary.evaluations[evaluationCall.evaluationRef];
-        return evaluationObj?.datasetRef;
-      })
-      .filter((ref): ref is string => ref != null);
-  }, [
-    evalCallIds,
-    props.state.summary.evaluationCalls,
-    props.state.summary.evaluations,
-  ]);
-
-  const datasetVariation = useMemo(() => {
-    // Extract dataset names and versions to check for version variations
-    const datasetVersionMap: {[datasetName: string]: Set<string>} = {};
-
-    datasetRefs.forEach(ref => {
-      // Parse the ref to extract name and version
-      const parsed = parseRefMaybe(ref) as WeaveObjectRef;
-      if (parsed && parsed.artifactName && parsed.artifactVersion) {
-        const datasetName = parsed.artifactName;
-        const datasetVersion = parsed.artifactVersion;
-
-        if (!datasetVersionMap[datasetName]) {
-          datasetVersionMap[datasetName] = new Set();
-        }
-        datasetVersionMap[datasetName].add(datasetVersion);
-      }
-    });
-
-    // Check if any dataset has multiple versions
-    return Object.values(datasetVersionMap).some(versions => versions.size > 1);
-  }, [datasetRefs]);
+  const datasetRefs = useMemo(
+    () => Object.values(props.state.summary.evaluations).map(e => e.datasetRef),
+    [props.state]
+  );
+  const evalCallIds = useMemo(
+    () => getOrderedCallIds(props.state),
+    [props.state]
+  );
 
   const modelProps = useMemo(() => {
     const propsRes: {[prop: string]: {[ref: string]: any}} = {};
@@ -356,17 +125,12 @@ const ScorecardContent: React.FC<{
     );
   }, [props.state]);
 
-  // Fetch call statuses for running indicators
-  const callStatuses = useEvaluationCallStatuses(
-    props.state.summary.entity,
-    props.state.summary.project,
-    evalCallIds
-  );
-
   const onCallClick = usePeekCall(
     props.state.summary.entity,
     props.state.summary.project
   );
+
+  const datasetVariation = Array.from(new Set(datasetRefs)).length > 1;
 
   let gridTemplateColumns = '';
   gridTemplateColumns += 'min-content '; // Scorer Name
@@ -389,14 +153,13 @@ const ScorecardContent: React.FC<{
           display: 'grid',
           gridTemplateColumns,
           border: STANDARD_BORDER,
+          borderRadius: BOX_RADIUS,
           overflow: 'auto',
-          backgroundColor: 'white',
-          borderRadius: '8px',
         }}>
         {/* Header Row */}
         <GridCell
           style={{
-            fontWeight: '600',
+            fontWeight: 'bold',
             textAlign: 'right',
             gridColumnEnd: 'span 2',
           }}>
@@ -407,19 +170,15 @@ const ScorecardContent: React.FC<{
             <GridCell
               key={evalCallId}
               style={{
-                fontWeight: '600',
+                fontWeight: 'bold',
               }}>
-              <EvaluationCallLink
-                callId={evalCallId}
-                state={props.state}
-                callStatus={callStatuses[evalCallId]}
-              />
+              <EvaluationCallLink callId={evalCallId} state={props.state} />
             </GridCell>
           );
         })}
         <GridCell
           style={{
-            fontWeight: '600',
+            fontWeight: 'bold',
             textAlign: 'right',
             gridColumnEnd: 'span 2',
           }}>
@@ -430,68 +189,60 @@ const ScorecardContent: React.FC<{
             <GridCell
               key={evalCallId}
               style={{
-                fontWeight: '600',
+                fontWeight: 'bold',
               }}>
               <EvaluationModelLink callId={evalCallId} state={props.state} />
             </GridCell>
           );
         })}
-        <>
-          <GridCell
-            style={{
-              fontWeight: '600',
-              textAlign: 'right',
-              gridColumnEnd: 'span 2',
-            }}>
-            {datasetVariation ? (
-              <div
+        {datasetVariation && (
+          <>
+            <GridCell
+              style={{
+                fontWeight: 'bold',
+                textAlign: 'right',
+                gridColumnEnd: 'span 2',
+              }}>
+              <Alert
+                severity="warning"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  justifyContent: 'flex-end',
+                  paddingTop: 0,
+                  paddingBottom: 0,
                 }}>
-                Dataset
-                <Tooltip
-                  trigger={
-                    <span>
-                      <IconOnlyPill
-                        icon="warning"
-                        color="gold"
-                        style={{flexShrink: 1}}
-                      />
-                    </span>
-                  }
-                  content={DATASET_VARIATION_WARNING_EXPLANATION}
-                />
-              </div>
-            ) : (
-              'Dataset'
-            )}
-          </GridCell>
-          {evalCallIds.map(evalCallId => {
-            return (
-              <GridCell
-                key={evalCallId}
-                style={{
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}>
-                <EvaluationDatasetLink
-                  callId={evalCallId}
-                  state={props.state}
-                />
-              </GridCell>
-            );
-          })}
-        </>
+                <Tooltip title={DATASET_VARIATION_WARNING_EXPLANATION}>
+                  <div
+                    style={{
+                      whiteSpace: 'nowrap',
+                    }}>
+                    {DATASET_VARIATION_WARNING_TITLE}
+                  </div>
+                </Tooltip>
+              </Alert>
+            </GridCell>
+            {evalCallIds.map(evalCallId => {
+              return (
+                <GridCell
+                  key={evalCallId}
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}>
+                  <EvaluationDatasetLink
+                    callId={evalCallId}
+                    state={props.state}
+                  />
+                </GridCell>
+              );
+            })}
+          </>
+        )}
         <GridCell
           style={{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
             backgroundColor: MOON_100,
-            fontWeight: 600,
-            fontSize: '16px',
+            color: MOON_600,
+            fontWeight: 'bold',
             borderTop: '1px solid #ccc',
             borderBottom: '1px solid #ccc',
             display: 'flex',
@@ -506,7 +257,7 @@ const ScorecardContent: React.FC<{
               flexDirection: 'row',
               gap: '8px',
             }}>
-            <span style={{fontSize: '14px'}}>Diff only</span>
+            <span>diff only</span>
             <Checkbox checked={diffOnly} onClick={() => setDiffOnly(v => !v)} />
           </div>
         </GridCell>
@@ -521,7 +272,7 @@ const ScorecardContent: React.FC<{
               <GridCell
                 style={{
                   gridColumnEnd: 'span 2',
-                  fontWeight: '600',
+                  fontWeight: 'bold',
                   textAlign: 'right',
                   textOverflow: 'ellipsis',
                 }}>
@@ -560,8 +311,8 @@ const ScorecardContent: React.FC<{
           style={{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
             backgroundColor: MOON_100,
-            fontWeight: 600,
-            fontSize: '16px',
+            color: MOON_600,
+            fontWeight: 'bold',
             borderTop: '1px solid #ccc',
             borderBottom: '1px solid #ccc',
           }}>
@@ -585,33 +336,27 @@ const ScorecardContent: React.FC<{
                     style={{
                       gridColumnEnd: 'span 2',
                       borderTop: '1px solid #ccc',
-                      fontWeight: '600',
+                      fontWeight: 'bold',
                       textAlign: 'left',
                     }}>
                     {scorersAreComparable ? (
                       scorerRefParsed && <SmallRef objRef={scorerRefParsed} />
                     ) : (
-                      <div
+                      <Alert
+                        severity="warning"
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          justifyContent: 'flex-end',
+                          paddingTop: 0,
+                          paddingBottom: 0,
                         }}>
-                        Scorer
-                        <Tooltip
-                          trigger={
-                            <span>
-                              <IconOnlyPill
-                                icon="warning"
-                                color="gold"
-                                style={{flexShrink: 1}}
-                              />
-                            </span>
-                          }
-                          content={SCORER_VARIATION_WARNING_EXPLANATION}
-                        />
-                      </div>
+                        <Tooltip title={SCORER_VARIATION_WARNING_EXPLANATION}>
+                          <div
+                            style={{
+                              whiteSpace: 'nowrap',
+                            }}>
+                            {SCORER_VARIATION_WARNING_TITLE}
+                          </div>
+                        </Tooltip>
+                      </Alert>
                     )}
                   </GridCell>
                   {evalCallIds.map((evalCallId, mNdx) => {
@@ -647,17 +392,15 @@ const ScorecardContent: React.FC<{
                           metricNdx === Object.keys(group.metrics).length - 1
                             ? '1px solid #ccc'
                             : '',
-                        fontWeight: '600',
+                        fontWeight: 'bold',
                         textAlign: 'right',
                         textOverflow: 'ellipsis',
                       }}>
                       {metricKey}
                     </GridCell>
                     {evalCallIds.map((evalCallId, mNdx) => {
-                      // Use the first visible evaluation as baseline
-                      const baselineCallId = evalCallIds[0];
                       const baseline = resolveSummaryMetricResult(
-                        baselineCallId,
+                        getBaselineCallId(props.state),
                         groupName,
                         metricKey,
                         compositeSummaryMetrics,
@@ -714,7 +457,7 @@ const ScorecardContent: React.FC<{
                                 {group.metrics[metricKey]
                                   .scorerAgnosticMetricDef.unit ?? ''}
                               </HorizontalBox>
-                              {dataIsNumber && !props.disableBaselineStats && (
+                              {dataIsNumber && (
                                 <ComparisonPill
                                   value={value}
                                   baseline={baseline}

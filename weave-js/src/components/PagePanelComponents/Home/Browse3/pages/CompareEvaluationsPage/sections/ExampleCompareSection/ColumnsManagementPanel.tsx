@@ -1,3 +1,4 @@
+import {Box, Checkbox, FormControlLabel, Stack} from '@mui/material';
 import {
   GridApi,
   GridColumnGroup,
@@ -12,8 +13,6 @@ import {
   useGridRootProps,
   useGridSelector,
 } from '@mui/x-data-grid-pro';
-import {Checkbox} from '@wandb/weave/components/Checkbox';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {FC, useMemo} from 'react';
 
 const getColumnGroupLeaves = (
@@ -70,55 +69,50 @@ const ColumnGroup: FC<{
     return !!(group as any)[CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY];
   }, [group]);
 
-  const idCheckboxGroup = `toggle-group-vis_${group.groupId}`;
-
   return (
-    <div className="mb-2">
-      <div className="flex items-center py-2">
-        <Checkbox
-          id={idCheckboxGroup}
-          size="small"
-          checked={isGroupIndeterminate ? 'indeterminate' : isGroupChecked}
-          onCheckedChange={toggleColumnGroup}
-        />
-        <label htmlFor={idCheckboxGroup} className="ml-4 cursor-pointer">
-          {group.headerName ?? group.groupId}
-        </label>
-      </div>
+    <div>
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={isGroupChecked}
+            indeterminate={isGroupIndeterminate}
+            size="small"
+            sx={{p: 1}}
+          />
+        }
+        label={group.headerName ?? group.groupId}
+        onChange={(_, newValue) => toggleColumnGroup(newValue)}
+      />
       {!groupControlsChildrenVisibility && (
-        <div className="ml-18">
+        <Box sx={{pl: 3.5}}>
           {group.children.map(child => {
-            if (isLeaf(child)) {
-              const idCheckbox = `toggle-vis_${child.field}`;
-              const checked = columnVisibilityModel[child.field] !== false;
-              const label = columnLookup[child.field].headerName ?? child.field;
-
-              return (
-                <div key={child.field} className="flex items-center py-2">
-                  <Checkbox
-                    id={idCheckbox}
-                    size="small"
-                    checked={checked}
-                    onCheckedChange={() => toggleColumn(child.field, !checked)}
-                  />
-                  <label htmlFor={idCheckbox} className="ml-4 cursor-pointer">
-                    {label}
-                  </label>
-                </div>
-              );
-            } else {
-              return (
-                <ColumnGroup
-                  group={child}
-                  columnLookup={columnLookup}
-                  key={child.groupId}
-                  apiRef={apiRef}
-                  columnVisibilityModel={columnVisibilityModel}
+            return isLeaf(child) ? (
+              <Stack direction="row" key={child.field}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={columnVisibilityModel[child.field] !== false}
+                      size="small"
+                      sx={{p: 1}}
+                    />
+                  }
+                  label={columnLookup[child.field].headerName ?? child.field}
+                  onChange={(_, newValue) =>
+                    toggleColumn(child.field, newValue)
+                  }
                 />
-              );
-            }
+              </Stack>
+            ) : (
+              <ColumnGroup
+                group={child}
+                columnLookup={columnLookup}
+                key={child.groupId}
+                apiRef={apiRef}
+                columnVisibilityModel={columnVisibilityModel}
+              />
+            );
           })}
-        </div>
+        </Box>
       )}
     </div>
   );
@@ -143,23 +137,16 @@ export const ColumnsManagementPanel: FC<GridColumnsPanelProps> = props => {
   }
 
   return (
-    <Tailwind>
-      <div
-        className="min-w-[360px] p-12"
-        style={{fontFamily: 'Source Sans Pro', fontSize: '14px'}}>
-        <div className="mb-4 font-semibold">Manage columns</div>
-        <div>
-          {columnGroupingModel.map(group => (
-            <ColumnGroup
-              group={group}
-              columnLookup={columnLookup}
-              columnVisibilityModel={columnVisibilityModel}
-              key={group.groupId}
-              apiRef={apiRef}
-            />
-          ))}
-        </div>
-      </div>
-    </Tailwind>
+    <Box sx={{px: 2, py: 0.5}}>
+      {columnGroupingModel.map(group => (
+        <ColumnGroup
+          group={group}
+          columnLookup={columnLookup}
+          columnVisibilityModel={columnVisibilityModel}
+          key={group.groupId}
+          apiRef={apiRef}
+        />
+      ))}
+    </Box>
   );
 };

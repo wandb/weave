@@ -1,13 +1,8 @@
 import {Box} from '@material-ui/core';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
-import {
-  MOON_100,
-  MOON_300,
-} from '../../../../../../../../common/css/color.styles';
-import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {buildCompositeMetricsMap} from '../../compositeMetricsUtil';
 import {
   BOX_RADIUS,
@@ -22,7 +17,7 @@ import {
   flattenedDimensionPath,
   resolveSummaryMetricValueForEvaluateCall,
 } from '../../ecpUtil';
-import {filterLatestCallIdsPerModelDataset} from '../../latestEvaluationUtil';
+import {HorizontalBox, VerticalBox} from '../../Layout';
 import {MetricsSelector} from './MetricsSelector';
 import {PlotlyBarPlot} from './PlotlyBarPlot';
 import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
@@ -30,74 +25,6 @@ import {PlotlyRadarPlot, RadarPlotData} from './PlotlyRadarPlot';
 /**
  * Summary plots produce plots to summarize evaluation comparisons.
  */
-export const SummaryPlotsSection: React.FC<{
-  state: EvaluationComparisonState;
-  setSelectedMetrics: (newModel: Record<string, boolean>) => void;
-  initialExpanded?: boolean;
-}> = ({state, setSelectedMetrics, initialExpanded = false}) => {
-  const [isExpanded, setIsExpanded] = useState(initialExpanded);
-  const {allMetricNames} = usePlotDataFromMetrics(state);
-  const {selectedMetrics} = state;
-
-  const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
-  };
-
-  return (
-    <div
-      style={{
-        backgroundColor: MOON_100,
-        width: '100%',
-        ...(isExpanded && {paddingBottom: '24px'}),
-      }}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          borderTop: `1px solid ${MOON_300}`,
-          paddingLeft: STANDARD_PADDING,
-          paddingRight: STANDARD_PADDING,
-          paddingTop: '8px',
-          paddingBottom: '8px',
-        }}
-        style={{
-          backgroundColor: 'transparent',
-        }}>
-        <Tailwind style={{width: '100%'}}>
-          <div className="flex w-full items-center gap-8">
-            <Button
-              variant="ghost"
-              icon={isExpanded ? 'chevron-down' : 'chevron-next'}
-              size="small"
-              onClick={e => {
-                e.stopPropagation();
-                toggleExpanded();
-              }}
-            />
-            <h3 className="m-0 text-lg">Metrics</h3>
-            <div className="ml-auto flex items-center">
-              <MetricsSelector
-                selectedMetrics={selectedMetrics}
-                setSelectedMetrics={setSelectedMetrics}
-                allMetrics={Array.from(allMetricNames)}
-              />
-            </div>
-          </div>
-        </Tailwind>
-      </Box>
-      {isExpanded && (
-        <Box
-          sx={{
-            borderTop: 'none',
-            borderRadius: '0 0 8px 8px',
-          }}>
-          <SummaryPlots state={state} setSelectedMetrics={setSelectedMetrics} />
-        </Box>
-      )}
-    </div>
-  );
-};
-
 export const SummaryPlots: React.FC<{
   state: EvaluationComparisonState;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
@@ -105,22 +32,26 @@ export const SummaryPlots: React.FC<{
   const {radarData, allMetricNames} = usePlotDataFromMetrics(state);
   const {selectedMetrics} = state;
 
-  // Don't initialize selectedMetrics here - let the parent component handle it
-  // This prevents conflicts with LeaderboardChartsSection's initialization
+  // Initialize selectedMetrics if null
+  useEffect(() => {
+    if (selectedMetrics == null) {
+      setSelectedMetrics(
+        Object.fromEntries(Array.from(allMetricNames).map(m => [m, true]))
+      );
+    }
+  }, [selectedMetrics, setSelectedMetrics, allMetricNames]);
 
   const filteredData = useFilteredData(radarData, selectedMetrics);
   const normalizedRadarData = normalizeDataForRadarPlot(filteredData);
-  const barPlotData = useBarPlotData(filteredData, state);
+  const barPlotData = useBarPlotData(filteredData);
 
-  // Filter bar plot data based on selectedMetrics
-  const filteredBarPlotData = useMemo(() => {
-    if (!selectedMetrics) return barPlotData;
-
-    return barPlotData.filter(plot => {
-      const metricToCheck = plot.originalMetric || plot.metric;
-      return selectedMetrics[metricToCheck] !== false;
-    });
-  }, [barPlotData, selectedMetrics]);
+  const {
+    containerRef,
+    isInitialRender,
+    plotsPerPage,
+    currentPage,
+    setCurrentPage,
+  } = useContainerDimensions();
 
   const handleCloseMetric = React.useCallback(
     (metric: string) => {
@@ -134,26 +65,60 @@ export const SummaryPlots: React.FC<{
     [setSelectedMetrics, selectedMetrics]
   );
 
-  const allPlots = useAllPlots(
-    normalizedRadarData,
-    filteredBarPlotData,
-    handleCloseMetric
-  );
+  const {plotsToShow, totalPlots, startIndex, endIndex, totalPages} =
+    usePaginatedPlots(
+      normalizedRadarData,
+      barPlotData,
+      plotsPerPage,
+      currentPage,
+      handleCloseMetric
+    );
+
+  // Render placeholder during initial render
+  if (isInitialRender) {
+    return <div ref={containerRef} style={{width: '100%', height: '400px'}} />;
+  }
 
   return (
-    <div style={{width: '100%'}}>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: STANDARD_PADDING,
-          paddingLeft: STANDARD_PADDING,
-          paddingRight: STANDARD_PADDING,
-          width: '100%',
+    <VerticalBox
+      sx={{
+        paddingLeft: STANDARD_PADDING,
+        paddingRight: STANDARD_PADDING,
+        // flex: '1 1 auto',
+        width: '100%',
+        gridGap: STANDARD_PADDING / 2,
+      }}>
+      <HorizontalBox
+        sx={{
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}>
-        {allPlots}
+        <div style={{display: 'flex', alignItems: 'center'}}>
+          <MetricsSelector
+            selectedMetrics={selectedMetrics}
+            setSelectedMetrics={setSelectedMetrics}
+            allMetrics={Array.from(allMetricNames)}
+          />
+        </div>
+        <div style={{display: 'flex', alignItems: 'center'}}>
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            totalPlots={totalPlots}
+            onPrevPage={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
+            onNextPage={() =>
+              setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))
+            }
+          />
+        </div>
+      </HorizontalBox>
+
+      <div ref={containerRef} style={{width: '100%'}}>
+        <HorizontalBox>{plotsToShow}</HorizontalBox>
       </div>
-    </div>
+    </VerticalBox>
   );
 };
 
@@ -161,34 +126,32 @@ const RadarPlotBox: React.FC<{data: RadarPlotData}> = ({data}) => (
   <Box
     sx={{
       height: PLOT_HEIGHT,
+      width: PLOT_HEIGHT * 1.5,
       borderRadius: BOX_RADIUS,
       border: STANDARD_BORDER,
       padding: PLOT_PADDING,
-      width: '100%',
-      minWidth: '300px',
-      bgcolor: 'white',
+      flex: '1 0 auto',
     }}>
     <PlotlyRadarPlot height={PLOT_HEIGHT} data={data} />
   </Box>
 );
 
 const BarPlotBox: React.FC<{
-  plot: BarPlotDataItem;
+  plot: {plotlyData: Plotly.Data; yRange: [number, number]; metric: string};
   onClose: (metric: string) => void;
 }> = ({plot, onClose}) => (
   <Box
     sx={{
       position: 'relative',
       height: PLOT_HEIGHT,
+      width: PLOT_HEIGHT,
       borderRadius: BOX_RADIUS,
       border: STANDARD_BORDER,
       paddingTop: PLOT_PADDING - 30,
       paddingBottom: PLOT_PADDING,
       paddingLeft: PLOT_PADDING,
       paddingRight: PLOT_PADDING,
-      width: '100%',
-      minWidth: '300px',
-      bgcolor: 'white',
+      flex: '1 1 auto',
     }}>
     <Button
       variant="ghost"
@@ -203,7 +166,7 @@ const BarPlotBox: React.FC<{
         padding: 0,
         zIndex: 1,
       }}
-      onClick={() => onClose(plot.originalMetric || plot.metric)}
+      onClick={() => onClose(plot.metric)}
       icon="close"
       aria-label={`Hide ${plot.metric}`}
     />
@@ -215,29 +178,53 @@ const BarPlotBox: React.FC<{
   </Box>
 );
 
-const useAllPlots = (
-  filteredData: RadarPlotData,
-  barPlotData: BarPlotDataItem[],
-  onClose: (metric: string) => void
-) => {
-  return useMemo(() => {
-    const plots = [];
-
-    // Always show radar plot first if we have data
-    if (Object.keys(filteredData).length > 0) {
-      plots.push(<RadarPlotBox key="radar" data={filteredData} />);
-    }
-
-    // Add all bar plots
-    barPlotData.forEach((plot, index) => {
-      plots.push(
-        <BarPlotBox key={`bar-${index}`} plot={plot} onClose={onClose} />
-      );
-    });
-
-    return plots;
-  }, [filteredData, barPlotData, onClose]);
-};
+const PaginationControls: React.FC<{
+  currentPage: number;
+  totalPages: number;
+  startIndex: number;
+  endIndex: number;
+  totalPlots: number;
+  onPrevPage: () => void;
+  onNextPage: () => void;
+}> = ({
+  currentPage,
+  totalPages,
+  startIndex,
+  endIndex,
+  totalPlots,
+  onPrevPage,
+  onNextPage,
+}) => (
+  <HorizontalBox sx={{width: '100%'}}>
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      <Tailwind>
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            onClick={onPrevPage}
+            disabled={currentPage === 0}
+            icon="chevron-next"
+            className="rotate-180"
+          />
+          <span className="mx-2 pb-2 text-sm text-moon-500">
+            {startIndex}-{endIndex} of {totalPlots}
+          </span>
+          <Button
+            variant="ghost"
+            onClick={onNextPage}
+            disabled={currentPage === totalPages - 1}
+            icon="chevron-next"
+          />
+        </div>
+      </Tailwind>
+    </Box>
+  </HorizontalBox>
+);
 
 const useFilteredData = (
   radarData: RadarPlotData,
@@ -248,9 +235,7 @@ const useFilteredData = (
     for (const [callId, metricBin] of Object.entries(radarData)) {
       const metrics: {[metric: string]: number} = {};
       for (const [metric, value] of Object.entries(metricBin.metrics)) {
-        // Show metric if selectedMetrics is undefined or if metric is explicitly true
-        // Hide only if explicitly false
-        if (!selectedMetrics || selectedMetrics[metric] !== false) {
+        if (selectedMetrics?.[metric]) {
           metrics[metric] = value;
         }
       }
@@ -330,18 +315,7 @@ function normalizeDataForRadarPlot(
   return radarData;
 }
 
-// Define the type for bar plot data
-type BarPlotDataItem = {
-  plotlyData: Plotly.Data;
-  yRange: [number, number];
-  metric: string;
-  originalMetric?: string;
-};
-
-const useBarPlotData = (
-  filteredData: RadarPlotData,
-  state?: EvaluationComparisonState
-): BarPlotDataItem[] =>
+const useBarPlotData = (filteredData: RadarPlotData) =>
   useMemo(() => {
     const metrics: {
       [metric: string]: {
@@ -349,7 +323,6 @@ const useBarPlotData = (
         values: number[];
         name: string;
         colors: string[];
-        datasets?: string[];
       };
     } = {};
 
@@ -357,101 +330,15 @@ const useBarPlotData = (
     for (const [callId, metricBin] of Object.entries(filteredData)) {
       for (const [metric, value] of Object.entries(metricBin.metrics)) {
         if (!metrics[metric]) {
-          metrics[metric] = {
-            callIds: [],
-            values: [],
-            name: metric,
-            colors: [],
-            datasets: [],
-          };
+          metrics[metric] = {callIds: [], values: [], name: metric, colors: []};
         }
         metrics[metric].callIds.push(callId);
         metrics[metric].values.push(value);
         metrics[metric].colors.push(metricBin.color);
-
-        // Add dataset information if state is available
-        if (state) {
-          const evalCall = state.summary.evaluationCalls[callId];
-          if (evalCall) {
-            const evaluation =
-              state.summary.evaluations[evalCall.evaluationRef];
-            if (evaluation && evaluation.datasetRef) {
-              // Extract dataset name from ref
-              const datasetMatch = evaluation.datasetRef.match(
-                /object\/([^:]+)(?::|$)/
-              );
-              const datasetName = datasetMatch ? datasetMatch[1] : 'Unknown';
-              metrics[metric].datasets!.push(datasetName);
-            }
-          }
-        }
       }
     }
 
-    // Check if we should split by dataset
-    const shouldSplitByDataset =
-      state &&
-      Object.values(metrics).some(m => {
-        const uniqueDatasets = new Set(m.datasets || []);
-        return uniqueDatasets.size > 1;
-      });
-
-    if (shouldSplitByDataset && state) {
-      // Group metrics by dataset
-      const metricsByDataset: {
-        [key: string]: BarPlotDataItem;
-      } = {};
-
-      Object.entries(metrics).forEach(([metric, metricBin]) => {
-        // Group by dataset
-        const datasetGroups: {
-          [dataset: string]: {
-            callIds: string[];
-            values: number[];
-            colors: string[];
-          };
-        } = {};
-
-        metricBin.callIds.forEach((callId, idx) => {
-          const dataset = metricBin.datasets![idx] || 'Unknown';
-          if (!datasetGroups[dataset]) {
-            datasetGroups[dataset] = {callIds: [], values: [], colors: []};
-          }
-          datasetGroups[dataset].callIds.push(callId);
-          datasetGroups[dataset].values.push(metricBin.values[idx]);
-          datasetGroups[dataset].colors.push(metricBin.colors[idx]);
-        });
-
-        // Create separate plots for each dataset
-        Object.entries(datasetGroups).forEach(([dataset, group]) => {
-          const maxY = Math.max(...group.values) * 1.1;
-          const minY = Math.min(...group.values, 0);
-          const plotlyData: Plotly.Data = {
-            type: 'bar',
-            y: group.values,
-            x: group.callIds,
-            text: group.values.map(value =>
-              Number.isInteger(value) ? value.toString() : value.toFixed(3)
-            ),
-            textposition: 'outside',
-            textfont: {size: 12, color: 'black'},
-            name: `${metric} (${dataset})`,
-            marker: {color: group.colors},
-          };
-          const key = `${metric}-${dataset}`;
-          metricsByDataset[key] = {
-            plotlyData,
-            yRange: [minY, maxY] as [number, number],
-            metric: key,
-            originalMetric: metric,
-          };
-        });
-      });
-
-      return Object.values(metricsByDataset);
-    }
-
-    // Original behavior when not splitting by dataset
+    // Convert metrics object to Plotly data format
     return Object.entries(metrics).map(([metric, metricBin]) => {
       const maxY = Math.max(...metricBin.values) * 1.1;
       const minY = Math.min(...metricBin.values, 0);
@@ -463,45 +350,113 @@ const useBarPlotData = (
           Number.isInteger(value) ? value.toString() : value.toFixed(3)
         ),
         textposition: 'outside',
-        textfont: {size: 12, color: 'black'},
+        textfont: {size: 14, color: 'black'},
         name: metric,
         marker: {color: metricBin.colors},
       };
       return {plotlyData, yRange: [minY, maxY] as [number, number], metric};
     });
-  }, [filteredData, state]);
+  }, [filteredData]);
 
-export const usePlotDataFromMetrics = (
+const useContainerDimensions = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [isInitialRender, setIsInitialRender] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    updateWidth();
+    setIsInitialRender(false);
+
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  const plotsPerPage = useMemo(() => {
+    return Math.max(1, Math.floor(containerWidth / PLOT_HEIGHT));
+  }, [containerWidth]);
+
+  return {
+    containerRef,
+    isInitialRender,
+    plotsPerPage,
+    currentPage,
+    setCurrentPage,
+  };
+};
+
+const usePaginatedPlots = (
+  filteredData: RadarPlotData,
+  barPlotData: Array<{
+    plotlyData: Plotly.Data;
+    yRange: [number, number];
+    metric: string;
+  }>,
+  plotsPerPage: number,
+  currentPage: number,
+  onClose: (metric: string) => void
+) => {
+  const radarPlotWidth = 2;
+  const totalBarPlots = barPlotData.length;
+  const totalPlotWidth = radarPlotWidth + totalBarPlots;
+  const totalPages = Math.ceil(totalPlotWidth / plotsPerPage);
+
+  const plotsToShow = useMemo(() => {
+    // First page always shows radar plot
+    if (currentPage === 0) {
+      const availableSpace = plotsPerPage - radarPlotWidth;
+      return [
+        <RadarPlotBox key="radar" data={filteredData} />,
+        ...barPlotData
+          .slice(0, availableSpace)
+          .map((plot, index) => (
+            <BarPlotBox key={`bar-${index}`} plot={plot} onClose={onClose} />
+          )),
+      ];
+    } else {
+      // Subsequent pages show only bar plots
+      const startIdx =
+        (currentPage - 1) * plotsPerPage + (plotsPerPage - radarPlotWidth);
+      const endIdx = startIdx + plotsPerPage;
+      return barPlotData
+        .slice(startIdx, endIdx)
+        .map((plot, index) => (
+          <BarPlotBox
+            key={`bar-${startIdx + index}`}
+            plot={plot}
+            onClose={onClose}
+          />
+        ));
+    }
+  }, [currentPage, plotsPerPage, filteredData, barPlotData, onClose]);
+
+  // Calculate pagination details
+  const totalPlots = barPlotData.length + 1; // +1 for the radar plot
+  const startIndex =
+    currentPage === 0 ? 1 : Math.min(plotsPerPage + 1, totalPlots);
+  const endIndex =
+    currentPage === 0
+      ? Math.min(plotsToShow.length, totalPlots)
+      : Math.min(startIndex + plotsToShow.length - 1, totalPlots);
+
+  return {plotsToShow, totalPlots, startIndex, endIndex, totalPages};
+};
+
+const usePlotDataFromMetrics = (
   state: EvaluationComparisonState
-): {
-  radarData: RadarPlotData;
-  allMetricNames: Set<string>;
-  datasetSplitInfo?: {[metric: string]: Set<string>};
-} => {
-  const {hiddenEvaluationIds, filterToLatestEvaluationsPerModel} =
-    useCompareEvaluationsState();
+): {radarData: RadarPlotData; allMetricNames: Set<string>} => {
   const compositeMetrics = useMemo(() => {
     return buildCompositeMetricsMap(state.summary, 'summary');
   }, [state]);
   const callIds = useMemo(() => {
-    const allCallIds = getOrderedCallIds(state).filter(
-      id => !hiddenEvaluationIds.has(id)
-    );
-
-    // Only apply latest evaluation filtering if we're in leaderboard mode
-    if (filterToLatestEvaluationsPerModel) {
-      // Filter to keep only the latest evaluation for each model-dataset combination
-      return filterLatestCallIdsPerModelDataset(
-        allCallIds,
-        state.summary.evaluationCalls,
-        state.summary.evaluations,
-        {},
-        true
-      );
-    }
-
-    return allCallIds;
-  }, [state, hiddenEvaluationIds, filterToLatestEvaluationsPerModel]);
+    return getOrderedCallIds(state);
+  }, [state]);
 
   return useMemo(() => {
     const metrics = Object.values(compositeMetrics)
@@ -536,45 +491,9 @@ export const usePlotDataFromMetrics = (
           evalScores,
         };
       });
-
-    // Track which metrics have multiple datasets
-    const datasetSplitInfo: {[metric: string]: Set<string>} = {};
-    metrics.forEach(metric => {
-      const datasets = new Set<string>();
-      callIds.forEach(callId => {
-        const evalCall = state.summary.evaluationCalls[callId];
-        if (evalCall) {
-          const evaluation = state.summary.evaluations[evalCall.evaluationRef];
-          if (evaluation && evaluation.datasetRef) {
-            const datasetMatch = evaluation.datasetRef.match(
-              /object\/([^:]+)(?::|$)/
-            );
-            if (datasetMatch) {
-              datasets.add(datasetMatch[1]);
-            }
-          }
-        }
-      });
-      if (datasets.size > 0) {
-        datasetSplitInfo[metric.metricLabel] = datasets;
-      }
-    });
-
-    // Check if we should split by dataset (same logic as bar charts)
-    const shouldSplitByDataset = Object.values(datasetSplitInfo).some(
-      datasets => datasets.size > 1
-    );
-
-    // Build radar data with dataset-aware metric names if needed
     const radarData = Object.fromEntries(
       callIds.map(callId => {
         const evalCall = state.summary.evaluationCalls[callId];
-        const evaluation = state.summary.evaluations[evalCall.evaluationRef];
-        const datasetName = evaluation?.datasetRef
-          ? evaluation.datasetRef.match(/object\/([^:]+)(?::|$)/)?.[1] ||
-            'Unknown'
-          : 'Unknown';
-
         return [
           evalCall.callId,
           {
@@ -582,13 +501,8 @@ export const usePlotDataFromMetrics = (
             color: evalCall.color,
             metrics: Object.fromEntries(
               metrics.map(metric => {
-                // Use dataset-aware metric names if we're splitting by dataset
-                const displayMetricName = shouldSplitByDataset
-                  ? `${metric.metricLabel} (${datasetName})`
-                  : metric.metricLabel;
-
                 return [
-                  displayMetricName,
+                  metric.metricLabel,
                   metric.evalScores[evalCall.callId] ?? 0,
                 ];
               })
@@ -597,31 +511,7 @@ export const usePlotDataFromMetrics = (
         ];
       })
     );
-
-    // Update allMetricNames to include dataset suffixes when appropriate
-    const allMetricNames = new Set<string>();
-    if (shouldSplitByDataset) {
-      // Add all metric-dataset combinations
-      metrics.forEach(metric => {
-        const datasets = datasetSplitInfo[metric.metricLabel];
-        if (datasets) {
-          datasets.forEach(dataset => {
-            allMetricNames.add(`${metric.metricLabel} (${dataset})`);
-          });
-        }
-      });
-    } else {
-      // Add base metric names
-      metrics.forEach(metric => {
-        allMetricNames.add(metric.metricLabel);
-      });
-    }
-
-    return {radarData, allMetricNames, datasetSplitInfo};
-  }, [
-    callIds,
-    compositeMetrics,
-    state.summary.evaluationCalls,
-    state.summary.evaluations,
-  ]);
+    const allMetricNames = new Set(metrics.map(m => m.metricLabel));
+    return {radarData, allMetricNames};
+  }, [callIds, compositeMetrics, state.summary.evaluationCalls]);
 };

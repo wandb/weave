@@ -1,14 +1,14 @@
-import {Box} from '@material-ui/core';
+import {Box, Tooltip} from '@material-ui/core';
 import {WarningAmberOutlined} from '@mui/icons-material';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import styled from 'styled-components';
 
 import {
-  MOON_100,
+  MOON_50,
   MOON_200,
   MOON_300,
   MOON_800,
@@ -16,7 +16,6 @@ import {
 import {parseRef, parseRefMaybe} from '../../../../../../../../react';
 import {Button} from '../../../../../../../Button';
 import {Icon} from '../../../../../../../Icon';
-import {TailwindContents} from '../../../../../../../Tailwind';
 import {CellValue} from '../../../../../Browse2/CellValue';
 import {isWeaveRef} from '../../../../filters/common';
 import {NotApplicable} from '../../../../NotApplicable';
@@ -134,7 +133,7 @@ const stickyHeaderStyleMixin: React.CSSProperties = {
   position: 'sticky',
   top: 0,
   zIndex: 1,
-  backgroundColor: MOON_100,
+  backgroundColor: MOON_50,
   fontWeight: 'bold',
 };
 
@@ -142,7 +141,7 @@ const stickySidebarStyleMixin: React.CSSProperties = {
   position: 'sticky',
   left: 0,
   zIndex: 1,
-  backgroundColor: MOON_100,
+  backgroundColor: MOON_50,
   fontWeight: 'bold',
 };
 
@@ -227,7 +226,6 @@ export const ExampleCompareSectionDetail: React.FC<{
   onClose: () => void;
   onExpandToggle: () => void;
   isExpanded: boolean;
-  isPeekDrawerOpen?: boolean;
 }> = props => {
   const ctx = useCompareEvaluationsState();
   // Prefer the method below (since `state` diverging from the
@@ -255,19 +253,6 @@ export const ExampleCompareSectionDetail: React.FC<{
   const target = useMemo(() => {
     return filteredRows[targetIndex];
   }, [filteredRows, targetIndex]);
-
-  // Filter orderedCallIds to only include those that have data for the current row
-  const filteredOrderedCallIds = useMemo(() => {
-    if (!target) return orderedCallIds;
-
-    // Get all evaluation call IDs that have data for this row
-    const callIdsWithData = new Set(
-      target.originalRows.map(row => row.evaluationCallId)
-    );
-
-    // Filter orderedCallIds to only include those with data
-    return orderedCallIds.filter(callId => callIdsWithData.has(callId));
-  }, [orderedCallIds, target]);
 
   const {targetRowValue, loading: loadingInputValue} =
     useExampleCompareDataAndPrefetch(ctx, filteredRows, targetIndex);
@@ -305,7 +290,7 @@ export const ExampleCompareSectionDetail: React.FC<{
   const numInputProps = inputColumnKeys?.length ?? 0;
   const numOutputKeys = outputColumnKeys?.length ?? 0;
 
-  const numTrials = filteredOrderedCallIds.map(leafId => {
+  const numTrials = orderedCallIds.map(leafId => {
     return target.originalRows.filter(row => row.evaluationCallId === leafId)
       .length;
   });
@@ -350,14 +335,14 @@ export const ExampleCompareSectionDetail: React.FC<{
   };
 
   const lookupTrialsForEval = (evalIndex: number): PivotedRow[] => {
-    const currEvalCallId = filteredOrderedCallIds[evalIndex];
+    const currEvalCallId = orderedCallIds[evalIndex];
     return target.originalRows.filter(
       row => row.evaluationCallId === currEvalCallId
     );
   };
 
   const lookupSelectedTrialIndexForEval = (evalIndex: number): number => {
-    const currEvalCallId = filteredOrderedCallIds[evalIndex];
+    const currEvalCallId = orderedCallIds[evalIndex];
     return selectedTrials[currEvalCallId] || 0;
   };
 
@@ -430,7 +415,7 @@ export const ExampleCompareSectionDetail: React.FC<{
     metricIndex: number
   ): MetricValueType | undefined => {
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
-    const currEvalCallId = filteredOrderedCallIds[evalIndex];
+    const currEvalCallId = orderedCallIds[evalIndex];
     const dimension = lookupDimension(scorerIndex, metricIndex);
     return lookupMetricValueDirect(
       targetTrial.scores,
@@ -445,7 +430,7 @@ export const ExampleCompareSectionDetail: React.FC<{
     scorerIndex: number,
     metricIndex: number
   ): MetricValueType | undefined => {
-    const currEvalCallId = filteredOrderedCallIds[evalIndex];
+    const currEvalCallId = orderedCallIds[evalIndex];
     const resolvedScoreId = resolvePeerDimension(
       compositeScoreMetrics,
       currEvalCallId,
@@ -463,7 +448,7 @@ export const ExampleCompareSectionDetail: React.FC<{
     evalIndex: number,
     outputPropIndex: number
   ): any => {
-    const currEvalCallId = filteredOrderedCallIds[evalIndex];
+    const currEvalCallId = orderedCallIds[evalIndex];
     const selectedTrial = lookupSelectedTrialForEval(evalIndex);
 
     return (selectedTrial?.output?.[outputColumnKeys[outputPropIndex]] ?? {})[
@@ -512,11 +497,11 @@ export const ExampleCompareSectionDetail: React.FC<{
   };
 
   const evalMapKey = (evalIndex: number) => {
-    return filteredOrderedCallIds[evalIndex];
+    return orderedCallIds[evalIndex];
   };
 
   const evalSelectedTrialPredictCallComp = (evalIndex: number) => {
-    const currEvalCallId = filteredOrderedCallIds[evalIndex];
+    const currEvalCallId = orderedCallIds[evalIndex];
     const selectedTrial = lookupSelectedTrialForEval(evalIndex);
     if (selectedTrial == null) {
       return null;
@@ -555,7 +540,7 @@ export const ExampleCompareSectionDetail: React.FC<{
   };
 
   const evalTrialSelectComp = (evalIndex: number, trialIndex: number) => {
-    const currEvalCallId = filteredOrderedCallIds[evalIndex];
+    const currEvalCallId = orderedCallIds[evalIndex];
     const selectedTrialNdx = lookupSelectedTrialIndexForEval(evalIndex);
     return (
       <Button
@@ -650,13 +635,13 @@ export const ExampleCompareSectionDetail: React.FC<{
     } else {
       inner = (
         <Tooltip
-          content={
+          title={
             SCORER_VARIATION_WARNING_TITLE +
             ': ' +
             SCORER_VARIATION_WARNING_EXPLANATION
-          }
-          trigger={<WarningAmberOutlined color="warning" />}
-        />
+          }>
+          <WarningAmberOutlined color="warning" />
+        </Tooltip>
       );
     }
 
@@ -688,46 +673,33 @@ export const ExampleCompareSectionDetail: React.FC<{
       sx={{
         justifyContent: 'space-between',
         alignItems: 'center',
-        bgcolor: MOON_100,
+        bgcolor: MOON_50,
         padding: '16px',
-        borderLeft: '1px solid #e0e0e0',
         height: HEADER_HIEGHT_PX,
-        gridGap: '8px',
       }}>
       <HorizontalBox
         sx={{
           alignItems: 'center',
           flex: 1,
-          gridGap: '8px',
         }}>
-        <Tooltip
-          content="Previous Example"
-          trigger={
-            <IconButton
-              // disabled={targetIndex === 0}
-              onClick={() => {
-                setSelectedInputDigest(
-                  filteredRows[targetIndex - 1].inputDigest
-                );
-              }}>
-              <Icon name="chevron-up" />
-            </IconButton>
-          }
-        />
-        <Tooltip
-          content="Next Example"
-          trigger={
-            <IconButton
-              // disabled={targetIndex === filteredRows.length - 1}
-              onClick={() => {
-                setSelectedInputDigest(
-                  filteredRows[targetIndex + 1].inputDigest
-                );
-              }}>
-              <Icon name="chevron-down" />
-            </IconButton>
-          }
-        />
+        <Tooltip title="Previous Example">
+          <IconButton
+            // disabled={targetIndex === 0}
+            onClick={() => {
+              setSelectedInputDigest(filteredRows[targetIndex - 1].inputDigest);
+            }}>
+            <Icon name="chevron-up" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Next Example">
+          <IconButton
+            // disabled={targetIndex === filteredRows.length - 1}
+            onClick={() => {
+              setSelectedInputDigest(filteredRows[targetIndex + 1].inputDigest);
+            }}>
+            <Icon name="chevron-down" />
+          </IconButton>
+        </Tooltip>
         <Box
           style={{
             flex: 0,
@@ -737,56 +709,28 @@ export const ExampleCompareSectionDetail: React.FC<{
         <Box
           style={{
             flex: 1,
-            fontSize: '16px',
-            fontWeight: '600',
           }}>
           {`Example ${targetIndex + 1} of ${filteredRows.length}`}
         </Box>
       </HorizontalBox>
 
-      <HorizontalBox
-        sx={{
-          gridGap: '8px',
-        }}>
-        <Tooltip
-          content={
-            props.isExpanded
-              ? props.isPeekDrawerOpen
-                ? 'Cannot collapse while peek drawer is open'
-                : 'Collapse'
-              : 'Full Screen'
-          }
-          trigger={
-            <IconButton
-              style={{
-                ...(props.isExpanded && props.isPeekDrawerOpen
-                  ? {opacity: 0.5, cursor: 'not-allowed'}
-                  : {}),
-              }}
-              onClick={() => {
-                if (!(props.isExpanded && props.isPeekDrawerOpen)) {
-                  props.onExpandToggle();
-                }
-              }}>
-              <Icon
-                name={
-                  props.isExpanded ? 'minimize-mode' : 'full-screen-mode-expand'
-                }
-              />
-            </IconButton>
-          }
-        />
-        <Tooltip
-          content="Close"
-          trigger={
-            <IconButton
-              onClick={() => {
-                props.onClose();
-              }}>
-              <Icon name={'close'} />
-            </IconButton>
-          }
-        />
+      <HorizontalBox>
+        <Tooltip title={props.isExpanded ? 'Collapse' : 'Expand'}>
+          <IconButton
+            onClick={() => {
+              props.onExpandToggle();
+            }}>
+            <Icon name={props.isExpanded ? 'expand-right' : 'contract-left'} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Close">
+          <IconButton
+            onClick={() => {
+              props.onClose();
+            }}>
+            <Icon name={'close'} />
+          </IconButton>
+        </Tooltip>
       </HorizontalBox>
     </HorizontalBox>
   );
@@ -1009,7 +953,7 @@ export const ExampleCompareSectionDetail: React.FC<{
                       <GridCell
                         key={metricIndex}
                         style={{
-                          backgroundColor: MOON_100,
+                          backgroundColor: MOON_50,
                         }}>
                         {scorerMetricKeyComp(scorerIndex, metricIndex)}
                       </GridCell>

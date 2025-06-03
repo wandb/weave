@@ -18,14 +18,9 @@ export type CompareEvaluationContext = {
   addEvaluationCall: (newCallId: string) => void;
   removeEvaluationCall: (callId: string) => void;
   setEvaluationCallOrder: (newCallIdOrder: string[]) => void;
-  hiddenEvaluationIds: Set<string>;
-  toggleHideEvaluation: (callId: string) => void;
 
   getCachedRowData: (digest: string) => any;
   setCachedRowData: (digest: string, data: any) => void;
-
-  // Flag to indicate if we should filter to latest evaluations per model (leaderboard mode)
-  filterToLatestEvaluationsPerModel?: boolean;
 };
 
 const CompareEvaluationsContext =
@@ -53,8 +48,6 @@ export const CompareEvaluationsProvider: React.FC<{
   setSelectedInputDigest: React.Dispatch<React.SetStateAction<string | null>>;
   comparisonDimensions?: ComparisonDimensionsType;
   selectedInputDigest?: string;
-  filterToLatestEvaluationsPerModel?: boolean;
-  colorByModel?: boolean;
 }> = ({
   entity,
   project,
@@ -66,18 +59,12 @@ export const CompareEvaluationsProvider: React.FC<{
   setSelectedInputDigest,
   comparisonDimensions,
   selectedInputDigest,
-  filterToLatestEvaluationsPerModel = false,
-  colorByModel = false,
   children,
 }) => {
   const initialEvaluationCallIdsMemo = useDeepMemo(initialEvaluationCallIds);
   const [evaluationCallIds, setEvaluationCallIds] = useState(
     initialEvaluationCallIdsMemo
   );
-  const [hiddenEvaluationIds, setHiddenEvaluationIds] = useState<Set<string>>(
-    new Set()
-  );
-
   useEffect(() => {
     setEvaluationCallIds(initialEvaluationCallIdsMemo);
   }, [initialEvaluationCallIdsMemo]);
@@ -88,8 +75,7 @@ export const CompareEvaluationsProvider: React.FC<{
     evaluationCallIds,
     comparisonDimensions,
     selectedInputDigest,
-    selectedMetrics ?? undefined,
-    colorByModel
+    selectedMetrics ?? undefined
   );
 
   // Here we use a ref instead of a state to avoid re-rendering the component when the cache is updated
@@ -109,17 +95,6 @@ export const CompareEvaluationsProvider: React.FC<{
           digest
         ]?.rawDataRow
       );
-    };
-    const toggleHideEvaluation = (callId: string) => {
-      setHiddenEvaluationIds(prev => {
-        const next = new Set(prev);
-        if (next.has(callId)) {
-          next.delete(callId);
-        } else {
-          next.add(callId);
-        }
-        return next;
-      });
     };
     return {
       state: initialState.result,
@@ -142,11 +117,8 @@ export const CompareEvaluationsProvider: React.FC<{
         setEvaluationCallIds(newCallIdOrder);
         onEvaluationCallIdsUpdate(newCallIdOrder);
       },
-      hiddenEvaluationIds,
-      toggleHideEvaluation,
       getCachedRowData,
       setCachedRowData,
-      filterToLatestEvaluationsPerModel,
     };
   }, [
     initialState.loading,
@@ -155,9 +127,7 @@ export const CompareEvaluationsProvider: React.FC<{
     setSelectedInputDigest,
     setSelectedMetrics,
     evaluationCallIds,
-    hiddenEvaluationIds,
     onEvaluationCallIdsUpdate,
-    filterToLatestEvaluationsPerModel,
   ]);
 
   if (!value) {

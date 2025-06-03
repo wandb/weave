@@ -53,8 +53,7 @@ export const useEvaluationComparisonState = (
   evaluationCallIds: string[],
   comparisonDimensions?: ComparisonDimensionsType,
   selectedInputDigest?: string,
-  selectedMetrics?: Record<string, boolean>,
-  colorByModel?: boolean
+  selectedMetrics?: Record<string, boolean>
 ): Loadable<EvaluationComparisonState> => {
   const orderedCallIds = useMemo(() => {
     return getCallIdsOrderedForQuery(evaluationCallIds);
@@ -62,8 +61,7 @@ export const useEvaluationComparisonState = (
   const summaryData = useEvaluationComparisonSummary(
     entity,
     project,
-    orderedCallIds,
-    colorByModel
+    orderedCallIds
   );
   const resultsData = useEvaluationComparisonResults(
     entity,

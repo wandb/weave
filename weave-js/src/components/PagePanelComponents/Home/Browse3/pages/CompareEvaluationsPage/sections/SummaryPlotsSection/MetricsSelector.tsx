@@ -31,11 +31,9 @@ export const MetricsSelector: React.FC<{
     ? allMetrics.filter(col => col.toLowerCase().includes(search.toLowerCase()))
     : allMetrics;
 
-  // Count metrics that are explicitly hidden (set to false)
-  const hiddenMetrics = allMetrics.filter(
-    metric => selectedMetrics?.[metric] === false
-  );
-  const numHidden = hiddenMetrics.length;
+  const shownMetrics = Object.values(selectedMetrics ?? {}).filter(Boolean);
+
+  const numHidden = allMetrics.length - shownMetrics.length;
   const buttonSuffix = search ? `(${filteredCols.length})` : 'all';
 
   return (
@@ -43,12 +41,10 @@ export const MetricsSelector: React.FC<{
       <span ref={ref}>
         <Button
           variant="ghost"
-          icon="settings"
+          icon="column"
           tooltip="Manage metrics"
-          onClick={onClick}>
-          {numHidden > 0 &&
-            `${numHidden} more ${numHidden === 1 ? 'metric' : 'metrics'}`}
-        </Button>
+          onClick={onClick}
+        />
       </span>
       <Popover
         id={id}
@@ -95,7 +91,7 @@ export const MetricsSelector: React.FC<{
               {Array.from(allMetrics).map((metric: string) => {
                 const value = metric;
                 const idSwitch = `toggle-vis_${value}`;
-                const checked = selectedMetrics?.[metric] ?? true;
+                const checked = selectedMetrics?.[metric] ?? false;
                 const label = metric;
                 const disabled = false;
                 if (

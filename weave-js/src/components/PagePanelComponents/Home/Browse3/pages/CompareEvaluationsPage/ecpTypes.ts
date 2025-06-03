@@ -63,7 +63,7 @@ export type EvaluationComparisonResults = {
 /**
  * The EvaluationObj is the primary object that defines the evaluation itself.
  */
-export type EvaluationObj = {
+type EvaluationObj = {
   ref: string;
   datasetRef: string;
   scorerRefs: string[];
@@ -82,7 +82,6 @@ export type EvaluationCall = {
   color: string;
   summaryMetrics: MetricResultMap;
   traceId: string;
-  startedAt: string;
 };
 
 /**
