@@ -65,27 +65,15 @@ const AudioHandlerComponent = ({
     </>
   );
 
-  const body = (
-    <TailwindContents>
-      {showPreview && iconAndText}
-      {!showPreview && (
-        <div className="group flex items-center gap-4">
-          {iconAndText}
-          {!showPreview && (
-            <div className="opacity-0 group-hover:opacity-100">
-              <DownloadButton isDownloading={isDownloading} doSave={doSave} />
-            </div>
-          )}
-        </div>
-      )}
-    </TailwindContents>
-  );
+  if (showPreview) {
+    return <TailwindContents>{iconAndText}</TailwindContents>;
+  }
 
-  return (
+  const tooltipTrigger = (
     <ContentTooltipWrapper
-      showPreview={showPreview}
+      showPreview={false}
       tooltipHint="Click icon or filename to preview, button to download"
-      body={body}
+      body={iconAndText}
     >
       <ContentMetadataTooltip
         filename={filename}
@@ -93,6 +81,17 @@ const AudioHandlerComponent = ({
         size={size}
       />
     </ContentTooltipWrapper>
+  );
+
+  return (
+    <TailwindContents>
+      <div className="group flex items-center gap-4">
+        {tooltipTrigger}
+        <div className="opacity-0 group-hover:opacity-100">
+          <DownloadButton isDownloading={isDownloading} doSave={doSave} />
+        </div>
+      </div>
+    </TailwindContents>
   );
 };
 

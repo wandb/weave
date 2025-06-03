@@ -100,6 +100,15 @@ const VideoHandlerComponent = ({
     />
   );
 
+  if (showPreview) {
+    return (
+      <TailwindContents>
+        {iconAndText}
+        {preview}
+      </TailwindContents>
+    );
+  }
+
   const previewComponent = (result: Blob) => {
     return <VideoThumbnail src={result} onClick={onTextClick} />;
   };
@@ -116,24 +125,12 @@ const VideoHandlerComponent = ({
     />
   );
 
-  const body = (
-    <TailwindContents>
-      <div className="group flex items-center gap-4">
-        {iconAndText}
-        {preview}
-        <div className="opacity-0 group-hover:opacity-100">
-          <DownloadButton isDownloading={isDownloading} doSave={doSave} />
-        </div>
-      </div>
-    </TailwindContents>
-  );
-
-  return (
+  const tooltipTrigger = (
     <ContentTooltipWrapper
-      showPreview={showPreview}
+      showPreview={false}
       tooltipHint="Click icon or filename to preview, button to download"
       tooltipPreview={tooltipPreview}
-      body={body}
+      body={iconAndText}
     >
       <ContentMetadataTooltip
         filename={filename}
@@ -141,6 +138,17 @@ const VideoHandlerComponent = ({
         size={size}
       />
     </ContentTooltipWrapper>
+  );
+
+  return (
+    <TailwindContents>
+      <div className="group flex items-center gap-4">
+        {tooltipTrigger}
+        <div className="opacity-0 group-hover:opacity-100">
+          <DownloadButton isDownloading={isDownloading} doSave={doSave} />
+        </div>
+      </div>
+    </TailwindContents>
   );
 };
 
