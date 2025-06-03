@@ -4,7 +4,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
-import {getContentHandler} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/ContentHandler';
+import {ContentHandler} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/ContentHandler';
 import {getIconName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/Shared';
 import { AutoSizer } from 'react-virtualized';
 
@@ -72,23 +72,12 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
   const content = data.files['content'];
 
   return (
-    <AutoSizer style={{height: '100%', width: '100%'}}>
-      {({width, height}) => {
-        if (width === 0 || height === 0) {
-          return null;
-        }
-        return (
-          <ContentViewMetadataLoaded
-            entity={entity}
-            project={project}
-            metadata={metadataJson}
-            content={content}
-            containerWidth={width}
-            containerHeight={height}
-          />
-        );
-      }}
-    </AutoSizer>
+    <ContentViewMetadataLoaded
+      entity={entity}
+      project={project}
+      metadata={metadataJson}
+      content={content}
+    />
   );
 };
 
@@ -97,8 +86,6 @@ type ContentViewMetadataLoadedProps = {
   project: string;
   metadata: ContentMetadata;
   content: string;
-  containerWidth: number;
-  containerHeight: number;
 };
 
 const ContentViewMetadataLoaded = ({
@@ -106,8 +93,6 @@ const ContentViewMetadataLoaded = ({
   project,
   metadata,
   content,
-  containerWidth,
-  containerHeight
 }: ContentViewMetadataLoadedProps) => {
   const [contentResult, setContentResult] = useState<Blob | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -115,6 +100,16 @@ const ContentViewMetadataLoaded = ({
   const [videoPlaybackStates, setVideoPlaybackStates] = useState<
     Record<string, {currentTime: number; volume: number; muted: boolean}>
   >({});
+  const [width, setWidth] = useState(0);
+  const [height, setHeight] = useState(0);
+
+  const div = useCallback(node => {
+    if (node !== null) {
+      setHeight(node.getBoundingClientRect().height);
+      setWidth(node.getBoundingClientRect().width);
+    }
+  }, []);
+
   const {useFileContent} = useWFHooks();
   const {filename, size, mimetype} = metadata;
   const contentContent = useFileContent({
@@ -184,26 +179,28 @@ const ContentViewMetadataLoaded = ({
 
   const iconStart = <Icon name={getIconName(mimetype)} />;
 
-  const handlerProps = {
-    mimetype,
-    filename,
-    size,
-    containerHeight,
-    containerWidth,
-    iconStart,
-    showPreview,
-    isDownloading,
-    contentResult,
-    openPreview,
-    closePreview,
-    doSave,
-    setShowPreview,
-    setIsDownloading,
-    videoPlaybackState: videoPlaybackStates[content],
-    updateVideoPlaybackState: (
-      newState: Partial<{currentTime: number; volume: number; muted: boolean}>
-    ) => updateVideoPlaybackState(content, newState),
-  };
-
-  return getContentHandler(handlerProps);
+  return (
+    <div ref={div}>
+      <ContentHandler
+        mimetype={mimetype}
+        width={width}
+        height={height}
+        filename={filename}
+        size={size}
+        iconStart={iconStart}
+        showPreview={showPreview}
+        isDownloading={isDownloading}
+        contentResult={contentResult}
+        openPreview={openPreview}
+        closePreview={closePreview}
+        doSave={doSave}
+        setShowPreview={setShowPreview}
+        setIsDownloading={setIsDownloading}
+        videoPlaybackState={videoPlaybackStates[content]}
+        updateVideoPlaybackState = {
+          (newState: Partial<{currentTime: number; volume: number; muted: boolean}>) => updateVideoPlaybackState(content, newState)
+        }
+      />
+    </div>
+  )
 };

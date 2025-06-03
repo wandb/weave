@@ -2,8 +2,6 @@ import {Button} from '@wandb/weave/components/Button';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import React, {useEffect, useContext, useState, useRef} from 'react';
 import {IconPlay} from '@wandb/weave/components/Icon';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
-
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {VideoPopup, VideoThumbnail, VideoContent} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
@@ -147,7 +145,7 @@ const VideoHandlerComponent = ({
 };
 
 const VideoPreview = ({
-  containerHeight,
+  height,
   filename,
   mimetype,
   size,
@@ -158,7 +156,6 @@ const VideoPreview = ({
   updateVideoPlaybackState,
 }: HandlerProps) => {
   const [showVideoPopup, setShowVideoPopup] = useState(false);
-  const [isThumbnail, setIsThumbnail] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -168,10 +165,8 @@ const VideoPreview = ({
   }, [isDownloading, contentResult, setIsDownloading]);
 
   const handleClick = () => {
-    if (containerHeight < 50) {
+    if (height < 24) {
       setShowVideoPopup(true);
-    } else {
-      setIsThumbnail(false);
     }
   };
 
@@ -183,7 +178,8 @@ const VideoPreview = ({
     return <LoadingDots />;
   }
 
-  if (containerHeight < 50) {
+  console.log(height)
+  if (height < 24) {
     const thumbnailComponent = (
       <div
         style={{

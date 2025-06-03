@@ -1,5 +1,5 @@
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import React, {useEffect} from 'react';
+import React, {FC, useEffect} from 'react';
 
 import {PDFHandler} from './PDFHandler';
 import {AudioHandler} from './AudioHandler';
@@ -35,7 +35,7 @@ export const CreateToolTipPreview = ({
   );
 };
 
-export const getContentHandler = ({
+export const ContentHandler: FC<HandlerProps> = ({
   mimetype,
   ...handlerProps
 }: HandlerProps) => {

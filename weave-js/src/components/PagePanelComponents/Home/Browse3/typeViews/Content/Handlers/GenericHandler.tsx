@@ -31,10 +31,10 @@ export const GenericHandler = ({
   showPreview,
 }: HandlerProps) => {
   const iconAndText = (
-    <>
+    <div className="flex items-center gap-2">
       {iconStart}
       <span>{filename}</span>
-    </>
+    </div>
   );
 
   const body = (

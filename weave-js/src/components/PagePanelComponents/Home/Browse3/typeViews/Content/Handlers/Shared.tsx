@@ -29,8 +29,8 @@ export type HandlerProps = {
   iconStart: React.ReactNode;
   showPreview: boolean;
   isDownloading: boolean;
-  containerWidth: number,
-  containerHeight: number,
+  width: number,
+  height: number,
   contentResult: Blob | null;
   openPreview: () => void;
   closePreview: () => void;
