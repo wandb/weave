@@ -160,7 +160,7 @@ def test_processing_thread_exception_handling():
         # Stop and check logs
         processor.stop_accepting_new_work_and_flush_queue()
         assert (
-            "Unprocessable item detected: Item failed 2 times (max retries: 2). Dropping item permanently."
+            "Unprocessable item detected, dropping item permanently."
             in mock_logger.exception.call_args[0][0]
         )
 
@@ -299,9 +299,9 @@ def test_poison_pill_detection_and_immediate_drop():
         assert log_path.exists()
         with open(log_path) as f:
             log_content = f.read()
-            assert "Poison pill detected" in log_content
+            assert "Unprocessable item detected" in log_content
             # Should have two poison pills logged (poison_const and batch_killer_const)
-            assert log_content.count("Poison pill detected") == 2
+            assert log_content.count("Unprocessable item detected") == 2
 
         # Test 4: Queue full - items get written to disk instead of being enqueued
         processor.enqueue(

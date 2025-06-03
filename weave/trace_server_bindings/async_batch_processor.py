@@ -156,10 +156,8 @@ class AsyncBatchProcessor(Generic[T]):
             error: The exception that occurred
         """
         item_id = id(item)
-
-        # All failed items are treated as poison pills - log and drop immediately
         error_message = (
-            f"Unprocessable item detected: Item failed processing and will be dropped permanently. "
+            f"Unprocessable item detected, dropping item permanently. "
             f"Item ID: {item_id}, Error: {error}"
         )
         logger.exception(error_message)
