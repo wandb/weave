@@ -104,6 +104,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 summary TEXT,
                 wb_user_id TEXT,
                 wb_run_id TEXT,
+                wb_run_step INTEGER,
                 deleted_at TEXT,
                 display_name TEXT
             )
@@ -194,8 +195,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     inputs,
                     input_refs,
                     wb_user_id,
-                    wb_run_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    wb_run_id,
+                    wb_run_step
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
@@ -211,6 +213,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     ),
                     req.start.wb_user_id,
                     req.start.wb_run_id,
+                    req.start.wb_run_step,
                 ),
             )
             conn.commit()
