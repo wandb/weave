@@ -2812,6 +2812,18 @@ def _setup_completion_model_info(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
+    elif model_name.startswith("coreweave/"):
+        # See https://docs.litellm.ai/docs/providers/openai_compatible
+        # but ignore the bit about omitting the /v1 because it is actually necessary
+        req.inputs.model = "openai/" + model_name.split("/")[1]
+        provider = "custom"
+        base_url = "https://infr.cw4637-staging.coreweave.app/v1"
+        # The API key should have been passed in as an extra header.
+        if req.inputs.extra_headers:
+            api_key = req.inputs.extra_headers.pop("api_key", None)
+            extra_headers = req.inputs.extra_headers
+            req.inputs.extra_headers = None
+        return_type = "openai"
     else:
         # Custom provider path
         custom_provider_info = get_custom_provider_info(
