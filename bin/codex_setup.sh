@@ -5,120 +5,10 @@ set -e  # Exit on any error
 #==============================================================================
 # Weave Development Environment Setup Script
 # 
-# This script sets up a complete development environment for Weave on Ubuntu 24.04
-# It installs Docker, uv, development tools, and pre-configures test environments
+# This script sets up a complete development environment for Weave
+# It installs uv, development tools, and pre-configures test environments
 # Many operations run in parallel for optimal performance.
 #==============================================================================
-
-#------------------------------------------------------------------------------
-# Docker Installation Functions
-#------------------------------------------------------------------------------
-
-detect_environment() {
-    # Check if we're in a container or limited environment
-    if [ -f /.dockerenv ] || [ -n "${CONTAINER:-}" ] || [ -n "${CI:-}" ]; then
-        echo "container"
-    elif ! systemctl --version >/dev/null 2>&1; then
-        echo "no-systemd"
-    elif ! systemctl is-system-running >/dev/null 2>&1; then
-        echo "systemd-limited"
-    else
-        echo "full-system"
-    fi
-}
-
-install_docker_prerequisites() {
-    echo "Installing Docker prerequisites..."
-    sudo apt-get update
-    sudo apt-get install -y \
-        ca-certificates \
-        curl \
-        gnupg \
-        lsb-release
-}
-
-setup_docker_repository() {
-    echo "Setting up Docker repository..."
-    # Add Docker's official GPG key
-    sudo mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    
-    # Set up the repository
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-      $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-}
-
-install_docker_engine() {
-    echo "Installing Docker Engine..."
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-    
-    # Configure Docker for current user - handle cases where $USER might not be set
-    local current_user="${USER:-$(whoami)}"
-    if [ -n "$current_user" ] && [ "$current_user" != "root" ]; then
-        echo "Adding user '$current_user' to docker group..."
-        sudo usermod -aG docker "$current_user"
-    else
-        echo "⚠️  Could not determine current user for docker group membership"
-        echo "You may need to manually run: sudo usermod -aG docker <your-username>"
-    fi
-    
-    # Handle service management based on environment
-    local env_type=$(detect_environment)
-    echo "Detected environment: $env_type"
-    
-    case "$env_type" in
-        "full-system")
-            echo "Starting and enabling Docker service..."
-            sudo systemctl start docker
-            sudo systemctl enable docker
-            echo "✓ Docker service started and enabled"
-            ;;
-        "systemd-limited"|"no-systemd")
-            echo "⚠️  Limited systemd environment detected"
-            echo "Attempting to start Docker daemon manually..."
-            if sudo dockerd --version >/dev/null 2>&1; then
-                # Try to start dockerd in background if not already running
-                if ! pgrep -x "dockerd" > /dev/null; then
-                    echo "Starting Docker daemon in background..."
-                    sudo dockerd > /var/log/docker.log 2>&1 &
-                    sleep 3
-                    if pgrep -x "dockerd" > /dev/null; then
-                        echo "✓ Docker daemon started manually"
-                    else
-                        echo "⚠️  Docker daemon may need manual start: sudo dockerd"
-                    fi
-                else
-                    echo "✓ Docker daemon already running"
-                fi
-            fi
-            ;;
-        "container")
-            echo "⚠️  Container environment detected"
-            echo "Docker installed but service management skipped"
-            echo "Note: You may need to mount Docker socket or use Docker-in-Docker"
-            ;;
-    esac
-    
-    echo "✓ Docker installation completed"
-    
-    # Test Docker access
-    if command -v docker >/dev/null 2>&1; then
-        if docker --version >/dev/null 2>&1; then
-            echo "✓ Docker CLI is accessible"
-        else
-            echo "⚠️  Docker CLI installed but may need daemon restart"
-        fi
-    fi
-}
-
-install_docker() {
-    echo "Installing Docker (required for ClickHouse container)..."
-    install_docker_prerequisites
-    setup_docker_repository
-    install_docker_engine
-}
 
 #------------------------------------------------------------------------------
 # Development Tools Installation Functions
@@ -187,30 +77,48 @@ install_lint_environment() {
 }
 
 #------------------------------------------------------------------------------
-# Container Setup Functions
+# ClickHouse Installation Functions
 #------------------------------------------------------------------------------
 
-prefetch_containers() {
-    echo "Pre-fetching required containers..."
+install_clickhouse_prerequisites() {
+    echo "Installing ClickHouse prerequisites..."
+    sudo apt-get update
+    sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+    echo "✓ ClickHouse prerequisites installed"
+}
+
+setup_clickhouse_repository() {
+    echo "Setting up ClickHouse repository..."
+    # Download the ClickHouse GPG key and store it in the keyring
+    curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | sudo gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
     
-    # Check if Docker is accessible
-    if ! docker info >/dev/null 2>&1; then
-        echo "⚠️  Docker daemon not accessible, skipping container prefetch"
-        echo "You can manually pull containers later with: docker pull clickhouse/clickhouse-server"
-        return 0
-    fi
+    # Get the system architecture
+    local arch=$(dpkg --print-architecture)
     
-    echo "Pulling ClickHouse container..."
-    if docker pull clickhouse/clickhouse-server; then
-        echo "✓ ClickHouse container downloaded successfully"
-    else
-        echo "⚠️  Failed to pull ClickHouse container (this is non-critical)"
-        echo "You can pull it manually later with: docker pull clickhouse/clickhouse-server"
-    fi
+    # Add the ClickHouse repository to apt sources
+    echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=${arch}] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
+    
+    # Update apt package lists
+    sudo apt-get update
+    echo "✓ ClickHouse repository configured"
+}
+
+install_clickhouse_packages() {
+    echo "Installing ClickHouse server and client..."
+    sudo apt-get install -y clickhouse-server clickhouse-client
+    echo "✓ ClickHouse packages installed"
+}
+
+install_clickhouse() {
+    echo "Installing ClickHouse database..."
+    install_clickhouse_prerequisites
+    setup_clickhouse_repository
+    install_clickhouse_packages
+    echo "✓ ClickHouse installation completed"
 }
 
 #------------------------------------------------------------------------------
-# Parallel Execution Orchestration
+# Parallel Workflow Functions
 #------------------------------------------------------------------------------
 
 run_uv_workflow() {
@@ -222,7 +130,7 @@ run_uv_workflow() {
     # Install global tools (depends on uv)
     install_global_tools
     
-    # Now run uv-dependent parallel tasks
+    # Run uv-dependent parallel tasks
     echo "Starting uv-dependent parallel tasks..."
     
     install_test_environments &
@@ -242,16 +150,13 @@ run_uv_workflow() {
     echo "✓ uv workflow completed successfully"
 }
 
-run_docker_workflow() {
-    echo "Starting Docker-dependent workflow..."
+run_clickhouse_workflow() {
+    echo "Starting ClickHouse workflow..."
     
-    # Install Docker first (required for container operations)
-    install_docker
+    # Install ClickHouse (independent of uv workflow)
+    install_clickhouse
     
-    # Run Docker-dependent tasks
-    prefetch_containers
-    
-    echo "✓ Docker workflow completed successfully"
+    echo "✓ ClickHouse workflow completed successfully"
 }
 
 #------------------------------------------------------------------------------
@@ -263,53 +168,31 @@ main() {
     echo "=================================================="
     
     # Run completely independent workflows in parallel
-    echo "Starting independent parallel workflows..."
+    echo "Starting parallel workflows..."
     
     run_uv_workflow &
     local uv_workflow_pid=$!
     
-    run_docker_workflow &
-    local docker_workflow_pid=$!
+    run_clickhouse_workflow &
+    local clickhouse_workflow_pid=$!
     
     # Wait for both workflows to complete
     echo "Waiting for all workflows to complete..."
     wait $uv_workflow_pid
-    wait $docker_workflow_pid
+    wait $clickhouse_workflow_pid
     
     echo "=================================================="
     echo "🎉 All setup tasks completed successfully!"
     echo ""
-    
-    # Provide environment-specific guidance
-    local env_type=$(detect_environment)
-    echo "📋 Next steps for your $env_type environment:"
-    
-    case "$env_type" in
-        "full-system")
-            echo "  ✅ Your development environment is fully ready!"
-            echo "  • Log out and back in (or run 'newgrp docker') to use Docker without sudo"
-            echo "  • All services should start automatically"
-            ;;
-        "systemd-limited"|"no-systemd")
-            echo "  ⚠️  Limited systemd environment detected:"
-            echo "  • Docker may need manual daemon start: sudo dockerd"
-            echo "  • Check Docker status with: docker info"
-            echo "  • Log out and back in (or run 'newgrp docker') for Docker group access"
-            ;;
-        "container")
-            echo "  🐳 Container environment detected:"
-            echo "  • Docker-in-Docker or socket mounting may be needed for containers"
-            echo "  • Most development tools are ready to use"
-            echo "  • Consider using bind mounts for persistent data"
-            ;;
-    esac
-    
+    echo "📋 Your development environment is ready!"
     echo ""
     echo "  🛠️  Development tools installed:"
     echo "  • uv (Python package manager)"
     echo "  • nox (testing automation)"
     echo "  • pre-commit (code quality hooks)"
-    echo "  • Docker (containerization)"
+    echo "  • Test environments for all shards"
+    echo "  • Lint environment configured"
+    echo "  • ClickHouse database server"
     echo ""
     echo "Happy coding! 🚀"
 }

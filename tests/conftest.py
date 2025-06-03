@@ -84,6 +84,12 @@ def pytest_addoption(parser):
         default="sqlite",
         help="Specify the client object to use: sqlite or clickhouse",
     )
+    parser.addoption(
+        "--clickhouse-process",
+        action="store",
+        default="false",
+        help="Use a clickhouse process instead of a container",
+    )
 
 
 def pytest_collection_modifyitems(config, items):
