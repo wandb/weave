@@ -54,7 +54,7 @@ const DownloadButton = ({
 };
 
 const ImageHandlerComponent = ({
-  iconStart,
+  iconWithText,
   filename,
   mimetype,
   size,
@@ -76,14 +76,8 @@ const ImageHandlerComponent = ({
     setShowPreview(false);
   };
 
-  const iconAndText = (
-    <CustomLink
-      variant="secondary"
-      icon={iconStart}
-      onClick={onTextClick}
-      text={filename}
-    />
-  );
+  // Use iconWithText directly (it already handles clicks)
+  const clickableIconAndText = iconWithText;
 
   const preview = showPreview && contentResult && (
     <ImageViewport blob={contentResult} isOpen={true} onClose={onClose} />
@@ -92,7 +86,7 @@ const ImageHandlerComponent = ({
   if (showPreview) {
     return (
       <TailwindContents>
-        {iconAndText}
+        {iconWithText}
         {preview}
       </TailwindContents>
     );
@@ -119,7 +113,7 @@ const ImageHandlerComponent = ({
       showPreview={false}
       tooltipHint="Click icon or filename to preview, button to download"
       tooltipPreview={tooltipPreview}
-      body={iconAndText}
+      body={clickableIconAndText}
     >
       <ContentMetadataTooltip
         filename={filename}

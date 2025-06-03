@@ -26,7 +26,7 @@ export type HandlerProps = {
   mimetype: string;
   filename: string;
   size: number;
-  iconStart: React.ReactNode;
+  iconWithText: React.ReactNode;
   showPreview: boolean;
   isDownloading: boolean;
   width: number,
@@ -74,12 +74,12 @@ export const ContentTooltipWrapper = ({
     </TailwindContents>
   );
 
-  return (
-    <>
-      {showPreview && body}
-      {!showPreview && <Tooltip trigger={body} content={tooltip} />}
-    </>
-  );
+  // Always render the body, but only wrap with tooltip when showPreview is false
+  if (showPreview) {
+    return <>{body}</>;
+  }
+  
+  return <Tooltip trigger={body} content={tooltip} />;
 };
 
 type ContentMetadataTooltipProps = {

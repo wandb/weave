@@ -24,7 +24,7 @@ const DownloadButton = ({
 };
 
 export const PDFHandler = ({
-  iconStart,
+  iconWithText,
   filename,
   mimetype,
   size,
@@ -35,14 +35,8 @@ export const PDFHandler = ({
   closePreview,
   doSave,
 }: HandlerProps) => {
-  const iconAndText = (
-    <CustomLink
-      variant="secondary"
-      icon={iconStart}
-      onClick={openPreview}
-      text={filename}
-    />
-  );
+  // Use iconWithText directly (it already handles clicks)
+  const clickableIconAndText = iconWithText;
   const preview = showPreview && contentResult && (
     <PDFView
       open={true}
@@ -55,7 +49,7 @@ export const PDFHandler = ({
   if (showPreview) {
     return (
       <TailwindContents>
-        {iconAndText}
+        {iconWithText}
         {preview}
       </TailwindContents>
     );
@@ -65,7 +59,7 @@ export const PDFHandler = ({
     <ContentTooltipWrapper
       showPreview={false}
       tooltipHint="Click icon or filename to preview, button to download"
-      body={iconAndText}
+      body={clickableIconAndText}
     >
       <ContentMetadataTooltip
         filename={filename}

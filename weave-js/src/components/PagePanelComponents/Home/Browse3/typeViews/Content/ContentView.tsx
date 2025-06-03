@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState, memo, useMemo} from 'react';
 
 import {Icon} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
@@ -6,6 +6,7 @@ import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {ContentHandler} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/ContentHandler';
 import {getIconName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/Shared';
+import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
@@ -86,6 +87,37 @@ type ContentViewMetadataLoadedProps = {
   metadata: ContentMetadata;
   content: string;
 };
+
+// Memoized component that doesn't re-render on size changes
+const IconWithText = memo(({
+  iconName, 
+  filename, 
+  isClickable,
+  onClick
+}: {
+  iconName: string; 
+  filename: string; 
+  isClickable?: boolean;
+  onClick?: () => void;
+}) => {
+  if (isClickable && onClick) {
+    return (
+      <CustomLink
+        variant="secondary"
+        icon={<Icon name={iconName} />}
+        onClick={onClick}
+        text={filename}
+      />
+    );
+  }
+  
+  return (
+    <div className="flex items-center gap-2">
+      <Icon name={iconName} />
+      <span>{filename}</span>
+    </div>
+  );
+});
 
 const ContentViewMetadataLoaded = ({
   entity,
@@ -182,7 +214,22 @@ const ContentViewMetadataLoaded = ({
     [updateVideoPlaybackState, content]
   );
 
-  const iconStart = <Icon name={getIconName(mimetype)} />;
+  // Memoize the icon name so it doesn't recalculate on every render
+  const iconName = useMemo(() => getIconName(mimetype), [mimetype]);
+  
+  // Determine if this content type should have clickable styling
+  const isClickable = useMemo(() => {
+    return mimetype === 'application/pdf' || 
+           mimetype.startsWith('audio/') || 
+           mimetype.startsWith('video/') || 
+           mimetype.startsWith('image/');
+  }, [mimetype]);
+  
+  // Create the IconWithText component that won't re-render on size changes
+  const iconWithText = useMemo(
+    () => <IconWithText iconName={iconName} filename={filename} isClickable={isClickable} onClick={openPreview} />,
+    [iconName, filename, isClickable, openPreview]
+  );
 
   return (
     <div ref={div}>
@@ -192,7 +239,7 @@ const ContentViewMetadataLoaded = ({
         height={height}
         filename={filename}
         size={size}
-        iconStart={iconStart}
+        iconWithText={iconWithText}
         showPreview={showPreview}
         isDownloading={isDownloading}
         contentResult={contentResult}

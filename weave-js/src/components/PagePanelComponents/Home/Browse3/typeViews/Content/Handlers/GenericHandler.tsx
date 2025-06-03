@@ -22,7 +22,7 @@ const DownloadButton = ({
 };
 
 export const GenericHandler = ({
-  iconStart,
+  iconWithText,
   filename,
   mimetype,
   size,
@@ -30,22 +30,12 @@ export const GenericHandler = ({
   doSave,
   showPreview,
 }: HandlerProps) => {
-  const iconAndText = (
-    <div className="flex items-center gap-2">
-      {iconStart}
-      <span>{filename}</span>
-    </div>
-  );
-
-  if (showPreview) {
-    return <TailwindContents>{iconAndText}</TailwindContents>;
-  }
-
-  const tooltipTrigger = (
+  // Always render iconWithText wrapped in appropriate container
+  const content = (
     <ContentTooltipWrapper
-      showPreview={false}
+      showPreview={showPreview}
       tooltipHint="Click button to download"
-      body={iconAndText}
+      body={iconWithText}
     >
       <ContentMetadataTooltip
         filename={filename}
@@ -58,10 +48,12 @@ export const GenericHandler = ({
   return (
     <TailwindContents>
       <div className="group flex items-center gap-4">
-        {tooltipTrigger}
-        <div className="opacity-0 group-hover:opacity-100">
-          <DownloadButton isDownloading={isDownloading} doSave={doSave} />
-        </div>
+        {content}
+        {!showPreview && (
+          <div className="opacity-0 group-hover:opacity-100">
+            <DownloadButton isDownloading={isDownloading} doSave={doSave} />
+          </div>
+        )}
       </div>
     </TailwindContents>
   );

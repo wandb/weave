@@ -26,7 +26,7 @@ const DownloadButton = ({
 };
 
 const AudioHandlerComponent = ({
-  iconStart,
+  iconWithText,
   filename,
   mimetype,
   size,
@@ -44,16 +44,12 @@ const AudioHandlerComponent = ({
     }
   };
 
-  const iconAndText = (
+  // For non-preview mode, use iconWithText directly (it already handles clicks)
+  const clickableIconAndText = !showPreview ? iconWithText : null;
+
+  const content = (
     <>
-      {!showPreview && (
-        <CustomLink
-          variant="secondary"
-          icon={iconStart}
-          onClick={onTextClick}
-          text={filename}
-        />
-      )}
+      {!showPreview && clickableIconAndText}
       {showPreview && contentResult && (
         <MiniAudioViewer
           audioSrc={contentResult}
@@ -66,14 +62,14 @@ const AudioHandlerComponent = ({
   );
 
   if (showPreview) {
-    return <TailwindContents>{iconAndText}</TailwindContents>;
+    return <TailwindContents>{content}</TailwindContents>;
   }
 
   const tooltipTrigger = (
     <ContentTooltipWrapper
       showPreview={false}
       tooltipHint="Click icon or filename to preview, button to download"
-      body={iconAndText}
+      body={clickableIconAndText}
     >
       <ContentMetadataTooltip
         filename={filename}

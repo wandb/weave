@@ -53,7 +53,7 @@ const DownloadButton = ({
 };
 
 const VideoHandlerComponent = ({
-  iconStart,
+  iconWithText,
   filename,
   mimetype,
   size,
@@ -77,14 +77,8 @@ const VideoHandlerComponent = ({
     setShowPreview(false);
   };
 
-  const iconAndText = (
-    <CustomLink
-      variant="secondary"
-      icon={iconStart}
-      onClick={onTextClick}
-      text={filename}
-    />
-  );
+  // Use iconWithText directly (it already handles clicks)
+  const clickableIconAndText = iconWithText;
 
   const preview = showPreview && contentResult && (
     <VideoPopup
@@ -103,7 +97,7 @@ const VideoHandlerComponent = ({
   if (showPreview) {
     return (
       <TailwindContents>
-        {iconAndText}
+        {iconWithText}
         {preview}
       </TailwindContents>
     );
@@ -130,7 +124,7 @@ const VideoHandlerComponent = ({
       showPreview={false}
       tooltipHint="Click icon or filename to preview, button to download"
       tooltipPreview={tooltipPreview}
-      body={iconAndText}
+      body={clickableIconAndText}
     >
       <ContentMetadataTooltip
         filename={filename}
