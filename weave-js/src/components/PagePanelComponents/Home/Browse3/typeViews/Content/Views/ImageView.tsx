@@ -83,14 +83,27 @@ export const ImageThumbnail = ({
   const thumbnailHeight = height ?? 38 * 3; // Default height of the cell row
   const thumbnailWidth = width ?? 68 * 3; // 16:9-ish ratio
 
+  // For small previews, use fixed dimensions to prevent jumping
+  const isSmallPreview = typeof height === 'number' && height <= 38;
+  
   return (
     <Tailwind>
       <div
-        className="relative flex h-full w-full items-center justify-start"
-        style={{cursor: 'pointer'}}
+        className={`relative flex items-center justify-start ${isSmallPreview ? '' : 'h-full w-full'}`}
+        style={{
+          cursor: 'pointer',
+          ...(isSmallPreview && {
+            height: thumbnailHeight,
+            width: thumbnailWidth,
+            flexShrink: 0
+          })
+        }}
         onClick={onClick}>
         <div
-          style={{height: thumbnailHeight, width: thumbnailWidth}}
+          style={{
+            height: isSmallPreview ? '100%' : thumbnailHeight,
+            width: isSmallPreview ? '100%' : thumbnailWidth
+          }}
           className="relative">
           <img
             style={{

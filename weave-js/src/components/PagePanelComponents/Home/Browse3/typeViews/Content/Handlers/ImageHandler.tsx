@@ -1,6 +1,6 @@
 import {Button} from '@wandb/weave/components/Button';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import React, {useEffect, useContext, useState} from 'react';
+import React, {useEffect, useContext, useState, useMemo, useCallback} from 'react';
 
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
@@ -150,29 +150,29 @@ const ImagePreview = ({
     }
   }, [isDownloading, contentResult, setIsDownloading]);
 
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
     setShowImagePopup(true);
-  };
+  }, []);
 
-  const handleClosePopup = () => {
+  const handleClosePopup = useCallback(() => {
     setShowImagePopup(false);
-  };
+  }, []);
+
+  const memoizedSmallThumbnail = useMemo(() => (
+    <ImageThumbnail blob={contentResult} onClick={handleClick} height={38} width={68} />
+  ), [contentResult, handleClick]);
 
   if (!contentResult) {
     return <LoadingDots />;
   }
 
   if (height < 24) {
-    const thumbnailComponent = (
-      <ImageThumbnail blob={contentResult} onClick={handleClick} height={38} width={68} />
-    );
-
     return (
       <>
         <ContentTooltipWrapper
           showPreview={false}
           tooltipHint="Click to open image in popup"
-          body={thumbnailComponent}
+          body={memoizedSmallThumbnail}
         >
           <ContentMetadataTooltip
             filename={filename}
@@ -180,13 +180,11 @@ const ImagePreview = ({
             size={size}
           />
         </ContentTooltipWrapper>
-        {showImagePopup && (
-          <ImageViewport
-            blob={contentResult}
-            isOpen={true}
-            onClose={handleClosePopup}
-          />
-        )}
+        <ImageViewport
+          blob={contentResult}
+          isOpen={showImagePopup}
+          onClose={handleClosePopup}
+        />
       </>
     );
   }
