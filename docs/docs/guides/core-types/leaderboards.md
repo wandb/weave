@@ -111,44 +111,18 @@ Each column represents a specific combination of:
 
 You configure these using `LeaderboardColumn`.
 
-### Metric values
-
 Each cell shows the result of a specific model on a specific evaluation metric.
 
-#### UI features:
+###  Example interpretation
 
-* **Color-coded performance**: Green = better performance (e.g., higher accuracy or lower error).
-* **Sort arrows**: Click column headers to sort models by metric value.
-* **Hover/Click**: See the underlying evaluation run and raw outputs.
+...
 
-###  Minimize vs Maximize
-
-Metrics are ranked based on what you specify:
-
-* `should_minimize=True` → Lower is better (e.g., loss, error)
-* Default (`False`) → Higher is better (e.g., accuracy, BLEU, recall)
-
-This affects how rows are ranked and color-highlighted.
-
-###  Descriptions & Metadata
-
-* Add markdown-formatted descriptions to your leaderboard and column definitions for clarity.
-* Evaluation names and scorer versions are shown inline — helpful for version tracking.
-
-###  Example Interpretation
-
-Imagine this simplified leaderboard:
-
-| Model     | Accuracy (↑) | Latency (↓) |
-| --------- | ------------ | ----------- |
-| `model_a` | 92%         | 150ms     |
-| `model_b` | 88%        | 75ms       |
-
-* `model_a` performs better on accuracy but is slower.
-* `model_b` is faster but less accurate — a trade-off.
-* Color-coding and arrows quickly show what’s better and why.
-
----
+<!--
+TODO:
+Add description of an example Leaderboard 
+Add example copyable script 
+Add some screenshots from example script output
+-->
 
 ###  Best practices
 
@@ -164,6 +138,6 @@ Imagine this simplified leaderboard:
 
 ##  Learn more
 
-*  [Leaderboard Quickstart Notebook](https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart)
-*  [Evaluation API Reference](https://weave-docs.wandb.ai/guides/evaluation/)
-*  [Built-in Scorers](https://weave-docs.wandb.ai/guides/evaluation/builtin_scorers)
+-  [Leaderboard Quickstart Notebook](https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart)
+-  [Evaluation API Reference](https://weave-docs.wandb.ai/guides/evaluation/)
+-  [Built-in Scorers](https://weave-docs.wandb.ai/guides/evaluation/builtin_scorers)
