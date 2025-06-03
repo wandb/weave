@@ -1,7 +1,9 @@
-import * as Dialog from '@wandb/weave/components/Dialog/Dialog';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useMemo, useState} from 'react';
+import Lightbox from 'yet-another-react-lightbox';
+import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
+import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 
 type ImageViewProps = {
   blob: Blob;
@@ -125,7 +127,6 @@ export const ImageThumbnail = ({
 
 export const ImageViewport = ({blob, isOpen, onClose}: ImageViewportProps) => {
   const [imageDim, setImageDim] = useState({width: -1, height: -1});
-
   const url = useMemo(() => {
     return URL.createObjectURL(blob);
   }, [blob]);
@@ -141,32 +142,24 @@ export const ImageViewport = ({blob, isOpen, onClose}: ImageViewportProps) => {
   if (imageDim.width === -1 || imageDim.height === -1) {
     return <LoadingDots />;
   }
-
   return (
-    <Dialog.Root open={isOpen} onOpenChange={onClose}>
-      <Dialog.Portal>
-        <Dialog.Overlay />
-        <Dialog.Content className="p-0">
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <img
-              style={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain',
-              }}
-              src={url}
-              alt="Popup Preview"
-            />
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <>
+      <Lightbox
+        plugins={[Fullscreen, Zoom]}
+        open={isOpen}
+        close={onClose}
+        controller={{
+          closeOnBackdropClick: true,
+        }}
+        slides={[{src: url}]}
+        render={{
+          // Hide previous and next buttons because we only have one image.
+          buttonPrev: () => null,
+          buttonNext: () => null,
+        }}
+        carousel={{finite: true}}
+        zoom={{maxZoomPixelRatio: 5}}
+      />
+    </>
   );
 };
