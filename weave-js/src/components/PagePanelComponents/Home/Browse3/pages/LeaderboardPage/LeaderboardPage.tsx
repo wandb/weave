@@ -28,18 +28,18 @@ import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {
   CompareEvaluationsProvider,
   useCompareEvaluationsState,
-} from '../CompareEvaluationsPage/compareEvaluationsContext';
-import {STANDARD_PADDING} from '../CompareEvaluationsPage/ecpConstants';
-import {EvaluationComparisonState} from '../CompareEvaluationsPage/ecpState';
-import {VerticalBox} from '../CompareEvaluationsPage/Layout';
-import {ExampleCompareSectionDetailGuarded} from '../CompareEvaluationsPage/sections/ExampleCompareSection/ExampleCompareSectionDetail';
-import {ExampleCompareSectionTable} from '../CompareEvaluationsPage/sections/ExampleCompareSection/ExampleCompareSectionTable';
-import {ExampleFilterSection} from '../CompareEvaluationsPage/sections/ExampleFilterSection/ExampleFilterSection';
-import {ScorecardSection} from '../CompareEvaluationsPage/sections/ScorecardSection/ScorecardSection';
+} from './CompareComponents/compareEvaluationsContext';
+import {STANDARD_PADDING} from './CompareComponents/ecpConstants';
+import {EvaluationComparisonState} from './CompareComponents/ecpState';
+import {VerticalBox} from './CompareComponents/Layout';
+import {ExampleCompareSectionDetailGuarded} from './CompareComponents/sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {ExampleCompareSectionTable} from './CompareComponents/sections/ExampleCompareSection/ExampleCompareSectionTable';
+import {ExampleFilterSection} from './CompareComponents/sections/ExampleFilterSection/ExampleFilterSection';
+import {ScorecardSection} from './CompareComponents/sections/ScorecardSection/ScorecardSection';
 import {
   SummaryPlotsSection,
   usePlotDataFromMetrics,
-} from '../CompareEvaluationsPage/sections/SummaryPlotsSection/SummaryPlotsSection';
+} from './CompareComponents/sections/SummaryPlotsSection/SummaryPlotsSection';
 import {DeleteObjectButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
 import {
   useBaseObjectInstances,
