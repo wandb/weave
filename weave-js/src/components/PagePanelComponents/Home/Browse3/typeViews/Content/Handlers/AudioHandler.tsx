@@ -1,10 +1,12 @@
 import {Button} from '@wandb/weave/components/Button';
-import React from 'react';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import React, {useEffect, useContext} from 'react';
 
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {MiniAudioViewer} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
 import {HandlerProps, ContentTooltipWrapper, ContentMetadataTooltip} from './Shared';
+import { WeaveflowPeekContext } from '../../../context';
 
 const DownloadButton = ({
   isDownloading,
@@ -23,7 +25,7 @@ const DownloadButton = ({
   );
 };
 
-export const AudioHandler = ({
+const AudioHandlerComponent = ({
   iconStart,
   filename,
   mimetype,
@@ -55,7 +57,7 @@ export const AudioHandler = ({
       {showPreview && contentResult && (
         <MiniAudioViewer
           audioSrc={contentResult}
-          autoplay={true}
+          autoplay={false}
           height={24}
           downloadFile={doSave}
         />
@@ -92,4 +94,40 @@ export const AudioHandler = ({
       />
     </ContentTooltipWrapper>
   );
+};
+
+const AudioPreview = ({
+  filename,
+  mimetype,
+  size,
+  contentResult,
+  isDownloading,
+  setIsDownloading,
+}: HandlerProps) => {
+  useEffect(() => {
+    if (!isDownloading && !contentResult) {
+      setIsDownloading(true);
+    }
+  }, [isDownloading, contentResult, setIsDownloading]);
+
+  if (!contentResult) {
+    return <LoadingDots />;
+  }
+
+  // For peek mode, show the audio player directly without tooltip
+  return (
+    <MiniAudioViewer
+      audioSrc={contentResult}
+      height={24}
+      autoplay={false}
+    />
+  );
+};
+
+export const AudioHandler = (props: HandlerProps) => {
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  if (isPeeking) {
+    return <AudioPreview {...props} />;
+  }
+  return <AudioHandlerComponent {...props} />;
 };
