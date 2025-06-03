@@ -1,14 +1,14 @@
 import json
-from typing import Any, Type, Union
+from typing import Any, Union
 
 import jsonschema
 from pydantic import BaseModel, Field
 
-from weave.scorers.scorer_types import LLMScorer
+from weave.flow.scorer import Scorer
 from weave.trace.op import op
 
 
-class LLMAsAJudgeScorer(LLMScorer):
+class LLMAsAJudgeScorer(Scorer):
     """
     A scorer that uses a large language model (LLM) to evaluate the output of
     another system or LLM. This is often referred to as "LLM as a Judge".
@@ -43,32 +43,39 @@ class LLMAsAJudgeScorer(LLMScorer):
     system_prompt: str = Field(description="The system prompt for the scorer LLM.")
     scorer_prompt: str = Field(description="The scorer prompt for the scorer LLM.")
     model: str = Field(description="The scoring model to use to scorer outputs.")
-    response_format: Union[dict, Type[BaseModel]] = Field(
+    response_format: Union[dict, type[BaseModel]] = Field(
         description="The response format for the scorer LLM."
     )
 
-    def __init__(self, model: str, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, model_id=model, model=model, **kwargs)
-
     @op
     async def score(self, *, input: Any, output: Any, **kwargs: Any) -> dict[str, Any]:
-        # This is safe because the import was already checked in LLMScorer.model_post_init
-        from litellm import ModelResponse
+        if isinstance(self.model, str):
+            try:
+                from litellm import acompletion
+            except ImportError:
+                raise ImportError(
+                    "litellm is required to use the LLM-powered scorers, please install it with `pip install litellm`"
+                )
 
-        response: ModelResponse = await self._acompletion(
-            messages=[
-                {"role": "system", "content": self.system_prompt},
-                {
-                    "role": "user",
-                    "content": self.scorer_prompt.format(input=input, output=output),
-                },
-            ],
-            model=self.model,
-            response_format=self.response_format,
-            temperature=0,
-        )
+            response = await acompletion(
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {
+                        "role": "user",
+                        "content": self.scorer_prompt.format(
+                            input=input, output=output
+                        ),
+                    },
+                ],
+                model=self.model,
+                response_format=self.response_format,
+                temperature=0,
+            )
 
-        content = response.choices[0].message.content
+            content = response.choices[0].message.content
+        else:
+            # elif isinstance(self.model, PlaygroundLLM)
+            raise NotImplementedError()
 
         final_response: dict[str, Any]
 
