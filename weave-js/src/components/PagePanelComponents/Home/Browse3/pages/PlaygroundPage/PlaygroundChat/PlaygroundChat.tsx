@@ -107,7 +107,7 @@ export const PlaygroundChat = ({
 }: PlaygroundChatProps) => {
   const [chatText, setChatText] = useState('');
 
-  const {handleRetry, handleSend} = useChatCompletionFunctions(
+  const {handleRetryStream, handleStreamSend} = useChatCompletionFunctions(
     setPlaygroundStates,
     setPlaygroundStateField,
     playgroundStates,
@@ -198,7 +198,7 @@ export const PlaygroundChat = ({
           chatText={chatText}
           setChatText={setChatText}
           isLoading={isAnyLoading}
-          onSend={handleSend}
+          onSend={handleStreamSend}
           onAdd={handleAddMessage}
           settingsTab={settingsTab}
           hasConfiguredProviders={hasConfiguredProviders}
@@ -226,7 +226,7 @@ export const PlaygroundChat = ({
                     className={`absolute bottom-0 left-0 right-0 top-0 z-[100] flex items-center justify-center bg-[${hexToRGB(
                       WHITE,
                       0.7
-                    )}]`}>
+                    )}] pointer-events-none`}>
                     <WaveLoader size="small" />
                   </div>
                 )}
@@ -258,6 +258,7 @@ export const PlaygroundChat = ({
                       <PlaygroundContext.Provider
                         value={{
                           isPlayground: true,
+                          isStreaming: isAnyLoading,
                           deleteMessage: (messageIndex, responseIndexes) =>
                             deleteMessage(idx, messageIndex, responseIndexes),
                           editMessage: (messageIndex, newMessage) =>
@@ -268,13 +269,13 @@ export const PlaygroundChat = ({
                           editChoice: (choiceIndex, newChoice) =>
                             editChoice(idx, choiceIndex, newChoice),
                           retry: (messageIndex: number, choiceIndex?: number) =>
-                            handleRetry(idx, messageIndex, choiceIndex),
+                            handleRetryStream(idx, messageIndex, choiceIndex),
                           sendMessage: (
                             role: PlaygroundMessageRole,
                             content: string,
                             toolCallId?: string
                           ) => {
-                            handleSend(
+                            handleStreamSend(
                               role,
                               chatText,
                               idx,
@@ -313,7 +314,7 @@ export const PlaygroundChat = ({
         chatText={chatText}
         setChatText={setChatText}
         isLoading={isAnyLoading}
-        onSend={handleSend}
+        onSend={handleStreamSend}
         onAdd={handleAddMessage}
         settingsTab={settingsTab}
         hasConfiguredProviders={hasConfiguredProviders}
