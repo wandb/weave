@@ -77,6 +77,29 @@ my_leaderboard = leaderboard.Leaderboard(
 weave.publish(my_leaderboard)
 ```
 
+Calling `weave.publish` prints a link to the new leaderboard so you can open it
+in the browser. The underlying implementation uses `leaderboard_path` whenever
+the object being published is a `Leaderboard`.
+
+### Python API
+
+Leaderboards are defined in `weave.flow.leaderboard`.
+
+```python
+leaderboard.LeaderboardColumn(
+    evaluation_object_ref: str,
+    scorer_name: str,
+    summary_metric_path: str,
+    should_minimize: bool | None = None,
+)
+```
+
+Retrieve aggregate scores with:
+
+```python
+results = leaderboard.get_leaderboard_results(my_leaderboard, client)
+```
+
 
 ### View a Leaderboard in the UI
 
@@ -113,17 +136,37 @@ You configure these using `LeaderboardColumn`.
 
 Each cell shows the result of a specific model on a specific evaluation metric.
 
+
 ###  Example interpretation
 
-...
+The Quickstart notebook constructs a leaderboard with three metrics. One metric sets `should_minimize=True` so lower values rank higher. Here is a simplified definition:
 
-<!--
-TODO:
-Add description of an example Leaderboard 
-Add example copyable script 
-Add some screenshots from example script output
--->
+```python
+spec = leaderboard.Leaderboard(
+    name="Zip Code World Knowledge",
+    description="...",
+    columns=[
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluations[0]).uri(),
+            scorer_name="check_concrete_fields",
+            summary_metric_path="state_match.true_fraction",
+        ),
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluations[1]).uri(),
+            scorer_name="check_value_fields",
+            should_minimize=True,
+            summary_metric_path="avg_temp_f_err.mean",
+        ),
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluations[2]).uri(),
+            scorer_name="check_subjective_fields",
+            summary_metric_path="correct_known_for.true_fraction",
+        ),
+    ],
+)
+```
 
+In the UI each row corresponds to a model and cells are color coded based on the metric value. Selecting a cell opens the evaluation run that produced it.
 ###  Best practices
 
 | Practice                         | Why It Helps                                |
