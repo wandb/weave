@@ -106,9 +106,15 @@ setup_clickhouse_repository() {
 install_clickhouse_packages() {
     echo "Installing ClickHouse server and client..."
     
-    # Use the official ClickHouse installation script with stdin feeding
-    echo "Installing via official ClickHouse script..."
-    printf '\n\n\n\n\n' | DEBIAN_FRONTEND=noninteractive curl -sSL https://install.clickhouse.com/ | sh -s -- server client
+    # Use package manager with stdin feeding (works better in container environments)
+    echo "Installing via package manager with non-interactive setup..."
+    
+    # Pre-configure to avoid prompts
+    echo "clickhouse-server clickhouse-server/default-password password ''" | sudo debconf-set-selections
+    echo "clickhouse-server clickhouse-server/default-password-repeat password ''" | sudo debconf-set-selections
+    
+    # Install with stdin feeding and non-interactive environment
+    printf '\n\n\n\n\n' | DEBIAN_FRONTEND=noninteractive sudo apt-get install -y clickhouse-server clickhouse-client
     
     echo "✓ ClickHouse packages installed"
 }
