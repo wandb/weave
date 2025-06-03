@@ -54,7 +54,7 @@ class AsyncBatchProcessor(Generic[T]):
         self.queue: Queue[T] = Queue(maxsize=max_queue_size)
         self.lock = Lock()
         self.stop_accepting_work_event = Event()
-        self.failure_counts: dict[int, int] = defaultdict(int)
+        self._failure_counts: dict[int, int] = defaultdict(int)
 
         # Processing Thread
         self.processing_thread = start_thread(self._process_batches)
@@ -155,8 +155,8 @@ class AsyncBatchProcessor(Generic[T]):
     def _mark_item_completed(self, item: T) -> None:
         """Mark an item as successfully completed - clear failure count and mark task done."""
         item_id = id(item)
-        if item_id in self.failure_counts:
-            del self.failure_counts[item_id]
+        if item_id in self._failure_counts:
+            del self._failure_counts[item_id]
         self.queue.task_done()
 
     def _handle_item_failure(self, item: T, error: Exception) -> bool:
@@ -171,24 +171,24 @@ class AsyncBatchProcessor(Generic[T]):
             bool: True if item should be dropped (unprocessable), False if it should be retried
         """
         item_id = id(item)
-        self.failure_counts[item_id] += 1
+        self._failure_counts[item_id] += 1
 
-        if self.failure_counts[item_id] >= self.max_retries_per_item:
+        if self._failure_counts[item_id] >= self.max_retries_per_item:
             # Poison pill detected - log big error, write to disk, and drop the item
             error_message = (
-                f"Unprocessable item detected: Item failed {self.failure_counts[item_id]} times "
+                f"Unprocessable item detected: Item failed {self._failure_counts[item_id]} times "
                 f"(max retries: {self.max_retries_per_item}). Dropping item permanently. "
                 f"Item ID: {item_id}, Error: {error}"
             )
             logger.exception(error_message)
             sentry_sdk.capture_message(error_message, level="error")
-            del self.failure_counts[item_id]
+            del self._failure_counts[item_id]
             self._write_item_to_disk(item, error_message)
 
             return True  # Drop the item!
         else:
             logger.warning(
-                f"Item processing failed (attempt {self.failure_counts[item_id]}/{self.max_retries_per_item}). "
+                f"Item processing failed (attempt {self._failure_counts[item_id]}/{self.max_retries_per_item}). "
                 f"Item ID: {item_id}, Error: {error}"
             )
             if get_raise_on_captured_errors():
