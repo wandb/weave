@@ -91,9 +91,9 @@ def ensure_clickhouse_db_instance_running(
 @pytest.fixture(scope="session")
 def ensure_clickhouse_db():
     host, port = ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
-    print("ENV", os.environ)
     if os.environ.get("CI"):
-        return host, port
+        yield host, port
+        return
     cleanup = ensure_clickhouse_db_instance_running(
         host=host,
         port=port,

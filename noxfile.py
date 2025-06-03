@@ -137,7 +137,7 @@ def tests(session, shard):
     # seems to resolve ci issues
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
-    print("ENV", env)
+
     session.run(
         "pytest",
         "--durations=20",
