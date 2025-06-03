@@ -39,7 +39,6 @@ from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import (
     ENTITY_TOO_LARGE_PAYLOAD,
-    ClickHouseTraceServer,
 )
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
 from weave.trace_server.ids import generate_id
@@ -3860,8 +3859,7 @@ def test_call_stream_query_heavy_query_batch(client):
 def clickhouse_client(client):
     if client_is_sqlite(client):
         return None
-    assert isinstance(client.server, ClickHouseTraceServer)
-    return client.server.ch_client
+    return client.server._next_trace_server.ch_client
 
 
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):

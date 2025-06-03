@@ -54,8 +54,15 @@ install_docker_engine() {
     sudo apt-get update
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     
-    # Configure Docker for current user
-    sudo usermod -aG docker $USER
+    # Configure Docker for current user - handle cases where $USER might not be set
+    local current_user="${USER:-$(whoami)}"
+    if [ -n "$current_user" ] && [ "$current_user" != "root" ]; then
+        echo "Adding user '$current_user' to docker group..."
+        sudo usermod -aG docker "$current_user"
+    else
+        echo "⚠️  Could not determine current user for docker group membership"
+        echo "You may need to manually run: sudo usermod -aG docker <your-username>"
+    fi
     
     # Handle service management based on environment
     local env_type=$(detect_environment)
