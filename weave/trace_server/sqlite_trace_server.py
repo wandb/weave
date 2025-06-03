@@ -696,7 +696,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     WHERE c.deleted_at IS NULL
                 )
                 SELECT id FROM Descendants;
-            """.format(", ".join("?" * len(req.call_ids)))
+            """.format(
+                ", ".join("?" * len(req.call_ids))
+            )
 
             params = [req.project_id] + req.call_ids
             cursor.execute(recursive_query, params)
@@ -708,7 +710,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SET deleted_at = CURRENT_TIMESTAMP
                 WHERE deleted_at is NULL AND
                     id IN ({})
-            """.format(", ".join("?" * len(all_ids)))
+            """.format(
+                ", ".join("?" * len(all_ids))
+            )
             print("MUTATION", delete_query)
             cursor.execute(delete_query, all_ids)
             conn.commit()
@@ -955,7 +959,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             WHERE project_id = ? AND
                 object_id = ? AND
                 digest IN ({})
-        """.format(", ".join("?" * len(found_digests)))
+        """.format(
+            ", ".join("?" * len(found_digests))
+        )
         delete_parameters = [req.project_id, req.object_id] + list(found_digests)
 
         with self.lock:
