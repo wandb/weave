@@ -1,3 +1,4 @@
+import os
 import subprocess
 import typing
 
@@ -90,6 +91,8 @@ def ensure_clickhouse_db_instance_running(
 @pytest.fixture(scope="session")
 def ensure_clickhouse_db():
     host, port = ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
+    if os.environ.get("CI"):
+        return host, port
     cleanup = ensure_clickhouse_db_instance_running(
         host=host,
         port=port,
