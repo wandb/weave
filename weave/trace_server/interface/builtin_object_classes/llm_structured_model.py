@@ -137,7 +137,7 @@ class LLMStructuredCompletionModel(Model):
     @op
     def predict(
         self,
-        user_input: MessageListLike,
+        user_input: MessageListLike = [],
         config: Optional[LLMStructuredModelParamsLike] = None,
         **template_vars: Any,
     ) -> Union[Message, str, dict[str, Any]]:
@@ -288,3 +288,7 @@ def parse_params_to_litellm_params(
             final_params[key] = value
 
     return final_params
+
+
+# Alias for LLMStructuredCompletionModel
+ConfiguredModel = LLMStructuredCompletionModel
