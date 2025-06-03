@@ -159,7 +159,7 @@ const ImagePreview = ({
   }, []);
 
   const memoizedSmallThumbnail = useMemo(() => (
-    <ImageThumbnail blob={contentResult} onClick={handleClick} height={38} width={68} />
+    contentResult && <ImageThumbnail blob={contentResult} onClick={handleClick} height={38} width={68} />
   ), [contentResult, handleClick]);
 
   if (!contentResult) {
