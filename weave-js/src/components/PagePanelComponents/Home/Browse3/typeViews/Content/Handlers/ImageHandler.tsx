@@ -1,11 +1,12 @@
 import {Button} from '@wandb/weave/components/Button';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import React, {useEffect} from 'react';
+import React, {useEffect, useContext, useState} from 'react';
 
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {ImageThumbnail, ImageViewport} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
 import {HandlerProps, ContentTooltipWrapper, ContentMetadataTooltip} from './Shared';
+import { WeaveflowPeekContext } from '../../../context';
 
 
 type CreateToolTipPreviewProps = {
@@ -52,7 +53,7 @@ const DownloadButton = ({
   );
 };
 
-export const ImageHandler = ({
+const ImageHandlerComponent = ({
   iconStart,
   filename,
   mimetype,
@@ -130,4 +131,95 @@ export const ImageHandler = ({
       />
     </ContentTooltipWrapper>
   );
+};
+
+const ImagePreview = ({
+  height,
+  filename,
+  mimetype,
+  size,
+  contentResult,
+  isDownloading,
+  setIsDownloading,
+}: HandlerProps) => {
+  const [showImagePopup, setShowImagePopup] = useState(false);
+
+  useEffect(() => {
+    if (!isDownloading && !contentResult) {
+      setIsDownloading(true);
+    }
+  }, [isDownloading, contentResult, setIsDownloading]);
+
+  const handleClick = () => {
+    setShowImagePopup(true);
+  };
+
+  const handleClosePopup = () => {
+    setShowImagePopup(false);
+  };
+
+  if (!contentResult) {
+    return <LoadingDots />;
+  }
+
+  if (height < 24) {
+    const thumbnailComponent = (
+      <ImageThumbnail blob={contentResult} onClick={handleClick} height={38} width={68} />
+    );
+
+    return (
+      <>
+        <ContentTooltipWrapper
+          showPreview={false}
+          tooltipHint="Click to open image in popup"
+          body={thumbnailComponent}
+        >
+          <ContentMetadataTooltip
+            filename={filename}
+            mimetype={mimetype}
+            size={size}
+          />
+        </ContentTooltipWrapper>
+        {showImagePopup && (
+          <ImageViewport
+            blob={contentResult}
+            isOpen={true}
+            onClose={handleClosePopup}
+          />
+        )}
+      </>
+    );
+  }
+  const thumbnailComponent = <ImageThumbnail blob={contentResult} onClick={handleClick} width="100%" height="100%"/>
+  return (
+      <>
+        <ContentTooltipWrapper
+          showPreview={false}
+          tooltipHint="Click to open image in popup"
+          body={thumbnailComponent}
+
+        >
+          <ContentMetadataTooltip
+            filename={filename}
+            mimetype={mimetype}
+            size={size}
+          />
+        </ContentTooltipWrapper>
+        {showImagePopup && (
+          <ImageViewport
+            blob={contentResult}
+            isOpen={true}
+            onClose={handleClosePopup}
+          />
+        )}
+      </>
+  )
+};
+
+export const ImageHandler = (props: HandlerProps) => {
+  const {isPeeking} = useContext(WeaveflowPeekContext);
+  if (isPeeking) {
+    return <ImagePreview {...props} />;
+  }
+  return <ImageHandlerComponent {...props} />;
 };

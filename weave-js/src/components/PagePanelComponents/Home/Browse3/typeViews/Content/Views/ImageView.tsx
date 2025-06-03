@@ -18,8 +18,16 @@ type ImageViewportProps = {
 type ImageThumbnailProps = ImageViewProps & {
   blob: Blob;
   onClick: () => void;
-  thumbnailHeight?: number;
-  thumbnailWidth?: number;
+  height?: number | string;
+  width?: number | string;
+};
+
+
+type PeekingImageThumbailProps = ImageViewProps & {
+  blob: Blob;
+  onClick: () => void;
+  height: number | string;
+  width: number | string;
 };
 
 const loadImage = (setImageDim: any, imageUrl: string) => {
@@ -37,11 +45,30 @@ const loadImage = (setImageDim: any, imageUrl: string) => {
   };
 };
 
+export const PeekingImageThumbnail = ({
+  blob,
+  onClick,
+  height,
+  width,
+}: PeekingImageThumbailProps) => {
+  // In cell preview
+  if (height < 24) {
+    height = 38;
+    width = 68;
+  }
+  else {
+    height = "100%";
+    width = "100%";
+  }
+
+  return <ImageThumbnail blob={blob} onClick={onClick} height={height} width={width} />;
+};
+
 export const ImageThumbnail = ({
   blob,
   onClick,
-  thumbnailHeight,
-  thumbnailWidth,
+  height,
+  width,
 }: ImageThumbnailProps) => {
   const url = useMemo(() => {
     return URL.createObjectURL(blob);
@@ -53,8 +80,8 @@ export const ImageThumbnail = ({
     };
   }, [url]);
 
-  thumbnailHeight = thumbnailHeight ?? 38 * 3; // Default height of the cell row
-  thumbnailWidth = thumbnailWidth ?? 68 * 3; // 16:9-ish ratio
+  const thumbnailHeight = height ?? 38 * 3; // Default height of the cell row
+  const thumbnailWidth = width ?? 68 * 3; // 16:9-ish ratio
 
   return (
     <Tailwind>
@@ -82,6 +109,7 @@ export const ImageThumbnail = ({
     </Tailwind>
   );
 };
+
 export const ImageViewport = ({blob, isOpen, onClose}: ImageViewportProps) => {
   const [imageDim, setImageDim] = useState({width: -1, height: -1});
 
