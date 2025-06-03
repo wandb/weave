@@ -97,13 +97,11 @@ async def test_publish_get(client: WeaveClient, mock_acompletion):
     assert object_ref._digest is not None
 
     saved_scorer = client.get(object_ref)
-    # assert saved_scorer.name == "LLMAsAJudgeScorer"
     assert (
         saved_scorer.system_prompt
         == "You are a judge that scores the output of a model."
     )
     assert saved_scorer.model == "gpt-4o-mini"
-    # assert saved_scorer.response_format == ResponseFormat
 
     result = await saved_scorer.score(
         input="The input data.", output="The output of the model."
