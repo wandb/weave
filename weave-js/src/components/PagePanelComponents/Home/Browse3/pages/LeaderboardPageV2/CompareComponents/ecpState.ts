@@ -10,7 +10,7 @@ import {useMemo} from 'react';
 import {
   useEvaluationComparisonResults,
   useEvaluationComparisonSummary,
-} from '../../wfReactInterface/tsDataModelHooksEvaluationComparison';
+} from '../../wfReactInterface/tsDataModelHooksLeaderboardV2';
 import {Loadable} from '../../wfReactInterface/wfDataModelHooksInterface';
 import {
   EvaluationComparisonResults,

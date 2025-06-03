@@ -48,7 +48,7 @@ export const EvaluationSelector = ({
     []
   );
   const expandedRefCols = useMemo(() => new Set<string>(), []);
-  // Don't query for output here, re-queried in tsDataModelHooksEvaluationComparison.ts
+  // Don't query for output here, re-queried in tsDataModelHooksLeaderboardV2.ts
   const columns = useMemo(() => ['inputs', 'display_name'], []);
   const calls = useCallsForQuery(
     entity,
