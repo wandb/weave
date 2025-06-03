@@ -87,7 +87,7 @@ def tests(session, shard):
     session.chdir("tests")
 
     env = {
-        k: session.env.get(k)
+        k: session.env.get(k) or os.getenv(k)
         for k in [
             "WEAVE_SENTRY_ENV",
             "CI",
@@ -137,7 +137,7 @@ def tests(session, shard):
     # seems to resolve ci issues
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
-
+    print("ENV", env)
     session.run(
         "pytest",
         "--durations=20",
