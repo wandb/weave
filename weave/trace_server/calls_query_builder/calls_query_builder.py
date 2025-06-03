@@ -620,9 +620,22 @@ class CallsQuery(BaseModel):
             )
         )
 
+        # Check if feedback is needed for CTE generation
+        needs_feedback, feedback_conditions = collect_feedback_conditions(
+            self.query_conditions, self.order_fields, pb
+        )
+
         # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs:
+        if not should_optimize and not self.include_costs and not needs_feedback:
             return self._as_sql_base_format(pb, table_alias)
+
+        # If we need feedback but no other optimization, build a simple query with feedback CTE
+        if not should_optimize and not self.include_costs and needs_feedback:
+            raw_sql = f"""
+            WITH {build_feedback_cte(self.query_conditions, self.order_fields, pb, self.project_id)}
+            {self._as_sql_base_format(pb, table_alias)}
+            """
+            return safely_format_sql(raw_sql, logger)
 
         # If so, build the two queries
         filter_query = CallsQuery(project_id=self.project_id)
@@ -662,6 +675,11 @@ class CallsQuery(BaseModel):
         raw_sql = f"""
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
         """
+
+        # Add feedback CTE if needed
+        if needs_feedback:
+            raw_sql += f""",
+            {build_feedback_cte(self.query_conditions, self.order_fields, pb, self.project_id)}"""
 
         if self.include_costs:
             # TODO: We should unify the calls query order by fields to be orm sort by fields
@@ -782,14 +800,6 @@ class CallsQuery(BaseModel):
             id_mask_sql = f"AND (calls_merged.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
         # TODO: We should also pull out id-masks from the dynamic query
 
-        feedback_join_sql = ""
-        if needs_feedback:
-            feedback_join_sql = f"""
-            LEFT JOIN feedback ON (
-                feedback.project_id = {param_slot(project_param, "String")} AND
-                feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
-            """
-
         storage_size_sql = ""
         if self.include_storage_size:
             storage_size_sql = f"""
@@ -814,15 +824,20 @@ class CallsQuery(BaseModel):
             on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
 
+        # Build feedback filter for the main query if feedback is needed
+        feedback_filter_sql = ""
+        if needs_feedback:
+            feedback_filter_sql = f"AND (calls_merged.id IN feedback_matching_ids)"
+
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
-        {feedback_join_sql}
         {storage_size_sql}
         {total_storage_size_sql}
         WHERE calls_merged.project_id = {param_slot(project_param, "String")}
         {id_mask_sql}
         {id_subquery_sql}
+        {feedback_filter_sql}
         {sortable_datetime_sql}
         {trace_roots_only_sql}
         {op_name_sql}
@@ -1339,3 +1354,54 @@ def build_calls_query_stats_query(
     calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
     return (calls_query_sql, aggregated_columns.keys())
+
+
+def build_feedback_cte(
+    query_conditions: list[Condition],
+    order_fields: list[OrderField],
+    pb: ParamBuilder,
+    project_id: str,
+) -> str:
+    """Build the feedback CTE SQL for feedback matching conditions."""
+    project_param = pb.add_param(project_id)
+
+    feedback_filter_conditions = []
+    for query_condition in query_conditions:
+        if query_condition.is_feedback():
+            filter_conditions.append(query_condition.as_sql(pb, "feedback"))
+
+    feedback_filter_condition_sql = " AND ".join(feedback_filter_conditions)
+
+    # For now, we'll build a simplified CTE that includes all calls that have any matching feedback
+    # This is a conservative approach that ensures correctness while we move to CTE
+    feedback_cte = f"""
+    feedback_matching_ids AS (
+        SELECT DISTINCT replaceRegexpAll(feedback.weave_ref, '^weave-trace-internal:///[^/]+/call/', '') AS call_id
+        FROM feedback
+        WHERE feedback.project_id = {param_slot(project_param, 'String')}
+           AND {feedback_filter_condition_sql}
+    )"""
+
+    return feedback_cte
+
+
+def collect_feedback_conditions(
+    query_conditions: list[Condition],
+    order_fields: list[OrderField],
+    pb: ParamBuilder,
+) -> tuple[bool, list[str]]:
+    """Collect feedback filter conditions and return whether feedback is needed and the conditions."""
+    needs_feedback = False
+    feedback_conditions = []
+
+    # Check query conditions for feedback fields
+    for query_condition in query_conditions:
+        if query_condition.is_feedback():
+            needs_feedback = True
+
+    # Check order fields for feedback fields
+    for order_field in order_fields:
+        if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
+            needs_feedback = True
+
+    return needs_feedback, feedback_conditions
