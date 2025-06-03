@@ -14,6 +14,19 @@ set -e  # Exit on any error
 # Docker Installation Functions
 #------------------------------------------------------------------------------
 
+detect_environment() {
+    # Check if we're in a container or limited environment
+    if [ -f /.dockerenv ] || [ -n "${CONTAINER:-}" ] || [ -n "${CI:-}" ]; then
+        echo "container"
+    elif ! systemctl --version >/dev/null 2>&1; then
+        echo "no-systemd"
+    elif ! systemctl is-system-running >/dev/null 2>&1; then
+        echo "systemd-limited"
+    else
+        echo "full-system"
+    fi
+}
+
 install_docker_prerequisites() {
     echo "Installing Docker prerequisites..."
     sudo apt-get update
@@ -42,11 +55,55 @@ install_docker_engine() {
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     
     # Configure Docker for current user
-    # sudo usermod -aG docker $USER
-    sudo systemctl start docker
-    sudo systemctl enable docker
+    sudo usermod -aG docker $USER
     
-    echo "✓ Docker installed successfully"
+    # Handle service management based on environment
+    local env_type=$(detect_environment)
+    echo "Detected environment: $env_type"
+    
+    case "$env_type" in
+        "full-system")
+            echo "Starting and enabling Docker service..."
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            echo "✓ Docker service started and enabled"
+            ;;
+        "systemd-limited"|"no-systemd")
+            echo "⚠️  Limited systemd environment detected"
+            echo "Attempting to start Docker daemon manually..."
+            if sudo dockerd --version >/dev/null 2>&1; then
+                # Try to start dockerd in background if not already running
+                if ! pgrep -x "dockerd" > /dev/null; then
+                    echo "Starting Docker daemon in background..."
+                    sudo dockerd > /var/log/docker.log 2>&1 &
+                    sleep 3
+                    if pgrep -x "dockerd" > /dev/null; then
+                        echo "✓ Docker daemon started manually"
+                    else
+                        echo "⚠️  Docker daemon may need manual start: sudo dockerd"
+                    fi
+                else
+                    echo "✓ Docker daemon already running"
+                fi
+            fi
+            ;;
+        "container")
+            echo "⚠️  Container environment detected"
+            echo "Docker installed but service management skipped"
+            echo "Note: You may need to mount Docker socket or use Docker-in-Docker"
+            ;;
+    esac
+    
+    echo "✓ Docker installation completed"
+    
+    # Test Docker access
+    if command -v docker >/dev/null 2>&1; then
+        if docker --version >/dev/null 2>&1; then
+            echo "✓ Docker CLI is accessible"
+        else
+            echo "⚠️  Docker CLI installed but may need daemon restart"
+        fi
+    fi
 }
 
 install_docker() {
@@ -128,11 +185,21 @@ install_lint_environment() {
 
 prefetch_containers() {
     echo "Pre-fetching required containers..."
-    docker pull clickhouse/clickhouse-server &
-    local docker_pid=$!
     
-    echo "Waiting for container downloads..."
-    wait $docker_pid && echo "✓ ClickHouse container downloaded"
+    # Check if Docker is accessible
+    if ! docker info >/dev/null 2>&1; then
+        echo "⚠️  Docker daemon not accessible, skipping container prefetch"
+        echo "You can manually pull containers later with: docker pull clickhouse/clickhouse-server"
+        return 0
+    fi
+    
+    echo "Pulling ClickHouse container..."
+    if docker pull clickhouse/clickhouse-server; then
+        echo "✓ ClickHouse container downloaded successfully"
+    else
+        echo "⚠️  Failed to pull ClickHouse container (this is non-critical)"
+        echo "You can pull it manually later with: docker pull clickhouse/clickhouse-server"
+    fi
 }
 
 #------------------------------------------------------------------------------
@@ -204,6 +271,40 @@ main() {
     
     echo "=================================================="
     echo "🎉 All setup tasks completed successfully!"
+    echo ""
+    
+    # Provide environment-specific guidance
+    local env_type=$(detect_environment)
+    echo "📋 Next steps for your $env_type environment:"
+    
+    case "$env_type" in
+        "full-system")
+            echo "  ✅ Your development environment is fully ready!"
+            echo "  • Log out and back in (or run 'newgrp docker') to use Docker without sudo"
+            echo "  • All services should start automatically"
+            ;;
+        "systemd-limited"|"no-systemd")
+            echo "  ⚠️  Limited systemd environment detected:"
+            echo "  • Docker may need manual daemon start: sudo dockerd"
+            echo "  • Check Docker status with: docker info"
+            echo "  • Log out and back in (or run 'newgrp docker') for Docker group access"
+            ;;
+        "container")
+            echo "  🐳 Container environment detected:"
+            echo "  • Docker-in-Docker or socket mounting may be needed for containers"
+            echo "  • Most development tools are ready to use"
+            echo "  • Consider using bind mounts for persistent data"
+            ;;
+    esac
+    
+    echo ""
+    echo "  🛠️  Development tools installed:"
+    echo "  • uv (Python package manager)"
+    echo "  • nox (testing automation)"
+    echo "  • pre-commit (code quality hooks)"
+    echo "  • Docker (containerization)"
+    echo ""
+    echo "Happy coding! 🚀"
 }
 
 # Execute main function
