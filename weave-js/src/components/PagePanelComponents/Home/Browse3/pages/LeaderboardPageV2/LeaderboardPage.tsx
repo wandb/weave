@@ -17,8 +17,8 @@ import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDisp
 import {
   LeaderboardColumnOrderType,
   LeaderboardGrid,
-} from '../../views/Leaderboard/LeaderboardGrid';
-import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
+} from '../../views/Leaderboard/LeaderboardGridV2';
+import {getPythonLeaderboardData} from '../../views/Leaderboard/query/leaderboardQueryV2';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {ALL_VALUE} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {useShowDeleteButton} from '../common/DeleteModal';
@@ -524,11 +524,35 @@ export const LeaderboardPageContentInner: React.FC<
   useEffect(() => {
     props.setName(workingLeaderboardValCopy.name ?? '');
   }, [props, workingLeaderboardValCopy.name]);
-  const {loading, data, evalData} = useSavedLeaderboardData(
-    props.entity,
-    props.project,
-    workingLeaderboardValCopy.columns
-  );
+  const getTraceServerClient = useGetTraceServerClientContext();
+  const [leaderboardState, setLeaderboardState] = useState<{
+    loading: boolean;
+    data: any;
+    evalData: any;
+  }>({loading: true, data: {modelGroups: {}}, evalData: {}});
+  
+  useEffect(() => {
+    let mounted = true;
+    getPythonLeaderboardData(
+      getTraceServerClient(),
+      props.entity,
+      props.project,
+      workingLeaderboardValCopy.columns
+    ).then(result => {
+      if (mounted) {
+        setLeaderboardState({
+          loading: false,
+          data: result.finalData,
+          evalData: result.evalData,
+        });
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [props.entity, props.project, getTraceServerClient, workingLeaderboardValCopy.columns]);
+  
+  const {loading, data, evalData} = leaderboardState;
   const hasRunningEvaluations = useHasRunningEvaluations(
     props.entity,
     props.project,
