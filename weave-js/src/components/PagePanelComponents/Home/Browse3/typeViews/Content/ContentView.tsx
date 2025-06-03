@@ -6,7 +6,6 @@ import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {ContentHandler} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/ContentHandler';
 import {getIconName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/Shared';
-import { AutoSizer } from 'react-virtualized';
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
@@ -177,6 +176,12 @@ const ContentViewMetadataLoaded = ({
     []
   );
 
+  const updateCurrentVideoPlaybackState = useCallback(
+    (newState: Partial<{currentTime: number; volume: number; muted: boolean}>) =>
+      updateVideoPlaybackState(content, newState),
+    [updateVideoPlaybackState, content]
+  );
+
   const iconStart = <Icon name={getIconName(mimetype)} />;
 
   return (
@@ -197,9 +202,7 @@ const ContentViewMetadataLoaded = ({
         setShowPreview={setShowPreview}
         setIsDownloading={setIsDownloading}
         videoPlaybackState={videoPlaybackStates[content]}
-        updateVideoPlaybackState = {
-          (newState: Partial<{currentTime: number; volume: number; muted: boolean}>) => updateVideoPlaybackState(content, newState)
-        }
+        updateVideoPlaybackState={updateCurrentVideoPlaybackState}
       />
     </div>
   )

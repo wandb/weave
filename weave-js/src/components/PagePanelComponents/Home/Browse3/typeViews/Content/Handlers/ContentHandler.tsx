@@ -1,5 +1,5 @@
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import React, {FC, useEffect} from 'react';
+import React, {FC, useEffect, memo} from 'react';
 
 import {PDFHandler} from './PDFHandler';
 import {AudioHandler} from './AudioHandler';
@@ -26,7 +26,7 @@ export const CreateToolTipPreview = ({
     if (!isDownloading && !contentResult) {
       setIsDownloading(true);
     }
-  });
+  }, [isDownloading, contentResult, setIsDownloading]);
   return (
     <>
       {contentResult && previewComponent(contentResult)}
@@ -35,7 +35,7 @@ export const CreateToolTipPreview = ({
   );
 };
 
-export const ContentHandler: FC<HandlerProps> = ({
+export const ContentHandler: FC<HandlerProps> = memo(({
   mimetype,
   ...handlerProps
 }: HandlerProps) => {
@@ -50,4 +50,4 @@ export const ContentHandler: FC<HandlerProps> = ({
   } else {
     return <GenericHandler mimetype={mimetype} {...handlerProps} />;
   }
-};
+});
