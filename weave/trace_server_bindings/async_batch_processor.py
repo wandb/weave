@@ -128,8 +128,6 @@ class AsyncBatchProcessor(Generic[T]):
             if current_batch := self._get_next_batch():
                 try:
                     self.processor_fn(current_batch)
-                    for item in current_batch:
-                        self.queue.task_done()
                 except Exception as e:
                     if get_raise_on_captured_errors():
                         raise
@@ -139,6 +137,9 @@ class AsyncBatchProcessor(Generic[T]):
                     # Process each item individually to identify unprocessable items, this can be
                     # costly for large batches!
                     self._process_batch_individually(current_batch)
+                else:
+                    for item in current_batch:
+                        self.queue.task_done()
 
             if self.stop_accepting_work_event.is_set() and self.queue.empty():
                 break
@@ -169,12 +170,12 @@ class AsyncBatchProcessor(Generic[T]):
         for item in batch:
             try:
                 self.processor_fn([item])
-                self.queue.task_done()
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise
                 # Item failed - treat as poison pill and drop it
                 self._handle_item_failure(item, e)
+            finally:
                 self.queue.task_done()
 
     def _rotate_log_file_if_needed(self) -> None:
