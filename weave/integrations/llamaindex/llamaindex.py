@@ -1,8 +1,7 @@
-import atexit
-import json
-from typing import Any, Dict, List, Optional, Tuple, Union
 import inspect
+import json
 import types
+from typing import Any, Optional, Union
 
 from weave.integrations.patcher import Patcher
 from weave.trace.context import weave_client_context
@@ -13,7 +12,6 @@ _import_failed = False
 try:
     from llama_index.core.instrumentation.event_handlers.base import BaseEventHandler
     from llama_index.core.instrumentation.events.base import BaseEvent
-    from llama_index.core.instrumentation.events.span import SpanDropEvent
     from llama_index.core.instrumentation.span_handlers.base import BaseSpanHandler
 except ImportError:
     _import_failed = True
@@ -21,11 +19,11 @@ except Exception:
     _import_failed = True
 
 # Module-level shared state
-_weave_calls_map: Dict[Union[str, Tuple[Optional[str], str]], Call] = {}
+_weave_calls_map: dict[Union[str, tuple[Optional[str], str]], Call] = {}
 _weave_client_instance: Optional[WeaveClient] = None
 _global_root_call: Optional[Call] = None
-# dict of id_ to [call, is_first_progress_event, accumulated_text, event_payload]
-_accumulators: Dict[str, list[Call, bool, str, Any]] = {}
+# dict of id_ to [call, is_first_progress_event, accumulated_text, event_payload, result, error]
+_accumulators: dict[str, list[Any]] = {}
 
 
 def get_weave_client() -> WeaveClient:
@@ -40,8 +38,11 @@ def _convert_instance_to_dict(obj: Any) -> Any:
     if hasattr(obj, "model_dump"):  # Handle pydantic models
         return obj.model_dump(exclude_none=True)
     elif hasattr(obj, "__dict__"):  # Handle regular class instances
-        return {k: v for k, v in vars(obj).items() 
-                if not k.startswith('__') and not callable(v)}
+        return {
+            k: v
+            for k, v in vars(obj).items()
+            if not k.startswith("__") and not callable(v)
+        }
     return obj
 
 
@@ -54,35 +55,39 @@ def _get_class_name(obj: Any) -> str:
     return obj.__class__.__name__
 
 
-def _process_inputs(raw_inputs: Dict[str, Any]) -> Dict[str, Any]:
+def _process_inputs(raw_inputs: dict[str, Any]) -> dict[str, Any]:
     """Process inputs to ensure JSON serializability and handle special cases."""
-    processed = {}
-    
+    processed: dict[str, Any] = {}
+
     for k, v in raw_inputs.items():
         # Handle lists of instances
         if isinstance(v, (list, tuple)) and len(v) > 0:
             # Check if list contains class instances
             first_item = v[0]
-            if hasattr(first_item, "__class__") and not isinstance(first_item, (str, int, float, bool, dict, list, tuple)):
+            if hasattr(first_item, "__class__") and not isinstance(
+                first_item, (str, int, float, bool, dict, list, tuple)
+            ):
                 # Convert list of instances to dict with class names as keys
                 processed[k] = {
                     f"{_get_class_name(item)}_{i}": _convert_instance_to_dict(item)
                     for i, item in enumerate(v)
                 }
                 continue
-        
+
         # Handle single instances
-        if hasattr(v, "__class__") and not isinstance(v, (str, int, float, bool, dict, list, tuple)):
+        if hasattr(v, "__class__") and not isinstance(
+            v, (str, int, float, bool, dict, list, tuple)
+        ):
             processed[k] = _convert_instance_to_dict(v)
             continue
-            
+
         # Ensure JSON serializability for other types
         try:
             json.dumps(v)
             processed[k] = v
         except (TypeError, OverflowError):
             processed[k] = str(v)
-    
+
     return processed
 
 
@@ -104,16 +109,19 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
         instance: Optional[Any],
         bound_args: Any,
         id_: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Maps arguments to their parameter names using Python's introspection."""
         inputs = {}
-        
+
         # First add any relevant instance variables if this is a method call
         if instance is not None:
             try:
                 instance_vars = {
-                    k: v for k, v in vars(instance).items() 
-                    if not k.startswith('__') and not callable(v) and not isinstance(v, (types.ModuleType, types.FunctionType))
+                    k: v
+                    for k, v in vars(instance).items()
+                    if not k.startswith("__")
+                    and not callable(v)
+                    and not isinstance(v, (types.ModuleType, types.FunctionType))
                 }
                 inputs.update(instance_vars)
             except (TypeError, AttributeError):
@@ -123,31 +131,31 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
         if bound_args is not None:
             # Get the function name from the span ID
             func_name = id_.split(".")[-1].split("-")[0] if "." in id_ else None
-            
+
             try:
                 # Get the raw args and kwargs
-                args = getattr(bound_args, 'args', ())
-                kwargs = getattr(bound_args, 'kwargs', {})
+                args = getattr(bound_args, "args", ())
+                kwargs = getattr(bound_args, "kwargs", {})
 
                 if func_name and instance is not None:
                     # Try to get the method from the instance
                     method = getattr(instance, func_name, None)
                     if method is not None:
                         # If it's a bound method, get its original function
-                        if hasattr(method, '__func__'):
+                        if hasattr(method, "__func__"):
                             method = method.__func__
-                        
+
                         # Get the signature
                         sig = inspect.signature(method)
-                        
+
                         # Instead of trying to bind, we'll match parameters manually
                         param_names = list(sig.parameters.keys())
-                        
+
                         # Map positional args to their parameter names
                         for i, arg in enumerate(args):
                             if i < len(param_names):
                                 inputs[param_names[i]] = arg
-                        
+
                         # Add any kwargs that match parameter names
                         for param_name in param_names:
                             if param_name in kwargs:
@@ -163,7 +171,7 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
         bound_args: Any,
         instance: Optional[Any] = None,
         parent_span_id: Optional[str] = None,
-        tags: Optional[Dict[str, Any]] = None,
+        tags: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
         """Creates a Weave call when a LlamaIndex span starts."""
@@ -172,13 +180,13 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
 
         # Map arguments to their parameter names
         raw_combined_inputs = self._map_args_to_params(instance, bound_args, id_)
-        
+
         # Process the inputs - just ensure JSON serializability
         inputs = _process_inputs(raw_combined_inputs)
 
         # Add any tags if present
         if tags:
-            inputs['_tags'] = tags
+            inputs["_tags"] = tags
 
         parent_call = None
         if parent_span_id and parent_span_id in _weave_calls_map:
@@ -187,10 +195,12 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
             parent_call = _global_root_call
 
         # we check if the span is streaming by checking if the op_name contains streaming indicators
-        self._is_streaming = (op_name.endswith("stream_complete") or 
-                             op_name.endswith("astream_complete") or
-                             op_name.endswith("stream_chat") or 
-                             op_name.endswith("astream_chat"))
+        self._is_streaming = (
+            op_name.endswith("stream_complete")
+            or op_name.endswith("astream_complete")
+            or op_name.endswith("stream_chat")
+            or op_name.endswith("astream_chat")
+        )
 
         try:
             call = gc.create_call(op_name, inputs, parent_call)
@@ -199,7 +209,9 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
             if self._is_streaming:
                 _accumulators[id_] = [call, False, {}, None, None]
         except Exception as e:
-            print(f"Weave(SpanHandler): Error creating call for {op_name} (ID: {id_}): {e}")
+            print(
+                f"Weave(SpanHandler): Error creating call for {op_name} (ID: {id_}): {e}"
+            )
 
     def _prepare_to_exit_or_drop(
         self,
@@ -276,14 +288,14 @@ class WeaveEventHandler(BaseEventHandler):
         """Get the base event name without Start/End suffix."""
         for suffix in ["StartEvent", "EndEvent", "Event"]:
             if event_class_name.endswith(suffix):
-                return event_class_name[:-len(suffix)]
+                return event_class_name[: -len(suffix)]
         return event_class_name
 
     def handle(self, event: BaseEvent) -> None:
         """Processes a LlamaIndex event, creating or finishing a Weave call."""
         gc = get_weave_client()
         event_class_name = event.class_name()
-        
+
         # Get base event name (e.g., "Embedding" from "EmbeddingStartEvent")
         base_event_name = self._get_base_event_name(event_class_name)
         op_name = f"llama_index.event.{base_event_name}"
@@ -293,7 +305,7 @@ class WeaveEventHandler(BaseEventHandler):
         is_progress_event = event_class_name.endswith("InProgressEvent")
 
         # Key for pairing start and end events.
-        event_pairing_key: Tuple[Optional[str], str] = (event.span_id, op_name)
+        event_pairing_key: tuple[Optional[str], str] = (event.span_id, op_name)
 
         try:
             raw_event_payload = event.model_dump(exclude_none=True)
@@ -307,18 +319,28 @@ class WeaveEventHandler(BaseEventHandler):
             # Create a new call for the start event
             call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
             _weave_calls_map[event_pairing_key] = call
-            
+
             # For streaming LLMCompletion and LLMChat events, pre-create the InProgress call
             # so that OpenAI autopatch inherits it as parent
-            if (base_event_name in ["LLMCompletion", "LLMChat"]) and event.span_id in _accumulators:
+            if (
+                base_event_name in ["LLMCompletion", "LLMChat"]
+            ) and event.span_id in _accumulators:
                 progress_op_name = f"llama_index.event.{base_event_name}InProgress"
                 progress_event_key = (event.span_id, progress_op_name)
                 # Create InProgress call as child of LLM start event
-                progress_call = gc.create_call(progress_op_name, raw_event_payload, call)
+                progress_call = gc.create_call(
+                    progress_op_name, raw_event_payload, call
+                )
                 _weave_calls_map[progress_event_key] = progress_call
                 # Update accumulator to point to the pre-created progress call
                 acc_entry = _accumulators[event.span_id]
-                _accumulators[event.span_id] = [progress_call, True, raw_event_payload, acc_entry[3], acc_entry[4]]
+                _accumulators[event.span_id] = [
+                    progress_call,
+                    True,
+                    raw_event_payload,
+                    acc_entry[3],
+                    acc_entry[4],
+                ]
         elif is_progress_event:
             # Get or create accumulator entry
             if event.span_id not in _accumulators:
@@ -327,14 +349,18 @@ class WeaveEventHandler(BaseEventHandler):
             acc_entry = _accumulators[event.span_id]
             acc_entry[2] = raw_event_payload
         elif is_end_event:
-            # Parent: span call or global root  
+            # Parent: span call or global root
             parent_call_for_event = _weave_calls_map.get(event.span_id)
             # Try to close the call for the progress event first
             deferred_result = None
             deferred_err = None
             if event.span_id in _accumulators:
                 acc_entry = _accumulators.pop(event.span_id)
-                progress_call, _, last_progress_payload = acc_entry[0], acc_entry[1], acc_entry[2]
+                progress_call, _, last_progress_payload = (
+                    acc_entry[0],
+                    acc_entry[1],
+                    acc_entry[2],
+                )
                 # Capture deferred values from the popped accumulator entry
                 if len(acc_entry) >= 5:
                     deferred_result = acc_entry[3]
@@ -350,16 +376,20 @@ class WeaveEventHandler(BaseEventHandler):
                 # No matching start event found, create a standalone call
                 call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
                 gc.finish_call(call, raw_event_payload)
-            
+
             # Only finish spans that were deferred due to streaming (indicated by deferred_result or deferred_err being set)
-            if event.span_id in _weave_calls_map and (deferred_result is not None or deferred_err is not None):
+            if event.span_id in _weave_calls_map and (
+                deferred_result is not None or deferred_err is not None
+            ):
                 span_call = _weave_calls_map.pop(event.span_id)
-                
+
                 outputs = None
                 if deferred_result is not None:
                     try:
                         if hasattr(deferred_result, "model_dump"):
-                            outputs = _process_inputs(deferred_result.model_dump(exclude_none=True))
+                            outputs = _process_inputs(
+                                deferred_result.model_dump(exclude_none=True)
+                            )
                         else:
                             outputs = _process_inputs({"result": deferred_result})
                     except Exception:
@@ -384,8 +414,8 @@ class LLamaIndexPatcher(Patcher):
     def __init__(self) -> None:
         super().__init__()
         self.dispatcher: Optional[Any] = None
-        self._original_event_handlers: Optional[List[BaseEventHandler]] = None
-        self._original_span_handlers: Optional[List[BaseSpanHandler[Any]]] = None
+        self._original_event_handlers: Optional[list[BaseEventHandler]] = None
+        self._original_span_handlers: Optional[list[BaseSpanHandler[Any]]] = None
         self.weave_event_handler: Optional[WeaveEventHandler] = None
         self.weave_span_handler: Optional[WeaveSpanHandler] = None
         self._atexit_registered: bool = False
@@ -394,6 +424,7 @@ class LLamaIndexPatcher(Patcher):
         """Tries to determine the name of the executing script."""
         try:
             import __main__
+
             if hasattr(__main__, "__file__") and __main__.__file__:
                 return __main__.__file__
         except (ImportError, AttributeError):
@@ -426,7 +457,11 @@ class LLamaIndexPatcher(Patcher):
 
     def undo_patch(self) -> bool:
         """Reverts LlamaIndex instrumentation to its original state."""
-        if not self.dispatcher or self._original_event_handlers is None or self._original_span_handlers is None:
+        if (
+            not self.dispatcher
+            or self._original_event_handlers is None
+            or self._original_span_handlers is None
+        ):
             return False
 
         try:
