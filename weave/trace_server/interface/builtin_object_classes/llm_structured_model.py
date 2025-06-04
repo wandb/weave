@@ -288,7 +288,3 @@ def parse_params_to_litellm_params(
             final_params[key] = value
 
     return final_params
-
-
-# Alias for LLMStructuredCompletionModel
-ConfiguredModel = LLMStructuredCompletionModel

@@ -129,7 +129,6 @@
           "title": "Description"
         },
         "field_schema": {
-          "additionalProperties": true,
           "default": {},
           "description": "Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, a tuple of a primitive type and a Pydantic Field, or primitive type",
           "examples": [
@@ -488,6 +487,9 @@
         "action_type": {
           "const": "contains_words",
           "default": "contains_words",
+          "enum": [
+            "contains_words"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1123,7 +1125,6 @@
           "anyOf": [
             {
               "items": {
-                "additionalProperties": true,
                 "type": "object"
               },
               "type": "array"
@@ -1277,6 +1278,9 @@
         "action_type": {
           "const": "llm_judge",
           "default": "llm_judge",
+          "enum": [
+            "llm_judge"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1293,7 +1297,6 @@
           "type": "string"
         },
         "response_schema": {
-          "additionalProperties": true,
           "title": "Response Schema",
           "type": "object"
         }
@@ -1320,7 +1323,6 @@
             },
             {
               "items": {
-                "additionalProperties": true,
                 "type": "object"
               },
               "type": "array"
@@ -1347,7 +1349,6 @@
         "function_call": {
           "anyOf": [
             {
-              "additionalProperties": true,
               "type": "object"
             },
             {
@@ -1446,7 +1447,7 @@
           "type": "string"
         },
         "_digest": {
-          "title": "Digest",
+          "title": " Digest",
           "type": "string"
         },
         "_extra": {
@@ -1454,7 +1455,7 @@
           "items": {
             "type": "string"
           },
-          "title": "Extra",
+          "title": " Extra",
           "type": "array"
         }
       },
@@ -1638,6 +1639,7 @@
       "type": "object"
     },
     "ProviderReturnType": {
+      "const": "openai",
       "enum": [
         "openai"
       ],

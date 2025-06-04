@@ -2403,7 +2403,6 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         project_id=ch_obj.project_id,
         object_id=ch_obj.object_id,
         created_at=_ensure_datetimes_have_tz(ch_obj.created_at),
-        deleted_at=_ensure_datetimes_have_tz(ch_obj.deleted_at),
         wb_user_id=ch_obj.wb_user_id,
         version_index=ch_obj.version_index,
         is_latest=ch_obj.is_latest,
