@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import datetime
 import json
@@ -493,7 +494,15 @@ class CallDict(TypedDict):
 
 @dataclasses.dataclass
 class Call:
-    """A Call represents a single operation that was executed as part of a trace."""
+    """A Call represents a single operation executed as part of a trace.
+
+    ``attributes`` are frozen once the call is created. Use
+    :func:`weave.attributes` or ``create_call(..., attributes=...)`` to
+    populate metadata beforehand. The ``summary`` dictionary may be
+    modified while the call is running; its contents are deep-merged
+    with computed summary values when :meth:`WeaveClient.finish_call`
+    is invoked.
+    """
 
     _op_name: str | Future[str]
     trace_id: str
@@ -503,7 +512,7 @@ class Call:
     id: str | None = None
     output: Any = None
     exception: str | None = None
-    summary: dict | None = None
+    summary: dict | None = dataclasses.field(default_factory=dict)
     _display_name: str | Callable[[Call], str] | None = None
     attributes: dict | None = None
     started_at: datetime.datetime | None = None
@@ -742,13 +751,15 @@ def make_client_call(
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=from_json(server_call.output, server_call.project_id, server),
         exception=server_call.exception,
-        summary=dict(server_call.summary) if server_call.summary is not None else None,
+        summary=dict(server_call.summary) if server_call.summary is not None else {},
         _display_name=server_call.display_name,
         attributes=server_call.attributes,
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
     )
+    if isinstance(call.attributes, AttributesDict):
+        call.attributes.freeze()
     ref = CallRef(entity, project, call_id)
     return WeaveObject(call, ref, server, None)
 
@@ -827,12 +838,18 @@ class WeaveKeyDict(dict):
 class AttributesDict(dict):
     """A dict representing the attributes of a call.
 
-    The `weave` key is reserved for internal use and cannot be set directly.
+    The ``weave`` key is reserved for internal use and cannot be set directly.
+    Attributes become immutable once the call is created. Any attempt to modify
+    the dictionary after call start will raise :class:`TypeError`. Use the
+    :func:`weave.attributes` context manager or the ``attributes`` parameter of
+    :meth:`WeaveClient.create_call` to supply metadata before the call begins.
     """
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__()
         dict.__setitem__(self, "weave", WeaveKeyDict())
+
+        self._frozen = False
 
         if kwargs:
             for key, value in kwargs.items():
@@ -843,10 +860,26 @@ class AttributesDict(dict):
                 else:
                     self[key] = value
 
+    def freeze(self) -> None:
+        self._frozen = True
+
     def __setitem__(self, key: Any, value: Any) -> None:
+        if self.__dict__.get("_frozen", False):
+            raise TypeError("Cannot modify attributes after call start")
         if key == "weave":
             raise KeyError("Cannot set 'weave' directly -- for internal use only!")
         super().__setitem__(key, value)
+
+    def __delitem__(self, key: Any) -> None:
+        if self.__dict__.get("_frozen", False):
+            raise TypeError("Cannot modify attributes after call start")
+        super().__delitem__(key)
+
+    def update(self, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
+        if self.__dict__.get("_frozen", False):
+            raise TypeError("Cannot modify attributes after call start")
+        for k, v in dict(*args, **kwargs).items():
+            self[k] = v
 
     def _set_weave_item(self, subkey: Any, value: Any) -> None:
         """Internal method to set items in the 'weave' subdictionary."""
@@ -1217,6 +1250,8 @@ class WeaveClient:
             inputs=inputs_with_refs,
             attributes=attributes_dict,
         )
+        # Disallow further modification of attributes after the call is created
+        attributes_dict.freeze()
         # feels like this should be in post init, but keping here
         # because the func needs to be resolved for schema insert below
         if callable(name_func := display_name):
@@ -1290,6 +1325,12 @@ class WeaveClient:
         *,
         op: Op | None = None,
     ) -> None:
+        """Finalize a call and persist its results.
+
+        Any values present in ``call.summary`` are deep-merged with computed
+        summary statistics (e.g. usage and status counts) before being written
+        to the database.
+        """
         if (
             is_tracing_setting_disabled()
             or (op is not None and should_skip_tracing_for_op(op))
@@ -1316,16 +1357,18 @@ class WeaveClient:
         call.output = postprocessed_output
 
         # Summary handling
-        summary = {}
+        computed_summary: dict = {}
         if call._children:
-            summary = sum_dict_leaves([child.summary or {} for child in call._children])
+            computed_summary = sum_dict_leaves(
+                [child.summary or {} for child in call._children]
+            )
         elif (
             isinstance(original_output, dict)
             and RESERVED_SUMMARY_USAGE_KEY in original_output
             and "model" in original_output
         ):
-            summary[RESERVED_SUMMARY_USAGE_KEY] = {}
-            summary[RESERVED_SUMMARY_USAGE_KEY][original_output["model"]] = {
+            computed_summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+            computed_summary[RESERVED_SUMMARY_USAGE_KEY][original_output["model"]] = {
                 "requests": 1,
                 **original_output[RESERVED_SUMMARY_USAGE_KEY],
             }
@@ -1339,11 +1382,14 @@ class WeaveClient:
             if isinstance(usage, pydantic.BaseModel):
                 usage = usage.model_dump(exclude_unset=True)
             if isinstance(usage, dict) and isinstance(model, str):
-                summary[RESERVED_SUMMARY_USAGE_KEY] = {}
-                summary[RESERVED_SUMMARY_USAGE_KEY][model] = {"requests": 1, **usage}
+                computed_summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+                computed_summary[RESERVED_SUMMARY_USAGE_KEY][model] = {
+                    "requests": 1,
+                    **usage,
+                }
 
         # Create client-side rollup of status_counts_by_op
-        status_counts_dict = summary.setdefault(
+        status_counts_dict = computed_summary.setdefault(
             RESERVED_SUMMARY_STATUS_COUNTS_KEY,
             {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0},
         )
@@ -1352,7 +1398,18 @@ class WeaveClient:
         else:
             status_counts_dict[TraceStatus.SUCCESS] += 1
 
-        call.summary = summary
+        # Merge any user-provided summary values with computed values
+        merged_summary = copy.deepcopy(call.summary or {})
+
+        def _deep_update(dst: dict, src: dict) -> None:
+            for k, v in src.items():
+                if isinstance(v, dict) and isinstance(dst.get(k), dict):
+                    _deep_update(dst[k], v)
+                else:
+                    dst[k] = v
+
+        _deep_update(merged_summary, computed_summary)
+        call.summary = merged_summary
 
         # Exception Handling
         exception_str: str | None = None
@@ -1384,7 +1441,7 @@ class WeaveClient:
                         id=call.id,
                         ended_at=ended_at,
                         output=output_json,
-                        summary=summary,
+                        summary=merged_summary,
                         exception=exception_str,
                     )
                 )
