@@ -31,7 +31,6 @@ export const PDFHandler = ({
   showPreview,
   contentResult,
   isDownloading,
-  openPreview,
   closePreview,
   doSave,
 }: HandlerProps) => {
@@ -45,7 +44,7 @@ export const PDFHandler = ({
       onDownload={doSave}
     />
   );
-  
+
   if (showPreview) {
     return (
       <TailwindContents>
