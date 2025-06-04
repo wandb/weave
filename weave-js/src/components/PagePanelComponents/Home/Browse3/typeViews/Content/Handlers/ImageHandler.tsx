@@ -6,7 +6,7 @@ import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {ImageThumbnail, ImageViewport} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
 import {HandlerProps, ContentTooltipWrapper, ContentMetadataTooltip} from './Shared';
-import { WeaveflowPeekContext } from '../../../context';
+import { WeaveflowPeekContext, WeaveMediaDisplayContext } from '../../../context';
 
 
 type CreateToolTipPreviewProps = {
@@ -168,7 +168,7 @@ const ImagePreview = ({
     return <LoadingDots />;
   }
 
-  if (height < 24) {
+  if (height < 21) {
     return (
       <>
         <ContentTooltipWrapper
@@ -218,7 +218,8 @@ const ImagePreview = ({
 
 export const ImageHandler = (props: HandlerProps) => {
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  if (isPeeking) {
+  const {showImageThumbnail} = useContext(WeaveMediaDisplayContext);
+  if (isPeeking || showImageThumbnail) {
     return <ImagePreview {...props} />;
   }
   return <ImageHandlerComponent {...props} />;

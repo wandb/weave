@@ -6,7 +6,7 @@ import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {VideoPopup, VideoThumbnail, VideoContent} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
 import {HandlerProps, ContentTooltipWrapper, ContentMetadataTooltip} from './Shared';
-import { WeaveflowPeekContext } from '../../../context';
+import { WeaveflowPeekContext, WeaveMediaDisplayContext } from '../../../context';
 
 type CreateToolTipPreviewProps = {
   contentResult: Blob | null;
@@ -236,7 +236,8 @@ const VideoPreview = ({
 
 export const VideoHandler = (props: HandlerProps) => {
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  if (isPeeking) {
+  const {showVideoThumbnail} = useContext(WeaveMediaDisplayContext);
+  if (isPeeking || showVideoThumbnail) {
     return <VideoPreview {...props} />;
   }
   return <VideoHandlerComponent {...props} />;

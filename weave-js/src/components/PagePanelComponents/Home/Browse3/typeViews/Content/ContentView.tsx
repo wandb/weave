@@ -90,14 +90,12 @@ type ContentViewMetadataLoadedProps = {
 
 // Memoized component that doesn't re-render on size changes
 const IconWithText = memo(({
-  iconName, 
-  filename, 
-  isClickable,
+  iconName,
+  filename,
   onClick
 }: {
-  iconName: IconName; 
-  filename: string; 
-  isClickable?: boolean;
+  iconName: IconName;
+  filename: string;
   onClick?: () => void;
 }) => {
   const icon = <Icon name={iconName} />;
