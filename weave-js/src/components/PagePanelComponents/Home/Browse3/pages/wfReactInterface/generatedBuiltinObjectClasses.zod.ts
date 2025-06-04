@@ -120,6 +120,17 @@ export type TestOnlyNestedBaseModel = z.infer<
   typeof TestOnlyNestedBaseModelSchema
 >;
 
+export const TestOnlyInheritedBaseObjectSchema = z.object({
+  additional_field: z.string().optional(),
+  b: z.number(),
+  c: z.number(),
+  description: z.union([z.null(), z.string()]).optional(),
+  name: z.union([z.null(), z.string()]).optional(),
+});
+export type TestOnlyInheritedBaseObject = z.infer<
+  typeof TestOnlyInheritedBaseObjectSchema
+>;
+
 export const TestOnlyNestedBaseObjectSchema = z.object({
   b: z.number(),
   description: z.union([z.null(), z.string()]).optional(),
@@ -226,6 +237,7 @@ export const builtinObjectClassRegistry = {
   ProviderModel: ProviderModelSchema,
   SavedView: SavedViewSchema,
   TestOnlyExample: TestOnlyExampleSchema,
+  TestOnlyInheritedBaseObject: TestOnlyInheritedBaseObjectSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
 };
 

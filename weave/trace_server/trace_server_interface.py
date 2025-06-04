@@ -211,7 +211,6 @@ class ObjSchemaForInsert(BaseModel):
     object_id: str
     val: Any
     builtin_object_class: Optional[str] = None
-    leaf_object_class: Optional[str] = None
     # Keeping `set_base_object_class` here until it is successfully removed from UI client
     set_base_object_class: Optional[str] = Field(
         exclude=True, default=None, deprecated=True

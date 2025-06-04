@@ -402,8 +402,3 @@ def test_completions_create_stream_custom_provider_with_tracking():
             assert call_args["extra_headers"] == {"X-Custom": "value"}
         finally:
             _secret_fetcher_context.reset(token)
-
-
-# Shared test constants
-TEST_PROJECT_ID = "dGVzdF9wcm9qZWN0"  # base64 encoded "test_project"
-FIXED_DATETIME = datetime(2024, 1, 1, 12, 0, 0)
