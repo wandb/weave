@@ -222,7 +222,6 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
             call_to_finish = _weave_calls_map.pop(id_)
             outputs = None
             exception_to_log = err
-
             if result is not None:
                 try:
                     if hasattr(result, "model_dump"):
@@ -348,9 +347,9 @@ class WeaveEventHandler(BaseEventHandler):
                 # No matching start event found, create a standalone call
                 call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
                 gc.finish_call(call, raw_event_payload)
-
-            # For streaming spans: finish the span call now that all events are processed
-            if event.span_id in _weave_calls_map:
+            
+            # Only finish spans that were deferred due to streaming (indicated by deferred_result or deferred_err being set)
+            if event.span_id in _weave_calls_map and (deferred_result is not None or deferred_err is not None):
                 span_call = _weave_calls_map.pop(event.span_id)
                 
                 outputs = None
@@ -364,6 +363,8 @@ class WeaveEventHandler(BaseEventHandler):
                         outputs = _process_inputs({"result": str(deferred_result)})
 
                 gc.finish_call(span_call, outputs, exception=deferred_err)
+            else:
+                pass
         else:
             # Parent: span call or global root
             parent_call_for_event = _weave_calls_map.get(event.span_id)
