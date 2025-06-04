@@ -31,6 +31,7 @@ import {
   useWeaveflowCurrentRouteContext,
   useWeaveflowRouteContext,
   WeaveflowPeekContext,
+  WeaveMediaDisplayProvider,
 } from './Browse3/context';
 import {FullPageButton} from './Browse3/FullPageButton';
 import {CallPage} from './Browse3/pages/CallPage/CallPage';
@@ -200,7 +201,9 @@ const Browse3Mounted: FC<{
                 flexDirection: 'column',
               }}>
               <ErrorBoundary>
-                <MainPeekingLayout />
+                <WeaveMediaDisplayProvider>
+                  <MainPeekingLayout />
+                </WeaveMediaDisplayProvider>
               </ErrorBoundary>
             </Box>
           </Route>
