@@ -3855,6 +3855,13 @@ def test_call_stream_query_heavy_query_batch(client):
         assert call.attributes["empty"] == ""
 
 
+@pytest.fixture
+def clickhouse_client(client):
+    if client_is_sqlite(client):
+        return None
+    return client.server._next_trace_server.ch_client
+
+
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with storage size information"""
     if client_is_sqlite(client):
