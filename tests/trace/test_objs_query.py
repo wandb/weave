@@ -770,3 +770,144 @@ def test_objs_query_filter_leaf_object_class_with_basic_objects(client: WeaveCli
     assert len(res.objs) == 6
     typed_object_ids = {obj.object_id for obj in res.objs}
     assert not any(obj_id.startswith("basic_dict_") for obj_id in typed_object_ids)
+
+
+def test_objs_query_filter_base_object_class_basic(client: WeaveClient):
+    """Test basic base_object_class filtering and verify base vs leaf class relationships."""
+    generate_typed_objects(client)
+
+    # Get all objects first to understand the hierarchy
+    all_res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
+
+    # Print object info for debugging
+    for obj in all_res.objs:
+        if not obj.object_id.startswith("basic_dict_"):
+            print(
+                f"Object {obj.object_id}: base={obj.base_object_class}, leaf={obj.leaf_object_class}"
+            )
+
+    # Test filtering by base class that should include inherited objects
+    # AdvancedLLMModel inherits from LLMStructuredCompletionModel, so filtering by
+    # base_object_class="LLMStructuredCompletionModel" should return:
+    # - 2 LLMStructuredCompletionModel objects (base=leaf="LLMStructuredCompletionModel")
+    # - 1 AdvancedLLMModel object (base="LLMStructuredCompletionModel", leaf="AdvancedLLMModel")
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(
+                base_object_classes=["LLMStructuredCompletionModel"]
+            ),
+        )
+    )
+
+    # Should get 3 objects total
+    assert len(res.objs) == 3
+
+    # All should have the same base_object_class
+    assert all(
+        obj.base_object_class == "LLMStructuredCompletionModel" for obj in res.objs
+    )
+
+    # But we should have two different leaf_object_classes
+    leaf_classes = {obj.leaf_object_class for obj in res.objs}
+    assert leaf_classes == {"LLMStructuredCompletionModel", "AdvancedLLMModel"}
+
+    # Count each type
+    llm_objs = [
+        obj
+        for obj in res.objs
+        if obj.leaf_object_class == "LLMStructuredCompletionModel"
+    ]
+    advanced_objs = [
+        obj for obj in res.objs if obj.leaf_object_class == "AdvancedLLMModel"
+    ]
+
+    assert len(llm_objs) == 2  # 2 base LLMStructuredCompletionModel objects
+    assert len(advanced_objs) == 1  # 1 AdvancedLLMModel object
+
+    # Verify the AdvancedLLMModel has additional fields from inheritance
+    advanced_obj = advanced_objs[0]
+    assert "max_tokens" in advanced_obj.val
+    assert "special_features" in advanced_obj.val
+    assert "llm_model_id" in advanced_obj.val  # Inherited from base class
+    assert "temperature" in advanced_obj.val  # Inherited from base class
+
+    # Test filtering by a base class where base == leaf
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(base_object_classes=["SimpleModel"]),
+        )
+    )
+
+    assert len(res.objs) == 2
+    assert all(obj.base_object_class == "SimpleModel" for obj in res.objs)
+    assert all(
+        obj.leaf_object_class == "SimpleModel" for obj in res.objs
+    )  # base == leaf
+
+
+def test_objs_query_filter_base_object_class_combined_with_leaf(client: WeaveClient):
+    """Test combining base_object_class and leaf_object_class filters."""
+    generate_typed_objects(client)
+
+    # Test filtering by both base and leaf class - should be intersection
+    # This should return only the base LLMStructuredCompletionModel objects,
+    # not the AdvancedLLMModel objects (which have different leaf class)
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(
+                base_object_classes=["LLMStructuredCompletionModel"],
+                leaf_object_classes=["LLMStructuredCompletionModel"],
+            ),
+        )
+    )
+
+    assert len(res.objs) == 2
+    assert all(
+        obj.base_object_class == "LLMStructuredCompletionModel" for obj in res.objs
+    )
+    assert all(
+        obj.leaf_object_class == "LLMStructuredCompletionModel" for obj in res.objs
+    )
+
+    # None should be AdvancedLLMModel
+    assert all("max_tokens" not in obj.val for obj in res.objs)
+    assert all("special_features" not in obj.val for obj in res.objs)
+
+    # Test filtering by base class but different leaf class
+    # This should return only the AdvancedLLMModel object
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(
+                base_object_classes=["LLMStructuredCompletionModel"],
+                leaf_object_classes=["AdvancedLLMModel"],
+            ),
+        )
+    )
+
+    assert len(res.objs) == 1
+    assert res.objs[0].base_object_class == "LLMStructuredCompletionModel"
+    assert res.objs[0].leaf_object_class == "AdvancedLLMModel"
+    assert "max_tokens" in res.objs[0].val
+    assert "special_features" in res.objs[0].val
+
+    # Test filtering by multiple base classes
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.ObjectVersionFilter(
+                base_object_classes=["SimpleModel", "Provider"],
+            ),
+        )
+    )
+
+    assert len(res.objs) == 3  # 2 SimpleModel + 1 Provider
+    base_classes = {obj.base_object_class for obj in res.objs}
+    assert base_classes == {"SimpleModel", "Provider"}
+
+    # For these objects, base should equal leaf (no inheritance)
+    for obj in res.objs:
+        assert obj.base_object_class == obj.leaf_object_class
