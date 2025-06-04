@@ -12,7 +12,7 @@ SELECT
     object_versions.digest,
     anySimpleState(object_versions.base_object_class) AS base_object_class,
     anySimpleState(object_versions.leaf_object_class) AS leaf_object_class,
-    anySimpleState(object_versions.wb_run_id) AS wb_run_id,
+    anySimpleState(object_versions.wb_user_id) AS wb_user_id,
     anySimpleState(length(object_versions.val_dump)) AS size_bytes,
     minSimpleState(object_versions.created_at) AS created_at,
     maxSimpleState(object_versions.created_at) AS updated_at
