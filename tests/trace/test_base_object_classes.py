@@ -63,6 +63,19 @@ def test_pythonic_creation(client: WeaveClient):
     assert isinstance(top_obj_gotten, base_objects.TestOnlyExample)
     assert top_obj_gotten.model_dump(by_alias=True) == top_obj.model_dump(by_alias=True)
 
+    # Test inherited object (leaf class) with pythonic creation
+    inherited_obj = base_objects.TestOnlyInheritedBaseObject(
+        b=10, c=20, additional_field="pythonic_test"
+    )
+    inherited_ref = weave.publish(inherited_obj)
+
+    inherited_obj_gotten = weave.ref(inherited_ref.uri()).get()
+
+    assert isinstance(inherited_obj_gotten, base_objects.TestOnlyInheritedBaseObject)
+    assert inherited_obj_gotten.model_dump(by_alias=True) == inherited_obj.model_dump(
+        by_alias=True
+    )
+
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
             {
@@ -113,9 +126,20 @@ def test_pythonic_creation(client: WeaveClient):
     )
     objs = objs_res.objs
 
-    assert len(objs) == 1
+    # Should get 2 objects: 1 base TestOnlyNestedBaseObject + 1 inherited TestOnlyInheritedBaseObject
+    assert len(objs) == 2
+
+    # Find the base and inherited objects
+    base_obj = next(
+        obj for obj in objs if obj.leaf_object_class == "TestOnlyNestedBaseObject"
+    )
+    inherited_obj_result = next(
+        obj for obj in objs if obj.leaf_object_class == "TestOnlyInheritedBaseObject"
+    )
+
+    # Verify base object
     assert (
-        objs[0].val
+        base_obj.val
         == with_base_object_class_annotations(
             nested_obj.model_dump(by_alias=True),
             "TestOnlyNestedBaseObject",
@@ -130,6 +154,27 @@ def test_pythonic_creation(client: WeaveClient):
             "_bases": ["BaseObject", "BaseModel"],
         }
     )
+
+    # Verify inherited object - demonstrates leaf class extraction from payload
+    assert inherited_obj_result.base_object_class == "TestOnlyNestedBaseObject"
+    assert inherited_obj_result.leaf_object_class == "TestOnlyInheritedBaseObject"
+
+    # For inherited objects, the _bases includes the full inheritance chain
+    expected_inherited_val = {
+        "_type": "TestOnlyInheritedBaseObject",
+        "name": None,
+        "description": None,
+        "b": 10,
+        "c": 20,
+        "additional_field": "pythonic_test",
+        "_class_name": "TestOnlyInheritedBaseObject",
+        "_bases": [
+            "TestOnlyNestedBaseObject",
+            "BaseObject",
+            "BaseModel",
+        ],  # Full inheritance chain
+    }
+    assert inherited_obj_result.val == expected_inherited_val
 
 
 def test_interface_creation(client):
