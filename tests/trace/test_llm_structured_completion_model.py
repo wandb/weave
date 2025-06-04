@@ -1,19 +1,19 @@
 import json
-import pytest
 from unittest.mock import Mock, patch
 
-import weave
+import pytest
+
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
     LLMStructuredCompletionModelDefaultParams,
     Message,
-    _substitute_template_variables,
     _prepare_llm_messages,
-    parse_params_to_litellm_params,
-    cast_to_message_list,
+    _substitute_template_variables,
     cast_to_message,
+    cast_to_message_list,
+    parse_params_to_litellm_params,
 )
 
 
@@ -21,7 +21,6 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
     client: WeaveClient,
 ):
     """Test creating LLMStructuredCompletionModel and verify base/leaf object classes are set properly."""
-
     # Test 1: Create with minimal parameters via builtin_object_class
     model_minimal = LLMStructuredCompletionModel(llm_model_id="gpt-4")
     minimal_res = client.server.obj_create(
@@ -112,7 +111,6 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
 
 def test_llm_structured_completion_model_filtering(client: WeaveClient):
     """Test querying LLMStructuredCompletionModel objects by leaf/base object classes."""
-
     # Create multiple models
     model1 = LLMStructuredCompletionModel(llm_model_id="gpt-4")
     model2 = LLMStructuredCompletionModel(llm_model_id="claude-3")
@@ -196,7 +194,6 @@ def test_llm_structured_completion_model_predict_text_response(
     mock_require_client, client: WeaveClient
 ):
     """Test the predict function with mocked LLM API response for text format."""
-
     # Setup mock client
     mock_client = Mock()
     mock_client.entity = "test_entity"
@@ -251,7 +248,6 @@ def test_llm_structured_completion_model_predict_json_response(
     mock_require_client, client: WeaveClient
 ):
     """Test the predict function with mocked LLM API response for JSON format."""
-
     # Setup mock client
     mock_client = Mock()
     mock_client.entity = "test_entity"
@@ -293,7 +289,6 @@ def test_llm_structured_completion_model_predict_with_template(
     mock_require_client, client: WeaveClient
 ):
     """Test the predict function with message templates and template variables."""
-
     # Setup mock client
     mock_client = Mock()
     mock_client.entity = "test_entity"
@@ -355,7 +350,6 @@ def test_llm_structured_completion_model_predict_with_config_override(
     mock_require_client, client: WeaveClient
 ):
     """Test the predict function with config parameter overriding defaults."""
-
     # Setup mock client
     mock_client = Mock()
     mock_client.entity = "test_entity"
@@ -410,7 +404,6 @@ def test_llm_structured_completion_model_predict_error_handling(
     mock_require_client, client: WeaveClient
 ):
     """Test the predict function error handling."""
-
     # Setup mock client
     mock_client = Mock()
     mock_client.entity = "test_entity"
@@ -452,7 +445,6 @@ def test_llm_structured_completion_model_predict_error_handling(
 
 def test_substitute_template_variables():
     """Test the _substitute_template_variables helper function."""
-
     # Test basic substitution
     messages = [
         Message(role="system", content="You are {assistant_name}"),
@@ -487,7 +479,6 @@ def test_substitute_template_variables():
 
 def test_prepare_llm_messages():
     """Test the _prepare_llm_messages helper function."""
-
     # Test with template and user input
     template_messages = [
         Message(role="system", content="You are a helpful assistant"),
@@ -522,7 +513,6 @@ def test_prepare_llm_messages():
 
 def test_parse_params_to_litellm_params():
     """Test the parse_params_to_litellm_params helper function."""
-
     # Test comprehensive parameter conversion
     params = LLMStructuredCompletionModelDefaultParams(
         temperature=0.7,
@@ -578,7 +568,6 @@ def test_parse_params_to_litellm_params():
 
 def test_cast_to_message_list():
     """Test the cast_to_message_list function."""
-
     # Test single Message object
     msg = Message(role="user", content="Hello")
     result = cast_to_message_list(msg)
@@ -620,7 +609,6 @@ def test_cast_to_message_list():
 
 def test_cast_to_message():
     """Test the cast_to_message function."""
-
     # Test Message object (passthrough)
     msg = Message(role="user", content="Hello")
     result = cast_to_message(msg)
@@ -644,7 +632,6 @@ def test_cast_to_message():
 
 def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
     """Test schema validation for LLMStructuredCompletionModel."""
-
     # Test missing required field
     with pytest.raises(Exception):  # ValidationError or similar
         client.server.obj_create(
