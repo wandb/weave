@@ -186,8 +186,11 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
         elif _global_root_call:  # Default to global root call
             parent_call = _global_root_call
 
-        # we check if the span is streaming by checking if the op_name ends with "stream_complete" or "astream_complete"
-        self._is_streaming = op_name.endswith("stream_complete") or op_name.endswith("astream_complete")
+        # we check if the span is streaming by checking if the op_name contains streaming indicators
+        self._is_streaming = (op_name.endswith("stream_complete") or 
+                             op_name.endswith("astream_complete") or
+                             op_name.endswith("stream_chat") or 
+                             op_name.endswith("astream_chat"))
 
         try:
             call = gc.create_call(op_name, inputs, parent_call)
@@ -305,12 +308,12 @@ class WeaveEventHandler(BaseEventHandler):
             call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
             _weave_calls_map[event_pairing_key] = call
             
-            # For streaming LLMCompletion events, pre-create the InProgress call
+            # For streaming LLMCompletion and LLMChat events, pre-create the InProgress call
             # so that OpenAI autopatch inherits it as parent
-            if base_event_name == "LLMCompletion" and event.span_id in _accumulators:
-                progress_op_name = "llama_index.event.LLMCompletionInProgress"
+            if (base_event_name in ["LLMCompletion", "LLMChat"]) and event.span_id in _accumulators:
+                progress_op_name = f"llama_index.event.{base_event_name}InProgress"
                 progress_event_key = (event.span_id, progress_op_name)
-                # Create InProgress call as child of LLMCompletion start event
+                # Create InProgress call as child of LLM start event
                 progress_call = gc.create_call(progress_op_name, raw_event_payload, call)
                 _weave_calls_map[progress_event_key] = progress_call
                 # Update accumulator to point to the pre-created progress call
