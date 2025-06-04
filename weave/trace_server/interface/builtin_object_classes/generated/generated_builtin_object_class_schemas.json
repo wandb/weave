@@ -1893,6 +1893,54 @@
       "title": "TestOnlyExample",
       "type": "object"
     },
+    "TestOnlyInheritedBaseObject": {
+      "description": "A builtin object that inherits from another builtin object for testing inheritance.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "b": {
+          "title": "B",
+          "type": "integer"
+        },
+        "c": {
+          "title": "C",
+          "type": "integer"
+        },
+        "additional_field": {
+          "default": "default_value",
+          "title": "Additional Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "b",
+        "c"
+      ],
+      "title": "TestOnlyInheritedBaseObject",
+      "type": "object"
+    },
     "TestOnlyNestedBaseModel": {
       "properties": {
         "a": {
@@ -1956,6 +2004,9 @@
     "TestOnlyNestedBaseObject": {
       "$ref": "#/$defs/TestOnlyNestedBaseObject"
     },
+    "TestOnlyInheritedBaseObject": {
+      "$ref": "#/$defs/TestOnlyInheritedBaseObject"
+    },
     "Leaderboard": {
       "$ref": "#/$defs/Leaderboard"
     },
@@ -1981,6 +2032,7 @@
   "required": [
     "TestOnlyExample",
     "TestOnlyNestedBaseObject",
+    "TestOnlyInheritedBaseObject",
     "Leaderboard",
     "ActionSpec",
     "AnnotationSpec",
