@@ -56,6 +56,8 @@ Focus on these primary test shards:
 
 *Important:* Since you don't have internet access, you must run `nox` with `--no-install`. We have pre-installed the requirements on the above shards.
 
+Therefore, a basic text command would look like: `nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::test_simple_op --weave-server=clickhouse --clickhouse-process=true`
+
 ## Typescript Testing Guidelines
 TODO: need to fill this out
 
