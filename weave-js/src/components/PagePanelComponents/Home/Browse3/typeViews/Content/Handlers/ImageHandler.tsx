@@ -3,7 +3,6 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import React, {useEffect, useContext, useState, useMemo, useCallback} from 'react';
 
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
-import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {ImageThumbnail, ImageViewport} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
 import {HandlerProps, ContentTooltipWrapper, ContentMetadataTooltip} from './Shared';
 import { WeaveflowPeekContext, WeaveMediaDisplayContext } from '../../../context';
@@ -160,9 +159,46 @@ const ImagePreview = ({
     setShowImagePopup(false);
   }, []);
 
-  const memoizedSmallThumbnail = useMemo(() => (
-    contentResult && <ImageThumbnail blob={contentResult} onClick={handleClick} height={38} width={68} />
-  ), [contentResult, handleClick]);
+  const imageUrl = useMemo(() => {
+    return contentResult ? URL.createObjectURL(contentResult) : '';
+  }, [contentResult]);
+
+  useEffect(() => {
+    return () => {
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl);
+      }
+    };
+  }, [imageUrl]);
+
+  const memoizedSmallThumbnail = useMemo(() => {
+    if (!contentResult || !imageUrl) return null;
+    return (
+      <div
+        style={{
+          height: 38,
+          width: 68,
+          cursor: 'pointer',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+        onClick={handleClick}
+      >
+        <img
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+          }}
+          src={imageUrl}
+          alt="Preview Thumbnail"
+        />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30 transition-all duration-200 hover:bg-black/20">
+          <span className="text-xs text-white">🔍</span>
+        </div>
+      </div>
+    );
+  }, [contentResult, imageUrl, handleClick]);
 
   if (!contentResult) {
     return <LoadingDots />;
@@ -175,6 +211,7 @@ const ImagePreview = ({
           showPreview={false}
           tooltipHint="Click to open image in popup"
           body={memoizedSmallThumbnail}
+          noTriggerWrap={true}
         >
           <ContentMetadataTooltip
             filename={filename}
@@ -191,13 +228,14 @@ const ImagePreview = ({
     );
   }
   const thumbnailComponent = <ImageThumbnail blob={contentResult} onClick={handleClick} width="100%" height="100%"/>
+
   return (
       <>
         <ContentTooltipWrapper
           showPreview={false}
           tooltipHint="Click to open image in popup"
           body={thumbnailComponent}
-
+          noTriggerWrap={true}
         >
           <ContentMetadataTooltip
             filename={filename}

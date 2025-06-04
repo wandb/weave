@@ -206,6 +206,7 @@ const VideoPreview = ({
           showPreview={false}
           tooltipHint="Click to open video in popup"
           body={thumbnailComponent}
+          noTriggerWrap={true}
         >
           <ContentMetadataTooltip
             filename={filename}

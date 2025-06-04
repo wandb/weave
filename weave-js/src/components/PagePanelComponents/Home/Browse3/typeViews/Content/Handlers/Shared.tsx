@@ -51,6 +51,7 @@ type ContentTooltipWrapperProps = {
   tooltipPreview?: React.ReactNode;
   body: React.ReactNode;
   children: React.ReactNode;
+  noTriggerWrap?: boolean;
 };
 
 export const ContentTooltipWrapper = ({
@@ -59,6 +60,7 @@ export const ContentTooltipWrapper = ({
   tooltipPreview,
   body,
   children,
+  noTriggerWrap,
 }: ContentTooltipWrapperProps) => {
   const tooltip = (
     <TailwindContents>
@@ -79,7 +81,7 @@ export const ContentTooltipWrapper = ({
     return <>{body}</>;
   }
   
-  return <Tooltip trigger={body} content={tooltip} />;
+  return <Tooltip trigger={body} content={tooltip} noTriggerWrap={noTriggerWrap} />;
 };
 
 type ContentMetadataTooltipProps = {
