@@ -46,7 +46,7 @@ import OpenAI from 'openai';
 import * as weave from 'weave';
 
 const client = await weave.init({ project: 'my-project' });
-const oaiClient = weave.wrapOpenAI(new OpenAI());
+const oaiClient = new OpenAI();
 
 const extract = weave.op(async function extract() {
   return await oaiClient.chat.completions.create({
@@ -63,7 +63,7 @@ class MyModel {
   private oaiClient: OpenAI;
 
   constructor() {
-    this.oaiClient = weave.wrapOpenAI(new OpenAI());
+    this.oaiClient = new OpenAI();
     this.invoke = weave.op(this, this.invoke);
   }
 

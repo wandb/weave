@@ -4,6 +4,7 @@ import _ from 'lodash';
 import React, {useEffect, useRef, useState} from 'react';
 
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
+import {useAnimatedText} from './hooks';
 import {MessagePanelPart} from './MessagePanelPart';
 import {PlaygroundMessagePanelButtons} from './PlaygroundMessagePanelButtons';
 import {PlaygroundMessagePanelEditor} from './PlaygroundMessagePanelEditor';
@@ -19,6 +20,7 @@ type MessagePanelProps = {
   isNested?: boolean;
   pendingToolResponseId?: string;
   messageHeader?: React.ReactNode;
+  isLast?: boolean;
 };
 
 export const MessagePanel = ({
@@ -32,7 +34,9 @@ export const MessagePanel = ({
   // and on save the tool call response will be updated and sent to the LLM
   pendingToolResponseId,
   messageHeader,
+  isLast = false,
 }: MessagePanelProps) => {
+  // If the message is the last message, we show the whole message by default
   const [isShowingMore, setIsShowingMore] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [editorHeight, setEditorHeight] = useState<number | null>(
@@ -40,7 +44,21 @@ export const MessagePanel = ({
   );
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const {isPlayground} = usePlaygroundContext();
+  const {isPlayground, isStreaming} = usePlaygroundContext();
+
+  // Determine if we should animate text
+  const shouldAnimateText = Boolean(
+    isPlayground &&
+      isStreaming &&
+      isLast &&
+      contentRef?.current &&
+      (message.content || (message.tool_calls && message.tool_calls.length > 0))
+  );
+
+  // Use animated text for the message content
+  const messageText = _.isString(message.content) ? message.content : '';
+  const {displayedText} = useAnimatedText(messageText, shouldAnimateText, 50);
+
   useEffect(() => {
     if (contentRef.current) {
       setIsOverflowing(contentRef.current.scrollHeight > 400);
@@ -49,10 +67,16 @@ export const MessagePanel = ({
 
   // Set isShowingMore to true when editor is opened
   useEffect(() => {
-    if (editorHeight !== null) {
+    if (editorHeight !== null && !isShowingMore) {
       setIsShowingMore(true);
     }
-  }, [editorHeight]);
+  }, [editorHeight, isShowingMore]);
+
+  useEffect(() => {
+    if (isLast && !isShowingMore && isOverflowing && isPlayground) {
+      setIsShowingMore(true);
+    }
+  }, [isLast, isShowingMore, isOverflowing, isPlayground]);
 
   const isUser = message.role === 'user';
   const isSystemPrompt = message.role === 'system';
@@ -148,7 +172,9 @@ export const MessagePanel = ({
                       })}>
                       {_.isString(message.content) ? (
                         <MessagePanelPart
-                          value={message.content}
+                          value={
+                            shouldAnimateText ? displayedText : message.content
+                          }
                           isStructuredOutput={isStructuredOutput}
                         />
                       ) : (

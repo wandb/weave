@@ -16,6 +16,7 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
 from weave.trace_server.interface.builtin_object_classes.saved_view import SavedView
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
     TestOnlyExample,
+    TestOnlyInheritedBaseObject,
     TestOnlyNestedBaseObject,
 )
 
@@ -34,6 +35,7 @@ def register_base_object(cls: type[BaseObject]) -> None:
 
 register_base_object(TestOnlyExample)
 register_base_object(TestOnlyNestedBaseObject)
+register_base_object(TestOnlyInheritedBaseObject)
 register_base_object(Leaderboard)
 register_base_object(ActionSpec)
 register_base_object(AnnotationSpec)

@@ -1,3 +1,4 @@
+import {Message} from '../ChatView/types';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {LLMMaxTokensKey} from './llmMaxTokens';
 
@@ -70,3 +71,23 @@ export type PlaygroundStateKey = keyof PlaygroundState;
 export type OptionalTraceCallSchema = Partial<TraceCallSchema>;
 
 export type PlaygroundMessageRole = 'assistant' | 'user' | 'system' | 'tool';
+
+export type LitellmCompletionResponse = {
+  id: string;
+  created: Date;
+  model: string;
+  object: string;
+  system_fingerprint: string;
+  usage: object;
+  service_tier: string;
+  choices: Array<Partial<LitellmCompletionChoice>>;
+};
+
+export type LitellmCompletionChoice = {
+  message: Partial<Message>;
+  index: number;
+  finish_reason: string;
+};
+
+export type OptionalLitellmCompletionResponse =
+  Partial<LitellmCompletionResponse>;

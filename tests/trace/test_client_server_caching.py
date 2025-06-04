@@ -116,6 +116,7 @@ class MockServer(TraceServerInterface):
                 is_latest=1,
                 kind="object",
                 base_object_class=None,
+                leaf_object_class=None,
                 val=self.mock_val,
             )
         )

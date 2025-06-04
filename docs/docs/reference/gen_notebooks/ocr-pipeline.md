@@ -1,12 +1,15 @@
-# Trace and Evaluate a Computer Vision Pipeline
+
 
 :::tip[This is a notebook]
 
-<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/ocr-pipeline.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
+<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/ocr-pipeline.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
 
-<a href="https://github.com/wandb/weave/blob/master/docs/notebooks/ocr-pipeline.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
+<a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/ocr-pipeline.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
+
+
+# Trace and Evaluate a Computer Vision Pipeline with Weave
 
 In this guide, you will learn how to use Weights & Biases (W&B) Weave to track and evaluate a computer vision pipeline that uses vision language model (VLMs) to perform optical character recognition (OCR) for a named entity recognition (NER) applications.
 Specifically, OpenAI's GPT-4.1's vision capabilities are used to extract named entities from handwritten notes.

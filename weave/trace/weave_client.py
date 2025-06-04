@@ -1227,6 +1227,7 @@ class WeaveClient:
             parent._children.append(call)
 
         current_wb_run_id = safe_current_wb_run_id()
+        current_wb_run_step = safe_current_wb_run_step()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -1258,6 +1259,7 @@ class WeaveClient:
                         inputs=inputs_json,
                         attributes=attributes_dict,
                         wb_run_id=current_wb_run_id,
+                        wb_run_step=current_wb_run_step,
                     )
                 )
             )
@@ -2351,6 +2353,22 @@ def safe_current_wb_run_id() -> str | None:
         return None
     else:
         return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
+
+
+def safe_current_wb_run_step() -> int | None:
+    try:
+        import wandb
+
+        wandb_run = wandb.run
+        if wandb_run is None:
+            return None
+    except ImportError:
+        return None
+    else:
+        try:
+            return int(wandb_run.step)
+        except Exception:
+            return None
 
 
 def check_wandb_run_matches(

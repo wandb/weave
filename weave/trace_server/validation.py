@@ -64,6 +64,16 @@ def wb_run_id_validator(s: Optional[str]) -> Optional[str]:
     return s
 
 
+def wb_run_step_validator(s: Optional[int]) -> Optional[int]:
+    if s is None:
+        return None
+    if not isinstance(s, int):
+        raise TypeError("wb_run_step must be an int")
+    if s < 0:
+        raise ValueError("wb_run_step must be non-negative")
+    return s
+
+
 def _validate_object_name_charset(name: str) -> None:
     # Object names must be alphanumeric with dashes
     invalid_chars = re.findall(r"[^\w._-]", name)

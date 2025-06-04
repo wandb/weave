@@ -201,7 +201,7 @@ Here, `sentence` is passed to the model and `...` is used in the scoring functio
     import {OpenAI} from 'openai';
 
     const client = await weave.init('intro-example');
-    const openaiClient = weave.wrapOpenAI(new OpenAI());
+    const openaiClient = new OpenAI();
 
     const fruitNameScorer = weave.op(
       ({modelOutput, datasetRow}) => datasetRow.target.fruit == modelOutput.fruit,
@@ -335,7 +335,7 @@ In some applications we want to create custom `Scorer` classes - where for examp
       rows: examples,
     });
 
-    const openaiClient = weave.wrapOpenAI(new OpenAI());
+    const openaiClient = new OpenAI();
 
     const model = weave.op(async function myModel({datasetRow}) {
       const prompt = `Extract fields ("fruit": <str>, "color": <str>, "flavor") from the following text, as json: ${datasetRow.sentence}`;

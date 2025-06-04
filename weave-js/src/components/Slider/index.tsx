@@ -56,6 +56,7 @@ type DisplayProps = {
   max: number;
   step: number;
   onChange: (value: number) => void;
+  onBlur?: (value: number) => void;
   value: number | undefined;
 };
 
@@ -69,6 +70,7 @@ export const Display = React.forwardRef(
       min,
       step,
       onChange,
+      onBlur,
       value,
       ...props
     } = p;
@@ -86,6 +88,7 @@ export const Display = React.forwardRef(
         min={min}
         step={step}
         onChange={e => onChange(Number(e.target.value))}
+        onBlur={e => onBlur?.(Number(e.target.value))}
         ref={ref}
         type="number"
         value={value}

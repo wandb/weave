@@ -93,10 +93,10 @@ _In this example, we're using openai so you will need to add an OpenAI [API key]
     import OpenAI from 'openai';
     // highlight-next-line
     import * as weave from 'weave';
-
+    
     // highlight-next-line
-    const openai = weave.wrapOpenAI(new OpenAI());
-
+    const openai = new OpenAI();
+  
     async function extractDinos(input: string) {
       const response = await openai.chat.completions.create({
         model: 'gpt-4o',

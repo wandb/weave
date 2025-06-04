@@ -27,6 +27,7 @@ export const ChoiceView = ({
       isNested={isNested}
       choiceIndex={choiceIndex}
       messageHeader={messageHeader}
+      isLast={true}
     />
   );
 };

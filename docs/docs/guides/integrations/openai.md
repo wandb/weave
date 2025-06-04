@@ -50,7 +50,18 @@ It’s important to store traces of LLM applications in a central database, both
   <TabItem value="typescript" label="TypeScript">
     Weave can automatically capture traces for the [openai typescript library](https://platform.openai.com/docs/libraries/node-js-library).
 
-    Start capturing by calling `await weave.init(<project-name>)` with a project name your choice, and then wrapping your OpenAI client with `weave.wrapOpenAI`.
+    Start capturing by calling `await weave.init(<project-name>)` with a project name your choice.
+
+    :::important What changed?
+    As of [PR #4554](https://github.com/wandb/weave/pull/4554), supported libraries such as OpenAI are automatically patched when Weave is loaded. You no longer need to manually wrap them, as was the case previously:
+
+    ```ts
+    weave.wrapOpenAI(new OpenAI());
+    ```
+
+    For more information, see the [JS integration guide](js.md).
+    :::
+
 
     ```typescript
     import {OpenAI} from 'openai';
@@ -59,7 +70,7 @@ It’s important to store traces of LLM applications in a central database, both
     // highlight-next-line
     const client = await weave.init('emoji-bot');
     // highlight-next-line
-    const openai = weave.wrapOpenAI(new OpenAI());
+    const openai = new OpenAI();
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4',
@@ -179,7 +190,7 @@ Wrapping a function with `weave.op` starts capturing inputs, outputs and app log
       'eevee',
     ];
 
-    const openai = weave.wrapOpenAI(new OpenAI());
+    const openai = new OpenAI();
 
     interface PokemonData {
       name: string;

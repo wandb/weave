@@ -343,7 +343,7 @@ const useCallsNoExpansion = (
   ]);
 
   // Keep track of the request we're waiting for, so that we
-  // can ignore requests that are superceded by more recent reqs
+  // can ignore requests that are superseded by more recent reqs
   const expectedRequestRef = useRef(req);
 
   const doFetch = useCallback(() => {

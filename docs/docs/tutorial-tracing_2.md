@@ -87,7 +87,7 @@ Building on our [basic tracing example](/quickstart), we will now add additional
     import OpenAI from 'openai';
     import * as weave from 'weave';
 
-    const openai = weave.wrapOpenAI(new OpenAI());
+    const openai = new OpenAI();
 
     const extractDinos = weave.op(async (sentence: string) => {
       const response = await openai.chat.completions.create({

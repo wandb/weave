@@ -489,7 +489,8 @@ def test_query_with_simple_feedback_sort() -> None:
         FROM
             calls_merged
         LEFT JOIN feedback ON
-            (feedback.weave_ref = concat('weave-trace-internal:///',
+            (feedback.project_id = {pb_4:String} AND
+            feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_4:String},
             '/call/',
             calls_merged.id))
@@ -561,7 +562,8 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
         FROM
             calls_merged
         LEFT JOIN feedback ON
-            (feedback.weave_ref = concat('weave-trace-internal:///',
+            (feedback.project_id = {pb_1:String} AND
+            feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_1:String},
             '/call/',
             calls_merged.id))
@@ -623,7 +625,8 @@ def test_query_with_simple_feedback_filter() -> None:
         FROM
             calls_merged
         LEFT JOIN feedback ON
-            (feedback.weave_ref = concat('weave-trace-internal:///',
+            (feedback.project_id = {pb_3:String} AND
+            feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_3:String},
             '/call/',
             calls_merged.id))
@@ -674,7 +677,8 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
         FROM
             calls_merged
         LEFT JOIN feedback ON
-            (feedback.weave_ref = concat('weave-trace-internal:///',
+            (feedback.project_id = {pb_6:String} AND
+            feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_6:String},
             '/call/',
             calls_merged.id))
@@ -1968,7 +1972,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
                     AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
         SELECT calls_merged.id AS id
         FROM calls_merged
-        LEFT JOIN feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_2:String}, '/call/', calls_merged.id))
+        LEFT JOIN feedback ON (feedback.project_id = {pb_2:String} AND feedback.weave_ref = concat('weave-trace-internal:///', {pb_2:String}, '/call/', calls_merged.id))
         WHERE calls_merged.project_id = {pb_2:String}
             AND (calls_merged.id IN filtered_calls)
             AND ((calls_merged.inputs_dump LIKE {pb_8:String}

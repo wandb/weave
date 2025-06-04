@@ -305,7 +305,7 @@ const ResultExplorer: React.FC<{
   height: number;
 }> = ({state, height}) => {
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
-    'split'
+    'table'
   );
   const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
 
