@@ -138,7 +138,7 @@ class AsyncBatchProcessor(Generic[T]):
                     # costly for large batches!
                     self._process_batch_individually(current_batch)
                 else:
-                    for item in current_batch:
+                    for _ in current_batch:
                         self.queue.task_done()
 
             if self.stop_accepting_work_event.is_set() and self.queue.empty():
