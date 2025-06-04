@@ -41,6 +41,9 @@ import {
 } from '../common/tabularListViews/columnBuilder';
 import {TypeVersionCategoryChip} from '../common/TypeVersionCategoryChip';
 import {useURLSearchParamsDict} from '../util';
+import {useControllableState} from '../util';
+import {useViewerInfo} from '../../../../../../common/hooks/useViewerInfo';
+import {TailwindContents} from '../../../../../Tailwind';
 import {
   KNOWN_BASE_OBJECT_CLASSES,
   OBJECT_ATTR_EDGE_NAME,
@@ -400,10 +403,15 @@ export const FilterableObjectVersionsTable: React.FC<{
 }> = props => {
   const {setSelectedVersions} = props;
   const {useRootObjectVersions} = useWFHooks();
+  const {loading: viewerLoading, userInfo} = useViewerInfo();
+  const [filter, setFilter] = useControllableState(
+    props.initialFilter ?? {},
+    props.onFilterUpdate
+  );
 
   const effectiveFilter = useMemo(() => {
-    return {...props.initialFilter, ...props.frozenFilter};
-  }, [props.initialFilter, props.frozenFilter]);
+    return {...filter, ...props.frozenFilter};
+  }, [filter, props.frozenFilter]);
 
   const isOneObject = effectiveFilter.objectName != null;
   const effectivelyLatestOnly = !effectiveFilter.objectName;
@@ -419,6 +427,7 @@ export const FilterableObjectVersionsTable: React.FC<{
         ? [effectiveFilter.objectName]
         : undefined,
       latestOnly: effectivelyLatestOnly,
+      userIds: effectiveFilter.userIds,
     },
     metadataOnly: effectivelyLatestOnly,
   });
@@ -465,8 +474,31 @@ export const FilterableObjectVersionsTable: React.FC<{
     return <Empty {...propsEmpty} />;
   }
 
+  const showMine = !!filter.userIds?.length;
+
   return (
-    <FilterLayoutTemplate>
+    <FilterLayoutTemplate
+      filterListItems={
+        !viewerLoading && userInfo ? (
+          <TailwindContents>
+            <Checkbox
+              checked={showMine}
+              onCheckedChange={checked => {
+                if (checked) {
+                  setFilter({...filter, userIds: [userInfo.id]});
+                } else {
+                  const newFilter = {...filter};
+                  delete newFilter.userIds;
+                  setFilter(newFilter);
+                }
+              }}
+            >
+              Show only my objects
+            </Checkbox>
+          </TailwindContents>
+        ) : null
+      }
+    >
       <ObjectVersionsTable
         objectVersions={objectVersions}
         objectTitle={props.objectTitle}

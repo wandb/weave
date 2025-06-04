@@ -187,6 +187,31 @@ def test_objs_query_wb_user_id(client: WeaveClient):
     assert all(obj.wb_user_id == correct_id for obj in res)
 
 
+def test_objs_query_filter_wb_user_ids(client: WeaveClient):
+    weave.publish({"i": 1}, name="obj_a")
+
+    client.server.server._next_trace_server._user_id = "second_user"
+    weave.publish({"i": 2}, name="obj_b")
+
+    client.server.server._next_trace_server._user_id = "third_user"
+    weave.publish({"i": 3}, name="obj_c")
+
+    for wb_user_ids, exp_count in [
+        (None, 3),
+        ([], 3),
+        (["second_user"], 1),
+        (["second_user", "third_user"], 2),
+        (["NOT_A_USER"], 0),
+    ]:
+        res = client.server.objs_query(
+            tsi.ObjQueryReq(
+                project_id=client._project_id(),
+                filter=tsi.ObjectVersionFilter(wb_user_ids=wb_user_ids),
+            )
+        )
+        assert len(res.objs) == exp_count
+
+
 def test_objs_query_deleted_interaction(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
