@@ -4,6 +4,7 @@
 
 import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
+import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
@@ -78,6 +79,9 @@ export const FilterBar = ({
   const [incompleteFilters, setIncompleteFilters] = useState<GridFilterItem[]>(
     []
   );
+
+  const {loading, userInfo} = useViewerInfo();
+  const isWandbAdmin = (!loading && userInfo?.admin) ?? false;
 
   // Merge the parent filter model with our incomplete filters
   useEffect(() => {
@@ -170,10 +174,12 @@ export const FilterBar = ({
     value: 'id',
     label: 'Call ID',
   });
-  (options[0] as GroupedOption).options.push({
-    value: 'feedback.[*].trigger_ref',
-    label: 'Monitored',
-  });
+  if (isWandbAdmin) {
+    (options[0] as GroupedOption).options.push({
+      value: 'feedback.[*].trigger_ref',
+      label: 'Monitored',
+    });
+  }
 
   const onRemoveAll = () => {
     const emptyModel = {items: []};
