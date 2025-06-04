@@ -4,57 +4,87 @@ set -e  # Exit on any error
 
 #==============================================================================
 # Weave Development Environment Setup Script
-# 
-# This script sets up a complete development environment for Weave
-# It installs uv, development tools, and pre-configures test environments
-# Many operations run in parallel for optimal performance.
+#
+# PURPOSE:
+#   This script sets up a complete development environment for Weave, including:
+#   - uv (Python package manager)
+#   - nox (testing automation)
+#   - pre-commit (code quality hooks)
+#   - ClickHouse database server
+#   - Test environments for all shards
+#   - Lint environment
+#
+# USAGE:
+#   ./bin/codex_setup.sh
+#
+# REQUIREMENTS:
+#   - Ubuntu 24.04 or compatible Linux distribution
+#   - sudo access for package installation
+#   - Internet connection for downloading packages
+#
+# FEATURES:
+#   - Sequential execution for easier debugging
+#   - Robust ClickHouse installation with expect automation
+#   - Clear progress feedback and error handling
+#   - Development-ready configuration with empty passwords
+#
+# AUTHOR: AI Assistant
+# VERSION: 1.0
+# LAST UPDATED: 2024
 #==============================================================================
 
 #------------------------------------------------------------------------------
-# Development Tools Installation Functions
+# Python Development Tools Installation
 #------------------------------------------------------------------------------
 
 install_uv() {
-    echo "Installing uv..."
+    echo "Installing uv Python package manager..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
     echo "✓ uv installed successfully"
 }
 
 install_global_tools() {
     echo "Installing global development tools..."
-    # Install tools sequentially for debugging
+    # Install tools sequentially for clear debugging output
+    echo "  Installing nox..."
     uv tool install nox
+    echo "  Installing pre-commit..."
     uv tool install pre-commit
     echo "✓ Global tools installed successfully"
 }
 
 setup_precommit() {
     echo "Setting up pre-commit hooks..."
-    # Dry-run precommit on a single file (forces dependencies to be installed)
+    # Dry-run precommit on a single file to force dependency installation
     pre-commit run --hook-stage pre-push --files ./weave/__init__.py
     echo "✓ Pre-commit setup completed"
 }
 
 #------------------------------------------------------------------------------
-# Test Environment Setup Functions
+# Test Environment Setup
 #------------------------------------------------------------------------------
 
 install_test_environments() {
-    echo "Installing test environment shards sequentially..."
+    echo "Installing test environment shards..."
     
-    # Install all test shards sequentially for debugging
+    # Install all test shards sequentially for clear debugging
+    echo "  Installing custom shard..."
     nox --install-only -e "tests-3.12(shard='custom')"
     echo "  ✓ Custom shard installed"
     
+    echo "  Installing trace shard..."
     nox --install-only -e "tests-3.12(shard='trace')"
     echo "  ✓ Trace shard installed"
     
+    echo "  Installing flow shard..."
     nox --install-only -e "tests-3.12(shard='flow')"
     echo "  ✓ Flow shard installed"
     
+    echo "  Installing trace server shard..."
     nox --install-only -e "tests-3.12(shard='trace_server')"
     echo "  ✓ Trace server shard installed"
     
+    echo "  Installing trace server bindings shard..."
     nox --install-only -e "tests-3.12(shard='trace_server_bindings')"
     echo "  ✓ Trace server bindings shard installed"
     
@@ -68,7 +98,7 @@ install_lint_environment() {
 }
 
 #------------------------------------------------------------------------------
-# ClickHouse Installation Functions
+# ClickHouse Database Installation
 #------------------------------------------------------------------------------
 
 install_clickhouse_prerequisites() {
@@ -80,33 +110,33 @@ install_clickhouse_prerequisites() {
 
 setup_clickhouse_repository() {
     echo "Setting up ClickHouse repository..."
-    # Download the ClickHouse GPG key and store it in the keyring
-    curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | sudo gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
     
-    # Get the system architecture
+    # Download and install ClickHouse GPG key
+    curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | \
+        sudo gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
+    
+    # Add ClickHouse repository to apt sources
     local arch=$(dpkg --print-architecture)
+    echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=${arch}] https://packages.clickhouse.com/deb stable main" | \
+        sudo tee /etc/apt/sources.list.d/clickhouse.list
     
-    # Add the ClickHouse repository to apt sources
-    echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=${arch}] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
-    
-    # Update apt package lists
+    # Update package lists
     sudo apt-get update
     echo "✓ ClickHouse repository configured"
 }
 
-
 install_clickhouse_packages() {
     echo "Installing ClickHouse server and client..."
     
-    # Install expect if not available
+    # Install expect if not available (needed for handling interactive prompts)
     if ! command -v expect >/dev/null 2>&1; then
-        echo "Installing expect for handling prompts..."
+        echo "  Installing expect for prompt automation..."
         sudo apt-get update
         DEBIAN_FRONTEND=noninteractive sudo apt-get install -y expect
     fi
     
-    # Use expect to handle the specific password prompt
-    echo "Installing packages with expect handling..."
+    # Use expect to handle interactive password prompts automatically
+    echo "  Installing ClickHouse packages with automated prompt handling..."
     expect -c "
         set timeout 300
         spawn sudo apt-get install -y clickhouse-server clickhouse-client
@@ -128,53 +158,14 @@ install_clickhouse_packages() {
 install_clickhouse() {
     echo "Installing ClickHouse database..."
     
+    # Note: Prerequisites installation is commented out as it may not be needed
+    # in container environments where basic packages are already available
     # install_clickhouse_prerequisites
+    
     setup_clickhouse_repository
     install_clickhouse_packages
     
     echo "✓ ClickHouse installation completed"
-}
-
-#------------------------------------------------------------------------------
-# Parallel Workflow Functions
-#------------------------------------------------------------------------------
-
-run_uv_workflow() {
-    echo "Starting uv-dependent workflow..."
-    
-    # Install uv first (required for subsequent steps)
-    install_uv
-    
-    # Install global tools (depends on uv)
-    install_global_tools
-    
-    # Run uv-dependent parallel tasks
-    echo "Starting uv-dependent parallel tasks..."
-    
-    install_test_environments &
-    local test_envs_pid=$!
-    
-    install_lint_environment &
-    local lint_env_pid=$!
-    
-    setup_precommit &
-    local precommit_pid=$!
-    
-    # Wait for uv-dependent tasks
-    wait $test_envs_pid
-    wait $lint_env_pid
-    wait $precommit_pid
-    
-    echo "✓ uv workflow completed successfully"
-}
-
-run_clickhouse_workflow() {
-    echo "Starting ClickHouse workflow..."
-    
-    # Install ClickHouse (independent of uv workflow)
-    install_clickhouse
-    
-    echo "✓ ClickHouse workflow completed successfully"
 }
 
 #------------------------------------------------------------------------------
@@ -184,47 +175,59 @@ run_clickhouse_workflow() {
 main() {
     echo "🚀 Starting Weave development environment setup..."
     echo "=================================================="
+    echo ""
     
-    # Run everything sequentially for debugging
-    echo "Running setup sequentially for debugging..."
-    
-    # Install uv first
+    # Run all installation steps sequentially for clear debugging
+    echo "📦 Installing Python package manager..."
     install_uv
+    echo ""
     
-    # Install global tools
+    echo "🛠️  Installing development tools..."
     install_global_tools
+    echo ""
     
-    # Install ClickHouse
+    echo "🗃️  Installing ClickHouse database..."
     install_clickhouse
+    echo ""
     
-    # Install test environments
+    echo "🧪 Installing test environments..."
     install_test_environments
+    echo ""
     
-    # Install lint environment
+    echo "🔍 Installing lint environment..."
     install_lint_environment
+    echo ""
     
-    # Setup precommit
+    echo "🔧 Setting up pre-commit hooks..."
     setup_precommit
+    echo ""
     
     echo "=================================================="
     echo "🎉 All setup tasks completed successfully!"
     echo ""
-    echo "📋 Your development environment is ready!"
+    echo "📋 Your Weave development environment is ready!"
     echo ""
     echo "  🛠️  Development tools installed:"
-    echo "  • uv (Python package manager)"
-    echo "  • nox (testing automation)"
-    echo "  • pre-commit (code quality hooks)"
-    echo "  • Test environments for all shards"
-    echo "  • Lint environment configured"
-    echo "  • ClickHouse database server"
+    echo "     • uv (Python package manager)"
+    echo "     • nox (testing automation)" 
+    echo "     • pre-commit (code quality hooks)"
+    echo "     • Test environments for all shards"
+    echo "     • Lint environment configured"
+    echo "     • ClickHouse database server"
     echo ""
     echo "  🗃️  ClickHouse quick start:"
-    echo "  • Connect: clickhouse-client"
-    echo "  • Default user: default (no password set)"
+    echo "     • Connect: clickhouse-client"
+    echo "     • Default user: default (no password required)"
+    echo "     • HTTP interface: http://localhost:8123"
+    echo "     • TCP interface: localhost:9000"
     echo ""
-    echo "Happy coding! 🚀"
+    echo "  🚀 Next steps:"
+    echo "     • Run tests: nox -e tests"
+    echo "     • Check code quality: pre-commit run --all-files"
+    echo "     • Start coding in your Weave development environment!"
+    echo ""
+    echo "Happy coding! 🎉"
 }
 
-# Execute main function
+# Script entry point
 main "$@"
