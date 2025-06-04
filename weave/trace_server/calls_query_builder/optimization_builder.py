@@ -14,8 +14,9 @@ improving performance for complex conditions.
 """
 
 import datetime
+import typing
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from pydantic import BaseModel
 
@@ -285,26 +286,278 @@ class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
         )
 
 
-class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
-    """Processes a calls query to a list of object table CTEs"""
+class ObjectRefCondition(BaseModel):
+    """Represents a condition that filters on object references"""
 
-    # list of '.' seperated paths to object refs
+    field_path: str  # e.g., "inputs.model.config.temperature"
+    operation_type: str  # "eq", "contains", "gt", "gte", "in"
+    value: typing.Union[
+        str, int, float, bool, list, dict, None
+    ]  # Allow dict for literal operations
     expand_columns: list[str]
-    object_table_alias_map: dict[str, str]
+    case_insensitive: bool = False
+    conversion_type: Optional[Literal["double", "string", "int", "bool", "exists"]] = (
+        None
+    )
 
-    # Add default equality handlers
+    def get_expand_column_match(self) -> Optional[str]:
+        """Find the matching expand column for this field path"""
+        # Find the shortest matching expand column to build full chain
+        for expand_col in sorted(self.expand_columns, key=len):
+            if self.field_path.startswith(expand_col + "."):
+                return expand_col
+        return None
+
+    def get_object_property_path(self) -> str:
+        """Get the property path within the object (after the expand column)"""
+        expand_match = self.get_expand_column_match()
+        if expand_match:
+            return self.field_path[len(expand_match) + 1 :]  # +1 for the dot
+        return self.field_path
+
+    def get_root_field(self) -> str:
+        """Get the root field name (e.g., 'inputs_dump' from 'inputs.model.config.temperature')"""
+        field_parts = self.field_path.split(".")
+        root = field_parts[0] + "_dump"
+        return root
+
+    def as_sql(
+        self,
+        pb: "ParamBuilder",
+        object_table_alias: str,
+        table_alias: str = "calls_merged",
+    ) -> str:
+        """Generate the SQL for this object ref condition"""
+        root_field = self.get_root_field()
+        expand_match = self.get_expand_column_match()
+
+        if not expand_match:
+            raise ValueError(f"No expand column match found for {self.field_path}")
+
+        # The key is the first property after the expand column
+        object_property_path = self.get_object_property_path()
+        property_parts = object_property_path.split(".")
+        key = property_parts[0]
+
+        # Parameterize the JSON path
+        json_path_param = pb.add_param(f"$.{key}")
+
+        # Build the SQL condition
+        field_sql = f"any({table_alias}.{root_field})"
+        ref_subquery = f"IN (SELECT full_ref FROM {object_table_alias})"
+
+        return f"JSON_VALUE({field_sql}, {param_slot(json_path_param, 'String')}) {ref_subquery}"
+
+
+def _get_cte_name_for_condition(i: int) -> str:
+    """Generate a unique CTE name for this condition"""
+    return f"obj_filter_{i}"
+
+
+class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
+    """Processes a calls query to identify and transform object reference conditions"""
+
+    def __init__(self, pb: "ParamBuilder", table_alias: str, expand_columns: list[str]):
+        super().__init__(pb, table_alias)
+        self.expand_columns = expand_columns
+        self.object_ref_conditions: list[ObjectRefCondition] = []
+        self.field_to_cte_map: dict[str, str] = {}  # Maps field paths to CTE names
+
+    def _is_object_ref_field(self, field_path: str) -> bool:
+        """Check if this field path is an object ref based on expand_columns"""
+        for expand_col in self.expand_columns:
+            if field_path.startswith(expand_col + "."):
+                return True
+        return False
+
+    def _create_cte_based_condition(self, condition: ObjectRefCondition) -> str:
+        """Create a SQL condition that uses the CTE for this object ref"""
+        expand_match = condition.get_expand_column_match()
+        if not expand_match:
+            raise ValueError(f"No expand column match found for {condition.field_path}")
+
+        # Get the root field (e.g., 'inputs_dump')
+        root_field = condition.get_root_field()
+
+        # Get the key from the expand column, not the object property path
+        # For "inputs.model" expand column, we want "model" (the part after "inputs.")
+        field_parts = condition.field_path.split(".")
+        expand_parts = expand_match.split(".")
+
+        # The key should be the part of the expand column after the root field
+        # e.g., for "inputs.model" expand column, key should be "model"
+        if len(expand_parts) > 1:
+            key = expand_parts[1]
+        else:
+            # This shouldn't happen if expand_match is valid, but fallback to first part
+            object_property_path = condition.get_object_property_path()
+            property_parts = object_property_path.split(".")
+            key = property_parts[0]
+
+        # Parameterize the JSON path
+        json_path_param = self.pb.add_param(f"$.{key}")
+
+        # Get the CTE name for this condition
+        index = self.object_ref_conditions.index(condition)
+        cte_name = _get_cte_name_for_condition(index)
+
+        # Create the SQL condition
+        field_sql = f"any({self.table_alias}.{root_field})"
+        return f"JSON_VALUE({field_sql}, {param_slot(json_path_param, 'String')}) IN (SELECT full_ref FROM {cte_name})"
+
+    def process_get_field(self, operand: tsi_query.GetFieldOperator) -> Optional[str]:
+        """Check if this field reference is an object ref - if so, we can't process it normally"""
+        field_path = operand.get_field_
+
+        if self._is_object_ref_field(field_path):
+            # Return None to indicate we can't process this normally
+            return None
+
+        # Not an object ref, let the parent handle it
+        return super().process_get_field(operand)
+
     def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
-        """Process equality operation."""
-        lhs_part = self.process_operand(operation.eq_[0])
-        if lhs_part is None:
-            return None
-        rhs = operation.eq_[1]
-        if isinstance(rhs, tsi_query.LiteralOperation) and rhs.literal_ is None:
-            return f"({lhs_part} IS NULL)"
-        rhs_part = self.process_operand(rhs)
-        if rhs_part is None:
-            return None
-        return f"({lhs_part} = {rhs_part})"
+        """Process equality operation for object refs"""
+        field_operand = None
+        conversion_type = None
+
+        # Handle direct GetFieldOperator
+        if isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
+            field_operand = operation.eq_[0]
+        # Handle ConvertOperation wrapping a GetFieldOperator
+        elif isinstance(operation.eq_[0], tsi_query.ConvertOperation):
+            if isinstance(operation.eq_[0].convert_.input, tsi_query.GetFieldOperator):
+                field_operand = operation.eq_[0].convert_.input
+                conversion_type = operation.eq_[0].convert_.to
+
+        if field_operand is not None:
+            field_path = field_operand.get_field_
+            if self._is_object_ref_field(field_path):
+                if isinstance(operation.eq_[1], tsi_query.LiteralOperation):
+                    obj_condition = ObjectRefCondition(
+                        field_path=field_path,
+                        operation_type="eq",
+                        value=operation.eq_[1].literal_,
+                        expand_columns=self.expand_columns,
+                        conversion_type=conversion_type,
+                    )
+                    self.object_ref_conditions.append(obj_condition)
+
+                    # Return the CTE-based condition
+                    return self._create_cte_based_condition(obj_condition)
+
+        return None
+
+    def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
+        """Process contains operation for object refs"""
+        if isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
+            field_path = operation.contains_.input.get_field_
+            if self._is_object_ref_field(field_path):
+                if isinstance(operation.contains_.substr, tsi_query.LiteralOperation):
+                    obj_condition = ObjectRefCondition(
+                        field_path=field_path,
+                        operation_type="contains",
+                        value=operation.contains_.substr.literal_,
+                        expand_columns=self.expand_columns,
+                        case_insensitive=operation.contains_.case_insensitive or False,
+                    )
+                    self.object_ref_conditions.append(obj_condition)
+
+                    # Return the CTE-based condition
+                    return self._create_cte_based_condition(obj_condition)
+
+        # Fall back to default (which will return None since we don't implement contains normally)
+        return None
+
+    def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
+        """Process greater than operation for object refs"""
+        field_operand = None
+        conversion_type = None
+
+        # Handle direct GetFieldOperator
+        if isinstance(operation.gt_[0], tsi_query.GetFieldOperator):
+            field_operand = operation.gt_[0]
+        # Handle ConvertOperation wrapping a GetFieldOperator
+        elif isinstance(operation.gt_[0], tsi_query.ConvertOperation):
+            if isinstance(operation.gt_[0].convert_.input, tsi_query.GetFieldOperator):
+                field_operand = operation.gt_[0].convert_.input
+                conversion_type = operation.gt_[0].convert_.to
+
+        if field_operand is not None:
+            field_path = field_operand.get_field_
+            if self._is_object_ref_field(field_path):
+                if isinstance(operation.gt_[1], tsi_query.LiteralOperation):
+                    obj_condition = ObjectRefCondition(
+                        field_path=field_path,
+                        operation_type="gt",
+                        value=operation.gt_[1].literal_,
+                        expand_columns=self.expand_columns,
+                        conversion_type=conversion_type,
+                    )
+                    self.object_ref_conditions.append(obj_condition)
+
+                    # Return the CTE-based condition
+                    return self._create_cte_based_condition(obj_condition)
+
+        return None
+
+    def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
+        """Process greater than or equal operation for object refs"""
+        field_operand = None
+        conversion_type = None
+
+        # Handle direct GetFieldOperator
+        if isinstance(operation.gte_[0], tsi_query.GetFieldOperator):
+            field_operand = operation.gte_[0]
+        # Handle ConvertOperation wrapping a GetFieldOperator
+        elif isinstance(operation.gte_[0], tsi_query.ConvertOperation):
+            if isinstance(operation.gte_[0].convert_.input, tsi_query.GetFieldOperator):
+                field_operand = operation.gte_[0].convert_.input
+                conversion_type = operation.gte_[0].convert_.to
+
+        if field_operand is not None:
+            field_path = field_operand.get_field_
+            if self._is_object_ref_field(field_path):
+                if isinstance(operation.gte_[1], tsi_query.LiteralOperation):
+                    obj_condition = ObjectRefCondition(
+                        field_path=field_path,
+                        operation_type="gte",
+                        value=operation.gte_[1].literal_,
+                        expand_columns=self.expand_columns,
+                        conversion_type=conversion_type,
+                    )
+                    self.object_ref_conditions.append(obj_condition)
+
+                    # Return the CTE-based condition
+                    return self._create_cte_based_condition(obj_condition)
+
+        return None
+
+    def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
+        """Process in operation for object refs"""
+        if isinstance(operation.in_[0], tsi_query.GetFieldOperator):
+            field_path = operation.in_[0].get_field_
+            if self._is_object_ref_field(field_path):
+                # Extract literal values from the list
+                values = []
+                for operand in operation.in_[1]:
+                    if isinstance(operand, tsi_query.LiteralOperation):
+                        values.append(operand.literal_)
+                    else:
+                        return None  # Can't handle non-literal values in IN
+
+                obj_condition = ObjectRefCondition(
+                    field_path=field_path,
+                    operation_type="in",
+                    value=values,
+                    expand_columns=self.expand_columns,
+                )
+                self.object_ref_conditions.append(obj_condition)
+
+                # Return the CTE-based condition
+                return self._create_cte_based_condition(obj_condition)
+
+        return None
 
 
 def apply_processor(
@@ -608,3 +861,241 @@ def _create_datetime_optimization_sql(
     return (
         f"{table_alias}.sortable_datetime {op_str} {param_slot(param_name, 'String')}"
     )
+
+
+def process_query_for_object_refs(
+    query: tsi_query.Query,
+    pb: "ParamBuilder",
+    table_alias: str,
+    expand_columns: list[str],
+) -> tuple[Optional[str], list[ObjectRefCondition]]:
+    """
+    Process a query to identify and extract object reference conditions.
+
+    Returns:
+        - Transformed SQL condition that uses CTEs (or None if no object refs)
+        - List of object ref conditions that were extracted
+    """
+    if not expand_columns:
+        return None, []
+
+    processor = ObjectRefFilterToCTEProcessor(pb, table_alias, expand_columns)
+    transformed_sql = apply_processor(processor, query.expr_)
+
+    return transformed_sql, processor.object_ref_conditions
+
+
+def build_object_ref_ctes(
+    pb: "ParamBuilder", project_id: str, object_ref_conditions: list[ObjectRefCondition]
+) -> tuple[str, dict[str, str]]:
+    """
+    Build CTEs (Common Table Expressions) for object reference filtering.
+
+    Args:
+        pb: Parameter builder for SQL parameters
+        project_id: Project ID for filtering
+        object_ref_conditions: List of object reference conditions to build CTEs for
+
+    Returns:
+        - CTE SQL string
+        - Dictionary mapping field paths to CTE alias names
+    """
+    if not object_ref_conditions:
+        return "", {}
+
+    project_param = pb.add_param(project_id)
+    cte_parts = []
+    field_to_cte_alias_map = {}
+    cte_counter = 0
+
+    for i, condition in enumerate(object_ref_conditions):
+        # Get the expand column match and property path
+        expand_match = condition.get_expand_column_match()
+        if not expand_match:
+            continue
+
+        object_property_path = condition.get_object_property_path()
+        property_parts = object_property_path.split(".")
+
+        # Build the leaf-level CTE (filters on the actual property value)
+        leaf_property = property_parts[-1]  # The final property to filter on
+        leaf_cte_name = f"obj_filter_{cte_counter}"
+        cte_counter += 1
+
+        # Parameterize the JSON path
+        json_path_param = pb.add_param(f"$.{leaf_property}")
+
+        # Generate the appropriate SQL condition based on operation type
+        if condition.operation_type == "eq":
+            from weave.trace_server.orm import python_value_to_ch_type
+
+            filter_param = pb.add_param(condition.value)
+            filter_type = python_value_to_ch_type(condition.value)
+
+            # Apply conversion if needed
+            if condition.conversion_type:
+                from weave.trace_server.orm import clickhouse_cast
+
+                json_extract = (
+                    f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')})"
+                )
+                converted_extract = clickhouse_cast(
+                    json_extract, condition.conversion_type
+                )
+                val_condition = (
+                    f"{converted_extract} = {param_slot(filter_param, filter_type)}"
+                )
+            else:
+                val_condition = f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')}) = {param_slot(filter_param, filter_type)}"
+        elif condition.operation_type == "contains":
+            filter_param = pb.add_param(f"%{condition.value}%")
+            if condition.case_insensitive:
+                val_condition = f"lower(JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')})) LIKE lower({param_slot(filter_param, 'String')})"
+            else:
+                val_condition = f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')}) LIKE {param_slot(filter_param, 'String')}"
+        elif condition.operation_type in ["gt", "gte"]:
+            from weave.trace_server.orm import python_value_to_ch_type
+
+            filter_param = pb.add_param(condition.value)
+            filter_type = python_value_to_ch_type(condition.value)
+            op_symbol = ">" if condition.operation_type == "gt" else ">="
+
+            # Apply conversion if needed
+            if condition.conversion_type:
+                from weave.trace_server.orm import clickhouse_cast
+
+                json_extract = (
+                    f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')})"
+                )
+                converted_extract = clickhouse_cast(
+                    json_extract, condition.conversion_type
+                )
+                val_condition = f"{converted_extract} {op_symbol} {param_slot(filter_param, filter_type)}"
+            else:
+                val_condition = f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')}) {op_symbol} {param_slot(filter_param, filter_type)}"
+        elif condition.operation_type == "in":
+            # Handle IN operation with multiple values
+            if not isinstance(condition.value, list):
+                continue
+            from weave.trace_server.orm import python_value_to_ch_type
+
+            if condition.value:
+                filter_param = pb.add_param(condition.value)
+                filter_type = f"Array({python_value_to_ch_type(condition.value[0])})"
+
+                # Apply conversion if needed
+                if condition.conversion_type:
+                    from weave.trace_server.orm import clickhouse_cast
+
+                    json_extract = (
+                        f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')})"
+                    )
+                    converted_extract = clickhouse_cast(
+                        json_extract, condition.conversion_type
+                    )
+                    val_condition = f"{converted_extract} IN {param_slot(filter_param, filter_type)}"
+                else:
+                    val_condition = f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')}) IN {param_slot(filter_param, filter_type)}"
+            else:
+                val_condition = "1=0"  # Empty IN list matches nothing
+        else:
+            continue
+
+        # Build the leaf CTE
+        leaf_cte = f"""
+        {leaf_cte_name} AS (
+            SELECT
+                object_id,
+                digest,
+                concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+            FROM object_versions
+            WHERE project_id = {param_slot(project_param, "String")}
+                AND {val_condition}
+            GROUP BY project_id, object_id, digest
+        )"""
+
+        cte_parts.append(leaf_cte)
+        current_cte_name = leaf_cte_name
+
+        # If we have nested properties, build intermediate CTEs
+        if len(property_parts) > 1:
+            # Work backwards from the leaf to build the chain
+            remaining_properties = property_parts[:-1]  # All but the last property
+            for j, prop in enumerate(reversed(remaining_properties)):
+                intermediate_cte_name = f"obj_filter_{cte_counter}"
+                cte_counter += 1
+
+                # Parameterize the JSON path for this property
+                prop_json_path_param = pb.add_param(f"$.{prop}")
+
+                intermediate_cte = f"""
+                {intermediate_cte_name} AS (
+                    SELECT
+                        object_id,
+                        digest,
+                        concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                    FROM object_versions
+                    WHERE project_id = {param_slot(project_param, "String")}
+                    AND JSON_VALUE(val_dump, {param_slot(prop_json_path_param, 'String')}) IN (
+                        SELECT full_ref
+                        FROM {current_cte_name}
+                    )
+                    GROUP BY project_id, object_id, digest
+                )"""
+                cte_parts.append(intermediate_cte)
+                current_cte_name = intermediate_cte_name
+
+        # Map a unique condition key to the final CTE name
+        # Use field_path + operation + value to create unique key for each condition
+        condition_key = (
+            f"{condition.field_path}_{condition.operation_type}_{condition.value}"
+        )
+        field_to_cte_alias_map[condition_key] = current_cte_name
+
+    if not cte_parts:
+        return "", {}
+
+    return ",\n".join(cte_parts), field_to_cte_alias_map
+
+
+def is_object_ref_operand(
+    operand: "tsi_query.Operand", expand_columns: list[str]
+) -> bool:
+    """Check if an operand references object fields based on expand_columns"""
+    if not expand_columns:
+        return False
+
+    def check_field_operator(field_op: "tsi_query.GetFieldOperator") -> bool:
+        field_path = field_op.get_field_
+        for expand_col in expand_columns:
+            if field_path.startswith(expand_col + "."):
+                return True
+        return False
+
+    # Check all GetFieldOperator operands in the expression tree
+    def check_operand_recursive(op: "tsi_query.Operand") -> bool:
+        if isinstance(op, tsi_query.GetFieldOperator):
+            return check_field_operator(op)
+        elif isinstance(op, tsi_query.AndOperation):
+            return any(check_operand_recursive(sub_op) for sub_op in op.and_)
+        elif isinstance(op, tsi_query.OrOperation):
+            return any(check_operand_recursive(sub_op) for sub_op in op.or_)
+        elif isinstance(op, tsi_query.NotOperation):
+            return any(check_operand_recursive(sub_op) for sub_op in op.not_)
+        elif isinstance(op, tsi_query.EqOperation):
+            return any(check_operand_recursive(sub_op) for sub_op in op.eq_)
+        elif isinstance(op, tsi_query.GtOperation):
+            return any(check_operand_recursive(sub_op) for sub_op in op.gt_)
+        elif isinstance(op, tsi_query.GteOperation):
+            return any(check_operand_recursive(sub_op) for sub_op in op.gte_)
+        elif isinstance(op, tsi_query.InOperation):
+            return check_operand_recursive(
+                op.in_[0]
+            )  # Only check the field being compared
+        elif isinstance(op, tsi_query.ContainsOperation):
+            return check_operand_recursive(op.contains_.input)
+        elif isinstance(op, tsi_query.ConvertOperation):
+            return check_operand_recursive(op.convert_.input)
+        return False
+
+    return check_operand_recursive(operand)
