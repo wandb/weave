@@ -796,8 +796,9 @@ class CallsQuery(BaseModel):
         feedback_join_sql = ""
         if needs_feedback:
             feedback_join_sql = f"""
-            LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
+            LEFT JOIN feedback ON (
+                feedback.project_id = {param_slot(project_param, "String")} AND
+                feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
 
         storage_size_sql = ""
@@ -869,6 +870,7 @@ ALLOWED_CALL_FIELDS = {
     "exception": CallsMergedAggField(field="exception", agg_fn="any"),
     "wb_user_id": CallsMergedAggField(field="wb_user_id", agg_fn="any"),
     "wb_run_id": CallsMergedAggField(field="wb_run_id", agg_fn="any"),
+    "wb_run_step": CallsMergedAggField(field="wb_run_step", agg_fn="any"),
     "deleted_at": CallsMergedAggField(field="deleted_at", agg_fn="any"),
     "display_name": CallsMergedAggField(field="display_name", agg_fn="argMaxMerge"),
     "storage_size_bytes": AggFieldWithTableOverrides(
