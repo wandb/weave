@@ -39,11 +39,13 @@ import {
   GridLeafColumn,
 } from '@mui/x-data-grid-pro';
 
+import {FIELD_ID_PATH_SEPARATOR} from '../../CallsPage/callsTableColumnsUtil';
+
 export function buildTree(strings: string[]): GridColumnGroup {
   const root: GridColumnGroup = {groupId: '', children: []};
 
   for (const str of strings) {
-    const fields = str.split('.');
+    const fields = str.split(FIELD_ID_PATH_SEPARATOR);
     addToTree(root, fields, str, 0);
   }
 
@@ -77,9 +79,9 @@ function addToTree(
   const newNode: GridColumnGroup = {
     headerName: fields[0],
     groupId: fullPath
-      .split('.')
+      .split(FIELD_ID_PATH_SEPARATOR)
       .slice(0, depth + 1)
-      .join('.'),
+      .join(FIELD_ID_PATH_SEPARATOR),
     children: [],
   };
   node.children.push(newNode);

@@ -10,6 +10,7 @@ import {useEffect, useMemo, useState} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {isWeaveRef} from '../../filters/common';
+import {FIELD_ID_PATH_SEPARATOR} from '../CallsPage/callsTableColumnsUtil';
 import {refDataCache} from './cache';
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
@@ -102,7 +103,7 @@ const navigateToPath = (
   path: string[];
   isValid: boolean;
 } => {
-  const parts = path.split('.');
+  const parts = path.split(FIELD_ID_PATH_SEPARATOR);
   let value: any = obj;
   let parent: any = null;
   const fullPath: string[] = [];

@@ -44,6 +44,7 @@ export const CallsPageLoadView = ({
       </div>
     );
   }
+
   if (!projectInfo) {
     return <Alert severity="error">Invalid project: {project}</Alert>;
   }
