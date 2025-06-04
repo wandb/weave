@@ -166,7 +166,6 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
         tags: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
-        print(f"Weave(SpanHandler): new_span -- {id_}")
         """Creates a Weave call when a LlamaIndex span starts."""
         gc = get_weave_client()
         op_name = _get_op_name_from_span(id_)
@@ -205,7 +204,6 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
         result: Optional[Any] = None,
         err: Optional[BaseException] = None,
     ) -> None:
-        print(f"Weave(SpanHandler): _prepare_to_exit_or_drop -- {id_}")
         """Common logic for finishing a Weave call for a LlamaIndex span."""
         gc = get_weave_client()
 
@@ -248,7 +246,6 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
         result: Optional[Any] = None,
         **kwargs: Any,
     ) -> Any:
-        print(f"Weave(SpanHandler): prepare_to_exit_span -- {id_}")
         """Finishes the Weave call when a LlamaIndex span exits successfully."""
         self._prepare_to_exit_or_drop(id_, result=result)
         return result
@@ -261,7 +258,6 @@ class WeaveSpanHandler(BaseSpanHandler[Any]):
         err: Optional[BaseException] = None,
         **kwargs: Any,
     ) -> Any:
-        print(f"Weave(SpanHandler): prepare_to_drop_span -- {id_}")
         """Finishes the Weave call with an error when a LlamaIndex span is dropped."""
         self._prepare_to_exit_or_drop(id_, err=err)
         return None
@@ -294,15 +290,7 @@ class WeaveEventHandler(BaseEventHandler):
         is_end_event = event_class_name.endswith("EndEvent")
         is_progress_event = event_class_name.endswith("InProgressEvent")
 
-        # Parent call can be an existing span's call or the global session root
-        parent_call_for_event = None
-        if event.span_id and event.span_id in _weave_calls_map:
-            parent_call_for_event = _weave_calls_map[event.span_id]
-        if is_progress_event and event.span_id in _accumulators:
-            parent_call_for_event = _accumulators[event.span_id][0]
-
         # Key for pairing start and end events.
-        # For progress events, we use a pointer to mark the start and end of the progress event.
         event_pairing_key: Tuple[Optional[str], str] = (event.span_id, op_name)
 
         try:
@@ -312,24 +300,33 @@ class WeaveEventHandler(BaseEventHandler):
 
         # try:
         if is_start_event:
+            # Parent: span call or global root
+            parent_call_for_event = _weave_calls_map.get(event.span_id)
             # Create a new call for the start event
             call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
             _weave_calls_map[event_pairing_key] = call
+            
+            # For streaming LLMCompletion events, pre-create the InProgress call
+            # so that OpenAI autopatch inherits it as parent
+            if base_event_name == "LLMCompletion" and event.span_id in _accumulators:
+                progress_op_name = "llama_index.event.LLMCompletionInProgress"
+                progress_event_key = (event.span_id, progress_op_name)
+                # Create InProgress call as child of LLMCompletion start event
+                progress_call = gc.create_call(progress_op_name, raw_event_payload, call)
+                _weave_calls_map[progress_event_key] = progress_call
+                # Update accumulator to point to the pre-created progress call
+                acc_entry = _accumulators[event.span_id]
+                _accumulators[event.span_id] = [progress_call, True, raw_event_payload, acc_entry[3], acc_entry[4]]
         elif is_progress_event:
+            # Get or create accumulator entry
+            if event.span_id not in _accumulators:
+                _accumulators[event.span_id] = [None, False, {}, None, None]
+
             acc_entry = _accumulators[event.span_id]
-
-            if not acc_entry[1]:
-                # First progress event – create the Weave call.
-                call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
-                _weave_calls_map[event_pairing_key] = call
-
-                # Update accumulator to point at the progress call and mark started.
-                acc_entry[0] = call
-                acc_entry[1] = True
-                acc_entry[2] = raw_event_payload
-            else:
-                acc_entry[2] = raw_event_payload
+            acc_entry[2] = raw_event_payload
         elif is_end_event:
+            # Parent: span call or global root  
+            parent_call_for_event = _weave_calls_map.get(event.span_id)
             # Try to close the call for the progress event first
             deferred_result = None
             deferred_err = None
@@ -368,6 +365,8 @@ class WeaveEventHandler(BaseEventHandler):
 
                 gc.finish_call(span_call, outputs, exception=deferred_err)
         else:
+            # Parent: span call or global root
+            parent_call_for_event = _weave_calls_map.get(event.span_id)
             # Handle non-start/end events as instantaneous events
             call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
             gc.finish_call(call, raw_event_payload)
