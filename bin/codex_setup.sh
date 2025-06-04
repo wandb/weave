@@ -22,10 +22,9 @@ install_uv() {
 
 install_global_tools() {
     echo "Installing global development tools..."
-    # Run tool installations in parallel since they're independent
-    uv tool install nox &
-    uv tool install pre-commit &
-    wait  # Wait for both installations to complete
+    # Install tools sequentially for debugging
+    uv tool install nox
+    uv tool install pre-commit
     echo "✓ Global tools installed successfully"
 }
 
@@ -41,39 +40,31 @@ setup_precommit() {
 #------------------------------------------------------------------------------
 
 install_test_environments() {
-    echo "Installing test environment shards in parallel..."
+    echo "Installing test environment shards sequentially..."
     
-    # Start all test shard installations in parallel
-    nox --install-only -e "tests-3.12(shard='custom')" &
-    local custom_pid=$!
+    # Install all test shards sequentially for debugging
+    nox --install-only -e "tests-3.12(shard='custom')"
+    echo "  ✓ Custom shard installed"
     
-    nox --install-only -e "tests-3.12(shard='trace')" &
-    local trace_pid=$!
+    nox --install-only -e "tests-3.12(shard='trace')"
+    echo "  ✓ Trace shard installed"
     
-    nox --install-only -e "tests-3.12(shard='flow')" &
-    local flow_pid=$!
+    nox --install-only -e "tests-3.12(shard='flow')"
+    echo "  ✓ Flow shard installed"
     
-    nox --install-only -e "tests-3.12(shard='trace_server')" &
-    local server_pid=$!
+    nox --install-only -e "tests-3.12(shard='trace_server')"
+    echo "  ✓ Trace server shard installed"
     
-    nox --install-only -e "tests-3.12(shard='trace_server_bindings')" &
-    local bindings_pid=$!
-    
-    # Wait for each shard and provide feedback
-    wait $custom_pid && echo "  ✓ Custom shard installed"
-    wait $trace_pid && echo "  ✓ Trace shard installed"
-    wait $flow_pid && echo "  ✓ Flow shard installed"
-    wait $server_pid && echo "  ✓ Trace server shard installed"
-    wait $bindings_pid && echo "  ✓ Trace server bindings shard installed"
+    nox --install-only -e "tests-3.12(shard='trace_server_bindings')"
+    echo "  ✓ Trace server bindings shard installed"
     
     echo "✓ All test environments installed successfully"
 }
 
 install_lint_environment() {
     echo "Installing lint environment..."
-    nox -e lint -- dry-run &
-    local lint_pid=$!
-    wait $lint_pid && echo "✓ Lint environment installed"
+    nox -e lint -- dry-run
+    echo "✓ Lint environment installed"
 }
 
 #------------------------------------------------------------------------------
@@ -103,18 +94,33 @@ setup_clickhouse_repository() {
     echo "✓ ClickHouse repository configured"
 }
 
+
 install_clickhouse_packages() {
     echo "Installing ClickHouse server and client..."
     
-    # Use package manager with stdin feeding (works better in container environments)
-    echo "Installing via package manager with non-interactive setup..."
+    # Install expect if not available
+    if ! command -v expect >/dev/null 2>&1; then
+        echo "Installing expect for handling prompts..."
+        sudo apt-get update
+        DEBIAN_FRONTEND=noninteractive sudo apt-get install -y expect
+    fi
     
-    # Pre-configure to avoid prompts
-    echo "clickhouse-server clickhouse-server/default-password password ''" | sudo debconf-set-selections
-    echo "clickhouse-server clickhouse-server/default-password-repeat password ''" | sudo debconf-set-selections
-    
-    # Install with stdin feeding and non-interactive environment
-    printf '\n\n\n\n\n' | DEBIAN_FRONTEND=noninteractive sudo apt-get install -y clickhouse-server clickhouse-client
+    # Use expect to handle the specific password prompt
+    echo "Installing packages with expect handling..."
+    expect -c "
+        set timeout 300
+        spawn sudo apt-get install -y clickhouse-server clickhouse-client
+        expect {
+            \"*password for the default user*\" { send \"\r\"; exp_continue }
+            \"*Password*\" { send \"\r\"; exp_continue }  
+            \"*password*\" { send \"\r\"; exp_continue }
+            \"*Enter*\" { send \"\r\"; exp_continue }
+            \"*Press*\" { send \"\r\"; exp_continue }
+            \"*(y/N)*\" { send \"y\r\"; exp_continue }
+            \"*Continue*\" { send \"\r\"; exp_continue }
+            eof
+        }
+    "
     
     echo "✓ ClickHouse packages installed"
 }
@@ -179,19 +185,26 @@ main() {
     echo "🚀 Starting Weave development environment setup..."
     echo "=================================================="
     
-    # Run completely independent workflows in parallel
-    echo "Starting parallel workflows..."
+    # Run everything sequentially for debugging
+    echo "Running setup sequentially for debugging..."
     
-    run_uv_workflow &
-    local uv_workflow_pid=$!
+    # Install uv first
+    install_uv
     
-    run_clickhouse_workflow &
-    local clickhouse_workflow_pid=$!
+    # Install global tools
+    install_global_tools
     
-    # Wait for both workflows to complete
-    echo "Waiting for all workflows to complete..."
-    wait $uv_workflow_pid
-    wait $clickhouse_workflow_pid
+    # Install ClickHouse
+    install_clickhouse
+    
+    # Install test environments
+    install_test_environments
+    
+    # Install lint environment
+    install_lint_environment
+    
+    # Setup precommit
+    setup_precommit
     
     echo "=================================================="
     echo "🎉 All setup tasks completed successfully!"
