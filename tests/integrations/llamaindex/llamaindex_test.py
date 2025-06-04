@@ -1,3 +1,5 @@
+import asyncio
+import os
 from collections.abc import Generator
 
 import pytest
@@ -7,110 +9,610 @@ from weave.integrations.integration_utilities import (
     filter_body,
     flatten_calls,
     flattened_calls_to_names,
+    op_name_from_ref,
 )
-from weave.trace.weave_client import Call
+from weave.trace.weave_client import Call, WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
 
 
-def assert_calls_correct_for_quickstart(flattened_calls: list[Call]) -> None:
-    """Next, the major thing to assert is the "shape" of the calls:
-    llama_index.query
-        llama_index.retrieve
-            llama_index.embedding
-        llama_index.synthesize
-            llama_index.chunking
-            llama_index.chunking
-            llama_index.templating
-            llama_index.llm
-                openai.chat.completions.create
-    """
-    assert len(flattened_calls) == 11
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
+    """Test synchronous LLM complete operation."""
+    from llama_index.llms.openai import OpenAI
+    
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
+    response = llm.complete("William Shakespeare is ")
+    
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
 
     exp = [
-        ("openai.embeddings.create", 0),
-        ("llama_index.query", 0),
-        ("llama_index.retrieve", 1),
-        ("llama_index.embedding", 2),
-        ("openai.embeddings.create", 3),
-        ("llama_index.synthesize", 1),
-        ("llama_index.chunking", 2),
-        ("llama_index.chunking", 2),
-        ("llama_index.templating", 2),
-        ("llama_index.llm", 2),
-        ("openai.chat.completions.create", 3),
+        ("llama_index.span.OpenAI.complete", 0),
+        ("llama_index.event.LLMCompletion", 1),
+        ("openai.chat.completions.create", 2),
     ]
     assert flattened_calls_to_names(flattened_calls) == exp
 
+    call_0, _ = flattened_calls[0]
+    assert call_0.started_at < call_0.ended_at
+    assert call_0.parent_id == None
+    assert call_0.inputs["model"] == "gpt-4o-mini"
+    assert call_0.inputs["temperature"] == 0.1
+    assert len(call_0.output["text"]) > 0
+    assert call_0.output["text"] == response.text
+    assert list(call_0.output["additional_kwargs"].keys()) == ["prompt_tokens", "completion_tokens", "total_tokens"]
 
-@pytest.fixture
-def fake_api_key() -> Generator[None, None, None]:
-    import os
+    call_1, _ = flattened_calls[1]
+    assert call_1.started_at < call_1.ended_at
+    assert call_1.parent_id == call_0.id
+    assert call_1.inputs["class_name"] == "LLMCompletionStartEvent"
+    assert call_1.inputs["prompt"] == "William Shakespeare is "
+    assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_1.inputs["model_dict"]["temperature"] == 0.1
+    assert call_1.output["class_name"] == "LLMCompletionEndEvent"
+    assert len(call_1.output["response"]["text"]) > 0
+    assert call_1.output["response"]["additional_kwargs"]["prompt_tokens"] == 11
+    assert call_1.output["response"]["additional_kwargs"]["completion_tokens"] == 195
 
-    orig_key = os.environ.get("OPENAI_API_KEY")
-    os.environ["OPENAI_API_KEY"] = "sk-DUMMY_KEY"
-    try:
-        yield
-    finally:
-        if orig_key is None:
-            del os.environ["OPENAI_API_KEY"]
-        else:
-            os.environ["OPENAI_API_KEY"] = orig_key
+    call_2, _ = flattened_calls[2]
+    assert call_2.started_at < call_2.ended_at
+    assert call_2.parent_id == call_1.id
+    assert call_2.inputs["model"] == "gpt-4o-mini"
+    assert call_2.inputs["temperature"] == 0.1
+    assert call_2.inputs["messages"] == [{"role": "user", "content": "William Shakespeare is "}]
+    assert call_2.inputs["stream"] == False
+    assert "id" in call_2.output
+    assert "choices" in call_2.output
+    assert len(call_2.output["choices"]) == 1
+    assert call_2.output["choices"][0]["finish_reason"] == "stop"
+    assert call_2.output["choices"][0]["index"] == 0
+    assert "message" in call_2.output["choices"][0]
+    assert call_2.output["choices"][0]["message"]["role"] == "assistant"
+    assert len(call_2.output["choices"][0]["message"]["content"]) > 0
+    assert call_2.output["usage"]["prompt_tokens"] == 11
+    assert call_2.output["usage"]["completion_tokens"] == 195
+    assert call_2.output["usage"]["total_tokens"] == 206
 
 
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=[
-        "api.wandb.ai",
-        "localhost",
-        "trace.wandb.ai",
-    ],
-    before_record_request=filter_body,
-)
-def test_llamaindex_quickstart(
-    client: weave.trace.weave_client.WeaveClient, fake_api_key: None
-) -> None:
-    # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
-    from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
-
-    documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
-    index = VectorStoreIndex.from_documents(documents)
-
-    query_engine = index.as_query_engine()
-    response = query_engine.query("What did the author do growing up?")
-
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
-    flattened_calls = flatten_calls(calls)
-    assert_calls_correct_for_quickstart(flattened_calls)
-    call, _ = flattened_calls[-2]
-    assert call.inputs["serialized"]["api_key"] == "REDACTED"
-
-
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=[
-        "api.wandb.ai",
-        "localhost",
-        "trace.wandb.ai",
-    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
-async def test_llamaindex_quickstart_async(
-    client: weave.trace.weave_client.WeaveClient, fake_api_key: None
-) -> None:
-    # This is taken directly from  https://docs.llamaindex.ai/en/stable/getting_started/starter_example/
-    from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
-
-    documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
-    index = VectorStoreIndex.from_documents(documents)
-
-    query_engine = index.as_query_engine()
-    response = await query_engine.aquery("What did the author do growing up?")
-
+async def test_llamaindex_llm_complete_async(client: WeaveClient) -> None:
+    """Test asynchronous LLM complete operation."""
+    from llama_index.llms.openai import OpenAI
+    
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
+    response = await llm.acomplete("William Shakespeare is ")
+    
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
-    assert_calls_correct_for_quickstart(flattened_calls)
-    call, _ = flattened_calls[-2]
-    assert call.inputs["serialized"]["api_key"] == "REDACTED"
+
+    exp = [
+        ("llama_index.span.OpenAI.acomplete", 0),
+        ("llama_index.event.LLMCompletion", 1),
+        ("openai.chat.completions.create", 2),
+    ]
+    assert flattened_calls_to_names(flattened_calls) == exp
+
+    call_0, _ = flattened_calls[0]
+    assert call_0.started_at < call_0.ended_at
+    assert call_0.parent_id is None
+    assert call_0.inputs["model"] == "gpt-4o-mini"
+    assert call_0.inputs["temperature"] == 0.1
+    assert call_0.inputs["_self"] == "William Shakespeare is "
+    assert len(call_0.output["text"]) > 0
+    assert call_0.output["additional_kwargs"]["prompt_tokens"] == 11
+    assert call_0.output["additional_kwargs"]["completion_tokens"] == 211
+
+    call_1, _ = flattened_calls[1]
+    assert call_1.started_at < call_1.ended_at
+    assert call_1.parent_id == call_0.id
+    assert call_1.inputs["prompt"] == "William Shakespeare is "
+    assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_1.inputs["model_dict"]["temperature"] == 0.1
+    assert len(call_1.output["response"]["text"]) > 0
+    assert call_1.output["response"]["additional_kwargs"]["prompt_tokens"] == 11
+    assert call_1.output["response"]["additional_kwargs"]["completion_tokens"] == 211
+
+    call_2, _ = flattened_calls[2]
+    assert call_2.started_at < call_2.ended_at
+    assert call_2.parent_id == call_1.id
+    assert call_2.inputs["model"] == "gpt-4o-mini"
+    assert call_2.inputs["temperature"] == 0.1
+    assert call_2.inputs["messages"] == [{"role": "user", "content": "William Shakespeare is "}]
+    assert call_2.inputs["stream"] == False
+    assert "id" in call_2.output
+    assert "choices" in call_2.output
+    assert len(call_2.output["choices"]) == 1
+    assert call_2.output["choices"][0]["finish_reason"] == "stop"
+    assert call_2.output["choices"][0]["index"] == 0
+    assert "message" in call_2.output["choices"][0]
+    assert call_2.output["choices"][0]["message"]["role"] == "assistant"
+    assert len(call_2.output["choices"][0]["message"]["content"]) > 0
+    assert call_2.output["usage"]["prompt_tokens"] == 11
+    assert call_2.output["usage"]["completion_tokens"] == 211
+    assert call_2.output["usage"]["total_tokens"] == 222
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_llamaindex_llm_stream_complete_sync(client: WeaveClient) -> None:
+    """Test synchronous LLM streaming complete operation."""
+    from llama_index.llms.openai import OpenAI
+    
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
+    handle = llm.stream_complete("William Shakespeare is ")
+    
+    all_content = ""
+    for token in handle:
+        if token.delta:
+            all_content += token.delta
+    
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+
+    exp = [
+        ('llama_index.span.OpenAI.stream_complete', 0),
+        ('llama_index.event.LLMCompletion', 1),
+        ('llama_index.event.LLMCompletionInProgress', 2),
+        ('openai.chat.completions.create', 3),
+    ]
+    assert flattened_calls_to_names(flattened_calls) == exp
+
+    call_0, _ = flattened_calls[0]
+    assert call_0.started_at < call_0.ended_at
+    assert call_0.parent_id is None
+    assert call_0.inputs["model"] == "gpt-4o-mini"
+    assert call_0.inputs["temperature"] == 0.1
+    assert call_0.inputs["_self"] == "William Shakespeare is "
+    assert "result" in call_0.output
+    assert call_0.output["result"].startswith("<generator object")
+
+    call_1, _ = flattened_calls[1]
+    assert call_1.started_at < call_1.ended_at
+    assert call_1.parent_id == call_0.id
+    assert call_1.inputs["prompt"] == "William Shakespeare is "
+    assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_1.inputs["model_dict"]["temperature"] == 0.1
+    assert "response" in call_1.output
+    assert "text" in call_1.output["response"]
+    assert len(call_1.output["response"]["text"]) > 0
+
+    call_2, _ = flattened_calls[2]
+    assert call_2.started_at < call_2.ended_at
+    assert call_2.parent_id == call_1.id
+    assert call_2.inputs["prompt"] == "William Shakespeare is "
+    assert call_2.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_2.inputs["model_dict"]["temperature"] == 0.1
+    assert "response" in call_2.output
+    assert "text" in call_2.output["response"]
+    assert len(call_2.output["response"]["text"]) > 0
+
+    call_3, _ = flattened_calls[3]
+    assert call_3.started_at < call_3.ended_at
+    assert call_3.parent_id == call_2.id
+    assert call_3.inputs["model"] == "gpt-4o-mini"
+    assert call_3.inputs["temperature"] == 0.1
+    assert call_3.inputs["stream"] == True
+    assert call_3.inputs["messages"] == [{"role": "user", "content": "William Shakespeare is "}]
+    assert "id" in call_3.output
+    assert "choices" in call_3.output
+    assert len(call_3.output["choices"]) == 1
+    assert call_3.output["choices"][0]["finish_reason"] == "stop"
+    assert call_3.output["choices"][0]["index"] == 0
+    assert "message" in call_3.output["choices"][0]
+    assert call_3.output["choices"][0]["message"]["role"] == "assistant"
+    assert len(call_3.output["choices"][0]["message"]["content"]) > 0
+    assert call_3.output["usage"]["prompt_tokens"] == 11
+    assert call_3.output["usage"]["completion_tokens"] == 160
+    assert call_3.output["usage"]["total_tokens"] == 171
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+@pytest.mark.asyncio
+async def test_llamaindex_llm_stream_complete_async(client: WeaveClient) -> None:
+    """Test asynchronous LLM streaming complete operation."""
+    from llama_index.llms.openai import OpenAI
+    
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
+    handle = await llm.astream_complete("William Shakespeare is ")
+
+    all_content = ""
+    async for token in handle:
+        if token.delta:
+            all_content += token.delta
+    
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+
+    exp = [
+        ('llama_index.span.OpenAI.astream_complete', 0),
+        ('llama_index.event.LLMCompletion', 1),
+        ('llama_index.event.LLMCompletionInProgress', 2),
+        ('openai.chat.completions.create', 3),
+    ]
+    assert flattened_calls_to_names(flattened_calls) == exp
+
+    call_0, _ = flattened_calls[0]
+    assert call_0.inputs["_self"] == "William Shakespeare is "
+    assert call_0.inputs["model"] == "gpt-4o-mini"
+    assert call_0.inputs["temperature"] == 0.1
+    assert call_0.inputs["api_key"] == "REDACTED"
+    assert call_0.inputs["api_base"] == "https://api.openai.com/v1"
+    assert "result" in call_0.output
+
+    call_1, _ = flattened_calls[1]
+    assert call_1.inputs["prompt"] == "William Shakespeare is "
+    assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_1.inputs["model_dict"]["temperature"] == 0.1
+    assert call_1.inputs["class_name"] == "LLMCompletionStartEvent"
+    assert "response" in call_1.output
+    assert call_1.output["response"]["text"] == all_content
+
+    call_2, _ = flattened_calls[2]
+    assert call_2.inputs["prompt"] == "William Shakespeare is "
+    assert call_2.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_2.inputs["model_dict"]["temperature"] == 0.1
+    assert call_2.inputs["class_name"] == "LLMCompletionStartEvent"
+    assert "response" in call_2.output
+    assert call_2.output["response"]["text"] == all_content
+
+    call_3, _ = flattened_calls[3]
+    assert call_3.inputs["messages"] == [{"role": "user", "content": "William Shakespeare is "}]
+    assert call_3.inputs["model"] == "gpt-4o-mini"
+    assert call_3.inputs["stream"] == True
+    assert call_3.inputs["temperature"] == 0.1
+    assert "id" in call_3.output
+    assert "choices" in call_3.output
+    assert len(call_3.output["choices"]) == 1
+    assert call_3.output["choices"][0]["finish_reason"] == "stop"
+    assert call_3.output["choices"][0]["index"] == 0
+    assert "message" in call_3.output["choices"][0]
+    assert call_3.output["choices"][0]["message"]["role"] == "assistant"
+    assert call_3.output["choices"][0]["message"]["content"] == all_content
+    assert call_3.output["usage"]["prompt_tokens"] == 11
+    assert call_3.output["usage"]["completion_tokens"] == 192
+    assert call_3.output["usage"]["total_tokens"] == 203
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_llamaindex_llm_chat_sync(client: WeaveClient) -> None:
+    """Test synchronous LLM chat operation."""
+    from llama_index.llms.openai import OpenAI
+    from llama_index.core.llms import ChatMessage
+    
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
+    messages = [
+        ChatMessage(role="system", content="You are a helpful assistant."),
+        ChatMessage(role="user", content="Tell me a joke."),
+    ]
+    
+    response = llm.chat(messages)
+    
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+
+    exp = [
+        ('llama_index.span.OpenAI.chat', 0),
+        ('llama_index.event.LLMChat', 1),
+        ('openai.chat.completions.create', 2),
+    ]
+    assert flattened_calls_to_names(flattened_calls) == exp
+
+    call_0, _ = flattened_calls[0]
+    assert call_0.inputs["model"] == "gpt-4o-mini"
+    assert call_0.inputs["temperature"] == 0.1
+    assert call_0.inputs["_self"]["ChatMessage_0"]["role"] == "system"
+    assert call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"] == "You are a helpful assistant."
+    assert call_0.inputs["_self"]["ChatMessage_1"]["role"] == "user"
+    assert call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"] == "Tell me a joke."
+    assert call_0.output["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_0.output["message"]["blocks"][0]["text"]
+    assert call_0.output["raw"]["usage"]["prompt_tokens"] == 22
+    assert call_0.output["raw"]["usage"]["completion_tokens"] == 17
+    assert call_0.output["raw"]["usage"]["total_tokens"] == 39
+
+    call_1, _ = flattened_calls[1]
+    assert call_1.inputs["messages"][0]["role"] == "system"
+    assert call_1.inputs["messages"][0]["blocks"][0]["text"] == "You are a helpful assistant."
+    assert call_1.inputs["messages"][1]["role"] == "user"
+    assert call_1.inputs["messages"][1]["blocks"][0]["text"] == "Tell me a joke."
+    assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_1.inputs["model_dict"]["temperature"] == 0.1
+    assert call_1.output["response"]["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_1.output["response"]["message"]["blocks"][0]["text"]
+
+    call_2, _ = flattened_calls[2]
+    assert call_2.inputs["messages"] == [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Tell me a joke."}
+    ]
+    assert call_2.inputs["model"] == "gpt-4o-mini"
+    assert call_2.inputs["temperature"] == 0.1
+    assert call_2.inputs["stream"] == False
+    assert call_2.output["choices"][0]["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_2.output["choices"][0]["message"]["content"]
+    assert call_2.output["usage"]["prompt_tokens"] == 22
+    assert call_2.output["usage"]["completion_tokens"] == 17
+    assert call_2.output["usage"]["total_tokens"] == 39
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+@pytest.mark.asyncio
+async def test_llamaindex_llm_chat_async(client: WeaveClient) -> None:
+    """Test asynchronous LLM chat operation."""
+    from llama_index.llms.openai import OpenAI
+    from llama_index.core.llms import ChatMessage
+    
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
+    messages = [
+        ChatMessage(role="system", content="You are a helpful assistant."),
+        ChatMessage(role="user", content="Tell me a joke."),
+    ]
+    
+    response = await llm.achat(messages)
+    
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+
+    exp = [('llama_index.span.OpenAI.achat', 0), ('llama_index.event.LLMChat', 1), ('openai.chat.completions.create', 2)]
+    assert flattened_calls_to_names(flattened_calls) == exp
+
+    call_0, _ = flattened_calls[0]
+    assert call_0.started_at < call_0.ended_at
+    assert call_0.inputs["model"] == "gpt-4o-mini"
+    assert call_0.inputs["temperature"] == 0.1
+    assert call_0.inputs["_self"]["ChatMessage_0"]["role"] == "system"
+    assert call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"] == "You are a helpful assistant."
+    assert call_0.inputs["_self"]["ChatMessage_1"]["role"] == "user"
+    assert call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"] == "Tell me a joke."
+    assert call_0.output["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_0.output["message"]["blocks"][0]["text"]
+
+    call_1, _ = flattened_calls[1]
+    assert call_1.started_at < call_1.ended_at
+    assert call_1.inputs["messages"][0]["role"] == "system"
+    assert call_1.inputs["messages"][0]["blocks"][0]["text"] == "You are a helpful assistant."
+    assert call_1.inputs["messages"][1]["role"] == "user"
+    assert call_1.inputs["messages"][1]["blocks"][0]["text"] == "Tell me a joke."
+    assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_1.inputs["model_dict"]["temperature"] == 0.1
+    assert call_1.output["response"]["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_1.output["response"]["message"]["blocks"][0]["text"]
+
+    call_2, _ = flattened_calls[2]
+    assert call_2.started_at < call_2.ended_at
+    assert call_2.inputs["messages"] == [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Tell me a joke."}
+    ]
+    assert call_2.inputs["model"] == "gpt-4o-mini"
+    assert call_2.inputs["temperature"] == 0.1
+    assert call_2.inputs["stream"] == False
+    assert call_2.output["choices"][0]["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_2.output["choices"][0]["message"]["content"]
+    assert call_2.output["usage"]["prompt_tokens"] == 22
+    assert call_2.output["usage"]["completion_tokens"] == 17
+    assert call_2.output["usage"]["total_tokens"] == 39
+  
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
+    """Test synchronous LLM streaming chat operation."""
+    from llama_index.llms.openai import OpenAI
+    from llama_index.core.llms import ChatMessage
+    
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
+    messages = [
+        ChatMessage(role="system", content="You are a helpful assistant."),
+        ChatMessage(role="user", content="Tell me a joke."),
+    ]
+    
+    handle = llm.stream_chat(messages)
+    
+    all_content = ""
+    for token in handle:
+        if token.delta:
+            all_content += token.delta
+    
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    
+    exp = [
+        ('llama_index.span.OpenAI.stream_chat', 0),
+        ('llama_index.event.LLMChat', 1),
+        ('llama_index.event.LLMChatInProgress', 2),
+        ('openai.chat.completions.create', 3),
+    ]
+    assert flattened_calls_to_names(flattened_calls) == exp
+    
+    call_0, _ = flattened_calls[0]
+    # Check call_0: OpenAI.stream_chat span
+    assert op_name_from_ref(call_0.op_name) == "llama_index.span.OpenAI.stream_chat"
+    assert call_0.inputs["model"] == "gpt-4o-mini"
+    assert call_0.inputs["temperature"] == 0.1
+    assert call_0.inputs["api_key"] == "REDACTED"
+    assert call_0.inputs["_self"]["ChatMessage_0"]["role"] == "system"
+    assert call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"] == "You are a helpful assistant."
+    assert call_0.inputs["_self"]["ChatMessage_1"]["role"] == "user"
+    assert call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"] == "Tell me a joke."
+    assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
+    assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
+    assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
+    
+    # Check call_1: LLMChat event
+    call_1, _ = flattened_calls[1]
+    assert op_name_from_ref(call_1.op_name) == "llama_index.event.LLMChat"
+    assert call_1.inputs["messages"][0]["role"] == "system"
+    assert call_1.inputs["messages"][0]["blocks"][0]["text"] == "You are a helpful assistant."
+    assert call_1.inputs["messages"][1]["role"] == "user"
+    assert call_1.inputs["messages"][1]["blocks"][0]["text"] == "Tell me a joke."
+    assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_1.inputs["model_dict"]["temperature"] == 0.1
+    assert call_1.output["response"]["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_1.output["response"]["message"]["blocks"][0]["text"]
+    assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
+    assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
+    assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
+    
+    # Check call_2: LLMChatInProgress event
+    call_2, _ = flattened_calls[2]
+    assert op_name_from_ref(call_2.op_name) == "llama_index.event.LLMChatInProgress"
+    assert call_2.inputs["messages"][0]["role"] == "system"
+    assert call_2.inputs["messages"][1]["role"] == "user"
+    assert call_2.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_2.output["response"]["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_2.output["response"]["message"]["blocks"][0]["text"]
+    assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
+    assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
+    assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
+    
+    # Check call_3: openai.chat.completions.create
+    call_3, _ = flattened_calls[3]
+    assert op_name_from_ref(call_3.op_name) == "openai.chat.completions.create"
+    assert call_3.inputs["model"] == "gpt-4o-mini"
+    assert call_3.inputs["stream"] is True
+    assert call_3.inputs["temperature"] == 0.1
+    assert call_3.inputs["messages"][0]["role"] == "system"
+    assert call_3.inputs["messages"][0]["content"] == "You are a helpful assistant."
+    assert call_3.inputs["messages"][1]["role"] == "user"
+    assert call_3.inputs["messages"][1]["content"] == "Tell me a joke."
+    assert call_3.output["choices"][0]["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_3.output["choices"][0]["message"]["content"]
+    assert call_3.output["usage"]["prompt_tokens"] == 22
+    assert call_3.output["usage"]["completion_tokens"] == 17
+    assert call_3.output["usage"]["total_tokens"] == 39
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+@pytest.mark.asyncio
+async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
+    """Test asynchronous LLM streaming chat operation."""
+    from llama_index.llms.openai import OpenAI
+    from llama_index.core.llms import ChatMessage
+    
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
+    messages = [
+        ChatMessage(role="system", content="You are a helpful assistant."),
+        ChatMessage(role="user", content="Tell me a joke."),
+    ]
+    
+    handle = await llm.astream_chat(messages)
+    
+    all_content = ""
+    async for token in handle:
+        if token.delta:
+            all_content += token.delta
+    
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+
+    exp = [
+        ('llama_index.span.OpenAI.astream_chat', 0),
+        ('llama_index.event.LLMChat', 1),
+        ('llama_index.event.LLMChatInProgress', 2),
+        ('openai.chat.completions.create', 3),
+    ]
+    assert flattened_calls_to_names(flattened_calls) == exp
+    
+    call_0, _ = flattened_calls[0]
+    assert op_name_from_ref(call_0.op_name) == "llama_index.span.OpenAI.astream_chat"
+    assert call_0.inputs["model"] == "gpt-4o-mini"
+    assert call_0.inputs["temperature"] == 0.1
+    assert call_0.inputs["api_key"] == "REDACTED"
+    assert call_0.inputs["_self"]["ChatMessage_0"]["role"] == "system"
+    assert call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"] == "You are a helpful assistant."
+    assert call_0.inputs["_self"]["ChatMessage_1"]["role"] == "user"
+    assert call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"] == "Tell me a joke."
+    assert "<async_generator object" in call_0.output["result"]
+    assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
+    assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
+    assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
+    
+    call_1, _ = flattened_calls[1]
+    assert op_name_from_ref(call_1.op_name) == "llama_index.event.LLMChat"
+    assert call_1.inputs["messages"][0]["role"] == "system"
+    assert call_1.inputs["messages"][0]["blocks"][0]["text"] == "You are a helpful assistant."
+    assert call_1.inputs["messages"][1]["role"] == "user"
+    assert call_1.inputs["messages"][1]["blocks"][0]["text"] == "Tell me a joke."
+    assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_1.output["response"]["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_1.output["response"]["message"]["blocks"][0]["text"]
+    assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
+    assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
+    assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
+    
+    call_2, _ = flattened_calls[2]
+    assert op_name_from_ref(call_2.op_name) == "llama_index.event.LLMChatInProgress"
+    assert call_2.inputs["messages"][0]["role"] == "system"
+    assert call_2.inputs["messages"][0]["blocks"][0]["text"] == "You are a helpful assistant."
+    assert call_2.inputs["messages"][1]["role"] == "user"
+    assert call_2.inputs["messages"][1]["blocks"][0]["text"] == "Tell me a joke."
+    assert call_2.inputs["model_dict"]["model"] == "gpt-4o-mini"
+    assert call_2.output["response"]["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_2.output["response"]["message"]["blocks"][0]["text"]
+    assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
+    assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
+    assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
+    
+    call_3, _ = flattened_calls[3]
+    assert op_name_from_ref(call_3.op_name) == "openai.chat.completions.create"
+    assert call_3.inputs["model"] == "gpt-4o-mini"
+    assert call_3.inputs["stream"] is True
+    assert call_3.inputs["temperature"] == 0.1
+    assert call_3.inputs["messages"][0]["role"] == "system"
+    assert call_3.inputs["messages"][0]["content"] == "You are a helpful assistant."
+    assert call_3.inputs["messages"][1]["role"] == "user"
+    assert call_3.inputs["messages"][1]["content"] == "Tell me a joke."
+    assert call_3.output["choices"][0]["message"]["role"] == "assistant"
+    assert "Why did the scarecrow win an award?" in call_3.output["choices"][0]["message"]["content"]
+    assert call_3.output["usage"]["prompt_tokens"] == 22
+    assert call_3.output["usage"]["completion_tokens"] == 17
+    assert call_3.output["usage"]["total_tokens"] == 39
+
