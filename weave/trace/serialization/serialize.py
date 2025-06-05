@@ -56,6 +56,11 @@ def to_json(
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():
+            if k == "ref":
+                # Refs are pointers to remote objects and should not be part of
+                # the serialized payload. They are attached by the client after
+                # the object is saved and returned from the server.
+                continue
             res[k] = to_json(v, project_id, client, use_dictify)
         return res
     elif isinstance_namedtuple(obj):
