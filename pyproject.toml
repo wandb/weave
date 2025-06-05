@@ -117,6 +117,9 @@ langchain = [
   "langchain-core>=0.2.1",
   "langchain-openai>=0.1.7",
   "langchain-community>=0.2.1",
+  "langchain-google-vertexai>=2.0.24",
+  "langchain-google-genai>=2.1.5",
+  "langchain-anthropic>=0.3.15",
   "chromadb>=0.5.0",
   "pysqlite3",
   "opentelemetry-exporter-otlp",
@@ -309,7 +312,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.51-dev0"
+current_version = "0.51.52-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

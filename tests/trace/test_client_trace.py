@@ -29,6 +29,7 @@ from tests.trace.util import (
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
+from weave.trace.context.call_context import require_current_call
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
@@ -2785,13 +2786,25 @@ def test_call_has_client_version(client):
 def test_user_cannot_modify_call_weave_dict(client):
     @weave.op
     def test():
+        call = require_current_call()
+
+        # allowed in this context
+        call.attributes["test"] = 123
+
+        with pytest.raises(KeyError):
+            call.attributes["weave"] = {"anything": "blah"}
+
+        with pytest.raises(KeyError):
+            call.attributes["weave"]["anything"] = "blah"
+
         return 1
 
     _, call = test.call()
 
-    call.attributes["test"] = 123
+    with pytest.raises(TypeError):
+        call.attributes["test"] = 123
 
-    with pytest.raises(KeyError):
+    with pytest.raises(TypeError):
         call.attributes["weave"] = {"anything": "blah"}
 
     with pytest.raises(KeyError):
@@ -3853,6 +3866,13 @@ def test_call_stream_query_heavy_query_batch(client):
     assert len(list(res)) == 10
     for call in res:
         assert call.attributes["empty"] == ""
+
+
+@pytest.fixture
+def clickhouse_client(client):
+    if client_is_sqlite(client):
+        return None
+    return client.server._next_trace_server.ch_client
 
 
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):

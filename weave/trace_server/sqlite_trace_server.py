@@ -119,6 +119,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 created_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
+                leaf_object_class TEXT,
                 refs TEXT,
                 val_dump TEXT,
                 digest TEXT,
@@ -769,6 +770,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     created_at,
                     kind,
                     base_object_class,
+                    leaf_object_class,
                     refs,
                     val_dump,
                     digest,
@@ -776,11 +778,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     is_latest,
                     deleted_at,
                     wb_user_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(project_id, kind, object_id, digest) DO UPDATE SET
                     created_at = excluded.created_at,
                     kind = excluded.kind,
                     base_object_class = excluded.base_object_class,
+                    leaf_object_class = excluded.leaf_object_class,
                     refs = excluded.refs,
                     val_dump = excluded.val_dump,
                     version_index = excluded.version_index,
@@ -793,6 +796,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     datetime.datetime.now().isoformat(),
                     get_kind(processed_val),
                     processed_result["base_object_class"],
+                    processed_result["leaf_object_class"],
                     json.dumps([]),
                     json_val,
                     digest,
@@ -890,6 +894,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 placeholders = ",".join(["?" for _ in req.filter.base_object_classes])
                 conds.append(f"base_object_class IN ({placeholders})")
                 parameters["base_object_classes"] = req.filter.base_object_classes
+            if req.filter.leaf_object_classes:
+                placeholders = ",".join(["?" for _ in req.filter.leaf_object_classes])
+                conds.append(f"leaf_object_class IN ({placeholders})")
+                parameters["leaf_object_classes"] = req.filter.leaf_object_classes
 
         objs = self._select_objs_query(
             req.project_id,
@@ -1495,7 +1503,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 version_index,
                 is_latest,
                 deleted_at,
-                wb_user_id
+                wb_user_id,
+                leaf_object_class
             FROM objects
             WHERE project_id = ? AND {pred}
         """
@@ -1541,6 +1550,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     is_latest=row[8],
                     deleted_at=row[9],
                     wb_user_id=row[10],
+                    leaf_object_class=row[11],
                 )
             )
         return result

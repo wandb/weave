@@ -99,6 +99,13 @@ There are three main ways to create Calls in Weave:
   </TabItem>
 </Tabs>
 
+#### Summary
+
+You can store metrics or other post-call values in the `summary`
+dictionary of a Call. Modify `call.summary` during execution and any
+values you add will be merged with Weave's computed summary data when
+the call finishes.
+
 ### 2. Decorating and wrapping functions
 
 However, often LLM applications have additional logic (such as pre/post processing, prompts, etc.) that you want to track.
@@ -382,6 +389,11 @@ However, often LLM applications have additional logic (such as pre/post processi
     with weave.attributes({'env': 'production'}):
         print(my_function.call("World"))
     ```
+
+    :::tip
+    `call.attributes` cannot be modified once the call starts. Use this
+    context manager to set any metadata before invoking the op.
+    :::
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
@@ -941,12 +953,12 @@ Please see the [schema](../../reference/python-sdk/weave/trace_server/weave.trac
 | trace_id | string (uuid) | Identifier for the trace this call belongs to |
 | parent_id | string (uuid) | Identifier of the parent call |
 | started_at | datetime | Timestamp when the call started |
-| attributes | Dict[str, Any] | User-defined metadata about the call |
+| attributes | Dict[str, Any] | User-defined metadata about the call *(read-only during execution)* |
 | inputs | Dict[str, Any] | Input parameters for the call |
 | ended_at | datetime (optional) | Timestamp when the call ended |
 | exception | string (optional) | Error message if the call failed |
 | output | Any (optional) | Result of the call |
-| summary | Optional[SummaryMap] | Post-execution summary information |
+| summary | Optional[SummaryMap] | Post-execution summary information. You can modify this during execution to record custom metrics. |
 | wb_user_id | Optional[str] | Associated Weights & Biases user ID |
 | wb_run_id | Optional[str] | Associated Weights & Biases run ID |
 | deleted_at | datetime (optional) | Timestamp of call deletion, if applicable |
@@ -955,7 +967,7 @@ The table above outlines the key properties of a Call in Weave. Each property pl
 
 - The `id`, `trace_id`, and `parent_id` fields help in organizing and relating calls within the system.
 - Timing information (`started_at`, `ended_at`) allows for performance analysis.
-- The `attributes` and `inputs` fields provide context for the call, while `output` and `summary` capture the results.
+- The `attributes` and `inputs` fields provide context for the call. Attributes are frozen once the call starts, so set them before invocation with `weave.attributes`. `output` and `summary` capture the results, and you can update `summary` during execution to log additional metrics.
 - Integration with Weights & Biases is facilitated through `wb_user_id` and `wb_run_id`.
 
 This comprehensive set of properties enables detailed tracking and analysis of function calls throughout your project.
