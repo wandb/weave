@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from collections.abc import Iterator
 from typing import Any, Callable, TypedDict, TypeVar
@@ -67,8 +68,6 @@ def _safe_cache_key_for_binary_data(data: Any) -> str:
             return data
         else:
             # For other types, try JSON serialization
-            import json
-
             return json.dumps(data, sort_keys=True, default=str)
     except (UnicodeDecodeError, UnicodeEncodeError, TypeError, ValueError):
         # If we can't serialize it, create a hash of its string representation
@@ -83,17 +82,16 @@ def _create_obj_create_cache_key(req: tsi.ObjCreateReq) -> str:
         val = obj_dict.pop("val", None)
 
         # Serialize everything except val
-        import json
-
         base_key = json.dumps(obj_dict, sort_keys=True)
 
         # Handle val separately as it might contain binary data
         val_key = _safe_cache_key_for_binary_data(val)
 
-        return f"{base_key}|val:{val_key}"
     except Exception:
         # Fallback to a hash of the entire request
         return hashlib.sha256(str(req).encode("utf-8", errors="ignore")).hexdigest()
+    else:
+        return f"{base_key}|val:{val_key}"
 
 
 def _create_file_create_cache_key(req: tsi.FileCreateReq) -> str:
@@ -101,10 +99,11 @@ def _create_file_create_cache_key(req: tsi.FileCreateReq) -> str:
     try:
         # Create key from project_id and name, plus hash of content
         content_hash = _safe_cache_key_for_binary_data(req.content)
-        return f"project:{req.project_id}|name:{req.name}|content:{content_hash}"
     except Exception:
         # Fallback to a hash of the entire request
         return hashlib.sha256(str(req).encode("utf-8", errors="ignore")).hexdigest()
+    else:
+        return f"project:{req.project_id}|name:{req.name}|content:{content_hash}"
 
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
