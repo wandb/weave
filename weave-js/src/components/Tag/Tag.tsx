@@ -43,7 +43,7 @@ export function useTagClasses({
     () =>
       classNames(
         'night-aware',
-        'min-h-22 flex max-h-22 w-fit items-center rounded-[3px] text-[14px]',
+        'min-h-22 flex h-22 max-h-22 w-fit items-center rounded-[3px] text-[14px] flex items-center gap-4 space-around px-4',
         getTagColorClass(tagColor),
         isInteractive ? getTagHoverClass(tagColor) : ''
       ),
@@ -76,19 +76,19 @@ export const Tag: FC<TagProps> = ({
   return (
     <TruncateByCharsWithTooltip {...truncationProps}>
       {({truncatedText}) => (
-        <div className={twMerge(classes, showIcon ? 'pl-4 pr-6' : 'px-6')}>
+        <div className={classes}>
           {showIcon && (
             <Icon
               role="presentation"
-              className="mr-4 h-14 w-14"
+              className=" h-14 w-14"
               name={iconName ?? DEFAULT_TAG_ICON}
             />
           )}
-          <span>{truncatedText}</span>
+          {truncatedText && <span>{truncatedText}</span>}
           {endIconName && (
             <Icon
               role="presentation"
-              className="ml-4 h-14 w-14"
+              className="h-14 w-14"
               name={endIconName}
             />
           )}
