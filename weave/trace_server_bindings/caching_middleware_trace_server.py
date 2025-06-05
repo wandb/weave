@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 import logging
 from collections.abc import Iterator
-import threading
-from typing import Any, Callable, OrderedDict, TypedDict, TypeVar
+from typing import Any, Callable, TypedDict, TypeVar
 
-import diskcache
 from pydantic import BaseModel
 from typing_extensions import Self
 
@@ -16,7 +13,7 @@ from weave.trace.settings import (
     server_cache_size_limit
 )
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.trace_server_common import LRUCache
+from weave.trace_server_bindings.mem_cache_with_disk_backend import MemCacheWithDiskCacheBackend
 
 logger = logging.getLogger(__name__)
 
@@ -51,61 +48,8 @@ def digest_is_cacheable(digest: str) -> bool:
 
     return True
 
-class LRUCache(OrderedDict):
-    def __init__(self, max_size: int = 1000, *args: Any, **kwargs: dict[str, Any]):
-        self.max_size = max_size
-        super().__init__(*args, **kwargs)
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        if key not in self and len(self) >= self.max_size:
-            self.popitem(last=False)
-        super().__setitem__(key, value)
-
-    def get(self, key: str) -> Any:
-        if key in self:
-            self.move_to_end(key)
-        return super().get(key)
-            
 
 
-class MemCacheWithDiskCacheBackend():
-    """
-    A multi-stage cache with a quick memory cache and a slower disk cache.
-
-    Important: disk IO is backgrounded and not thread-safe (by design). We 
-    don't want to block the main thread for disk IO. Items with the same key
-    are expected to have the same value for the duration of the program.
-
-    The point of this cache is to:
-    1. provide rapid access to the most recent data
-    2. Use disk cache for long-term storage (ok if stale)
-    """
-
-    def __init__(self, cache_dir: str, size_limit: int = 1_000_000_000):
-        self._disk_cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(cache_dir, size_limit=size_limit)
-        self._mem_cache: LRUCache[str, str | bytes] = LRUCache(maxsize=1000)
-        self._disk_cache_thread_pool = ThreadPoolExecutor(max_workers=1)
-
-
-    def close(self) -> None:
-        self._disk_cache_thread_pool.shutdown(wait=False)
-        self._disk_cache.close()
-
-    def get(self, key: str) -> str | bytes:
-        res = self._mem_cache.get(key)
-        if res is None:
-            res = self._disk_cache.get(key)
-        return res
-    
-    def set(self, key: str, value: str | bytes) -> None:
-        self._mem_cache[key] = value
-        self._disk_cache_thread_pool.submit(self._disk_cache.set, key, value)
-    
-    def delete(self, key: str) -> None:
-        self._disk_cache.delete(key)
-
-    def __contains__(self, key: str) -> bool:
-        return key in self._mem_cache or key in self._disk_cache
 
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
@@ -203,12 +147,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return None
 
     def _safe_cache_delete_prefix(self, prefix: str) -> None:
+        """Delete all cached entries that start with the given prefix."""
         try:
-            for key in self._cache:
-                if key.startswith(prefix):
-                    self._safe_cache_delete(key)
+            self._cache.delete_keys_with_prefix(prefix)
         except Exception as e:
-            logger.exception(f"Error deleting cached values with prefix: {e}")
+            logger.exception(f"Error deleting cached values with prefix '{prefix}': {e}")
 
     def _with_cache(
         self,
@@ -240,13 +183,15 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         except Exception as e:
             logger.exception(f"Error creating cache key: {e}")
             return func(req)
+        
         try:
             cached_json_value = self._safe_cache_get(cache_key)
-            if cached_json_value:
+            if cached_json_value is not None:
                 return deserialize(cached_json_value)
         except Exception as e:
-            logger.exception(f"Error validating cached value: {e}")
+            logger.exception(f"Error deserializing cached value: {e}")
             self._safe_cache_delete(cache_key)
+        
         res = func(req)
         try:
             json_value_to_cache = serialize(res)
@@ -378,8 +323,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             try:
                 existing_result = self._safe_cache_get(ref)
             except Exception as e:
-                logger.exception(f"Error getting cached value: {e}")
-            if existing_result:
+                logger.exception(f"Error getting cached value for ref '{ref}': {e}")
+            
+            if existing_result is not None:
                 final_results[i] = existing_result
             else:
                 needed_refs.append(ref)
@@ -391,13 +337,14 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             for i, val in zip(needed_indices, needed_results.vals):
                 final_results[i] = val
                 try:
-                    parsed_ref = parse_uri(ref)
+                    # Only cache if the ref has a cacheable digest
+                    parsed_ref = parse_uri(needed_refs[needed_indices.index(i)])
                     if isinstance(parsed_ref, ObjectRef) and digest_is_cacheable(
                         parsed_ref.digest
                     ):
-                        self._safe_cache_set(ref, val)
+                        self._safe_cache_set(needed_refs[needed_indices.index(i)], val)
                 except Exception as e:
-                    logger.exception(f"Error caching values: {e}")
+                    logger.exception(f"Error caching ref value: {e}")
 
         return tsi.RefsReadBatchRes(vals=final_results)
 
