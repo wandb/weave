@@ -95,6 +95,7 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
+from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
@@ -223,6 +224,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
+        self._kafka_producer: Optional[KafkaProducer] = None
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -243,6 +245,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return self._file_storage_client
         self._file_storage_client = maybe_get_storage_client_from_env()
         return self._file_storage_client
+
+    @property
+    def kafka_producer(self) -> KafkaProducer:
+        if self._kafka_producer is not None:
+            return self._kafka_producer
+        self._kafka_producer = KafkaProducer.from_env()
+        return self._kafka_producer
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -311,7 +320,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+    def call_end(self, req: tsi.CallEndReq, publish: bool = True) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
@@ -320,6 +329,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
+
+        if wf_env.wf_enable_online_eval() and publish:
+            self.kafka_producer.produce_call_end(req.end)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()

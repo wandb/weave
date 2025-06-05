@@ -165,6 +165,8 @@ test = [
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
+  "freezegun",
+  "eval_type_backport",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
@@ -177,6 +179,8 @@ test = [
   "moviepy<=1.0.3",
   "filelock",
   "httpx",
+
+  "confluent-kafka",
 
   "weave[trace_server]",
   "weave[trace_server_tests]",
