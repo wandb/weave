@@ -572,7 +572,6 @@ function sortDatetimeFirst(items: GridFilterItem[]): GridFilterItem[] {
   return items.sort((a, b) => {
     const aIsDatetime = getFieldType(a.field) === 'datetime';
     const bIsDatetime = getFieldType(b.field) === 'datetime';
-
     if (aIsDatetime && !bIsDatetime) return -1;
     if (!aIsDatetime && bIsDatetime) return 1;
     return 0;
