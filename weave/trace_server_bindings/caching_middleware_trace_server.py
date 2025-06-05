@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import logging
 from collections.abc import Iterator
-from typing import Any, Callable, TypedDict, TypeVar
+import threading
+from typing import Any, Callable, OrderedDict, TypedDict, TypeVar
 
 import diskcache
 from pydantic import BaseModel
@@ -11,10 +13,10 @@ from typing_extensions import Self
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import (
     server_cache_dir,
-    server_cache_size_limit,
-    use_server_cache,
+    server_cache_size_limit
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.trace_server_common import LRUCache
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,62 @@ def digest_is_cacheable(digest: str) -> bool:
 
     return True
 
+class LRUCache(OrderedDict):
+    def __init__(self, max_size: int = 1000, *args: Any, **kwargs: dict[str, Any]):
+        self.max_size = max_size
+        super().__init__(*args, **kwargs)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if key not in self and len(self) >= self.max_size:
+            self.popitem(last=False)
+        super().__setitem__(key, value)
+
+    def get(self, key: str) -> Any:
+        if key in self:
+            self.move_to_end(key)
+        return super().get(key)
+            
+
+
+class MemCacheWithDiskCacheBackend():
+    """
+    A multi-stage cache with a quick memory cache and a slower disk cache.
+
+    Important: disk IO is backgrounded and not thread-safe (by design). We 
+    don't want to block the main thread for disk IO. Items with the same key
+    are expected to have the same value for the duration of the program.
+
+    The point of this cache is to:
+    1. provide rapid access to the most recent data
+    2. Use disk cache for long-term storage (ok if stale)
+    """
+
+    def __init__(self, cache_dir: str, size_limit: int = 1_000_000_000):
+        self._disk_cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(cache_dir, size_limit=size_limit)
+        self._mem_cache: LRUCache[str, str | bytes] = LRUCache(maxsize=1000)
+        self._disk_cache_thread_pool = ThreadPoolExecutor(max_workers=1)
+
+
+    def close(self) -> None:
+        self._disk_cache_thread_pool.shutdown(wait=False)
+        self._disk_cache.close()
+
+    def get(self, key: str) -> str | bytes:
+        res = self._mem_cache.get(key)
+        if res is None:
+            res = self._disk_cache.get(key)
+        return res
+    
+    def set(self, key: str, value: str | bytes) -> None:
+        self._mem_cache[key] = value
+        self._disk_cache_thread_pool.submit(self._disk_cache.set, key, value)
+    
+    def delete(self, key: str) -> None:
+        self._disk_cache.delete(key)
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._mem_cache or key in self._disk_cache
+
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     """A middleware trace server that provides caching functionality.
@@ -80,7 +138,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             size_limit: Maximum size in bytes for the cache (default 1GB)
         """
         self._next_trace_server = next_trace_server
-        self._cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
+        self._cache = MemCacheWithDiskCacheBackend(
             cache_dir, size_limit=size_limit
         )
         self._cache_recorder: CacheRecorder = {
@@ -112,10 +170,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         Returns:
             The cached value if found, None otherwise
         """
-        if not use_server_cache():
-            self._cache_recorder["skips"] += 1
-            return None
-
         try:
             res = self._cache.get(key)
         except Exception as e:
@@ -135,8 +189,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             key: The cache key
             value: The value to cache
         """
-        if not use_server_cache():
-            return None
         try:
             self._cache.set(key, value)
         except Exception as e:
@@ -144,8 +196,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return None
 
     def _safe_cache_delete(self, key: str) -> None:
-        if not use_server_cache():
-            return None
         try:
             self._cache.delete(key)
         except Exception as e:
@@ -153,8 +203,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return None
 
     def _safe_cache_delete_prefix(self, prefix: str) -> None:
-        if not use_server_cache():
-            return None
         try:
             for key in self._cache:
                 if key.startswith(prefix):
