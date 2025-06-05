@@ -1,20 +1,21 @@
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+import tempfile
 from collections.abc import Iterator
 from typing import Any, Callable, TypedDict, TypeVar
 
-import diskcache
 from pydantic import BaseModel
 from typing_extensions import Self
 
 from weave.trace.refs import ObjectRef, parse_uri
-from weave.trace.settings import (
-    server_cache_dir,
-    server_cache_size_limit,
-    use_server_cache,
-)
+from weave.trace.settings import server_cache_dir, server_cache_size_limit
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings.mem_cache_with_disk_backend import (
+    MemCacheWithDiskCacheBackend,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +81,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             size_limit: Maximum size in bytes for the cache (default 1GB)
         """
         self._next_trace_server = next_trace_server
-        self._cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
-            cache_dir, size_limit=size_limit
+        self._cache_dir = cache_dir or os.path.join(
+            tempfile.gettempdir(), "weave-cache"
+        )
+        self._cache = MemCacheWithDiskCacheBackend(
+            self._cache_dir, size_limit=size_limit
         )
         self._cache_recorder: CacheRecorder = {
             "hits": 0,
@@ -94,6 +98,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         """Cleanup method called when object is destroyed."""
         try:
             self._cache.close()
+            shutil.rmtree(self._cache_dir)
         except Exception as e:
             logger.exception(f"Error closing cache: {e}")
 
@@ -112,10 +117,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         Returns:
             The cached value if found, None otherwise
         """
-        if not use_server_cache():
-            self._cache_recorder["skips"] += 1
-            return None
-
         try:
             res = self._cache.get(key)
         except Exception as e:
@@ -135,8 +136,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             key: The cache key
             value: The value to cache
         """
-        if not use_server_cache():
-            return None
         try:
             self._cache.set(key, value)
         except Exception as e:
@@ -144,8 +143,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return None
 
     def _safe_cache_delete(self, key: str) -> None:
-        if not use_server_cache():
-            return None
         try:
             self._cache.delete(key)
         except Exception as e:
@@ -153,14 +150,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return None
 
     def _safe_cache_delete_prefix(self, prefix: str) -> None:
-        if not use_server_cache():
-            return None
+        """Delete all cached entries that start with the given prefix."""
         try:
-            for key in self._cache:
-                if key.startswith(prefix):
-                    self._safe_cache_delete(key)
+            self._cache.delete_keys_with_prefix(prefix)
         except Exception as e:
-            logger.exception(f"Error deleting cached values with prefix: {e}")
+            logger.exception(
+                f"Error deleting cached values with prefix '{prefix}': {e}"
+            )
 
     def _with_cache(
         self,
@@ -192,13 +188,15 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         except Exception as e:
             logger.exception(f"Error creating cache key: {e}")
             return func(req)
+
         try:
             cached_json_value = self._safe_cache_get(cache_key)
-            if cached_json_value:
+            if cached_json_value is not None:
                 return deserialize(cached_json_value)
         except Exception as e:
-            logger.exception(f"Error validating cached value: {e}")
+            logger.exception(f"Error deserializing cached value: {e}")
             self._safe_cache_delete(cache_key)
+
         res = func(req)
         try:
             json_value_to_cache = serialize(res)
@@ -252,6 +250,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             return self._next_trace_server.obj_read(req)
         return self._with_cache_pydantic(
             self._next_trace_server.obj_read, req, tsi.ObjReadRes
+        )
+
+    # Obj API
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        # All obj_create requests are cacheable!
+        return self._with_cache_pydantic(
+            self._next_trace_server.obj_create, req, tsi.ObjCreateRes
         )
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
@@ -323,8 +328,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             try:
                 existing_result = self._safe_cache_get(ref)
             except Exception as e:
-                logger.exception(f"Error getting cached value: {e}")
-            if existing_result:
+                logger.exception(f"Error getting cached value for ref '{ref}': {e}")
+
+            if existing_result is not None:
                 final_results[i] = existing_result
             else:
                 needed_refs.append(ref)
@@ -336,15 +342,23 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             for i, val in zip(needed_indices, needed_results.vals):
                 final_results[i] = val
                 try:
-                    parsed_ref = parse_uri(ref)
+                    # Only cache if the ref has a cacheable digest
+                    parsed_ref = parse_uri(needed_refs[needed_indices.index(i)])
                     if isinstance(parsed_ref, ObjectRef) and digest_is_cacheable(
                         parsed_ref.digest
                     ):
-                        self._safe_cache_set(ref, val)
+                        self._safe_cache_set(needed_refs[needed_indices.index(i)], val)
                 except Exception as e:
-                    logger.exception(f"Error caching values: {e}")
+                    logger.exception(f"Error caching ref value: {e}")
 
         return tsi.RefsReadBatchRes(vals=final_results)
+
+    # File API
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        # All file_create requests are cacheable!
+        return self._with_cache_pydantic(
+            self._next_trace_server.file_create, req, tsi.FileCreateRes
+        )
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         return self._with_cache(
@@ -414,10 +428,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         return self._next_trace_server.cost_purge(req)
 
-    # Obj API
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        return self._next_trace_server.obj_create(req)
-
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         return self._next_trace_server.objs_query(req)
 
@@ -427,10 +437,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         return self._next_trace_server.table_update(req)
-
-    # File API
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        return self._next_trace_server.file_create(req)
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         return self._next_trace_server.feedback_create(req)

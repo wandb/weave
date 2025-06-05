@@ -105,11 +105,11 @@ class UserSettings(BaseModel):
     This cannot be changed after the client has been initialized.
     """
 
-    use_server_cache: bool = False
+    use_server_cache: bool = True
     """
-    Toggles caching of server responses, defaults to False
+    Toggles caching of server responses, defaults to True
 
-    If True, caches server responses to disk.
+    If True, caches server responses to disk at `WEAVE_SERVER_CACHE_DIR`.
     Can be overridden with the environment variable `WEAVE_USE_SERVER_CACHE`
     """
 
