@@ -1,0 +1,70 @@
+interactions:
+  - request:
+      body: ""
+      headers:
+        Accept:
+          - "*/*"
+        Accept-Encoding:
+          - gzip, deflate, zstd
+        Connection:
+          - keep-alive
+        Content-Length:
+          - "284"
+        Content-Type:
+          - application/json
+        User-Agent:
+          - python-requests/2.32.3
+        x-goog-api-client:
+          - langchain-google-genai/2.1.5-ChatGoogleGenerativeAI:models/gemini-1.5-pro
+            gl-python/3.12.9 grpc/1.71.0 gax/2.24.2 gccl/2.1.5-ChatGoogleGenerativeAI:models/gemini-1.5-pro
+        x-goog-api-key:
+          - AIzaSyBMFtq5UrvJTtFw20Zjh3Oy1rhKpj-zQ3U
+        x-goog-request-params:
+          - model=models/gemini-1.5-pro
+      method: POST
+      uri: https://127.0.0.1:9090/v1beta/models/gemini-1.5-pro:generateContent?%24alt=json%3Benum-encoding%3Dint
+    response:
+      body:
+        string:
+          "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
+          [\n          {\n            \"text\": \"Hmm. Future of AI...  Like a djinn,
+          isn't it? Powerful, unpredictable.  Could be a boon, could be a curse. Depends
+          who's holding the reins, what wishes they make.  Lot of talk, lot of fear.
+          \ Me? I've seen worse.  Magic, monsters... they're a known quantity.  This
+          AI... it's a different sort of beast. Still learning its teeth.  Best to be
+          cautious.  And have a silver sword handy.  Just in case.\\n\"\n          }\n
+          \       ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
+          1,\n      \"avgLogprobs\": -0.20968768026976459\n    }\n  ],\n  \"usageMetadata\":
+          {\n    \"promptTokenCount\": 23,\n    \"candidatesTokenCount\": 113,\n    \"totalTokenCount\":
+          136,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": 1,\n
+          \       \"tokenCount\": 23\n      }\n    ],\n    \"candidatesTokensDetails\":
+          [\n      {\n        \"modality\": 1,\n        \"tokenCount\": 113\n      }\n
+          \   ]\n  },\n  \"modelVersion\": \"gemini-1.5-pro-002\",\n  \"responseId\":
+          \"v4Y_aLaWIq_57dcPztDP0AM\"\n}\n"
+      headers:
+        Alt-Svc:
+          - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+        Content-Type:
+          - application/json; charset=UTF-8
+        Date:
+          - Tue, 03 Jun 2025 23:35:30 GMT
+        Server:
+          - scaffolding on HTTPServer2
+        Server-Timing:
+          - gfet4t7; dur=2808
+        Transfer-Encoding:
+          - chunked
+        Vary:
+          - Origin
+          - X-Origin
+          - Referer
+        X-Content-Type-Options:
+          - nosniff
+        X-Frame-Options:
+          - SAMEORIGIN
+        X-XSS-Protection:
+          - "0"
+      status:
+        code: 200
+        message: OK
+version: 1
