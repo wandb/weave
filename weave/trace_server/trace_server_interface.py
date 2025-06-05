@@ -199,6 +199,7 @@ class ObjSchema(BaseModel):
     is_latest: int
     kind: str
     base_object_class: Optional[str]
+    leaf_object_class: Optional[str]
     val: Any
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -508,6 +509,11 @@ class ObjectVersionFilter(BaseModel):
         default=None,
         description="Filter objects by their base classes",
         examples=[["Model"], ["Dataset"]],
+    )
+    leaf_object_classes: Optional[list[str]] = Field(
+        default=None,
+        description="Filter objects by their leaf classes",
+        examples=[["Model"], ["Dataset"], ["LLMStructuredCompletionModel"]],
     )
     object_ids: Optional[list[str]] = Field(
         default=None,
