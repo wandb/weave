@@ -199,8 +199,22 @@ class ScorerCache:
             if scorer_id not in self._cached_scorers:
                 if len(self._cached_scorers) >= self._max_size:
                     self._cached_scorers.popitem()
-                self._cached_scorers[scorer_id] = default_factory()
+                scorer = default_factory()
+                self._setup_scorer_score_method(scorer)
+                self._cached_scorers[scorer_id] = scorer
         return self._cached_scorers[scorer_id]
+
+    def _setup_scorer_score_method(self, scorer: Scorer) -> None:
+        """Setup the score method op for the scorer once during caching."""
+        scorer_name = scorer.name or "UnnamedScorer"
+
+        @weave.op(name=scorer_name, enable_code_capture=False)
+        def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
+            # TODO: can't use score here because it will cause version mismatch
+            # return score
+            return cast(ScoreType, current_score.get())
+
+        scorer.__dict__["score"] = MethodType(score_method, scorer)
 
 
 global_scorer_cache = ScorerCache()
@@ -282,14 +296,6 @@ class ScoreLogger(BaseModel):
         # this is safe; pydantic casting is done in validator above
         scorer = cast(Scorer, scorer)
 
-        @weave.op(name=scorer.name, enable_code_capture=False)
-        def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
-            # TODO: can't use score here because it will cause version mismatch
-            # return score
-            return cast(ScoreType, current_score.get())
-
-        scorer.__dict__["score"] = MethodType(score_method, scorer)
-
         # attach the score feedback to the predict call
         with call_context.set_call_stack(
             [self.evaluate_call, self.predict_and_score_call]
@@ -298,8 +304,8 @@ class ScoreLogger(BaseModel):
                 with weave.attributes(IMPERATIVE_SCORE_MARKER):
                     await self.predict_call.apply_scorer(scorer)
 
-        # this is always true because of how the scorer is created in the validator
-        scorer_name = cast(str, scorer.name)
+        # Use scorer name or fallback to a default
+        scorer_name = scorer.name or "UnnamedScorer"
         self._captured_scores[scorer_name] = score
 
 
@@ -463,9 +469,9 @@ class EvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for finalization"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for finalization"
+        )
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -551,9 +557,9 @@ class EvaluationLogger(BaseModel):
             final_summary = {**final_summary, **summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
         try:
             with _set_current_summary(final_summary):
                 with weave.attributes(IMPERATIVE_EVAL_MARKER):
