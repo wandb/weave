@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections.abc import Iterator
 from typing import Any, Callable, TypedDict, TypeVar
@@ -48,6 +49,62 @@ def digest_is_cacheable(digest: str) -> bool:
         return False
 
     return True
+
+
+def _safe_cache_key_for_binary_data(data: Any) -> str:
+    """Create a safe cache key component for potentially binary data.
+
+    This function handles the case where data might contain binary content
+    that cannot be JSON-serialized.
+    """
+    try:
+        if isinstance(data, bytes):
+            # For binary data, create a hash instead of trying to serialize
+            return hashlib.sha256(data).hexdigest()
+        elif isinstance(data, str):
+            # For strings, try to encode and see if it's valid UTF-8
+            data.encode("utf-8")
+            return data
+        else:
+            # For other types, try JSON serialization
+            import json
+
+            return json.dumps(data, sort_keys=True, default=str)
+    except (UnicodeDecodeError, UnicodeEncodeError, TypeError, ValueError):
+        # If we can't serialize it, create a hash of its string representation
+        return hashlib.sha256(str(data).encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _create_obj_create_cache_key(req: tsi.ObjCreateReq) -> str:
+    """Create a cache key for ObjCreateReq that handles binary data safely."""
+    try:
+        # Create a safe representation of the object
+        obj_dict = req.obj.model_dump()
+        val = obj_dict.pop("val", None)
+
+        # Serialize everything except val
+        import json
+
+        base_key = json.dumps(obj_dict, sort_keys=True)
+
+        # Handle val separately as it might contain binary data
+        val_key = _safe_cache_key_for_binary_data(val)
+
+        return f"{base_key}|val:{val_key}"
+    except Exception:
+        # Fallback to a hash of the entire request
+        return hashlib.sha256(str(req).encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _create_file_create_cache_key(req: tsi.FileCreateReq) -> str:
+    """Create a cache key for FileCreateReq that handles binary content safely."""
+    try:
+        # Create key from project_id and name, plus hash of content
+        content_hash = _safe_cache_key_for_binary_data(req.content)
+        return f"project:{req.project_id}|name:{req.name}|content:{content_hash}"
+    except Exception:
+        # Fallback to a hash of the entire request
+        return hashlib.sha256(str(req).encode("utf-8", errors="ignore")).hexdigest()
 
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
@@ -257,8 +314,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         # All obj_create requests are cacheable!
-        return self._with_cache_pydantic(
-            self._next_trace_server.obj_create, req, tsi.ObjCreateRes
+        return self._with_cache(
+            self._next_trace_server.obj_create,
+            req,
+            "obj_create",
+            _create_obj_create_cache_key,
+            lambda res: res.model_dump_json(),
+            lambda json_value: tsi.ObjCreateRes.model_validate_json(json_value),
         )
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
@@ -356,8 +418,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     # File API
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         # All file_create requests are cacheable!
-        return self._with_cache_pydantic(
-            self._next_trace_server.file_create, req, tsi.FileCreateRes
+        return self._with_cache(
+            self._next_trace_server.file_create,
+            req,
+            "file_create",
+            _create_file_create_cache_key,
+            lambda res: res.model_dump_json(),
+            lambda json_value: tsi.FileCreateRes.model_validate_json(json_value),
         )
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
