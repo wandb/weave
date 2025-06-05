@@ -1,7 +1,6 @@
 import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
-import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
@@ -288,11 +287,6 @@ export const PlaygroundChat = ({
                   </div>
                 </div>
                 <div className="relative mx-auto w-full max-w-[800px] p-[8px] pl-[12px]">
-                  {state.loading && (
-                    <div className="absolute bottom-[16px] left-[16px] z-[100] flex">
-                      <WaveLoader size="small" />
-                    </div>
-                  )}
                   {state.traceCall.summary && (
                     <PlaygroundCallStats
                       call={state.traceCall as TraceCallSchema}
