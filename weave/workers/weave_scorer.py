@@ -35,6 +35,7 @@ from weave.trace.weave_client import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.environment import (
+    wf_enable_online_eval,
     wf_scoring_worker_batch_size,
     wf_scoring_worker_batch_timeout,
 )
@@ -500,5 +501,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    logger.info("Starting scorer worker...")
-    asyncio.run(main())
+    if wf_enable_online_eval():
+        logger.info("Starting scorer worker...")
+        asyncio.run(main())
+    else:
+        logger.info("Online eval is disabled, exiting.")
