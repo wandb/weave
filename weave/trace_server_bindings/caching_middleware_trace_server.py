@@ -254,6 +254,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             self._next_trace_server.obj_read, req, tsi.ObjReadRes
         )
 
+    # Obj API
+    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        # All obj_create requests are cacheable!
+        return self._with_cache_pydantic(
+            self._next_trace_server.obj_create, req, tsi.ObjCreateRes
+        )
+
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         if req.digests:
             for digest in req.digests:
@@ -346,6 +353,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
         return tsi.RefsReadBatchRes(vals=final_results)
 
+    # File API
+    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        # All file_create requests are cacheable!
+        return self._with_cache_pydantic(
+            self._next_trace_server.file_create, req, tsi.FileCreateRes
+        )
+
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         return self._with_cache(
             self._next_trace_server.file_content_read,
@@ -414,10 +428,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         return self._next_trace_server.cost_purge(req)
 
-    # Obj API
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        return self._next_trace_server.obj_create(req)
-
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         return self._next_trace_server.objs_query(req)
 
@@ -427,10 +437,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         return self._next_trace_server.table_update(req)
-
-    # File API
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        return self._next_trace_server.file_create(req)
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         return self._next_trace_server.feedback_create(req)
