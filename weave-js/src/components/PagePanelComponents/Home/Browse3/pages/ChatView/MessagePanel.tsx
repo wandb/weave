@@ -57,7 +57,11 @@ export const MessagePanel = ({
 
   // Use animated text for the message content
   const messageText = _.isString(message.content) ? message.content : '';
-  const {displayedText} = useAnimatedText(messageText, shouldAnimateText, 50);
+  const {displayedText, isAnimating} = useAnimatedText(
+    messageText,
+    shouldAnimateText,
+    50
+  );
 
   useEffect(() => {
     if (contentRef.current) {
@@ -176,6 +180,7 @@ export const MessagePanel = ({
                             shouldAnimateText ? displayedText : message.content
                           }
                           isStructuredOutput={isStructuredOutput}
+                          showCursor={shouldAnimateText && isAnimating}
                         />
                       ) : (
                         message.content!.map((p, i) => (

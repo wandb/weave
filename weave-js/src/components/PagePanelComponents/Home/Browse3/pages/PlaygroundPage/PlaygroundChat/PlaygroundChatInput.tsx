@@ -128,8 +128,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               onClick={() => handleSend(addMessageRole)}
               disabled={
                 isLoading || chatText.trim() === '' || !hasConfiguredProviders
-              }
-              startIcon={isLoading ? 'loading' : undefined}>
+              }>
               {isLoading ? 'Sending...' : 'Send'}
             </Button>
           </div>
