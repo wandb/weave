@@ -334,6 +334,16 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         else:
             cache_key_prefix = f'obj_read_{{"project_id":"{req.project_id}","object_id":"{req.object_id}"'
             self._safe_cache_delete_prefix(cache_key_prefix)
+
+        # Also invalidate obj_create cache entries for the same object
+        # Since obj_create cache keys are based on the request content, we need to invalidate
+        # all obj_create entries for this project_id and object_id
+        try:
+            obj_create_cache_prefix = f'obj_create_{{"project_id":"{req.project_id}","object_id":"{req.object_id}"'
+            self._safe_cache_delete_prefix(obj_create_cache_prefix)
+        except Exception as e:
+            logger.exception(f"Error deleting obj_create cached values: {e}")
+
         return self._next_trace_server.obj_delete(req)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
