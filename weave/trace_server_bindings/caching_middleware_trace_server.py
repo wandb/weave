@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 import shutil
@@ -49,6 +51,61 @@ def digest_is_cacheable(digest: str) -> bool:
         return False
 
     return True
+
+
+def _safe_cache_key_for_binary_data(data: Any) -> str:
+    """Create a safe cache key component for potentially binary data.
+
+    This function handles the case where data might contain binary content
+    that cannot be JSON-serialized.
+    """
+    try:
+        if isinstance(data, bytes):
+            # For binary data, create a hash instead of trying to serialize
+            return hashlib.sha256(data).hexdigest()
+        elif isinstance(data, str):
+            # For strings, try to encode and see if it's valid UTF-8
+            data.encode("utf-8")
+            return data
+        else:
+            # For other types, try JSON serialization
+            return json.dumps(data, sort_keys=True, default=str)
+    except (UnicodeDecodeError, UnicodeEncodeError, TypeError, ValueError):
+        # If we can't serialize it, create a hash of its string representation
+        utf8_str_repr = str(data).encode("utf-8", errors="ignore")
+        return hashlib.sha256(utf8_str_repr).hexdigest()
+
+
+def _create_obj_create_cache_key(req: tsi.ObjCreateReq) -> str:
+    """Create a cache key for ObjCreateReq that handles binary data safely."""
+    try:
+        # Create a safe representation of the object
+        obj_dict = req.obj.model_dump()
+        val = obj_dict.pop("val", None)
+
+        # Serialize everything except val
+        base_key = json.dumps(obj_dict, sort_keys=True)
+
+        # Handle val separately as it might contain binary data
+        val_key = _safe_cache_key_for_binary_data(val)
+
+    except Exception:
+        # Fallback to a hash of the entire request
+        return hashlib.sha256(str(req).encode("utf-8", errors="ignore")).hexdigest()
+    else:
+        return f"{base_key}|val:{val_key}"
+
+
+def _create_file_create_cache_key(req: tsi.FileCreateReq) -> str:
+    """Create a cache key for FileCreateReq that handles binary content safely."""
+    try:
+        # Create key from project_id and name, plus hash of content
+        content_hash = _safe_cache_key_for_binary_data(req.content)
+    except Exception:
+        # Fallback to a hash of the entire request
+        return hashlib.sha256(str(req).encode("utf-8", errors="ignore")).hexdigest()
+    else:
+        return f"project:{req.project_id}|name:{req.name}|content:{content_hash}"
 
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
@@ -255,8 +312,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         # All obj_create requests are cacheable!
-        return self._with_cache_pydantic(
-            self._next_trace_server.obj_create, req, tsi.ObjCreateRes
+        return self._with_cache(
+            self._next_trace_server.obj_create,
+            req,
+            "obj_create",
+            _create_obj_create_cache_key,
+            lambda res: res.model_dump_json(),
+            lambda json_value: tsi.ObjCreateRes.model_validate_json(json_value),
         )
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
@@ -270,6 +332,16 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         else:
             cache_key_prefix = f'obj_read_{{"project_id":"{req.project_id}","object_id":"{req.object_id}"'
             self._safe_cache_delete_prefix(cache_key_prefix)
+
+        # Also invalidate obj_create cache entries for the same object
+        # Since obj_create cache keys are based on the request content, we need to invalidate
+        # all obj_create entries for this project_id and object_id
+        try:
+            obj_create_cache_prefix = f'obj_create_{{"project_id":"{req.project_id}","object_id":"{req.object_id}"'
+            self._safe_cache_delete_prefix(obj_create_cache_prefix)
+        except Exception as e:
+            logger.exception(f"Error deleting obj_create cached values: {e}")
+
         return self._next_trace_server.obj_delete(req)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
@@ -356,8 +428,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     # File API
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         # All file_create requests are cacheable!
-        return self._with_cache_pydantic(
-            self._next_trace_server.file_create, req, tsi.FileCreateRes
+        return self._with_cache(
+            self._next_trace_server.file_create,
+            req,
+            "file_create",
+            _create_file_create_cache_key,
+            lambda res: res.model_dump_json(),
+            lambda json_value: tsi.FileCreateRes.model_validate_json(json_value),
         )
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
