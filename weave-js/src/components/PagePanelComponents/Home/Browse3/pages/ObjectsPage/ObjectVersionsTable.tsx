@@ -83,6 +83,8 @@ export const ObjectVersionsTable: React.FC<{
         val = _.omit(val, 'rows');
       }
       // This is a dirty hack to enable keeping the nested query value for Monitors
+      // allows to specify top-level fields from the underlying vals which are not
+      // flattened into nested columns
       (props.keepNestedVal || []).forEach(keepVal => {
         if (keepVal in vals[i]) {
           val[keepVal] = vals[i][keepVal];

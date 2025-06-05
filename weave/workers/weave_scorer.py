@@ -5,6 +5,7 @@ from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Optional, TypedDict
 
+import ddtrace
 import sentry_sdk
 from confluent_kafka import KafkaError, Message
 from tenacity import (
@@ -199,6 +200,12 @@ async def get_filtered_calls(
     count_req = tsi.CallsQueryStatsReq(
         project_id=project_id,
         filter=tsi.CallsFilter(call_ids=call_ids),
+        # We want to make sure all end_call events have been written to the DB
+        query={
+            "$expr": {
+                "$not": [{"$eq": [{"$getField": "ended_at"}, {"$literal": None}]}]
+            }
+        },
     )
 
     count = server.calls_query_stats(count_req).count
@@ -289,6 +296,7 @@ def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, An
     return call_start_res.id, result
 
 
+@ddtrace.tracer.wrap(name="weave_scorer.apply_scorer")
 async def apply_scorer(
     monitor_internal_ref: InternalObjectRef,
     scorer: Scorer,
@@ -389,7 +397,7 @@ async def process_project_ended_calls(
 
     call_ids = [ended_call.id for ended_call in ended_calls]
 
-    for active_monitor in active_monitors:
+    async def _process_monitor(active_monitor: ActiveMonitor) -> None:
         monitor = active_monitor["monitor"]
         monitor_internal_ref = active_monitor["internal_ref"]
         wb_user_id = active_monitor["wb_user_id"]
@@ -407,12 +415,19 @@ async def process_project_ended_calls(
         )
 
         with get_trace_server().call_batch():
-            for call in calls:
-                for scorer in monitor.scorers:
-                    logger.info("Applying scorer %s to call %s", scorer.name, call.id)
-                    await apply_scorer(
+            await asyncio.gather(
+                *[
+                    apply_scorer(
                         monitor_internal_ref, scorer, call, project_id, wb_user_id
                     )
+                    for scorer in monitor.scorers
+                    for call in calls
+                ]
+            )
+
+    await asyncio.gather(
+        *[_process_monitor(active_monitor) for active_monitor in active_monitors]
+    )
 
 
 async def run_consumer() -> None:

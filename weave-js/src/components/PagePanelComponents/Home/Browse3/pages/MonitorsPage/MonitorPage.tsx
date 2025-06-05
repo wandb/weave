@@ -33,6 +33,8 @@ import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
 import React, {useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
+import {MONITORED_FILTER_VALUE} from '../../filters/common';
+
 const MONITOR_VERSIONS_SORT_KEY: SortBy[] = [
   {field: 'created_at', direction: 'desc'},
 ];
@@ -87,7 +89,7 @@ const MonitorPageInner = ({
     () => ({
       items: [
         {
-          field: 'feedback.[*].trigger_ref',
+          field: MONITORED_FILTER_VALUE,
           operator: '(string): in',
           value: allVersionRefs,
         },
@@ -120,7 +122,7 @@ const MonitorPageInner = ({
     }));
     return {
       $expr: {
-        $in: [{$getField: 'feedback.[*].trigger_ref'}, allVersionRefOperands],
+        $in: [{$getField: MONITORED_FILTER_VALUE}, allVersionRefOperands],
       },
     };
   }, [allVersionRefs]);

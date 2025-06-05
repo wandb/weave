@@ -329,5 +329,6 @@ def test_do_score_call(mock_get_trace_server: MagicMock):
                     output={"json_valid": True},
                     summary={},
                 )
-            )
+            ),
+            publish=False,
         )

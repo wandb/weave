@@ -346,6 +346,10 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = {
   'attributes.weave.sys_version': 'Python version used',
 };
 
+// The wildcard works because monitors are the only usage of trigger_ref at this time
+// This will need to be updated if we add more usage of trigger_ref
+export const MONITORED_FILTER_VALUE = 'feedback.[*].trigger_ref';
+
 // Create a unique symbol for RefString
 const WeaveRefStringSymbol = Symbol('WeaveRefString');
 const ArtifactRefStringSymbol = Symbol('ArtifactRefString');

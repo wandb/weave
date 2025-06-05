@@ -4,10 +4,10 @@
 
 import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
+import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
 import {IconFilterAlt} from '../../../../Icon';
@@ -23,6 +23,7 @@ import {
   FilterId,
   getOperatorOptions,
   isValuelessOperator,
+  MONITORED_FILTER_VALUE,
   UNFILTERABLE_FIELDS,
   upsertFilter,
 } from './common';
@@ -176,8 +177,9 @@ export const FilterBar = ({
   });
   if (isWandbAdmin) {
     (options[0] as GroupedOption).options.push({
-      value: 'feedback.[*].trigger_ref',
+      value: MONITORED_FILTER_VALUE,
       label: 'Monitored',
+      description: 'Find all calls scored by a particular monitor',
     });
   }
 

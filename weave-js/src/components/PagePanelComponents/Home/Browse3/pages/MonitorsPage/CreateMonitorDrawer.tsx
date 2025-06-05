@@ -24,12 +24,12 @@ import {
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/OpSelector';
 import {queryToGridFilterModel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/SavedViews/savedViewUtil';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
-import {useObjCreate} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
-import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import {
-  ObjectVersionSchema,
-  WeaveObjectVersionKey,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+  useObjCreate,
+  useScorerCreate,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
+import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
+import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {parseRef} from '@wandb/weave/react';
@@ -151,51 +151,7 @@ export const CreateMonitorDrawer = ({
 
   const objCreate = useObjCreate();
 
-  const createScorer = useCallback(
-    async ({
-      name: scorerName,
-      refUri,
-    }: {
-      name: string;
-      refUri?: string;
-    }): Promise<WeaveObjectVersionKey> => {
-      let scorerDigest: string;
-      if (refUri) {
-        // If the scorer already exists (this is an edit) we do not recreate it.
-        scorerDigest = parseRef(refUri).artifactVersion;
-      } else {
-        // If refUri is undefined the scorer needs to be create.
-        const scorerObj = {
-          _type: scorerName,
-          name: scorerName,
-          description: `${scorerName} created from the UI.`,
-          ref: null,
-          column_map: null,
-          _class_name: scorerName,
-          _bases: ['Scorer', 'Object', 'BaseModel'],
-        };
-
-        scorerDigest = await objCreate({
-          projectId: `${entity}/${project}`,
-          objectId: scorerName,
-          val: scorerObj,
-        });
-      }
-
-      const objectVersionKey: WeaveObjectVersionKey = {
-        scheme: 'weave',
-        entity,
-        project,
-        weaveKind: 'object',
-        objectId: scorerName,
-        versionHash: scorerDigest,
-        path: '',
-      };
-
-      return objectVersionKey;
-    },
-    [entity, objCreate, project]
-  );
+  const scorerCreate = useScorerCreate();
 
   const createMonitor = useCallback(async () => {
     if (!enableCreateButton) {
@@ -205,7 +161,14 @@ export const CreateMonitorDrawer = ({
     setIsCreating(true);
     try {
       const scorerRefs = await Promise.all(
-        scorers.map(async scorer => await createScorer(scorer))
+        scorers.map(
+          async scorer =>
+            await scorerCreate({
+              entity,
+              project,
+              ...scorer,
+            })
+        )
       );
 
       const mongoQuery = getFilterByRaw(filterModel);
@@ -266,7 +229,7 @@ export const CreateMonitorDrawer = ({
     entity,
     objCreate,
     project,
-    createScorer,
+    scorerCreate,
   ]);
 
   return (

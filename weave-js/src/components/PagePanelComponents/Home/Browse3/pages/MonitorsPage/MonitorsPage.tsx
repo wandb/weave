@@ -17,6 +17,8 @@ import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
 import React, {useMemo, useState} from 'react';
 
+import {MONITORED_FILTER_VALUE} from '../../filters/common';
+
 export const MonitorsPage = ({
   entity,
   project,
@@ -98,18 +100,25 @@ export const MonitorsPage = ({
               valueGetter: (_, row) => row.obj.val['op_names'],
               renderCell: params => {
                 const opRefs: string[] = params.value;
-                return opRefs.length > 0 ? (
+                if (opRefs.length === 0) {
+                  return null;
+                }
+                let firstOpRef: WeaveObjectRef | null = null;
+                try {
+                  firstOpRef = parseRef(opRefs[0]) as WeaveObjectRef;
+                } catch (e) {
+                  return <span>Incorrect op ref: {opRefs[0]}</span>;
+                }
+                return (
                   <div className="flex items-center gap-2">
                     {opRefs[0] !== ALL_TRACES_OR_CALLS_REF_KEY ? (
-                      <SmallRef
-                        objRef={parseRef(opRefs[0]) as WeaveObjectRef}
-                      />
+                      <SmallRef objRef={firstOpRef} />
                     ) : null}
                     {opRefs.length > 1 ? (
                       <span>{`+${opRefs.length - 1}`}</span>
                     ) : null}
                   </div>
-                ) : null;
+                );
               },
             },
             {
@@ -180,7 +189,7 @@ const CallCountCell = ({
     return {
       $expr: {
         $contains: {
-          input: {$getField: 'feedback.[*].trigger_ref'},
+          input: {$getField: MONITORED_FILTER_VALUE},
           substr: {
             $literal: `${monitorRef.split(':').slice(0, -1).join(':')}:`,
           },

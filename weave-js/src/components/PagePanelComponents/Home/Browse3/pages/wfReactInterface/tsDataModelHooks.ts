@@ -70,6 +70,7 @@ import {
   UseTableQueryStatsParams,
   UseTableRowsQueryParams,
   UseTableUpdateParams,
+  WeaveObjectVersionKey,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
@@ -2122,6 +2123,60 @@ export const useObjCreate = () => {
         });
     },
     [getTsClient]
+  );
+};
+
+export const useScorerCreate = () => {
+  const objCreate = useObjCreate();
+
+  return useCallback(
+    async ({
+      entity,
+      project,
+      name,
+      refUri,
+    }: {
+      entity: string;
+      project: string;
+      name: string;
+      refUri?: string;
+    }): Promise<WeaveObjectVersionKey> => {
+      let scorerDigest: string;
+      if (refUri) {
+        // If the scorer already exists (this is an edit) we do not recreate it.
+        scorerDigest = parseRef(refUri).artifactVersion;
+      } else {
+        // If refUri is undefined the scorer needs to be create.
+        const scorerObj = {
+          _type: name,
+          name: name,
+          description: `${name} created from the UI.`,
+          ref: null,
+          column_map: null,
+          _class_name: name,
+          _bases: ['Scorer', 'Object', 'BaseModel'],
+        };
+
+        scorerDigest = await objCreate({
+          projectId: `${entity}/${project}`,
+          objectId: name,
+          val: scorerObj,
+        });
+      }
+
+      const objectVersionKey: WeaveObjectVersionKey = {
+        scheme: 'weave',
+        entity,
+        project,
+        weaveKind: 'object',
+        objectId: name,
+        versionHash: scorerDigest,
+        path: '',
+      };
+
+      return objectVersionKey;
+    },
+    [objCreate]
   );
 };
 

@@ -21,6 +21,7 @@ import {
   useRootObjectVersions,
 } from '../pages/wfReactInterface/tsDataModelHooks';
 import {KnownBaseObjectClassType} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+import {SmallOpVersionsRef} from './SmallOpVersionsRef';
 import {SmallRefLoaded} from './SmallRefLoaded';
 
 export const objectRefDisplayName = (
@@ -104,7 +105,17 @@ export const SmallWeaveRef = ({
 }: SmallWeaveRefProps) => {
   return (
     <TailwindContents>
-      {objRef.weaveKind === 'call' ? (
+      {objRef.artifactVersion === '*' ? (
+        objRef.weaveKind === 'op' ? (
+          <SmallOpVersionsRef objRef={objRef} />
+        ) : (
+          <SmallObjectVersionsRef
+            objRef={objRef}
+            iconOnly={iconOnly}
+            noLink={noLink}
+          />
+        )
+      ) : objRef.weaveKind === 'call' ? (
         <SmallWeaveCallRef
           objRef={objRef}
           iconOnly={iconOnly}
