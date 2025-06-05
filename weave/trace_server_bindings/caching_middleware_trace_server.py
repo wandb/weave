@@ -71,7 +71,8 @@ def _safe_cache_key_for_binary_data(data: Any) -> str:
             return json.dumps(data, sort_keys=True, default=str)
     except (UnicodeDecodeError, UnicodeEncodeError, TypeError, ValueError):
         # If we can't serialize it, create a hash of its string representation
-        return hashlib.sha256(str(data).encode("utf-8", errors="ignore")).hexdigest()
+        utf8_str_repr = str(data).encode("utf-8", errors="ignore")
+        return hashlib.sha256(utf8_str_repr).hexdigest()
 
 
 def _create_obj_create_cache_key(req: tsi.ObjCreateReq) -> str:
