@@ -110,6 +110,11 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
     const {messagesTemplate, ...defaultParams} =
       savedModel?.savedModelParams ?? {};
 
+    // Filter out undefined values from defaultParams
+    const filteredDefaultParams = Object.fromEntries(
+      Object.entries(defaultParams).filter(([_, value]) => value !== undefined)
+    );
+
     setPlaygroundStates(
       playgroundStates.map((state, i) => {
         if (i === index) {
@@ -137,7 +142,7 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
               },
             },
             // Update the other params
-            ...defaultParams,
+            ...filteredDefaultParams,
           };
         }
         return state;

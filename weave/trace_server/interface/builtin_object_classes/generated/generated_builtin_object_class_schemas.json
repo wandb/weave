@@ -966,6 +966,7 @@
       "type": "object"
     },
     "LLMStructuredCompletionModel": {
+      "additionalProperties": false,
       "properties": {
         "name": {
           "anyOf": [
@@ -991,6 +992,17 @@
           "default": null,
           "title": "Description"
         },
+        "ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "llm_model_id": {
           "title": "Llm Model Id",
           "type": "string"
@@ -1008,11 +1020,19 @@
     "LLMStructuredCompletionModelDefaultParams": {
       "properties": {
         "messages_template": {
-          "items": {
-            "$ref": "#/$defs/Message"
-          },
-          "title": "Messages Template",
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Message"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Messages Template"
         },
         "temperature": {
           "anyOf": [
@@ -1119,18 +1139,20 @@
         "response_format": {
           "anyOf": [
             {
-              "$ref": "#/$defs/ResponseFormat"
+              "enum": [
+                "json_object",
+                "text"
+              ],
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "title": "Response Format"
         }
       },
-      "required": [
-        "messages_template"
-      ],
       "title": "LLMStructuredCompletionModelDefaultParams",
       "type": "object"
     },
@@ -1309,6 +1331,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Content"
         },
         "name": {
@@ -1320,6 +1343,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Name"
         },
         "function_call": {
@@ -1331,6 +1355,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Function Call"
         },
         "tool_call_id": {
@@ -1342,15 +1367,12 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Tool Call Id"
         }
       },
       "required": [
-        "role",
-        "content",
-        "name",
-        "function_call",
-        "tool_call_id"
+        "role"
       ],
       "title": "Message",
       "type": "object"
@@ -1408,6 +1430,42 @@
         "$not"
       ],
       "title": "NotOperation",
+      "type": "object"
+    },
+    "ObjectRef": {
+      "properties": {
+        "entity": {
+          "title": "Entity",
+          "type": "string"
+        },
+        "project": {
+          "title": "Project",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "_digest": {
+          "title": " Digest",
+          "type": "string"
+        },
+        "_extra": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": " Extra",
+          "type": "array"
+        }
+      },
+      "required": [
+        "entity",
+        "project",
+        "name",
+        "_digest"
+      ],
+      "title": "ObjectRef",
       "type": "object"
     },
     "OrOperation": {
@@ -1626,14 +1684,6 @@
       ],
       "title": "Query",
       "type": "object"
-    },
-    "ResponseFormat": {
-      "enum": [
-        "json",
-        "text"
-      ],
-      "title": "ResponseFormat",
-      "type": "string"
     },
     "SavedView": {
       "properties": {
