@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+import tempfile
 from collections.abc import Iterator
 from typing import Any, Callable, TypedDict, TypeVar
 
@@ -8,12 +11,11 @@ from pydantic import BaseModel
 from typing_extensions import Self
 
 from weave.trace.refs import ObjectRef, parse_uri
-from weave.trace.settings import (
-    server_cache_dir,
-    server_cache_size_limit
-)
+from weave.trace.settings import server_cache_dir, server_cache_size_limit
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings.mem_cache_with_disk_backend import MemCacheWithDiskCacheBackend
+from weave.trace_server_bindings.mem_cache_with_disk_backend import (
+    MemCacheWithDiskCacheBackend,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +51,6 @@ def digest_is_cacheable(digest: str) -> bool:
     return True
 
 
-
-
-
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     """A middleware trace server that provides caching functionality.
 
@@ -82,8 +81,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             size_limit: Maximum size in bytes for the cache (default 1GB)
         """
         self._next_trace_server = next_trace_server
+        self._cache_dir = cache_dir or os.path.join(
+            tempfile.gettempdir(), "weave-cache"
+        )
         self._cache = MemCacheWithDiskCacheBackend(
-            cache_dir, size_limit=size_limit
+            self._cache_dir, size_limit=size_limit
         )
         self._cache_recorder: CacheRecorder = {
             "hits": 0,
@@ -96,6 +98,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         """Cleanup method called when object is destroyed."""
         try:
             self._cache.close()
+            shutil.rmtree(self._cache_dir)
         except Exception as e:
             logger.exception(f"Error closing cache: {e}")
 
@@ -151,7 +154,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         try:
             self._cache.delete_keys_with_prefix(prefix)
         except Exception as e:
-            logger.exception(f"Error deleting cached values with prefix '{prefix}': {e}")
+            logger.exception(
+                f"Error deleting cached values with prefix '{prefix}': {e}"
+            )
 
     def _with_cache(
         self,
@@ -183,7 +188,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         except Exception as e:
             logger.exception(f"Error creating cache key: {e}")
             return func(req)
-        
+
         try:
             cached_json_value = self._safe_cache_get(cache_key)
             if cached_json_value is not None:
@@ -191,7 +196,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         except Exception as e:
             logger.exception(f"Error deserializing cached value: {e}")
             self._safe_cache_delete(cache_key)
-        
+
         res = func(req)
         try:
             json_value_to_cache = serialize(res)
@@ -324,7 +329,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
                 existing_result = self._safe_cache_get(ref)
             except Exception as e:
                 logger.exception(f"Error getting cached value for ref '{ref}': {e}")
-            
+
             if existing_result is not None:
                 final_results[i] = existing_result
             else:
