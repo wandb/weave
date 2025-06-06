@@ -21,6 +21,7 @@ import {
   FIELD_DESCRIPTIONS,
   FIELD_LABELS,
   FilterId,
+  getFieldType,
   getOperatorOptions,
   isValuelessOperator,
   MONITORED_FILTER_VALUE,
@@ -183,6 +184,31 @@ export const FilterBar = ({
     });
   }
 
+  // Sort options within each group so datetime fields appear first
+  const sortFieldOptions = (
+    fieldOptions: {value: string; label: string; description?: string}[]
+  ) => {
+    return fieldOptions.sort((a, b) => {
+      const aIsDatetime = getFieldType(a.value) === 'datetime';
+      const bIsDatetime = getFieldType(b.value) === 'datetime';
+
+      if (aIsDatetime && !bIsDatetime) return -1;
+      if (!aIsDatetime && bIsDatetime) return 1;
+      return 0;
+    });
+  };
+
+  // Apply sorting to each option group
+  const sortedOptions = options.map(group => {
+    if ('options' in group) {
+      return {
+        ...group,
+        options: sortFieldOptions([...group.options]),
+      };
+    }
+    return group;
+  });
+
   const onRemoveAll = () => {
     const emptyModel = {items: []};
     setLocalFilterModel(emptyModel);
@@ -322,11 +348,27 @@ export const FilterBar = ({
     f => !isFilterIncomplete(f)
   );
 
+  // Utility function to sort datetime fields first
+  const sortDatetimeFirst = (items: GridFilterItem[]) => {
+    return items.sort((a, b) => {
+      const aIsDatetime = getFieldType(a.field) === 'datetime';
+      const bIsDatetime = getFieldType(b.field) === 'datetime';
+
+      if (aIsDatetime && !bIsDatetime) return -1;
+      if (!aIsDatetime && bIsDatetime) return 1;
+      return 0;
+    });
+  };
+
   // Determine if we should show a border based on whether there are active filters
   const hasBorder = completeItems.length > 0;
 
   const {combinedItems, activeEditIds} = useMemo(() => {
-    const {items, activeIds} = combineRangeFilters(completeItems, activeEditId);
+    const sortedCompleteItems = sortDatetimeFirst([...completeItems]);
+    const {items, activeIds} = combineRangeFilters(
+      sortedCompleteItems,
+      activeEditId
+    );
     return {combinedItems: items, activeEditIds: activeIds};
   }, [completeItems, activeEditId]);
 
@@ -400,19 +442,32 @@ export const FilterBar = ({
               </div>
             </DraggableHandle>
             <div className="grid grid-cols-[auto_auto_auto_30px] gap-4">
-              {localFilterModel.items.map(item => (
-                <FilterRow
-                  key={item.id}
-                  entity={entity}
-                  project={project}
-                  item={item}
-                  options={options}
-                  onAddFilter={onAddFilter}
-                  onUpdateFilter={onUpdateFilter}
-                  onRemoveFilter={onRemoveFilter}
-                  activeEditId={activeEditId}
-                />
-              ))}
+              {(() => {
+                const sortedItems = sortDatetimeFirst([
+                  ...localFilterModel.items,
+                ]);
+
+                return sortedItems.map((item, index) => {
+                  // Check if this is the first datetime filter after sorting
+                  const isFirstDatetimeFilter =
+                    index === 0 && getFieldType(item.field) === 'datetime';
+
+                  return (
+                    <FilterRow
+                      key={item.id}
+                      entity={entity}
+                      project={project}
+                      item={item}
+                      options={sortedOptions}
+                      onAddFilter={onAddFilter}
+                      onUpdateFilter={onUpdateFilter}
+                      onRemoveFilter={onRemoveFilter}
+                      activeEditId={activeEditId}
+                      disabled={isFirstDatetimeFilter}
+                    />
+                  );
+                });
+              })()}
             </div>
             {localFilterModel.items.length === 0 && (
               <FilterRow
@@ -424,7 +479,7 @@ export const FilterBar = ({
                   operator: '',
                   value: undefined,
                 }}
-                options={options}
+                options={sortedOptions}
                 onAddFilter={onAddFilter}
                 onUpdateFilter={onUpdateFilter}
                 onRemoveFilter={onRemoveFilter}
