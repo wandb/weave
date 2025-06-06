@@ -159,6 +159,15 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_RETRY_MAX_ATTEMPTS`
     """
 
+    enable_disk_fallback: bool = True
+    """
+    Toggles disk fallback for dropped items.
+
+    If True, items that fail to be processed or are dropped due to queue limits
+    will be written to disk as a fallback instead of being lost.
+    Can be overridden with the environment variable `WEAVE_ENABLE_DISK_FALLBACK`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -250,6 +259,11 @@ def retry_max_interval() -> float:
     if max_interval is None:
         return 60 * 5  # 5 minutes
     return max_interval
+
+
+def should_enable_disk_fallback() -> bool:
+    """Returns whether disk fallback should be enabled for dropped items."""
+    return _should("enable_disk_fallback")
 
 
 def parse_and_apply_settings(
