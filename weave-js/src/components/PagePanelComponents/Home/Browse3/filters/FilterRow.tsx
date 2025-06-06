@@ -68,6 +68,10 @@ export const FilterRow = ({
       getFieldType(item.field)
     );
 
+  // Encourage users to create a new filter instead of modifying the datetime
+  // filter by locking the selection. Still deletable.
+  const isFieldDisabled = item.field === 'started_at';
+
   return (
     <>
       <div className="min-w-[250px]">
@@ -75,6 +79,7 @@ export const FilterRow = ({
           options={options}
           value={item.field}
           onSelectField={onSelectField}
+          isDisabled={isFieldDisabled}
         />
       </div>
       <div className="w-[165px]">

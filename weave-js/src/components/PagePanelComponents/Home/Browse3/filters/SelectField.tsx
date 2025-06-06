@@ -26,6 +26,7 @@ export type SelectFieldOption = FieldOption | GroupedOption;
 type SelectFieldProps = {
   options: SelectFieldOption[];
   value: string;
+  isDisabled?: boolean;
   onSelectField: (name: string) => void;
 };
 
@@ -57,18 +58,19 @@ const SingleValue = ({
 export const SelectField = ({
   options,
   value,
+  isDisabled,
   onSelectField,
 }: SelectFieldProps) => {
   const internalOptions = _.cloneDeep(options);
   const allOptions: FieldOption[] = internalOptions.flatMap(
     (groupOption: SelectFieldOption) => (groupOption as GroupedOption).options
   );
-  let isDisabled = false;
+  let isDisabledOverride = isDisabled ?? false;
   let selectedOption = allOptions.find(o => o.value === value);
 
   // Handle the case of a filter that we let the user create but not edit.
   if (value && !selectedOption) {
-    isDisabled = true;
+    isDisabledOverride = true;
     selectedOption = {
       value,
       label: getFieldLabel(value),
@@ -90,7 +92,7 @@ export const SelectField = ({
       onChange={onReactSelectChange}
       components={{Option, SingleValue}}
       formatOptionLabel={OptionLabel}
-      isDisabled={isDisabled}
+      isDisabled={isDisabledOverride}
       autoFocus
     />
   );
