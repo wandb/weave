@@ -1,3 +1,4 @@
+import time
 import base64
 import contextlib
 import logging
@@ -355,8 +356,7 @@ class InMemoryWeaveLogCollector(logging.Handler):
         return [
             record
             for record in logs
-            if record.levelname == levelname
-            and record.name.startswith("weave")
+            if record.levelname == levelname and record.name.startswith("weave")
             # (Tim) For some reason that i cannot figure out, there is some test that
             # a) is trying to connect to the PROD trace server
             # b) seemingly doesn't fail
@@ -439,6 +439,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                 res = attr(*args, **kwargs)
                 if self.__dict__.get("_autoflush", True):
                     self_super._flush()
+                    time.sleep(0.05)
                 return res
 
             return wrapper
