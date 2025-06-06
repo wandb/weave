@@ -733,6 +733,7 @@ def test_dataset_calls(client):
     for row in ref.rows:
         call = client.create_call("x", {"a": row["doc"]})
         client.finish_call(call, None)
+    client.finish()
 
     calls = list(client.get_calls(filter={"op_name": "x"}))
     assert calls[0].inputs["a"] == "xx"
