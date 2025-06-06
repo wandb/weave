@@ -2,10 +2,17 @@
  * This bar above a grid displays currently set filters for quick editing.
  */
 
-import {Popover} from '@mui/material';
+import {
+  Dialog,
+  DialogActions as MaterialDialogActions,
+  DialogContent as MaterialDialogContent,
+  DialogTitle as MaterialDialogTitle,
+  Popover,
+} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import styled from 'styled-components';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
@@ -71,6 +78,8 @@ export const FilterBar = ({
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [showDeleteWarning, setShowDeleteWarning] = useState(false);
+  const [filterToDelete, setFilterToDelete] = useState<FilterId | null>(null);
 
   // local filter model is used to avoid triggering a re-render of the trace
   // table on every keystroke. debounced DEBOUNCE_MS ms
@@ -210,9 +219,27 @@ export const FilterBar = ({
   });
 
   const onRemoveAll = () => {
-    const emptyModel = {items: []};
-    setLocalFilterModel(emptyModel);
-    setFilterModel(emptyModel);
+    const sortedItems = sortDatetimeFirst([...localFilterModel.items]);
+
+    // Check if there's only one filter and it's a datetime filter
+    if (
+      sortedItems.length === 1 &&
+      getFieldType(sortedItems[0].field) === 'datetime'
+    ) {
+      setFilterToDelete(sortedItems[0].id);
+      setShowDeleteWarning(true);
+      return;
+    }
+
+    // Remove all filters except the first datetime filter
+    const firstDatetimeFilter = sortedItems.find(
+      item => getFieldType(item.field) === 'datetime'
+    );
+    const newItems = firstDatetimeFilter ? [firstDatetimeFilter] : [];
+
+    const newModel = {items: newItems};
+    setLocalFilterModel(newModel);
+    setFilterModel(newModel);
     setAnchorEl(null);
   };
 
@@ -282,6 +309,20 @@ export const FilterBar = ({
 
   const onRemoveFilter = useCallback(
     (filterId: FilterId) => {
+      // Check if this is the first datetime filter
+      const sortedItems = sortDatetimeFirst([...localFilterModel.items]);
+      const isFirstDatetimeFilter =
+        sortedItems.length > 0 &&
+        sortedItems[0].id === filterId &&
+        getFieldType(sortedItems[0].field) === 'datetime';
+
+      if (isFirstDatetimeFilter) {
+        setFilterToDelete(filterId);
+        setShowDeleteWarning(true);
+        return;
+      }
+
+      // Proceed with normal deletion
       const items = localFilterModel.items.filter(f => f.id !== filterId);
       const newModel = {...localFilterModel, items};
       setLocalFilterModel(newModel);
@@ -294,6 +335,28 @@ export const FilterBar = ({
     },
     [localFilterModel, applyCompletedFilters, activeEditId]
   );
+
+  const handleConfirmDelete = useCallback(() => {
+    if (filterToDelete !== null) {
+      const items = localFilterModel.items.filter(f => f.id !== filterToDelete);
+      const newModel = {...localFilterModel, items};
+      setLocalFilterModel(newModel);
+      applyCompletedFilters(newModel);
+
+      // Clear active edit if removed
+      if (activeEditId === filterToDelete) {
+        setActiveEditId(null);
+      }
+    }
+
+    setShowDeleteWarning(false);
+    setFilterToDelete(null);
+  }, [filterToDelete, localFilterModel, applyCompletedFilters, activeEditId]);
+
+  const handleCancelDelete = useCallback(() => {
+    setShowDeleteWarning(false);
+    setFilterToDelete(null);
+  }, []);
 
   const onSetSelected = useCallback(() => {
     const newFilter =
@@ -347,18 +410,6 @@ export const FilterBar = ({
   const completeItems = localFilterModel.items.filter(
     f => !isFilterIncomplete(f)
   );
-
-  // Utility function to sort datetime fields first
-  const sortDatetimeFirst = (items: GridFilterItem[]) => {
-    return items.sort((a, b) => {
-      const aIsDatetime = getFieldType(a.field) === 'datetime';
-      const bIsDatetime = getFieldType(b.field) === 'datetime';
-
-      if (aIsDatetime && !bIsDatetime) return -1;
-      if (!aIsDatetime && bIsDatetime) return 1;
-      return 0;
-    });
-  };
 
   // Determine if we should show a border based on whether there are active filters
   const hasBorder = completeItems.length > 0;
@@ -508,6 +559,77 @@ export const FilterBar = ({
           </div>
         </Tailwind>
       </Popover>
+      <RemoveFilterModal
+        open={showDeleteWarning}
+        onClose={handleCancelDelete}
+        handleConfirmDelete={handleConfirmDelete}
+      />
     </>
+  );
+};
+
+function sortDatetimeFirst(items: GridFilterItem[]): GridFilterItem[] {
+  return items.sort((a, b) => {
+    const aIsDatetime = getFieldType(a.field) === 'datetime';
+    const bIsDatetime = getFieldType(b.field) === 'datetime';
+
+    if (aIsDatetime && !bIsDatetime) return -1;
+    if (!aIsDatetime && bIsDatetime) return 1;
+    return 0;
+  });
+}
+
+const DialogContent = styled(MaterialDialogContent)`
+  padding: 0 32px !important;
+`;
+DialogContent.displayName = 'S.DialogContent';
+
+const DialogTitle = styled(MaterialDialogTitle)`
+  padding: 32px 32px 16px 32px !important;
+
+  &.MuiDialogTitle-root {
+    font-weight: 600;
+    font-size: 24px;
+    line-height: 30px;
+  }
+`;
+DialogTitle.displayName = 'S.DialogTitle';
+
+const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
+  justify-content: ${({$align}) =>
+    $align === 'left' ? 'flex-start' : 'flex-end'} !important;
+  padding: 24px 32px 32px 32px !important;
+`;
+DialogActions.displayName = 'S.DialogActions';
+
+const RemoveFilterModal = ({
+  open,
+  onClose,
+  handleConfirmDelete,
+}: {
+  open: boolean;
+  onClose: () => void;
+  handleConfirmDelete: () => void;
+}) => {
+  return (
+    <Tailwind>
+      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+        <DialogTitle>Remove date filter?</DialogTitle>
+        <DialogContent style={{overflow: 'hidden'}}>
+          <p>
+            Query performance relies on the datetime filter. Without it, results
+            may take longer to load.
+          </p>
+        </DialogContent>
+        <DialogActions $align="left">
+          <Button variant="destructive" onClick={handleConfirmDelete}>
+            Remove filter
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Tailwind>
   );
 };
