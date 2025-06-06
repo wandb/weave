@@ -2168,22 +2168,22 @@ def test_all_optimization_filters():
             calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_8:String}
-            AND (calls_merged.parent_id IN {pb_7:Array(String)}
-                OR calls_merged.parent_id IS NULL)
-            AND ((calls_merged.op_name IN {pb_3:Array(String)})
-                OR (calls_merged.op_name IS NULL))
             AND (calls_merged.trace_id IN {pb_4:Array(String)}
                 OR calls_merged.trace_id IS NULL)
+            AND (calls_merged.parent_id IN {pb_7:Array(String)}
+                OR calls_merged.parent_id IS NULL)
             AND (((hasAny(calls_merged.input_refs, {pb_5:Array(String)})
                 OR length(calls_merged.input_refs) = 0)
                 AND (hasAny(calls_merged.output_refs, {pb_6:Array(String)})
                     OR length(calls_merged.output_refs) = 0)))
+            AND ((calls_merged.op_name IN {pb_3:Array(String)})
+                OR (calls_merged.op_name IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
             AND (((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)}))
                 AND (hasAny(array_concat_agg(calls_merged.output_refs), {pb_1:Array(String)}))
-            AND (any(calls_merged.parent_id) IN {pb_2:Array(String)}))))
+                AND (any(calls_merged.parent_id) IN {pb_2:Array(String)}))))
         """,
         {
             "pb_0": ["weave-trace-internal:///222222222222%"],

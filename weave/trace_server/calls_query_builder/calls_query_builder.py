@@ -752,7 +752,7 @@ class CallsQuery(BaseModel):
         )
         # parent_id is valid as null, so we must always include the HAVING filter
         # in addition to this optimization
-        parent_ids_filter_sql = process_parent_ids_filter_to_sql(
+        parent_ids_opt_filter_sql = process_parent_ids_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -763,7 +763,7 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
-        sortable_datetime_sql = (
+        sortable_datetime_opt_sql = (
             optimization_conditions.sortable_datetime_filters_sql or ""
         )
         str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
@@ -841,13 +841,13 @@ class CallsQuery(BaseModel):
         WHERE calls_merged.project_id = {param_slot(project_param, "String")}
         {id_mask_sql}
         {id_subquery_sql}
-        {sortable_datetime_sql}
+        {sortable_datetime_opt_sql}
         {trace_id_sql}
         {trace_roots_only_sql}
-        {parent_ids_filter_sql}
+        {parent_ids_opt_filter_sql}
+        {ref_filter_opt_sql}
         {op_name_sql}
         {str_filter_opt_sql}
-        {ref_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
