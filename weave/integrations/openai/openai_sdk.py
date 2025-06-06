@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.context import call_context
 from weave.trace.op import Op, ProcessedInputs, _add_accumulator
 
 if TYPE_CHECKING:
@@ -303,6 +304,14 @@ def should_use_accumulator(inputs: dict) -> bool:
 def openai_on_input_handler(
     func: Op, args: tuple, kwargs: dict
 ) -> ProcessedInputs | None:
+    attrs = call_context.call_attributes.get()
+
+    completion = args[0]
+    if hasattr(completion, "_client") and hasattr(completion._client, "_base_url"):
+        base_url = str(completion._client._base_url)
+        attrs["api_endpoint"] = base_url
+        call_context.call_attributes.set(attrs)
+
     if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
         original_args = args
         original_kwargs = kwargs
