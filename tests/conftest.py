@@ -1,8 +1,8 @@
-import time
 import base64
 import contextlib
 import logging
 import os
+import time
 import typing
 from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
@@ -356,7 +356,8 @@ class InMemoryWeaveLogCollector(logging.Handler):
         return [
             record
             for record in logs
-            if record.levelname == levelname and record.name.startswith("weave")
+            if record.levelname == levelname
+            and record.name.startswith("weave")
             # (Tim) For some reason that i cannot figure out, there is some test that
             # a) is trying to connect to the PROD trace server
             # b) seemingly doesn't fail
