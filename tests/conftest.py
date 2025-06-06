@@ -443,7 +443,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                     self_super._flush()
 
                     server = self.__dict__.get("server")
-                    if not hasattr(server, _next_trace_server):
+                    if not hasattr(server, "_next_trace_server"):
                         # sqlite, just return
                         return
 
