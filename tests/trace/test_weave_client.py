@@ -1922,12 +1922,16 @@ def test_delete_op_version(client):
     with pytest.raises(weave.trace_server.errors.ObjectDeletedError):
         op_ref.get()
 
+    client.finish()
+
     # lets get the calls
     calls = list(my_op.calls())
     assert len(calls) == 1
 
     # call the deleted op, this should still work (?)
     my_op(1)
+
+    client.finish()
 
     calls = list(my_op.calls())
     assert len(calls) == 2
