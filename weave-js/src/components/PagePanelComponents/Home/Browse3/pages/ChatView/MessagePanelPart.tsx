@@ -45,7 +45,7 @@ export const MessagePanelPart = ({
         <div>
           <span className="whitespace-break-spaces">{value}</span>
           {showCursor && (
-            <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[16px] w-[2px] bg-moon-500" />
+            <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[12px] w-[12px] rounded-full bg-gold-500" />
           )}
         </div>
       </>
