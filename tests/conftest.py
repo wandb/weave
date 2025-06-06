@@ -445,7 +445,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                     server = self.__dict__.get("server")
                     if not hasattr(server, "_next_trace_server"):
                         # sqlite, just return
-                        return
+                        return res
 
                     # Sleep to allow inserts to become available, when flush did something
                     if (
