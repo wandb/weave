@@ -440,7 +440,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                 res = attr(*args, **kwargs)
                 if self.__dict__.get("_autoflush", True):
                     self_super._flush()
-                    time.sleep(0.05)
+                    time.sleep(0.01)
                 return res
 
             return wrapper
