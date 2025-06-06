@@ -439,8 +439,21 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
             def wrapper(*args, **kwargs):
                 res = attr(*args, **kwargs)
                 if self.__dict__.get("_autoflush", True):
+                    has_pending_jobs = self_super._get_pending_jobs()["total_jobs"] > 0
                     self_super._flush()
-                    time.sleep(0.01)
+
+                    server = self.__dict__.get(
+                        "server"
+                    )._next_trace_server._internal_trace_server
+                    # Sleep to allow inserts to become available, when flush did something
+                    if (
+                        isinstance(
+                            server,
+                            clickhouse_trace_server_batched.ClickHouseTraceServer,
+                        )
+                        and has_pending_jobs
+                    ):
+                        time.sleep(0.01)
                 return res
 
             return wrapper
