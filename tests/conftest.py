@@ -442,9 +442,11 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                     has_pending_jobs = self_super._get_pending_jobs()["total_jobs"] > 0
                     self_super._flush()
 
-                    server = self.__dict__.get(
-                        "server"
-                    )._next_trace_server._internal_trace_server
+                    server = self.__dict__.get("server")
+                    if not hasattr(server, _next_trace_server):
+                        # sqlite, just return
+                        return
+
                     # Sleep to allow inserts to become available, when flush did something
                     if (
                         isinstance(
