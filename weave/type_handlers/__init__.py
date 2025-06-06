@@ -3,6 +3,7 @@ from weave.type_handlers.DateTime import datetime
 from weave.type_handlers.File import file
 from weave.type_handlers.Image import image
 from weave.type_handlers.Markdown import markdown
+from weave.type_handlers.OpenAI import completion
 from weave.type_handlers.Video import video
 
 file.register()
@@ -11,3 +12,4 @@ audio.register()
 datetime.register()
 markdown.register()
 video.register()
+completion.register()

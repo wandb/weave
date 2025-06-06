@@ -6,6 +6,7 @@ import {DateTimeView} from './datetime.datetime/DateTimeView';
 import {FileView} from './File/FileView';
 import {MarkdownView} from './Markdown/MarkdownView';
 import {VideoPlayer} from './moviepy.video.VideoClip/VideoPlayer';
+import {OpenAICompletionView} from './OpenAI/Completions';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
 type CustomWeaveTypeDispatcherProps = {
@@ -62,6 +63,10 @@ const customWeaveTypeRegistry: {
   },
   'weave.type_handlers.File.file.File': {
     component: FileView,
+  },
+  'weave.type_handlers.OpenAI.completion.OpenAICompletion': {
+    component: OpenAICompletionView,
+    preferredRowHeight: 100,
   },
 };
 
