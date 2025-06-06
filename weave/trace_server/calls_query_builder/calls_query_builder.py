@@ -750,6 +750,13 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
+        # parent_id is valid as null, so we must always include the HAVING filter
+        # in addition to this optimization
+        parent_ids_filter_sql = process_parent_ids_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
 
         optimization_conditions = process_query_to_optimization_sql(
             self.query_conditions,
@@ -836,6 +843,7 @@ class CallsQuery(BaseModel):
         {id_subquery_sql}
         {sortable_datetime_sql}
         {trace_roots_only_sql}
+        {parent_ids_filter_sql}
         {op_name_sql}
         {trace_id_sql}
         {str_filter_opt_sql}
@@ -1205,6 +1213,28 @@ def process_trace_roots_only_filter_to_sql(
     )
 
     return f"AND ({parent_id_field_sql} IS NULL)"
+
+
+def process_parent_ids_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the parent_id and returns a sql string if there are any parent_ids."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.parent_ids:
+        return ""
+
+    parent_id_field = get_field_by_name("parent_id")
+    if not isinstance(parent_id_field, CallsMergedAggField):
+        raise TypeError("parent_id is not an aggregate field")
+
+    parent_id_field_sql = parent_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
+
+    return f"AND ({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
 
 
 def process_ref_filters_to_sql(
