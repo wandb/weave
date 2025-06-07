@@ -121,7 +121,10 @@ function createOpWrapper<T extends (...args: any[]) => any>(
     ...params: Parameters<T>
   ): Promise<Awaited<ReturnType<T>>> {
     const client = getGlobalClient();
-    const thisArg = options?.isDecorator ? this : options?.bindThis;
+    const thisArg =
+      options?.isDecorator || options?.shouldAdoptThis
+        ? this
+        : options?.bindThis;
 
     if (!client) {
       warnOnce(
@@ -172,30 +175,39 @@ function createOpWrapper<T extends (...args: any[]) => any>(
         const {initialStateFn, reduceFn} = options.streamReducer;
         let state = initialStateFn();
 
-        const wrappedIterator = {
-          [Symbol.asyncIterator]: async function* () {
-            try {
-              for await (const chunk of result as AsyncIterable<any>) {
-                state = reduceFn(state, chunk);
-                yield chunk;
-              }
-            } finally {
-              if (client) {
-                const endTime = new Date();
-                await client.finishCall(
-                  call,
-                  state,
-                  currentCall,
-                  parentCall,
-                  options?.summarize,
-                  endTime,
-                  startCallPromise
-                );
-              }
+        async function* WeaveIterator() {
+          try {
+            for await (const chunk of result as AsyncIterable<any>) {
+              state = reduceFn(state, chunk);
+              yield chunk;
             }
+          } finally {
+            if (client) {
+              const endTime = new Date();
+              await client.finishCall(
+                call,
+                state,
+                currentCall,
+                parentCall,
+                options?.summarize,
+                endTime,
+                startCallPromise
+              );
+            }
+          }
+        }
+        const proxy = new Proxy(result, {
+          get: (target, prop) => {
+            if (prop === Symbol.asyncIterator) {
+              return WeaveIterator;
+            }
+
+            // allow all other properties to be accessed normally
+            return Reflect.get(target, prop);
           },
-        };
-        return wrappedIterator as Awaited<ReturnType<T>>;
+        });
+
+        return proxy;
       } else {
         // Non-stream handling
         const endTime = new Date();

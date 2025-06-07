@@ -19,7 +19,7 @@ export type Op<T extends (...args: any[]) => any> = {
     ? AsyncIterable<Awaited<U>>
     : Promise<Awaited<ReturnType<T>>>);
 
-interface StreamReducer<T, R> {
+export interface StreamReducer<T, R> {
   initialStateFn: () => R;
   reduceFn: (state: R, chunk: T) => R;
 }
@@ -60,6 +60,8 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
   bindThis?: WeaveObject;
   isDecorator?: boolean;
+  // If true, the op will adopt the `this` value of the original function
+  shouldAdoptThis?: boolean;
   parameterNames?: ParameterNamesOption;
 }
 
