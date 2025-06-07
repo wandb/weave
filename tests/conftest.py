@@ -2,6 +2,7 @@ import base64
 import contextlib
 import logging
 import os
+import time
 import typing
 from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
@@ -438,7 +439,23 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
             def wrapper(*args, **kwargs):
                 res = attr(*args, **kwargs)
                 if self.__dict__.get("_autoflush", True):
+                    has_pending_jobs = self_super._get_pending_jobs()["total_jobs"] > 0
                     self_super._flush()
+
+                    server = self.__dict__.get("server")
+                    if not hasattr(server, "_next_trace_server"):
+                        # sqlite, just return
+                        return res
+
+                    # Sleep to allow inserts to become available, when flush did something
+                    if (
+                        isinstance(
+                            server,
+                            clickhouse_trace_server_batched.ClickHouseTraceServer,
+                        )
+                        and has_pending_jobs
+                    ):
+                        time.sleep(0.01)
                 return res
 
             return wrapper
