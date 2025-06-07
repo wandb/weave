@@ -14,6 +14,9 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import ReactDOM from 'react-dom';
 import {components, OptionProps} from 'react-select';
 
+import {getHostedModels, MODEL_INDEX} from '../../../inference/modelInfo';
+import {ModelTile} from '../../../inference/ModelTile';
+import {useInferenceContext} from '../../../inference/util';
 import {LlmStructuredCompletionModel} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {
@@ -63,17 +66,21 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   project: string;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
+  onViewCatalog?: (provider: string) => void;
 }
 
 const SubMenu = ({
+  value,
   llms,
   onChange,
   position,
   onSelect,
   isAdmin,
   onConfigureProvider,
+  onViewCatalog,
   providers,
 }: {
+  value: string;
   llms: Array<LLMOption>;
   onChange: (
     value: LLMMaxTokensKey,
@@ -84,6 +91,7 @@ const SubMenu = ({
   onSelect: () => void;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
+  onViewCatalog?: (provider: string) => void;
   providers?: ProviderOption[];
 }) => {
   return ReactDOM.createPortal(
@@ -102,22 +110,97 @@ const SubMenu = ({
         p: '6px',
         zIndex: 1,
       }}>
-      {llms.map(llm => (
+      {llms.map(llm => {
+        // TODO: Would be nice to have all models in the catalog so we could
+        //       display tiles, link to comparison and details, etc.
+        const isCoreWeaveModel = value === 'coreweave';
+        const catalogModel = isCoreWeaveModel
+          ? MODEL_INDEX[llm.value.split('/')[1]]
+          : null;
+        const isUnspportedCoreWeaveModel =
+          isCoreWeaveModel &&
+          (!catalogModel || catalogModel.apiStyle !== 'chat');
+        if (isUnspportedCoreWeaveModel) {
+          // Playground doesn't support embedding models.
+          return null;
+        }
+        return (
+          <Box
+            key={`${llm.value}${llm.versionIndex}`}
+            onClick={e => {
+              e.preventDefault();
+              e.stopPropagation();
+              onChange(
+                llm.value as LLMMaxTokensKey,
+                llm.max_tokens,
+                llm.defaultParams && llm.baseModelId
+                  ? LLMOptionToSavedPlaygroundModelState(llm)
+                  : undefined
+              );
+              onSelect();
+            }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              width: '100%',
+              wordBreak: 'break-all',
+              wordWrap: 'break-word',
+              whiteSpace: 'normal',
+              p: '6px',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              '&:hover': {
+                backgroundColor: hexToRGB(OBLIVION, 0.04),
+                '& .info-button': {
+                  opacity: 1,
+                },
+              },
+            }}>
+            <Box sx={{flex: 1}}>
+              {llm.label}
+              {llm.subLabel && (
+                <div className="text-sm text-moon-500">{llm.subLabel}</div>
+              )}
+            </Box>
+            {catalogModel && onViewCatalog && (
+              <Box sx={{opacity: 0}} className="info-button">
+                <Button
+                  icon="info"
+                  variant="ghost"
+                  size="small"
+                  tooltip={
+                    <ModelTile
+                      model={catalogModel}
+                      hint="Click info button for full model details"
+                    />
+                  }
+                  tooltipProps={{
+                    className: 'p-0 bg-transparent',
+                    side: 'bottom',
+                    sideOffset: 8,
+                  }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    onViewCatalog(
+                      `${catalogModel.provider}/${catalogModel.id}`
+                    );
+                  }}
+                />
+              </Box>
+            )}
+          </Box>
+        );
+      })}
+      {onViewCatalog && !providers && value === 'coreweave' && (
         <Box
-          key={`${llm.value}${llm.versionIndex}`}
           onClick={e => {
-            e.preventDefault();
             e.stopPropagation();
-            onChange(
-              llm.value as LLMMaxTokensKey,
-              llm.max_tokens,
-              llm.defaultParams && llm.baseModelId
-                ? LLMOptionToSavedPlaygroundModelState(llm)
-                : undefined
-            );
-            onSelect();
+            onViewCatalog(value);
           }}
           sx={{
+            display: 'flex',
+            alignItems: 'center',
             width: '100%',
             wordBreak: 'break-all',
             wordWrap: 'break-word',
@@ -125,16 +208,20 @@ const SubMenu = ({
             p: '6px',
             cursor: 'pointer',
             borderRadius: '4px',
+            fontWeight: 600,
             '&:hover': {
               backgroundColor: hexToRGB(OBLIVION, 0.04),
+              '& .info-button': {
+                opacity: 1,
+              },
             },
           }}>
-          {llm.label}
-          {llm.subLabel && (
-            <div className="text-sm text-moon-500">{llm.subLabel}</div>
-          )}
+          <Box sx={{flex: 1}}>Compare models</Box>
+          <Box sx={{opacity: 0}} className="info-button">
+            <Icon width={18} height={18} name="forward-next" />
+          </Box>
         </Box>
-      ))}
+      )}
       {providers?.map(provider => {
         const tooltipContent =
           provider.value !== 'custom-provider' && !isAdmin
@@ -203,6 +290,7 @@ const SubMenuOption = ({
   project,
   isAdmin,
   onConfigureProvider,
+  onViewCatalog,
   ...props
 }: CustomOptionProps) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -267,6 +355,7 @@ const SubMenuOption = ({
       </Box>
       {isHovered && hasOptions && (
         <SubMenu
+          value={props.data.value}
           providers={props.data.providers}
           llms={llms}
           onChange={onChange}
@@ -280,6 +369,7 @@ const SubMenuOption = ({
           }}
           isAdmin={isAdmin}
           onConfigureProvider={onConfigureProvider}
+          onViewCatalog={onViewCatalog}
         />
       )}
     </Box>
@@ -293,6 +383,7 @@ export const CustomOption = ({
   project,
   isAdmin,
   onConfigureProvider,
+  onViewCatalog,
   data,
   ...props
 }: CustomOptionProps) => {
@@ -399,7 +490,8 @@ export const CustomOption = ({
       entity={entity}
       project={project}
       isAdmin={isAdmin}
-      onConfigureProvider={onConfigureProvider}>
+      onConfigureProvider={onConfigureProvider}
+      onViewCatalog={onViewCatalog}>
       {children}
     </SubMenuOption>
   );
@@ -436,6 +528,7 @@ export const useLLMDropdownOptions = (
   savedModelsResult: TraceObjSchemaForBaseObjectClass<'LLMStructuredCompletionModel'>[],
   savedModelsLoading: boolean
 ) => {
+  const inferenceContext = useInferenceContext();
   const options: ProviderOption[] = [];
   const disabledOptions: ProviderOption[] = [];
   const savedModelsOptions: ProviderOption[] = [];
@@ -448,6 +541,9 @@ export const useLLMDropdownOptions = (
     });
   } else {
     Object.entries(configuredProviders).forEach(([provider, {status}]) => {
+      if (provider === 'coreweave' && !inferenceContext.isInferenceEnabled) {
+        return;
+      }
       const providerLLMs = Object.entries(LLM_MAX_TOKENS)
         .filter(([_, config]) => config.provider === provider)
         .map(([llmKey]) => ({
@@ -470,6 +566,18 @@ export const useLLMDropdownOptions = (
         options.push(option);
       }
     });
+  }
+
+  // Insert hosted models
+  if (inferenceContext.isInferenceEnabled) {
+    const hostedOptions = options[0].llms;
+    for (const model of getHostedModels()) {
+      hostedOptions.push({
+        label: model.label ?? model.id,
+        value: `coreweave/${model.idPlayground}`,
+        max_tokens: 1000, // TODO: Get max tokens from model info
+      });
+    }
   }
 
   // Add custom providers

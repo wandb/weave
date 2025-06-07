@@ -63,6 +63,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {getParamArray, queryGetDict} from './Browse3/urlQueryUtil';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -999,12 +1000,16 @@ const ComparePageBinding = () => {
 };
 
 const PlaygroundPageBinding = () => {
-  const params = useParamsDecoded<Browse3TabItemParams>();
+  const {entity, project, itemName} = useParamsDecoded<Browse3TabItemParams>();
+  const history = useHistory();
+  const query = queryGetDict(history);
+  const modelIds = getParamArray(query, 'model');
   return (
     <PlaygroundPage
-      entity={params.entity}
-      project={params.project}
-      callId={params.itemName}
+      entity={entity}
+      project={project}
+      callId={itemName}
+      modelIds={modelIds}
     />
   );
 };
