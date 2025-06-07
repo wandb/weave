@@ -46,7 +46,7 @@ def query_with_retry(
         except exceptions.Timeout as e:
             if attempt_no == num_timeout_retries:
                 raise
-            logging.warn(
+            logging.warning(
                 f'wandb GQL query timed out: "{e}", retrying (num_attempts={attempt_no + 1})'
             )
 
