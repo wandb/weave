@@ -1,0 +1,133 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 98006615-45bd-4c30-9fc7-6ef36e56e353
+      user-agent:
+      - unknown/None; hf_hub/0.30.2; python/3.10.15; torch/2.6.0; transformers/4.51.3;
+        session_id/9466b0495ee8470db65be13e61ebce38; file_type/config; from_auto_class/False
+    method: HEAD
+    uri: https://huggingface.co/bert-base-uncased/resolve/main/config.json
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename*=UTF-8''config.json; filename="config.json";
+      Content-Length:
+      - '570'
+      Content-Security-Policy:
+      - default-src 'none'; sandbox
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Tue, 15 Apr 2025 15:35:14 GMT
+      ETag:
+      - '"45a2321a7ecfdaaf60a6c1fd7f5463994cc8907d"'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 495a6ea9a073f54a4cfe961944b955c2.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - 33wrmHNM7EAC5Fy54jluDsV5eGzfZHp-DvgHaqWNSLTdMlrTxt0A3g==
+      X-Amz-Cf-Pop:
+      - JFK50-P9
+      X-Cache:
+      - Miss from cloudfront
+      X-Hub-Cache:
+      - HIT
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - 86b5e0934494bd15c9632b12f734a8a67f723594
+      X-Request-Id:
+      - Root=1-67fe7cb2-4a8bfe8b5754aa73333a6a3a;98006615-45bd-4c30-9fc7-6ef36e56e353
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 4c29e3cb-2c77-48fe-9cb1-03571f0fb6c7
+      user-agent:
+      - unknown/None; hf_hub/0.30.2; python/3.10.15; torch/2.6.0; transformers/4.51.3;
+        session_id/9466b0495ee8470db65be13e61ebce38; file_type/tokenizer; from_auto_class/False;
+        is_fast/False
+    method: HEAD
+    uri: https://huggingface.co/bert-base-uncased/resolve/main/tokenizer_config.json
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename*=UTF-8''tokenizer_config.json; filename="tokenizer_config.json";
+      Content-Length:
+      - '48'
+      Content-Security-Policy:
+      - default-src 'none'; sandbox
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Tue, 15 Apr 2025 15:35:14 GMT
+      ETag:
+      - '"e5c73d8a50df1f56fb5b0b8002d7cf4010afdccb"'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 82ea6125c245bf5c3d91bf07bf2aab4c.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - onSOj0kCYQqLsBseMt18zHLETHlagFhGHfTIDoRrr29ZRG-UG6V_YA==
+      X-Amz-Cf-Pop:
+      - JFK50-P9
+      X-Cache:
+      - Miss from cloudfront
+      X-Hub-Cache:
+      - HIT
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - 86b5e0934494bd15c9632b12f734a8a67f723594
+      X-Request-Id:
+      - Root=1-67fe7cb2-572fe6405f91555416ab0363;4c29e3cb-2c77-48fe-9cb1-03571f0fb6c7
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+version: 1
