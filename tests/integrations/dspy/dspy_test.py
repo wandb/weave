@@ -257,7 +257,7 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     assert accuracy > 30
 
     calls = list(client.calls())
-    assert len(calls) == 22
+    assert len(calls) == 32
 
     call = calls[0]
     assert call.started_at < call.ended_at
