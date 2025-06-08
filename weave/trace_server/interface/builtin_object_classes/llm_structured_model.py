@@ -152,6 +152,42 @@ class LLMStructuredCompletionModel(Model):
         """
         current_client = require_weave_client()
 
+        req = self._prepare_completion_request(
+            project_id=f"{current_client.entity}/{current_client.project}",
+            user_input=user_input,
+            config=config,
+            **template_vars,
+        )
+
+        # 5. Call the LLM API
+        try:
+            api_response = current_client.server.completions_create(req=req)
+        except Exception as e:
+            raise RuntimeError("Failed to call LLM completions endpoint.") from e
+
+        # 6. Extract the message from the API response
+        try:
+            # The 'response' attribute of CompletionsCreateRes is a dict
+            response_payload = api_response.response
+            return _parse_response(response_payload, req.inputs.response_format)
+        except (
+            KeyError,
+            IndexError,
+            TypeError,
+            AttributeError,
+            json.JSONDecodeError,
+        ) as e:
+            raise RuntimeError(
+                f"Failed to extract message from LLM response payload. Response: {api_response.response}"
+            ) from e
+
+    def _prepare_completion_request(
+        self,
+        project_id: str,
+        user_input: MessageListLike,
+        config: Optional[LLMStructuredModelParamsLike],
+        **template_vars: Any,
+    ) -> CompletionsCreateReq:
         # Ensure user_input is properly converted to a list of Message objects
         # This is needed because the @op decorator might interfere with Pydantic validation
         if not isinstance(user_input, list) or (
@@ -190,47 +226,29 @@ class LLMStructuredCompletionModel(Model):
             model=model_id_str, messages=prepared_messages_dicts, **completion_params
         )
         req = CompletionsCreateReq(
-            project_id=f"{current_client.entity}/{current_client.project}",
+            project_id=project_id,
             inputs=completion_inputs,
         )
 
-        # 5. Call the LLM API
-        try:
-            api_response = current_client.server.completions_create(req=req)
-        except Exception as e:
-            raise RuntimeError("Failed to call LLM completions endpoint.") from e
+        return req
 
-        # 6. Extract the message from the API response
-        try:
-            # The 'response' attribute of CompletionsCreateRes is a dict
-            response_payload = api_response.response
-            if response_payload.get("error"):
-                # Or handle more gracefully depending on desired behavior
-                raise RuntimeError(
-                    f"LLM API returned an error: {response_payload['error']}"
-                )
 
-            # Assuming OpenAI-like structure: a list of choices, first choice has the message
-            output_message_dict = response_payload["choices"][0]["message"]
+def _parse_response(
+    response_payload: dict, response_format: ResponseFormat
+) -> Union[Message, str, dict[str, Any]]:
+    if response_payload.get("error"):
+        # Or handle more gracefully depending on desired behavior
+        raise RuntimeError(f"LLM API returned an error: {response_payload['error']}")
 
-            if default_p_model.response_format == "text":
-                return output_message_dict["content"]
-            elif default_p_model.response_format == "json_object":
-                return json.loads(output_message_dict["content"])
-            else:
-                raise ValueError(
-                    f"Invalid response_format: {default_p_model.response_format}"
-                )
-        except (
-            KeyError,
-            IndexError,
-            TypeError,
-            AttributeError,
-            json.JSONDecodeError,
-        ) as e:
-            raise RuntimeError(
-                f"Failed to extract message from LLM response payload. Response: {api_response.response}"
-            ) from e
+    # Assuming OpenAI-like structure: a list of choices, first choice has the message
+    output_message_dict = response_payload["choices"][0]["message"]
+
+    if response_format == "text":
+        return output_message_dict["content"]
+    elif response_format == "json_object":
+        return json.loads(output_message_dict["content"])
+    else:
+        raise ValueError(f"Invalid response_format: {response_format}")
 
 
 def _prepare_llm_messages(
