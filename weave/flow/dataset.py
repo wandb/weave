@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from weave.flow.obj import Object
+from weave.trace.casting import cast_to_table
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
@@ -112,31 +113,6 @@ class Dataset(Object):
         )
         weave.publish(new_dataset, name=self.name)
         return new_dataset
-
-    # @field_validator("rows", mode="before")
-    # def convert_to_table(cls, rows: Any) -> Union[weave.Table, WeaveTable]:
-    #     if weave_isinstance(rows, WeaveTable):
-    #         return rows
-    #     if not isinstance(rows, weave.Table):
-    #         table_ref = getattr(rows, "table_ref", None)
-    #         rows = weave.Table(rows)
-    #         if table_ref:
-    #             rows.table_ref = table_ref
-    #     if len(rows.rows) == 0:
-    #         raise ValueError("Attempted to construct a Dataset with an empty list.")
-    #     for row in rows.rows:
-    #         if not isinstance(row, dict):
-    #             raise TypeError(
-    #                 "Attempted to construct a Dataset with a non-dict object. Found type: "
-    #                 + str(type(row))
-    #                 + " of row: "
-    #                 + short_str(row)
-    #             )
-    #         if len(row) == 0:
-    #             raise ValueError(
-    #                 "Attempted to construct a Dataset row with an empty dict."
-    #             )
-    #     return rows
 
     def __iter__(self) -> Iterator[dict]:
         return iter(self.rows)
