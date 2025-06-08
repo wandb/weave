@@ -23,7 +23,7 @@ import {
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
-import {SmallOpVersionsRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallOpVersionsRef';
+import {SafeOpRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/MonitorsPage';
 import {SmallRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallRef';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
@@ -198,10 +198,7 @@ const MonitorPageInner = ({
                       <Box className="flex gap-2">
                         {monitorVersions[0].val['op_names'].map(
                           (opRefUri: string) => (
-                            <SmallOpVersionsRef
-                              key={opRefUri}
-                              objRef={parseRef(opRefUri) as WeaveObjectRef}
-                            />
+                            <SafeOpRef key={opRefUri} opRef={opRefUri} />
                           )
                         )}
                       </Box>

@@ -103,16 +103,13 @@ export const MonitorsPage = ({
                 if (opRefs.length === 0) {
                   return null;
                 }
-                let firstOpRef: WeaveObjectRef | null = null;
-                try {
-                  firstOpRef = parseRef(opRefs[0]) as WeaveObjectRef;
-                } catch (e) {
-                  return <span>Incorrect op ref: {opRefs[0]}</span>;
-                }
                 return (
                   <div className="flex items-center gap-2">
                     {opRefs[0] !== ALL_TRACES_OR_CALLS_REF_KEY ? (
-                      <SmallRef objRef={firstOpRef} />
+                      <SafeOpRef opRef={opRefs[0]} />
+                    ) : null}
+                    {opRefs[0] === ALL_TRACES_OR_CALLS_REF_KEY ? (
+                      <span>All calls</span>
                     ) : null}
                     {opRefs.length > 1 ? (
                       <span>{`+${opRefs.length - 1}`}</span>
@@ -214,4 +211,12 @@ const CallCountCell = ({
       )}`}
     />
   );
+};
+
+export const SafeOpRef = ({opRef}: {opRef: string}) => {
+  try {
+    return <SmallRef objRef={parseRef(opRef) as WeaveObjectRef} />;
+  } catch (e) {
+    return <span>Incorrect op ref: {opRef}</span>;
+  }
 };
