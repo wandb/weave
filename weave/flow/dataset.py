@@ -1,15 +1,12 @@
 from collections.abc import Iterable, Iterator
 from functools import cached_property
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING
 
-from pydantic import BeforeValidator, Field
 from typing_extensions import Self
 
-from weave.flow.casting import cast_to_table
 from weave.flow.obj import Object
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.objectify import register_object
-from weave.trace.table import Table
 from weave.trace.vals import WeaveObject, WeaveTable
 from weave.trace.weave_client import Call
 
@@ -43,11 +40,7 @@ class Dataset(Object):
     ```
     """
 
-    rows: Annotated[
-        Table | WeaveTable | list[dict],
-        BeforeValidator(cast_to_table),
-        Field(description="The rows of the dataset."),
-    ]
+    rows: TableLike
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
