@@ -88,10 +88,26 @@ const NUMERIC_SETTINGS_MAPPING: Record<
   },
 };
 
-export const usePlaygroundState = () => {
-  const [playgroundStates, setPlaygroundStates] = useState<PlaygroundState[]>([
-    DEFAULT_PLAYGROUND_STATE,
-  ]);
+const getDefaultModelState = (modelId: LLMMaxTokensKey): PlaygroundState => {
+  return {
+    ...DEFAULT_PLAYGROUND_STATE,
+    model: modelId,
+  };
+};
+
+const getDefaultModelsState = (
+  defaultModelIds: LLMMaxTokensKey[]
+): PlaygroundState[] => {
+  if (defaultModelIds.length === 0) {
+    return [DEFAULT_PLAYGROUND_STATE];
+  }
+  return defaultModelIds.map(modelId => getDefaultModelState(modelId));
+};
+
+export const usePlaygroundState = (defaultModelIds: LLMMaxTokensKey[]) => {
+  const [playgroundStates, setPlaygroundStates] = useState<PlaygroundState[]>(
+    getDefaultModelsState(defaultModelIds)
+  );
 
   const setPlaygroundStateField = useCallback(
     (
