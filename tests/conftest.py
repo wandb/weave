@@ -450,10 +450,8 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                         server,
                         clickhouse_trace_server_batched.ClickHouseTraceServer,
                     ) and hasattr(server, "_next_trace_server"):
-                        # Force merge the calls table before reads!
-                        server._next_trace_server.ch_client.command(
-                            "OPTIMIZE TABLE calls_merged FINAL"
-                        )
+                        # Wait for all inserts to clear!
+                        time.sleep(0.1)
 
                 res = attr(*args, **kwargs)
                 if self.__dict__.get("_autoflush", True):
