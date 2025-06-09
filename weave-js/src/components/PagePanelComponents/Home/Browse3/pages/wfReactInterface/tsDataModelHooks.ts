@@ -70,6 +70,7 @@ import {
   UseTableQueryStatsParams,
   UseTableRowsQueryParams,
   UseTableUpdateParams,
+  WeaveObjectVersionKey,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
@@ -182,7 +183,7 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
+export const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
 
@@ -472,7 +473,7 @@ const useCalls = (
   }, [calls.refetch, expandedCalls, loading, calls.error]);
 };
 
-const useCallsStats = (
+export const useCallsStats = (
   params: UseCallsStatsParams
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -996,7 +997,7 @@ const useFileContent = (
   }, [fileContentRes, params.skip, error]);
 };
 
-const useObjectVersion = (
+export const useObjectVersion = (
   params: UseObjectVersionParams
 ): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1139,7 +1140,7 @@ export const convertTraceServerObjectVersionToSchema = <
   };
 };
 
-const useRootObjectVersions = (
+export const useRootObjectVersions = (
   params: UseRootObjectVersionsParams
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1173,6 +1174,7 @@ const useRootObjectVersions = (
       },
       limit: params.limit,
       metadata_only: params.metadataOnly,
+      sort_by: params.sortBy,
       ...(!!params.includeStorageSize ? {include_storage_size: true} : null),
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
@@ -1197,6 +1199,7 @@ const useRootObjectVersions = (
     params.limit,
     params.metadataOnly,
     params.includeStorageSize,
+    params.sortBy,
     getTsClient,
   ]);
 
@@ -2120,6 +2123,60 @@ export const useObjCreate = () => {
         });
     },
     [getTsClient]
+  );
+};
+
+export const useScorerCreate = () => {
+  const objCreate = useObjCreate();
+
+  return useCallback(
+    async ({
+      entity,
+      project,
+      name,
+      refUri,
+    }: {
+      entity: string;
+      project: string;
+      name: string;
+      refUri?: string;
+    }): Promise<WeaveObjectVersionKey> => {
+      let scorerDigest: string;
+      if (refUri) {
+        // If the scorer already exists (this is an edit) we do not recreate it.
+        scorerDigest = parseRef(refUri).artifactVersion;
+      } else {
+        // If refUri is undefined the scorer needs to be create.
+        const scorerObj = {
+          _type: name,
+          name: name,
+          description: `${name} created from the UI.`,
+          ref: null,
+          column_map: null,
+          _class_name: name,
+          _bases: ['Scorer', 'Object', 'BaseModel'],
+        };
+
+        scorerDigest = await objCreate({
+          projectId: `${entity}/${project}`,
+          objectId: name,
+          val: scorerObj,
+        });
+      }
+
+      const objectVersionKey: WeaveObjectVersionKey = {
+        scheme: 'weave',
+        entity,
+        project,
+        weaveKind: 'object',
+        objectId: name,
+        versionHash: scorerDigest,
+        path: '',
+      };
+
+      return objectVersionKey;
+    },
+    [objCreate]
   );
 };
 

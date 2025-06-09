@@ -295,7 +295,10 @@ A decorator to weave op-ify a function or method. Works for both sync and async.
 attributes(attributes: 'dict[str, Any]') → Iterator
 ```
 
-Context manager for setting attributes on a call. 
+Context manager for setting attributes on a call.
+
+Attributes become immutable once a call begins execution. Use this
+context manager to provide metadata before the call starts.
 
 
 

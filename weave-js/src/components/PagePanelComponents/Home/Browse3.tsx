@@ -44,6 +44,7 @@ import {DatasetsPage} from './Browse3/pages/DatasetsPage/DatasetsPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
+import {MonitorsPage} from './Browse3/pages/MonitorsPage/MonitorsPage';
 import {ObjectPage} from './Browse3/pages/ObjectsPage/ObjectPage';
 import {WFHighLevelObjectVersionFilter} from './Browse3/pages/ObjectsPage/objectsPageTypes';
 import {ObjectVersionPage} from './Browse3/pages/ObjectsPage/ObjectVersionPage';
@@ -62,6 +63,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {getParamArray, queryGetDict} from './Browse3/urlQueryUtil';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -414,6 +416,9 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
         </Route>
+        <Route path={`${projectRoot}/monitors`}>
+          <MonitorsPageBinding />
+        </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
         </Route>
@@ -726,6 +731,12 @@ const CallPageBinding = () => {
   );
 };
 
+const MonitorsPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <MonitorsPage entity={entity} project={project} />;
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
@@ -989,12 +1000,16 @@ const ComparePageBinding = () => {
 };
 
 const PlaygroundPageBinding = () => {
-  const params = useParamsDecoded<Browse3TabItemParams>();
+  const {entity, project, itemName} = useParamsDecoded<Browse3TabItemParams>();
+  const history = useHistory();
+  const query = queryGetDict(history);
+  const modelIds = getParamArray(query, 'model');
   return (
     <PlaygroundPage
-      entity={params.entity}
-      project={params.project}
-      callId={params.itemName}
+      entity={entity}
+      project={project}
+      callId={itemName}
+      modelIds={modelIds}
     />
   );
 };
