@@ -55,7 +55,8 @@ def digest_is_cacheable(digest: str) -> bool:
     return True
 
 
-CACHE_DIR_PREFIX = "weave_trace_server_cache_" + version.VERSION
+CACHE_DIR_PREFIX = "weave_trace_server_cache"
+CACHE_KEY_SUFFIX = "v_" + version.VERSION
 
 
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
@@ -170,6 +171,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
                 f"Error deleting cached values with prefix '{prefix}': {e}"
             )
 
+    def _make_cache_key(self, namespace: str, key: str) -> str:
+        return f"{namespace}_{key}_{CACHE_KEY_SUFFIX}"
+
     def _with_cache(
         self,
         func: Callable[[TReq], TRes],
@@ -196,7 +200,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             The function result, either from cache or from calling func
         """
         try:
-            cache_key = f"{namespace}_{make_cache_key(req)}"
+            cache_key = self._make_cache_key(namespace, make_cache_key(req))
         except Exception as e:
             logger.exception(f"Error creating cache key: {e}")
             return func(req)
@@ -338,7 +342,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         for needed_ndx, ref in enumerate(req.refs):
             existing_result = None
             try:
-                existing_result = self._safe_cache_get(ref)
+                existing_result = self._safe_cache_get(
+                    self._make_cache_key("refs_read_batch", ref)
+                )
             except Exception as e:
                 logger.exception(f"Error getting cached value for ref '{ref}': {e}")
 
@@ -361,7 +367,10 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
                     if isinstance(parsed_ref, ObjectRef) and digest_is_cacheable(
                         parsed_ref.digest
                     ):
-                        self._safe_cache_set(needed_ref, needed_val)
+                        self._safe_cache_set(
+                            self._make_cache_key("refs_read_batch", needed_ref),
+                            needed_val,
+                        )
                 except Exception as e:
                     logger.exception(f"Error caching ref value: {e}")
 

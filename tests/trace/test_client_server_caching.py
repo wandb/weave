@@ -10,9 +10,13 @@ import PIL
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
 from weave.trace_server.trace_server_interface import (
+    FileContentReadReq,
+    FileCreateReq,
+    ObjCreateReq,
     ObjReadReq,
     ObjReadRes,
     ObjSchema,
+    ObjSchemaForInsert,
     TraceServerInterface,
 )
 
@@ -199,3 +203,133 @@ def test_server_cache_latency(client):
     print(f"Added latency: {added_latency}")
 
     assert added_latency < 0.001
+
+
+def test_file_create_caching(client):
+    caching_server: CachingMiddlewareTraceServer = client.server.server
+    file_bytes = b"hello"
+    caching_server.reset_cache_recorder()
+    create_0 = client.server.file_create(
+        FileCreateReq(
+            project_id="test",
+            name="test",
+            content=file_bytes,
+        )
+    )
+    assert caching_server.get_cache_recorder() == {
+        "hits": 0,
+        "misses": 1,
+        "errors": 0,
+        "skips": 0,
+    }
+    caching_server.reset_cache_recorder()
+    create_1 = client.server.file_create(
+        FileCreateReq(
+            project_id="test",
+            name="test",
+            content=file_bytes,
+        )
+    )
+    assert caching_server.get_cache_recorder() == {
+        "hits": 1,
+        "misses": 0,
+        "errors": 0,
+        "skips": 0,
+    }
+    assert create_0 == create_1
+
+    caching_server.reset_cache_recorder()
+    read_0 = client.server.file_content_read(
+        FileContentReadReq(
+            project_id="test",
+            digest=create_0.digest,
+        )
+    )
+    assert caching_server.get_cache_recorder() == {
+        "hits": 0,
+        "misses": 1,
+        "errors": 0,
+        "skips": 0,
+    }
+    caching_server.reset_cache_recorder()
+    read_1 = client.server.file_content_read(
+        FileContentReadReq(
+            project_id="test",
+            digest=create_0.digest,
+        )
+    )
+    assert caching_server.get_cache_recorder() == {
+        "hits": 1,
+        "misses": 0,
+        "errors": 0,
+        "skips": 0,
+    }
+    assert read_0.content == read_1.content == file_bytes
+
+
+def test_obj_create_caching(client):
+    caching_server: CachingMiddlewareTraceServer = client.server.server
+    val = {"hello": "world"}
+    caching_server.reset_cache_recorder()
+    create_0 = client.server.obj_create(
+        ObjCreateReq(
+            obj=ObjSchemaForInsert(
+                project_id="test",
+                object_id="test",
+                val=val,
+            )
+        )
+    )
+    assert caching_server.get_cache_recorder() == {
+        "hits": 0,
+        "misses": 1,
+        "errors": 0,
+        "skips": 0,
+    }
+    caching_server.reset_cache_recorder()
+    create_1 = client.server.obj_create(
+        ObjCreateReq(
+            obj=ObjSchemaForInsert(
+                project_id="test",
+                object_id="test",
+                val=val,
+            )
+        )
+    )
+    assert caching_server.get_cache_recorder() == {
+        "hits": 1,
+        "misses": 0,
+        "errors": 0,
+        "skips": 0,
+    }
+    assert create_0 == create_1
+
+    caching_server.reset_cache_recorder()
+    read_0 = client.server.obj_read(
+        ObjReadReq(
+            project_id="test",
+            object_id="test",
+            digest=create_0.digest,
+        )
+    )
+    assert caching_server.get_cache_recorder() == {
+        "hits": 0,
+        "misses": 1,
+        "errors": 0,
+        "skips": 0,
+    }
+    caching_server.reset_cache_recorder()
+    read_1 = client.server.obj_read(
+        ObjReadReq(
+            project_id="test",
+            object_id="test",
+            digest=create_0.digest,
+        )
+    )
+    assert caching_server.get_cache_recorder() == {
+        "hits": 1,
+        "misses": 0,
+        "errors": 0,
+        "skips": 0,
+    }
+    assert read_0.obj.val == read_1.obj.val == val
