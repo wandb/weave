@@ -666,6 +666,10 @@ class CallsQuery(BaseModel):
             # SUPER IMPORTANT: still need to re-sort the final query
             outer_query.order_fields = self.order_fields
         else:
+            if has_heavy_filter and self.limit:
+                # Move heavy condition + optimizations to light filter w/ hardcap limit
+                filter_query.query_conditions.extend(outer_query.query_conditions)
+                filter_query.limit = self.limit * 10
             outer_query.order_fields = self.order_fields
             outer_query.limit = self.limit
             outer_query.offset = self.offset
