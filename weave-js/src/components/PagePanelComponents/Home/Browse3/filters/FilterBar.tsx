@@ -2,17 +2,10 @@
  * This bar above a grid displays currently set filters for quick editing.
  */
 
-import {
-  Dialog,
-  DialogActions as MaterialDialogActions,
-  DialogContent as MaterialDialogContent,
-  DialogTitle as MaterialDialogTitle,
-  Popover,
-} from '@mui/material';
+import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import styled from 'styled-components';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
