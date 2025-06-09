@@ -454,9 +454,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
 
                 res = attr(*args, **kwargs)
                 if self.__dict__.get("_autoflush", True):
-                    has_pending_jobs = self_super._get_pending_jobs()["total_jobs"] > 0
                     self_super._flush()
-
                 return res
 
             return wrapper
