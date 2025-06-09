@@ -192,7 +192,7 @@ export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
 
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
-  console.log('renderFullScreen', scrollX, scrollY);
+
   document.body.appendChild(fullScreenElement);
   fullScreenElement.appendChild(canvas);
   canvas.width = window.screen.width;
@@ -214,7 +214,6 @@ export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
       window.scrollTo(scrollX, scrollY);
     });
   });
-  await new Promise(resolve => requestAnimationFrame(resolve));
 
   try {
     await fullScreenElement.requestFullscreen();
