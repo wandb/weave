@@ -24,6 +24,7 @@ from typing import (
     Protocol,
     TypedDict,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -928,7 +929,7 @@ def cast_to_query(obj: Any) -> Query | None:
 
 CallsFilterLike = Annotated[CallsFilter, pydantic.BeforeValidator(cast_to_calls_filter)]
 SortByLike = Annotated[SortBy, pydantic.BeforeValidator(cast_to_sort_by)]
-QueryLike = Annotated[Query | None, pydantic.BeforeValidator(cast_to_query)]
+QueryLike = Annotated[Union[Query, None], pydantic.BeforeValidator(cast_to_query)]
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
