@@ -4,7 +4,6 @@ from typing import Any, Optional, get_type_hints
 import pytest
 
 import weave
-from tests.trace.util import AnyStrMatcher
 from weave.trace.op import OpCallError, is_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.vals import MissingSelfInstanceError
@@ -128,7 +127,7 @@ def test_sync_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            _digest=AnyStrMatcher(),
+            _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             _extra=(),
         ),
         "a": 1,
@@ -163,7 +162,7 @@ async def test_async_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            _digest=AnyStrMatcher(),
+            _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             _extra=(),
         ),
         "a": 1,
