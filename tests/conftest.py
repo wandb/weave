@@ -2,6 +2,7 @@ import base64
 import contextlib
 import logging
 import os
+import time
 import typing
 from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
@@ -446,10 +447,11 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
             def wrapper(*args, **kwargs):
                 if attr.__name__ in calls_queries_that_need_optimize:
                     server = self.__dict__.get("server")
-                    if isinstance(
-                        server,
-                        clickhouse_trace_server_batched.ClickHouseTraceServer,
-                    ) and hasattr(server, "_next_trace_server"):
+                    if (
+                        server
+                        and server._next_trace_server
+                        and hasattr(server._next_trace_server, "ch_client")
+                    ):
                         # Wait for all inserts to clear!
                         time.sleep(0.1)
 
