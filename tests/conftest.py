@@ -356,8 +356,7 @@ class InMemoryWeaveLogCollector(logging.Handler):
         return [
             record
             for record in logs
-            if record.levelname == levelname
-            and record.name.startswith("weave")
+            if record.levelname == levelname and record.name.startswith("weave")
             # (Tim) For some reason that i cannot figure out, there is some test that
             # a) is trying to connect to the PROD trace server
             # b) seemingly doesn't fail
@@ -437,6 +436,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
         if callable(attr) and name != "flush":
 
             def wrapper(*args, **kwargs):
+                print("args", args, kwargs)
                 res = attr(*args, **kwargs)
                 if self.__dict__.get("_autoflush", True):
                     has_pending_jobs = self_super._get_pending_jobs()["total_jobs"] > 0
@@ -445,6 +445,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                     server = self.__dict__.get("server")
                     if not hasattr(server, "_next_trace_server"):
                         # sqlite, just return
+                        print(f"sqlite, returning {res}")
                         return res
 
                     # Sleep to allow inserts to become available, when flush did something
@@ -453,9 +454,15 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                             server,
                             clickhouse_trace_server_batched.ClickHouseTraceServer,
                         )
-                        and has_pending_jobs
+                        and res is None
                     ):
-                        time.sleep(0.01)
+                        start = time.time()
+                        server._next_trace_server.ch_client.command(
+                            "SELECT count(*) FROM calls_merged"
+                        )
+                        end = time.time()
+                        print(f">>>>>>>>>>>>>>>>>>>>>>> Time taken: {end - start}")
+                        # time.sleep(0.05)
                 return res
 
             return wrapper
