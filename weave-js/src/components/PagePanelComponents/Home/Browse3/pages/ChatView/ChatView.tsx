@@ -22,14 +22,14 @@ export const ChatView = ({chat}: ChatViewProps) => {
   // Check if we should show loading state
   const shouldShowLoading = useMemo(() => {
     if (!playgroundContext.isPlayground) return false;
-    
+
     const messages = chat.request?.messages || [];
     if (messages.length === 0) return false;
-    
+
     // Check if the last message is from user and we have no result yet
     const lastMessage = messages[messages.length - 1];
     const isLastMessageFromUser = lastMessage.role === 'user';
-    
+
     return isLastMessageFromUser && !chatResult;
   }, [playgroundContext.isPlayground, chat.request?.messages, chatResult]);
 
@@ -64,25 +64,25 @@ export const ChatView = ({chat}: ChatViewProps) => {
       />
       {/* Show loading state when waiting for response */}
       {shouldShowLoading && (
-          <>
-            <span className="mb-[8px] text-sm font-semibold text-moon-800">
-              Response
-            </span>
-            <div className="flex gap-[16px] py-4">
-              <div className="w-32 flex-shrink-0">
-                <Callout
-                  size="x-small"
-                  icon="robot-service-member"
-                  color="moon"
-                  className="mt-[4px] h-32 w-32 bg-moon-100"
-                />
-              </div>
-              <div className="flex items-center">
-                <WaveLoader size="small" />
-              </div>
+        <>
+          <span className="mb-[8px] text-sm font-semibold text-moon-800">
+            Response
+          </span>
+          <div className="flex gap-[16px] py-4">
+            <div className="w-32 flex-shrink-0">
+              <Callout
+                size="x-small"
+                icon="robot-service-member"
+                color="moon"
+                className="mt-[4px] h-32 w-32 bg-moon-100"
+              />
             </div>
-          </>
-        )}
+            <div className="flex items-center">
+              <WaveLoader size="small" />
+            </div>
+          </div>
+        </>
+      )}
       {chatResult &&
         'content' in chatResult &&
         chatResult.content &&
