@@ -105,6 +105,7 @@ import {ReactComponent as ImportIdle} from '../../assets/icons/icon-idle.svg';
 import {ReactComponent as ImportIgnoreOutliers} from '../../assets/icons/icon-ignore-outliers.svg';
 import {ReactComponent as ImportImpersonateMaskAlt} from '../../assets/icons/icon-impersonate-mask-alt.svg';
 import {ReactComponent as ImportImportInsert} from '../../assets/icons/icon-import-insert.svg';
+import {ReactComponent as ImportInference} from '../../assets/icons/icon-inference.svg';
 import {ReactComponent as ImportInfo} from '../../assets/icons/icon-info.svg';
 import {ReactComponent as ImportItalic} from '../../assets/icons/icon-italic.svg';
 import {ReactComponent as ImportJobAutomation} from '../../assets/icons/icon-job-automation.svg';
@@ -615,6 +616,9 @@ export const IconImpersonateMaskAlt = (props: SVGIconProps) => (
 );
 export const IconImportInsert = (props: SVGIconProps) => (
   <ImportImportInsert {...updateIconProps(props)} />
+);
+export const IconInference = (props: SVGIconProps) => (
+  <ImportInference {...updateIconProps(props)} />
 );
 export const IconInfo = (props: SVGIconProps) => (
   <ImportInfo {...updateIconProps(props)} />
@@ -1257,6 +1261,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'ignore-outliers': IconIgnoreOutliers,
   'impersonate-mask-alt': IconImpersonateMaskAlt,
   'import-insert': IconImportInsert,
+  inference: IconInference,
   info: IconInfo,
   italic: IconItalic,
   'job-automation': IconJobAutomation,
