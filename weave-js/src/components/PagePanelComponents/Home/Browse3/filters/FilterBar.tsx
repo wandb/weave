@@ -124,6 +124,10 @@ export const FilterBar = ({
       label: 'attributes',
       options: [],
     },
+    {
+      label: 'Annotations',
+      options: [],
+    },
   ];
   for (const col of cols) {
     if (UNFILTERABLE_FIELDS.includes(col.field)) {
@@ -150,15 +154,14 @@ export const FilterBar = ({
         label: (col.headerName ?? col.field).substring('attributes.'.length),
         description: FIELD_DESCRIPTIONS[col.field],
       });
-    } else if (
-      col.field.startsWith('summary.weave.feedback.wandb.annotation')
-    ) {
-      const parsed = parseFeedbackType(col.field);
+    } else if (col.field.startsWith('feedback.[wandb.annotation')) {
+      const field = col.field.slice();
+      const parsed = parseFeedbackType(field);
       if (!parsed) {
         continue;
       }
       const backendFilter = convertFeedbackFieldToBackendFilter(parsed.field);
-      (options[0] as GroupedOption).options.push({
+      (options[4] as GroupedOption).options.push({
         value: backendFilter,
         label: parsed ? parsed.displayName : col.field,
       });
