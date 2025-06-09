@@ -48,6 +48,7 @@ def cast_to_table(obj: Any) -> Table | WeaveTable:
     # Try to create a Table from iterable of dicts
     if isinstance(obj, Iterable) and not isinstance(obj, (str, bytes)):
         rows = list(obj)
+        first_row_keys = set(rows[0].keys())
         for row in rows:
             if not isinstance(row, dict):
                 raise TypeError(
@@ -55,6 +56,11 @@ def cast_to_table(obj: Any) -> Table | WeaveTable:
                 )
             if len(row) == 0:
                 raise ValueError("Unable to cast to Table: dict cannot be empty.")
+            if set(row.keys()) != first_row_keys:
+                raise ValueError(
+                    f"Unable to cast to Table: all rows must have the same keys. "
+                    f"Row 0 has keys {sorted(first_row_keys)}, but row {i} has keys {sorted(row.keys())}"
+                )
             if not all(isinstance(k, str) for k in row.keys()):
                 raise TypeError(
                     f"Unable to cast to Table: all dicts must have string keys. Found type: {type(row)}"
