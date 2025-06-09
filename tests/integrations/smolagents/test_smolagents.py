@@ -97,7 +97,7 @@ def test_tool_calling_agent_search(client):
     )
 
     calls = client.calls()
-    assert len(calls) == 20
+    assert len(calls) == 17
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -136,7 +136,7 @@ def test_tool_calling_agent_weather(client):
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
     calls = client.calls()
-    assert len(calls) == 12
+    assert len(calls) == 10
 
     call = calls[0]
     assert call.started_at < call.ended_at

@@ -70,6 +70,7 @@ import {
   UseTableQueryStatsParams,
   UseTableRowsQueryParams,
   UseTableUpdateParams,
+  WeaveObjectVersionKey,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
@@ -182,7 +183,7 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
+export const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
 
@@ -343,7 +344,7 @@ const useCallsNoExpansion = (
   ]);
 
   // Keep track of the request we're waiting for, so that we
-  // can ignore requests that are superceded by more recent reqs
+  // can ignore requests that are superseded by more recent reqs
   const expectedRequestRef = useRef(req);
 
   const doFetch = useCallback(() => {
@@ -472,7 +473,7 @@ const useCalls = (
   }, [calls.refetch, expandedCalls, loading, calls.error]);
 };
 
-const useCallsStats = (
+export const useCallsStats = (
   params: UseCallsStatsParams
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -496,17 +497,19 @@ const useCallsStats = (
         entity: params.entity,
         project: params.project,
       }),
-      filter: {
-        op_names: deepFilter?.opVersionRefs,
-        input_refs: deepFilter?.inputObjectVersionRefs,
-        output_refs: deepFilter?.outputObjectVersionRefs,
-        parent_ids: deepFilter?.parentIds,
-        trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter?.callIds,
-        trace_roots_only: deepFilter?.traceRootsOnly,
-        wb_run_ids: deepFilter?.runIds,
-        wb_user_ids: deepFilter?.userIds,
-      },
+      filter: deepFilter
+        ? {
+            op_names: deepFilter?.opVersionRefs,
+            input_refs: deepFilter?.inputObjectVersionRefs,
+            output_refs: deepFilter?.outputObjectVersionRefs,
+            parent_ids: deepFilter?.parentIds,
+            trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
+            call_ids: deepFilter?.callIds,
+            trace_roots_only: deepFilter?.traceRootsOnly,
+            wb_run_ids: deepFilter?.runIds,
+            wb_user_ids: deepFilter?.userIds,
+          }
+        : undefined,
       query: params.query,
       limit: params.limit,
       ...(!!params.includeTotalStorageSize
@@ -568,7 +571,6 @@ const useProjectHasCalls = (
   const callsStats = useCallsStats({
     entity: params.entity,
     project: params.project,
-    filter: {},
     limit: 1,
     skip: params.skip,
   });
@@ -995,7 +997,7 @@ const useFileContent = (
   }, [fileContentRes, params.skip, error]);
 };
 
-const useObjectVersion = (
+export const useObjectVersion = (
   params: UseObjectVersionParams
 ): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1138,7 +1140,7 @@ export const convertTraceServerObjectVersionToSchema = <
   };
 };
 
-const useRootObjectVersions = (
+export const useRootObjectVersions = (
   params: UseRootObjectVersionsParams
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1172,6 +1174,7 @@ const useRootObjectVersions = (
       },
       limit: params.limit,
       metadata_only: params.metadataOnly,
+      sort_by: params.sortBy,
       ...(!!params.includeStorageSize ? {include_storage_size: true} : null),
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
@@ -1196,6 +1199,7 @@ const useRootObjectVersions = (
     params.limit,
     params.metadataOnly,
     params.includeStorageSize,
+    params.sortBy,
     getTsClient,
   ]);
 
@@ -2119,6 +2123,60 @@ export const useObjCreate = () => {
         });
     },
     [getTsClient]
+  );
+};
+
+export const useScorerCreate = () => {
+  const objCreate = useObjCreate();
+
+  return useCallback(
+    async ({
+      entity,
+      project,
+      name,
+      refUri,
+    }: {
+      entity: string;
+      project: string;
+      name: string;
+      refUri?: string;
+    }): Promise<WeaveObjectVersionKey> => {
+      let scorerDigest: string;
+      if (refUri) {
+        // If the scorer already exists (this is an edit) we do not recreate it.
+        scorerDigest = parseRef(refUri).artifactVersion;
+      } else {
+        // If refUri is undefined the scorer needs to be create.
+        const scorerObj = {
+          _type: name,
+          name: name,
+          description: `${name} created from the UI.`,
+          ref: null,
+          column_map: null,
+          _class_name: name,
+          _bases: ['Scorer', 'Object', 'BaseModel'],
+        };
+
+        scorerDigest = await objCreate({
+          projectId: `${entity}/${project}`,
+          objectId: name,
+          val: scorerObj,
+        });
+      }
+
+      const objectVersionKey: WeaveObjectVersionKey = {
+        scheme: 'weave',
+        entity,
+        project,
+        weaveKind: 'object',
+        objectId: name,
+        versionHash: scorerDigest,
+        path: '',
+      };
+
+      return objectVersionKey;
+    },
+    [objCreate]
   );
 };
 

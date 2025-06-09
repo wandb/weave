@@ -18,6 +18,7 @@ import {
 } from './common';
 import {IdList} from './IdList';
 import {SelectDatetimeDropdown} from './SelectDatetimeDropdown';
+import {SelectMonitor} from './SelectMonitor';
 import {TextValue} from './TextValue';
 import {ValueInputBoolean} from './ValueInputBoolean';
 import {ValueInputStatus} from './ValueInputStatus';
@@ -62,6 +63,16 @@ export const SelectValue = ({
   }
   if (fieldType === 'user') {
     return <UserLink userId={value} includeName={true} hasPopover={false} />;
+  }
+  if (fieldType === 'monitor') {
+    return (
+      <SelectMonitor
+        entity={entity}
+        project={project}
+        value={value}
+        onChange={onSetValue}
+      />
+    );
   }
   if (fieldType === 'run') {
     return (

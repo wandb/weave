@@ -236,6 +236,18 @@ export const EMPTY_PROPS_OBJECT_VERSIONS: EmptyProps = {
     </>
   ),
 };
+
+export const EMPTY_PROPS_MONITORS: EmptyProps = {
+  icon: 'job-automation' as const,
+  heading: 'No monitors yet',
+  description: 'Use monitors to automatically run scorers on incoming traces.',
+  moreInformation: (
+    <>
+      Learn about <TargetBlank href="">monitors</TargetBlank>.
+    </>
+  ),
+};
+
 export const EMPTY_NO_TRACE_SERVER: EmptyProps = {
   icon: 'weave' as const,
   heading: 'Weave coming soon!',

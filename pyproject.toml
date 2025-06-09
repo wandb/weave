@@ -104,7 +104,7 @@ huggingface = ["huggingface-hub>=0.28.1"]
 smolagents = [
   "openai>=1.0.0",
   "litellm>=1.58",
-  "smolagents>=1.8.1",
+  "smolagents>=1.17.0",
   "huggingface-hub>=0.28.1",
   "SQLAlchemy>=2.0.38",
 ]
@@ -117,6 +117,9 @@ langchain = [
   "langchain-core>=0.2.1",
   "langchain-openai>=0.1.7",
   "langchain-community>=0.2.1",
+  "langchain-google-vertexai>=2.0.24",
+  "langchain-google-genai>=2.1.5",
+  "langchain-anthropic>=0.3.15",
   "chromadb>=0.5.0",
   "pysqlite3",
   "opentelemetry-exporter-otlp",
@@ -162,6 +165,8 @@ test = [
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
+  "freezegun",
+  "eval_type_backport",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
@@ -174,6 +179,8 @@ test = [
   "moviepy<=1.0.3",
   "filelock",
   "httpx",
+
+  "confluent-kafka",
 
   "weave[trace_server]",
   "weave[trace_server_tests]",
@@ -305,7 +312,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.48-dev0"
+current_version = "0.51.52-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

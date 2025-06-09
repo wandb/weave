@@ -4,6 +4,7 @@
 
 import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
+import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
@@ -29,7 +30,7 @@ import {EvaluationCall} from './ecpTypes';
 import {EVALUATION_NAME_DEFAULT} from './ecpUtil';
 import {VerticalBox} from './Layout';
 import {ComparisonDefinitionSection} from './sections/ComparisonDefinitionSection/ComparisonDefinitionSection';
-import {ExampleCompareSectionDetail} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
+import {ExampleCompareSectionDetailGuarded} from './sections/ExampleCompareSection/ExampleCompareSectionDetail';
 import {ExampleCompareSectionTable} from './sections/ExampleCompareSection/ExampleCompareSectionTable';
 import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilterSection';
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
@@ -121,9 +122,7 @@ export const CompareEvaluationsPageContent: React.FC<
       setSelectedInputDigest={setSelectedInputDigest}>
       <CustomWeaveTypeProjectContext.Provider
         value={{entity: props.entity, project: props.project}}>
-        <AutoSizer style={{height: '100%', width: '100%'}}>
-          {({height, width}) => <CompareEvaluationsPageInner height={height} />}
-        </AutoSizer>
+        <CompareEvaluationsPageInner />
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
   );
@@ -174,13 +173,8 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
   );
 };
 
-const CompareEvaluationsPageInner: React.FC<{
-  height: number;
-}> = props => {
+const CompareEvaluationsPageInner: React.FC<{}> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
-  const showExampleFilter = false;
-  // Keeping this here in case we want to bring it back
-  // Object.keys(state.summary.evaluationCalls).length === 2;
   const showExamples =
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
@@ -190,7 +184,7 @@ const CompareEvaluationsPageInner: React.FC<{
   return (
     <Box
       sx={{
-        height: props.height,
+        height: '100%',
         width: '100%',
         overflow: 'auto',
       }}>
@@ -226,12 +220,34 @@ const CompareEvaluationsPageInner: React.FC<{
                   setSelectedMetrics={setSelectedMetrics}
                 />
                 <ScorecardSection state={state} />
+                <Tailwind style={{width: '100%'}}>
+                  <div className="px-16">
+                    <div className="flex w-full flex-col items-center gap-3 rounded-lg border border-dashed border-moon-300 bg-moon-50 p-16">
+                      <Icon name="table" size="large" color="moon-500 mb-4" />
+                      <div className="mb-4 flex flex-col items-center">
+                        <p className="text-center font-semibold">
+                          Looking for your evaluation results?
+                        </p>
+                        <p className="text-center text-moon-500">
+                          You can find it in our new results tab.
+                        </p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setTabValue('results')}>
+                        Review evaluation results
+                      </Button>
+                    </div>
+                    <div className="h-16"></div>
+                  </div>
+                </Tailwind>
               </VerticalBox>
             ),
           },
           {
             value: 'results',
             label: 'Results',
+            loading: resultsLoading,
             content: (
               <VerticalBox
                 sx={{
@@ -252,26 +268,20 @@ const CompareEvaluationsPageInner: React.FC<{
                     <WaveLoader size="small" />
                   </Box>
                 ) : showExamples ? (
-                  <>
-                    {showExampleFilter && (
-                      <ExampleFilterSection state={state} />
-                    )}
-                    <ResultExplorer state={state} height={props.height} />
-                  </>
+                  <AutoSizer style={{height: '100%', width: '100%'}}>
+                    {({height, width}) => {
+                      return <ResultExplorer state={state} height={height} />;
+                    }}
+                  </AutoSizer>
                 ) : (
                   <VerticalBox
                     sx={{
                       paddingLeft: STANDARD_PADDING,
                       paddingRight: STANDARD_PADDING,
+                      paddingTop: STANDARD_PADDING,
                       width: '100%',
                       overflow: 'auto',
                     }}>
-                    <Box
-                      sx={{
-                        fontWeight: 'bold',
-                      }}>
-                      Examples
-                    </Box>
                     <Alert severity="info">
                       The selected evaluations' datasets have 0 rows in common,
                       try comparing evaluations with datasets that have at least
@@ -295,21 +305,23 @@ const ResultExplorer: React.FC<{
   height: number;
 }> = ({state, height}) => {
   const [viewMode, setViewMode] = useState<'detail' | 'table' | 'split'>(
-    'split'
+    'table'
   );
+  const regressionFinderEnabled = state.evaluationCallIdsOrdered.length === 2;
 
   return (
     <VerticalBox
       sx={{
         height: '100%',
         width: '100%',
-        overflow: 'hidden',
+        overflow: 'auto',
       }}>
+      {regressionFinderEnabled && <ExampleFilterSection state={state} />}
       <Box
         style={{
           display: 'flex',
           flexDirection: 'row',
-          height: '100%',
+          height: height,
           borderTop: '1px solid #e0e0e0',
         }}>
         <Box
@@ -332,7 +344,7 @@ const ResultExplorer: React.FC<{
             borderLeft: '1px solid #e0e0e0',
             display: viewMode !== 'table' ? 'block' : 'none',
           }}>
-          <ExampleCompareSectionDetail
+          <ExampleCompareSectionDetailGuarded
             state={state}
             onClose={() => setViewMode('table')}
             onExpandToggle={() =>

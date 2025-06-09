@@ -21,6 +21,7 @@ class CallStartCHInsertable(BaseModel):
 
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
@@ -32,6 +33,7 @@ class CallStartCHInsertable(BaseModel):
     _display_name_v = field_validator("display_name")(validation.display_name_validator)
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
+    _wb_run_step_v = field_validator("wb_run_step")(validation.wb_run_step_validator)
 
 
 class CallEndCHInsertable(BaseModel):
@@ -118,6 +120,7 @@ class SelectableCHCallSchema(BaseModel):
 
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
     deleted_at: Optional[datetime.datetime] = None
 
@@ -127,6 +130,7 @@ class ObjCHInsertable(BaseModel):
     wb_user_id: Optional[str] = None
     kind: str
     base_object_class: Optional[str]
+    leaf_object_class: Optional[str]
     object_id: str
     refs: list[str]
     val_dump: str
@@ -152,6 +156,7 @@ class SelectableCHObjSchema(BaseModel):
     val_dump: str
     kind: str
     base_object_class: Optional[str]
+    leaf_object_class: Optional[str]
     digest: str
     version_index: int
     is_latest: int
