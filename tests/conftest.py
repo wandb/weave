@@ -649,14 +649,13 @@ def network_proxy_client(client):
 @pytest.fixture(autouse=True)
 def caching_client_isolation():
     test_specific_cache_dir = f"test_caching_client_isolation_{get_test_name()}"
-    with tempfile.TemporaryDirectory() as temp_dir:
-        target_dir = os.path.join(temp_dir, test_specific_cache_dir)
-        os.makedirs(target_dir, exist_ok=True)
-        current_cache_dir = os.environ.get("WEAVE_SERVER_CACHE_DIR")
-        os.environ["WEAVE_SERVER_CACHE_DIR"] = target_dir
-        yield
-        if current_cache_dir is not None:
-            os.environ["WEAVE_SERVER_CACHE_DIR"] = current_cache_dir
-        else:
-            os.environ.pop("WEAVE_SERVER_CACHE_DIR")
-        shutil.rmtree(target_dir)
+    temp_dir = os.path.join(tempfile.gettempdir(), test_specific_cache_dir)
+    os.makedirs(temp_dir, exist_ok=True)
+    current_cache_dir = os.environ.get("WEAVE_SERVER_CACHE_DIR")
+    os.environ["WEAVE_SERVER_CACHE_DIR"] = temp_dir
+    yield
+    shutil.rmtree(temp_dir)
+    if current_cache_dir is not None:
+        os.environ["WEAVE_SERVER_CACHE_DIR"] = current_cache_dir
+    else:
+        os.environ.pop("WEAVE_SERVER_CACHE_DIR")
