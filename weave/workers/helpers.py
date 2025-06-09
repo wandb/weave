@@ -1,21 +1,23 @@
-import asyncio
 import logging
+import os
 from functools import lru_cache
 
 import aiohttp
 from gql import Client, gql
 from gql.transport.requests import RequestsHTTPTransport
 
+from weave.trace_server.trace_server_interface import (
+    CompletionsCreateReq,
+    CompletionsCreateRequestInputs,
+    CompletionsCreateRes,
+)
+
 logger = logging.getLogger(__name__)
 
 
 def get_internal_service_token() -> str:
     try:
-        internal_service_token = (
-            "qa-test-service:lillies_FELINES_obtuse_SERENDIPITY_chase"
-        )
-        # internal_service_token = "weave-worker:9wEl,Iw2jWy4>FCG|ftZkDlG-:q;yLN#"
-        # internal_service_token = os.environ["WANDB_INTERNAL_SERVICE_TOKEN"]
+        internal_service_token = os.environ["WANDB_INTERNAL_SERVICE_TOKEN"]
     except KeyError:
         raise KeyError("WANDB_INTERNAL_SERVICE_TOKEN is not set")
 
@@ -27,7 +29,9 @@ INTERNAL_SERVICE_TOKEN_PREFIX = "X-Wandb-Internal-Service"
 
 def get_authenticated_client(impersonate_as: str | None = None) -> Client:
     try:
-        wandb_base_url = "https://api.qa.wandb.ai"
+        wandb_base_url = "https://api.wandb.ai"
+        # QA
+        # wandb_base_url = "https://api.qa.wandb.ai"
         # wandb_base_url = os.environ["WANDB_BASE_URL"]
     except KeyError:
         raise KeyError("WANDB_BASE_URL is not set")
@@ -101,54 +105,86 @@ def get_username_from_user_id(user_id: str) -> str:
 
 
 async def get_completion(
-    system_prompt: str, scoring_prompt: str, model: str, project_id: str, user_id: str
-) -> str:
-    entity_name, project_name = get_external_project_id(project_id)
+    request: CompletionsCreateReq, user_id: str
+) -> CompletionsCreateRes:
     username = get_username_from_user_id(user_id)
-
     try:
-        trace_server_base_url = "https://trace_server.wandb.test"
-        # trace_server_base_url = os.environ["TRACE_SERVER_BASE_URL"]
+        trace_server_base_url = os.environ["TRACE_SERVER_BASE_URL"]
     except KeyError:
         raise KeyError("TRACE_SERVER_BASE_URL is not set")
-
-    inputs = {
-        "model": model,
-        "max_tokens": 1024,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": scoring_prompt},
-        ],
-    }
 
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{trace_server_base_url}/completions/create",
-            json={
-                "inputs": inputs,
-                "model": model,
-                "project_id": f"{entity_name}/{project_name}",
-                "track_llm_call": False,
-            },
+            json=request.model_dump(),
             headers={
+                # This is for Gorilla to authenticate the request
                 "Wandb-Internal-Service": f"{INTERNAL_SERVICE_TOKEN_PREFIX} {get_internal_service_token()}",
                 "impersonated-username": username,
                 # Og== is the base64 encoding of ":"
+                # This is required for the trace server to accept the request
                 "Authorization": "Basic Og==",
             },
             ssl=False,
         ) as response:
-            return await response.json()
+            return CompletionsCreateRes.model_validate(await response.json())
+
+
+def get_permissions():
+    client = get_authenticated_client()
+    payload = client.execute(
+        gql(
+            """
+        query CanReadProjectScope($projectName: String, $entityName: String) {
+            project(name: $projectName, entityName: $entityName) {
+                internalId
+                weavePermissions {
+                    canRead
+                    canWrite
+                }
+            }
+        }
+    """
+        ),
+        {"projectName": "monitor-test", "entityName": "wandb"},
+    )
+    print(payload)
+
+
+def ext_to_int_project_id():
+    client = get_authenticated_client()
+    payload = client.execute(
+        gql(
+            """
+        query WeaveTraceServerProjectNamesToId ($entityName: String, $projectName: String) {
+            project(name: $projectName, entityName: $entityName) {
+                internalId
+            }
+        }
+    """
+        ),
+        {"entityName": "weave-team", "projectName": "monitor-test"},
+    )
+    print(payload)
 
 
 if __name__ == "__main__":
-    result = asyncio.run(
-        get_completion(
-            system_prompt="you are a helpful assistant",
-            scoring_prompt="say hello",
+    req = CompletionsCreateReq(
+        project_id="wandb/monitor-test",
+        track_llm_call=False,
+        inputs=CompletionsCreateRequestInputs(
             model="claude-sonnet-4-20250514",
-            project_id="UHJvamVjdEludGVybmFsSWQ6NDI3NQ==",
-            user_id="VXNlcjo5Njc=",
-        )
+            messages=[
+                {
+                    "role": "user",
+                    "content": "say hello",
+                }
+            ],
+        ),
     )
-    print(result)
+    # result = asyncio.run(get_completion(req, "VXNlcjoyMzU4MjI0"))
+    # print(result)
+    print(get_permissions())
+    # print(ext_to_int_project_id())
+    # print(get_username_from_user_id("VXNlcjo5Njc="))
+    # print(get_external_project_id("UHJvamVjdEludGVybmFsSWQ6NDI3NQ=="))

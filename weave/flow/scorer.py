@@ -36,8 +36,6 @@ class Scorer(Object):
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
 
-
-class BuiltInScorer(Scorer):
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
         field_values = {}

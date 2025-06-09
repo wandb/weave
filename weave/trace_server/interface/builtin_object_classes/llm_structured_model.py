@@ -152,7 +152,7 @@ class LLMStructuredCompletionModel(Model):
         """
         current_client = require_weave_client()
 
-        req = self._prepare_completion_request(
+        req = self.prepare_completion_request(
             project_id=f"{current_client.entity}/{current_client.project}",
             user_input=user_input,
             config=config,
@@ -169,7 +169,7 @@ class LLMStructuredCompletionModel(Model):
         try:
             # The 'response' attribute of CompletionsCreateRes is a dict
             response_payload = api_response.response
-            return _parse_response(response_payload, req.inputs.response_format)
+            return parse_response(response_payload, req.inputs.response_format)
         except (
             KeyError,
             IndexError,
@@ -181,7 +181,7 @@ class LLMStructuredCompletionModel(Model):
                 f"Failed to extract message from LLM response payload. Response: {api_response.response}"
             ) from e
 
-    def _prepare_completion_request(
+    def prepare_completion_request(
         self,
         project_id: str,
         user_input: MessageListLike,
@@ -233,7 +233,7 @@ class LLMStructuredCompletionModel(Model):
         return req
 
 
-def _parse_response(
+def parse_response(
     response_payload: dict, response_format: ResponseFormat
 ) -> Union[Message, str, dict[str, Any]]:
     if response_payload.get("error"):

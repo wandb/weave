@@ -3,7 +3,7 @@ import logging
 import os
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta
-from typing import Any, Optional, TypedDict
+from typing import Any, Optional, TypedDict, cast
 
 import ddtrace
 import sentry_sdk
@@ -21,10 +21,12 @@ from tenacity import (
 import weave.scorers  # noqa: F401
 from weave.flow.monitor import Monitor
 from weave.flow.scorer import Scorer, preparer_scorer_op_args
+from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.box import box
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import _default_on_input_handler
 from weave.trace.serialization.serialize import to_json
+from weave.trace.vals import make_trace_obj
 from weave.trace.weave_client import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     Call,
@@ -39,12 +41,16 @@ from weave.trace_server.environment import (
     wf_scoring_worker_batch_size,
     wf_scoring_worker_batch_timeout,
 )
+from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
+    parse_response,
+)
 from weave.trace_server.kafka import CALL_ENDED_TOPIC, KafkaConsumer
 from weave.trace_server.refs_internal import (
     InternalCallRef,
     InternalObjectRef,
     parse_internal_uri,
 )
+from weave.workers.helpers import get_completion, get_external_project_id
 
 # We add the hostname to differentiate between workers. This will be the pod name in Kubernetes.
 hostname = os.environ.get("HOSTNAME", "localhost")
@@ -163,17 +169,40 @@ def resolve_scorer_refs(scorer_ref_uris: list[str], project_id: str) -> list[Sco
         parse_internal_uri(scorer_ref_uri) for scorer_ref_uri in scorer_ref_uris
     ]
 
-    scorer_dicts = server.refs_read_batch(
+    scorer_dicts: list[dict[str, Any]] = server.refs_read_batch(
         tsi.RefsReadBatchReq(refs=scorer_ref_uris)
     ).vals
 
-    scorers = [
-        maybe_objectify(from_json(scorer_dict, project_id, server))
-        for scorer_dict in scorer_dicts
-    ]
+    scorers: list[Scorer] = []
 
-    for scorer, scorer_ref in zip(scorers, scorer_refs):
+    for scorer_dict, scorer_ref in zip(scorer_dicts, scorer_refs):
+        # We resolve scorer attributes that are internal refs
+        # This should be done recursively but for now we only resolve the first level.
+        for k, v in scorer_dict.items():
+            if isinstance(v, str) and v.startswith("weave-trace-internal://"):
+                ref_dict = server.refs_read_batch(tsi.RefsReadBatchReq(refs=[v])).vals[
+                    0
+                ]
+                scorer_dict[k] = from_json(ref_dict, project_id, server)
+                # scorer_dict[k] = make_trace_obj(
+                #    from_json(ref_dict, project_id, server),
+                #    None,
+                #    server,
+                #    None,
+                # )
+
+        scorer = maybe_objectify(
+            make_trace_obj(
+                from_json(scorer_dict, project_id, server),
+                None,
+                server,
+                None,
+            )
+        )
+
         scorer.__dict__["internal_ref"] = scorer_ref
+
+        scorers.append(scorer)
 
     return scorers  # type: ignore
 
@@ -201,10 +230,21 @@ async def get_filtered_calls(
     count_req = tsi.CallsQueryStatsReq(
         project_id=project_id,
         filter=tsi.CallsFilter(call_ids=call_ids),
-        # We want to make sure all end_call events have been written to the DB
+        # We want to make sure all start and end call parts have been written to the DB
         query={
             "$expr": {
-                "$not": [{"$eq": [{"$getField": "ended_at"}, {"$literal": None}]}]
+                "$and": [
+                    {
+                        "$not": [
+                            {"$eq": [{"$getField": "ended_at"}, {"$literal": None}]}
+                        ]
+                    },
+                    {
+                        "$not": [
+                            {"$eq": [{"$getField": "started_at"}, {"$literal": None}]}
+                        ]
+                    },
+                ]
             }
         },
     )
@@ -252,7 +292,9 @@ def build_client_call(server_call: tsi.CallSchema) -> Call:
     )
 
 
-def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, Any]:
+async def _do_score_call(
+    scorer: Scorer, call: Call, project_id: str, wb_user_id: Optional[str]
+) -> tuple[str, Any]:
     example = {k: v for k, v in call.inputs.items() if k != "self"}
     output = call.output
 
@@ -278,7 +320,12 @@ def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, An
 
     call_start_res = server.call_start(call_start_req)
 
-    result = score_op.resolve_fn(**score_args)
+    if isinstance(scorer, LLMAsAJudgeScorer):
+        result = await _do_score_call_llm_as_a_judge(
+            scorer, inputs_with_defaults, project_id, wb_user_id
+        )
+    else:
+        result = score_op.resolve_fn(**score_args)
 
     result = box(result)
 
@@ -297,6 +344,28 @@ def _do_score_call(scorer: Scorer, call: Call, project_id: str) -> tuple[str, An
     return call_start_res.id, result
 
 
+async def _do_score_call_llm_as_a_judge(
+    scorer: LLMAsAJudgeScorer,
+    inputs_with_defaults: dict[str, Any],
+    project_id: str,
+    wb_user_id: Optional[str],
+) -> Any:
+    scoring_prompt = scorer.scoring_prompt.format(**inputs_with_defaults)
+    user_input = [{"role": "user", "content": scoring_prompt}]
+    entity_name, project_name = get_external_project_id(project_id)
+
+    req = scorer.model.prepare_completion_request(
+        project_id=f"{entity_name}/{project_name}",
+        user_input=user_input,
+        config=None,
+        **inputs_with_defaults,
+    )
+    req.track_llm_call = False
+    result = await get_completion(req, wb_user_id)
+    response_payload = result.response
+    return parse_response(response_payload, req.inputs.response_format)
+
+
 @ddtrace.tracer.wrap(name="weave_scorer.apply_scorer")
 async def apply_scorer(
     monitor_internal_ref: InternalObjectRef,
@@ -306,7 +375,7 @@ async def apply_scorer(
     wb_user_id: Optional[str],
 ) -> None:
     """Actually apply the scorer to the call."""
-    score_call_id, result = _do_score_call(scorer, call, project_id)
+    score_call_id, result = await _do_score_call(scorer, call, project_id, wb_user_id)
 
     # score_call = _get_score_call(score_call_id, project_id)
 
@@ -387,10 +456,10 @@ KAFKA_CONSUMER_GROUP_ID = "weave-worker-scorer"
 async def process_project_ended_calls(
     project_id: str,
     ended_calls: list[tsi.EndedCallSchemaForInsert],
-) -> None:
+) -> list[str]:
     if len(ended_calls) == 0:
         logger.warning("No ended calls to process, this should not happen")
-        return
+        return []
 
     project_id = ended_calls[0].project_id
 
@@ -398,7 +467,7 @@ async def process_project_ended_calls(
 
     call_ids = [ended_call.id for ended_call in ended_calls]
 
-    async def _process_monitor(active_monitor: ActiveMonitor) -> None:
+    async def _process_monitor(active_monitor: ActiveMonitor) -> list[str]:
         monitor = active_monitor["monitor"]
         monitor_internal_ref = active_monitor["internal_ref"]
         wb_user_id = active_monitor["wb_user_id"]
@@ -416,7 +485,7 @@ async def process_project_ended_calls(
         )
 
         with get_trace_server().call_batch():
-            await asyncio.gather(
+            results = await asyncio.gather(
                 *[
                     apply_scorer(
                         monitor_internal_ref, scorer, call, project_id, wb_user_id
@@ -426,9 +495,21 @@ async def process_project_ended_calls(
                 ]
             )
 
-    await asyncio.gather(
+        failed_call_ids = [
+            cast(str, call.id)
+            for result, call in zip(results, calls)
+            if isinstance(result, Exception)
+        ]
+
+        return failed_call_ids
+
+    results = await asyncio.gather(
         *[_process_monitor(active_monitor) for active_monitor in active_monitors]
     )
+
+    failed_call_ids = [call_id for call_ids in results for call_id in call_ids]
+
+    return failed_call_ids
 
 
 async def run_consumer() -> None:
