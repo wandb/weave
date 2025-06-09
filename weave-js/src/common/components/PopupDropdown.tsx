@@ -10,7 +10,7 @@ import {
 
 import * as globals from '../css/globals.styles';
 
-type DropdownSection = DropdownItemProps[];
+export type DropdownSection = DropdownItemProps[];
 
 export interface PopupDropdownProps extends StrictPopupProps {
   position?: StrictPopupProps['position'];

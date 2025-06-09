@@ -6,7 +6,7 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {Autocomplete, FormControl, ListItem, Tooltip} from '@mui/material';
+import {Tooltip} from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
@@ -17,12 +17,10 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {
-  Icon,
   IconNotVisible,
   IconPinToRight,
   IconSortAscending,
@@ -59,9 +57,7 @@ import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
-import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
@@ -70,10 +66,7 @@ import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {
-  CallSchema,
-  OpVersionSchema,
-} from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
@@ -98,6 +91,7 @@ import {CallsTableNoRowsOverlay} from './CallsTableNoRowsOverlay';
 import {DEFAULT_FILTER_CALLS, useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import {OpSelector} from './OpSelector';
 import {ParentFilterTag} from './ParentFilterTag';
 
 const MAX_SELECT = 100;
@@ -1167,112 +1161,6 @@ export const CallsTable: FC<{
   );
 };
 
-const OpSelector = ({
-  frozenFilter,
-  filter,
-  setFilter,
-  selectedOpVersionOption,
-  opVersionOptions,
-}: {
-  frozenFilter: WFHighLevelCallFilter | undefined;
-  filter: WFHighLevelCallFilter;
-  setFilter: (state: WFHighLevelCallFilter) => void;
-  selectedOpVersionOption: string;
-  opVersionOptions: Record<
-    string,
-    {
-      title: string;
-      ref: string;
-      group: string;
-      objectVersion?: OpVersionSchema;
-    }
-  >;
-}) => {
-  const frozenOpFilter = Object.keys(frozenFilter ?? {}).includes('opVersions');
-  const handleChange = useCallback(
-    (event: any, newValue: string | null) => {
-      if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
-        setFilter({
-          ...filter,
-          opVersionRefs: [],
-        });
-      } else {
-        setFilter({
-          ...filter,
-          opVersionRefs: newValue ? [newValue] : [],
-        });
-      }
-    },
-    [filter, setFilter]
-  );
-
-  return (
-    <div className="flex-none">
-      <ListItem sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
-        <FormControl fullWidth sx={{borderColor: MOON_200}}>
-          <Autocomplete
-            PaperComponent={paperProps => <StyledPaper {...paperProps} />}
-            ListboxProps={{
-              sx: {
-                fontSize: '14px',
-                fontFamily: 'Source Sans Pro',
-                '& .MuiAutocomplete-option': {
-                  fontSize: '14px',
-                  fontFamily: 'Source Sans Pro',
-                },
-                '& .MuiAutocomplete-groupLabel': {
-                  fontSize: '14px',
-                  fontFamily: 'Source Sans Pro',
-                },
-              },
-            }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                height: '32px',
-                fontFamily: 'Source Sans Pro',
-                '& fieldset': {
-                  borderColor: MOON_200,
-                },
-                '&:hover fieldset': {
-                  borderColor: `rgba(${TEAL_300}, 0.48)`,
-                },
-              },
-              '& .MuiOutlinedInput-input': {
-                fontSize: '14px',
-                height: '32px',
-                padding: '0 14px',
-                boxSizing: 'border-box',
-                fontFamily: 'Source Sans Pro',
-              },
-              '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator':
-                {
-                  backgroundColor: 'transparent',
-                  marginBottom: '2px',
-                },
-            }}
-            size="small"
-            limitTags={1}
-            disabled={frozenOpFilter}
-            value={selectedOpVersionOption}
-            onChange={handleChange}
-            renderInput={renderParams => (
-              <StyledTextField {...renderParams} sx={{maxWidth: '350px'}} />
-            )}
-            getOptionLabel={option => opVersionOptions[option]?.title ?? ''}
-            disableClearable={
-              selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
-            }
-            groupBy={option => opVersionOptions[option]?.group}
-            options={Object.keys(opVersionOptions)}
-            popupIcon={<Icon name="chevron-down" width={16} height={16} />}
-            clearIcon={<Icon name="close" width={16} height={16} />}
-          />
-        </FormControl>
-      </ListItem>
-    </div>
-  );
-};
-
 // Get the tail of the peekPath (ignore query params)
 const getPeekId = (peekPath: string | null): string | null => {
   if (!peekPath) {
@@ -1286,7 +1174,7 @@ const getPeekId = (peekPath: string | null): string | null => {
 
 export type FlattenedCallData = TraceCallSchema & {[key: string]: string};
 
-function prepareFlattenedCallDataForTable(
+export function prepareFlattenedCallDataForTable(
   callsResult: CallSchema[]
 ): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));
