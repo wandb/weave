@@ -635,6 +635,7 @@ def caching_client_isolation():
     test_specific_cache_dir = f"test_caching_client_isolation_{get_test_name()}"
     with tempfile.TemporaryDirectory() as temp_dir:
         target_dir = os.path.join(temp_dir, test_specific_cache_dir)
+        os.makedirs(target_dir, exist_ok=True)
         current_cache_dir = os.environ.get("WEAVE_SERVER_CACHE_DIR")
         os.environ["WEAVE_SERVER_CACHE_DIR"] = target_dir
         yield
