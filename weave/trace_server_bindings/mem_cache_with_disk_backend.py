@@ -157,11 +157,11 @@ class MemCacheWithDiskCacheBackend:
         self._pending_disk_writes: dict[str, Any] = {}
         self._pending_lock = threading.Lock()
 
-    def close(self) -> None:
+    def close(self, wait: bool = False) -> None:
         """Cleanup resources, ensuring pending disk writes complete."""
         try:
             # Wait for pending disk operations to complete
-            self._disk_cache_thread_pool.shutdown(wait=True)
+            self._disk_cache_thread_pool.shutdown(wait=wait)
         except Exception as e:
             logger.warning(f"Error waiting for disk cache operations to complete: {e}")
 
