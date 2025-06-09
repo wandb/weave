@@ -77,6 +77,89 @@ my_leaderboard = leaderboard.Leaderboard(
 weave.publish(my_leaderboard)
 ```
 
+### End-to-End Example
+
+Below is a minimal runnable example that mirrors the Quickstart notebook. It
+creates a dataset, evaluation, model, and leaderboard all from Python.
+
+```python
+import weave
+from weave.flow import leaderboard
+from weave.trace.ref_util import get_ref
+
+weave.init("leaderboard-demo")
+
+dataset = [
+    {"input": "42", "target": "42"},
+]
+
+@weave.op
+def simple_accuracy(target: str, output: str) -> bool:
+    return target == output
+
+evaluation = weave.Evaluation(
+    name="Simple Numbers",
+    dataset=dataset,
+    scorers=[simple_accuracy],
+)
+
+@weave.op
+def echo_model(input: str) -> str:
+    return input
+
+await evaluation.evaluate(echo_model)
+
+spec = leaderboard.Leaderboard(
+    name="Accuracy Example",
+    description="Compare models on a simple dataset",
+    columns=[
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluation).uri(),
+            scorer_name="simple_accuracy",
+            summary_metric_path="true_fraction",
+        )
+    ],
+)
+
+weave.publish(spec)
+
+client = weave.WeaveClient(entity="my-entity", project="leaderboard-demo")
+results = leaderboard.get_leaderboard_results(spec, client)
+print(results)
+```
+
+Calling `weave.publish` prints a link to the new leaderboard so you can open it
+in the browser. The implementation uses `leaderboard_path` whenever the object
+being published is a `Leaderboard`.
+
+### Python API
+
+Leaderboards are defined in `weave.flow.leaderboard`.
+
+```python
+leaderboard.Leaderboard(
+    name: str,
+    description: str | None = None,
+    columns: list[leaderboard.LeaderboardColumn],
+)
+
+leaderboard.LeaderboardColumn(
+    evaluation_object_ref: str,
+    scorer_name: str,
+    summary_metric_path: str,
+    should_minimize: bool | None = None,
+)
+```
+
+Retrieve aggregate scores with:
+
+```python
+results = leaderboard.get_leaderboard_results(my_leaderboard, client)
+```
+
+`get_leaderboard_results` returns a list of `LeaderboardModelResult` objects,
+each containing the aggregated metric values for a single model.
+
 
 ### View a Leaderboard in the UI
 
@@ -87,6 +170,7 @@ Navigate to **"Leaderboards"** in the sidebar to:
 - View and sort by metric values
 - Inspect individual model evaluations
 - Edit leaderboard structure via the UI or code
+  (add/remove columns, choose models, and filter datasets)
 
 
 ## Interpret the Leaderboard
@@ -113,17 +197,37 @@ You configure these using `LeaderboardColumn`.
 
 Each cell shows the result of a specific model on a specific evaluation metric.
 
+
 ###  Example interpretation
 
-...
+The Quickstart notebook constructs a leaderboard with three metrics. One metric sets `should_minimize=True` so lower values rank higher. Here is a simplified definition:
 
-<!--
-TODO:
-Add description of an example Leaderboard 
-Add example copyable script 
-Add some screenshots from example script output
--->
+```python
+spec = leaderboard.Leaderboard(
+    name="Zip Code World Knowledge",
+    description="...",
+    columns=[
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluations[0]).uri(),
+            scorer_name="check_concrete_fields",
+            summary_metric_path="state_match.true_fraction",
+        ),
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluations[1]).uri(),
+            scorer_name="check_value_fields",
+            should_minimize=True,
+            summary_metric_path="avg_temp_f_err.mean",
+        ),
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluations[2]).uri(),
+            scorer_name="check_subjective_fields",
+            summary_metric_path="correct_known_for.true_fraction",
+        ),
+    ],
+)
+```
 
+In the UI each row corresponds to a model and cells are color coded based on the metric value. Selecting a cell opens the evaluation run that produced it.
 ###  Best practices
 
 | Practice                         | Why It Helps                                |
