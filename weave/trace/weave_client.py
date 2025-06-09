@@ -1547,7 +1547,7 @@ class WeaveClient:
     @pydantic.validate_call
     def get_feedback(
         self,
-        query: QueryLike | None = None,
+        query: Query | str | None = None,
         *,
         reaction: str | None = None,
         offset: int = 0,
@@ -1624,7 +1624,7 @@ class WeaveClient:
     @pydantic.validate_call
     def feedback(
         self,
-        query: QueryLike | None = None,
+        query: Query | str | None = None,
         *,
         reaction: str | None = None,
         offset: int = 0,
@@ -1709,7 +1709,7 @@ class WeaveClient:
     @pydantic.validate_call
     def query_costs(
         self,
-        query: QueryLike | None = None,
+        query: Query | str | None = None,
         llm_ids: list[str] | None = None,
         offset: int = 0,
         limit: int = 100,
