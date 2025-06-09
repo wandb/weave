@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import tempfile
 from collections.abc import Iterator
 from typing import Any, Callable, TypedDict, TypeVar
@@ -12,7 +11,11 @@ from typing_extensions import Self
 
 from weave import version
 from weave.trace.refs import ObjectRef, parse_uri
-from weave.trace.settings import server_cache_dir, server_cache_size_limit
+from weave.trace.settings import (
+    server_cache_dir,
+    server_cache_size_limit,
+    use_server_cache,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.mem_cache_with_disk_backend import (
     MemCacheWithDiskCacheBackend,
@@ -102,7 +105,6 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         """Cleanup method called when object is destroyed."""
         try:
             self._cache.close()
-            shutil.rmtree(self._cache_dir)
         except Exception as e:
             logger.exception(f"Error closing cache: {e}")
 
@@ -121,6 +123,10 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         Returns:
             The cached value if found, None otherwise
         """
+        if not use_server_cache():
+            self._cache_recorder["skips"] += 1
+            return None
+
         try:
             res = self._cache.get(key)
         except Exception as e:
@@ -140,6 +146,8 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             key: The cache key
             value: The value to cache
         """
+        if not use_server_cache():
+            return None
         try:
             self._cache.set(key, value)
         except Exception as e:
@@ -147,6 +155,8 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return None
 
     def _safe_cache_delete(self, key: str) -> None:
+        if not use_server_cache():
+            return None
         try:
             self._cache.delete(key)
         except Exception as e:
@@ -155,6 +165,8 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def _safe_cache_delete_prefix(self, prefix: str) -> None:
         """Delete all cached entries that start with the given prefix."""
+        if not use_server_cache():
+            return None
         try:
             self._cache.delete_keys_with_prefix(prefix)
         except Exception as e:
