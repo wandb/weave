@@ -558,8 +558,7 @@ export const FilterBar = ({
         onClose={handleCancelDelete}
         deleteTitleStr="date range"
         deleteBodyStrs={[
-          'Removing the date range can lead to degraded query performance for large queries.',
-          'We recommend keeping it enabled for best performance.',
+          'Removing the date range can lead to degraded performance for large queries.',
         ]}
         onDelete={() => Promise.resolve(handleConfirmDelete())}
         actionWord="Remove"
@@ -567,4 +566,3 @@ export const FilterBar = ({
     </>
   );
 };
-
