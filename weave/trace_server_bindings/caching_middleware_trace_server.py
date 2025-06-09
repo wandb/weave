@@ -10,6 +10,7 @@ from typing import Any, Callable, TypedDict, TypeVar
 from pydantic import BaseModel
 from typing_extensions import Self
 
+from weave import version
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import server_cache_dir, server_cache_size_limit
 from weave.trace_server import trace_server_interface as tsi
@@ -51,6 +52,8 @@ def digest_is_cacheable(digest: str) -> bool:
     return True
 
 
+CACHE_DIR_PREFIX = "weave_trace_server_cache_" + version.VERSION
+
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     """A middleware trace server that provides caching functionality.
 
@@ -82,7 +85,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         """
         self._next_trace_server = next_trace_server
         self._cache_dir = cache_dir or os.path.join(
-            tempfile.gettempdir(), "weave-cache"
+            tempfile.gettempdir(), CACHE_DIR_PREFIX
         )
         self._cache = MemCacheWithDiskCacheBackend(
             self._cache_dir, size_limit=size_limit
