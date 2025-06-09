@@ -356,7 +356,8 @@ class InMemoryWeaveLogCollector(logging.Handler):
         return [
             record
             for record in logs
-            if record.levelname == levelname and record.name.startswith("weave")
+            if record.levelname == levelname
+            and record.name.startswith("weave")
             # (Tim) For some reason that i cannot figure out, there is some test that
             # a) is trying to connect to the PROD trace server
             # b) seemingly doesn't fail
@@ -404,6 +405,12 @@ def logging_error_check(request, log_collector):
         )
 
 
+calls_queries_that_need_optimize = [
+    "get_calls",
+    "get_call",
+]
+
+
 class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
     """
     A WeaveClient that automatically flushes after every method call.
@@ -436,33 +443,20 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
         if callable(attr) and name != "flush":
 
             def wrapper(*args, **kwargs):
-                print("args", args, kwargs)
+                if attr.__name__ in calls_queries_that_need_optimize:
+                    server = self.__dict__.get("server")
+                    if hasattr(server, "_next_trace_server"):
+                        start = time.time()
+                        server._next_trace_server.ch_client.command(
+                            "OPTIMIZE TABLE calls_merged FINAL"
+                        )
+                        end = time.time()
+
                 res = attr(*args, **kwargs)
                 if self.__dict__.get("_autoflush", True):
                     has_pending_jobs = self_super._get_pending_jobs()["total_jobs"] > 0
                     self_super._flush()
 
-                    server = self.__dict__.get("server")
-                    if not hasattr(server, "_next_trace_server"):
-                        # sqlite, just return
-                        print(f"sqlite, returning {res}")
-                        return res
-
-                    # Sleep to allow inserts to become available, when flush did something
-                    if (
-                        isinstance(
-                            server,
-                            clickhouse_trace_server_batched.ClickHouseTraceServer,
-                        )
-                        and res is None
-                    ):
-                        start = time.time()
-                        server._next_trace_server.ch_client.command(
-                            "SELECT count(*) FROM calls_merged"
-                        )
-                        end = time.time()
-                        print(f">>>>>>>>>>>>>>>>>>>>>>> Time taken: {end - start}")
-                        # time.sleep(0.05)
                 return res
 
             return wrapper
