@@ -31,6 +31,7 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
+from weave.flow.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace import trace_sentry, urls
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
@@ -1036,14 +1037,15 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
     def get_calls(
         self,
         *,
-        filter: CallsFilter | None = None,
+        filter: CallsFilterLike | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        sort_by: list[SortBy] | None = None,
-        query: Query | None = None,
+        sort_by: list[SortByLike] | None = None,
+        query: QueryLike | None = None,
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
@@ -1501,9 +1503,10 @@ class WeaveClient:
             )
         )
 
+    @pydantic.validate_call
     def get_feedback(
         self,
-        query: Query | str | None = None,
+        query: QueryLike | None = None,
         *,
         reaction: str | None = None,
         offset: int = 0,
@@ -1577,9 +1580,10 @@ class WeaveClient:
         )
 
     @deprecated(new_name="get_feedback")
+    @pydantic.validate_call
     def feedback(
         self,
-        query: Query | str | None = None,
+        query: QueryLike | None = None,
         *,
         reaction: str | None = None,
         offset: int = 0,
@@ -1661,9 +1665,10 @@ class WeaveClient:
             CostPurgeReq(project_id=self._project_id(), query=Query(**{"$expr": expr}))
         )
 
+    @pydantic.validate_call
     def query_costs(
         self,
-        query: Query | str | None = None,
+        query: QueryLike | None = None,
         llm_ids: list[str] | None = None,
         offset: int = 0,
         limit: int = 100,
