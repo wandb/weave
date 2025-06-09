@@ -10,7 +10,6 @@ from weave.flow.scorer import Scorer, _validate_scorer_signature
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.vals import WeaveObject
-from weave.trace_server.trace_server_interface import CallsFilter, Query, SortBy
 
 
 def cast_to_dataset(obj: Any) -> Dataset:
@@ -51,55 +50,5 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
     return res
 
 
-def cast_to_calls_filter(obj: Any) -> CallsFilter:
-    if isinstance(obj, CallsFilter):
-        return obj
-
-    if isinstance(obj, dict):
-        return CallsFilter(**obj)
-
-    if obj is None:
-        return CallsFilter()
-
-    raise TypeError("Unable to cast to CallsFilter")
-
-
-def cast_to_sort_by(obj: Any) -> SortBy:
-    if isinstance(obj, SortBy):
-        return obj
-
-    if isinstance(obj, dict):
-        return SortBy(**obj)
-
-    if isinstance(obj, str):
-        # Handle simple string format like "started_at desc"
-        parts = obj.split()
-        if len(parts) == 2:
-            field, direction = parts
-            return SortBy(field=field, direction=direction)
-        else:
-            return SortBy(field=obj, direction="asc")
-
-    raise TypeError(f"Unable to cast to SortBy: {obj}")
-
-
-def cast_to_query(obj: Any) -> Query | None:
-    if isinstance(obj, Query):
-        return obj
-
-    if isinstance(obj, dict):
-        return Query(**obj)
-
-    if obj is None:
-        return None
-
-    raise TypeError("Unable to cast to Query")
-
-
 DatasetLike = Annotated[Dataset, BeforeValidator(cast_to_dataset)]
 ScorerLike = Annotated[Union[Op, Scorer], BeforeValidator(cast_to_scorer)]
-
-# calls query parameter types
-CallsFilterLike = Annotated[CallsFilter, BeforeValidator(cast_to_calls_filter)]
-SortByLike = Annotated[SortBy, BeforeValidator(cast_to_sort_by)]
-QueryLike = Annotated[Query | None, BeforeValidator(cast_to_query)]
