@@ -23,6 +23,7 @@ import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../feedback/HumanFeedback/tsHumanFeedback';
+import {DeleteModal} from '../pages/common/DeleteModal';
 import {ColumnInfo} from '../types';
 import {
   FIELD_DESCRIPTIONS,
@@ -193,46 +194,19 @@ export const FilterBar = ({
     });
   }
 
-  // Sort options within each group so datetime fields appear first
-  const sortFieldOptions = (
-    fieldOptions: {value: string; label: string; description?: string}[]
-  ) => {
-    return fieldOptions.sort((a, b) => {
-      const aIsDatetime = getFieldType(a.value) === 'datetime';
-      const bIsDatetime = getFieldType(b.value) === 'datetime';
-
-      if (aIsDatetime && !bIsDatetime) return -1;
-      if (!aIsDatetime && bIsDatetime) return 1;
-      return 0;
-    });
-  };
-
-  // Apply sorting to each option group
-  const sortedOptions = options.map(group => {
-    if ('options' in group) {
-      return {
-        ...group,
-        options: sortFieldOptions([...group.options]),
-      };
-    }
-    return group;
-  });
-
   const onRemoveAll = () => {
-    const sortedItems = sortDatetimeFirst([...localFilterModel.items]);
-
     // Check if there's only one filter and it's a datetime filter
     if (
-      sortedItems.length === 1 &&
-      getFieldType(sortedItems[0].field) === 'datetime'
+      localFilterModel.items.length === 1 &&
+      getFieldType(localFilterModel.items[0].field) === 'datetime'
     ) {
-      setFilterToDelete(sortedItems[0].id);
+      setFilterToDelete(localFilterModel.items[0].id);
       setShowDeleteWarning(true);
       return;
     }
 
     // Remove all filters except the first datetime filter
-    const firstDatetimeFilter = sortedItems.find(
+    const firstDatetimeFilter = localFilterModel.items.find(
       item => getFieldType(item.field) === 'datetime'
     );
     const newItems = firstDatetimeFilter ? [firstDatetimeFilter] : [];
@@ -310,11 +284,10 @@ export const FilterBar = ({
   const onRemoveFilter = useCallback(
     (filterId: FilterId) => {
       // Check if this is the first datetime filter
-      const sortedItems = sortDatetimeFirst([...localFilterModel.items]);
       const isFirstDatetimeFilter =
-        sortedItems.length > 0 &&
-        sortedItems[0].id === filterId &&
-        getFieldType(sortedItems[0].field) === 'datetime';
+        localFilterModel.items.length > 0 &&
+        localFilterModel.items[0].id === filterId &&
+        getFieldType(localFilterModel.items[0].field) === 'datetime';
 
       if (isFirstDatetimeFilter) {
         setFilterToDelete(filterId);
@@ -415,11 +388,7 @@ export const FilterBar = ({
   const hasBorder = completeItems.length > 0;
 
   const {combinedItems, activeEditIds} = useMemo(() => {
-    const sortedCompleteItems = sortDatetimeFirst([...completeItems]);
-    const {items, activeIds} = combineRangeFilters(
-      sortedCompleteItems,
-      activeEditId
-    );
+    const {items, activeIds} = combineRangeFilters(completeItems, activeEditId);
     return {combinedItems: items, activeEditIds: activeIds};
   }, [completeItems, activeEditId]);
 
@@ -494,11 +463,7 @@ export const FilterBar = ({
             </DraggableHandle>
             <div className="grid grid-cols-[auto_auto_auto_30px] gap-4">
               {(() => {
-                const sortedItems = sortDatetimeFirst([
-                  ...localFilterModel.items,
-                ]);
-
-                return sortedItems.map((item, index) => {
+                return localFilterModel.items.map((item, index) => {
                   // Check if this is the first datetime filter after sorting
                   const isFirstDatetimeFilter =
                     index === 0 && getFieldType(item.field) === 'datetime';
@@ -509,7 +474,7 @@ export const FilterBar = ({
                       entity={entity}
                       project={project}
                       item={item}
-                      options={sortedOptions}
+                      options={options}
                       onAddFilter={onAddFilter}
                       onUpdateFilter={onUpdateFilter}
                       onRemoveFilter={onRemoveFilter}
@@ -530,7 +495,7 @@ export const FilterBar = ({
                   operator: '',
                   value: undefined,
                 }}
-                options={sortedOptions}
+                options={options}
                 onAddFilter={onAddFilter}
                 onUpdateFilter={onUpdateFilter}
                 onRemoveFilter={onRemoveFilter}
@@ -559,24 +524,19 @@ export const FilterBar = ({
           </div>
         </Tailwind>
       </Popover>
-      <RemoveFilterModal
+      <DeleteModal
         open={showDeleteWarning}
         onClose={handleCancelDelete}
-        handleConfirmDelete={handleConfirmDelete}
+        deleteTitleStr="date range"
+        deleteBodyStrs={[
+          'Removing the date range can lead to degraded performance for large queries.',
+        ]}
+        onDelete={() => Promise.resolve(handleConfirmDelete())}
+        actionWord="Remove"
       />
     </>
   );
 };
-
-function sortDatetimeFirst(items: GridFilterItem[]): GridFilterItem[] {
-  return items.sort((a, b) => {
-    const aIsDatetime = getFieldType(a.field) === 'datetime';
-    const bIsDatetime = getFieldType(b.field) === 'datetime';
-    if (aIsDatetime && !bIsDatetime) return -1;
-    if (!aIsDatetime && bIsDatetime) return 1;
-    return 0;
-  });
-}
 
 const DialogContent = styled(MaterialDialogContent)`
   padding: 0 32px !important;
