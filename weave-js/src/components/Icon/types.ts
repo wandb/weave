@@ -44,6 +44,7 @@ export const IconNames = {
   ContentFullWidth: 'content-full-width',
   ContentNarrow: 'content-narrow',
   ContentWide: 'content-wide',
+  ContextWindow: 'context-window',
   ContractLeft: 'contract-left',
   Copy: 'copy',
   CreditCardPayment: 'credit-card-payment',
