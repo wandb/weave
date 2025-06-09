@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Iterable, Iterator
 from functools import cached_property
 from typing import TYPE_CHECKING
@@ -63,11 +65,11 @@ class Dataset(Object):
         return cls(rows=rows)
 
     @classmethod
-    def from_pandas(cls, df: "pd.DataFrame") -> Self:
+    def from_pandas(cls, df: pd.DataFrame) -> Self:
         rows = df.to_dict(orient="records")
         return cls(rows=rows)
 
-    def to_pandas(self) -> "pd.DataFrame":
+    def to_pandas(self) -> pd.DataFrame:
         try:
             import pandas as pd
         except ImportError:
@@ -75,7 +77,7 @@ class Dataset(Object):
 
         return pd.DataFrame(self.rows)
 
-    def add_rows(self, rows: Iterable[dict]) -> "Dataset":
+    def add_rows(self, rows: Iterable[dict]) -> Dataset:
         """Create a new dataset version by appending rows to the existing dataset.
 
         This is useful for adding examples to large datasets without having to
