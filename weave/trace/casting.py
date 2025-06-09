@@ -76,4 +76,5 @@ QueryLike = Annotated[Query, pydantic.BeforeValidator(cast_to_query)]
 TableLike = Annotated[
     Table | WeaveTable | list[dict],
     pydantic.BeforeValidator(cast_to_table),
+    pydantic.BeforeValidator(non_empty_list),
 ]

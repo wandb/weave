@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from weave.flow.obj import Object
-from weave.trace.casting import cast_to_table
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
@@ -13,6 +12,12 @@ from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
     import pandas as pd
+
+
+def non_empty_list(rows: list) -> list:
+    if len(rows) == 0:
+        raise ValueError("Unable to cast to Table: list cannot be empty.")
+    return rows
 
 
 @register_object
