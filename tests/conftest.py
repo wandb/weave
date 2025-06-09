@@ -445,7 +445,10 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
             def wrapper(*args, **kwargs):
                 if attr.__name__ in calls_queries_that_need_optimize:
                     server = self.__dict__.get("server")
-                    if hasattr(server, "_next_trace_server"):
+                    if isinstance(
+                        server,
+                        clickhouse_trace_server_batched.ClickHouseTraceServer,
+                    ) and hasattr(server, "_next_trace_server"):
                         start = time.time()
                         server._next_trace_server.ch_client.command(
                             "OPTIMIZE TABLE calls_merged FINAL"
