@@ -1,6 +1,6 @@
 {
   "name": "weave",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "AI development toolkit",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",

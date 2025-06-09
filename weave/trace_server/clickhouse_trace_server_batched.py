@@ -95,6 +95,7 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
+from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
@@ -223,6 +224,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
+        self._kafka_producer: Optional[KafkaProducer] = None
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -243,6 +245,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return self._file_storage_client
         self._file_storage_client = maybe_get_storage_client_from_env()
         return self._file_storage_client
+
+    @property
+    def kafka_producer(self) -> KafkaProducer:
+        if self._kafka_producer is not None:
+            return self._kafka_producer
+        self._kafka_producer = KafkaProducer.from_env()
+        return self._kafka_producer
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -311,7 +320,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+    def call_end(self, req: tsi.CallEndReq, publish: bool = True) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
@@ -320,6 +329,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
+
+        if wf_env.wf_enable_online_eval() and publish:
+            self.kafka_producer.produce_call_end(req.end)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
@@ -705,6 +717,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             wb_user_id=req.obj.wb_user_id,
             kind=get_kind(processed_val),
             base_object_class=processed_result["base_object_class"],
+            leaf_object_class=processed_result["leaf_object_class"],
             refs=extract_refs_from_values(processed_val),
             val_dump=json_val,
             digest=digest,
@@ -754,6 +767,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if req.filter.base_object_classes:
                 object_query_builder.add_base_object_classes_condition(
                     req.filter.base_object_classes
+                )
+            if req.filter.leaf_object_classes:
+                object_query_builder.add_leaf_object_classes_condition(
+                    req.filter.leaf_object_classes
                 )
         if req.limit is not None:
             object_query_builder.set_limit(req.limit)
@@ -807,6 +824,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     val_dump=obj.val_dump,
                     refs=obj.refs,
                     base_object_class=obj.base_object_class,
+                    leaf_object_class=obj.leaf_object_class,
                     deleted_at=now,
                     wb_user_id=obj.wb_user_id,
                     # Keep the original created_at timestamp
@@ -2384,6 +2402,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         ),
         "exception": ch_call_dict.get("exception"),
         "wb_run_id": ch_call_dict.get("wb_run_id"),
+        "wb_run_step": ch_call_dict.get("wb_run_step"),
         "wb_user_id": ch_call_dict.get("wb_user_id"),
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
@@ -2402,6 +2421,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         digest=ch_obj.digest,
         kind=ch_obj.kind,
         base_object_class=ch_obj.base_object_class,
+        leaf_object_class=ch_obj.leaf_object_class,
         val=json.loads(ch_obj.val_dump),
         size_bytes=ch_obj.size_bytes,
     )
@@ -2439,6 +2459,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
+        wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,
         display_name=start_call.display_name,
     )
@@ -2810,6 +2831,18 @@ def _setup_completion_model_info(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
+    elif model_name.startswith("coreweave/"):
+        # See https://docs.litellm.ai/docs/providers/openai_compatible
+        # but ignore the bit about omitting the /v1 because it is actually necessary
+        req.inputs.model = "openai/" + model_name.replace("coreweave/", "", 1)
+        provider = "custom"
+        base_url = "https://infr.cw4637-staging.coreweave.app/v1"
+        # The API key should have been passed in as an extra header.
+        if req.inputs.extra_headers:
+            api_key = req.inputs.extra_headers.pop("api_key", None)
+            extra_headers = req.inputs.extra_headers
+            req.inputs.extra_headers = None
+        return_type = "openai"
     else:
         # Custom provider path
         custom_provider_info = get_custom_provider_info(
