@@ -278,15 +278,25 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         )
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        cache_key_partial = (
+            f'{{"project_id": "{req.project_id}", "object_id": "{req.object_id}"'
+        )
         if req.digests:
             for digest in req.digests:
                 try:
-                    cache_key_prefix = f'obj_read_{{"project_id":"{req.project_id}","object_id":"{req.object_id}","digest":"{digest}"'
+                    cache_key_partial_digest = (
+                        f'{cache_key_partial}, "digest": "{digest}"'
+                    )
+                    cache_key_prefix = f"obj_read_{cache_key_partial_digest}"
+                    self._safe_cache_delete_prefix(cache_key_prefix)
+                    cache_key_prefix = f'obj_create_{{"obj": {cache_key_partial_digest}'
                     self._safe_cache_delete_prefix(cache_key_prefix)
                 except Exception as e:
                     logger.exception(f"Error deleting cached value: {e}")
         else:
-            cache_key_prefix = f'obj_read_{{"project_id":"{req.project_id}","object_id":"{req.object_id}"'
+            cache_key_prefix = f"obj_read_{cache_key_partial}"
+            self._safe_cache_delete_prefix(cache_key_prefix)
+            cache_key_prefix = f'obj_create_{{"obj": {cache_key_partial}'
             self._safe_cache_delete_prefix(cache_key_prefix)
         return self._next_trace_server.obj_delete(req)
 
