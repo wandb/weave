@@ -88,12 +88,8 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             size_limit: Maximum size in bytes for the cache (default 1GB)
         """
         self._next_trace_server = next_trace_server
-        self._cache_dir = cache_dir or os.path.join(
-            tempfile.gettempdir(), CACHE_DIR_PREFIX
-        )
-        self._cache = MemCacheWithDiskCacheBackend(
-            self._cache_dir, size_limit=size_limit
-        )
+        cache_dir = cache_dir or os.path.join(tempfile.gettempdir(), CACHE_DIR_PREFIX)
+        self._cache = MemCacheWithDiskCacheBackend(cache_dir, size_limit)
         self._cache_recorder: CacheRecorder = {
             "hits": 0,
             "misses": 0,
@@ -339,7 +335,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         needed_refs: list[str] = []
         needed_indices: list[int] = []
 
-        for i, ref in enumerate(req.refs):
+        for needed_ndx, ref in enumerate(req.refs):
             existing_result = None
             try:
                 existing_result = self._safe_cache_get(ref)
@@ -347,23 +343,25 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
                 logger.exception(f"Error getting cached value for ref '{ref}': {e}")
 
             if existing_result is not None:
-                final_results[i] = existing_result
+                final_results[needed_ndx] = existing_result
             else:
                 needed_refs.append(ref)
-                needed_indices.append(i)
+                needed_indices.append(needed_ndx)
 
         if needed_refs:
             new_req = tsi.RefsReadBatchReq(refs=needed_refs)
             needed_results = self._next_trace_server.refs_read_batch(new_req)
-            for i, val in zip(needed_indices, needed_results.vals):
-                final_results[i] = val
+            for needed_ndx, needed_ref, needed_val in zip(
+                needed_indices, needed_refs, needed_results.vals
+            ):
+                final_results[needed_ndx] = needed_val
                 try:
                     # Only cache if the ref has a cacheable digest
-                    parsed_ref = parse_uri(needed_refs[needed_indices.index(i)])
+                    parsed_ref = parse_uri(needed_ref)
                     if isinstance(parsed_ref, ObjectRef) and digest_is_cacheable(
                         parsed_ref.digest
                     ):
-                        self._safe_cache_set(needed_refs[needed_indices.index(i)], val)
+                        self._safe_cache_set(needed_ref, needed_val)
                 except Exception as e:
                     logger.exception(f"Error caching ref value: {e}")
 
