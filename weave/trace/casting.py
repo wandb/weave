@@ -51,7 +51,7 @@ def cast_to_table(obj: Any) -> Table | WeaveTable:
     if isinstance(obj, Iterable) and not isinstance(obj, (str, bytes)):
         rows = list(obj)
         first_row_keys = set(rows[0].keys())
-        for row in rows:
+        for i, row in enumerate(rows):
             if not isinstance(row, dict):
                 raise TypeError(
                     f"Unable to cast to Table: all items must be dicts. Found type: {type(row)}"

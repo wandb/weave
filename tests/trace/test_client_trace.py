@@ -2538,9 +2538,9 @@ def test_read_call_start_with_cost(client):
         pass
     elif isinstance(summary, dict):
         # Check that the costs object was NOT added
-        assert COST_OBJECT_NAME not in summary.get("weave", {}), (
-            f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
-        )
+        assert (
+            COST_OBJECT_NAME not in summary.get("weave", {})
+        ), f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
     else:
         pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
 
