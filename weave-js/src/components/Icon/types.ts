@@ -104,6 +104,7 @@ export const IconNames = {
   IgnoreOutliers: 'ignore-outliers',
   ImpersonateMaskAlt: 'impersonate-mask-alt',
   ImportInsert: 'import-insert',
+  Inference: 'inference',
   Info: 'info',
   Italic: 'italic',
   JobAutomation: 'job-automation',

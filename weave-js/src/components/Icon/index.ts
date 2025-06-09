@@ -105,6 +105,7 @@ export {
   IconIgnoreOutliers,
   IconImpersonateMaskAlt,
   IconImportInsert,
+  IconInference,
   IconInfo,
   IconItalic,
   IconJobAutomation,
