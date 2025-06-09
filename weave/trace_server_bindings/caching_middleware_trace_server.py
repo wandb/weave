@@ -54,6 +54,7 @@ def digest_is_cacheable(digest: str) -> bool:
 
 CACHE_DIR_PREFIX = "weave_trace_server_cache_" + version.VERSION
 
+
 class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     """A middleware trace server that provides caching functionality.
 
