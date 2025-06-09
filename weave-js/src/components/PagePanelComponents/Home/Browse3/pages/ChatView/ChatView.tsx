@@ -1,7 +1,7 @@
-import React, {useEffect, useMemo, useRef} from 'react';
-
 import {Callout} from '@wandb/weave/components/Callout';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import React, {useEffect, useMemo, useRef} from 'react';
+
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {ChoicesView} from './ChoicesView';
