@@ -4,6 +4,53 @@ import levenshtein from 'js-levenshtein';
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
 export const LLM_MAX_TOKENS = {
+  // CoreWeave hosted models
+  'cw_deepseek-ai_DeepSeek-R1': {
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: true,
+  },
+  'cw_meta-llama_Llama-3.3-70B-Instruct': {
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: true,
+  },
+  'cw_mistralai_Mistral-Small-3.1-24B-Instruct-2503': {
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: true,
+  },
+  'cw_meta-llama_Llama-4-Scout-17B-16E-Instruct': {
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: true,
+  },
+  'cw_Qwen_QwQ-32B': {
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: true,
+  },
+  'cw_microsoft_Phi-4-mini-instruct': {
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: true,
+  },
+  'cw_meta-llama_Llama-4-Maverick-17B-128E-Instruct-FP8': {
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: true,
+  },
+  'cw_Qwen_Qwen2.5-VL-7B-Instruct': {
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: true,
+  },
+  'cw_ibm-granite_granite-3.3-8b-instruct': {
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: true,
+  },
+  // End hosted models
   'gpt-4.1-mini-2025-04-14': {
     provider: 'openai',
     max_tokens: 32768,
@@ -677,6 +724,7 @@ export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
 ) as LLMMaxTokensKey[];
 
 export const LLM_PROVIDER_SECRETS: Record<string, string[]> = {
+  coreweave: [],
   openai: ['OPENAI_API_KEY'],
   anthropic: ['ANTHROPIC_API_KEY'],
   gemini: ['GEMINI_API_KEY'],
@@ -696,6 +744,7 @@ export const LLM_PROVIDER_LABELS: Record<
   (typeof LLM_PROVIDERS)[number],
   string
 > = {
+  coreweave: 'W&B hosted',
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   azure: 'Azure',

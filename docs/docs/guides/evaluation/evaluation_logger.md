@@ -16,6 +16,10 @@ The `EvaluationLogger` offers flexibility while the standard framework offers st
 ## Basic workflow
 
 1. _Initialize the logger:_ Create an instance of `EvaluationLogger`, optionally providing metadata about the `model` and `dataset`. Defaults will be used if omitted.
+    :::important Track token usage and cost
+    To capture token usage and cost for LLM calls (e.g. OpenAI), initialize `EvaluationLogger` before any LLM invocations**. 
+    If you call your LLM first and then log predictions afterward, token and cost data are not captured.
+    :::
 2. _Log predictions:_ Call `log_prediction` for each input/output pair from your system.
 3. _Log scores:_ Use the returned `ScoreLogger` to `log_score` for the prediction. Multiple scores per prediction are supported.
 4. _Finish prediction:_ Always call `finish()` after logging scores for a prediction to finalize it.
@@ -44,7 +48,7 @@ from weave import EvaluationLogger
 
 weave.init('my-project')
 
-# Initialize the logger (model/dataset names are optional metadata)
+# Initialize EvaluationLogger BEFORE calling the model to ensure token tracking
 eval_logger = EvaluationLogger(
     model="my_model",
     dataset="my_dataset"
@@ -57,12 +61,15 @@ eval_samples = [
     {'inputs': {'a': 3, 'b': 4}, 'expected': 7},
 ]
 
-# Example model logic.  This does not have to be decorated with @weave.op,
-# but if you do, it will be traced and logged.
+# Example model logic using OpenAI
 @weave.op
 def user_model(a: int, b: int) -> int:
     oai = OpenAI()
-    _ = oai.chat.completions.create(messages=[{"role": "user", "content": f"What is {a}+{b}?"}], model="gpt-4o-mini")
+    response = oai.chat.completions.create(
+        messages=[{"role": "user", "content": f"What is {a}+{b}?"}],
+        model="gpt-4o-mini"
+    )
+    # Use the response in some way (here we just return a + b for simplicity)
     return a + b
 
 # Iterate through examples, predict, and log
@@ -102,13 +109,19 @@ print("Evaluation logging complete. View results in the Weave UI.")
 You can first compute your model outputs, then separately log predictions and scores. This allows for better separation of evaluation and logging logic.
 
 ```python
-ev = EvaluationLogger(model="example_model", dataset="example_dataset")
+# Initialize EvaluationLogger BEFORE calling the model to ensure token tracking
+ev = EvaluationLogger(
+    model="example_model", 
+    dataset="example_dataset"
+)
 
+# Model outputs (e.g. OpenAI calls) must happen after logger init for token tracking
 outputs = [your_output_generator(**inputs) for inputs in your_dataset]
 preds = [ev.log_prediction(inputs, output) for inputs, output in zip(your_dataset, outputs)]
 for pred in preds:
     pred.log_score(scorer="greater_than_5_scorer", score=output > 5)
     pred.log_score(scorer="greater_than_7_scorer", score=output > 7)
+    pred.finish()
 
 ev.log_summary()
 ```
@@ -207,6 +220,7 @@ models = [
 ]
 
 for model in models:
+    # EvalLogger must be initialized before model calls to capture tokens
     ev = EvaluationLogger(model=model, dataset="example_dataset")
     for inputs in your_dataset:
         output = your_output_generator(**inputs)
