@@ -32,6 +32,7 @@ This approach allows for more flexible runtime configuration while still respect
 import datetime
 import json
 import logging
+from collections import defaultdict
 from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
@@ -45,6 +46,8 @@ from weave.integrations.patcher import Patcher
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.weave_client import Call
+from weave.trace_server.trace_server_interface import LLMUsageSchema
+from weave.utils.dict_utils import convert_defaultdict_to_dict, safe_get
 
 import_failed = False
 
@@ -58,7 +61,7 @@ except ImportError:
     import_failed = True
 
 from collections.abc import Generator
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
@@ -241,6 +244,7 @@ if not import_failed:
                 # Finish the call.
                 call = self._call_map.pop(run_id)
                 run_dict = _run_to_dict(run, as_input=False)
+                _extract_usage_data(call, run_dict)
                 self.wc.finish_call(call, run_dict)
 
         def _update_run_error(self, run: Run) -> None:
@@ -365,6 +369,136 @@ else:
 
     class WeaveTracer:  # type: ignore
         pass
+
+
+ModelName = str
+
+
+def _extract_usage_data(call: Call, output: Any) -> None:
+    """Extract usage data from the output of a call.
+
+    Args:
+        call: The call that finished
+        output: The output of the call
+    """
+    usage: Union[dict[ModelName, LLMUsageSchema], None] = None
+    if output is not None and "outputs" in output and len(output["outputs"]) > 0:
+        first_output = output["outputs"][0]
+        if (
+            (message := safe_get(first_output, ["output"]))
+            and hasattr(message, "response_metadata")
+            and safe_get(message.response_metadata, ["token_usage"])
+        ):
+            # LangChain AIMessage response format
+            usage = _extract_chat_message_usage(message.response_metadata)
+        elif (generations := safe_get(first_output, ["generations"])) and (
+            len(generations) > 0
+            and len(generations[0]) > 0
+            and safe_get(
+                generations[0][0],
+                ["message", "kwargs", "response_metadata", "token_usage"],
+            )
+        ):
+            # openai response format
+            usage = _extract_openai_usage(output)
+        elif (generations := safe_get(first_output, ["generations"])) and (
+            len(generations) > 0
+            and len(generations[0]) > 0
+            and safe_get(
+                generations[0][0],
+                ["message", "kwargs", "response_metadata", "usage_metadata"],
+            )
+        ):
+            # google vertexai response format
+            usage = _extract_google_vertexai_usage(output)
+        elif (generations := safe_get(first_output, ["generations"])) and (
+            len(generations) > 0
+            and len(generations[0]) > 0
+            and safe_get(generations[0][0], ["generation_info", "usage_metadata"])
+        ):
+            # google genai response format
+            usage = _extract_google_genai_usage(output)
+
+    if usage is not None:
+        if call.summary is None:
+            call.summary = {}
+        call.summary.update({"usage": usage})
+
+
+def _extract_openai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
+    usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
+    for output in output["outputs"]:
+        for generation_list in output["generations"]:
+            for generation in generation_list:
+                response_metadata = generation["message"]["kwargs"]["response_metadata"]
+                model = response_metadata["model_name"]
+                usage_metadata = response_metadata["token_usage"]
+
+                usage[model]["prompt_tokens"] += usage_metadata.get("prompt_tokens", 0)
+                usage[model]["completion_tokens"] += usage_metadata.get(
+                    "completion_tokens", 0
+                )
+                usage[model]["total_tokens"] += usage_metadata.get("total_tokens", 0)
+
+    return convert_defaultdict_to_dict(usage)
+
+
+def _extract_google_vertexai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
+    usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
+    for output in output["outputs"]:
+        for generation_list in output["generations"]:
+            for generation in generation_list:
+                response_metadata = generation["message"]["kwargs"]["response_metadata"]
+                model = response_metadata["model_name"]
+                usage_metadata = response_metadata["usage_metadata"]
+
+                usage[model]["prompt_tokens"] += usage_metadata.get(
+                    "prompt_token_count", 0
+                )
+                usage[model]["completion_tokens"] += usage_metadata.get(
+                    "candidates_token_count", 0
+                )
+                usage[model]["total_tokens"] += usage_metadata.get(
+                    "total_token_count", 0
+                )
+
+    return convert_defaultdict_to_dict(usage)
+
+
+def _extract_google_genai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
+    usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
+    for output in output["outputs"]:
+        for generation_list in output["generations"]:
+            for generation in generation_list:
+                generation_info = generation["generation_info"]
+                model = generation_info["model_name"]
+                usage_metadata = generation_info["usage_metadata"]
+
+                usage[model]["prompt_tokens"] += usage_metadata.get("input_tokens", 0)
+                usage[model]["completion_tokens"] += usage_metadata.get(
+                    "output_tokens", 0
+                )
+                usage[model]["total_tokens"] += usage_metadata.get("total_tokens", 0)
+
+    return convert_defaultdict_to_dict(usage)
+
+
+def _extract_chat_message_usage(
+    response_metadata: dict,
+) -> dict[ModelName, LLMUsageSchema]:
+    usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
+    model = safe_get(response_metadata, ["model_name"]) or "unknown"
+    token_usage = safe_get(response_metadata, ["token_usage"]) or {}
+
+    usage[model]["prompt_tokens"] += token_usage.get("prompt_tokens", 0)
+    usage[model]["completion_tokens"] += token_usage.get("completion_tokens", 0)
+    usage[model]["total_tokens"] += token_usage.get("total_tokens", 0)
+
+    return convert_defaultdict_to_dict(usage)
 
 
 weave_tracing_callback_var: ContextVar[Optional[WeaveTracer]] = ContextVar(

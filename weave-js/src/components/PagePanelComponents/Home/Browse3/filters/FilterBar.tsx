@@ -7,6 +7,7 @@ import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
+import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
 import {IconFilterAlt} from '../../../../Icon';
@@ -22,6 +23,7 @@ import {
   FilterId,
   getOperatorOptions,
   isValuelessOperator,
+  MONITORED_FILTER_VALUE,
   UNFILTERABLE_FIELDS,
   upsertFilter,
 } from './common';
@@ -78,6 +80,9 @@ export const FilterBar = ({
   const [incompleteFilters, setIncompleteFilters] = useState<GridFilterItem[]>(
     []
   );
+
+  const {loading, userInfo} = useViewerInfo();
+  const isWandbAdmin = (!loading && userInfo?.admin) ?? false;
 
   // Merge the parent filter model with our incomplete filters
   useEffect(() => {
@@ -170,6 +175,13 @@ export const FilterBar = ({
     value: 'id',
     label: 'Call ID',
   });
+  if (isWandbAdmin) {
+    (options[0] as GroupedOption).options.push({
+      value: MONITORED_FILTER_VALUE,
+      label: 'Monitored',
+      description: 'Find all calls scored by a particular monitor',
+    });
+  }
 
   const onRemoveAll = () => {
     const emptyModel = {items: []};
