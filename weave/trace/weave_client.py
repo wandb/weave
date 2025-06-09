@@ -444,7 +444,7 @@ def _get_direct_ref(obj: Any) -> Ref | None:
 def _remove_empty_ref(obj: ObjectRecord) -> ObjectRecord:
     if hasattr(obj, "ref"):
         if obj.ref != None:
-            raise ValueError(f"Unexpected ref in pydantic object record: {obj}")
+            raise ValueError(f"Unexpected ref in object record: {obj}")
         else:
             del obj.__dict__["ref"]
     return obj
