@@ -404,6 +404,14 @@ def logging_error_check(request, log_collector):
         )
 
 
+calls_queries_that_need_optimize = [
+    "get_calls",
+    "get_call",
+    "call",
+    "calls",
+]
+
+
 class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
     """
     A WeaveClient that automatically flushes after every method call.
@@ -436,6 +444,18 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
         if callable(attr) and name != "flush":
 
             def wrapper(*args, **kwargs):
+                if attr.__name__ in calls_queries_that_need_optimize:
+                    server = self.__dict__.get("server")
+                    if (
+                        server
+                        and server._next_trace_server
+                        and hasattr(server._next_trace_server, "ch_client")
+                    ):
+                        # Wait for all inserts to clear!
+                        server._next_trace_server.ch_client.command(
+                            "OPTIMIZE TABLE calls_merged FINAL"
+                        )
+
                 res = attr(*args, **kwargs)
                 if self.__dict__.get("_autoflush", True):
                     self_super._flush()
