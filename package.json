@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "@docusaurus/plugin-client-redirects": "^3.8.1"
+    "@docusaurus/plugin-client-redirects": "3.4.0"
   }
 }
