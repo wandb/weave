@@ -45,6 +45,7 @@ export {
   IconContentFullWidth,
   IconContentNarrow,
   IconContentWide,
+  IconContextWindow,
   IconContractLeft,
   IconCopy,
   IconCreditCardPayment,

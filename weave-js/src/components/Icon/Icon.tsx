@@ -45,6 +45,7 @@ import {ReactComponent as ImportColumn} from '../../assets/icons/icon-column.svg
 import {ReactComponent as ImportContentFullWidth} from '../../assets/icons/icon-content-full-width.svg';
 import {ReactComponent as ImportContentNarrow} from '../../assets/icons/icon-content-narrow.svg';
 import {ReactComponent as ImportContentWide} from '../../assets/icons/icon-content-wide.svg';
+import {ReactComponent as ImportContextWindow} from '../../assets/icons/icon-context-window.svg';
 import {ReactComponent as ImportContractLeft} from '../../assets/icons/icon-contract-left.svg';
 import {ReactComponent as ImportCopy} from '../../assets/icons/icon-copy.svg';
 import {ReactComponent as ImportCreditCardPayment} from '../../assets/icons/icon-credit-card-payment.svg';
@@ -436,6 +437,9 @@ export const IconContentNarrow = (props: SVGIconProps) => (
 );
 export const IconContentWide = (props: SVGIconProps) => (
   <ImportContentWide {...updateIconProps(props)} />
+);
+export const IconContextWindow = (props: SVGIconProps) => (
+  <ImportContextWindow {...updateIconProps(props)} />
 );
 export const IconContractLeft = (props: SVGIconProps) => (
   <ImportContractLeft {...updateIconProps(props)} />
@@ -1201,6 +1205,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'content-full-width': IconContentFullWidth,
   'content-narrow': IconContentNarrow,
   'content-wide': IconContentWide,
+  'context-window': IconContextWindow,
   'contract-left': IconContractLeft,
   copy: IconCopy,
   'credit-card-payment': IconCreditCardPayment,
