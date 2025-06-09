@@ -2,17 +2,10 @@
  * This bar above a grid displays currently set filters for quick editing.
  */
 
-import {
-  Dialog,
-  DialogActions as MaterialDialogActions,
-  DialogContent as MaterialDialogContent,
-  DialogTitle as MaterialDialogTitle,
-  Popover,
-} from '@mui/material';
+import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import styled from 'styled-components';
 
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
@@ -22,6 +15,7 @@ import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../feedback/HumanFeedback/tsHumanFeedback';
+import {DeleteModal} from '../pages/common/DeleteModal';
 import {ColumnInfo} from '../types';
 import {
   FIELD_DESCRIPTIONS,
@@ -559,66 +553,18 @@ export const FilterBar = ({
           </div>
         </Tailwind>
       </Popover>
-      <RemoveFilterModal
+      <DeleteModal
         open={showDeleteWarning}
         onClose={handleCancelDelete}
-        handleConfirmDelete={handleConfirmDelete}
+        deleteTitleStr="date range"
+        deleteBodyStrs={[
+          'Removing the date range can lead to degraded query performance for large queries.',
+          'We recommend keeping it enabled for best performance.',
+        ]}
+        onDelete={() => Promise.resolve(handleConfirmDelete())}
+        actionWord="Remove"
       />
     </>
   );
 };
 
-const DialogContent = styled(MaterialDialogContent)`
-  padding: 0 32px !important;
-`;
-DialogContent.displayName = 'S.DialogContent';
-
-const DialogTitle = styled(MaterialDialogTitle)`
-  padding: 32px 32px 16px 32px !important;
-
-  &.MuiDialogTitle-root {
-    font-weight: 600;
-    font-size: 24px;
-    line-height: 30px;
-  }
-`;
-DialogTitle.displayName = 'S.DialogTitle';
-
-const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
-  justify-content: ${({$align}) =>
-    $align === 'left' ? 'flex-start' : 'flex-end'} !important;
-  padding: 24px 32px 32px 32px !important;
-`;
-DialogActions.displayName = 'S.DialogActions';
-
-const RemoveFilterModal = ({
-  open,
-  onClose,
-  handleConfirmDelete,
-}: {
-  open: boolean;
-  onClose: () => void;
-  handleConfirmDelete: () => void;
-}) => {
-  return (
-    <Tailwind>
-      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-        <DialogTitle>Remove date filter?</DialogTitle>
-        <DialogContent style={{overflow: 'hidden'}}>
-          <p>
-            Query performance relies on the datetime filter. Without it, results
-            may take longer to load.
-          </p>
-        </DialogContent>
-        <DialogActions $align="left">
-          <Button variant="destructive" onClick={handleConfirmDelete}>
-            Remove filter
-          </Button>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Tailwind>
-  );
-};
