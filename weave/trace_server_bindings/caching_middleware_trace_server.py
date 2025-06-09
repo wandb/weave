@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import os
 import tempfile
@@ -244,7 +246,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             func,
             req,
             func.__name__,
-            lambda req: req.model_dump_json(),
+            lambda req: pydantic_bytes_safe_dump(req),
             lambda res: res.model_dump_json(),
             lambda json_value: res_type.model_validate_json(json_value),
         )
@@ -487,3 +489,20 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         return self._next_trace_server.project_stats(req)
+
+
+def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
+    raw_dict = obj.model_dump()
+
+    # Convert bytes to base64 string for JSON serialization
+    def _bytes_to_base64(obj: Any) -> Any:
+        if isinstance(obj, bytes):
+            return base64.b64encode(obj).decode("utf-8")
+        elif isinstance(obj, dict):
+            return {k: _bytes_to_base64(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [_bytes_to_base64(v) for v in obj]
+        return obj
+
+    processed_dict = _bytes_to_base64(raw_dict)
+    return json.dumps(processed_dict, ensure_ascii=False)
