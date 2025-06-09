@@ -2,7 +2,6 @@ import base64
 import contextlib
 import logging
 import os
-import time
 import typing
 from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
@@ -408,6 +407,8 @@ def logging_error_check(request, log_collector):
 calls_queries_that_need_optimize = [
     "get_calls",
     "get_call",
+    "call",
+    "calls",
 ]
 
 
@@ -449,11 +450,10 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
                         server,
                         clickhouse_trace_server_batched.ClickHouseTraceServer,
                     ) and hasattr(server, "_next_trace_server"):
-                        start = time.time()
+                        # Force merge the calls table before reads!
                         server._next_trace_server.ch_client.command(
                             "OPTIMIZE TABLE calls_merged FINAL"
                         )
-                        end = time.time()
 
                 res = attr(*args, **kwargs)
                 if self.__dict__.get("_autoflush", True):
