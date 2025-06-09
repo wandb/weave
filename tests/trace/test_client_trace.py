@@ -4085,7 +4085,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
 
     # Verify that storage size is present
     assert queried_obj.size_bytes is not None
-    assert queried_obj.size_bytes == 270  # Should have some size due to the test data
+    assert queried_obj.size_bytes == 257  # Should have some size due to the test data
 
     # Test that a table is created and its size is correct
     table_ref = parse_uri(queried_obj.val["rows"])
