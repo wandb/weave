@@ -139,7 +139,7 @@ const CellValueStringWithPopup = ({value, style}: CellValueStringProps) => {
   ) : (
     <TooltipContent onClick={onClick}>
       <TooltipText isJSON={json}>{displayTrimmed}</TooltipText>
-      <TooltipHint>Click for complete content</TooltipHint>
+      <TooltipHint>Click to view full content</TooltipHint>
     </TooltipContent>
   );
 
