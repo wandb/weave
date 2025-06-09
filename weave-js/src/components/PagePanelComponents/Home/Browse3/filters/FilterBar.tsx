@@ -529,66 +529,11 @@ export const FilterBar = ({
         onClose={handleCancelDelete}
         deleteTitleStr="date range"
         deleteBodyStrs={[
-          'Removing the date range can lead to degraded performance for large queries.',
+          'Removing the date range can significantly reduce performance in large projects.',
         ]}
         onDelete={() => Promise.resolve(handleConfirmDelete())}
         actionWord="Remove"
       />
     </>
-  );
-};
-
-const DialogContent = styled(MaterialDialogContent)`
-  padding: 0 32px !important;
-`;
-DialogContent.displayName = 'S.DialogContent';
-
-const DialogTitle = styled(MaterialDialogTitle)`
-  padding: 32px 32px 16px 32px !important;
-
-  &.MuiDialogTitle-root {
-    font-weight: 600;
-    font-size: 24px;
-    line-height: 30px;
-  }
-`;
-DialogTitle.displayName = 'S.DialogTitle';
-
-const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
-  justify-content: ${({$align}) =>
-    $align === 'left' ? 'flex-start' : 'flex-end'} !important;
-  padding: 24px 32px 32px 32px !important;
-`;
-DialogActions.displayName = 'S.DialogActions';
-
-const RemoveFilterModal = ({
-  open,
-  onClose,
-  handleConfirmDelete,
-}: {
-  open: boolean;
-  onClose: () => void;
-  handleConfirmDelete: () => void;
-}) => {
-  return (
-    <Tailwind>
-      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-        <DialogTitle>Remove date filter?</DialogTitle>
-        <DialogContent style={{overflow: 'hidden'}}>
-          <p>
-            Query performance relies on the datetime filter. Without it, results
-            may take longer to load.
-          </p>
-        </DialogContent>
-        <DialogActions $align="left">
-          <Button variant="destructive" onClick={handleConfirmDelete}>
-            Remove filter
-          </Button>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Tailwind>
   );
 };
