@@ -178,11 +178,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       if (inputRef.current) {
         inputRef.current.blur();
       }
-    } else if (event.key === 'Escape') {
-      setDropdownVisible(false);
-      if (inputRef.current) {
-        inputRef.current.blur();
-      }
     }
   };
 
