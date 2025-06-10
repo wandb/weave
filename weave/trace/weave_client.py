@@ -947,10 +947,7 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
-        if parallelism_upload:
-            self.future_executor_fastlane = FutureExecutor(
-                max_workers=parallelism_upload
-            )
+        self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:

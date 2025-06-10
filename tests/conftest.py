@@ -642,3 +642,16 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+@pytest.fixture(autouse=True)
+def caching_client_isolation(monkeypatch, tmp_path):
+    """Isolate cache directories for each test to prevent cross-test contamination."""
+    test_specific_cache_dir = (
+        tmp_path / f"weave_cache_{get_test_name().replace('/', '_').replace('::', '_')}"
+    )
+    test_specific_cache_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
+    yield test_specific_cache_dir
+    # tmp_path and monkeypatch automatically handle cleanup
