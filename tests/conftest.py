@@ -2,7 +2,6 @@ import base64
 import contextlib
 import logging
 import os
-import shutil
 import tempfile
 import typing
 from collections.abc import Iterator
@@ -647,15 +646,11 @@ def network_proxy_client(client):
 
 
 @pytest.fixture(autouse=True)
-def caching_client_isolation():
-    test_specific_cache_dir = f"test_caching_client_isolation_{get_test_name()}"
-    temp_dir = os.path.join(tempfile.gettempdir(), test_specific_cache_dir)
-    os.makedirs(temp_dir, exist_ok=True)
-    current_cache_dir = os.environ.get("WEAVE_SERVER_CACHE_DIR")
-    os.environ["WEAVE_SERVER_CACHE_DIR"] = temp_dir
-    yield
-    shutil.rmtree(temp_dir)
-    if current_cache_dir is not None:
-        os.environ["WEAVE_SERVER_CACHE_DIR"] = current_cache_dir
-    else:
-        os.environ.pop("WEAVE_SERVER_CACHE_DIR")
+def caching_client_isolation(monkeypatch, tmp_path):
+    """Isolate cache directories for each test to prevent cross-test contamination."""
+    test_specific_cache_dir = tmp_path / f"weave_cache_{get_test_name().replace('/', '_').replace('::', '_')}"
+    test_specific_cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
+    yield test_specific_cache_dir
+    # tmp_path and monkeypatch automatically handle cleanup

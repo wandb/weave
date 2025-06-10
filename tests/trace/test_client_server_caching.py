@@ -173,7 +173,7 @@ def test_server_cache_size_limit(client):
             assert sizes["cache.db"] <= limit * 1.1
         elif len(sizes) == 3:
             assert sizes["cache.db-shm"] <= 50000
-            assert sizes["cache.db-wal"] < 4_000_000 * 1.1  # WAL bound by 4MB
+            assert sizes["cache.db-wal"] == 0
             assert sizes["cache.db"] <= limit * 1.1
         else:
             raise ValueError(

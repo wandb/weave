@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import threading
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Generic, TypeVar
 
 import diskcache
@@ -29,7 +28,7 @@ class ThreadSafeLRUCache(Generic[K, V]):
         Args:
             max_size: Maximum number of items to store. If 0, unlimited size.
         """
-        self.max_size = max_size
+        self._max_size = max_size
         self._cache: OrderedDict[K, V] = OrderedDict()
         self._lock = threading.RLock()
 
@@ -49,8 +48,8 @@ class ThreadSafeLRUCache(Generic[K, V]):
             self._cache.move_to_end(key)
             return self._cache[key]
 
-    def __setitem__(self, key: K, value: V) -> None:
-        """Set value for key, with LRU eviction if needed.
+    def set(self, key: K, value: V) -> None:
+        """Set a key-value pair, evicting oldest if necessary.
 
         Args:
             key: The key to set
@@ -58,88 +57,79 @@ class ThreadSafeLRUCache(Generic[K, V]):
         """
         with self._lock:
             if key in self._cache:
-                # Update existing key, move to end
+                # Update existing key and move to end
                 self._cache[key] = value
                 self._cache.move_to_end(key)
             else:
                 # Add new key
-                if self.max_size > 0 and len(self._cache) >= self.max_size:
-                    # Remove least recently used (first item)
-                    self._cache.popitem(last=False)
                 self._cache[key] = value
+                # Evict oldest if over capacity
+                if len(self._cache) > self._max_size:
+                    self._cache.popitem(last=False)  # Remove oldest (first item)
 
-    def __delitem__(self, key: K) -> None:
-        """Delete key from cache.
+    def delete(self, key: K) -> bool:
+        """Delete a key from the cache.
 
         Args:
             key: The key to delete
 
-        Raises:
-            KeyError: If key not found
+        Returns:
+            True if key existed and was deleted, False otherwise
         """
         with self._lock:
-            del self._cache[key]
+            try:
+                del self._cache[key]
+                return True
+            except KeyError:
+                return False
 
-    def __contains__(self, key: K) -> bool:
-        """Check if key exists in cache.
+    def delete_keys_with_prefix(self, prefix: str) -> int:
+        """Delete all keys that start with the given prefix.
 
         Args:
-            key: The key to check
+            prefix: The prefix to match
 
         Returns:
-            True if key exists, False otherwise
+            Number of keys deleted
         """
         with self._lock:
-            return key in self._cache
-
-    def keys(self) -> list[K]:
-        """Return a view of cache keys.
-
-        Returns:
-            A view of the cache keys
-        """
-        with self._lock:
-            return list(self._cache.keys())
+            keys_to_delete = [key for key in self._cache.keys() 
+                            if isinstance(key, str) and key.startswith(prefix)]
+            for key in keys_to_delete:
+                del self._cache[key]
+            return len(keys_to_delete)
 
     def clear(self) -> None:
-        """Clear all items from cache."""
+        """Clear all items from the cache."""
         with self._lock:
             self._cache.clear()
 
     def __len__(self) -> int:
-        """Return number of items in cache."""
+        """Return the number of items in the cache."""
         with self._lock:
             return len(self._cache)
 
 
 class MemCacheWithDiskCacheBackend:
     """
-    A multi-stage cache with a quick memory cache and a slower disk cache.
+    A simple 2-layer cache with thread-safe memory cache and persistent disk cache.
 
     This implementation provides:
-    1. Fast memory cache for recent data using thread-safe LRU eviction
-    2. Persistent disk cache for long-term storage
-    3. Background disk I/O to avoid blocking the main thread
-    4. Proper error handling and recovery from cache failures
-    5. Memory cache population from disk cache hits for better performance
-    6. Thread-safe operations with proper cleanup
+    1. Fast thread-safe memory cache for recent data using LRU eviction
+    2. Persistent disk cache for cross-process storage
+    3. Synchronous operations for consistency
+    4. Simple and reliable error handling
 
     Design decisions:
-    - Disk I/O is backgrounded to prevent blocking, with the assumption that
-      items with the same key have the same value for the program duration
-    - Memory cache is immediately updated on writes for fast subsequent reads
-    - Disk cache errors don't fail the operation, they just log warnings
-    - Pending disk writes are tracked to avoid duplicate writes and enable cancellation
-    - Proper cleanup ensures all background operations complete on shutdown
-
-    Thread Safety:
-    - Memory cache operations are protected by locks
-    - Disk operations are handled by a single background thread
-    - Pending writes tracking is protected by a separate lock
+    - All operations are synchronous to avoid consistency issues
+    - Memory cache is checked first for speed
+    - Disk cache provides persistence across processes
+    - Memory cache is populated from disk hits for better performance
+    - No background threading to avoid WAL consistency issues
     """
 
     def __init__(self, cache_dir: str, size_limit: int = 1_000_000_000):
-        """Initialize the multi-stage cache.
+        """Initialize the 2-layer cache.
 
         Args:
             cache_dir: Directory path for disk cache storage
@@ -151,27 +141,9 @@ class MemCacheWithDiskCacheBackend:
         self._mem_cache: ThreadSafeLRUCache[str, str | bytes] = ThreadSafeLRUCache(
             max_size=1000
         )
-        self._disk_cache_thread_pool = ThreadPoolExecutor(
-            max_workers=1, thread_name_prefix="weave-cache-disk-writer"
-        )
-        self._pending_disk_writes: dict[str, Any] = {}
-        self._pending_lock = threading.Lock()
-
-    def close(self, wait: bool = False) -> None:
-        """Cleanup resources, ensuring pending disk writes complete."""
-        try:
-            # Wait for pending disk operations to complete
-            self._disk_cache_thread_pool.shutdown(wait=wait)
-        except Exception as e:
-            logger.warning(f"Error waiting for disk cache operations to complete: {e}")
-
-        try:
-            self._disk_cache.close()
-        except Exception as e:
-            logger.exception(f"Error closing disk cache: {e}")
 
     def get(self, key: str) -> str | bytes | None:
-        """Get value from cache, checking memory first, then disk.
+        """Get a value from the cache, checking memory first, then disk.
 
         Args:
             key: The cache key to look up
@@ -179,165 +151,103 @@ class MemCacheWithDiskCacheBackend:
         Returns:
             The cached value if found, None otherwise
         """
-        # First check memory cache
-        res = self._mem_cache.get(key)
-        if res is not None:
-            return res
-
-        # Then check disk cache
+        # First check memory cache (fast)
+        value = self._mem_cache.get(key)
+        if value is not None:
+            return value
+        
+        # Check disk cache (slower)
         try:
-            res = self._disk_cache.get(key)
-            if res is not None:
-                # Populate memory cache with disk result for faster future access
-                self._mem_cache[key] = res
-                return res
+            value = self._disk_cache.get(key)
+            if value is not None:
+                # Populate memory cache for future hits
+                self._mem_cache.set(key, value)
+                return value
         except Exception as e:
-            logger.exception(f"Error reading from disk cache: {e}")
-
+            logger.debug(f"Error reading from disk cache for key '{key}': {e}")
+        
         return None
 
     def set(self, key: str, value: str | bytes) -> None:
-        """Set value in cache, updating memory immediately and disk in background.
-
+        """Set a value in both memory and disk cache.
+        
         Args:
             key: The cache key
-            value: The value to cache
+            value: The value to store
+            
+        Note:
+            This implementation assumes that the same key will ALWAYS have the same value,
+            even after deletes. This allows us to optimize by checking disk cache existence
+            before writing - if the key exists, we know it has the correct value already.
         """
-        # Immediately set in memory cache
-        self._mem_cache[key] = value
-
-        # Check if we already have a pending write for this key
-        with self._pending_lock:
-            if key in self._pending_disk_writes:
-                # Cancel the previous write since we have a newer value
-                try:
-                    self._pending_disk_writes[key].cancel()
-                except Exception:
-                    pass  # Future might already be running
-
-        # Background the disk write
-        future = self._disk_cache_thread_pool.submit(self._safe_disk_set, key, value)
-
-        with self._pending_lock:
-            self._pending_disk_writes[key] = future
-
-        # Clean up completed futures
-        future.add_done_callback(lambda f: self._cleanup_pending_write(key))
-
-    def _safe_disk_set(self, key: str, value: str | bytes) -> None:
-        """Safely write to disk cache with error handling.
-
-        Args:
-            key: The cache key
-            value: The value to write
-        """
+        # Always update memory cache first (fast)
+        self._mem_cache.set(key, value)
+        
+        # Check if key already exists in disk cache to avoid unnecessary write
+        # Since same keys always have same values, existence check is sufficient
+        try:
+            if key in self._disk_cache:
+                # Key exists, so it must have the same value - skip write
+                return
+        except Exception as e:
+            logger.debug(f"Error checking disk cache existence for key '{key}': {e}")
+            # Fall through to attempt write anyway
+        
+        # Key doesn't exist in disk cache, so write it
         try:
             self._disk_cache.set(key, value)
         except Exception as e:
-            logger.exception(f"Error writing to disk cache for key '{key}': {e}")
-
-    def _cleanup_pending_write(self, key: str) -> None:
-        """Remove completed write from pending writes dict.
-
-        Args:
-            key: The cache key that finished writing
-        """
-        with self._pending_lock:
-            self._pending_disk_writes.pop(key, None)
+            logger.warning(f"Error writing to disk cache for key '{key}': {e}")
 
     def delete(self, key: str) -> None:
-        """Delete key from both memory and disk cache.
+        """Delete a key from both memory and disk cache.
 
         Args:
             key: The cache key to delete
         """
-        # Remove from memory cache
+        # Delete from memory cache
+        self._mem_cache.delete(key)
+        
+        # Delete from disk cache
         try:
-            del self._mem_cache[key]
+            del self._disk_cache[key]
         except KeyError:
-            pass
-
-        # Cancel any pending disk write
-        with self._pending_lock:
-            pending_future = self._pending_disk_writes.pop(key, None)
-            if pending_future:
-                try:
-                    pending_future.cancel()
-                except Exception:
-                    pass
-
-        # Remove from disk cache (backgrounded)
-        self._disk_cache_thread_pool.submit(self._safe_disk_delete, key)
-
-    def _safe_disk_delete(self, key: str) -> None:
-        """Safely delete from disk cache with error handling.
-
-        Args:
-            key: The cache key to delete
-        """
-        try:
-            self._disk_cache.delete(key)
+            pass  # Key didn't exist, that's fine
         except Exception as e:
-            logger.exception(f"Error deleting from disk cache for key '{key}': {e}")
-
-    def __contains__(self, key: str) -> bool:
-        """Check if key exists in either memory or disk cache.
-
-        Args:
-            key: The cache key to check
-
-        Returns:
-            True if key exists in either cache, False otherwise
-        """
-        if key in self._mem_cache:
-            return True
-        try:
-            return key in self._disk_cache
-        except Exception as e:
-            logger.exception(f"Error checking disk cache for key '{key}': {e}")
-            return False
+            logger.warning(f"Error deleting from disk cache for key '{key}': {e}")
 
     def delete_keys_with_prefix(self, prefix: str) -> None:
-        """Delete all cached entries that start with the given prefix.
+        """Delete all keys that start with the given prefix from both caches.
 
         Args:
             prefix: The prefix to match for deletion
         """
+        # Delete from memory cache
+        deleted_count = self._mem_cache.delete_keys_with_prefix(prefix)
+        logger.debug(f"Deleted {deleted_count} keys from memory cache with prefix '{prefix}'")
+        
+        # Delete from disk cache
         try:
-            # Get keys from memory cache
-            mem_keys_to_delete = [
-                key for key in self._mem_cache.keys() if key.startswith(prefix)
-            ]
-
-            # Delete from memory cache
-            for key in mem_keys_to_delete:
-                try:
-                    del self._mem_cache[key]
-                except KeyError:
-                    pass
-
-            # Delete from disk cache (this is more expensive, so we do it in background)
-            def delete_disk_keys_with_prefix() -> None:
-                try:
-                    disk_keys_to_delete = [
-                        key for key in self._disk_cache if key.startswith(prefix)
-                    ]
-                    for key in disk_keys_to_delete:
-                        try:
-                            self._disk_cache.delete(key)
-                        except Exception as e:
-                            logger.exception(
-                                f"Error deleting disk cache key '{key}': {e}"
-                            )
-                except Exception as e:
-                    logger.exception(
-                        f"Error scanning disk cache for prefix '{prefix}': {e}"
-                    )
-
-            # Submit disk cleanup as background task
-            self._disk_cache_thread_pool.submit(delete_disk_keys_with_prefix)
-
+            deleted_count = 0
+            # Get all keys with the prefix
+            for key in list(self._disk_cache.iterkeys()):
+                if key.startswith(prefix):
+                    try:
+                        del self._disk_cache[key]
+                        deleted_count += 1
+                    except KeyError:
+                        pass  # Key was already deleted
+            logger.debug(f"Deleted {deleted_count} keys from disk cache with prefix '{prefix}'")
         except Exception as e:
-            logger.exception(
-                f"Error deleting cached values with prefix '{prefix}': {e}"
-            )
+            logger.warning(f"Error deleting keys with prefix '{prefix}' from disk cache: {e}")
+
+    def close(self) -> None:
+        """Cleanup resources. Synchronous to ensure WAL is properly flushed."""
+        try:
+            # Clear memory cache
+            self._mem_cache.clear()
+            
+            # Close disk cache - this should flush all pending operations
+            self._disk_cache.close()
+        except Exception as e:
+            logger.exception(f"Error closing cache: {e}")
