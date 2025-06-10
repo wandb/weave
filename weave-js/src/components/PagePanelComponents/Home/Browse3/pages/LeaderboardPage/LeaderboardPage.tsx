@@ -24,7 +24,7 @@ import {
 } from '../../views/Leaderboard/LeaderboardGrid';
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
-import {SimplePageLayout} from '../common/SimplePageLayout';
+import {SimplePageLayout, SimplePageLayoutContext} from '../common/SimplePageLayout';
 import {
   useBaseObjectInstances,
   useCreateBuiltinObjectInstance,
@@ -45,46 +45,84 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const {isEditor} = useIsEditor(props.entity);
   const [isEditing, setIsEditing] = useState(false);
+  const simplePageLayoutContext = useContext(SimplePageLayoutContext);
+  
   useEffect(() => {
     if (isEditor && props.openEditorOnMount) {
       setIsEditing(true);
     }
   }, [isEditor, props.openEditorOnMount]);
+  
+  // Show buttons in headerExtra when not peeking
+  const headerExtra = isEditor && !isPeeking ? (
+    <Box display="flex" gap="4px" marginRight="16px" alignItems="center">
+      <EditLeaderboardButton
+        entity={props.entity}
+        project={props.project}
+        leaderboardName={props.leaderboardName}
+        isEditing={isEditing}
+        setIsEditing={setIsEditing}
+        isPeeking={isPeeking}
+      />
+      <DeleteLeaderboardButton
+        entity={props.entity}
+        project={props.project}
+        leaderboardName={props.leaderboardName}
+      />
+    </Box>
+  ) : null;
+  
+  // When peeking and user is editor, prepend buttons to headerSuffix
+  const contextValue = useMemo(() => {
+    if (isPeeking && isEditor) {
+      return {
+        ...simplePageLayoutContext,
+        headerSuffix: (
+          <>
+            <Box display="flex" gap="4px" alignItems="center">
+              <EditLeaderboardButton
+                entity={props.entity}
+                project={props.project}
+                leaderboardName={props.leaderboardName}
+                isEditing={isEditing}
+                setIsEditing={setIsEditing}
+                isPeeking={isPeeking}
+              />
+              <DeleteLeaderboardButton
+                entity={props.entity}
+                project={props.project}
+                leaderboardName={props.leaderboardName}
+              />
+            </Box>
+            {simplePageLayoutContext.headerSuffix}
+          </>
+        ),
+      };
+    }
+    return simplePageLayoutContext;
+  }, [isPeeking, isEditor, simplePageLayoutContext, props.entity, props.project, props.leaderboardName, isEditing]);
+  
   return (
-    <SimplePageLayout
-      title={name}
-      hideTabsIfSingle
-      tabs={[
-        {
-          label: 'Leaderboard',
-          content: (
-            <LeaderboardPageContent
-              {...props}
-              setName={setName}
-              isEditing={isEditing}
-              setIsEditing={setIsEditing}
-            />
-          ),
-        },
-      ]}
-      headerExtra={
-          <Box display="flex" gap="4px" marginRight="16px" alignItems="center">
-            <EditLeaderboardButton
-              entity={props.entity}
-              project={props.project}
-              leaderboardName={props.leaderboardName}
-              isEditing={isEditing}
-              setIsEditing={setIsEditing}
-              isPeeking={isPeeking}
-            />
-            <DeleteLeaderboardButton
-              entity={props.entity}
-              project={props.project}
-              leaderboardName={props.leaderboardName}
-            />
-          </Box>
-      }
-    />
+    <SimplePageLayoutContext.Provider value={contextValue}>
+      <SimplePageLayout
+        title={name}
+        hideTabsIfSingle
+        tabs={[
+          {
+            label: 'Leaderboard',
+            content: (
+              <LeaderboardPageContent
+                {...props}
+                setName={setName}
+                isEditing={isEditing}
+                setIsEditing={setIsEditing}
+              />
+            ),
+          },
+        ]}
+        headerExtra={headerExtra}
+      />
+    </SimplePageLayoutContext.Provider>
   );
 };
 
