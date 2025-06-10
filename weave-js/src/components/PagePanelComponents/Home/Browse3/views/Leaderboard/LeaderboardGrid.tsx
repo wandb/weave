@@ -132,11 +132,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               params.value
             }` ?? ''
           );
-          
+
           // Check if any evaluation for this model is running
           const modelGroup = (params.row as RowData).modelGroup;
           const isRunning = modelHasRunningEvaluation(modelGroup);
-          
+
           if (modelRef) {
             return (
               <div
@@ -153,9 +153,9 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                 }}>
                 <SmallRef objRef={modelRef} />
                 {isRunning && (
-                  <StatusChip 
-                    value="running" 
-                    iconOnly 
+                  <StatusChip
+                    value="running"
+                    iconOnly
                     tooltipOverride="Evaluation in progress"
                   />
                 )}
@@ -527,11 +527,15 @@ const modelGroupIsOp = (modelGroup: GroupedLeaderboardModelGroup) => {
 /**
  * Check if a model group has any running evaluations.
  */
-const modelHasRunningEvaluation = (modelGroup: GroupedLeaderboardModelGroup) => {
+const modelHasRunningEvaluation = (
+  modelGroup: GroupedLeaderboardModelGroup
+) => {
   try {
     for (const datasetGroup of Object.values(modelGroup.datasetGroups)) {
       for (const scorerGroup of Object.values(datasetGroup.scorerGroups)) {
-        for (const metricPathGroup of Object.values(scorerGroup.metricPathGroups)) {
+        for (const metricPathGroup of Object.values(
+          scorerGroup.metricPathGroups
+        )) {
           for (const record of metricPathGroup) {
             if (record.isRunning) {
               return true;
