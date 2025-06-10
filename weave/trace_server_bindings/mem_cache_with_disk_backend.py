@@ -3,17 +3,16 @@ from __future__ import annotations
 import logging
 import threading
 from collections import OrderedDict
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 import diskcache
 
 logger = logging.getLogger(__name__)
 
-K = TypeVar("K")
 V = TypeVar("V")
 
 
-class ThreadSafeLRUCache(Generic[K, V]):
+class ThreadSafeLRUCache(Generic[V]):
     """Thread-safe LRU cache implementation using OrderedDict.
 
     This implementation provides:
@@ -29,10 +28,10 @@ class ThreadSafeLRUCache(Generic[K, V]):
             max_size: Maximum number of items to store. If 0, unlimited size.
         """
         self._max_size = max_size
-        self._cache: OrderedDict[K, V] = OrderedDict()
+        self._cache: OrderedDict[str, V] = OrderedDict()
         self._lock = threading.RLock()
 
-    def get(self, key: K) -> V | None:
+    def get(self, key: str) -> V | None:
         """Get value by key, moving it to end (most recently used).
 
         Args:
@@ -48,7 +47,7 @@ class ThreadSafeLRUCache(Generic[K, V]):
             self._cache.move_to_end(key)
             return self._cache[key]
 
-    def set(self, key: K, value: V) -> None:
+    def set(self, key: str, value: V) -> None:
         """Set a key-value pair, evicting oldest if necessary.
 
         Args:
@@ -67,7 +66,7 @@ class ThreadSafeLRUCache(Generic[K, V]):
                 if len(self._cache) > self._max_size:
                     self._cache.popitem(last=False)  # Remove oldest (first item)
 
-    def delete(self, key: K) -> bool:
+    def delete(self, key: str) -> bool:
         """Delete a key from the cache.
 
         Args:
@@ -79,9 +78,9 @@ class ThreadSafeLRUCache(Generic[K, V]):
         with self._lock:
             try:
                 del self._cache[key]
-                return True
             except KeyError:
                 return False
+        return True
 
     def delete_keys_with_prefix(self, prefix: str) -> int:
         """Delete all keys that start with the given prefix.
@@ -93,8 +92,11 @@ class ThreadSafeLRUCache(Generic[K, V]):
             Number of keys deleted
         """
         with self._lock:
-            keys_to_delete = [key for key in self._cache.keys() 
-                            if isinstance(key, str) and key.startswith(prefix)]
+            keys_to_delete = [
+                key
+                for key in self._cache.keys()
+                if isinstance(key, str) and key.startswith(prefix)
+            ]
             for key in keys_to_delete:
                 del self._cache[key]
             return len(keys_to_delete)
@@ -138,7 +140,7 @@ class MemCacheWithDiskCacheBackend:
         self._disk_cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
             cache_dir, size_limit=size_limit
         )
-        self._mem_cache: ThreadSafeLRUCache[str, str | bytes] = ThreadSafeLRUCache(
+        self._mem_cache: ThreadSafeLRUCache[str | bytes] = ThreadSafeLRUCache(
             max_size=1000
         )
 
@@ -155,7 +157,7 @@ class MemCacheWithDiskCacheBackend:
         value = self._mem_cache.get(key)
         if value is not None:
             return value
-        
+
         # Check disk cache (slower)
         try:
             value = self._disk_cache.get(key)
@@ -165,16 +167,16 @@ class MemCacheWithDiskCacheBackend:
                 return value
         except Exception as e:
             logger.debug(f"Error reading from disk cache for key '{key}': {e}")
-        
+
         return None
 
     def set(self, key: str, value: str | bytes) -> None:
         """Set a value in both memory and disk cache.
-        
+
         Args:
             key: The cache key
             value: The value to store
-            
+
         Note:
             This implementation assumes that the same key will ALWAYS have the same value,
             even after deletes. This allows us to optimize by checking disk cache existence
@@ -182,7 +184,7 @@ class MemCacheWithDiskCacheBackend:
         """
         # Always update memory cache first (fast)
         self._mem_cache.set(key, value)
-        
+
         # Check if key already exists in disk cache to avoid unnecessary write
         # Since same keys always have same values, existence check is sufficient
         try:
@@ -192,7 +194,7 @@ class MemCacheWithDiskCacheBackend:
         except Exception as e:
             logger.debug(f"Error checking disk cache existence for key '{key}': {e}")
             # Fall through to attempt write anyway
-        
+
         # Key doesn't exist in disk cache, so write it
         try:
             self._disk_cache.set(key, value)
@@ -207,7 +209,7 @@ class MemCacheWithDiskCacheBackend:
         """
         # Delete from memory cache
         self._mem_cache.delete(key)
-        
+
         # Delete from disk cache
         try:
             del self._disk_cache[key]
@@ -224,8 +226,10 @@ class MemCacheWithDiskCacheBackend:
         """
         # Delete from memory cache
         deleted_count = self._mem_cache.delete_keys_with_prefix(prefix)
-        logger.debug(f"Deleted {deleted_count} keys from memory cache with prefix '{prefix}'")
-        
+        logger.debug(
+            f"Deleted {deleted_count} keys from memory cache with prefix '{prefix}'"
+        )
+
         # Delete from disk cache
         try:
             deleted_count = 0
@@ -237,16 +241,20 @@ class MemCacheWithDiskCacheBackend:
                         deleted_count += 1
                     except KeyError:
                         pass  # Key was already deleted
-            logger.debug(f"Deleted {deleted_count} keys from disk cache with prefix '{prefix}'")
+            logger.debug(
+                f"Deleted {deleted_count} keys from disk cache with prefix '{prefix}'"
+            )
         except Exception as e:
-            logger.warning(f"Error deleting keys with prefix '{prefix}' from disk cache: {e}")
+            logger.warning(
+                f"Error deleting keys with prefix '{prefix}' from disk cache: {e}"
+            )
 
     def close(self) -> None:
         """Cleanup resources. Synchronous to ensure WAL is properly flushed."""
         try:
             # Clear memory cache
             self._mem_cache.clear()
-            
+
             # Close disk cache - this should flush all pending operations
             self._disk_cache.close()
         except Exception as e:
