@@ -6,6 +6,7 @@
  * selecting an alternate evaluation.
  */
 
+import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
 import React, {useRef, useState} from 'react';
 
 import {Button} from '../../../../../Button';
@@ -108,7 +109,7 @@ export const ParentFilterTagInner = ({
   }
 
   const truncatedId = parentCall.callId.slice(-4);
-  const label = `${parentCall.displayName} (${truncatedId})`;
+  const label = `Parent: ${parentCall.displayName} (${truncatedId})`;
 
   // Wrapper to prevent wrapping and ensure single line display
   const NoWrapWrapper: React.FC<{children: React.ReactNode}> = ({children}) => (
@@ -126,21 +127,25 @@ export const ParentFilterTagInner = ({
   return (
     <>
       {buttonChangeEval}
-      <RemovableTag
-        maxChars={48}
-        truncatedPart="middle"
-        color="moon"
-        label={`Parent: ${label}`}
-        Wrapper={NoWrapWrapper}
-        removeAction={
-          <RemoveAction
-            onClick={(e: React.SyntheticEvent) => {
-              e.stopPropagation();
-              onSetParentFilter(undefined);
-            }}
+      <StyledTooltip enterDelay={500} title={label} placement="top" padding={8}>
+        <span>
+          <RemovableTag
+            maxChars={48}
+            truncatedPart="middle"
+            color="moon"
+            label={label}
+            Wrapper={NoWrapWrapper}
+            removeAction={
+              <RemoveAction
+                onClick={(e: React.SyntheticEvent) => {
+                  e.stopPropagation();
+                  onSetParentFilter(undefined);
+                }}
+              />
+            }
           />
-        }
-      />
+        </span>
+      </StyledTooltip>
     </>
   );
 };
