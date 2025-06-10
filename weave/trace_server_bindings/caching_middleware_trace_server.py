@@ -20,7 +20,9 @@ from weave.trace.settings import (
 )
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.mem_cache_with_disk_backend import (
-    create_memory_disk_cache,
+    DiskCache,
+    LRUCache,
+    StackedCache,
 )
 
 logger = logging.getLogger(__name__)
@@ -505,3 +507,28 @@ def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
 
     processed_dict = _bytes_to_base64(raw_dict)
     return json.dumps(processed_dict, ensure_ascii=False)
+
+
+def create_memory_disk_cache(
+    cache_dir: str, size_limit: int = 1_000_000_000, memory_size: int = 1000
+) -> StackedCache:
+    """Factory function to create a memory+disk stacked cache.
+
+    This is the equivalent of the old MemCacheWithDiskCacheBackend but more flexible.
+
+    Args:
+        cache_dir: Directory path for disk cache storage
+        size_limit: Maximum size in bytes for disk cache (default 1GB)
+        memory_size: Maximum number of items in memory cache (default 1000)
+
+    Returns:
+        A StackedCache with memory and disk layers
+    """
+    memory_layer = LRUCache[str, str | bytes](max_size=memory_size)
+    disk_layer = DiskCache(cache_dir, size_limit)
+
+    return StackedCache(
+        layers=[memory_layer, disk_layer],
+        populate_on_hit=True,
+        existence_check_optimization=True,  # Enable the "same key = same value" optimization
+    )

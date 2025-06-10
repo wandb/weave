@@ -289,32 +289,3 @@ class StackedCache:
     def layers(self) -> list[CacheProtocol[str, str | bytes]]:
         """Access to the underlying cache layers."""
         return self._layers
-
-
-def create_memory_disk_cache(
-    cache_dir: str, size_limit: int = 1_000_000_000, memory_size: int = 1000
-) -> StackedCache:
-    """Factory function to create a memory+disk stacked cache.
-
-    This is the equivalent of the old MemCacheWithDiskCacheBackend but more flexible.
-
-    Args:
-        cache_dir: Directory path for disk cache storage
-        size_limit: Maximum size in bytes for disk cache (default 1GB)
-        memory_size: Maximum number of items in memory cache (default 1000)
-
-    Returns:
-        A StackedCache with memory and disk layers
-    """
-    memory_layer = LRUCache[str, str | bytes](max_size=memory_size)
-    disk_layer = DiskCache(cache_dir, size_limit)
-
-    return StackedCache(
-        layers=[memory_layer, disk_layer],
-        populate_on_hit=True,
-        existence_check_optimization=True,  # Enable the "same key = same value" optimization
-    )
-
-
-# Backward compatibility alias
-MemCacheWithDiskCacheBackend = create_memory_disk_cache
