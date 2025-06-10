@@ -659,7 +659,7 @@ class CallsQuery(BaseModel):
         filter_query.order_fields = self.order_fields
         filter_query.limit = self.limit
         filter_query.offset = self.offset
-        # outer query must also order
+        # SUPER IMPORTANT: still need to re-sort the final query
         outer_query.order_fields = self.order_fields
 
         raw_sql = f"""
