@@ -99,6 +99,7 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
+from weave.trace.casting import CallsFilterLike, SortByLike, QueryLike
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
@@ -889,47 +890,6 @@ class AttributesDict(dict):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"
-
-
-def cast_to_calls_filter(obj: Any) -> CallsFilter:
-    if isinstance(obj, CallsFilter):
-        return obj
-
-    if isinstance(obj, dict):
-        return CallsFilter(**obj)
-
-    if obj is None:
-        return CallsFilter()
-
-    raise TypeError("Unable to cast to CallsFilter")
-
-
-def cast_to_sort_by(obj: Any) -> SortBy:
-    if isinstance(obj, SortBy):
-        return obj
-
-    if isinstance(obj, dict):
-        return SortBy(**obj)
-
-    raise TypeError(f"Unable to cast to SortBy: {obj}")
-
-
-def cast_to_query(obj: Any) -> Query | None:
-    if isinstance(obj, Query):
-        return obj
-
-    if isinstance(obj, dict):
-        return Query(**obj)
-
-    if obj is None:
-        return None
-
-    raise TypeError("Unable to cast to Query")
-
-
-CallsFilterLike = Annotated[CallsFilter, pydantic.BeforeValidator(cast_to_calls_filter)]
-SortByLike = Annotated[SortBy, pydantic.BeforeValidator(cast_to_sort_by)]
-QueryLike = Annotated[Union[Query, None], pydantic.BeforeValidator(cast_to_query)]
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
