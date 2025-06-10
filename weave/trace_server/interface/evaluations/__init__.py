@@ -1,7 +1,8 @@
 import datetime
-from typing import Protocol, Optional
+from typing import Optional, Protocol
 
 from pydantic import BaseModel, Field
+
 
 class ObjectBackedThing(BaseModel):
     project_id: str
@@ -14,15 +15,17 @@ class ObjectBackedThing(BaseModel):
     deleted_at: Optional[datetime.datetime]
 
 
-
 class Model(ObjectBackedThing):
     id: str
+
 
 class Task(ObjectBackedThing):
     id: str
 
+
 class Scorer(ObjectBackedThing):
     id: str
+
 
 class CallBackedThing(BaseModel):
     project_id: str
@@ -30,6 +33,7 @@ class CallBackedThing(BaseModel):
     created_at: datetime.datetime
     updated_at: datetime.datetime
     deleted_at: Optional[datetime.datetime]
+
 
 class Result(CallBackedThing):
     id: str
@@ -52,9 +56,6 @@ class Label(BaseModel):
     exampleId: str
 
 
-
-
-
 class Comparison(BaseModel):
     id: str
 
@@ -74,5 +75,4 @@ class Summary(BaseModel):
     taskId: str
 
 
-class TraceServerEvaluationInterfaceMixin(Protocol):
-    ...
+class TraceServerEvaluationInterfaceMixin(Protocol): ...
