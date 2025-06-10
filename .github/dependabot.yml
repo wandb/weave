@@ -32,16 +32,16 @@ updates:
           # - "weave_server_sdk*"
 
       # # Trace server dependencies
-      # trace_server:
-      #   patterns:
-      #     - "ddtrace*"
-      #     - "boto3*"
-      #     - "azure-storage-blob*"
-      #     - "google-cloud-storage*"
-      #     - "litellm*"
-      #     - "opentelemetry-proto*"
-      #     - "opentelemetry-semantic-conventions-ai*"
-      #     - "openinference-semantic-conventions*"
+      trace_server:
+        patterns:
+          - "ddtrace*"
+          - "boto3*"
+          - "azure-storage-blob*"
+          - "google-cloud-storage*"
+          - "litellm*"
+          - "opentelemetry-proto*"
+          - "opentelemetry-semantic-conventions-ai*"
+          - "openinference-semantic-conventions*"
 
       # # Testing dependencies
       # test:
