@@ -21,6 +21,7 @@ import {
 } from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {useIsEditor} from './LeaderboardPage';
+import {DeleteLeaderboardButton} from './LeaderboardDeleteButton';
 
 const Container = styled.div`
   width: 100%;
@@ -88,7 +89,7 @@ const CreateLeaderboardButton: FC<{
           marginLeft: '0px',
         }}
         size="medium"
-        variant="secondary"
+        variant="ghost"
         onClick={() => {
           createLeaderboard().then(navigateToLeaderboard);
         }}
@@ -105,6 +106,7 @@ const LeaderboardTable: React.FC<{
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
+  const {isEditor} = useIsEditor(props.entity);
 
   // TODO: Once `useCollectionObjects` lands from the online
   // evals project, switch to that (much more type safe)
@@ -151,6 +153,18 @@ const LeaderboardTable: React.FC<{
       hideCategoryColumn
       hideVersionSuffix
       onRowClick={onClick}
+      actionMenu={
+        isEditor
+          ? obj => (
+              <DeleteLeaderboardButton
+                entity={props.entity}
+                project={props.project}
+                leaderboardName={obj.objectId}
+                variant="icon"
+              />
+            )
+          : undefined
+      }
     />
   );
 };
