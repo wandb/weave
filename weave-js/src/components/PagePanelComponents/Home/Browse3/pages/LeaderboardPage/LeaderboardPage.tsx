@@ -68,9 +68,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
         },
       ]}
       headerExtra={
-        !isEditing &&
-        isEditor && (
-          <Box display="flex" gap="4px" alignItems="center">
+          <Box display="flex" gap="4px" marginRight="16px" alignItems="center">
             <EditLeaderboardButton
               entity={props.entity}
               project={props.project}
@@ -85,7 +83,6 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
               leaderboardName={props.leaderboardName}
             />
           </Box>
-        )
       }
     />
   );
@@ -360,9 +357,9 @@ const EditLeaderboardButton: FC<{
         size="medium"
         variant="ghost"
         onClick={handleClick}
-        icon={isEditing ? 'close' : 'pencil-edit'}>
-        {isEditing ? 'Discard Changes' : 'Edit'}
-      </Button>
+        icon={isEditing ? 'close' : 'pencil-edit'}
+        tooltip={isEditing ? 'Discard Changes' : 'Edit'}
+      />
     </Box>
   );
 };
