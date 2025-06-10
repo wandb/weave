@@ -190,7 +190,10 @@ export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
   fullScreenElement.style.height = '100%';
   fullScreenElement.style.width = '100%';
 
-  result.request.domElement.appendChild(fullScreenElement);
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+
+  document.body.appendChild(fullScreenElement);
   fullScreenElement.appendChild(canvas);
   canvas.width = window.screen.width;
   canvas.height = window.screen.height;
@@ -206,6 +209,10 @@ export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
 
   onNextExitFullscreen(() => {
     canvas.remove();
+    fullScreenElement.remove();
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
   });
 
   try {
