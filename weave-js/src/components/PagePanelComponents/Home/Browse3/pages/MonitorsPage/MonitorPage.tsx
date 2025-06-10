@@ -29,7 +29,7 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
+import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 

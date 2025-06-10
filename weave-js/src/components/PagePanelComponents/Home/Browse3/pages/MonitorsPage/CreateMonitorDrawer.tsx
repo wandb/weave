@@ -9,6 +9,7 @@ import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/H
 import {FilterPanel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/FilterPanel';
 import {prepareFlattenedCallDataForTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTable';
 import {useCallsTableColumns} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableColumns';
+import {LLMAsAJudgeScorerForm} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
 import {
   useOpVersionOptions,
   WFHighLevelCallFilter,
@@ -26,6 +27,7 @@ import {queryToGridFilterModel} from '@wandb/weave/components/PagePanelComponent
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {
   useObjCreate,
+  useRootObjectVersions,
   useScorerCreate,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
@@ -36,16 +38,22 @@ import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useMemo, useState} from 'react';
 import {toast} from 'react-toastify';
-
-const typographyStyle = {fontFamily: 'Source Sans Pro'};
+import {
+  FieldName,
+  typographyStyle,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/FormComponents';
 
 const PAGE_SIZE = 10;
 const PAGE_OFFSET = 0;
 
-enum BuiltInScorers {
-  ValidJSONScorer = 'ValidJSONScorer',
-  ValidXMLScorer = 'ValidXMLScorer',
-}
+const SCORER_FORMS: Map<
+  string,
+  React.ComponentType<{scorer: ObjectVersionSchema}> | null
+> = new Map([
+  ['ValidJSONScorer', null],
+  ['ValidXMLScorer', null],
+  ['LLMAsAJudgeScorer', LLMAsAJudgeScorerForm],
+]);
 
 export const CreateMonitorDrawer = ({
   entity,
@@ -71,24 +79,37 @@ export const CreateMonitorDrawer = ({
   const [filter, setFilter] = useState<WFHighLevelCallFilter>({});
   const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
   const {useCalls} = useWFHooks();
-  const [scorers, setScorers] = useState<{name: string; refUri?: string}[]>([]);
+  const [scorers, setScorers] = useState<ObjectVersionSchema[]>([]);
   const [active, setActive] = useState<boolean>(false);
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const {sortBy, lowLevelFilter} = useFilterSortby(filter, {items: []}, [
     {field: 'started_at', sort: 'desc'},
   ]);
-  useMemo(() => {
-    const existingScorers = (monitor?.val['scorers'] || []).map(
-      (scorerRefUri: string) => ({
-        refUri: scorerRefUri,
-        name: parseRef(scorerRefUri).artifactName,
-      })
+
+  const scorerIds: string[] = useMemo(() => {
+    return (
+      monitor?.val['scorers']?.map(
+        (scorerRefUri: string) => parseRef(scorerRefUri).artifactName
+      ) || []
     );
+  }, [monitor]);
+
+  const {result: existingScorerObjects} = useRootObjectVersions({
+    entity,
+    project,
+    filter: {
+      objectIds: scorerIds,
+      latestOnly: true,
+    },
+    skip: !monitor || scorerIds.length === 0,
+  });
+
+  useMemo(() => {
     setMonitorName(monitor?.val['name'] || '');
     setDescription(monitor?.val['description'] || '');
     setSamplingRate((monitor?.val['sampling_rate'] || 0.1) * 100);
     setFilter({opVersionRefs: monitor?.val['op_names'] || []});
-    setScorers(existingScorers);
+    setScorers(existingScorerObjects || []);
     setActive(monitor?.val['active'] || false);
     setFilterModel(
       queryToGridFilterModel(monitor?.val['query']) || {
@@ -231,6 +252,20 @@ export const CreateMonitorDrawer = ({
     project,
     scorerCreate,
   ]);
+
+  const scorerForms = useMemo(() => {
+    return (
+      <>
+        {scorers.map((scorer, index) => {
+          const ScorerForm = SCORER_FORMS.get(scorer.val['_type']);
+          if (!ScorerForm) {
+            return null;
+          }
+          return <ScorerForm key={index} />;
+        })}
+      </>
+    );
+  }, [scorers]);
 
   return (
     <Drawer
@@ -400,7 +435,7 @@ export const CreateMonitorDrawer = ({
                       <FieldName name="Scorers" />
                       <Autocomplete
                         multiple
-                        options={Object.values(BuiltInScorers)}
+                        options={Array.from(SCORER_FORMS.keys())}
                         sx={{width: '100%'}}
                         value={scorers.map(scorer => scorer.name)}
                         onChange={(
@@ -422,6 +457,7 @@ export const CreateMonitorDrawer = ({
                         }}
                       />
                     </Box>
+                    {scorerForms}
                   </Box>
                 </Box>
               </Box>
@@ -447,13 +483,5 @@ export const CreateMonitorDrawer = ({
         </Box>
       </Tailwind>
     </Drawer>
-  );
-};
-
-const FieldName = ({name}: {name: string}) => {
-  return (
-    <Typography sx={typographyStyle} className="mb-8 font-semibold">
-      {name}
-    </Typography>
   );
 };
