@@ -66,19 +66,14 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const dropdownRef = useRef<HTMLUListElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Set default value to 1mo if no valid date
+  // Initialize input value from prop value
   useEffect(() => {
-    if (!value) {
-      const defaultDate = parseDate('1mo');
-      if (defaultDate) {
-        const localDate = formatDate(defaultDate);
-        onChange(localDate);
-        setInputValue(localDate);
-      }
+    if (value && value !== inputValue) {
+      setInputValue(value);
     }
-    // Only run on first render
+    // Only run when value changes from parent
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [value]);
 
   // Add analytics hook
   useFireAnalyticsForDateFilterDropdownUsed(entity, project, inputValue, value);
@@ -128,8 +123,9 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
         onChange(formattedDate);
         setIsInvalid(false);
       } else {
+        // Don't update the filter state when input is invalid
+        // Just mark it as invalid and keep the current input value
         setIsInvalid(true);
-        onChange('');
       }
     },
     [onChange]
@@ -142,7 +138,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       }
       debounceTimeoutRef.current = setTimeout(() => {
         parseAndUpdateDate(newInputValue);
-      }, 500);
+      }, 1000);
     },
     [parseAndUpdateDate]
   );
@@ -167,6 +163,26 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     );
     if (!isPredefined) {
       setSelectedSuggestion(null);
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      // Clear any pending debounced parse
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      // Immediately parse the current input value
+      parseAndUpdateDate(inputValue, true);
+      setDropdownVisible(false);
+      if (inputRef.current) {
+        inputRef.current.blur();
+      }
+    } else if (event.key === 'Escape') {
+      setDropdownVisible(false);
+      if (inputRef.current) {
+        inputRef.current.blur();
+      }
     }
   };
 
@@ -283,6 +299,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
             aria-label="Date input"
             value={inputValue}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
             onFocus={() => setDropdownVisible(true)}
             onBlur={event => {
               if (
@@ -292,6 +309,13 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
                 setDropdownVisible(false);
               }
               setIsInputFocused(false);
+
+              // When user leaves the input, immediately parse what they've typed
+              // Clear any pending debounced parse first
+              if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+              }
+              parseAndUpdateDate(inputValue, true);
             }}
             onMouseEnter={() => setIsInputHovered(true)}
             onMouseLeave={() => setIsInputHovered(false)}
