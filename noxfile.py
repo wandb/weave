@@ -95,7 +95,7 @@ def tests(session, shard):
     session.chdir("tests")
 
     env = {
-        k: session.env.get(k)
+        k: session.env.get(k) or os.getenv(k)
         for k in [
             "WEAVE_SENTRY_ENV",
             "CI",

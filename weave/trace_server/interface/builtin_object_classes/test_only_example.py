@@ -12,6 +12,13 @@ class TestOnlyNestedBaseObject(base_object_def.BaseObject):
     b: int
 
 
+class TestOnlyInheritedBaseObject(TestOnlyNestedBaseObject):
+    """A builtin object that inherits from another builtin object for testing inheritance."""
+
+    c: int
+    additional_field: str = "default_value"
+
+
 class TestOnlyExample(base_object_def.BaseObject):
     primitive: int
     nested_base_model: TestOnlyNestedBaseModel
@@ -24,4 +31,4 @@ class TestOnlyExample(base_object_def.BaseObject):
     nested_base_object: base_object_def.RefStr
 
 
-__all__ = ["TestOnlyExample", "TestOnlyNestedBaseObject"]
+__all__ = ["TestOnlyExample", "TestOnlyNestedBaseObject", "TestOnlyInheritedBaseObject"]
