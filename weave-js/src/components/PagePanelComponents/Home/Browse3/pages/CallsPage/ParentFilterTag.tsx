@@ -110,6 +110,19 @@ export const ParentFilterTagInner = ({
   const truncatedId = parentCall.callId.slice(-4);
   const label = `${parentCall.displayName} (${truncatedId})`;
 
+  // Wrapper to prevent wrapping and ensure single line display
+  const NoWrapWrapper: React.FC<{children: React.ReactNode}> = ({children}) => (
+    <div
+      style={{
+        maxWidth: '300px',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      }}>
+      {children}
+    </div>
+  );
+
   return (
     <>
       {buttonChangeEval}
@@ -118,6 +131,7 @@ export const ParentFilterTagInner = ({
         truncatedPart="middle"
         color="moon"
         label={`Parent: ${label}`}
+        Wrapper={NoWrapWrapper}
         removeAction={
           <RemoveAction
             onClick={(e: React.SyntheticEvent) => {
