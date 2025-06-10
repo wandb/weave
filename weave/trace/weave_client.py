@@ -1534,6 +1534,22 @@ class WeaveClient:
 
             # Find all feedback objects with a specific reaction.
             client.get_feedback(reaction="👍", limit=10)
+
+            # Find all feedback objects with a specific feedback type with
+            # mongo-style query.
+            from weave.trace_server.interface.query import Query
+
+            query = Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "feedback_type"},
+                            {"$literal": "wandb.reaction.1"},
+                        ],
+                    }
+                }
+            )
+            client.get_feedback(query=query)
             ```
 
         Args:
@@ -1559,7 +1575,7 @@ class WeaveClient:
                 ],
             }
         elif isinstance(query, Query):
-            expr = query.expr_.dict()
+            expr = query.expr_
 
         if reaction:
             expr = {
