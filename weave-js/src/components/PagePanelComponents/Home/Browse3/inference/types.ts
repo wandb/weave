@@ -104,6 +104,7 @@ export type SelectedState = {
 export type InferenceContextType = {
   isLoggedIn: boolean;
   isInferenceEnabled: boolean;
+  availabilityMessage: string;
   playgroundEntity: string;
   playgroundProject: string;
   projectExists: boolean | undefined;

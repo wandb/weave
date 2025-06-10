@@ -441,6 +441,15 @@ def _get_direct_ref(obj: Any) -> Ref | None:
     return get_ref(obj)
 
 
+def _remove_empty_ref(obj: ObjectRecord) -> ObjectRecord:
+    if hasattr(obj, "ref"):
+        if obj.ref != None:
+            raise ValueError(f"Unexpected ref in object record: {obj}")
+        else:
+            del obj.__dict__["ref"]
+    return obj
+
+
 def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, Ref):
         return obj
@@ -448,12 +457,20 @@ def map_to_refs(obj: Any) -> Any:
         return ref
 
     if isinstance(obj, ObjectRecord):
-        return obj.map_values(map_to_refs)
+        # Here, we expect ref to be empty since it would have short circuited
+        # above with `_get_direct_ref`
+        return _remove_empty_ref(obj.map_values(map_to_refs))
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
         obj_record = pydantic_object_record(obj)
+        # Here, we expect ref to be empty since it would have short circuited
+        # above with `_get_direct_ref`
+        obj_record = _remove_empty_ref(obj_record)
         return obj_record.map_values(map_to_refs)
     elif dataclasses.is_dataclass(obj):
         obj_record = dataclass_object_record(obj)
+        # Here, we expect ref to be empty since it would have short circuited
+        # above with `_get_direct_ref`
+        obj_record = _remove_empty_ref(obj_record)
         return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
         return obj.ref
@@ -930,10 +947,7 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
-        if parallelism_upload:
-            self.future_executor_fastlane = FutureExecutor(
-                max_workers=parallelism_upload
-            )
+        self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
