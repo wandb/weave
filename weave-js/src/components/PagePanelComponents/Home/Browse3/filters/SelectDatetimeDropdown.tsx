@@ -193,8 +193,8 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     if (date) {
       const formattedDate = formatDate(date);
       setInputValue(formattedDate);
-      onChange(formattedDate);
       setIsInvalid(false);
+      // Don't auto update the date until the calendar is closed
     }
   };
 
@@ -204,9 +204,15 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   };
 
   // Add handler for closing when Ok button is clicked
-  const handleAccept = (date: Date | null) => {
+  const handleClose = (date: Date | null) => {
+    setIsCalendarOpen(false);
+    setDropdownVisible(false);
+    if (inputRef.current) {
+      inputRef.current.blur();
+    }
     if (date) {
-      setIsCalendarOpen(false);
+      const formattedDate = formatDate(date);
+      parseAndUpdateDate(formattedDate, true);
     }
   };
 
@@ -351,11 +357,12 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
           />
           <DateTimePicker
             open={isCalendarOpen}
-            onClose={() => setIsCalendarOpen(false)}
+            onClose={() => handleClose(null)}
             value={new Date(inputValue) ?? null}
             onChange={handleDateChange}
-            onAccept={handleAccept}
+            onAccept={handleClose}
             reduceAnimations
+            closeOnSelect={false}
             slotProps={{
               textField: {
                 style: {display: 'none'},
