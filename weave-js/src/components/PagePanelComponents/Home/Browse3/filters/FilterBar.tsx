@@ -457,10 +457,8 @@ export const FilterBar = ({
             <div className="grid grid-cols-[auto_auto_auto_30px] gap-4">
               {(() => {
                 return localFilterModel.items.map((item, index) => {
-                  // Check if this is the first datetime filter after sorting
                   const isFirstDatetimeFilter =
                     index === 0 && getFieldType(item.field) === 'datetime';
-
                   return (
                     <FilterRow
                       key={item.id}
