@@ -6,6 +6,7 @@ import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
 import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
@@ -52,8 +53,8 @@ export const CompareEvaluationsPage: React.FC<
     <SimplePageLayout
       title={
         props.evaluationCallIds.length === 1
-          ? 'Evaluation Results'
-          : 'Compare Evaluations'
+          ? 'Evaluation results'
+          : 'Compare evaluations'
       }
       hideTabsIfSingle
       tabs={[
@@ -215,38 +216,45 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
                   alignItems: 'flex-start',
                   gridGap: STANDARD_PADDING,
                 }}>
-                <SummaryPlots
-                  state={state}
-                  setSelectedMetrics={setSelectedMetrics}
-                />
+                {Object.keys(state.summary.evaluationCalls).length > 1 && (
+                  <SummaryPlots
+                    state={state}
+                    setSelectedMetrics={setSelectedMetrics}
+                  />
+                )}
                 <ScorecardSection state={state} />
                 <Tailwind style={{width: '100%'}}>
-                  <div className="px-16">
-                    <div className="flex w-full flex-col items-center gap-3 rounded-lg border border-dashed border-moon-300 bg-moon-50 p-16">
-                      <Icon name="table" size="large" color="moon-500 mb-4" />
-                      <div className="mb-4 flex flex-col items-center">
-                        <p className="text-center font-semibold">
-                          Looking for your evaluation results?
-                        </p>
-                        <p className="text-center text-moon-500">
-                          You can find it in our new results tab.
-                        </p>
-                      </div>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setTabValue('results')}>
-                        Review evaluation results
-                      </Button>
-                    </div>
-                    <div className="h-16"></div>
-                  </div>
-                </Tailwind>
+<div className="px-16">
+  <div className="flex w-full flex items-center gap-3 rounded-lg bg-moon-100 px-16 py-8">
+    <Icon name="table" size="large" color="moon-500 mb-4" />
+    <p className="text-[14px] ml-[8px] font-semibold">
+      Looking for your evaluation results?
+    </p>
+    <p className="text-[14px] ml-[8px] mr-auto text-moon-500">
+      You can find it in our new results tab.
+    </p>
+    <Button
+      variant="ghost"
+      onClick={() => setTabValue('results')}>
+      Review evaluation results
+    </Button>
+  </div>
+  <div className="h-16"></div>
+</div>
+</Tailwind>
               </VerticalBox>
             ),
           },
           {
             value: 'results',
-            label: 'Results',
+            label: (
+              <>
+                Dataset results
+                <Tailwind>
+                  <Pill label="New" color="gold" className="ml-2" />
+                </Tailwind>
+              </>
+            ) as any,
             loading: resultsLoading,
             content: (
               <VerticalBox
