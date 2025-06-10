@@ -9,6 +9,7 @@ import {Button} from '../../../../../Button';
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {CallsTable} from '../CallsPage/CallsTable';
+import {isPredictAndScoreOp} from '../common/heuristics';
 import {CallLink} from '../common/Links';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -101,10 +102,18 @@ export const CallDetails: FC<{
     columns,
   });
 
-  const {multipleChildCallOpRefs} = useMemo(
-    () => callGrouping(!childCalls.loading ? childCalls.result ?? [] : []),
-    [childCalls.loading, childCalls.result]
-  );
+  const {multipleChildCallOpRefs} = useMemo(() => {
+    const result = callGrouping(
+      !childCalls.loading ? childCalls.result ?? [] : []
+    );
+    // Sort them so predict_and_score ops appear first
+    result.multipleChildCallOpRefs.sort((a, b) => {
+      if (isPredictAndScoreOp(a)) return -1;
+      if (isPredictAndScoreOp(b)) return 1;
+      return 0;
+    });
+    return result;
+  }, [childCalls.loading, childCalls.result]);
   const {baseRouter} = useWeaveflowRouteContext();
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const history = useHistory();

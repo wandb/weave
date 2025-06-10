@@ -5,10 +5,14 @@ from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
 from typing import Callable, Generic, TypeVar
 
+import sentry_sdk
+
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
+
+HEALTH_CHECK_INTERVAL = 5.0  # seconds
 
 
 class AsyncBatchProcessor(Generic[T]):
@@ -36,12 +40,11 @@ class AsyncBatchProcessor(Generic[T]):
         self.queue: Queue[T] = Queue(maxsize=max_queue_size)
         self.lock = Lock()
         self.stop_accepting_work_event = Event()
-        self.processing_thread = Thread(target=self._process_batches)
-        self.processing_thread.daemon = True
-        self.processing_thread.start()
 
-        # TODO: Probably should include a health check thread here.  It will revive the
-        # processing thread if that thread dies.
+        # Processing Thread
+        self.processing_thread = start_thread(self._process_batches)
+        # Health check thread, to revive the processing thread if it dies
+        self.health_check_thread = start_thread(self._health_check)
 
         # TODO: Probably should include some sort of local write buffer.  It might not need
         # to be here, but it should exist.  That handles 2 cases:
@@ -68,10 +71,13 @@ class AsyncBatchProcessor(Generic[T]):
                 try:
                     self.queue.put_nowait(item)
                 except Full:
+                    # Check if the health check has died, restart it if so
+                    self._ensure_health_check_alive()
+
                     # TODO: This is probably not what you want, but it will prevent OOM for now.
-                    logger.warning(
-                        f"Queue is full.  Dropping item.  Max queue size: {self.queue.maxsize}"
-                    )
+                    error = f"Queue is full.  Dropping item.  Max queue size: {self.queue.maxsize}"
+                    logger.warning(error)
+                    sentry_sdk.capture_message(error)
 
     def _get_next_batch(self) -> list[T]:
         batch: list[T] = []
@@ -111,15 +117,55 @@ class AsyncBatchProcessor(Generic[T]):
         Any new items enqueued after this call will not be processed!"""
         self.stop_accepting_work_event.set()
         self.processing_thread.join()
+        self.health_check_thread.join()
 
     def accept_new_work(self) -> None:
         """Resumes accepting new work."""
         self.stop_accepting_work_event.clear()
         # Start a new processing thread
-        self.processing_thread = Thread(target=self._process_batches)
-        self.processing_thread.daemon = True
-        self.processing_thread.start()
+        self.processing_thread = start_thread(self._process_batches)
+        # Restart health check thread
+        self.health_check_thread = start_thread(self._health_check)
 
     def is_accepting_new_work(self) -> bool:
         """Returns True if the processor is accepting new work."""
         return not self.stop_accepting_work_event.is_set()
+
+    def _ensure_health_check_alive(self) -> None:
+        """Ensures the health check thread is alive, restarts if needed."""
+        if not self.health_check_thread.is_alive() and self.is_accepting_new_work():
+            logger.warning("Health check thread died, attempting to revive it")
+            try:
+                self.health_check_thread = start_thread(self._health_check)
+                logger.info("Health check thread successfully revived")
+            except Exception as e:
+                logger.exception(f"Failed to revive health check thread: {e}")
+                sentry_sdk.capture_exception(e)
+
+    def _health_check(self) -> None:
+        """Health check thread that monitors and revives the processing thread if it dies."""
+        while self.is_accepting_new_work():
+            time.sleep(HEALTH_CHECK_INTERVAL)
+
+            # If we're shutting down, don't revive
+            if self.stop_accepting_work_event.is_set():
+                break
+
+            # Check if processing thread is dead
+            if not self.processing_thread.is_alive():
+                logger.warning("Processing thread died, attempting to revive it")
+                try:
+                    # Create and start a new processing thread
+                    self.processing_thread = start_thread(self._process_batches)
+                    logger.info("Processing thread successfully revived")
+                except Exception as e:
+                    logger.exception(f"Failed to revive processing thread: {e}")
+                    sentry_sdk.capture_exception(e)
+
+
+def start_thread(target: Callable[[], None]) -> Thread:
+    """Starts a thread and returns it."""
+    thread = Thread(target=target)
+    thread.daemon = True
+    thread.start()
+    return thread
