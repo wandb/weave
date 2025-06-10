@@ -16,7 +16,11 @@ import ReactMarkdown from 'react-markdown';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
-import {useClosePeek, useWeaveflowCurrentRouteContext, useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
+import {
+  useClosePeek,
+  useWeaveflowRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {
   LeaderboardColumnOrderType,
@@ -24,7 +28,10 @@ import {
 } from '../../views/Leaderboard/LeaderboardGrid';
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
-import {SimplePageLayout, SimplePageLayoutContext} from '../common/SimplePageLayout';
+import {
+  SimplePageLayout,
+  SimplePageLayoutContext,
+} from '../common/SimplePageLayout';
 import {
   useBaseObjectInstances,
   useCreateBuiltinObjectInstance,
@@ -46,32 +53,33 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const {isEditor} = useIsEditor(props.entity);
   const [isEditing, setIsEditing] = useState(false);
   const simplePageLayoutContext = useContext(SimplePageLayoutContext);
-  
+
   useEffect(() => {
     if (isEditor && props.openEditorOnMount) {
       setIsEditing(true);
     }
   }, [isEditor, props.openEditorOnMount]);
-  
+
   // Show buttons in headerExtra when not peeking
-  const headerExtra = isEditor && !isPeeking ? (
-    <Box display="flex" gap="4px" marginRight="16px" alignItems="center">
-      <EditLeaderboardButton
-        entity={props.entity}
-        project={props.project}
-        leaderboardName={props.leaderboardName}
-        isEditing={isEditing}
-        setIsEditing={setIsEditing}
-        isPeeking={isPeeking}
-      />
-      <DeleteLeaderboardButton
-        entity={props.entity}
-        project={props.project}
-        leaderboardName={props.leaderboardName}
-      />
-    </Box>
-  ) : null;
-  
+  const headerExtra =
+    isEditor && !isPeeking ? (
+      <Box display="flex" gap="4px" marginRight="16px" alignItems="center">
+        <EditLeaderboardButton
+          entity={props.entity}
+          project={props.project}
+          leaderboardName={props.leaderboardName}
+          isEditing={isEditing}
+          setIsEditing={setIsEditing}
+          isPeeking={isPeeking}
+        />
+        <DeleteLeaderboardButton
+          entity={props.entity}
+          project={props.project}
+          leaderboardName={props.leaderboardName}
+        />
+      </Box>
+    ) : null;
+
   // When peeking and user is editor, prepend buttons to headerSuffix
   const contextValue = useMemo(() => {
     if (isPeeking && isEditor) {
@@ -100,8 +108,16 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
       };
     }
     return simplePageLayoutContext;
-  }, [isPeeking, isEditor, simplePageLayoutContext, props.entity, props.project, props.leaderboardName, isEditing]);
-  
+  }, [
+    isPeeking,
+    isEditor,
+    simplePageLayoutContext,
+    props.entity,
+    props.project,
+    props.leaderboardName,
+    isEditing,
+  ]);
+
   return (
     <SimplePageLayoutContext.Provider value={contextValue}>
       <SimplePageLayout
@@ -364,26 +380,48 @@ const EditLeaderboardButton: FC<{
   isEditing: boolean;
   setIsEditing: (isEditing: boolean) => void;
   isPeeking?: boolean;
-}> = ({entity, project, leaderboardName, isEditing, setIsEditing, isPeeking}) => {
+}> = ({
+  entity,
+  project,
+  leaderboardName,
+  isEditing,
+  setIsEditing,
+  isPeeking,
+}) => {
   const history = useHistory();
   const {baseRouter} = useWeaveflowRouteContext();
   const closePeek = useClosePeek();
-  
+
   const handleClick = useCallback(() => {
     if (isPeeking) {
       // When in peek mode, close the peek drawer first
       closePeek();
       // Then navigate to the full page with edit mode enabled after a brief delay
       setTimeout(() => {
-        const editUrl = baseRouter.leaderboardsUIUrl(entity, project, leaderboardName, true);
+        const editUrl = baseRouter.leaderboardsUIUrl(
+          entity,
+          project,
+          leaderboardName,
+          true
+        );
         history.push(editUrl);
       }, 0);
     } else {
       // When not in peek mode, just toggle edit mode
       setIsEditing(!isEditing);
     }
-  }, [isPeeking, isEditing, setIsEditing, baseRouter, entity, project, leaderboardName, history, closePeek]);
-  
+  }, [
+    isPeeking,
+    isEditing,
+    setIsEditing,
+    baseRouter,
+    entity,
+    project,
+    leaderboardName,
+    history,
+    closePeek,
+  ]);
+
   return (
     <Box
       sx={{

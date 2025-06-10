@@ -20,8 +20,8 @@ import {
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {useIsEditor} from './LeaderboardPage';
 import {DeleteLeaderboardButton} from './LeaderboardDeleteButton';
+import {useIsEditor} from './LeaderboardPage';
 
 const Container = styled.div`
   width: 100%;
