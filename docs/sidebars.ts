@@ -107,6 +107,7 @@ const sidebars: SidebarsConfig = {
             "guides/evaluation/builtin_scorers",
             "guides/evaluation/weave_local_scorers",
             "guides/evaluation/evaluation_logger",
+            "guides/core-types/leaderboards"
           ]
         },
       ],

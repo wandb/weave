@@ -1,186 +1,227 @@
 # Leaderboards
 
-Weave Leaderboards make it easy to evaluate and compare multiple models against multiple criteria, whether you're testing raw accuracy, numerical prediction quality, or subjective reasoning. They’re ideal for:
+Weave _Leaderboards_ make it easy to evaluate and compare multiple models across multiple metrics—whether you're measuring accuracy, generation quality, latency, or custom evaluation logic. They provide a unified way to visualize model performance, track changes over time, and align on team-wide benchmarks.
+
+Leaderboards are ideal for:
 
 - Prompt engineering comparisons
 - RAG and fine-tuned model evaluation
-- Tracking performance over time
-- Aligning team-wide benchmarks
+- Tracking model performance regressions
+- Coordinating shared evaluation workflows
+
+You can create leaderboards either through the [Weave UI](#ui) or [in Python](#python).
+
+## Create a Leaderboard
+
+You can create a leaderboard via the [Weave UI](#ui) or [programmatically](#python).
+
+### UI
+
+You can create and customize leaderboards directly in the Weave UI:
+
+1. In the Weave UI, Navigate to the **Leaders** section. If it's not visible, click **More** → **Leaders**.
+2. Click **+ New Leaderboard**.
+3. In the **Leaderboard Title** field, enter a descriptive name (e.g., `summarization-benchmark-v1`).
+4. Optionally, add a description to explain what this leaderboard compares.
+5. [Add columns](#add-columns) to define which evaluations and metrics to display.
+6. Once you're happy with the layout, your leaderboard is saved and ready to publish.
+
+#### Add Columns
+
+Each column represents a metric from a specific evaluation. To configure a column, set the following columns:
+
+- **Evaluation**: Select an evaluation run from the dropdown (must be previously created).
+- **Scorer**: Choose a scoring function (e.g., `jaccard_similarity`, `simple_accuracy`) used in that evaluation.
+- **Metric**: Choose a summary metric to display (e.g., `mean`, `true_fraction`, etc.).
+
+To add more columns, click **+ Add Column**.
+
+Click the three-dot menu (`⋯`) on the right of any column to:
+
+- **Move before / after** – Reorder columns
+- **Duplicate** – Copy the column definition
+- **Delete** – Remove the column
+- **Sort ascending** – Set the default sort for the leaderboard (click again to toggle descending)
+
+### Python
 
 :::tip
-Looking for a runnable example? See the [Leaderboard Quickstart Notebook](https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart).
+Looking for a complete, runnable code sample? See the [End-to-End Python example](#end-to-end-python-example).
 :::
 
-## Build a Leaderboard
+Follow these steps to create and publish a leaderboard:
 
-### Set up
+1. Define a test dataset. You can use the built-in [`Dataset`](datasets.md), or define a list of inputs and targets manually:
 
-1. First, create a test dataset. You can either [use the built-in Weave `Dataset`](./datasets.md), or create a list of objects:
+   ```python
+   dataset = [
+       {"input": "...", "target": "..."},
+       ...
+   ]
+   ```
 
-    ```python
-    dataset = [
-        {"input": "some_input", "target": "expected_output"},
-        # Add your data rows here
-    ]
-    ```
+2. Define one or more [scorers](../evaluation/scorers.md):
 
-2. Create an [`Evaluation`](../core-types/evaluations.md) that uses the dataset:
+   ```python
+   @weave.op
+   def jaccard_similarity(target: str, output: str) -> float:
+       ...
+   ```
 
-    ```python
-    evaluation = Evaluation(
-        name="My Evaluation",
-        dataset=dataset,
-        scorers=[...],  # Define below
-    )
-    ```
+3. Create an [`Evaluation`](../core-types/evaluations.md):
 
-3. Define the [scoring function(s)](../evaluation/scorers.md) for your Evaluation: 
+   ```python
+   evaluation = weave.Evaluation(
+       name="My Eval",
+       dataset=dataset,
+       scorers=[jaccard_similarity],
+   )
+   ```
 
-    ```python
-    @weave.op
-    def simple_accuracy(target, output):
-        return target == output
-    ```
+4. Define models to be evaluated:
 
-4. Define any number of models and run them against the evaluation:
+   ```python
+   @weave.op
+   def my_model(input: str) -> str:
+       ...
+   ```
 
-    ```python
-    @weave.op
-    def my_model(input):
-        return some_output_based_on(input)
+5. Run the evaluation:
 
-    await evaluation.evaluate(my_model)
-    ```
+   ```python
+    async def run_all():
+        await evaluation.evaluate(model_vanilla)
+        await evaluation.evaluate(model_humanlike)
+        await evaluation.evaluate(model_messy)
 
-All evaluations are logged and tracked in Weave automatically.
+   asyncio.run(run_all())
+   ```
 
-### Create the Leaderboard
+6. Create the leaderboard:
 
-Once you have evaluations, define a leaderboard that compares them across one or more metrics.
+   ```python
+   spec = leaderboard.Leaderboard(
+       name="My Leaderboard",
+       description="Evaluating models on X task",
+       columns=[
+           leaderboard.LeaderboardColumn(
+               evaluation_object_ref=get_ref(evaluation).uri(),
+               scorer_name="jaccard_similarity",
+               summary_metric_path="mean",
+           )
+       ]
+   )
+   ```
+
+7. Publish it:
+
+   ```python
+   weave.publish(spec)
+   ```
+
+8. Retrieve the results:
+
+   ```python
+   results = leaderboard.get_leaderboard_results(spec, client)
+   print(results)
+   ```
+
+## End-to-End Python example
+
+The following example demonstrates how to use Weave Evaluations and Leaderboards to compare three summarization models on a shared dataset using a custom metric. It creates a small benchmark, evaluates each model, scores them with [Jaccard similarity](https://www.learndatasci.com/glossary/jaccard-similarity/), and publishes the results to a Weave leaderboard.
 
 ```python
+import weave
 from weave.flow import leaderboard
 from weave.trace.ref_util import get_ref
+import asyncio
 
-my_leaderboard = leaderboard.Leaderboard(
-    name="My Model Comparison",
-    description="This leaderboard compares several models on key tasks.",
+client = weave.init("leaderboard-demo")
+
+dataset = [
+    {
+        "input": "Weave is a tool for building interactive LLM apps. It offers observability, trace inspection, and versioning.",
+        "target": "Weave helps developers build and observe LLM applications."
+    },
+    {
+        "input": "The OpenAI GPT-4o model can process text, audio, and vision inputs, making it a multimodal powerhouse.",
+        "target": "GPT-4o is a multimodal model for text, audio, and images."
+    },
+    {
+        "input": "The W&B team recently added native support for agents and evaluations in Weave.",
+        "target": "W&B added agents and evals to Weave."
+    }
+]
+
+@weave.op
+def jaccard_similarity(target: str, output: str) -> float:
+    target_tokens = set(target.lower().split())
+    output_tokens = set(output.lower().split())
+    intersection = len(target_tokens & output_tokens)
+    union = len(target_tokens | output_tokens)
+    return intersection / union if union else 0.0
+
+evaluation = weave.Evaluation(
+    name="Summarization Quality",
+    dataset=dataset,
+    scorers=[jaccard_similarity],
+)
+
+@weave.op
+def model_vanilla(input: str) -> str:
+    return input[:50]
+
+@weave.op
+def model_humanlike(input: str) -> str:
+    if "Weave" in input:
+        return "Weave helps developers build and observe LLM applications."
+    elif "GPT-4o" in input:
+        return "GPT-4o supports text, audio, and vision input."
+    else:
+        return "W&B added agent support to Weave."
+
+@weave.op
+def model_messy(input: str) -> str:
+    return "Summarizer summarize models model input text LLMs."
+
+async def run_all():
+    await evaluation.evaluate(model_vanilla)
+    await evaluation.evaluate(model_humanlike)
+    await evaluation.evaluate(model_messy)
+
+asyncio.run(run_all())
+
+spec = leaderboard.Leaderboard(
+    name="Summarization Model Comparison",
+    description="Evaluate summarizer models using Jaccard similarity on 3 short samples.",
     columns=[
         leaderboard.LeaderboardColumn(
             evaluation_object_ref=get_ref(evaluation).uri(),
-            scorer_name="simple_accuracy",
-            summary_metric_path="true_fraction",  # Adjust based on your scorer's output
+            scorer_name="jaccard_similarity",
+            summary_metric_path="mean",
         )
     ]
 )
 
-weave.publish(my_leaderboard)
+weave.publish(spec)
+
+results = leaderboard.get_leaderboard_results(spec, client)
+print(results)
 ```
 
-Calling `weave.publish` prints a link to the new leaderboard so you can open it
-in the browser. The underlying implementation uses `leaderboard_path` whenever
-the object being published is a `Leaderboard`.
+### View and interpret the Leaderboard
 
-### Python API
+Once you've run the script, follow these steps to view the leaderboard:
 
-Leaderboards are defined in `weave.flow.leaderboard`.
+1. In the **Weave UI**, go to the **Leaders** tab. If it's not visible, click **More**, then select **Leaders**.
+2. Click on the name of your leaderboard—e.g. `Summarization Model Comparison`.
 
-```python
-leaderboard.LeaderboardColumn(
-    evaluation_object_ref: str,
-    scorer_name: str,
-    summary_metric_path: str,
-    should_minimize: bool | None = None,
-)
-```
+You’ll see a leaderboard table, where each row represents one model (`model_humanlike`, `model_vanilla`, `model_messy`). The `mean` column shows the average Jaccard similarity between that model's output and the reference summaries.
 
-Retrieve aggregate scores with:
+![A Leaderboard in the Weave UI](imgs/leaderboard-example.png)
 
-```python
-results = leaderboard.get_leaderboard_results(my_leaderboard, client)
-```
+For this example:
 
-
-### View a Leaderboard in the UI
-
-Your leaderboard is now visible in the Weave UI:
-
-Navigate to **"Leaderboards"** in the sidebar to:
-
-- View and sort by metric values
-- Inspect individual model evaluations
-- Edit leaderboard structure via the UI or code
-
-
-## Interpret the Leaderboard
-
-Once your leaderboard is defined and published, the Weave UI presents a side-by-side comparison of models, datasets, and evaluation metrics — all in one table.
-
-### Rows: Models
-
-Each row represents a model you’ve evaluated. The model names are pulled from the `@weave.op` function names you used during evaluation.
-
-:::tip
-Use meaningful model names like `gpt_4_tuned_v1` or `no_rag_baseline` to make results easier to scan.
-:::
-
-### Columns: Metrics
-
-Each column represents a specific combination of:
-
-- ✅ **Evaluation** (e.g., a dataset or task)
-- ✅ **Scorer** (a function that computes correctness/error)
-- ✅ **Summary Metric** (a field path like `"true_fraction"` or `"mean"`)
-
-You configure these using `LeaderboardColumn`.
-
-Each cell shows the result of a specific model on a specific evaluation metric.
-
-
-###  Example interpretation
-
-The Quickstart notebook constructs a leaderboard with three metrics. One metric sets `should_minimize=True` so lower values rank higher. Here is a simplified definition:
-
-```python
-spec = leaderboard.Leaderboard(
-    name="Zip Code World Knowledge",
-    description="...",
-    columns=[
-        leaderboard.LeaderboardColumn(
-            evaluation_object_ref=get_ref(evaluations[0]).uri(),
-            scorer_name="check_concrete_fields",
-            summary_metric_path="state_match.true_fraction",
-        ),
-        leaderboard.LeaderboardColumn(
-            evaluation_object_ref=get_ref(evaluations[1]).uri(),
-            scorer_name="check_value_fields",
-            should_minimize=True,
-            summary_metric_path="avg_temp_f_err.mean",
-        ),
-        leaderboard.LeaderboardColumn(
-            evaluation_object_ref=get_ref(evaluations[2]).uri(),
-            scorer_name="check_subjective_fields",
-            summary_metric_path="correct_known_for.true_fraction",
-        ),
-    ],
-)
-```
-
-In the UI each row corresponds to a model and cells are color coded based on the metric value. Selecting a cell opens the evaluation run that produced it.
-###  Best practices
-
-| Practice                         | Why It Helps                                |
-| -------------------------------- | ------------------------------------------- |
-| Use descriptive scorer names     | Clarifies what each metric is measuring     |
-| Normalize your metric outputs    | Keeps values interpretable across columns   |
-| Use `should_minimize` for errors | Ensures correct ranking behavior            |
-| Include markdown descriptions    | Improves readability in the UI              |
-| Click into cell results          | Inspect underlying model outputs and traces |
-
----
-
-##  Learn more
-
--  [Leaderboard Quickstart Notebook](https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart)
--  [Evaluation API Reference](https://weave-docs.wandb.ai/guides/evaluation/)
--  [Built-in Scorers](https://weave-docs.wandb.ai/guides/evaluation/builtin_scorers)
+- `model_humanlike` performs the best, with \~46% overlap.
+- `model_vanilla` (a naive truncation) gets \~21%.
+- `model_messy` an intentionally bad model, scores \~2%.
