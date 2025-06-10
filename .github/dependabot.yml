@@ -1,0 +1,230 @@
+version: 2
+updates:
+  # Monitor Python dependencies in pyproject.toml
+  - package-ecosystem: "pip"
+    directory: "/"
+    target-branch: "andrew/dependabot" # TODO: remove when ready to merge
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone:
+        "America/New_York"
+        # Group minor and patch updates together to reduce PR noise
+    # Groups match the optional dependencies structure in pyproject.toml
+    groups:
+      # Core dependencies
+      core:
+        patterns:
+          - "pydantic*"
+          # - "wandb*"
+          # - "packaging*"
+          # - "tenacity*"
+          # - "emoji*"
+          # - "uuid-utils*"
+          # - "numpy*"
+          # - "rich*"
+          # - "click*"
+          # - "gql*"
+          # - "jsonschema*"
+          # - "diskcache*"
+          # - "nest-asyncio*"
+          # - "weave_server_sdk*"
+
+      # # Trace server dependencies
+      # trace_server:
+      #   patterns:
+      #     - "ddtrace*"
+      #     - "boto3*"
+      #     - "azure-storage-blob*"
+      #     - "google-cloud-storage*"
+      #     - "litellm*"
+      #     - "opentelemetry-proto*"
+      #     - "opentelemetry-semantic-conventions-ai*"
+      #     - "openinference-semantic-conventions*"
+
+      # # Testing dependencies
+      # test:
+      #   patterns:
+      #     - "nox*"
+      #     - "pytest*"
+      #     - "clickhouse_connect*"
+      #     - "fastapi*"
+      #     - "sqlparse*"
+      #     - "freezegun*"
+      #     - "eval_type_backport*"
+      #     - "vcrpy*"
+      #     - "flask*"
+      #     - "uvicorn*"
+      #     - "filelock*"
+      #     - "httpx*"
+      #     - "confluent-kafka*"
+      #     - "moto*"
+
+      # # Documentation dependencies
+      # docs:
+      #   patterns:
+      #     - "playwright*"
+      #     - "lazydocs*"
+      #     - "nbformat*"
+      #     - "nbconvert*"
+
+      # # Media support
+      # video_support:
+      #   patterns:
+      #     - "moviepy*"
+      #     - "pillow*"
+
+      # # AI/LLM integrations
+      # anthropic:
+      #   patterns:
+      #     - "anthropic*"
+
+      # cerebras:
+      #   patterns:
+      #     - "cerebras-cloud-sdk*"
+
+      # cohere:
+      #   patterns:
+      #     - "cohere*"
+
+      # crewai:
+      #   patterns:
+      #     - "crewai*"
+      #     - "crewai-tools*"
+
+      # dspy:
+      #   patterns:
+      #     - "dspy*"
+
+      # google_ai_studio:
+      #   patterns:
+      #     - "google-generativeai*"
+
+      # google_genai:
+      #   patterns:
+      #     - "google-genai*"
+
+      # groq:
+      #   patterns:
+      #     - "groq*"
+
+      # huggingface:
+      #   patterns:
+      #     - "huggingface-hub*"
+
+      # smolagents:
+      #   patterns:
+      #     - "smolagents*"
+      #     - "SQLAlchemy*"
+
+      # instructor:
+      #   patterns:
+      #     - "instructor*"
+
+      # langchain:
+      #   patterns:
+      #     - "langchain-core*"
+      #     - "langchain-openai*"
+      #     - "langchain-community*"
+      #     - "langchain-google-vertexai*"
+      #     - "langchain-google-genai*"
+      #     - "langchain-anthropic*"
+      #     - "chromadb*"
+      #     - "pysqlite3*"
+      #     - "opentelemetry-exporter-otlp*"
+
+      # langchain_nvidia_ai_endpoints:
+      #   patterns:
+      #     - "langchain-nvidia-ai-endpoints*"
+
+      # litellm:
+      #   patterns:
+      #     - "litellm*"
+
+      # llamaindex:
+      #   patterns:
+      #     - "llama-index*"
+
+      # mistral0:
+      #   patterns:
+      #     - "mistralai*"
+
+      # mistral1:
+      #   patterns:
+      #     - "mistralai*"
+
+      # scorers:
+      #   patterns:
+      #     - "Levenshtein*"
+      #     - "sentence-transformers*"
+      #     - "scikit-learn*"
+      #     - "transformers*"
+      #     - "torch*"
+      #     - "sentencepiece*"
+      #     - "pip*"
+      #     - "presidio-analyzer*"
+      #     - "presidio-anonymizer*"
+
+      # notdiamond:
+      #   patterns:
+      #     - "notdiamond*"
+
+      # openai:
+      #   patterns:
+      #     - "openai*"
+
+      # openai_agents:
+      #   patterns:
+      #     - "openai-agents*"
+
+      # presidio:
+      #   patterns:
+      #     - "presidio-analyzer*"
+      #     - "presidio-anonymizer*"
+
+      # modal:
+      #   patterns:
+      #     - "modal*"
+      #     - "python-dotenv*"
+
+      # mcp:
+      #   patterns:
+      #     - "mcp*"
+
+      # vertexai:
+      #   patterns:
+      #     - "vertexai*"
+      #     - "shapely*"
+
+      # bedrock:
+      #   patterns:
+      #     - "boto3*"
+
+      # # Development dependencies
+      # dev:
+      #   patterns:
+      #     - "tomlkit*"
+      #     - "python-multipart*"
+
+      # # Pandas testing
+      # pandas-test:
+      #   patterns:
+      #     - "pandas*"
+    # Limit the number of open PRs
+    open-pull-requests-limit: 10
+    # Auto-approve minor and patch updates for low-risk dependencies
+    reviewers:
+      - "wandb/weave-team"
+    # Add prefix to PR titles
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    # Ignore major version updates by default - these will need manual review
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    # Allow version requirements to be updated
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
