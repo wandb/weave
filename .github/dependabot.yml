@@ -2,7 +2,7 @@ version: 2
 updates:
   # Monitor Python dependencies in pyproject.toml
   - package-ecosystem: "pip"
-    directory: "weave"
+    directory: "/weave"
     target-branch: "andrew/dependabot" # TODO: remove when ready to merge
     schedule:
       interval: "weekly"
