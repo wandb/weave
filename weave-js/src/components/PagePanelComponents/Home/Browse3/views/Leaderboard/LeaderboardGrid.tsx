@@ -196,27 +196,28 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
             selectedEvaluations.length < allAvailableEvaluationIds.length;
 
           return (
-              <Checkbox
-                size="small"
-                checked={
-                  selectedEvaluations.length === 0
-                    ? false
-                    : selectedEvaluations.length === allAvailableEvaluationIds.length
-                    ? true
-                    : 'indeterminate'
+            <Checkbox
+              size="small"
+              checked={
+                selectedEvaluations.length === 0
+                  ? false
+                  : selectedEvaluations.length ===
+                    allAvailableEvaluationIds.length
+                  ? true
+                  : 'indeterminate'
+              }
+              onCheckedChange={() => {
+                if (isAllSelected || isSomeSelected) {
+                  // Deselect all
+                  setSelectedEvaluations([]);
+                } else {
+                  // Select all (up to MAX_SELECT)
+                  setSelectedEvaluations(
+                    allAvailableEvaluationIds.slice(0, MAX_SELECT)
+                  );
                 }
-                onCheckedChange={() => {
-                  if (isAllSelected || isSomeSelected) {
-                    // Deselect all
-                    setSelectedEvaluations([]);
-                  } else {
-                    // Select all (up to MAX_SELECT)
-                    setSelectedEvaluations(
-                      allAvailableEvaluationIds.slice(0, MAX_SELECT)
-                    );
-                  }
-                }}
-              />
+              }}
+            />
           );
         },
         renderCell: (params: GridRenderCellParams) => {

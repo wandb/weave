@@ -261,7 +261,9 @@ export const LeaderboardPageContentInner: React.FC<
                 selected:
               </div>
               <CompareEvaluationsTableButton
-                buttonText={selectedEvaluations.length === 1 ? 'View' : 'Compare'}
+                buttonText={
+                  selectedEvaluations.length === 1 ? 'View' : 'Compare'
+                }
                 tooltipText="Compare metrics and examples for selected evaluations"
                 onClick={() => {
                   history.push(
