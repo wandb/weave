@@ -20,6 +20,7 @@ import {NotApplicable} from '../../../NotApplicable';
 import {SmallRef} from '../../../smallRef/SmallRef';
 import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
 import {CustomWeaveTypeProjectContext} from '../../../typeViews/CustomWeaveTypeDispatcher';
+import {FIELD_ID_PATH_SEPARATOR} from '../../CallsPage/callsTableColumnsUtil';
 import {
   OBJECT_ATTR_EDGE_NAME,
   WEAVE_PRIVATE_PREFIX,
@@ -82,13 +83,14 @@ export function prepareFlattenedDataForTable<T>(
     Object.keys(flattened).forEach(key => {
       let newKey = key;
 
-      // If the key ends with the expanded ref key, then we have 2 cases
-      if (key.endsWith('.' + EXPANDED_REF_REF_KEY)) {
+      // If the key ends with the expanded ref key, then we have 2 case
+      if (key.endsWith(FIELD_ID_PATH_SEPARATOR + EXPANDED_REF_REF_KEY)) {
         const keyRoot = newKey.slice(0, -EXPANDED_REF_REF_KEY.length - 1);
 
         // Case 1: the refVal is a primitive and we just need to toss away the ref key
         const refValIsPrimitive =
-          flattened[newKey + '.' + EXPANDED_REF_VAL_KEY] !== undefined;
+          flattened[newKey + FIELD_ID_PATH_SEPARATOR + EXPANDED_REF_VAL_KEY] !==
+          undefined;
         if (refValIsPrimitive) {
           return;
 
@@ -99,12 +101,18 @@ export function prepareFlattenedDataForTable<T>(
       }
 
       // Next, we remove all path parts that are the expanded ref val key
-      if (newKey.includes('.' + EXPANDED_REF_VAL_KEY)) {
-        newKey = newKey.replaceAll('.' + EXPANDED_REF_VAL_KEY, '');
+      if (newKey.includes(FIELD_ID_PATH_SEPARATOR + EXPANDED_REF_VAL_KEY)) {
+        newKey = newKey.replaceAll(
+          FIELD_ID_PATH_SEPARATOR + EXPANDED_REF_VAL_KEY,
+          ''
+        );
       }
 
       // Finally, we remove any keys that start with underscore
-      if (newKey.includes('._') || newKey.startsWith('_')) {
+      if (
+        newKey.includes(FIELD_ID_PATH_SEPARATOR + '_') ||
+        newKey.startsWith('_')
+      ) {
         return;
       }
 
@@ -112,7 +120,8 @@ export function prepareFlattenedDataForTable<T>(
       cleaned[newKey] = flattened[key];
     });
 
-    return {...r, ...cleaned} as T & {[key: string]: string};
+    return cleaned as T & {[key: string]: string};
+    // return {...r, ...cleaned} as T & {[key: string]: string};
   });
 }
 /**
@@ -145,12 +154,14 @@ function replaceTableRefsInFlattenedData(flattened: Record<string, any>) {
         if (isWeaveObjectRef(parsedRef)) {
           if (parsedRef.weaveKind === 'table') {
             let parentRef: string | null = null;
-            const lookupPath = key.split('.');
+            const lookupPath = key.split(FIELD_ID_PATH_SEPARATOR);
             if (lookupPath.length > 0) {
               const attr = lookupPath.pop()!;
               while (lookupPath.length > 0) {
                 const parentKey =
-                  lookupPath.join('.') + '.' + EXPANDED_REF_REF_KEY;
+                  lookupPath.join(FIELD_ID_PATH_SEPARATOR) +
+                  FIELD_ID_PATH_SEPARATOR +
+                  EXPANDED_REF_REF_KEY;
                 if (parentKey in flattened) {
                   const parentVal = flattened[parentKey];
                   if (isWeaveRef(parentVal)) {
@@ -236,7 +247,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         node.renderHeaderGroup = () => {
           return (
             <CollapseHeader
-              headerName={key.split('.').slice(-1)[0]}
+              headerName={key.split(FIELD_ID_PATH_SEPARATOR).slice(-1)[0]}
               field={key}
               onCollapse={onCollapse}
             />
@@ -246,7 +257,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
         node.renderHeaderGroup = () => {
           return (
             <ExpandHeader
-              headerName={key.split('.').slice(-1)[0]}
+              headerName={key.split(FIELD_ID_PATH_SEPARATOR).slice(-1)[0]}
               field={key}
               hasExpand
               onExpand={onExpand}
@@ -267,7 +278,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       headerName: key,
       display: 'flex',
       renderHeader: () => {
-        return <div>{key.split('.').slice(-1)[0]}</div>;
+        return <div>{key.split(FIELD_ID_PATH_SEPARATOR).slice(-1)[0]}</div>;
       },
       valueGetter: (unused: any, row: any) => {
         const val = valueForKey(row, key);
@@ -335,7 +346,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       col.renderHeader = () => {
         return (
           <CollapseHeader
-            headerName={key.split('.').slice(-1)[0]}
+            headerName={key.split(FIELD_ID_PATH_SEPARATOR).slice(-1)[0]}
             field={key}
             onCollapse={onCollapse}
           />
@@ -345,7 +356,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       col.renderHeader = () => {
         return (
           <ExpandHeader
-            headerName={key.split('.').slice(-1)[0]}
+            headerName={key.split(FIELD_ID_PATH_SEPARATOR).slice(-1)[0]}
             field={key}
             hasExpand
             onExpand={onExpand}

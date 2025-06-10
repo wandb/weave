@@ -79,6 +79,7 @@ import {
   RefreshButton,
 } from './CallsTableButtons';
 import {useCallsTableColumns} from './callsTableColumns';
+import {FIELD_ID_PATH_SEPARATOR} from './callsTableColumnsUtil';
 import {
   ALL_TRACES_OR_CALLS_REF_KEY,
   getEffectiveFilter,
@@ -97,15 +98,15 @@ import {ParentFilterTag} from './ParentFilterTag';
 const MAX_SELECT = 100;
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
-  'attributes.weave',
-  'summary.weave.feedback',
-  'summary.status_counts',
+  `attributes${FIELD_ID_PATH_SEPARATOR}weave`,
+  `summary${FIELD_ID_PATH_SEPARATOR}weave${FIELD_ID_PATH_SEPARATOR}feedback`,
+  `summary${FIELD_ID_PATH_SEPARATOR}status_counts`,
   // attributes.python was logged for a short period of time
   // accidentally in v0.51.47. We can hide it for a while
   // and remove this after a few months (say Sept 2025)
-  'attributes.python',
+  `attributes${FIELD_ID_PATH_SEPARATOR}python`,
   'wb_run_id',
-  'attributes.otel_span',
+  `attributes${FIELD_ID_PATH_SEPARATOR}otel_span`,
 ];
 
 export const ALWAYS_PIN_LEFT_CALLS = ['CustomCheckbox'];
@@ -271,7 +272,7 @@ export const CallsTable: FC<{
         return true;
       }
       for (const refCol of expandedRefCols) {
-        if (col.startsWith(refCol + '.')) {
+        if (col.startsWith(refCol + FIELD_ID_PATH_SEPARATOR)) {
           return true;
         }
       }
@@ -360,11 +361,13 @@ export const CallsTable: FC<{
         // The acknowledge drawback of this approach is that we are not filtering by that
         // cell's value, but rather the entire object itself. This still might confuse users,
         // but is better than returning nothing.
-        const fieldParts = field.split('.');
+        const fieldParts = field.split(FIELD_ID_PATH_SEPARATOR);
         let ancestorField: string | null = null;
         let targetRef: string | null = null;
         for (let i = 1; i <= fieldParts.length; i++) {
-          const ancestorFieldCandidate = fieldParts.slice(0, i).join('.');
+          const ancestorFieldCandidate = fieldParts
+            .slice(0, i)
+            .join(FIELD_ID_PATH_SEPARATOR);
           if (expandedRefCols.has(ancestorFieldCandidate)) {
             const candidateRow = callsResult.find(
               row => row.traceCall?.id === rowId
@@ -374,7 +377,9 @@ export const CallsTable: FC<{
                 flattenObjectPreservingWeaveTypes(candidateRow);
               const targetRefCandidate =
                 flattenedCandidateRow[
-                  ancestorFieldCandidate + '.' + EXPANDED_REF_REF_KEY
+                  ancestorFieldCandidate +
+                    FIELD_ID_PATH_SEPARATOR +
+                    EXPANDED_REF_REF_KEY
                 ];
               if (targetRefCandidate != null) {
                 ancestorField = ancestorFieldCandidate;
