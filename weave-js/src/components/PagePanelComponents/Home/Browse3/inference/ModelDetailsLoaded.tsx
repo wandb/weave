@@ -197,7 +197,7 @@ export const ModelDetailsLoaded = ({
           </Button>
         </div>
       </div>
-      <div className="mb-8 mt-16 font-semibold">Model overview</div>
+      <div className="mb-8 mt-16 text-lg font-semibold">Model overview</div>
 
       <div className="mb-16 flex gap-10">
         <Tooltip
