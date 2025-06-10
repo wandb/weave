@@ -237,11 +237,7 @@ class StackedCache:
 
     def put(self, key: str, value: str | bytes) -> None:
         """Put a value in all cache layers."""
-        # Always update fastest layer first
-        self._layers[0].put(key, value)
-
-        # For slower layers, optionally check existence first
-        for layer in self._layers[1:]:
+        for layer in self._layers:
             should_write = True
 
             if self._existence_check_optimization:

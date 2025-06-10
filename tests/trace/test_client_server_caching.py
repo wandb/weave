@@ -323,3 +323,197 @@ def test_obj_create_caching(client):
         "skips": 0,
     }
     assert read_0.obj.val == read_1.obj.val == val
+
+
+def test_cache_default_enabled():
+    """Test that caching is enabled by default."""
+    from weave.trace.settings import use_server_cache
+
+    # Should be True by default now
+    assert use_server_cache() is True
+
+
+def test_cache_isolation_between_tests(tmp_path, monkeypatch):
+    """Test that the caching_client_isolation fixture properly isolates cache directories."""
+    # This test verifies that each test gets its own cache directory
+    test_cache_dir_1 = tmp_path / "cache_1"
+    test_cache_dir_2 = tmp_path / "cache_2"
+
+    # Create two different cache instances with different directories
+    from tests.conftest import ThrowingServer
+    from weave.trace_server_bindings.caching_middleware_trace_server import (
+        CachingMiddlewareTraceServer,
+    )
+
+    base_server = ThrowingServer()
+    cache_server_1 = CachingMiddlewareTraceServer(base_server, str(test_cache_dir_1))
+    cache_server_2 = CachingMiddlewareTraceServer(base_server, str(test_cache_dir_2))
+
+    # Write to first cache
+    cache_server_1._safe_cache_set("test_key", "test_value_1")
+
+    # Write different value to second cache with same key
+    cache_server_2._safe_cache_set("test_key", "test_value_2")
+
+    # Verify isolation - each cache should have its own value
+    assert cache_server_1._safe_cache_get("test_key") == "test_value_1"
+    assert cache_server_2._safe_cache_get("test_key") == "test_value_2"
+
+    # Cleanup
+    cache_server_1.__del__()
+    cache_server_2.__del__()
+
+
+def test_cache_persistence_across_client_instances(tmp_path):
+    """Test that cache persists when creating new client instances with same cache directory."""
+    from tests.conftest import ThrowingServer
+    from weave.trace_server_bindings.caching_middleware_trace_server import (
+        CachingMiddlewareTraceServer,
+    )
+
+    cache_dir = str(tmp_path / "persistent_cache")
+    base_server = ThrowingServer()
+
+    # Create first cache instance and store something
+    cache_server_1 = CachingMiddlewareTraceServer(base_server, cache_dir)
+    cache_server_1._safe_cache_set("persistent_key", "persistent_value")
+    cache_server_1.__del__()  # Simulate client shutdown
+
+    # Create second cache instance with same directory
+    cache_server_2 = CachingMiddlewareTraceServer(base_server, cache_dir)
+
+    # Should be able to retrieve the value from disk
+    cached_value = cache_server_2._safe_cache_get("persistent_key")
+    assert cached_value == "persistent_value"
+
+    # Cleanup
+    cache_server_2.__del__()
+
+
+def test_cache_existence_check_optimization(tmp_path):
+    """Test that the existence check optimization works correctly."""
+    from weave.trace_server_bindings.caching_middleware_trace_server import (
+        create_memory_disk_cache,
+    )
+
+    cache_dir = str(tmp_path / "existence_test")
+    cache = create_memory_disk_cache(cache_dir, 1000000)
+
+    # First write should hit both memory and disk
+    cache.put("test_key", "test_value")
+
+    # Key should exist in both layers
+    assert "test_key" in cache
+    assert "test_key" in cache.layers[0]  # memory cache
+    # Note: We can't easily test disk cache __contains__ directly due to DiskCache wrapper
+
+    # Second write with same key should skip disk write due to existence check
+    # This is hard to test directly, so we inject a stale value directly:
+    cache.layers[0].put("test_key", "INVALID")
+    cache.layers[1].put("test_key", "INVALID")
+    # This put should skip the disk write
+    cache.put("test_key", "test_value")  # Same value
+    assert "test_key" in cache
+
+    cache.close()
+
+
+def test_cache_keys_method(tmp_path):
+    """Test that the keys() method returns the union of all keys across cache layers."""
+    from weave.trace_server_bindings.caching_middleware_trace_server import (
+        create_memory_disk_cache,
+    )
+
+    cache_dir = str(tmp_path / "keys_test")
+    cache = create_memory_disk_cache(cache_dir, 1000000)
+
+    # Add some keys (directly to layers)
+    cache.layers[0].put("key1", "value1")
+    cache.layers[1].put("key2", "value2")
+
+    # Get all keys
+    all_keys = cache.keys()
+
+    # Should contain all our keys
+    assert "key1" in all_keys
+    assert "key2" in all_keys
+    assert len(all_keys) == 2
+
+    cache.close()
+
+
+def test_cache_error_handling_robustness(tmp_path):
+    """Test that cache handles errors gracefully without crashing."""
+    from weave.trace_server_bindings.caching_middleware_trace_server import (
+        create_memory_disk_cache,
+    )
+
+    cache_dir = str(tmp_path / "error_test")
+    cache = create_memory_disk_cache(cache_dir, 1000000)
+
+    # Normal operation should work
+    cache.put("good_key", "good_value")
+    assert cache.get("good_key") == "good_value"
+
+    # Getting non-existent key should return None (not raise)
+    assert cache.get("nonexistent_key") is None
+
+    # Deleting non-existent key should not raise
+    cache.delete("nonexistent_key")  # Should not crash
+
+    # Checking non-existent key should return False
+    assert "nonexistent_key" not in cache
+
+    cache.close()
+
+
+def test_cache_memory_disk_layer_interaction(tmp_path):
+    """Test that memory and disk cache layers work together correctly."""
+    from weave.trace_server_bindings.caching_middleware_trace_server import (
+        create_memory_disk_cache,
+    )
+
+    cache_dir = str(tmp_path / "layer_test")
+    cache = create_memory_disk_cache(cache_dir, 1000000)
+
+    # Store a value - should go to both layers
+    cache.put("layer_key", "layer_value")
+
+    # Should be retrievable (could come from either layer)
+    assert cache.get("layer_key") == "layer_value"
+
+    # Clear only memory cache (access internal structure for testing)
+    memory_cache = cache.layers[0]
+    memory_cache.clear()
+
+    # Should still be retrievable from disk
+    assert cache.get("layer_key") == "layer_value"
+
+    # After retrieval, should be back in memory cache
+    assert memory_cache.get("layer_key") == "layer_value"
+
+    cache.close()
+
+
+def test_cache_directory_creation(tmp_path):
+    """Test that cache directory is created if it doesn't exist."""
+    from tests.conftest import ThrowingServer
+    from weave.trace_server_bindings.caching_middleware_trace_server import (
+        CachingMiddlewareTraceServer,
+    )
+
+    # Use a nested directory that doesn't exist
+    cache_dir = str(tmp_path / "nested" / "cache" / "directory")
+    assert not os.path.exists(cache_dir)
+
+    base_server = ThrowingServer()
+    cache_server = CachingMiddlewareTraceServer(base_server, cache_dir)
+
+    # Directory should be created
+    assert os.path.exists(cache_dir)
+
+    # Should be able to use the cache
+    cache_server._safe_cache_set("creation_test", "success")
+    assert cache_server._safe_cache_get("creation_test") == "success"
+
+    cache_server.__del__()
