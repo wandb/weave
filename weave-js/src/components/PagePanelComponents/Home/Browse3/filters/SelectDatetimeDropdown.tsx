@@ -192,7 +192,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 
   const handleIconClick = (event: React.MouseEvent) => {
     event.stopPropagation();
-    setIsCalendarOpen(true);
+    setIsCalendarOpen(prev => !prev);
   };
 
   // Add handler for closing when Ok button is clicked
@@ -345,6 +345,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
             value={new Date(inputValue) ?? null}
             onChange={handleDateChange}
             onAccept={handleAccept}
+            reduceAnimations
             slotProps={{
               textField: {
                 style: {display: 'none'},
