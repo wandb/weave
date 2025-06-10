@@ -658,14 +658,9 @@ class CallsQuery(BaseModel):
         # Order Fields:
         filter_query.order_fields = self.order_fields
         filter_query.limit = self.limit
-        # The filter query must handle offset
         filter_query.offset = self.offset
-        if self.limit:
-            # Filter query must be much more permissive to account for potentially
-            # unmerged rows, * 10 for maximum safety.
-            filter_query.limit = self.limit * 10
+        # outer query must also order
         outer_query.order_fields = self.order_fields
-        outer_query.limit = self.limit
 
         raw_sql = f"""
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
