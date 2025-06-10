@@ -17,14 +17,12 @@ from concurrent.futures import Future
 from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
-    Annotated,
     Any,
     Callable,
     Generic,
     Protocol,
     TypedDict,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -34,6 +32,7 @@ from requests import HTTPError
 
 from weave import version
 from weave.trace import trace_sentry, urls
+from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -99,7 +98,6 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
-from weave.trace.casting import CallsFilterLike, SortByLike, QueryLike
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,

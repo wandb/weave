@@ -1,8 +1,8 @@
-from typing import Any, Annotated, Union
+from typing import Annotated, Any
 
 import pydantic
 
-from weave.trace_server.trace_server_interface import CallsFilter, SortBy, Query
+from weave.trace_server.trace_server_interface import CallsFilter, Query, SortBy
 
 
 def cast_to_calls_filter(obj: Any) -> CallsFilter:
