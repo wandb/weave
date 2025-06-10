@@ -31,6 +31,7 @@ import {
 } from '../wfReactInterface/objectClassQuery';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
+import {DeleteLeaderboardButton} from './LeaderboardDeleteButton';
 
 type LeaderboardPageProps = {
   entity: string;
@@ -69,14 +70,21 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
       headerExtra={
         !isEditing &&
         isEditor && (
-          <EditLeaderboardButton
-            entity={props.entity}
-            project={props.project}
-            leaderboardName={props.leaderboardName}
-            isEditing={isEditing}
-            setIsEditing={setIsEditing}
-            isPeeking={isPeeking}
-          />
+          <Box display="flex" gap="4px" alignItems="center">
+            <EditLeaderboardButton
+              entity={props.entity}
+              project={props.project}
+              leaderboardName={props.leaderboardName}
+              isEditing={isEditing}
+              setIsEditing={setIsEditing}
+              isPeeking={isPeeking}
+            />
+            <DeleteLeaderboardButton
+              entity={props.entity}
+              project={props.project}
+              leaderboardName={props.leaderboardName}
+            />
+          </Box>
         )
       }
     />
@@ -349,12 +357,8 @@ const EditLeaderboardButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        className="mx-16"
-        style={{
-          marginLeft: '0px',
-        }}
         size="medium"
-        variant="secondary"
+        variant="ghost"
         onClick={handleClick}
         icon={isEditing ? 'close' : 'pencil-edit'}>
         {isEditing ? 'Discard Changes' : 'Edit'}
