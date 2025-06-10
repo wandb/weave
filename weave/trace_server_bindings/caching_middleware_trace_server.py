@@ -520,7 +520,7 @@ def create_memory_disk_cache(
     Returns:
         A StackedCache with memory and disk layers
     """
-    memory_layer = LRUCache[str, str | bytes](max_size=memory_size)
+    memory_layer: LRUCache[str, str | bytes] = LRUCache(max_size=memory_size)
     disk_layer = DiskCache(cache_dir, size_limit)
 
     return StackedCache(
