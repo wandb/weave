@@ -91,19 +91,20 @@ export const ModelTile = ({
 
   return (
     <div
-      className={`group w-[500px] cursor-pointer rounded-lg border border-moon-200 bg-white px-16 pb-6 pt-12 ${
-        isSelected ? 'shadow-[0_0_10px_rgb(169,237,242)]' : ''
+      className={`group w-[500px] cursor-pointer rounded-lg border border-moon-250 bg-white px-16 pb-6 pt-12  ${
+        isSelected
+          ? 'border-teal-500 shadow-[0_0_10px_rgb(169,237,242)]'
+          : 'hover:border-moon-350'
       }`}
       onClick={onClickTile}>
-      <div className="flex cursor-pointer items-center gap-8">
-        {/* <Orb /> */}
+      <div className="mb-8 flex items-center gap-8">
         {logoImg}
-        <div className="text-md font-semibold text-teal-600">
+        <div className="text-lg font-semibold text-teal-600">
           <Link to={urlInference(model.provider, model.id)}>{label}</Link>
         </div>
         {model.modalities && <Modalities modalities={model.modalities} />}
       </div>
-      <div className="flex items-center gap-16">
+      <div className="mb-8 flex items-center gap-16 text-sm">
         {model.launchDate && (
           <Tooltip
             trigger={
@@ -133,7 +134,7 @@ export const ModelTile = ({
           <Tooltip
             trigger={
               <div className="flex items-center gap-2">
-                <IconOnlyPill color="moon" icon="recent-clock" />
+                <IconOnlyPill color="moon" icon="context-window" />
                 <div className="text-moon-500">
                   {getContextWindowString(model)}
                 </div>
