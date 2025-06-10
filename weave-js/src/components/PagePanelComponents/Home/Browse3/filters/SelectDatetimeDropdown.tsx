@@ -50,7 +50,8 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   onChange,
   isActive,
 }) => {
-  const [inputValue, setInputValue] = useState(value);
+  const [inputValue, setInputValue] = useState('');
+  console.log('inputValue', inputValue);
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(
@@ -66,13 +67,20 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const dropdownRef = useRef<HTMLUListElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Initialize input value from prop value
+  // Format and set input value whenever the value prop changes
   useEffect(() => {
-    if (value && value !== inputValue) {
-      setInputValue(value);
+    if (value) {
+      const date = parseDate(value);
+      if (date) {
+        const formattedDate = formatDate(date);
+        setInputValue(formattedDate);
+      } else {
+        // If parseDate fails, use the raw value as fallback
+        setInputValue(value);
+      }
+    } else {
+      setInputValue('');
     }
-    // Only run when value changes from parent
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   // Add analytics hook
@@ -310,7 +318,9 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               if (debounceTimeoutRef.current) {
                 clearTimeout(debounceTimeoutRef.current);
               }
-              parseAndUpdateDate(inputValue, true);
+              if (inputValue !== value) {
+                parseAndUpdateDate(inputValue, true);
+              }
             }}
             onMouseEnter={() => setIsInputHovered(true)}
             onMouseLeave={() => setIsInputHovered(false)}
