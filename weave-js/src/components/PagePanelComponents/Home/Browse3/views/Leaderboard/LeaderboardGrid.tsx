@@ -1,4 +1,4 @@
-import {Box} from '@mui/material';
+import {Box, Tooltip} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroup,
@@ -7,6 +7,7 @@ import {
   GridSortDirection,
   GridSortItem,
 } from '@mui/x-data-grid-pro';
+import {Checkbox} from '@wandb/weave/components/Checkbox';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
@@ -27,6 +28,8 @@ import {
 } from './query/leaderboardQuery';
 
 const USE_COMPARE_EVALUATIONS_PAGE = true;
+const MAX_SELECT = 100;
+
 export type LeaderboardColumnOrderType = Array<{
   datasetGroup: string;
   scorerGroup: string;
@@ -39,6 +42,8 @@ interface LeaderboardGridProps {
   data: GroupedLeaderboardData;
   columnOrder?: LeaderboardColumnOrderType;
   loading: boolean;
+  selectedEvaluations?: string[];
+  onSelectedEvaluationsChange?: (evaluations: string[]) => void;
 }
 
 type RowData = {
@@ -53,13 +58,37 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   data,
   loading,
   columnOrder,
+  selectedEvaluations: controlledSelectedEvaluations,
+  onSelectedEvaluationsChange,
 }) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
+
+  // Internal state for uncontrolled mode
+  const [internalSelectedEvaluations, setInternalSelectedEvaluations] =
+    useState<string[]>([]);
+
+  // Use controlled value if provided, otherwise use internal state
+  const isControlled = controlledSelectedEvaluations !== undefined;
+  const selectedEvaluations = isControlled
+    ? controlledSelectedEvaluations
+    : internalSelectedEvaluations;
+
+  const setSelectedEvaluations = useCallback(
+    (evaluations: string[]) => {
+      if (isControlled && onSelectedEvaluationsChange) {
+        onSelectedEvaluationsChange(evaluations);
+      } else {
+        setInternalSelectedEvaluations(evaluations);
+      }
+    },
+    [isControlled, onSelectedEvaluationsChange]
+  );
+
   const onCellClick = useCallback(
     (record: LeaderboardValueRecord) => {
       const sourceCallId = record.sourceEvaluationCallId;
-      if (sourceCallId) {
+      if (sourceCallId && selectedEvaluations.length === 0) {
         let to: string;
         if (USE_COMPARE_EVALUATIONS_PAGE) {
           to = peekingRouter.compareEvaluationsUri(
@@ -74,7 +103,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         history.push(to);
       }
     },
-    [entity, history, peekingRouter, project]
+    [entity, history, peekingRouter, project, selectedEvaluations.length]
   );
 
   const columnStats = useMemo(() => getColumnStats(data), [data]);
@@ -117,8 +146,127 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     return rowData;
   }, [data]);
 
+  // Get all evaluation IDs from the current row data
+  const getAllEvaluationIds = useCallback((row: RowData): string[] => {
+    const evaluationIds: string[] = [];
+    const modelGroup = row.modelGroup;
+
+    Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
+      Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
+        Object.values(scorerGroup.metricPathGroups).forEach(records => {
+          records.forEach(record => {
+            if (record.sourceEvaluationCallId) {
+              evaluationIds.push(record.sourceEvaluationCallId);
+            }
+          });
+        });
+      });
+    });
+
+    // Return unique IDs
+    return [...new Set(evaluationIds)];
+  }, []);
+
+  // Get all available evaluation IDs from all rows
+  const allAvailableEvaluationIds = useMemo(() => {
+    const allIds: string[] = [];
+    rows.forEach(row => {
+      allIds.push(...getAllEvaluationIds(row));
+    });
+    return [...new Set(allIds)];
+  }, [rows, getAllEvaluationIds]);
+
   const columns: Array<GridColDef<RowData>> = useMemo(
     () => [
+      {
+        minWidth: 35,
+        width: 35,
+        field: 'CustomCheckbox',
+        sortable: false,
+        disableColumnMenu: true,
+        resizable: false,
+        disableExport: true,
+        display: 'flex',
+        renderHeader: (params: any) => {
+          const isAllSelected =
+            selectedEvaluations.length === allAvailableEvaluationIds.length &&
+            allAvailableEvaluationIds.length > 0;
+          const isSomeSelected =
+            selectedEvaluations.length > 0 &&
+            selectedEvaluations.length < allAvailableEvaluationIds.length;
+
+          return (
+              <Checkbox
+                size="small"
+                checked={
+                  selectedEvaluations.length === 0
+                    ? false
+                    : selectedEvaluations.length === allAvailableEvaluationIds.length
+                    ? true
+                    : 'indeterminate'
+                }
+                onCheckedChange={() => {
+                  if (isAllSelected || isSomeSelected) {
+                    // Deselect all
+                    setSelectedEvaluations([]);
+                  } else {
+                    // Select all (up to MAX_SELECT)
+                    setSelectedEvaluations(
+                      allAvailableEvaluationIds.slice(0, MAX_SELECT)
+                    );
+                  }
+                }}
+              />
+          );
+        },
+        renderCell: (params: GridRenderCellParams) => {
+          const row = params.row as RowData;
+          const rowEvaluationIds = getAllEvaluationIds(row);
+          const isSelected = rowEvaluationIds.some(id =>
+            selectedEvaluations.includes(id)
+          );
+          const disabled =
+            !isSelected && selectedEvaluations.length >= MAX_SELECT;
+          const tooltipText =
+            selectedEvaluations.length >= MAX_SELECT && !isSelected
+              ? `Selection limited to ${MAX_SELECT} items`
+              : '';
+
+          return (
+            <Tooltip title={tooltipText} placement="right" arrow>
+              {/* https://mui.com/material-ui/react-tooltip/ */}
+              {/* By default disabled elements like <button> do not trigger user interactions */}
+              {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
+              <span style={{marginLeft: 'auto', marginRight: 'auto'}}>
+                <Checkbox
+                  size="small"
+                  disabled={disabled}
+                  checked={isSelected}
+                  onCheckedChange={() => {
+                    if (isSelected) {
+                      // Remove all evaluation IDs from this row
+                      setSelectedEvaluations(
+                        selectedEvaluations.filter(
+                          id => !rowEvaluationIds.includes(id)
+                        )
+                      );
+                    } else {
+                      // Add all evaluation IDs from this row
+                      const newSelection = [
+                        ...selectedEvaluations,
+                        ...rowEvaluationIds,
+                      ];
+                      setSelectedEvaluations(
+                        [...new Set(newSelection)].slice(0, MAX_SELECT)
+                      );
+                    }
+                  }}
+                />
+              </span>
+            </Tooltip>
+          );
+        },
+      },
       {
         field: 'modelGroupName',
         headerName: 'Model',
@@ -230,6 +378,10 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                                 metricPathGroupName,
                                 value
                               ),
+                              cursor:
+                                selectedEvaluations.length > 0
+                                  ? 'default'
+                                  : 'pointer',
                             }}>
                             {inner}
                           </div>
@@ -243,7 +395,17 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           )
       ),
     ],
-    [columnStats.datasetGroups, entity, getColorForScore, onCellClick, project]
+    [
+      columnStats.datasetGroups,
+      entity,
+      getColorForScore,
+      onCellClick,
+      project,
+      selectedEvaluations,
+      allAvailableEvaluationIds,
+      getAllEvaluationIds,
+      setSelectedEvaluations,
+    ]
   );
 
   const groupingModel: GridColumnGroup[] = useMemo(() => {
@@ -372,14 +534,18 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         hideFooterSelectedRowCount
         disableMultipleColumnsSorting={false}
         columnHeaderHeight={40}
-        rowHeight={40}
+        rowHeight={38}
         loading={loading}
         sortModel={sortModel}
         onSortModelChange={setSortModel}
+        pinnedColumns={{left: ['CustomCheckbox']}}
         sx={{
           borderRadius: 0,
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
+          },
+          '& .MuiDataGrid-main:focus-visible': {
+            outline: 'none',
           },
           '& .MuiDataGrid-cell': {
             cursor: 'pointer',

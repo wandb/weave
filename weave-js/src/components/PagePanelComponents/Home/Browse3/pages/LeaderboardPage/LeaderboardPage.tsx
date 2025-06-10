@@ -3,6 +3,7 @@ import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Loading} from '@wandb/weave/components/Loading';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {
   FC,
@@ -13,9 +14,10 @@ import React, {
   useState,
 } from 'react';
 import ReactMarkdown from 'react-markdown';
+import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
-import {WeaveflowPeekContext} from '../../context';
+import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {
   LeaderboardColumnOrderType,
@@ -23,6 +25,7 @@ import {
 } from '../../views/Leaderboard/LeaderboardGrid';
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
+import {CompareEvaluationsTableButton} from '../CallsPage/CallsTableButtons';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   useBaseObjectInstances,
@@ -160,12 +163,23 @@ export const LeaderboardPageContentInner: React.FC<
     props.project,
     props.leaderboardName
   );
+  const history = useHistory();
+  const {peekingRouter} = useWeaveflowRouteContext();
   const [leaderboardVal, setLeaderboardVal] = useState(props.leaderboardVal);
   const [workingLeaderboardValCopy, setWorkingLeaderboardValCopy] =
     useState(leaderboardVal);
+  const [selectedEvaluations, setSelectedEvaluations] = useState<string[]>([]);
+
   useEffect(() => {
     props.setName(workingLeaderboardValCopy.name ?? '');
   }, [props, workingLeaderboardValCopy.name]);
+
+  // Clear selections when editing mode changes
+  useEffect(() => {
+    if (props.isEditing) {
+      setSelectedEvaluations([]);
+    }
+  }, [props.isEditing]);
   const {loading, data, evalData} = useSavedLeaderboardData(
     props.entity,
     props.project,
@@ -175,6 +189,7 @@ export const LeaderboardPageContentInner: React.FC<
   const discardChanges = useCallback(() => {
     setWorkingLeaderboardValCopy(leaderboardVal);
     props.setIsEditing(false);
+    setSelectedEvaluations([]);
   }, [leaderboardVal, props]);
   const commitChanges = useCallback(() => {
     const mounted = true;
@@ -228,6 +243,40 @@ export const LeaderboardPageContentInner: React.FC<
         flexDirection="column"
         height="100%"
         minWidth="50%">
+        {selectedEvaluations.length > 0 && (
+          <Tailwind>
+            <div className="bg-gray-50 flex items-center gap-8 border-b border-moon-250 px-16 py-8">
+              <Button
+                variant="ghost"
+                size="small"
+                icon="close"
+                onClick={() => setSelectedEvaluations([])}
+                tooltip="Clear selection"
+              />
+              <div className="text-sm">
+                {selectedEvaluations.length}{' '}
+                {selectedEvaluations.length === 1
+                  ? 'evaluation'
+                  : 'evaluations'}{' '}
+                selected:
+              </div>
+              <CompareEvaluationsTableButton
+                buttonText={selectedEvaluations.length === 1 ? 'View' : 'Compare'}
+                tooltipText="Compare metrics and examples for selected evaluations"
+                onClick={() => {
+                  history.push(
+                    peekingRouter.compareEvaluationsUri(
+                      props.entity,
+                      props.project,
+                      selectedEvaluations,
+                      null
+                    )
+                  );
+                }}
+              />
+            </div>
+          </Tailwind>
+        )}
         {workingLeaderboardValCopy.description && (
           <Box
             display="flex"
@@ -259,6 +308,8 @@ export const LeaderboardPageContentInner: React.FC<
             loading={loading}
             data={data}
             columnOrder={columnOrder}
+            selectedEvaluations={selectedEvaluations}
+            onSelectedEvaluationsChange={setSelectedEvaluations}
           />
         </Box>
       </Box>

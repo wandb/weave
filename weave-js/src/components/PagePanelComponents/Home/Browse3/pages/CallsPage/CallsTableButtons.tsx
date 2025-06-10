@@ -428,7 +428,8 @@ export const CompareEvaluationsTableButton: FC<{
   onClick: () => void;
   disabled?: boolean;
   tooltipText?: string;
-}> = ({onClick, disabled, tooltipText}) => (
+  buttonText?: string;
+}> = ({onClick, disabled, tooltipText, buttonText = 'Compare'}) => (
   <Box
     sx={{
       height: '100%',
@@ -442,7 +443,7 @@ export const CompareEvaluationsTableButton: FC<{
       onClick={onClick}
       icon="chart-scatterplot"
       tooltip={tooltipText}>
-      Compare
+      {buttonText}
     </Button>
   </Box>
 );
