@@ -6,7 +6,7 @@ export type ActionType = z.infer<typeof ActionTypeSchema>;
 export const ModelSchema = z.enum(['gpt-4o', 'gpt-4o-mini']);
 export type Model = z.infer<typeof ModelSchema>;
 
-export const ResponseFormatSchema = z.enum(['json', 'text']);
+export const ResponseFormatSchema = z.enum(['json_object', 'text']);
 export type ResponseFormat = z.infer<typeof ResponseFormatSchema>;
 
 export const ProviderReturnTypeSchema = z.enum(['openai']);
@@ -42,17 +42,24 @@ export const LeaderboardColumnSchema = z.object({
 export type LeaderboardColumn = z.infer<typeof LeaderboardColumnSchema>;
 
 export const MessageSchema = z.object({
-  content: z.union([
-    z.array(z.record(z.string(), z.any())),
-    z.null(),
-    z.string(),
-  ]),
-  function_call: z.union([z.record(z.string(), z.any()), z.null()]),
-  name: z.union([z.null(), z.string()]),
+  content: z
+    .union([z.array(z.record(z.string(), z.any())), z.null(), z.string()])
+    .optional(),
+  function_call: z.union([z.record(z.string(), z.any()), z.null()]).optional(),
+  name: z.union([z.null(), z.string()]).optional(),
   role: z.string(),
-  tool_call_id: z.union([z.null(), z.string()]),
+  tool_call_id: z.union([z.null(), z.string()]).optional(),
 });
 export type Message = z.infer<typeof MessageSchema>;
+
+export const ObjectRefSchema = z.object({
+  _digest: z.string(),
+  _extra: z.array(z.string()).optional(),
+  entity: z.string(),
+  name: z.string(),
+  project: z.string(),
+});
+export type ObjectRef = z.infer<typeof ObjectRefSchema>;
 
 export const ProviderSchema = z.object({
   api_key_name: z.string(),
@@ -160,7 +167,7 @@ export const LlmStructuredCompletionModelDefaultParamsSchema = z.object({
     .union([z.array(z.record(z.string(), z.any())), z.null()])
     .optional(),
   max_tokens: z.union([z.number(), z.null()]).optional(),
-  messages_template: z.array(MessageSchema),
+  messages_template: z.union([z.array(MessageSchema), z.null()]).optional(),
   n_times: z.union([z.number(), z.null()]).optional(),
   presence_penalty: z.union([z.number(), z.null()]).optional(),
   response_format: z.union([ResponseFormatSchema, z.null()]).optional(),
@@ -198,6 +205,7 @@ export const LlmStructuredCompletionModelSchema = z.object({
   description: z.union([z.null(), z.string()]).optional(),
   llm_model_id: z.string(),
   name: z.union([z.null(), z.string()]).optional(),
+  ref: z.union([ObjectRefSchema, z.null()]).optional(),
 });
 export type LlmStructuredCompletionModel = z.infer<
   typeof LlmStructuredCompletionModelSchema
