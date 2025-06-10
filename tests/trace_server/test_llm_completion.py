@@ -53,6 +53,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
             object_id=self.provider_id,
             digest="digest-1",
             base_object_class="Provider",
+            leaf_object_class="Provider",
             val={
                 "base_url": "https://api.example.com",
                 "api_key_name": "TEST_API_KEY",
@@ -73,6 +74,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
             object_id=f"{self.provider_id}-{self.model_id}",
             digest="digest-2",
             base_object_class="ProviderModel",
+            leaf_object_class="ProviderModel",
             val={
                 "name": "actual-model-name",
                 "provider": self.provider_id,
@@ -526,6 +528,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
                 object_id="custom-provider",
                 digest="digest-1",
                 base_object_class="Provider",
+                leaf_object_class="Provider",
                 val={
                     "base_url": "https://api.custom.com",
                     "api_key_name": "CUSTOM_API_KEY",
@@ -545,6 +548,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
                 object_id="custom-provider-model",
                 digest="digest-2",
                 base_object_class="ProviderModel",
+                leaf_object_class="ProviderModel",
                 val={
                     "name": "custom-model",
                     "provider": "custom-provider",

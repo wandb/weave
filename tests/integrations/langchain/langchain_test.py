@@ -1,5 +1,6 @@
 import os
 from collections.abc import Generator
+from unittest.mock import patch
 
 import pytest
 import tiktoken
@@ -75,6 +76,12 @@ def test_simple_chain_invoke(
 
     calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_invoke(calls, exp_name)
+
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "gpt-4o-mini-2024-07-18" in call.summary["usage"].unwrap()
 
 
 @pytest.mark.skip_clickhouse_client
@@ -698,3 +705,113 @@ def test_weave_attributes_in_call(client: WeaveClient) -> None:
     assert "lc_id" in call_attrs
     assert "parent_run_id" in call_attrs
     assert "lc_name" in call_attrs
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "*.googleapis.com"],
+    before_record_request=filter_body,
+    match_on=["method", "scheme", "path", "query"],
+)
+def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
+    from google.auth.credentials import AnonymousCredentials
+    from langchain_google_vertexai import ChatVertexAI
+
+    with patch(
+        "google.auth.default", return_value=(AnonymousCredentials(), "wandb-qa")
+    ):
+        llm = ChatVertexAI(
+            model="gemini-2.5-pro-preview-05-06",
+            temperature=0,
+            max_tokens=None,
+            max_retries=2,
+            api_transport="rest",
+            credentials=AnonymousCredentials(),
+        )
+
+        messages = [
+            (
+                "system",
+                "Talk like Geralt of Rivia.",
+            ),
+            ("human", "What do you do?"),
+        ]
+
+        llm.invoke(messages)
+
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "gemini-2.5-pro-preview-05-06" in call.summary["usage"].unwrap()
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+    match_on=["method", "scheme", "path", "query"],
+)
+def test_langchain_google_genai_usage(client: WeaveClient) -> None:
+    from langchain_google_genai import GoogleGenerativeAI
+
+    llm = GoogleGenerativeAI(
+        model="gemini-1.5-pro",
+        transport="rest",
+        google_api_key="fake-key",
+    )
+
+    llm.invoke(
+        [
+            ("system", "Talk like Geralt of Rivia."),
+            ("human", "what do you think about the future of AI?"),
+        ]
+    )
+
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "gemini-1.5-pro-002" in call.summary["usage"].unwrap()
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_langchain_anthropic_usage(client: WeaveClient) -> None:
+    from langchain_anthropic import ChatAnthropic
+
+    model = ChatAnthropic(
+        model="claude-opus-4-20250514",
+        anthropic_api_key="sk-ant-api03-fake-key",
+    )
+
+    model.invoke(
+        [
+            (
+                "system",
+                "Talk like Geralt of Rivia.",
+            ),
+            (
+                "human",
+                "Are semicolons optional in JavaScript? You should also reasonate why as a witcher, you know about JavaScript.",
+            ),
+        ]
+    )
+
+    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "claude-opus-4-20250514" in call.summary["usage"].unwrap()
