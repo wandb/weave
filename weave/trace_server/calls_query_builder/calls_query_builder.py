@@ -644,6 +644,7 @@ class CallsQuery(BaseModel):
         )
 
         # Select Fields:
+        filter_query.add_field("project_id")
         filter_query.add_field("id")
         for field in self.select_fields:
             outer_query.select_fields.append(field)
@@ -670,9 +671,8 @@ class CallsQuery(BaseModel):
             outer_query.limit = self.limit
             outer_query.offset = self.offset
 
-        raw_sql = f"""
-        WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
-        """
+        # Generate the inner subquery for the WHERE (project_id, id) IN clause
+        inner_subquery = filter_query._as_sql_base_format(pb, table_alias)
 
         if self.include_costs:
             # TODO: We should unify the calls query order by fields to be orm sort by fields
@@ -683,15 +683,15 @@ class CallsQuery(BaseModel):
                 )
                 for sort_by in self.order_fields
             ]
-            raw_sql += f""",
-            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
+            raw_sql = f"""
+            WITH all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name=None, inner_subquery=inner_subquery)}),
             {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
 
         else:
-            raw_sql += f"""
-            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
-            """
+            raw_sql = outer_query._as_sql_base_format(
+                pb, table_alias, id_subquery_name=None, inner_subquery=inner_subquery
+            )
 
         return safely_format_sql(raw_sql, logger)
 
@@ -700,6 +700,7 @@ class CallsQuery(BaseModel):
         pb: ParamBuilder,
         table_alias: str,
         id_subquery_name: Optional[str] = None,
+        inner_subquery: Optional[str] = None,
     ) -> str:
         needs_feedback = False
         select_fields_sql = ", ".join(
@@ -791,6 +792,9 @@ class CallsQuery(BaseModel):
         id_subquery_sql = ""
         if id_subquery_name is not None:
             id_subquery_sql = f"AND (calls_merged.id IN {id_subquery_name})"
+        elif inner_subquery is not None:
+            # Use the new late aggregation approach with (project_id, id) IN subquery
+            id_subquery_sql = f"AND ((calls_merged.project_id, calls_merged.id) IN (SELECT project_id, id FROM ({inner_subquery})))"
 
         project_param = pb.add_param(self.project_id)
 
