@@ -23,6 +23,7 @@ import {
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
   DESCENDENT_CALL_ID_PARAM,
+  FeedbackProvider,
   HIDE_TRACETREE_PARAM,
   PEEK_PARAM,
   SHOW_FEEDBACK_PARAM,
@@ -637,13 +638,6 @@ const useURLBackedCallPageState = () => {
     setDescendentCallId(getOptionalString(query, DESCENDENT_CALL_ID_PARAM));
   }, [query]);
 
-  const [showFeedback, setShowFeedback] = useState<boolean | undefined>(
-    getOptionalBoolean(query, SHOW_FEEDBACK_PARAM)
-  );
-  useEffect(() => {
-    setShowFeedback(getOptionalBoolean(query, SHOW_FEEDBACK_PARAM));
-  }, [query]);
-
   const [hideTraceTree, setHideTraceTree] = useState<boolean | undefined>(
     getOptionalBoolean(query, HIDE_TRACETREE_PARAM)
   );
@@ -668,7 +662,7 @@ const useURLBackedCallPageState = () => {
         rootCallId,
         descendentCallId,
         hideTraceTree,
-        showFeedback
+        getOptionalBoolean(query, SHOW_FEEDBACK_PARAM)
       )
     );
     return () => {
@@ -681,8 +675,8 @@ const useURLBackedCallPageState = () => {
     params.project,
     rootCallId,
     descendentCallId,
-    showFeedback,
     hideTraceTree,
+    query,
   ]);
 
   return {
@@ -690,11 +684,9 @@ const useURLBackedCallPageState = () => {
     project: params.project,
     rootCallId,
     descendentCallId,
-    showFeedback,
     hideTraceTree,
     setRootCallId,
     setDescendentCallId,
-    setShowFeedback,
     setHideTraceTree,
   };
 };
@@ -707,27 +699,60 @@ const CallPageBinding = () => {
     project,
     rootCallId,
     descendentCallId,
-    showFeedback,
     hideTraceTree,
     setRootCallId,
     setDescendentCallId,
-    setShowFeedback,
     setHideTraceTree,
   } = useURLBackedCallPageState();
 
+  const query = useURLSearchParamsDict();
+  const history = useHistory();
+  const currentRouter = useWeaveflowCurrentRouteContext();
+
+  // Get initial feedback state from URL
+  const initialShowFeedback = getOptionalBoolean(query, SHOW_FEEDBACK_PARAM);
+
+  // Memoize the URL updater to avoid recreating the provider on every render
+  const setShowFeedbackInUrl = useCallback(
+    (showFeedback: boolean | undefined) => {
+      history.push(
+        currentRouter.callUIUrl(
+          entity,
+          project,
+          '',
+          rootCallId,
+          descendentCallId,
+          hideTraceTree,
+          showFeedback
+        )
+      );
+    },
+    [
+      currentRouter,
+      entity,
+      project,
+      rootCallId,
+      descendentCallId,
+      hideTraceTree,
+      history,
+    ]
+  );
+
   return (
-    <CallPage
-      entity={entity}
-      project={project}
-      rootCallId={rootCallId}
-      setRootCallId={setRootCallId}
-      focusedCallId={descendentCallId}
-      setFocusedCallId={setDescendentCallId}
-      hideTraceTree={hideTraceTree}
-      setHideTraceTree={setHideTraceTree}
-      showFeedback={showFeedback}
-      setShowFeedback={setShowFeedback}
-    />
+    <FeedbackProvider
+      initialShowFeedback={initialShowFeedback}
+      setShowFeedbackInUrl={setShowFeedbackInUrl}>
+      <CallPage
+        entity={entity}
+        project={project}
+        rootCallId={rootCallId}
+        setRootCallId={setRootCallId}
+        focusedCallId={descendentCallId}
+        setFocusedCallId={setDescendentCallId}
+        hideTraceTree={hideTraceTree}
+        setHideTraceTree={setHideTraceTree}
+      />
+    </FeedbackProvider>
   );
 };
 

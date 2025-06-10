@@ -286,15 +286,33 @@ export const EMPTY_PROPS_ACTION_SPECS: EmptyProps = {
 };
 
 export const EMPTY_PROPS_ANNOTATIONS: EmptyProps = {
-  icon: 'forum-chat-bubble' as const,
-  heading: 'No annotations yet',
-  description: 'Create annotations in the UI or python.',
+  size: 'small',
+  icon: 'type-number-alt' as const,
+  heading: 'Create an annotation',
+  description:
+    'Create structured annotations for gathering feedback on traces and evaluations.',
   moreInformation: (
     <>
-      More information about creating and using annotation specifications for
-      human labeling can be found in the{' '}
+      Learn more about labeling with{' '}
       <TargetBlank href="https://weave-docs.wandb.ai/guides/tracking/feedback#add-human-annotations">
-        documentation
+        annotations
+      </TargetBlank>
+      .
+    </>
+  ),
+};
+
+export const EMPTY_PROPS_FEEDBACK: EmptyProps = {
+  size: 'small',
+  icon: 'add-reaction' as const,
+  heading: 'Add your first feedback',
+  description:
+    'Provide feedback on traces and evaluations directly within the UI or using the API.',
+  moreInformation: (
+    <>
+      Learn how to{' '}
+      <TargetBlank href="http://wandb.me/weave_feedback">
+        add feedback
       </TargetBlank>
       .
     </>
