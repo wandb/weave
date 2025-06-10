@@ -13,9 +13,10 @@ import React, {
   useState,
 } from 'react';
 import ReactMarkdown from 'react-markdown';
+import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
-import {WeaveflowPeekContext} from '../../context';
+import {useClosePeek, useWeaveflowCurrentRouteContext, useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {
   LeaderboardColumnOrderType,
@@ -66,12 +67,15 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
         },
       ]}
       headerExtra={
-        !isPeeking &&
         !isEditing &&
         isEditor && (
           <EditLeaderboardButton
+            entity={props.entity}
+            project={props.project}
+            leaderboardName={props.leaderboardName}
             isEditing={isEditing}
             setIsEditing={setIsEditing}
+            isPeeking={isPeeking}
           />
         )
       }
@@ -311,9 +315,32 @@ export const ToggleLeaderboardConfig: React.FC<{
 };
 
 const EditLeaderboardButton: FC<{
+  entity: string;
+  project: string;
+  leaderboardName: string;
   isEditing: boolean;
   setIsEditing: (isEditing: boolean) => void;
-}> = ({isEditing, setIsEditing}) => {
+  isPeeking?: boolean;
+}> = ({entity, project, leaderboardName, isEditing, setIsEditing, isPeeking}) => {
+  const history = useHistory();
+  const {baseRouter} = useWeaveflowRouteContext();
+  const closePeek = useClosePeek();
+  
+  const handleClick = useCallback(() => {
+    if (isPeeking) {
+      // When in peek mode, close the peek drawer first
+      closePeek();
+      // Then navigate to the full page with edit mode enabled after a brief delay
+      setTimeout(() => {
+        const editUrl = baseRouter.leaderboardsUIUrl(entity, project, leaderboardName, true);
+        history.push(editUrl);
+      }, 0);
+    } else {
+      // When not in peek mode, just toggle edit mode
+      setIsEditing(!isEditing);
+    }
+  }, [isPeeking, isEditing, setIsEditing, baseRouter, entity, project, leaderboardName, history, closePeek]);
+  
   return (
     <Box
       sx={{
@@ -328,7 +355,7 @@ const EditLeaderboardButton: FC<{
         }}
         size="medium"
         variant="secondary"
-        onClick={() => setIsEditing(!isEditing)}
+        onClick={handleClick}
         icon={isEditing ? 'close' : 'pencil-edit'}>
         {isEditing ? 'Discard Changes' : 'Edit'}
       </Button>
