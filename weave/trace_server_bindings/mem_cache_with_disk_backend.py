@@ -3,259 +3,318 @@ from __future__ import annotations
 import logging
 import threading
 from collections import OrderedDict
-from typing import Generic, TypeVar
+from typing import Generic, Protocol, TypeVar
 
 import diskcache
 
 logger = logging.getLogger(__name__)
 
+K = TypeVar("K")
 V = TypeVar("V")
 
 
-class ThreadSafeLRUCache(Generic[V]):
-    """Thread-safe LRU cache implementation using OrderedDict.
+class CacheProtocol(Protocol[K, V]):
+    """Protocol defining the interface for all cache implementations."""
 
-    This implementation provides:
-    - Thread-safe operations with proper locking
-    - LRU eviction when max_size is exceeded
-    - Move-to-end behavior on access to maintain LRU order
-    """
+    def get(self, key: K) -> V | None:
+        """Get a value by key. Returns None if not found or on error."""
+        ...
+
+    def put(self, key: K, value: V) -> None:
+        """Put a key-value pair. Silent on errors."""
+        ...
+
+    def delete(self, key: K) -> None:
+        """Delete a key. Silent if key doesn't exist or on errors."""
+        ...
+
+    def keys(self) -> set[K]:
+        """Return all keys in this cache layer. Returns empty set on errors."""
+        ...
+
+    def __contains__(self, key: K) -> bool:
+        """Check if key exists in cache. Returns False on errors."""
+        ...
+
+    def close(self) -> None:
+        """Cleanup resources."""
+        ...
+
+
+class LRUCache(Generic[K, V]):
+    """Thread-safe LRU cache implementation using OrderedDict."""
 
     def __init__(self, max_size: int = 1000):
         """Initialize LRU cache with maximum size.
 
         Args:
-            max_size: Maximum number of items to store. If 0, unlimited size.
+            max_size: Maximum number of items to store
         """
         self._max_size = max_size
-        self._cache: OrderedDict[str, V] = OrderedDict()
+        self._cache: OrderedDict[K, V] = OrderedDict()
         self._lock = threading.RLock()
 
-    def get(self, key: str) -> V | None:
-        """Get value by key, moving it to end (most recently used).
-
-        Args:
-            key: The key to look up
-
-        Returns:
-            The value if found, None otherwise
-        """
-        with self._lock:
-            if key not in self._cache:
-                return None
-            # Move to end to maintain LRU order
-            self._cache.move_to_end(key)
-            return self._cache[key]
-
-    def set(self, key: str, value: V) -> None:
-        """Set a key-value pair, evicting oldest if necessary.
-
-        Args:
-            key: The key to set
-            value: The value to store
-        """
-        with self._lock:
-            if key in self._cache:
-                # Update existing key and move to end
-                self._cache[key] = value
+    def get(self, key: K) -> V | None:
+        """Get value by key, moving it to end (most recent). Returns None on error."""
+        try:
+            with self._lock:
+                if key not in self._cache:
+                    return None
+                # Move to end (most recently used)
                 self._cache.move_to_end(key)
-            else:
-                # Add new key
-                self._cache[key] = value
-                # Evict oldest if over capacity
-                if len(self._cache) > self._max_size:
-                    self._cache.popitem(last=False)  # Remove oldest (first item)
+                return self._cache[key]
+        except Exception as e:
+            logger.debug(f"Error getting key '{key}' from memory cache: {e}")
+            return None
 
-    def delete(self, key: str) -> bool:
-        """Delete a key from the cache.
+    def put(self, key: K, value: V) -> None:
+        """Put a key-value pair, evicting oldest if necessary. Silent on errors."""
+        try:
+            with self._lock:
+                if key in self._cache:
+                    # Update existing key and move to end
+                    self._cache[key] = value
+                    self._cache.move_to_end(key)
+                else:
+                    # Add new key
+                    self._cache[key] = value
+                    # Evict oldest if over capacity
+                    if len(self._cache) > self._max_size:
+                        self._cache.popitem(last=False)  # Remove oldest (first item)
+        except Exception as e:
+            logger.debug(f"Error setting key '{key}' in memory cache: {e}")
 
-        Args:
-            key: The key to delete
-
-        Returns:
-            True if key existed and was deleted, False otherwise
-        """
-        with self._lock:
-            try:
+    def delete(self, key: K) -> None:
+        """Delete a key from the cache. Silent on errors."""
+        try:
+            with self._lock:
                 del self._cache[key]
-            except KeyError:
-                return False
-        return True
+        except (KeyError, Exception) as e:
+            # Silent on both KeyError (key doesn't exist) and other errors
+            logger.debug(f"Error deleting key '{key}' from memory cache: {e}")
 
-    def delete_keys_with_prefix(self, prefix: str) -> int:
-        """Delete all keys that start with the given prefix.
-
-        Args:
-            prefix: The prefix to match
-
-        Returns:
-            Number of keys deleted
-        """
-        with self._lock:
-            keys_to_delete = [
-                key
-                for key in self._cache.keys()
-                if isinstance(key, str) and key.startswith(prefix)
-            ]
-            for key in keys_to_delete:
-                del self._cache[key]
-            return len(keys_to_delete)
+    def keys(self) -> set[K]:
+        """Return all keys in the cache. Returns empty set on errors."""
+        try:
+            with self._lock:
+                return set(self._cache.keys())
+        except Exception as e:
+            logger.debug(f"Error getting keys from memory cache: {e}")
+            return set()
 
     def clear(self) -> None:
         """Clear all items from the cache."""
-        with self._lock:
-            self._cache.clear()
+        try:
+            with self._lock:
+                self._cache.clear()
+        except Exception as e:
+            logger.debug(f"Error clearing memory cache: {e}")
+
+    def __contains__(self, key: K) -> bool:
+        """Check if key exists in cache. Returns False on errors."""
+        try:
+            with self._lock:
+                return key in self._cache
+        except Exception as e:
+            logger.debug(f"Error checking memory cache for key '{key}': {e}")
+            return False
+
+    def close(self) -> None:
+        """Cleanup resources."""
+        self.clear()
 
     def __len__(self) -> int:
         """Return the number of items in the cache."""
-        with self._lock:
-            return len(self._cache)
+        try:
+            with self._lock:
+                return len(self._cache)
+        except Exception:
+            return 0
 
 
-class MemCacheWithDiskCacheBackend:
-    """
-    A simple 2-layer cache with thread-safe memory cache and persistent disk cache.
-
-    This implementation provides:
-    1. Fast thread-safe memory cache for recent data using LRU eviction
-    2. Persistent disk cache for cross-process storage
-    3. Synchronous operations for consistency
-    4. Simple and reliable error handling
-
-    Design decisions:
-    - All operations are synchronous to avoid consistency issues
-    - Memory cache is checked first for speed
-    - Disk cache provides persistence across processes
-    - Memory cache is populated from disk hits for better performance
-    - No background threading to avoid WAL consistency issues
-    """
+class DiskCache:
+    """Wrapper around diskcache.Cache to conform to CacheProtocol."""
 
     def __init__(self, cache_dir: str, size_limit: int = 1_000_000_000):
-        """Initialize the 2-layer cache.
+        """Initialize disk cache.
 
         Args:
             cache_dir: Directory path for disk cache storage
             size_limit: Maximum size in bytes for disk cache (default 1GB)
         """
-        self._disk_cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
+        self._cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
             cache_dir, size_limit=size_limit
-        )
-        self._mem_cache: ThreadSafeLRUCache[str | bytes] = ThreadSafeLRUCache(
-            max_size=1000
         )
 
     def get(self, key: str) -> str | bytes | None:
-        """Get a value from the cache, checking memory first, then disk.
-
-        Args:
-            key: The cache key to look up
-
-        Returns:
-            The cached value if found, None otherwise
-        """
-        # First check memory cache (fast)
-        value = self._mem_cache.get(key)
-        if value is not None:
-            return value
-
-        # Check disk cache (slower)
+        """Get a value by key. Returns None on error."""
         try:
-            value = self._disk_cache.get(key)
-            if value is not None:
-                # Populate memory cache for future hits
-                self._mem_cache.set(key, value)
-                return value
+            return self._cache.get(key)
         except Exception as e:
             logger.debug(f"Error reading from disk cache for key '{key}': {e}")
+            return None
 
-        return None
-
-    def set(self, key: str, value: str | bytes) -> None:
-        """Set a value in both memory and disk cache.
-
-        Args:
-            key: The cache key
-            value: The value to store
-
-        Note:
-            This implementation assumes that the same key will ALWAYS have the same value,
-            even after deletes. This allows us to optimize by checking disk cache existence
-            before writing - if the key exists, we know it has the correct value already.
-        """
-        # Always update memory cache first (fast)
-        self._mem_cache.set(key, value)
-
-        # Check if key already exists in disk cache to avoid unnecessary write
-        # Since same keys always have same values, existence check is sufficient
+    def put(self, key: str, value: str | bytes) -> None:
+        """Put a key-value pair. Silent on errors."""
         try:
-            if key in self._disk_cache:
-                # Key exists, so it must have the same value - skip write
-                return
+            self._cache.set(key, value)
         except Exception as e:
-            logger.debug(f"Error checking disk cache existence for key '{key}': {e}")
-            # Fall through to attempt write anyway
-
-        # Key doesn't exist in disk cache, so write it
-        try:
-            self._disk_cache.set(key, value)
-        except Exception as e:
-            logger.warning(f"Error writing to disk cache for key '{key}': {e}")
+            logger.debug(f"Error writing to disk cache for key '{key}': {e}")
 
     def delete(self, key: str) -> None:
-        """Delete a key from both memory and disk cache.
-
-        Args:
-            key: The cache key to delete
-        """
-        # Delete from memory cache
-        self._mem_cache.delete(key)
-
-        # Delete from disk cache
+        """Delete a key from the cache. Silent on errors."""
         try:
-            del self._disk_cache[key]
-        except KeyError:
-            pass  # Key didn't exist, that's fine
-        except Exception as e:
-            logger.warning(f"Error deleting from disk cache for key '{key}': {e}")
+            del self._cache[key]
+        except (KeyError, Exception) as e:
+            # Silent on both KeyError (key doesn't exist) and other errors
+            logger.debug(f"Error deleting from disk cache for key '{key}': {e}")
 
-    def delete_keys_with_prefix(self, prefix: str) -> None:
-        """Delete all keys that start with the given prefix from both caches.
-
-        Args:
-            prefix: The prefix to match for deletion
-        """
-        # Delete from memory cache
-        deleted_count = self._mem_cache.delete_keys_with_prefix(prefix)
-        logger.debug(
-            f"Deleted {deleted_count} keys from memory cache with prefix '{prefix}'"
-        )
-
-        # Delete from disk cache
+    def keys(self) -> set[str]:
+        """Return all keys in the disk cache. Returns empty set on errors."""
         try:
-            deleted_count = 0
-            # Get all keys with the prefix
-            for key in list(self._disk_cache.iterkeys()):
-                if key.startswith(prefix):
-                    try:
-                        del self._disk_cache[key]
-                        deleted_count += 1
-                    except KeyError:
-                        pass  # Key was already deleted
-            logger.debug(
-                f"Deleted {deleted_count} keys from disk cache with prefix '{prefix}'"
-            )
+            return set(self._cache.iterkeys())
         except Exception as e:
-            logger.warning(
-                f"Error deleting keys with prefix '{prefix}' from disk cache: {e}"
-            )
+            logger.debug(f"Error getting keys from disk cache: {e}")
+            return set()
 
     def close(self) -> None:
-        """Cleanup resources. Synchronous to ensure WAL is properly flushed."""
+        """Cleanup resources."""
         try:
-            # Clear memory cache
-            self._mem_cache.clear()
-
-            # Close disk cache - this should flush all pending operations
-            self._disk_cache.close()
+            self._cache.close()
         except Exception as e:
-            logger.exception(f"Error closing cache: {e}")
+            logger.exception(f"Error closing disk cache: {e}")
+
+    def __contains__(self, key: str) -> bool:
+        """Check if key exists in cache. Returns False on errors."""
+        try:
+            return key in self._cache
+        except Exception as e:
+            logger.debug(f"Error checking disk cache for key '{key}': {e}")
+            return False
+
+
+class StackedCache:
+    """A cache that stacks multiple cache layers with configurable strategies.
+
+    This implementation provides a general way to combine multiple cache layers:
+    - Fast layers (like memory) are checked first
+    - Writes can go to all layers or specific layers
+    - Cache hits in slower layers populate faster layers
+    """
+
+    def __init__(
+        self,
+        layers: list[CacheProtocol[str, str | bytes]],
+        populate_on_hit: bool = True,
+        existence_check_optimization: bool = False,
+    ):
+        """Initialize stacked cache.
+
+        Args:
+            layers: List of cache layers, ordered from fastest to slowest
+            populate_on_hit: Whether to populate faster layers on slower layer hits
+            existence_check_optimization: Whether to check existence in slowest layer
+                before writing (useful when same key always has same value)
+        """
+        if not layers:
+            raise ValueError("At least one cache layer is required")
+
+        self._layers = layers
+        self._populate_on_hit = populate_on_hit
+        self._existence_check_optimization = existence_check_optimization
+
+    def get(self, key: str) -> str | bytes | None:
+        """Get a value from the cache, checking layers from fastest to slowest."""
+        for i, layer in enumerate(self._layers):
+            value = layer.get(key)
+            if value is not None:
+                # Populate faster layers if this was a hit in a slower layer
+                if self._populate_on_hit and i > 0:
+                    for faster_layer in self._layers[:i]:
+                        faster_layer.put(key, value)
+                return value
+        return None
+
+    def put(self, key: str, value: str | bytes) -> None:
+        """Put a value in all cache layers."""
+        # Always update fastest layer first
+        self._layers[0].put(key, value)
+
+        # For slower layers, optionally check existence first
+        for layer in self._layers[1:]:
+            should_write = True
+
+            if self._existence_check_optimization:
+                # Check if key exists - if so, we know it has the same value
+                if key in layer:
+                    should_write = False
+
+            if should_write:
+                layer.put(key, value)
+
+    def delete(self, key: str) -> None:
+        """Delete a key from all cache layers."""
+        for layer in self._layers:
+            layer.delete(key)
+
+    def keys(self) -> set[str]:
+        """Return union of all keys across all cache layers."""
+        all_keys: set[str] = set()
+        for layer in self._layers:
+            try:
+                layer_keys = layer.keys()
+                all_keys.update(layer_keys)
+            except Exception as e:
+                logger.debug(f"Error getting keys from cache layer: {e}")
+                # Continue with other layers
+        return all_keys
+
+    def __contains__(self, key: str) -> bool:
+        """Check if key exists in any cache layer."""
+        for layer in self._layers:
+            try:
+                if key in layer:
+                    return True
+            except Exception as e:
+                logger.debug(f"Error checking cache layer for key '{key}': {e}")
+                # Continue with other layers
+        return False
+
+    def close(self) -> None:
+        """Close all cache layers."""
+        for layer in self._layers:
+            layer.close()
+
+    @property
+    def layers(self) -> list[CacheProtocol[str, str | bytes]]:
+        """Access to the underlying cache layers."""
+        return self._layers
+
+
+def create_memory_disk_cache(
+    cache_dir: str, size_limit: int = 1_000_000_000, memory_size: int = 1000
+) -> StackedCache:
+    """Factory function to create a memory+disk stacked cache.
+
+    This is the equivalent of the old MemCacheWithDiskCacheBackend but more flexible.
+
+    Args:
+        cache_dir: Directory path for disk cache storage
+        size_limit: Maximum size in bytes for disk cache (default 1GB)
+        memory_size: Maximum number of items in memory cache (default 1000)
+
+    Returns:
+        A StackedCache with memory and disk layers
+    """
+    memory_layer = LRUCache[str, str | bytes](max_size=memory_size)
+    disk_layer = DiskCache(cache_dir, size_limit)
+
+    return StackedCache(
+        layers=[memory_layer, disk_layer],
+        populate_on_hit=True,
+        existence_check_optimization=True,  # Enable the "same key = same value" optimization
+    )
+
+
+# Backward compatibility alias
+MemCacheWithDiskCacheBackend = create_memory_disk_cache

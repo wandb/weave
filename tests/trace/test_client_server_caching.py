@@ -65,7 +65,6 @@ def test_server_caching(client):
         "hits": 0,
         # get the ref
         "misses": 1,
-        "errors": 0,
         "skips": 0,
     }
     caching_server.reset_cache_recorder()
@@ -76,7 +75,6 @@ def test_server_caching(client):
         # 1 table_query_stats for len(rows)
         # 5 images
         "misses": 7,
-        "errors": 0,
         "skips": 0,
     }
     compare_datasets(gotten_dataset, dataset)
@@ -87,7 +85,6 @@ def test_server_caching(client):
     assert caching_server.get_cache_recorder() == {
         "hits": 7,
         "misses": 0,
-        "errors": 0,
         "skips": 0,
     }
 
@@ -99,7 +96,6 @@ def test_server_caching(client):
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
         "misses": 0,
-        "errors": 0,
         "skips": 7,
     }
 
@@ -154,7 +150,9 @@ def test_server_cache_size_limit(client):
             )
 
             # Internally, the cache estimates it's own size
-            assert caching_server._cache._disk_cache.volume() <= limit * 1.1
+            # Access the disk cache layer (second layer in the stack)
+            disk_cache = caching_server._cache.layers[1]
+            assert disk_cache._cache.volume() <= limit * 1.1
 
             # Allows us to test the on-disk size
             sizes = get_cache_sizes(temp_dir)
@@ -219,7 +217,6 @@ def test_file_create_caching(client):
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
         "misses": 1,
-        "errors": 0,
         "skips": 0,
     }
     caching_server.reset_cache_recorder()
@@ -233,7 +230,6 @@ def test_file_create_caching(client):
     assert caching_server.get_cache_recorder() == {
         "hits": 1,
         "misses": 0,
-        "errors": 0,
         "skips": 0,
     }
     assert create_0 == create_1
@@ -248,7 +244,6 @@ def test_file_create_caching(client):
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
         "misses": 1,
-        "errors": 0,
         "skips": 0,
     }
     caching_server.reset_cache_recorder()
@@ -261,7 +256,6 @@ def test_file_create_caching(client):
     assert caching_server.get_cache_recorder() == {
         "hits": 1,
         "misses": 0,
-        "errors": 0,
         "skips": 0,
     }
     assert read_0.content == read_1.content == file_bytes
@@ -283,7 +277,6 @@ def test_obj_create_caching(client):
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
         "misses": 1,
-        "errors": 0,
         "skips": 0,
     }
     caching_server.reset_cache_recorder()
@@ -299,7 +292,6 @@ def test_obj_create_caching(client):
     assert caching_server.get_cache_recorder() == {
         "hits": 1,
         "misses": 0,
-        "errors": 0,
         "skips": 0,
     }
     assert create_0 == create_1
@@ -315,7 +307,6 @@ def test_obj_create_caching(client):
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
         "misses": 1,
-        "errors": 0,
         "skips": 0,
     }
     caching_server.reset_cache_recorder()
@@ -329,7 +320,6 @@ def test_obj_create_caching(client):
     assert caching_server.get_cache_recorder() == {
         "hits": 1,
         "misses": 0,
-        "errors": 0,
         "skips": 0,
     }
     assert read_0.obj.val == read_1.obj.val == val
