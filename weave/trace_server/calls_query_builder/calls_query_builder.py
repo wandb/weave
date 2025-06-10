@@ -650,29 +650,22 @@ class CallsQuery(BaseModel):
 
         # Query Conditions
         for condition in self.query_conditions:
-            if condition.is_heavy():
-                outer_query.query_conditions.append(condition)
-            else:
-                filter_query.query_conditions.append(condition)
+            filter_query.query_conditions.append(condition)
 
         # Hardcoded Filter - always light
         filter_query.hardcoded_filter = self.hardcoded_filter
 
         # Order Fields:
-        if has_light_order_filter:
-            filter_query.order_fields = self.order_fields
-            filter_query.limit = self.limit
-            filter_query.offset = self.offset
-            # SUPER IMPORTANT: still need to re-sort the final query
-            outer_query.order_fields = self.order_fields
-        else:
-            if has_heavy_filter and self.limit:
-                # Move heavy condition + optimizations to light filter w/ hardcap limit
-                filter_query.query_conditions.extend(outer_query.query_conditions)
-                filter_query.limit = self.limit * 10
-            outer_query.order_fields = self.order_fields
-            outer_query.limit = self.limit
-            outer_query.offset = self.offset
+        filter_query.order_fields = self.order_fields
+        filter_query.limit = self.limit
+        filter_query.offset = self.offset
+        if self.limit:
+            # Filter query must be much more permissive to account for potentially
+            # unmerged rows, * 10 for maximum safety.
+            filter_query.limit = self.limit * 10
+        outer_query.order_fields = self.order_fields
+        outer_query.limit = self.limit
+        outer_query.offset = self.offset
 
         raw_sql = f"""
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
