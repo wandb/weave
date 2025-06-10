@@ -2,7 +2,7 @@ version: 2
 updates:
   # Monitor Python dependencies in pyproject.toml
   - package-ecosystem: "pip"
-    directory: "/weave"
+    directory: "/"
     target-branch: "andrew/dependabot" # TODO: remove when ready to merge
     schedule:
       interval: "weekly"
@@ -225,8 +225,8 @@ updates:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
       # Exclude weave_query package and its dependencies from dependabot monitoring
-      - dependency-name: "weave_query"
-      - dependency-name: "weave-query"
+      - dependency-name: "weave_query*"
+      - dependency-name: "weave-query*"
     # Allow version requirements to be updated
     allow:
       - dependency-type: "direct"
