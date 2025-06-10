@@ -19,11 +19,7 @@ from weave.trace.settings import (
     use_server_cache,
 )
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings.mem_cache_with_disk_backend import (
-    DiskCache,
-    LRUCache,
-    StackedCache,
-)
+from weave.trace_server_bindings.caches import DiskCache, LRUCache, StackedCache
 
 logger = logging.getLogger(__name__)
 
