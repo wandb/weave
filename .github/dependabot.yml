@@ -2,7 +2,7 @@ version: 2
 updates:
   # Monitor Python dependencies in pyproject.toml
   - package-ecosystem: "pip"
-    directory: "/"
+    directory: "weave"
     target-branch: "andrew/dependabot" # TODO: remove when ready to merge
     schedule:
       interval: "weekly"
@@ -17,31 +17,31 @@ updates:
       core:
         patterns:
           - "pydantic*"
-          # - "wandb*"
-          # - "packaging*"
-          # - "tenacity*"
-          # - "emoji*"
-          # - "uuid-utils*"
-          # - "numpy*"
-          # - "rich*"
-          # - "click*"
-          # - "gql*"
-          # - "jsonschema*"
-          # - "diskcache*"
-          # - "nest-asyncio*"
+          - "wandb*"
+          - "packaging*"
+          - "tenacity*"
+          - "emoji*"
+          - "uuid-utils*"
+          - "numpy*"
+          - "rich*"
+          - "click*"
+          - "gql*"
+          - "jsonschema*"
+          - "diskcache*"
+          - "nest-asyncio*"
           # - "weave_server_sdk*"
 
       # # Trace server dependencies
-      # trace_server:
-      #   patterns:
-      #     - "ddtrace*"
-      #     - "boto3*"
-      #     - "azure-storage-blob*"
-      #     - "google-cloud-storage*"
-      #     - "litellm*"
-      #     - "opentelemetry-proto*"
-      #     - "opentelemetry-semantic-conventions-ai*"
-      #     - "openinference-semantic-conventions*"
+      trace_server:
+        patterns:
+          - "ddtrace*"
+          - "boto3*"
+          - "azure-storage-blob*"
+          - "google-cloud-storage*"
+          - "litellm*"
+          - "opentelemetry-proto*"
+          - "opentelemetry-semantic-conventions-ai*"
+          - "openinference-semantic-conventions*"
 
       # # Testing dependencies
       # test:
@@ -224,6 +224,9 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # Exclude weave_query package and its dependencies from dependabot monitoring
+      - dependency-name: "weave_query"
+      - dependency-name: "weave-query"
     # Allow version requirements to be updated
     allow:
       - dependency-type: "direct"
