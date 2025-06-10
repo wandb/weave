@@ -210,10 +210,22 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     if (inputRef.current) {
       inputRef.current.blur();
     }
-    if (date) {
-      const formattedDate = formatDate(date);
-      parseAndUpdateDate(formattedDate, true);
+    // Clear any pending debounced parse first
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
+
+    // Defer the date parsing to the next event loop cycle to allow calendar to close first
+    setTimeout(() => {
+      if (date) {
+        // When OK is clicked, use the provided date
+        const formattedDate = formatDate(date);
+        parseAndUpdateDate(formattedDate, true);
+      } else {
+        // When clicking outside, immediately parse the current input value
+        parseAndUpdateDate(inputValue, true);
+      }
+    }, 1);
   };
 
   const handleSuggestionClick = useCallback(
