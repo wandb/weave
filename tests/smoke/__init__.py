@@ -1,0 +1,1 @@
+# Smoke tests for Weave on Windows containers 
