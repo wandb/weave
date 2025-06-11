@@ -127,8 +127,6 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     ]
   );
 
-
-
   const columnStats = useMemo(() => getColumnStats(data), [data]);
 
   const getColorForScore = useCallback(

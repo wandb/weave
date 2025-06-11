@@ -27,6 +27,7 @@ import {
   LeaderboardGrid,
 } from '../../views/Leaderboard/LeaderboardGrid';
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
+import {GroupedLeaderboardData, LeaderboardValueRecord} from '../../views/Leaderboard/query/leaderboardQuery';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
@@ -36,7 +37,6 @@ import {
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {useObjectVersion} from '../wfReactInterface/tsDataModelHooks';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
-import {GroupedLeaderboardData, LeaderboardValueRecord} from '../../views/Leaderboard/query/leaderboardQuery';
 
 // Utility function to flatten all evaluation records from grouped data
 const getAllEvaluationRecords = (data: GroupedLeaderboardData): LeaderboardValueRecord[] => {
