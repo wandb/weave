@@ -1503,7 +1503,6 @@ class WeaveClient:
             )
         )
 
-    @pydantic.validate_call
     def get_feedback(
         self,
         query: Query | str | None = None,
@@ -1580,7 +1579,6 @@ class WeaveClient:
         )
 
     @deprecated(new_name="get_feedback")
-    @pydantic.validate_call
     def feedback(
         self,
         query: Query | str | None = None,
@@ -1665,7 +1663,6 @@ class WeaveClient:
             CostPurgeReq(project_id=self._project_id(), query=Query(**{"$expr": expr}))
         )
 
-    @pydantic.validate_call
     def query_costs(
         self,
         query: Query | str | None = None,
