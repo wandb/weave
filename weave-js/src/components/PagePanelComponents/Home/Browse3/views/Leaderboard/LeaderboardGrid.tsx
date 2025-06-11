@@ -7,6 +7,7 @@ import {
   GridSortDirection,
   GridSortItem,
 } from '@mui/x-data-grid-pro';
+import {Button} from '@wandb/weave/components/Button';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
@@ -168,7 +169,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           const modelRef = parseRefMaybe(
             `weave:///${entity}/${project}/${isOp ? 'op' : 'object'}/${
               params.value
-            }` ?? ''
+            }`
           );
           if (modelRef) {
             return (
@@ -274,7 +275,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                                 metricPathGroupName,
                                 value
                               ),
-                              border: isSelected ? '2px solid #1976d2' : 'none',
+                              border: isSelected ? '2px solid #13A9BA' : 'none',
                               boxSizing: 'border-box',
                             }}>
                             {inner}
@@ -310,7 +311,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           children: [],
           renderHeaderGroup: params => {
             const ref = parseRefMaybe(
-              `weave:///${entity}/${project}/object/${datasetGroupName}` ?? ''
+              `weave:///${entity}/${project}/object/${datasetGroupName}`
             );
             if (ref) {
               return <SmallRef objRef={ref} />;
@@ -328,7 +329,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               children: [],
               renderHeaderGroup: params => {
                 const ref = parseRefMaybe(
-                  `weave:///${entity}/${project}/op/${scorerGroupName}` ?? ''
+                  `weave:///${entity}/${project}/op/${scorerGroupName}`
                 );
                 if (ref) {
                   return <SmallRef objRef={ref} />;
@@ -417,55 +418,44 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         overflow: 'hidden',
       }}>
       {selectedEvaluationIds.length > 0 && (
-        <Box
-          sx={{
-            padding: 2,
-            backgroundColor: '#f5f5f5',
+        <div
+          style={{
+            borderTop: '1px solid #e0e0e0',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            gap: '8px',
+            backgroundColor: 'white',
+            padding: '8px',
           }}>
-          <span>
+          <Button
+            variant="ghost"
+            size="small"
+            icon="close"
+            onClick={() => setSelectedEvaluationIds([])}
+            tooltip="Clear selection"
+          />
+          <div style={{fontSize: '0.875rem'}}>
             {selectedEvaluationIds.length} evaluation
-            {selectedEvaluationIds.length > 1 ? 's' : ''} selected (Press Enter
-            to compare or Alt/Option+click to select more)
-          </span>
-          <Box sx={{display: 'flex', gap: 1}}>
-            <button
-              onClick={() => {
-                const to = peekingRouter.compareEvaluationsUri(
-                  entity,
-                  project,
-                  selectedEvaluationIds,
-                  null
-                );
-                history.push(to);
-                setSelectedEvaluationIds([]);
-              }}
-              style={{
-                padding: '4px 12px',
-                backgroundColor: '#1976d2',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}>
-              Compare
-            </button>
-            <button
-              onClick={() => setSelectedEvaluationIds([])}
-              style={{
-                padding: '4px 12px',
-                backgroundColor: '#666',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}>
-              Clear
-            </button>
-          </Box>
-        </Box>
+            {selectedEvaluationIds.length === 1 ? '' : 's'} selected:
+          </div>
+          <Button
+            size="medium"
+            variant="primary"
+            onClick={() => {
+              const to = peekingRouter.compareEvaluationsUri(
+                entity,
+                project,
+                selectedEvaluationIds,
+                null
+              );
+              history.push(to);
+              setSelectedEvaluationIds([]);
+            }}
+            icon="chart-scatterplot"
+            tooltip="Compare metrics and examples for selected evaluations">
+            Compare
+          </Button>
+        </div>
       )}
       <StyledDataGrid
         rows={rows}
