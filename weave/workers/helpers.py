@@ -18,10 +18,11 @@ logger = logging.getLogger(__name__)
 def get_internal_service_token() -> str:
     try:
         internal_service_token = os.environ["WANDB_INTERNAL_SERVICE_TOKEN"]
+        secret_name = os.environ["WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME"]
     except KeyError:
         raise KeyError("WANDB_INTERNAL_SERVICE_TOKEN is not set")
 
-    return internal_service_token
+    return f"{secret_name}:{internal_service_token}"
 
 
 INTERNAL_SERVICE_TOKEN_PREFIX = "X-Wandb-Internal-Service"
@@ -127,7 +128,7 @@ async def get_completion(
             return CompletionsCreateRes.model_validate(await response.json())
 
 
-def get_permissions():
+def get_permissions() -> None:
     client = get_authenticated_client()
     payload = client.execute(
         gql(
