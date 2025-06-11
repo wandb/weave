@@ -1,6 +1,7 @@
 import React from 'react';
 
 import {TextField} from '../../../../Form/TextField';
+import {FILTER_INPUT_DEBOUNCE_MS} from './FilterBar';
 
 type TextValueProps = {
   value: string;
@@ -43,7 +44,7 @@ export const TextValue = ({
     // Set new timeout
     debounceTimeoutRef.current = setTimeout(() => {
       onSetValue(newValue);
-    }, 1000);
+    }, FILTER_INPUT_DEBOUNCE_MS);
   };
 
   return (

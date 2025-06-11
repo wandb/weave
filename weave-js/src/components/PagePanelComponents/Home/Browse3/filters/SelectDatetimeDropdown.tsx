@@ -17,6 +17,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../integrations/analytics/userEvents';
 import {formatDate, formatDateOnly, parseDate} from '../../../../../util/date';
+import {FILTER_INPUT_DEBOUNCE_MS} from './FilterBar';
 
 type PredefinedSuggestion = {
   abbreviation: string;
@@ -51,7 +52,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   isActive,
 }) => {
   const [inputValue, setInputValue] = useState('');
-  console.log('inputValue', inputValue);
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(
@@ -146,7 +146,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       }
       debounceTimeoutRef.current = setTimeout(() => {
         parseAndUpdateDate(newInputValue);
-      }, 1000);
+      }, FILTER_INPUT_DEBOUNCE_MS);
     },
     [parseAndUpdateDate]
   );

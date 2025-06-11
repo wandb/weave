@@ -32,6 +32,8 @@ import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
+export const FILTER_INPUT_DEBOUNCE_MS = 1000;
+
 type FilterBarProps = {
   entity: string;
   project: string;
