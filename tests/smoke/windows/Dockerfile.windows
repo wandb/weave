@@ -13,11 +13,19 @@ RUN Invoke-WebRequest -Uri https://www.python.org/ftp/python/3.11.9/python-3.11.
 RUN python -m ensurepip --upgrade; \
     python -m pip install --upgrade pip
 
-# Install pytest
-RUN python -m pip install pytest
+# Install pytest and build tools
+RUN python -m pip install pytest build setuptools wheel
 
 # Set working directory
 WORKDIR /app
+
+# Copy package files
+COPY pyproject.toml .
+COPY README.md .
+COPY weave/ ./weave/
+
+# Install weave in development mode
+RUN python -m pip install -e .
 
 # Copy test files
 COPY tests/smoke/windows/test_windows_smoke.py .
