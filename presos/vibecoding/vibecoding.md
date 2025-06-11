@@ -308,7 +308,7 @@ Presenter Notes:
 **Warp** - Natural language → shell commands, smart suggestions & AI assistant
 
 <!-- IMG_GEN: {"prompt": "Magical command portal: terminal window as ancient stone archway with mystical runes, natural language floating in as glowing spells, transforming into command line incantations, magical realism art style", "size": "1792x1024"} -->
-![bg right:35%](images/warp-terminal.png)
+![bg right:55% 100%](images/warp.png)
 
 <!-- 
 Presenter Notes:
@@ -436,7 +436,7 @@ Presenter Notes:
 
 ---
 
-### otebooks 📓
+### Notebooks 📓
 *AI-powered data science workflows*
 
 **What AI can do:**
@@ -450,7 +450,7 @@ Presenter Notes:
 * "Clean this messy dataset"
 
 <!-- IMG_GEN: {"prompt": "Data scientist working with AI in a modern jupyter notebook interface, multiple data visualizations and charts floating as holograms around the screen, AI assistant analyzing scatter plots and regression models, clean tech aesthetic with blue and green data streams"} -->
-![bg right:30% 80%](images/notebooks.png)
+![bg right:40% 100%](images/notebooks.png)
 
 <!-- 
 Presenter Notes:
@@ -486,7 +486,7 @@ Presenter Notes:
 ### AGENTS.md (or equivalent) 📋
 *Your AI's instruction manual for your project*
 
-**Include in your project:**
+
 ```markdown
 # Project Context
 - Architecture overview & key patterns
@@ -494,15 +494,14 @@ Presenter Notes:
 
 # AI Instructions  
 - "Always use TypeScript strict mode"
-- "Follow Repository pattern for data access"
 - "Include comprehensive error handling"
 ```
 
 **Benefits:** Consistent AI behavior, faster feature work, automatic quality
 
 **Examples:**
-* https://github.com/tssweeney/agentikit/blob/main/.cursor/rules/general-project-rules.mdc
-* https://github.com/wandb/weave/blob/master/AGENTS.md
+* [Cursor Rules](https://github.com/tssweeney/agentikit/blob/main/.cursor/rules/general-project-rules.mdc)
+* [AGENTS.md](https://github.com/wandb/weave/blob/master/AGENTS.md)
 
 <!-- IMG_GEN: {"prompt": "Living instruction manual: AGENTS.md file as glowing tome with pages that float and rearrange themselves, AI reading and memorizing the patterns, library of knowledge with floating texts, magical realism meets technical documentation"} -->
 ![bg right:30% 75%](images/agents-md.png)
@@ -574,7 +573,7 @@ Presenter Notes:
 **Result:** Better docs, easier reviews, improved team communication
 
 <!-- IMG_GEN: {"prompt": "Automated PR workflow visualization: AI assistant examining code diffs on multiple screens, generating commit messages and PR descriptions, conveyor belt of documents flowing from code changes to polished documentation, industrial automation meets software development, clean vector style"} -->
-![bg right:30% 80%](images/pr-workflow.png)
+![bg right:40% 100%](images/git_diff.png)
 
 <!-- 
 Presenter Notes:
@@ -606,7 +605,6 @@ Presenter Notes:
 ---
 
 ## Building your AI "Team"
-*10 minutes*
 
 <!-- IMG_GEN: {"prompt": "AI dream team assembly: diverse AI personalities as superhero squad, each with unique powers and visual design representing their capabilities, team lineup poster style with dramatic lighting and heroic poses", "size": "1792x1024"} -->
 ![bg right:55%](images/ai-team.png)
