@@ -243,18 +243,19 @@ export const LeaderboardPageContentInner: React.FC<
     if (!data || selectedEvaluations.length === 0) {
       return 0;
     }
-    
+
     // Each model group (row) is selected if it contains any selected evaluations
     return Object.keys(data.modelGroups).filter(modelGroupName => {
       const modelGroup = data.modelGroups[modelGroupName];
-      
+
       // Check if this model group contains any selected evaluations using .some() for efficiency
       return Object.values(modelGroup.datasetGroups).some(datasetGroup =>
         Object.values(datasetGroup.scorerGroups).some(scorerGroup =>
           Object.values(scorerGroup.metricPathGroups).some(records =>
-            records.some(record => 
-              record.sourceEvaluationCallId && 
-              selectedEvaluations.includes(record.sourceEvaluationCallId)
+            records.some(
+              record =>
+                record.sourceEvaluationCallId &&
+                selectedEvaluations.includes(record.sourceEvaluationCallId)
             )
           )
         )
@@ -282,19 +283,16 @@ export const LeaderboardPageContentInner: React.FC<
               />
               <div className="text-sm">
                 {selectedModelsCount}{' '}
-                {selectedModelsCount === 1
-                  ? 'model'
-                  : 'models'}{' '}
-                selected:
+                {selectedModelsCount === 1 ? 'model' : 'models'} selected:
               </div>
               <CompareEvaluationsDropdownButton
                 entity={props.entity}
                 project={props.project}
                 selectedEvaluations={selectedEvaluations}
-                onDatasetSelect={(datasetId) => {
+                onDatasetSelect={datasetId => {
                   // Filter evaluations to only include those for the selected dataset
                   const filteredEvaluations: string[] = [];
-                  
+
                   // Iterate through selected evaluations and find those matching the dataset
                   selectedEvaluations.forEach(evalId => {
                     // Find the model group that contains this evaluation
@@ -302,25 +300,36 @@ export const LeaderboardPageContentInner: React.FC<
                       const datasetGroup = modelGroup.datasetGroups[datasetId];
                       if (datasetGroup) {
                         // Check if this evaluation ID exists in this dataset's records
-                        Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
-                          Object.values(scorerGroup.metricPathGroups).forEach(records => {
-                            records.forEach(record => {
-                              if (record.sourceEvaluationCallId === evalId) {
-                                filteredEvaluations.push(evalId);
+                        Object.values(datasetGroup.scorerGroups).forEach(
+                          scorerGroup => {
+                            Object.values(scorerGroup.metricPathGroups).forEach(
+                              records => {
+                                records.forEach(record => {
+                                  if (
+                                    record.sourceEvaluationCallId === evalId
+                                  ) {
+                                    filteredEvaluations.push(evalId);
+                                  }
+                                });
                               }
-                            });
-                          });
-                        });
+                            );
+                          }
+                        );
                       }
                     });
                   });
-                  
+
                   // Remove duplicates
-                  const uniqueFilteredEvaluations = [...new Set(filteredEvaluations)];
-                  
+                  const uniqueFilteredEvaluations = [
+                    ...new Set(filteredEvaluations),
+                  ];
+
                   console.log('Selected dataset:', datasetId);
-                  console.log('Filtered evaluations:', uniqueFilteredEvaluations);
-                  
+                  console.log(
+                    'Filtered evaluations:',
+                    uniqueFilteredEvaluations
+                  );
+
                   if (uniqueFilteredEvaluations.length > 0) {
                     history.push(
                       peekingRouter.compareEvaluationsUri(
@@ -337,7 +346,7 @@ export const LeaderboardPageContentInner: React.FC<
                     ? Object.keys(
                         Object.values(data.modelGroups)[0].datasetGroups || {}
                       ).map(datasetName => ({
-                        id: datasetName,   // Keep full name as ID for filtering
+                        id: datasetName, // Keep full name as ID for filtering
                         name: datasetName, // Pass full name, formatting is done in the component
                       }))
                     : []
@@ -481,15 +490,16 @@ const DatasetNameWithVersion: FC<{
   entity: string;
   project: string;
   datasetFullName: string;
-}> = ({ entity, project, datasetFullName }) => {
-  const ref = useMemo(() => 
-    parseRefMaybe(`weave:///${entity}/${project}/object/${datasetFullName}`),
+}> = ({entity, project, datasetFullName}) => {
+  const ref = useMemo(
+    () =>
+      parseRefMaybe(`weave:///${entity}/${project}/object/${datasetFullName}`),
     [entity, project, datasetFullName]
   );
-  
+
   // Check if it's a WeaveObjectRef
   const isWeaveRef = ref && 'entityName' in ref && 'weaveKind' in ref;
-  
+
   const objectVersion = useObjectVersion(
     isWeaveRef
       ? {
@@ -507,19 +517,20 @@ const DatasetNameWithVersion: FC<{
         }
       : undefined
   );
-  
+
   if (!ref || !('artifactName' in ref)) {
     return <>{datasetFullName}</>;
   }
-  
+
   const versionIndex = objectVersion?.result?.versionIndex ?? -1;
   const baseName = ref.artifactName;
-  
+
   // Format like SmallRef does
-  const displayName = versionIndex >= 0 
-    ? `${baseName}:v${versionIndex}`
-    : `${baseName}:${ref.artifactVersion.slice(0, 6)}`;
-    
+  const displayName =
+    versionIndex >= 0
+      ? `${baseName}:v${versionIndex}`
+      : `${baseName}:${ref.artifactVersion.slice(0, 6)}`;
+
   return <>{displayName}</>;
 };
 
@@ -539,11 +550,11 @@ const CompareEvaluationsDropdownButton: FC<{
   onDatasetSelect,
   availableDatasets = [],
   disabled,
-  loading
+  loading,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const buttonText = selectedEvaluations.length === 1 ? 'View' : 'Compare';
-  
+
   return (
     <Box
       sx={{
@@ -573,8 +584,8 @@ const CompareEvaluationsDropdownButton: FC<{
           </Button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
-          <DropdownMenu.Content 
-            align="start" 
+          <DropdownMenu.Content
+            align="start"
             sideOffset={4}
             className="min-w-[200px]">
             {availableDatasets.length === 0 ? (
