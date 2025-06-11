@@ -21,7 +21,7 @@ if errorlevel 1 (
 REM Install dependencies
 echo Installing dependencies...
 python -m pip install --upgrade pip
-python -m pip install -e ../..
+python -m pip install -e ../../..
 python -m pip install pytest
 
 REM Set environment variables
@@ -51,12 +51,12 @@ if errorlevel 1 (
 )
 
 REM Change to repo root
-pushd ..\..
+pushd ..\..\.
 
 REM Build container if requested
 if "%2"=="build" (
     echo Building Windows container...
-    docker build -f Dockerfile.windows -t weave-windows-test:latest .
+    docker build -f tests/smoke/windows/Dockerfile.windows -t weave-windows-test:latest .
     if errorlevel 1 (
         echo ERROR: Failed to build container!
         popd

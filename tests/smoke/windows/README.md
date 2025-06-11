@@ -1,6 +1,6 @@
 # Weave Windows Smoke Tests
 
-This directory contains smoke tests to validate that Weave works correctly on Windows containers and Windows environments.
+This directory (`tests/smoke/windows/`) contains Windows-specific smoke tests to validate that Weave works correctly on Windows containers and Windows environments.
 
 ## Overview
 
@@ -15,6 +15,8 @@ The smoke tests cover:
 - Basic concurrent operations
 
 ## Running Tests Locally
+
+**Note:** All commands should be run from the repository root unless otherwise specified.
 
 ### Prerequisites
 
@@ -33,7 +35,7 @@ The easiest way to run tests locally is using the provided PowerShell script:
 
 ```powershell
 # Run tests natively
-cd tests/smoke
+cd tests/smoke/windows
 .\run_windows_tests.ps1
 
 # Run tests in a Windows container
@@ -48,26 +50,26 @@ cd tests/smoke
 #### Native Windows Testing
 
 ```powershell
-# Install dependencies
+# Install dependencies (from repo root)
 pip install -e .
 pip install pytest
 
 # Run smoke tests
-cd tests/smoke
+cd tests/smoke/windows
 python -m pytest test_windows_smoke.py -v
 ```
 
 #### Container Testing
 
 ```powershell
-# Build the Windows container
-docker build -f Dockerfile.windows -t weave-windows-test:latest .
+# Build the Windows container (from repo root)
+docker build -f tests/smoke/windows/Dockerfile.windows -t weave-windows-test:latest .
 
 # Run tests in the container
 docker run --rm weave-windows-test:latest
 
 # Run with custom command
-docker run --rm weave-windows-test:latest python -m pytest tests/smoke/test_windows_smoke.py -v --tb=short
+docker run --rm weave-windows-test:latest python -m pytest tests/smoke/windows/test_windows_smoke.py -v --tb=short
 ```
 
 ## CI/CD Integration
@@ -96,14 +98,20 @@ Main test file containing all smoke tests:
 - `test_unicode_support()` - Tests Unicode handling
 - `test_concurrent_ops()` - Tests concurrent operations
 
-### `Dockerfile.windows`
+### `tests/smoke/windows/Dockerfile.windows`
 Windows container definition:
 - Based on Windows Server Core LTSC 2022
 - Installs Python 3.11
 - Installs Weave and dependencies
 - Runs smoke tests by default
 
-### `run_windows_tests.ps1`
+### `.github/workflows/windows-smoke-test.yaml`
+GitHub Actions workflow for CI/CD:
+- Runs tests on Windows Server 2022
+- Tests in both containers and native environments
+- Multiple Python versions
+
+### `tests/smoke/windows/run_windows_tests.ps1`
 PowerShell script for local testing:
 - Supports both native and container testing
 - Handles dependency installation

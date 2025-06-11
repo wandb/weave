@@ -5,15 +5,13 @@ on:
     branches: [ master, main ]
     paths:
       - 'weave/**'
-      - 'tests/smoke/**'
-      - 'Dockerfile.windows'
+      - 'tests/smoke/windows/**'
       - '.github/workflows/windows-smoke-test.yaml'
   pull_request:
     branches: [ master, main ]
     paths:
       - 'weave/**'
-      - 'tests/smoke/**'
-      - 'Dockerfile.windows'
+      - 'tests/smoke/windows/**'
       - '.github/workflows/windows-smoke-test.yaml'
   workflow_dispatch:
     inputs:
@@ -36,7 +34,7 @@ jobs:
       
     - name: Build Windows container
       run: |
-        docker build -f Dockerfile.windows -t weave-windows-test:latest .
+        docker build -f tests/smoke/windows/Dockerfile.windows -t weave-windows-test:latest .
       
     - name: Run smoke tests in container
       run: |
@@ -52,7 +50,7 @@ jobs:
           -e WEAVE_SMOKE_TEST=1 `
           -e PYTHONUNBUFFERED=1 `
           weave-windows-test:latest `
-          python -m pytest tests/smoke/test_windows_smoke.py -v --tb=short
+          python -m pytest tests/smoke/windows/test_windows_smoke.py -v --tb=short
   
   windows-native-test:
     runs-on: windows-2022
@@ -81,7 +79,7 @@ jobs:
         WEAVE_SMOKE_TEST: '1'
         PYTHONUNBUFFERED: '1'
       run: |
-        python -m pytest tests/smoke/test_windows_smoke.py -v
+        python -m pytest tests/smoke/windows/test_windows_smoke.py -v
         
     - name: Upload test results
       if: always()

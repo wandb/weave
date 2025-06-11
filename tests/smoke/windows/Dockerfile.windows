@@ -29,11 +29,11 @@ RUN python -m pip install --upgrade pip setuptools wheel build
 RUN python -m pip install -e .
 
 # Copy test files
-COPY tests/smoke/ ./tests/smoke/
+COPY tests/smoke/windows/ ./tests/smoke/windows/
 
 # Set environment variables for Windows
 ENV PYTHONUNBUFFERED=1
 ENV WEAVE_SMOKE_TEST=1
 
 # Default command to run smoke tests
-CMD ["python", "-m", "pytest", "tests/smoke/test_windows_smoke.py", "-v"] 
+CMD ["python", "-m", "pytest", "tests/smoke/windows/test_windows_smoke.py", "-v"] 

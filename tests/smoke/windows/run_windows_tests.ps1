@@ -32,7 +32,7 @@ function Run-NativeTests {
     # Install dependencies
     Write-Host "Installing dependencies..." -ForegroundColor Yellow
     python -m pip install --upgrade pip
-    python -m pip install -e ../..
+    python -m pip install -e ../../..
     python -m pip install pytest
     
     # Set environment variables
@@ -61,13 +61,13 @@ function Run-ContainerTests {
     }
     
     # Change to repository root
-    Push-Location ../..
+    Push-Location ../../..
     
     try {
         # Build container if requested
         if ($BuildContainer) {
             Write-Host "Building Windows container..." -ForegroundColor Yellow
-            docker build -f Dockerfile.windows -t weave-windows-test:latest .
+            docker build -f tests/smoke/windows/Dockerfile.windows -t weave-windows-test:latest .
             if ($LASTEXITCODE -ne 0) {
                 Write-Error "Failed to build container!"
                 exit 1
