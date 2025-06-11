@@ -15,11 +15,13 @@ import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../feedback/HumanFeedback/tsHumanFeedback';
+import {DeleteModal} from '../pages/common/DeleteModal';
 import {ColumnInfo} from '../types';
 import {
   FIELD_DESCRIPTIONS,
   FIELD_LABELS,
   FilterId,
+  getFieldType,
   getOperatorOptions,
   isValuelessOperator,
   MONITORED_FILTER_VALUE,
@@ -69,6 +71,8 @@ export const FilterBar = ({
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [showDeleteWarning, setShowDeleteWarning] = useState(false);
+  const [filterToDelete, setFilterToDelete] = useState<FilterId | null>(null);
 
   // local filter model is used to avoid triggering a re-render of the trace
   // table on every keystroke.
@@ -186,9 +190,25 @@ export const FilterBar = ({
   }
 
   const onRemoveAll = () => {
-    const emptyModel = {items: []};
-    setLocalFilterModel(emptyModel);
-    setFilterModel(emptyModel);
+    // Check if there's only one filter and it's a datetime filter
+    if (
+      localFilterModel.items.length === 1 &&
+      getFieldType(localFilterModel.items[0].field) === 'datetime'
+    ) {
+      setFilterToDelete(localFilterModel.items[0].id);
+      setShowDeleteWarning(true);
+      return;
+    }
+
+    // Remove all filters except the first datetime filter
+    const firstDatetimeFilter = localFilterModel.items.find(
+      item => getFieldType(item.field) === 'datetime'
+    );
+    const newItems = firstDatetimeFilter ? [firstDatetimeFilter] : [];
+
+    const newModel = {items: newItems};
+    setLocalFilterModel(newModel);
+    setFilterModel(newModel);
     setAnchorEl(null);
   };
 
@@ -252,6 +272,19 @@ export const FilterBar = ({
 
   const onRemoveFilter = useCallback(
     (filterId: FilterId) => {
+      // Check if this is the first datetime filter
+      const isFirstDatetimeFilter =
+        localFilterModel.items.length > 0 &&
+        localFilterModel.items[0].id === filterId &&
+        getFieldType(localFilterModel.items[0].field) === 'datetime';
+
+      if (isFirstDatetimeFilter) {
+        setFilterToDelete(filterId);
+        setShowDeleteWarning(true);
+        return;
+      }
+
+      // Proceed with normal deletion
       const items = localFilterModel.items.filter(f => f.id !== filterId);
       const newModel = {...localFilterModel, items};
       setLocalFilterModel(newModel);
@@ -264,6 +297,28 @@ export const FilterBar = ({
     },
     [localFilterModel, applyCompletedFilters, activeEditId]
   );
+
+  const handleConfirmDelete = useCallback(() => {
+    if (filterToDelete !== null) {
+      const items = localFilterModel.items.filter(f => f.id !== filterToDelete);
+      const newModel = {...localFilterModel, items};
+      setLocalFilterModel(newModel);
+      applyCompletedFilters(newModel);
+
+      // Clear active edit if removed
+      if (activeEditId === filterToDelete) {
+        setActiveEditId(null);
+      }
+    }
+
+    setShowDeleteWarning(false);
+    setFilterToDelete(null);
+  }, [filterToDelete, localFilterModel, applyCompletedFilters, activeEditId]);
+
+  const handleCancelDelete = useCallback(() => {
+    setShowDeleteWarning(false);
+    setFilterToDelete(null);
+  }, []);
 
   const onSetSelected = useCallback(() => {
     const newFilter =
@@ -396,19 +451,26 @@ export const FilterBar = ({
               </div>
             </DraggableHandle>
             <div className="grid grid-cols-[auto_auto_auto_30px] gap-4">
-              {localFilterModel.items.map(item => (
-                <FilterRow
-                  key={item.id}
-                  entity={entity}
-                  project={project}
-                  item={item}
-                  options={options}
-                  onAddFilter={onAddFilter}
-                  onUpdateFilter={onUpdateFilter}
-                  onRemoveFilter={onRemoveFilter}
-                  activeEditId={activeEditId}
-                />
-              ))}
+              {(() => {
+                return localFilterModel.items.map((item, index) => {
+                  const isFirstDatetimeFilter =
+                    index === 0 && getFieldType(item.field) === 'datetime';
+                  return (
+                    <FilterRow
+                      key={item.id}
+                      entity={entity}
+                      project={project}
+                      item={item}
+                      options={options}
+                      onAddFilter={onAddFilter}
+                      onUpdateFilter={onUpdateFilter}
+                      onRemoveFilter={onRemoveFilter}
+                      activeEditId={activeEditId}
+                      disabled={isFirstDatetimeFilter}
+                    />
+                  );
+                });
+              })()}
             </div>
             {localFilterModel.items.length === 0 && (
               <FilterRow
@@ -449,6 +511,16 @@ export const FilterBar = ({
           </div>
         </Tailwind>
       </Popover>
+      <DeleteModal
+        open={showDeleteWarning}
+        onClose={handleCancelDelete}
+        deleteTitleStr="date range"
+        deleteBodyStrs={[
+          'Removing the date range can significantly reduce performance in large projects.',
+        ]}
+        onDelete={() => Promise.resolve(handleConfirmDelete())}
+        actionWord="Remove"
+      />
     </>
   );
 };

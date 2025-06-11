@@ -32,7 +32,6 @@ const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
   {abbreviation: '2d', label: '2 Days'},
   {abbreviation: '1w', label: '1 Week'},
   {abbreviation: '1mo', label: '1 Month'},
-  {abbreviation: '3mo', label: '3 Months'},
   {abbreviation: 'custom', label: 'Custom datetime', isCustomDate: true},
 ];
 
