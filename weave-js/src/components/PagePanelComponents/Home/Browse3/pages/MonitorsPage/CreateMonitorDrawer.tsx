@@ -31,12 +31,15 @@ import {
   useScorerCreate,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
-import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {
+  ObjectVersionKey,
+  ObjectVersionSchema,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {toast} from 'react-toastify';
 import {
   FieldName,
@@ -48,12 +51,60 @@ const PAGE_OFFSET = 0;
 
 const SCORER_FORMS: Map<
   string,
-  React.ComponentType<{scorer: ObjectVersionSchema}> | null
+  React.ComponentType<{
+    scorer: ObjectVersionSchema;
+    onChange: (scorer: ObjectVersionSchema) => void;
+    onValidationChange: (isValid: boolean) => void;
+  }> | null
 > = new Map([
   ['ValidJSONScorer', null],
   ['ValidXMLScorer', null],
   ['LLMAsAJudgeScorer', LLMAsAJudgeScorerForm],
 ]);
+
+export const MonitorDrawerRouter = (props: CreateMonitorDrawerProps) => {
+  if (props.monitor) {
+    return (
+      <CreateMonitorDrawerWithScorers {...props} monitor={props.monitor} /> // Repeating monitor to appease type checking
+    );
+  }
+  return <CreateMonitorDrawer {...props} />;
+};
+
+const CreateMonitorDrawerWithScorers = (
+  props: CreateMonitorDrawerProps & {monitor: ObjectVersionSchema}
+) => {
+  const scorerIds: string[] = useMemo(() => {
+    return (
+      props.monitor.val['scorers'].map(
+        (scorerRefUri: string) => parseRef(scorerRefUri).artifactName
+      ) || []
+    );
+  }, [props.monitor]);
+
+  const {result: scorers, loading} = useRootObjectVersions({
+    entity: props.entity,
+    project: props.project,
+    filter: {
+      objectIds: scorerIds,
+      latestOnly: true,
+    },
+  });
+  return loading || !scorers ? (
+    <WaveLoader size="huge" />
+  ) : (
+    <CreateMonitorDrawer {...props} scorers={scorers} />
+  );
+};
+
+type CreateMonitorDrawerProps = {
+  entity: string;
+  project: string;
+  open: boolean;
+  onClose: () => void;
+  monitor?: ObjectVersionSchema;
+  scorers?: ObjectVersionSchema[];
+};
 
 export const CreateMonitorDrawer = ({
   entity,
@@ -61,62 +112,46 @@ export const CreateMonitorDrawer = ({
   open,
   onClose,
   monitor,
-}: {
-  entity: string;
-  project: string;
-  open: boolean;
-  onClose: () => void;
-  monitor?: ObjectVersionSchema;
-}) => {
+  scorers: existingScorers,
+}: CreateMonitorDrawerProps) => {
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [description, setDescription] = useState<string>('');
-  const [monitorName, setMonitorName] = useState<string>('');
-  const [samplingRate, setSamplingRate] = useState<number>(10);
+  const [description, setDescription] = useState<string>(
+    monitor?.val['description'] || ''
+  );
+  const [monitorName, setMonitorName] = useState<string>(
+    monitor?.val['name'] || ''
+  );
+  const [samplingRate, setSamplingRate] = useState<number>(
+    (monitor?.val['sampling_rate'] || 0.1) * 100
+  );
   const [selectedOpVersionOption, setSelectedOpVersionOption] = useState<
     string[]
   >([]);
-  const [filter, setFilter] = useState<WFHighLevelCallFilter>({});
-  const [filterModel, setFilterModel] = useState<GridFilterModel>({items: []});
+  const [filter, setFilter] = useState<WFHighLevelCallFilter>({
+    opVersionRefs: monitor?.val['op_names'] || [],
+  });
+  const [filterModel, setFilterModel] = useState<GridFilterModel>(
+    queryToGridFilterModel(monitor?.val['query']) || {
+      items: [],
+    }
+  );
   const {useCalls} = useWFHooks();
-  const [scorers, setScorers] = useState<ObjectVersionSchema[]>([]);
-  const [active, setActive] = useState<boolean>(false);
+  const [scorers, setScorers] = useState<ObjectVersionSchema[]>(
+    existingScorers || []
+  );
+  const [scorerValids, setScorerValids] = useState<boolean[]>([]);
+  const [active, setActive] = useState<boolean>(
+    monitor?.val['active'] || false
+  );
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const {sortBy, lowLevelFilter} = useFilterSortby(filter, {items: []}, [
     {field: 'started_at', sort: 'desc'},
   ]);
 
-  const scorerIds: string[] = useMemo(() => {
-    return (
-      monitor?.val['scorers']?.map(
-        (scorerRefUri: string) => parseRef(scorerRefUri).artifactName
-      ) || []
-    );
-  }, [monitor]);
-
-  const {result: existingScorerObjects} = useRootObjectVersions({
-    entity,
-    project,
-    filter: {
-      objectIds: scorerIds,
-      latestOnly: true,
-    },
-    skip: !monitor || scorerIds.length === 0,
-  });
-
-  useMemo(() => {
-    setMonitorName(monitor?.val['name'] || '');
-    setDescription(monitor?.val['description'] || '');
-    setSamplingRate((monitor?.val['sampling_rate'] || 0.1) * 100);
-    setFilter({opVersionRefs: monitor?.val['op_names'] || []});
-    setScorers(existingScorerObjects || []);
-    setActive(monitor?.val['active'] || false);
-    setFilterModel(
-      queryToGridFilterModel(monitor?.val['query']) || {
-        items: [],
-      }
-    );
-  }, [monitor, setMonitorName]);
+  useEffect(() => {
+    setScorerValids(currentValids => currentValids.slice(0, scorers.length));
+  }, [scorers.length]);
 
   const {result: callsResults, loading: callsLoading} = useCalls({
     entity,
@@ -161,14 +196,31 @@ export const CreateMonitorDrawer = ({
     setSelectedOpVersionOption(filter.opVersionRefs ?? []);
   }, [filter]);
 
+  const allScorersValid = useMemo(() => {
+    return scorers.every((scorer, index) => {
+      const hasForm = SCORER_FORMS.get(scorer.val['_type']) !== null;
+      if (hasForm) {
+        return scorerValids[index] === true;
+      }
+      return true; // No form, so it's valid
+    });
+  }, [scorers, scorerValids]);
+
   const enableCreateButton = useMemo(() => {
     return (
       monitorName.length > 0 &&
       selectedOpVersionOption.length > 0 &&
       scorers.length > 0 &&
-      nameError === null
+      nameError === null &&
+      allScorersValid
     );
-  }, [monitorName, selectedOpVersionOption, scorers, nameError]);
+  }, [
+    monitorName,
+    selectedOpVersionOption,
+    scorers,
+    nameError,
+    allScorersValid,
+  ]);
 
   const objCreate = useObjCreate();
 
@@ -180,16 +232,31 @@ export const CreateMonitorDrawer = ({
     }
 
     setIsCreating(true);
+
     try {
       const scorerRefs = await Promise.all(
-        scorers.map(
-          async scorer =>
-            await scorerCreate({
+        scorers.map(async scorer => {
+          let scorerVersionKey: ObjectVersionKey;
+          if (scorer.versionHash) {
+            scorerVersionKey = {
+              scheme: 'weave',
+              weaveKind: 'object',
+              entity: scorer.entity,
+              project: scorer.project,
+              objectId: scorer.objectId,
+              versionHash: scorer.versionHash,
+              path: '',
+            };
+          } else {
+            scorerVersionKey = await scorerCreate({
               entity,
               project,
-              ...scorer,
-            })
-        )
+              name: scorer.objectId,
+              val: scorer.val,
+            });
+          }
+          return objectVersionKeyToRefUri(scorerVersionKey);
+        })
       );
 
       const mongoQuery = getFilterByRaw(filterModel);
@@ -210,9 +277,7 @@ export const CreateMonitorDrawer = ({
         op_names: opNames,
         query: mongoQuery ? {$expr: mongoQuery} : null,
         sampling_rate: samplingRate / 100,
-        scorers: scorerRefs.map(scorerRef =>
-          objectVersionKeyToRefUri(scorerRef)
-        ),
+        scorers: scorerRefs,
         active: active,
       };
 
@@ -261,7 +326,24 @@ export const CreateMonitorDrawer = ({
           if (!ScorerForm) {
             return null;
           }
-          return <ScorerForm key={index} />;
+          return (
+            <ScorerForm
+              key={index}
+              scorer={scorer}
+              onChange={(newScorer: ObjectVersionSchema) =>
+                setScorers(currentScorers =>
+                  currentScorers.map((s, i) => (i === index ? newScorer : s))
+                )
+              }
+              onValidationChange={(isValid: boolean) =>
+                setScorerValids(currentValids => {
+                  const nextValids = [...currentValids];
+                  nextValids[index] = isValid;
+                  return nextValids;
+                })
+              }
+            />
+          );
         })}
       </>
     );
@@ -437,7 +519,9 @@ export const CreateMonitorDrawer = ({
                         multiple
                         options={Array.from(SCORER_FORMS.keys())}
                         sx={{width: '100%'}}
-                        value={scorers.map(scorer => scorer.name)}
+                        value={scorers.map(
+                          scorer => scorer.objectId || scorer.val['_type']
+                        )}
                         onChange={(
                           unused,
                           newScorers: string | string[] | null
@@ -451,7 +535,17 @@ export const CreateMonitorDrawer = ({
                             : [newScorers as string];
                           setScorers(
                             newScorerArray.map(newScorer => ({
-                              name: newScorer,
+                              scheme: 'weave',
+                              weaveKind: 'object',
+                              entity,
+                              project,
+                              objectId: '',
+                              versionHash: '',
+                              path: '',
+                              versionIndex: 0,
+                              baseObjectClass: newScorer,
+                              createdAtMs: Date.now(),
+                              val: {_type: newScorer},
                             }))
                           );
                         }}

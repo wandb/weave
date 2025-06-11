@@ -6,7 +6,7 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
 import {ALL_TRACES_OR_CALLS_REF_KEY} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 import {EMPTY_PROPS_MONITORS} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/EmptyContent';
-import {CreateMonitorDrawer} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/CreateMonitorDrawer';
+import {MonitorDrawerRouter} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/CreateMonitorDrawer';
 import {FilterableObjectVersionsTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectVersionsTable';
 import {Query} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientInterface/query';
 import {useCallsStats} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
@@ -162,7 +162,7 @@ export const MonitorsPage = ({
           ]}
         />
       </Box>
-      <CreateMonitorDrawer
+      <MonitorDrawerRouter
         entity={entity}
         project={project}
         open={isCreateDrawerOpen}

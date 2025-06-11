@@ -19,7 +19,7 @@ def wf_kafka_broker_port() -> int:
 
 def wf_enable_online_eval() -> bool:
     """Whether to enable online evaluation."""
-    return os.environ.get("WF_ENABLE_ONLINE_EVAL", "false").lower() == "true"
+    return os.environ.get("WEAVE_ENABLE_ONLINE_EVAL", "false").lower() == "true"
 
 
 def wf_scoring_worker_batch_size() -> int:

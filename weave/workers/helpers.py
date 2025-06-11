@@ -29,17 +29,14 @@ INTERNAL_SERVICE_TOKEN_PREFIX = "X-Wandb-Internal-Service"
 
 def get_authenticated_client(impersonate_as: str | None = None) -> Client:
     try:
-        wandb_base_url = "https://api.wandb.ai"
-        # QA
-        # wandb_base_url = "https://api.qa.wandb.ai"
-        # wandb_base_url = os.environ["WANDB_BASE_URL"]
+        wandb_base_url = os.environ["WANDB_BASE_URL"]
     except KeyError:
         raise KeyError("WANDB_BASE_URL is not set")
 
     internal_service_token = get_internal_service_token()
 
     headers = {
-        "Authorization": f"{INTERNAL_SERVICE_TOKEN_PREFIX} {internal_service_token}"
+        "Authorization": f"{INTERNAL_SERVICE_TOKEN_PREFIX} {internal_service_token}",
     }
     if impersonate_as:
         headers["impersonated-username"] = impersonate_as
@@ -109,9 +106,9 @@ async def get_completion(
 ) -> CompletionsCreateRes:
     username = get_username_from_user_id(user_id)
     try:
-        trace_server_base_url = os.environ["TRACE_SERVER_BASE_URL"]
+        trace_server_base_url = os.environ["WEAVE_TRACE_SERVER_BASE_URL"]
     except KeyError:
-        raise KeyError("TRACE_SERVER_BASE_URL is not set")
+        raise KeyError("WEAVE_TRACE_SERVER_BASE_URL is not set")
 
     async with aiohttp.ClientSession() as session:
         async with session.post(
@@ -146,7 +143,7 @@ def get_permissions():
         }
     """
         ),
-        {"projectName": "monitor-test", "entityName": "wandb"},
+        {"projectName": "monitor-test", "entityName": "weave-team"},
     )
     print(payload)
 
@@ -163,7 +160,7 @@ def ext_to_int_project_id():
         }
     """
         ),
-        {"entityName": "weave-team", "projectName": "monitor-test"},
+        {"entityName": "wandb", "projectName": "monitor-test"},
     )
     print(payload)
 
@@ -184,7 +181,10 @@ if __name__ == "__main__":
     )
     # result = asyncio.run(get_completion(req, "VXNlcjoyMzU4MjI0"))
     # print(result)
-    print(get_permissions())
+    # logging.basicConfig(level=logging.DEBUG)
+    # print(get_permissions())
     # print(ext_to_int_project_id())
     # print(get_username_from_user_id("VXNlcjo5Njc="))
+    # print(get_username_from_user_id("VXNlcjo2Mzg4Nw=="))
+    # print(get_username_from_user_id("VXNlcjoyMzU4MjI0"))
     # print(get_external_project_id("UHJvamVjdEludGVybmFsSWQ6NDI3NQ=="))
