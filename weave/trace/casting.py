@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Union
+from typing import Annotated, Any
 
 import pydantic
 
@@ -35,8 +35,6 @@ def cast_to_query(obj: Any) -> Query:
     raise TypeError("Unable to cast to Query")
 
 
-CallsFilterLike = Annotated[
-    Union[CallsFilter, None], pydantic.BeforeValidator(cast_to_calls_filter)
-]
+CallsFilterLike = Annotated[CallsFilter, pydantic.BeforeValidator(cast_to_calls_filter)]
 SortByLike = Annotated[SortBy, pydantic.BeforeValidator(cast_to_sort_by)]
-QueryLike = Annotated[Union[Query, None], pydantic.BeforeValidator(cast_to_query)]
+QueryLike = Annotated[Query, pydantic.BeforeValidator(cast_to_query)]
