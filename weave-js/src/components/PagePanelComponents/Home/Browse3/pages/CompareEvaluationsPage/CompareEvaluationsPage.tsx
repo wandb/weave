@@ -224,24 +224,24 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
                 )}
                 <ScorecardSection state={state} />
                 <Tailwind style={{width: '100%'}}>
-<div className="px-16">
-  <div className="flex w-full flex items-center gap-3 rounded-lg bg-moon-100 px-16 py-8">
-    <Icon name="table" size="large" color="moon-500 mb-4" />
-    <p className="text-[14px] ml-[8px] font-semibold">
-      Looking for your evaluation results?
-    </p>
-    <p className="text-[14px] ml-[8px] mr-auto text-moon-500">
-      You can find it in our new results tab.
-    </p>
-    <Button
-      variant="ghost"
-      onClick={() => setTabValue('results')}>
-      Review evaluation results
-    </Button>
-  </div>
-  <div className="h-16"></div>
-</div>
-</Tailwind>
+                  <div className="px-16">
+                    <div className="flex flex w-full items-center gap-3 rounded-lg bg-moon-100 px-16 py-8">
+                      <Icon name="table" size="large" color="moon-500 mb-4" />
+                      <p className="ml-[8px] text-[14px] font-semibold">
+                        Looking for your evaluation results?
+                      </p>
+                      <p className="ml-[8px] mr-auto text-[14px] text-moon-500">
+                        You can find it in our new results tab.
+                      </p>
+                      <Button
+                        variant="ghost"
+                        onClick={() => setTabValue('results')}>
+                        Review evaluation results
+                      </Button>
+                    </div>
+                    <div className="h-16"></div>
+                  </div>
+                </Tailwind>
               </VerticalBox>
             ),
           },
