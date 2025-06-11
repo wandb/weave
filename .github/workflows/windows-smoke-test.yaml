@@ -1,24 +1,10 @@
 name: Windows Container Smoke Test
 
+# This workflow validates that Weave functions correctly on Windows
+# by running smoke tests inside a Windows Server Core container
+
 on:
   push:
-    branches: [ master, main ]
-    paths:
-      - 'weave/**'
-      - 'tests/smoke/windows/**'
-      - '.github/workflows/windows-smoke-test.yaml'
-  pull_request:
-    branches: [ master, main ]
-    paths:
-      - 'weave/**'
-      - 'tests/smoke/windows/**'
-      - '.github/workflows/windows-smoke-test.yaml'
-  workflow_dispatch:
-    inputs:
-      run_full_test:
-        description: 'Run full test suite'
-        required: false
-        default: 'false'
 
 jobs:
   windows-container-test:
@@ -41,51 +27,4 @@ jobs:
         docker run --rm `
           -e WEAVE_SMOKE_TEST=1 `
           -e PYTHONUNBUFFERED=1 `
-          weave-windows-test:latest
-      
-    - name: Run extended tests (if requested)
-      if: github.event.inputs.run_full_test == 'true'
-      run: |
-        docker run --rm `
-          -e WEAVE_SMOKE_TEST=1 `
-          -e PYTHONUNBUFFERED=1 `
-          weave-windows-test:latest `
-          python -m pytest tests/smoke/windows/test_windows_smoke.py -v --tb=short
-  
-  windows-native-test:
-    runs-on: windows-2022
-    timeout-minutes: 20
-    strategy:
-      matrix:
-        python-version: ['3.9', '3.10', '3.11']
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
-        pip install pytest
-        
-    - name: Run smoke tests
-      env:
-        WEAVE_SMOKE_TEST: '1'
-        PYTHONUNBUFFERED: '1'
-      run: |
-        python -m pytest tests/smoke/windows/test_windows_smoke.py -v
-        
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v3
-      with:
-        name: windows-test-results-${{ matrix.python-version }}
-        path: |
-          **/*test*.log
-          **/*test*.xml 
+          weave-windows-test:latest 

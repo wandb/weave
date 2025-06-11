@@ -1,12 +1,12 @@
 # Weave Windows Smoke Tests
 
-This directory (`tests/smoke/windows/`) contains Windows-specific smoke tests to validate that Weave works correctly on Windows containers and Windows environments.
+This directory (`tests/smoke/windows/`) contains Windows-specific smoke tests to validate that Weave works correctly on Windows containers.
 
 ## Overview
 
-The smoke tests cover:
+The smoke tests validate core Weave functionality on Windows:
 - Basic Weave initialization and import
-- Op decorators and function tracing
+- Op decorators and function tracing  
 - Nested operations
 - Exception handling
 - Complex data types
@@ -14,74 +14,16 @@ The smoke tests cover:
 - Unicode support
 - Basic concurrent operations
 
-## Running Tests Locally
-
-**Note:** All commands should be run from the repository root unless otherwise specified.
-
-### Prerequisites
-
-For native testing:
-- Windows 10/11 or Windows Server 2019/2022
-- Python 3.9+ installed
-- Git for Windows
-
-For container testing:
-- Docker Desktop for Windows with Windows containers enabled
-- Windows 10/11 Pro/Enterprise or Windows Server
-
-### Using PowerShell Script
-
-The easiest way to run tests locally is using the provided PowerShell script:
-
-```powershell
-# Run tests natively
-cd tests/smoke/windows
-.\run_windows_tests.ps1
-
-# Run tests in a Windows container
-.\run_windows_tests.ps1 -UseContainer -BuildContainer
-
-# Run with verbose output
-.\run_windows_tests.ps1 -Verbose
-```
-
-### Manual Testing
-
-#### Native Windows Testing
-
-```powershell
-# Install dependencies (from repo root)
-pip install -e .
-pip install pytest
-
-# Run smoke tests
-cd tests/smoke/windows
-python -m pytest test_windows_smoke.py -v
-```
-
-#### Container Testing
-
-```powershell
-# Build the Windows container (from repo root)
-docker build -f tests/smoke/windows/Dockerfile.windows -t weave-windows-test:latest .
-
-# Run tests in the container
-docker run --rm weave-windows-test:latest
-
-# Run with custom command
-docker run --rm weave-windows-test:latest python -m pytest tests/smoke/windows/test_windows_smoke.py -v --tb=short
-```
-
 ## CI/CD Integration
 
-The Windows smoke tests are automatically run in GitHub Actions when:
-- Code is pushed to master/main branches
-- Pull requests are created
-- Manual workflow dispatch is triggered
+The Windows smoke tests run automatically in GitHub Actions via the `.github/workflows/windows-smoke-test.yaml` workflow. The tests run in a Windows Server Core container with Python 3.11.
 
-The workflow runs tests:
-1. In Windows containers
-2. Natively on Windows runners with Python 3.9, 3.10, and 3.11
+### Test Execution
+
+The workflow:
+1. Builds a Windows container using `tests/smoke/windows/Dockerfile.windows`
+2. Runs the smoke tests inside the container
+3. Reports results back to the PR/commit
 
 ## Test Structure
 
@@ -98,51 +40,14 @@ Main test file containing all smoke tests:
 - `test_unicode_support()` - Tests Unicode handling
 - `test_concurrent_ops()` - Tests concurrent operations
 
-### `tests/smoke/windows/Dockerfile.windows`
+### `Dockerfile.windows`
 Windows container definition:
 - Based on Windows Server Core LTSC 2022
 - Installs Python 3.11
 - Installs Weave and dependencies
 - Runs smoke tests by default
 
-### `.github/workflows/windows-smoke-test.yaml`
-GitHub Actions workflow for CI/CD:
-- Runs tests on Windows Server 2022
-- Tests in both containers and native environments
-- Multiple Python versions
-
-### `tests/smoke/windows/run_windows_tests.ps1`
-PowerShell script for local testing:
-- Supports both native and container testing
-- Handles dependency installation
-- Provides colored output and error handling
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Docker not running**
-   ```
-   Error: Docker is not installed or not running!
-   ```
-   Solution: Start Docker Desktop and switch to Windows containers
-
-2. **Python not found**
-   ```
-   Error: Python is not installed or not in PATH!
-   ```
-   Solution: Install Python from python.org and add to PATH
-
-3. **Container build fails**
-   - Ensure you're using Windows containers (not Linux)
-   - Check Docker Desktop settings
-   - Ensure sufficient disk space
-
-4. **Import errors in tests**
-   - Run `pip install -e .` from repository root
-   - Ensure all dependencies are installed
-
-### Environment Variables
+## Environment Variables
 
 The tests use these environment variables:
 - `WEAVE_SMOKE_TEST=1` - Indicates smoke test mode

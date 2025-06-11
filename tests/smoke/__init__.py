@@ -1,1 +1,0 @@
-# Smoke tests for Weave
