@@ -176,6 +176,7 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 
 const CompareEvaluationsPageInner: React.FC<{}> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
+  const {isPeeking} = useContext(WeaveflowPeekContext);
   const showExamples =
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
@@ -223,25 +224,27 @@ const CompareEvaluationsPageInner: React.FC<{}> = props => {
                   />
                 )}
                 <ScorecardSection state={state} />
-                <Tailwind style={{width: '100%'}}>
-                  <div className="px-16">
-                    <div className="flex flex w-full items-center gap-3 rounded-lg bg-moon-100 px-16 py-8">
-                      <Icon name="table" size="large" color="moon-500 mb-4" />
-                      <p className="ml-[8px] text-[14px] font-semibold">
-                        Looking for your evaluation results?
-                      </p>
-                      <p className="ml-[8px] mr-auto text-[14px] text-moon-500">
-                        You can find it in our new results tab.
-                      </p>
-                      <Button
-                        variant="ghost"
-                        onClick={() => setTabValue('results')}>
-                        Review evaluation results
-                      </Button>
+                {!isPeeking && (
+                  <Tailwind style={{width: '100%'}}>
+                    <div className="px-16">
+                      <div className="flex flex w-full items-center gap-3 rounded-lg bg-moon-100 px-16 py-8">
+                        <Icon name="table" size="large" color="moon-500 mb-4" />
+                        <p className="ml-[8px] text-[14px] font-semibold">
+                          Looking for your evaluation results?
+                        </p>
+                        <p className="ml-[8px] mr-auto text-[14px] text-moon-500">
+                          You can find it in our new results tab.
+                        </p>
+                        <Button
+                          variant="ghost"
+                          onClick={() => setTabValue('results')}>
+                          Review evaluation results
+                        </Button>
+                      </div>
+                      <div className="h-16"></div>
                     </div>
-                    <div className="h-16"></div>
-                  </div>
-                </Tailwind>
+                  </Tailwind>
+                )}
               </VerticalBox>
             ),
           },
