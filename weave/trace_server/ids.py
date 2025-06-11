@@ -10,10 +10,10 @@ def _generate_uuidv7_bytes() -> bytes:
     """Generate UUIDv7 bytes according to RFC9562."""
     # Generate 16 random bytes
     value = bytearray(os.urandom(16))
-    
+
     # Current timestamp in milliseconds
     timestamp = int(time.time() * 1000)
-    
+
     # Place timestamp in first 48 bits (6 bytes)
     value[0] = (timestamp >> 40) & 0xFF
     value[1] = (timestamp >> 32) & 0xFF
@@ -21,13 +21,13 @@ def _generate_uuidv7_bytes() -> bytes:
     value[3] = (timestamp >> 16) & 0xFF
     value[4] = (timestamp >> 8) & 0xFF
     value[5] = timestamp & 0xFF
-    
+
     # Set version (7) in bits 12-15 of byte 6
     value[6] = (value[6] & 0x0F) | 0x70
-    
+
     # Set variant (10) in bits 0-1 of byte 8
     value[8] = (value[8] & 0x3F) | 0x80
-    
+
     return bytes(value)
 
 
@@ -40,7 +40,7 @@ def generate_id() -> str:
     for our use case.
     """
     uuid_bytes = _generate_uuidv7_bytes()
-    
+
     # Convert to standard UUID string format: 8-4-4-4-12
-    hex_str = ''.join(f'{byte:02x}' for byte in uuid_bytes)
+    hex_str = "".join(f"{byte:02x}" for byte in uuid_bytes)
     return f"{hex_str[:8]}-{hex_str[8:12]}-{hex_str[12:16]}-{hex_str[16:20]}-{hex_str[20:32]}"
