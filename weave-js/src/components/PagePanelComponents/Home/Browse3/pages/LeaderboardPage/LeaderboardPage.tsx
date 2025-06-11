@@ -6,6 +6,7 @@ import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {
   FC,
@@ -18,7 +19,6 @@ import React, {
 import ReactMarkdown from 'react-markdown';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
-import {parseRefMaybe} from '@wandb/weave/react';
 
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
