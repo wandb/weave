@@ -5,18 +5,19 @@ name: Windows Container Smoke Test
 
 on:
   push:
+    branches:
+      - master
+      - main
+  pull_request:
 
 jobs:
   windows-container-test:
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 15
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
       
     - name: Build Windows container
       run: |
@@ -24,7 +25,4 @@ jobs:
       
     - name: Run smoke tests in container
       run: |
-        docker run --rm `
-          -e WEAVE_SMOKE_TEST=1 `
-          -e PYTHONUNBUFFERED=1 `
-          weave-windows-test:latest 
+        docker run --rm weave-windows-test:latest 

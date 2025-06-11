@@ -50,9 +50,8 @@ Windows container definition:
 ## Environment Variables
 
 The tests use these environment variables:
-- `WEAVE_SMOKE_TEST=1` - Indicates smoke test mode
-- `WEAVE_CACHE_DIR` - Temporary directory for Weave data
-- `PYTHONUNBUFFERED=1` - Ensures real-time output
+- `WEAVE_CACHE_DIR` - Temporary directory for Weave data (set by tests)
+- `PYTHONUNBUFFERED=1` - Ensures real-time output in container logs
 
 ## Adding New Tests
 

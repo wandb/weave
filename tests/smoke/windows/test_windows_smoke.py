@@ -2,11 +2,12 @@
 Basic smoke tests for Weave on Windows containers.
 These tests validate core functionality works correctly on Windows.
 """
-
 import os
 import platform
 import sys
 import tempfile
+import threading
+import time
 
 import pytest
 
@@ -16,17 +17,12 @@ import weave
 def test_windows_environment():
     """Verify we're running on Windows."""
     assert platform.system() == "Windows", f"Expected Windows, got {platform.system()}"
-    print(f"Running on Windows version: {platform.version()}")
-    print(f"Python version: {sys.version}")
 
 
 def test_weave_import():
     """Test that weave can be imported successfully."""
-    import weave
-
     assert weave is not None
     assert hasattr(weave, "__version__")
-    print(f"Weave version: {weave.__version__}")
 
 
 def test_weave_init():
@@ -168,9 +164,6 @@ def test_unicode_support():
 
 def test_concurrent_ops():
     """Test basic concurrent operations."""
-    import threading
-    import time
-
     with tempfile.TemporaryDirectory() as tmpdir:
         os.environ["WEAVE_CACHE_DIR"] = tmpdir
         weave.init("windows-smoke-test-concurrent")
@@ -200,36 +193,3 @@ def test_concurrent_ops():
         # Check results
         assert len(results) == 5
         assert sorted(results) == [0, 2, 4, 6, 8]
-
-
-if __name__ == "__main__":
-    # Run tests with pytest if available, otherwise run directly
-    try:
-        import pytest
-
-        pytest.main([__file__, "-v"])
-    except ImportError:
-        # Run tests manually if pytest is not available
-        print("Running tests manually (pytest not available)")
-
-        test_functions = [
-            test_windows_environment,
-            test_weave_import,
-            test_weave_init,
-            test_basic_op,
-            test_nested_ops,
-            test_op_with_exceptions,
-            test_op_with_complex_types,
-            test_file_paths_windows,
-            test_unicode_support,
-            test_concurrent_ops,
-        ]
-
-        for test_func in test_functions:
-            try:
-                print(f"\nRunning {test_func.__name__}...")
-                test_func()
-                print(f"✓ {test_func.__name__} passed")
-            except Exception as e:
-                print(f"✗ {test_func.__name__} failed: {e}")
-                raise

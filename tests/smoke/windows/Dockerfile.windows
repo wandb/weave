@@ -1,16 +1,12 @@
-# Use Windows Server Core as base image
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
-# Install Python 3.11
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# Download and install Python
+# Install Python 3.11
 RUN Invoke-WebRequest -Uri https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe -OutFile python-installer.exe; \
     Start-Process python-installer.exe -ArgumentList '/quiet', 'InstallAllUsers=1', 'PrependPath=1' -Wait; \
-    Remove-Item -Force python-installer.exe
-
-# Verify Python installation
-RUN python --version
+    Remove-Item -Force python-installer.exe; \
+    python --version
 
 # Set working directory
 WORKDIR C:\\weave
@@ -22,10 +18,8 @@ COPY README.md .
 # Copy the weave source code
 COPY weave/ ./weave/
 
-# Install build dependencies
+# Install pip and weave
 RUN python -m pip install --upgrade pip setuptools wheel build
-
-# Install weave in editable mode for testing
 RUN python -m pip install -e .
 
 # Copy test files
@@ -33,7 +27,6 @@ COPY tests/smoke/windows/ ./tests/smoke/windows/
 
 # Set environment variables for Windows
 ENV PYTHONUNBUFFERED=1
-ENV WEAVE_SMOKE_TEST=1
 
-# Default command to run smoke tests
+# Run smoke tests
 CMD ["python", "-m", "pytest", "tests/smoke/windows/test_windows_smoke.py", "-v"] 
