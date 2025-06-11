@@ -2,7 +2,7 @@
   {
     "provider": "coreweave",
     "id": "cw_deepseek-ai_DeepSeek-R1",
-    "idPlayground": "cw_deepseek-ai_DeepSeek-R1",
+    "idPlayground": "deepseek-ai/DeepSeek-R1",
     "idHuggingFace": "deepseek-ai/DeepSeek-R1",
     "label": "DeepSeek R1",
     "status": "hosted",
@@ -18,7 +18,7 @@
   {
     "provider": "coreweave",
     "id": "cw_meta-llama_Llama-3.3-70B-Instruct",
-    "idPlayground": "cw_meta-llama_Llama-3.3-70B-Instruct",
+    "idPlayground": "meta-llama/Llama-3.3-70B-Instruct",
     "idHuggingFace": "meta-llama/Llama-3.3-70B-Instruct",
     "label": "Llama 3.3 70B",
     "status": "hosted",
@@ -34,7 +34,7 @@
   {
     "provider": "coreweave",
     "id": "cw_mistralai_Mistral-Small-3.1-24B-Instruct-2503",
-    "idPlayground": "cw_mistralai_Mistral-Small-3.1-24B-Instruct-2503",
+    "idPlayground": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
     "idHuggingFace": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
     "label": "Mistral Small 3.1",
     "status": "hosted",
@@ -50,7 +50,7 @@
   {
     "provider": "coreweave",
     "id": "cw_meta-llama_Llama-4-Scout-17B-16E-Instruct",
-    "idPlayground": "cw_meta-llama_Llama-4-Scout-17B-16E-Instruct",
+    "idPlayground": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
     "idHuggingFace": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
     "label": "Llama 4 Scout",
     "status": "hosted",
@@ -66,7 +66,7 @@
   {
     "provider": "coreweave",
     "id": "cw_Qwen_QwQ-32B",
-    "idPlayground": "cw_Qwen_QwQ-32B",
+    "idPlayground": "Qwen/QwQ-32B",
     "idHuggingFace": "Qwen/QwQ-32B",
     "label": "Qwen QwQ 32B",
     "status": "hosted",
@@ -83,7 +83,7 @@
   {
     "provider": "coreweave",
     "id": "cw_microsoft_Phi-4-mini-instruct",
-    "idPlayground": "cw_microsoft_Phi-4-mini-instruct",
+    "idPlayground": "microsoft/Phi-4-mini-instruct",
     "idHuggingFace": "microsoft/Phi-4-mini-instruct",
     "label": "Phi 4 Mini",
     "status": "hosted",
@@ -99,7 +99,7 @@
   {
     "provider": "coreweave",
     "id": "cw_meta-llama_Llama-4-Maverick-17B-128E-Instruct-FP8",
-    "idPlayground": "cw_meta-llama_Llama-4-Maverick-17B-128E-Instruct-FP8",
+    "idPlayground": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
     "idHuggingFace": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
     "label": "Llama 4 Maverick",
     "status": "hosted",
@@ -115,7 +115,7 @@
   {
     "provider": "coreweave",
     "id": "cw_Qwen_Qwen2.5-VL-7B-Instruct",
-    "idPlayground": "cw_Qwen_Qwen2.5-VL-7B-Instruct",
+    "idPlayground": "Qwen/Qwen2.5-VL-7B-Instruct",
     "idHuggingFace": "Qwen/Qwen2.5-VL-7B-Instruct",
     "label": "Qwen 2.5 VL 7B",
     "status": "hosted",
@@ -131,7 +131,7 @@
   {
     "provider": "coreweave",
     "id": "cw_ibm-granite_granite-3.3-8b-instruct",
-    "idPlayground": "cw_ibm-granite_granite-3.3-8b-instruct",
+    "idPlayground": "ibm-granite/granite-3.3-8b-instruct",
     "idHuggingFace": "ibm-granite/granite-3.3-8b-instruct",
     "label": "Granite 3.3 8B",
     "status": "hosted",

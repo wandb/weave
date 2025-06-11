@@ -135,15 +135,13 @@ export const ExplorerLoaded = ({
     );
   };
 
-  // TODO: Hardcoding number of columns until we can discuss with design team.
-  // const availableWidth = width - 2 * 32; // remove padding
+  const availableWidth = width - 2 * 32; // remove padding
   const tileWidth = 500;
   const gap = 12;
-  const numColumns = 2;
-  // const numColumns = Math.max(
-  //   1,
-  //   Math.floor((availableWidth + gap) / (tileWidth + gap))
-  // );
+  const numColumns = Math.max(
+    1,
+    Math.floor((availableWidth + gap) / (tileWidth + gap))
+  );
 
   return (
     <div className="px-32 py-24" onClick={onClickBackground}>
@@ -176,7 +174,7 @@ export const ExplorerLoaded = ({
           gridTemplateColumns: `repeat(${numColumns}, ${tileWidth}px)`,
           gap,
         }}
-        className="mx-auto grid">
+        className="absolute mx-auto grid">
         <AnimatePresence>
           {models.map(m => {
             return (

@@ -199,7 +199,7 @@ class ObjSchema(BaseModel):
     is_latest: int
     kind: str
     base_object_class: Optional[str]
-    leaf_object_class: Optional[str]
+    leaf_object_class: Optional[str] = None
     val: Any
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
