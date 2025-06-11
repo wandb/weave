@@ -105,13 +105,13 @@ Presenter Notes:
 
 ### What is Vibe Coding? 🤔
 
-**Vibe Coding** = Coding with AI as your pair programming partner
+**Vibe Coding** = Coding with an AI "copilot"
 
 **Traditional:** Write → Test → Debug → Repeat  
 **Vibe Coding:** Think → Discuss → Code → Iterate
 
 **Key Shifts:**
-* From "What syntax?" → "What am I achieving?"
+* From "What code?" → "What goal?"
 * From isolated solving → collaborative reasoning  
 * From perfect drafts → rapid iteration
 * From Stack Overflow → asking your AI pair
@@ -154,7 +154,6 @@ Presenter Notes:
 * Assembly → High-Level Languages  
 * Raw SQL → ORMs  
 * Manual Memory → Garbage Collection
-* Monoliths → Microservices → Serverless
 
 **Now:** Manual Coding → AI-Assisted Coding
 
@@ -176,33 +175,7 @@ Presenter Notes:
 
 ---
 
-### Your New Superpowers
-
-**With AI:** Multiple, simulataneous workstreams
-
-**You become:**
-* 🎨 **Creative Director** - defining what to build
-* 🏗️ **System Architect** - designing how it fits together  
-* 🔧 **Technical Product Manager** - prioritizing and coordinating
-* 🎯 **Quality Gatekeeper** - ensuring standards and best practices
-
-**The demand for great engineers increases, not decreases**
-
-<!-- IMG_GEN: {"prompt": "Epic superhero-style illustration: developer in flowing cape standing atop multiple floating project platforms, AI assistants as glowing orbs orbiting around them, dramatic lighting with city skyline background, comic book art style with dynamic action lines"} -->
-![bg right:25% 90%](images/superpowers.png)
-
-<!-- 
-Presenter Notes:
-- This is the key insight - you become MORE valuable, not less
-- You can take on bigger, more complex challenges
-- Companies will need fewer junior developers but more senior/staff engineers
-- The work becomes more strategic and less tactical
--->
-
----
-
 ## Common Tools Landscape
-*10 minutes + demos*
 
 <!-- IMG_GEN: {"prompt": "Futuristic tool workshop floating in space: various AI coding tools as crystalline floating workstations connected by energy bridges, holographic interfaces everywhere, space station aesthetic with cosmic background", "size": "1792x1024"} -->
 ![bg right:55%](images/tools-landscape.png)
@@ -222,7 +195,9 @@ Presenter Notes:
 **Cursor** - Multi-file editing, background agents  
 **Windsurf** - Autonomous code changes across files  
 **Zed** - Real-time collaboration, lightning-fast  
-**VSCode + Copilot** - Most widely adopted, beginner-friendly
+**VSCode + Copilot** - Most widely adopted
+
+They all are starting to converge!
 
 ![bg right:35% 80%](images/ide-comparison.png)
 
@@ -234,14 +209,25 @@ Presenter Notes:
 - Show the different UX approaches
 -->
 
+--- 
+
+### Cursor Demo
+* Shell Command (Shell cmd-k)
+* Type-Ahead
+* Editor Spot Fix (cmd-K)
+* Codebase Question (Ask mode)
+* Feature Implementation (Agent Mode) 
+* Demonstrate Context adding (URLs, etc...)
+* Generate PR
+
 ---
 
 ### Task-Oriented Tools 🎯
 
 **Claude Code** - Deep reasoning, CLI-based  
-**Cursor Agents** - Autonomous workers, cloud-based  
-**Devin** - Full-stack development & deployment  
+**Cursor Background Agents** - Autonomous workers, cloud-based
 **OpenAI Codex** - Code generation API, powers many tools
+**Devin** - Full-stack development & deployment - integrates with slack
 
 <!-- IMG_GEN: {"prompt": "Specialist AI entities as mystical beings: Claude as wise oracle with ancient scrolls of code, Cursor agents as busy worker sprites, Devin as powerful wizard orchestrating entire projects, fantasy art meets cyberpunk"} -->
 ![bg right:35% 85%](images/specialized-tools.png)
@@ -253,6 +239,18 @@ Presenter Notes:
 - Devin is still in early access but worth mentioning
 - Background agents are where things get really powerful
 -->
+
+--- 
+
+### OpenAI Codex Demo
+* Implement a specific feature
+
+https://chatgpt.com/codex
+
+
+
+
+
 
 ---
 
@@ -273,6 +271,15 @@ Presenter Notes:
 
 ---
 
+### Coderrabbit Demo
+
+![bg](images/coderrabbit_1.png)
+![bg](images/coderrabbit_2.png)
+
+https://github.com/wandb/weave/pull/3653
+
+---
+
 ### AI-Enhanced Terminals ⚡
 
 **Warp** - Natural language → shell commands, smart suggestions & AI assistant
@@ -290,7 +297,6 @@ Presenter Notes:
 ---
 
 ## Essential Workflow Elements
-*15 minutes + workflow demos*
 
 <!-- IMG_GEN: {"prompt": "Dynamic workflow symphony: five different work patterns as musical instruments in an orchestra, each element creating visual music notes in the air, conductor coordinating the harmony, art deco poster style", "size": "1792x1024"} -->
 ![bg left:50%](images/workflow-elements.png)
@@ -353,7 +359,7 @@ Presenter Notes:
 * "Add type hints to this module"
 
 <!-- IMG_GEN: {"prompt": "Precision targeting concept: developer with laser-guided crosshairs selecting specific code sections, AI responding with surgical precision tools, medical operation meets sniper precision, clean vector illustration style"} -->
-![bg right:35% 80%](images/spot-requests.png)
+![bg right:35%](images/spot-requests.png)
 
 <!-- 
 Presenter Notes:
@@ -371,8 +377,6 @@ Presenter Notes:
 * **Architectural:** "Should I use a factory pattern here?"
 * **Debugging:** "Why isn't this working as expected?"
 * **Best practices:** "Is there a more Pythonic way to do this?"
-
-**Flow:** Ask → Get explanations + examples → Iterate → Learn
 
 <!-- IMG_GEN: {"prompt": "Socratic dialogue scene: developer and AI as ancient philosophers in a modern setting, thought bubbles containing code patterns and architectural diagrams, wisdom-sharing atmosphere, renaissance art style with modern coding elements"} -->
 ![bg left:35% 85%](images/ask-questions.png)
@@ -409,8 +413,40 @@ Presenter Notes:
 
 ---
 
+#### Notebooks 📓
+*AI-powered data science workflows*
+
+(Hex)
+
+**What AI can do:**
+* Generate analysis code from natural language
+* Explain complex data science concepts  
+* Debug statistical models & create visualizations
+
+**Example prompts:**
+* "Create a correlation plot between X and Y"
+* "Explain why this model is overfitting"
+* "Clean this messy dataset"
+
+<!-- IMG_GEN: {"prompt": "Data scientist working with AI in a modern jupyter notebook interface, multiple data visualizations and charts floating as holograms around the screen, AI assistant analyzing scatter plots and regression models, clean tech aesthetic with blue and green data streams"} -->
+![bg right:30% 80%](images/notebooks.png)
+
+<!-- 
+Presenter Notes:
+- Great for data scientists in the audience
+- Show Jupyter + AI if possible
+- Emphasize the analysis capabilities
+-->
+
+---
+
+### Hex Demo
+
+https://app.hex.tech/8ecc814e-8a34-46e1-b465-0c38bd16e93e/hex/0196da17-fbc7-788f-b371-4b0664107ffb/draft/logic
+
+---
+
 ## Advanced Tips and Tricks
-*10 minutes + tips demos*
 
 <!-- IMG_GEN: {"prompt": "Master craftsman's workshop: ancient scrolls transforming into digital interfaces, traditional tools morphing into AI assistants, blend of medieval craftsmanship and futuristic technology, golden hour lighting with mystical atmosphere", "size": "1792x1024"} -->
 ![bg left:50%](images/advanced-tips.png)
@@ -441,6 +477,9 @@ Presenter Notes:
 
 **Benefits:** Consistent AI behavior, faster feature work, automatic quality
 
+https://github.com/tssweeney/agentikit/blob/main/.cursor/rules/general-project-rules.mdc
+https://github.com/wandb/weave/blob/master/AGENTS.md
+
 <!-- IMG_GEN: {"prompt": "Living instruction manual: AGENTS.md file as glowing tome with pages that float and rearrange themselves, AI reading and memorizing the patterns, library of knowledge with floating texts, magical realism meets technical documentation"} -->
 ![bg right:30% 75%](images/agents-md.png)
 
@@ -453,8 +492,8 @@ Presenter Notes:
 
 ---
 
-### PR.md 📝
-*Template for AI-generated pull request descriptions*
+### PRD.md 📝
+*Useful for having ashared, collaborative state betwene you and the agent*
 
 **Template structure:**
 ```markdown
@@ -467,10 +506,6 @@ Presenter Notes:
 ## Testing & Review notes
 <!-- AI lists what to test & review -->
 ```
-
-**Result:** Comprehensive PR descriptions with zero effort
-
-![bg right:30% 80%](images/pr-template.png)
 
 <!-- 
 Presenter Notes:
@@ -491,6 +526,7 @@ Presenter Notes:
 
 **Magic phrase:** "Summarize our conversation and current state"
 
+<!-- IMG_GEN: {"prompt": "Abstract concept of information synthesis: swirling constellation of code fragments, conversation bubbles, and file icons being compressed into a single glowing summary orb, AI brain organizing scattered information into coherent structure, minimalist infographic style with purple and teal colors"} -->
 ![bg right:30% 80%](images/context-summary.png)
 
 <!-- 
@@ -498,52 +534,6 @@ Presenter Notes:
 - Context management is crucial for long sessions
 - Show how summarization keeps AI focused
 - This prevents AI from "forgetting" what you're working on
--->
-
----
-
-### Templating 🎯
-*Standardize common patterns*
-
-**What to template:**
-* API endpoints & test structures
-* Component boilerplates & config files
-
-**Prompt templates:**
-* "Implement [PATTERN] for [FEATURE] following our [STANDARD]"
-* "Add error handling to [FUNCTION] using our patterns"
-* "Create tests for [MODULE] covering [SCENARIOS]"
-
-![bg right:30% 80%](images/templating.png)
-
-<!-- 
-Presenter Notes:
-- Templates ensure consistency
-- Show how to create reusable patterns
-- This scales your best practices
--->
-
----
-
-### Notes 📚
-*Building your AI knowledge base*
-
-**What to capture:**
-* Solutions to tricky problems & architecture decisions
-* Performance optimizations & debugging techniques
-
-**How to use:**
-* "Here's how we solved this before..."
-* "Apply the pattern from our auth module"
-* "Use the optimization from our notes"
-
-![bg right:30% 80%](images/notes-system.png)
-
-<!-- 
-Presenter Notes:
-- This builds institutional knowledge
-- Show how notes can be referenced in future sessions
-- This is like having a team wiki that AI can use
 -->
 
 ---
@@ -559,6 +549,7 @@ Presenter Notes:
 
 **Result:** Better docs, easier reviews, improved team communication
 
+<!-- IMG_GEN: {"prompt": "Automated PR workflow visualization: AI assistant examining code diffs on multiple screens, generating commit messages and PR descriptions, conveyor belt of documents flowing from code changes to polished documentation, industrial automation meets software development, clean vector style"} -->
 ![bg right:30% 80%](images/pr-workflow.png)
 
 <!-- 
@@ -575,12 +566,10 @@ Presenter Notes:
 
 **The pattern:**
 1. **Explore:** Let AI try different approaches  
-2. **Checkpoint:** Commit working solutions
-3. **Branch & Compare:** AI analyzes different approaches
-4. **Merge:** Combine best parts of solutions
+2. **Checkpoint:** Stage incremental progress
+2. **Commit:** Commit working solutions
 
-**AI helps:** Compare implementations, explain trade-offs, suggest best approach
-
+<!-- IMG_GEN: {"prompt": "Git branching strategy as a tree of possibilities: multiple code branches growing from a central trunk, AI gardener tending to different experimental approaches, some branches merging back together, organic growth meets version control, botanical illustration style with tech elements"} -->
 ![bg right:30% 80%](images/git-workflow.png)
 
 <!-- 
@@ -609,10 +598,14 @@ Presenter Notes:
 
 ### Service Provider Options ☁️
 
-**Anthropic Claude** - Best for complex reasoning & architecture  
-**OpenAI GPT** - Well-rounded, wide knowledge base  
-**Google Gemini** - Large context window, multi-modal  
-**X.ai Grok** - Real-time information access
+**Anthropic Claude Family** - Best for complex reasoning & architecture
+ * Can be a bit of an over-achiever, but accepted as the best
+
+**OpenAI GPT Family** - Well-rounded, wide knowledge base  
+ * Can be a bit of a minimalist, but has the broadest knowledge
+
+**Google Gemini Family** - Large context window, multi-modal  
+**X.ai Grok Family** - Real-time information access
 
 ![bg right:25% 80%](images/service-providers.png)
 
@@ -627,12 +620,14 @@ Presenter Notes:
 
 ### Self-Hosted Options 🏠
 
-**DeepSeek Coder** - Specialized for code generation  
-**Code Llama** - Open-source coding specialist  
-**Llama 3.1** - General-purpose with good coding abilities
+**DeepSeek Family** - Specialized for code generation 
+**Meta Llama Family** - General-purpose with good coding abilities
 
 **Benefits:** Privacy, cost control, offline capability
 
+Can host on a private cloud or locally using ollama.
+
+<!-- IMG_GEN: {"prompt": "Private server fortress: secure data center with glowing AI models running locally, shields and locks protecting sensitive code, developer working with locally hosted AI models behind corporate firewall, cybersecurity meets AI infrastructure, fortress architecture with tech elements"} -->
 ![bg right:30% 80%](images/self-hosted.png)
 
 <!-- 
@@ -647,12 +642,13 @@ Presenter Notes:
 ### Building Your Toolkit Strategy 🛠️
 
 **The Multi-Model Approach:**
-1. **Primary:** Main model for most work (Claude 3.5 Sonnet)
-2. **Specialist:** Code-specific for complex algorithms (DeepSeek Coder)  
+1. **Primary:** Main model for most work (GPT o3)
+2. **Specialist:** Code-specific for complex algorithms (Claude 4.0 Sonnet)  
 3. **Speed:** Fast model for simple tasks (GPT-4o Mini)
 
 **Consider:** Cost vs. Capability, Privacy, Context window, Speed
 
+<!-- IMG_GEN: {"prompt": "Strategic decision matrix visualization: multi-dimensional chess board with AI models as different chess pieces, each piece showing different strengths (speed, capability, cost, privacy), strategic mind evaluating trade-offs, tactical planning meets AI selection, 3D chess aesthetic with floating decision criteria"} -->
 ![bg right:30% 80%](images/strategy-matrix.png)
 
 <!-- 
@@ -664,11 +660,33 @@ Presenter Notes:
 
 ---
 
-## Q&A
-*10 minutes*
+### Your New Superpowers
 
-<!-- IMG_GEN: {"prompt": "Interactive Q&A constellation: questions floating as glowing orbs around a central discussion space, answers materializing as connecting light streams, community gathering in digital space, warm and welcoming atmosphere"} -->
-![bg left:45% 80%](images/qa.png)
+**With AI:** Multiple, simulataneous workstreams
+
+**You become:**
+* 🎨 **Creative Director** - defining what to build
+* 🏗️ **System Architect** - designing how it fits together  
+* 🔧 **Technical Product Manager** - prioritizing and coordinating
+* 🎯 **Quality Gatekeeper** - ensuring standards and best practices
+
+**The demand for great engineers increases, not decreases**
+
+<!-- IMG_GEN: {"prompt": "Epic superhero-style illustration: developer in flowing cape standing atop multiple floating project platforms, AI assistants as glowing orbs orbiting around them, dramatic lighting with city skyline background, comic book art style with dynamic action lines"} -->
+![bg right:25% 90%](images/superpowers.png)
+
+<!-- 
+Presenter Notes:
+- This is the key insight - you become MORE valuable, not less
+- You can take on bigger, more complex challenges
+- Companies will need fewer junior developers but more senior/staff engineers
+- The work becomes more strategic and less tactical
+-->
+
+---
+
+
+## Q&A
 
 <!-- 
 Presenter Notes:
@@ -685,19 +703,29 @@ Presenter Notes:
 * Practice the core workflows we covered
 
 **"What about code quality?"**
-* AI doesn't replace code review - it enhances it
+* AI doesn't replace code review - you are ultimately responsible
 * Use AI to catch common issues early
 * Still need human judgment for architecture decisions
 
-**"How much does this cost?"**
-* Most tools: $20-50/month per developer
-* ROI typically positive within first month
-* Self-hosted options available for budget constraints
+---
 
-**"What about security?"**
-* Most providers offer enterprise plans with data protection
-* Consider self-hosted options for sensitive codebases
-* Review your organization's AI policies
+## Thank You! 🚀
+
+
+**Next Steps:**
+1. **Try Cursor** - Start with the most beginner-friendly AI IDE
+2. **Practice workflows** - Focus on shell commands & spot requests  
+3. **Build confidence** - Start with simple tasks, grow complexity
+
+
+
+<!-- 
+Presenter Notes:
+- Thank the audience
+- Encourage them to start experimenting
+- Offer to help with questions later
+- Emphasize that the best way to learn is by doing
+-->
 
 ---
 
@@ -724,12 +752,10 @@ Presenter Notes:
 * AI directly queries databases  
 * AI reads/writes files across your system
 * AI interacts with external APIs
-* AI runs tests and sees results
 
 **Why it matters:**
 * Makes AI significantly more capable
 * Standardized tool ecosystem emerging
-* Your AI becomes a true development partner
 
 ![bg right:30% 80%](images/mcp-diagram.png)
 
@@ -754,29 +780,6 @@ Presenter Notes:
 - Show how AI coding applies beyond just writing code
 -->
 
----
-
-#### Notebooks 📓
-*AI-powered data science workflows*
-
-**What AI can do:**
-* Generate analysis code from natural language
-* Explain complex data science concepts  
-* Debug statistical models & create visualizations
-
-**Example prompts:**
-* "Create a correlation plot between X and Y"
-* "Explain why this model is overfitting"
-* "Clean this messy dataset"
-
-![bg right:30% 80%](images/notebooks.png)
-
-<!-- 
-Presenter Notes:
-- Great for data scientists in the audience
-- Show Jupyter + AI if possible
-- Emphasize the analysis capabilities
--->
 
 ---
 
@@ -791,8 +794,6 @@ Presenter Notes:
 * "Convert these function signatures to API docs"
 * "Write a README for this project"
 * "Explain this algorithm in simple terms"
-
-![bg right:30% 80%](images/markdown-docs.png)
 
 <!-- 
 Presenter Notes:
@@ -813,7 +814,7 @@ Presenter Notes:
 
 **Meta moment:** This presentation was built with AI assistance!
 
-![bg right:30% 80%](images/presentation-creation.png)
+![bg right:50%](images/me_building_this_deck.png)
 
 <!-- 
 Presenter Notes:
@@ -837,42 +838,11 @@ Presenter Notes:
 * PlantUML & ASCII art
 * SVG code generation
 
-**Example:** "Create a data flow diagram for our microservices"
-
-![bg right:30% 80%](images/diagram-generation.png)
+![bg right:50%](images/llm_diagram.png)
 
 <!-- 
 Presenter Notes:
 - Visual communication is crucial in engineering
 - Show diagram generation if possible
 - This helps with system design and communication
--->
-
----
-
-## Thank You! 🚀
-
-### Your Journey Starts Now
-
-**Next Steps:**
-1. **Try Cursor** - Start with the most beginner-friendly AI IDE
-2. **Practice workflows** - Focus on shell commands & spot requests  
-3. **Build confidence** - Start with simple tasks, grow complexity
-4. **Join the community** - Share experiences, learn from others
-
-**Key Takeaway:** You're not being replaced - you're being amplified
-
-*"The best time to start vibe coding was yesterday. The second best time is now."*
-
-### Questions?
-
-<!-- IMG_GEN: {"prompt": "Celebration of new coding era: developer and AI raising hands in victory together, confetti of code symbols falling like celebration, sunrise over a futuristic coding city, inspirational poster art style with vibrant colors"} -->
-![bg right:50%](images/thank-you.png)
-
-<!-- 
-Presenter Notes:
-- Thank the audience
-- Encourage them to start experimenting
-- Offer to help with questions later
-- Emphasize that the best way to learn is by doing
 -->
