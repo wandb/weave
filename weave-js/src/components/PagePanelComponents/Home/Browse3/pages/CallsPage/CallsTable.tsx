@@ -990,7 +990,7 @@ export const CallsTable: FC<{
               )}
             </div>
           )}
-          <div className="ml-auto flex items-center gap-8">
+          <div className="ml-auto flex min-w-0 items-center gap-8 overflow-hidden">
             {selectedInputObjectVersion && (
               <RemovableTag
                 color="moon"
