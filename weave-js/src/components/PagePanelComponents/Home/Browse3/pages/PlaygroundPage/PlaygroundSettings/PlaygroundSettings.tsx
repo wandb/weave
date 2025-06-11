@@ -59,7 +59,7 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
     <div className="relative flex h-full w-[320px] shrink-0 flex-col border-l border-moon-250 pb-4">
       <div className="flex items-center justify-between gap-8 border-b border-moon-250 px-16 py-8">
         {/* Header */}
-        <div className="flex items-center gap-8">
+        <div className="flex items-center line-clamp-1 [&>span]:line-clamp-1 gap-8">
           <Tag label={`${settingsTab + 1}`} />
           <Tooltip
             content={playgroundStates[settingsTab].model}
