@@ -334,7 +334,8 @@ export const CallsTable: FC<{
       setCallsTotal(calls.total);
       callsEffectiveFilter.current = effectiveFilter;
       prevViewIdRef.current = currentViewIdResolved;
-    } else {
+    } else if (calls.result.length !== callsResult.length) {
+      console.log('calls result changed', calls.result.length);
       setCallsResult(calls.result);
     }
   }, [calls, effectiveFilter, currentViewIdResolved, hasStructuralChange]);
@@ -344,6 +345,7 @@ export const CallsTable: FC<{
     const flattened = prepareFlattenedCallDataForTable(
       hasStructuralChange ? [] : callsResult
     );
+    console.log('table data computed', flattened?.length);
     return flattened;
   }, [callsResult, hasStructuralChange]);
 
@@ -496,6 +498,8 @@ export const CallsTable: FC<{
     shouldIncludeTotalStorageSize && calls.storageSizeLoading,
     !!calls.storageSizeError
   );
+
+  console.log('columns', columns.cols.length);
 
   // This contains columns which are suitable for selection and raw data
   // entry. Notably, not children of expanded refs.
@@ -654,6 +658,7 @@ export const CallsTable: FC<{
   }, [isEvaluateTable, clearSelectedCalls]);
 
   const muiColumns = useMemo(() => {
+    console.log('recomputing mui columns');
     const cols: GridColDef[] = [
       {
         minWidth: 30,
