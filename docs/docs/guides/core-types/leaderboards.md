@@ -128,7 +128,7 @@ To create and publish a leaderboard:
 
 ## End-to-End Python example
 
-The following example demonstrates how to use Weave Evaluations and Leaderboards to compare three summarization models on a shared dataset using a custom metric. It creates a small benchmark, evaluates each model, scores them with [Jaccard similarity](https://www.learndatasci.com/glossary/jaccard-similarity/), and publishes the results to a Weave leaderboard.
+The following example uses Weave Evaluations and creates a leaderboard to compare three summarization models on a shared dataset using a custom metric. It creates a small benchmark, evaluates each model, scores each model with [Jaccard similarity](https://www.learndatasci.com/glossary/jaccard-similarity/), and publishes the results to a Weave leaderboard.
 
 ```python
 import weave
