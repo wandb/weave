@@ -2,31 +2,25 @@ FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# Install Python 3.11
+# Install Python
 RUN Invoke-WebRequest -Uri https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe -OutFile python-installer.exe; \
     Start-Process python-installer.exe -ArgumentList '/quiet', 'InstallAllUsers=1', 'PrependPath=1' -Wait; \
     Remove-Item -Force python-installer.exe; \
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User"); \
     python --version
 
+# Install pip
+RUN python -m ensurepip --upgrade; \
+    python -m pip install --upgrade pip
+
+# Install pytest
+RUN python -m pip install pytest
+
 # Set working directory
-WORKDIR C:\\weave
-
-# Copy requirements first for better caching
-COPY pyproject.toml .
-COPY README.md .
-
-# Copy the weave source code
-COPY weave/ ./weave/
-
-# Install pip and weave
-RUN python -m pip install --upgrade pip setuptools wheel build
-RUN python -m pip install -e .
+WORKDIR /app
 
 # Copy test files
-COPY tests/smoke/windows/ ./tests/smoke/windows/
+COPY tests/smoke/windows/test_windows_smoke.py .
 
-# Set environment variables for Windows
-ENV PYTHONUNBUFFERED=1
-
-# Run smoke tests
-CMD ["python", "-m", "pytest", "tests/smoke/windows/test_windows_smoke.py", "-v"] 
+# Run tests
+CMD ["python", "-m", "pytest", "test_windows_smoke.py", "-v"] 
