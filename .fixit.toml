@@ -1,0 +1,42 @@
+# Fixit configuration file
+# https://fixit.readthedocs.io/
+
+[tool.fixit]
+# Enable automatic fixes where safe
+enable-root-import = true
+
+# Rules to enable
+enable = []
+
+# Rules to disable (if any become problematic)
+disable = ["fixit.rules.NoStringTypeAnnotation"]
+
+# Paths to include
+include = ["weave/"]
+
+# Paths to exclude
+exclude = [
+    "build/",
+    "dist/",
+    ".git/",
+    "__pycache__/",
+    "*.pyc",
+    ".pytest_cache/",
+    ".mypy_cache/",
+    "node_modules/",
+    ".venv/",
+    "venv/",
+    ".env/",
+    "env/",
+]
+
+# File patterns to process
+python-version = "3.9"
+
+# Formatter settings (if using alongside other formatters)
+respect-gitignore = true
+extend-ignore-names = []
+
+# Options for specific rules
+[tool.fixit.rules]
+# Configure specific rule options here if needed
