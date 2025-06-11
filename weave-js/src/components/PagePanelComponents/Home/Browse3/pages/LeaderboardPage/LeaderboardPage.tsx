@@ -27,7 +27,10 @@ import {
   LeaderboardGrid,
 } from '../../views/Leaderboard/LeaderboardGrid';
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
-import {GroupedLeaderboardData, LeaderboardValueRecord} from '../../views/Leaderboard/query/leaderboardQuery';
+import {
+  GroupedLeaderboardData,
+  LeaderboardValueRecord,
+} from '../../views/Leaderboard/query/leaderboardQuery';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
@@ -39,7 +42,9 @@ import {useObjectVersion} from '../wfReactInterface/tsDataModelHooks';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 
 // Utility function to flatten all evaluation records from grouped data
-const getAllEvaluationRecords = (data: GroupedLeaderboardData): LeaderboardValueRecord[] => {
+const getAllEvaluationRecords = (
+  data: GroupedLeaderboardData
+): LeaderboardValueRecord[] => {
   const records: LeaderboardValueRecord[] = [];
   Object.values(data.modelGroups).forEach(modelGroup => {
     Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
@@ -264,9 +269,10 @@ export const LeaderboardPageContentInner: React.FC<
     const allRecords = getAllEvaluationRecords(data);
     const selectedModelNames = new Set(
       allRecords
-        .filter(record => 
-          record.sourceEvaluationCallId && 
-          selectedEvaluations.includes(record.sourceEvaluationCallId)
+        .filter(
+          record =>
+            record.sourceEvaluationCallId &&
+            selectedEvaluations.includes(record.sourceEvaluationCallId)
         )
         .map(record => record.modelName)
     );
@@ -284,9 +290,10 @@ export const LeaderboardPageContentInner: React.FC<
     const allRecords = getAllEvaluationRecords(data);
     const datasetsWithSelectedEvaluations = new Set(
       allRecords
-        .filter(record =>
-          record.sourceEvaluationCallId &&
-          selectedEvaluations.includes(record.sourceEvaluationCallId)
+        .filter(
+          record =>
+            record.sourceEvaluationCallId &&
+            selectedEvaluations.includes(record.sourceEvaluationCallId)
         )
         .map(record => record.datasetName)
     );
@@ -349,10 +356,13 @@ export const LeaderboardPageContentInner: React.FC<
                   const uniqueFilteredEvaluations = [
                     ...new Set(
                       allRecords
-                        .filter(record =>
-                          record.sourceEvaluationCallId &&
-                          selectedEvaluations.includes(record.sourceEvaluationCallId) &&
-                          record.datasetName === datasetId
+                        .filter(
+                          record =>
+                            record.sourceEvaluationCallId &&
+                            selectedEvaluations.includes(
+                              record.sourceEvaluationCallId
+                            ) &&
+                            record.datasetName === datasetId
                         )
                         .map(record => record.sourceEvaluationCallId)
                     ),
