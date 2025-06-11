@@ -56,26 +56,65 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 }) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
+  const [selectedEvaluationIds, setSelectedEvaluationIds] = useState<string[]>(
+    []
+  );
+
   const onCellClick = useCallback(
-    (record: LeaderboardValueRecord) => {
+    (record: LeaderboardValueRecord, event: React.MouseEvent) => {
       const sourceCallId = record.sourceEvaluationCallId;
       if (sourceCallId) {
-        let to: string;
-        if (USE_COMPARE_EVALUATIONS_PAGE) {
-          to = peekingRouter.compareEvaluationsUri(
-            entity,
-            project,
-            [sourceCallId],
-            null
-          );
+        const isMultiSelect = event.altKey || event.metaKey;
+
+        if (isMultiSelect) {
+          // Toggle selection
+          setSelectedEvaluationIds(prev => {
+            if (prev.includes(sourceCallId)) {
+              return prev.filter(id => id !== sourceCallId);
+            } else {
+              return [...prev, sourceCallId];
+            }
+          });
         } else {
-          to = peekingRouter.callUIUrl(entity, project, '', sourceCallId);
+          // Single selection - navigate immediately
+          let to: string;
+          if (USE_COMPARE_EVALUATIONS_PAGE) {
+            to = peekingRouter.compareEvaluationsUri(
+              entity,
+              project,
+              [sourceCallId],
+              null
+            );
+          } else {
+            to = peekingRouter.callUIUrl(entity, project, '', sourceCallId);
+          }
+          history.push(to);
         }
-        history.push(to);
       }
     },
     [entity, history, peekingRouter, project]
   );
+
+  // Navigate to compare drawer when multiple evaluations are selected
+  useEffect(() => {
+    if (selectedEvaluationIds.length > 0) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Enter' && selectedEvaluationIds.length > 0) {
+          const to = peekingRouter.compareEvaluationsUri(
+            entity,
+            project,
+            selectedEvaluationIds,
+            null
+          );
+          history.push(to);
+          setSelectedEvaluationIds([]);
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [selectedEvaluationIds, entity, project, peekingRouter, history]);
 
   const columnStats = useMemo(() => getColumnStats(data), [data]);
 
@@ -181,6 +220,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                         metricPathGroupName
                       );
                       const value = record?.metricValue;
+                      const isSelected =
+                        record?.sourceEvaluationCallId &&
+                        selectedEvaluationIds.includes(
+                          record.sourceEvaluationCallId
+                        );
                       let inner: React.ReactNode = value;
                       if (inner == null) {
                         inner = <NotApplicable />;
@@ -212,7 +256,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                             overflow: 'hidden',
                             padding: '2px',
                           }}
-                          onClick={() => record && onCellClick(record)}>
+                          onClick={e => record && onCellClick(record, e)}>
                           <div
                             style={{
                               width: '100%',
@@ -230,6 +274,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                                 metricPathGroupName,
                                 value
                               ),
+                              border: isSelected ? '2px solid #1976d2' : 'none',
+                              boxSizing: 'border-box',
                             }}>
                             {inner}
                           </div>
@@ -243,7 +289,14 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           )
       ),
     ],
-    [columnStats.datasetGroups, entity, getColorForScore, onCellClick, project]
+    [
+      columnStats.datasetGroups,
+      entity,
+      getColorForScore,
+      onCellClick,
+      project,
+      selectedEvaluationIds,
+    ]
   );
 
   const groupingModel: GridColumnGroup[] = useMemo(() => {
@@ -363,6 +416,57 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         flexDirection: 'column',
         overflow: 'hidden',
       }}>
+      {selectedEvaluationIds.length > 0 && (
+        <Box
+          sx={{
+            padding: 2,
+            backgroundColor: '#f5f5f5',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+          <span>
+            {selectedEvaluationIds.length} evaluation
+            {selectedEvaluationIds.length > 1 ? 's' : ''} selected (Press Enter
+            to compare or Alt/Option+click to select more)
+          </span>
+          <Box sx={{display: 'flex', gap: 1}}>
+            <button
+              onClick={() => {
+                const to = peekingRouter.compareEvaluationsUri(
+                  entity,
+                  project,
+                  selectedEvaluationIds,
+                  null
+                );
+                history.push(to);
+                setSelectedEvaluationIds([]);
+              }}
+              style={{
+                padding: '4px 12px',
+                backgroundColor: '#1976d2',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}>
+              Compare
+            </button>
+            <button
+              onClick={() => setSelectedEvaluationIds([])}
+              style={{
+                padding: '4px 12px',
+                backgroundColor: '#666',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}>
+              Clear
+            </button>
+          </Box>
+        </Box>
+      )}
       <StyledDataGrid
         rows={rows}
         columns={orderedColumns}
