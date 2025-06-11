@@ -2,9 +2,9 @@
 Basic smoke tests for Weave on Windows containers.
 These tests validate core functionality works correctly on Windows.
 """
+
 import os
 import platform
-import sys
 import tempfile
 import threading
 import time
