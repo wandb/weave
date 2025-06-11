@@ -175,6 +175,31 @@ Presenter Notes:
 
 ---
 
+### Your New Superpowers
+
+**With AI:** Multiple, simultaneous workstreams
+
+**You become:**
+* 🎨 **Creative Director** - defining what to build
+* 🏗️ **System Architect** - designing how it fits together  
+* 🔧 **Technical Product Manager** - prioritizing and coordinating
+* 🎯 **Quality Gatekeeper** - ensuring standards and best practices
+
+**The demand for great engineers increases, not decreases**
+
+<!-- IMG_GEN: {"prompt": "Epic superhero-style illustration: developer in flowing cape standing atop multiple floating project platforms, AI assistants as glowing orbs orbiting around them, dramatic lighting with city skyline background, comic book art style with dynamic action lines"} -->
+![bg right:25% 90%](images/superpowers.png)
+
+<!-- 
+Presenter Notes:
+- This is the key insight - you become MORE valuable, not less
+- You can take on bigger, more complex challenges
+- Companies will need fewer junior developers but more senior/staff engineers
+- The work becomes more strategic and less tactical
+-->
+
+---
+
 ## Common Tools Landscape
 
 <!-- IMG_GEN: {"prompt": "Futuristic tool workshop floating in space: various AI coding tools as crystalline floating workstations connected by energy bridges, holographic interfaces everywhere, space station aesthetic with cosmic background", "size": "1792x1024"} -->
@@ -212,13 +237,15 @@ Presenter Notes:
 --- 
 
 ### Cursor Demo
+
+**Live Demo Agenda:**
 * Shell Command (Shell cmd-k)
-* Type-Ahead
+* Type-Ahead completion
 * Editor Spot Fix (cmd-K)
-* Codebase Question (Ask mode)
+* Codebase Questions (Ask mode)
 * Feature Implementation (Agent Mode) 
-* Demonstrate Context adding (URLs, etc...)
-* Generate PR
+* Context adding (URLs, files, etc.)
+* PR generation
 
 ---
 
@@ -227,7 +254,7 @@ Presenter Notes:
 **Claude Code** - Deep reasoning, CLI-based  
 **Cursor Background Agents** - Autonomous workers, cloud-based
 **OpenAI Codex** - Code generation API, powers many tools
-**Devin** - Full-stack development & deployment - integrates with slack
+**Devin** - Full-stack development & deployment (integrates with Slack)
 
 <!-- IMG_GEN: {"prompt": "Specialist AI entities as mystical beings: Claude as wise oracle with ancient scrolls of code, Cursor agents as busy worker sprites, Devin as powerful wizard orchestrating entire projects, fantasy art meets cyberpunk"} -->
 ![bg right:35% 85%](images/specialized-tools.png)
@@ -243,14 +270,9 @@ Presenter Notes:
 --- 
 
 ### OpenAI Codex Demo
-* Implement a specific feature
+* Implement a specific feature end-to-end
 
-https://chatgpt.com/codex
-
-
-
-
-
+**Demo URL:** https://chatgpt.com/codex
 
 ---
 
@@ -271,12 +293,13 @@ Presenter Notes:
 
 ---
 
-### Coderrabbit Demo
+### CodeRabbit Demo
 
-![bg](images/coderrabbit_1.png)
-![bg](images/coderrabbit_2.png)
+**Live Example:** AI-powered PR review in action
 
-https://github.com/wandb/weave/pull/3653
+**Demo URL:** https://github.com/wandb/weave/pull/3653
+
+![bg right:50%](images/coderrabbit_1.png)
 
 ---
 
@@ -413,10 +436,8 @@ Presenter Notes:
 
 ---
 
-#### Notebooks 📓
+### otebooks 📓
 *AI-powered data science workflows*
-
-(Hex)
 
 **What AI can do:**
 * Generate analysis code from natural language
@@ -442,7 +463,9 @@ Presenter Notes:
 
 ### Hex Demo
 
-https://app.hex.tech/8ecc814e-8a34-46e1-b465-0c38bd16e93e/hex/0196da17-fbc7-788f-b371-4b0664107ffb/draft/logic
+**Live Example:** AI-assisted data analysis and visualization
+
+**Demo URL:** https://app.hex.tech/8ecc814e-8a34-46e1-b465-0c38bd16e93e/hex/0196da17-fbc7-788f-b371-4b0664107ffb/draft/logic
 
 ---
 
@@ -477,8 +500,9 @@ Presenter Notes:
 
 **Benefits:** Consistent AI behavior, faster feature work, automatic quality
 
-https://github.com/tssweeney/agentikit/blob/main/.cursor/rules/general-project-rules.mdc
-https://github.com/wandb/weave/blob/master/AGENTS.md
+**Examples:**
+* https://github.com/tssweeney/agentikit/blob/main/.cursor/rules/general-project-rules.mdc
+* https://github.com/wandb/weave/blob/master/AGENTS.md
 
 <!-- IMG_GEN: {"prompt": "Living instruction manual: AGENTS.md file as glowing tome with pages that float and rearrange themselves, AI reading and memorizing the patterns, library of knowledge with floating texts, magical realism meets technical documentation"} -->
 ![bg right:30% 75%](images/agents-md.png)
@@ -493,7 +517,7 @@ Presenter Notes:
 ---
 
 ### PRD.md 📝
-*Useful for having ashared, collaborative state betwene you and the agent*
+*Useful for having a shared, collaborative state between you and the agent*
 
 **Template structure:**
 ```markdown
@@ -567,7 +591,7 @@ Presenter Notes:
 **The pattern:**
 1. **Explore:** Let AI try different approaches  
 2. **Checkpoint:** Stage incremental progress
-2. **Commit:** Commit working solutions
+3. **Commit:** Commit working solutions
 
 <!-- IMG_GEN: {"prompt": "Git branching strategy as a tree of possibilities: multiple code branches growing from a central trunk, AI gardener tending to different experimental approaches, some branches merging back together, organic growth meets version control, botanical illustration style with tech elements"} -->
 ![bg right:30% 80%](images/git-workflow.png)
@@ -625,7 +649,7 @@ Presenter Notes:
 
 **Benefits:** Privacy, cost control, offline capability
 
-Can host on a private cloud or locally using ollama.
+Can host on a private cloud or locally using Ollama.
 
 <!-- IMG_GEN: {"prompt": "Private server fortress: secure data center with glowing AI models running locally, shields and locks protecting sensitive code, developer working with locally hosted AI models behind corporate firewall, cybersecurity meets AI infrastructure, fortress architecture with tech elements"} -->
 ![bg right:30% 80%](images/self-hosted.png)
@@ -636,6 +660,20 @@ Presenter Notes:
 - Mention the trade-offs: control vs. convenience
 - Self-hosted requires more technical expertise
 -->
+
+---
+
+### DeepSeek Local Demo
+
+Many options here.
+
+1. Get a model
+
+```
+> ollama run deepseek-r1:7b
+```
+
+2. Connect it: https://zed.dev/docs/ai/configuration#ollama
 
 ---
 
@@ -659,32 +697,6 @@ Presenter Notes:
 -->
 
 ---
-
-### Your New Superpowers
-
-**With AI:** Multiple, simulataneous workstreams
-
-**You become:**
-* 🎨 **Creative Director** - defining what to build
-* 🏗️ **System Architect** - designing how it fits together  
-* 🔧 **Technical Product Manager** - prioritizing and coordinating
-* 🎯 **Quality Gatekeeper** - ensuring standards and best practices
-
-**The demand for great engineers increases, not decreases**
-
-<!-- IMG_GEN: {"prompt": "Epic superhero-style illustration: developer in flowing cape standing atop multiple floating project platforms, AI assistants as glowing orbs orbiting around them, dramatic lighting with city skyline background, comic book art style with dynamic action lines"} -->
-![bg right:25% 90%](images/superpowers.png)
-
-<!-- 
-Presenter Notes:
-- This is the key insight - you become MORE valuable, not less
-- You can take on bigger, more complex challenges
-- Companies will need fewer junior developers but more senior/staff engineers
-- The work becomes more strategic and less tactical
--->
-
----
-
 
 ## Q&A
 
@@ -711,13 +723,15 @@ Presenter Notes:
 
 ## Thank You! 🚀
 
-
 **Next Steps:**
 1. **Try Cursor** - Start with the most beginner-friendly AI IDE
 2. **Practice workflows** - Focus on shell commands & spot requests  
 3. **Build confidence** - Start with simple tasks, grow complexity
 
+### Questions?
 
+<!-- IMG_GEN: {"prompt": "Celebration of new coding era: developer and AI raising hands in victory together, confetti of code symbols falling like celebration, sunrise over a futuristic coding city, inspirational poster art style with vibrant colors"} -->
+![bg right:50%](images/thank-you.png)
 
 <!-- 
 Presenter Notes:
@@ -783,7 +797,7 @@ Presenter Notes:
 
 ---
 
-#### Markdown 📝
+### Markdown 📝
 *AI as your writing and documentation partner*
 
 **What AI creates:**
@@ -804,7 +818,7 @@ Presenter Notes:
 
 ---
 
-#### Presentations 🎯
+### Presentations 🎯
 *AI helps create and structure presentations*
 
 **AI capabilities:**
@@ -825,7 +839,7 @@ Presenter Notes:
 
 ---
 
-#### Diagrams 📊
+### Diagrams 📊
 *AI creates visual system representations*
 
 **What AI generates:**
