@@ -2,6 +2,8 @@ import {Box} from '@mui/material';
 import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
+import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
+import {Icon} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
@@ -25,7 +27,6 @@ import {
 } from '../../views/Leaderboard/LeaderboardGrid';
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
-import {CompareEvaluationsTableButton} from '../CallsPage/CallsTableButtons';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {
   useBaseObjectInstances,
@@ -235,6 +236,30 @@ export const LeaderboardPageContentInner: React.FC<
       .filter(c => c != null) as LeaderboardColumnOrderType;
   }, [workingLeaderboardValCopy, evalData]);
 
+  // Calculate the number of selected models (rows) based on selectedEvaluations
+  const selectedModelsCount = useMemo(() => {
+    if (!data || selectedEvaluations.length === 0) {
+      return 0;
+    }
+    
+    // Each model group (row) is selected if it contains any selected evaluations
+    return Object.keys(data.modelGroups).filter(modelGroupName => {
+      const modelGroup = data.modelGroups[modelGroupName];
+      
+      // Check if this model group contains any selected evaluations using .some() for efficiency
+      return Object.values(modelGroup.datasetGroups).some(datasetGroup =>
+        Object.values(datasetGroup.scorerGroups).some(scorerGroup =>
+          Object.values(scorerGroup.metricPathGroups).some(records =>
+            records.some(record => 
+              record.sourceEvaluationCallId && 
+              selectedEvaluations.includes(record.sourceEvaluationCallId)
+            )
+          )
+        )
+      );
+    }).length;
+  }, [data, selectedEvaluations]);
+
   return (
     <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
       <Box
@@ -254,27 +279,71 @@ export const LeaderboardPageContentInner: React.FC<
                 tooltip="Clear selection"
               />
               <div className="text-sm">
-                {selectedEvaluations.length}{' '}
-                {selectedEvaluations.length === 1
-                  ? 'evaluation'
-                  : 'evaluations'}{' '}
+                {selectedModelsCount}{' '}
+                {selectedModelsCount === 1
+                  ? 'model'
+                  : 'models'}{' '}
                 selected:
               </div>
-              <CompareEvaluationsTableButton
-                buttonText={
-                  selectedEvaluations.length === 1 ? 'View' : 'Compare'
-                }
-                tooltipText="Compare metrics and examples for selected evaluations"
-                onClick={() => {
-                  history.push(
-                    peekingRouter.compareEvaluationsUri(
-                      props.entity,
-                      props.project,
-                      selectedEvaluations,
-                      null
-                    )
-                  );
+              <CompareEvaluationsDropdownButton
+                selectedEvaluations={selectedEvaluations}
+                onDatasetSelect={(datasetId) => {
+                  // Filter evaluations to only include those for the selected dataset
+                  const filteredEvaluations: string[] = [];
+                  
+                  // Iterate through selected evaluations and find those matching the dataset
+                  selectedEvaluations.forEach(evalId => {
+                    // Find the model group that contains this evaluation
+                    Object.values(data.modelGroups).forEach(modelGroup => {
+                      const datasetGroup = modelGroup.datasetGroups[datasetId];
+                      if (datasetGroup) {
+                        // Check if this evaluation ID exists in this dataset's records
+                        Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
+                          Object.values(scorerGroup.metricPathGroups).forEach(records => {
+                            records.forEach(record => {
+                              if (record.sourceEvaluationCallId === evalId) {
+                                filteredEvaluations.push(evalId);
+                              }
+                            });
+                          });
+                        });
+                      }
+                    });
+                  });
+                  
+                  // Remove duplicates
+                  const uniqueFilteredEvaluations = [...new Set(filteredEvaluations)];
+                  
+                  console.log('Selected dataset:', datasetId);
+                  console.log('Filtered evaluations:', uniqueFilteredEvaluations);
+                  
+                  if (uniqueFilteredEvaluations.length > 0) {
+                    history.push(
+                      peekingRouter.compareEvaluationsUri(
+                        props.entity,
+                        props.project,
+                        uniqueFilteredEvaluations,
+                        null
+                      )
+                    );
+                  }
                 }}
+                availableDatasets={
+                  data && Object.keys(data.modelGroups).length > 0
+                    ? Object.keys(
+                        Object.values(data.modelGroups)[0].datasetGroups || {}
+                      ).map(datasetName => {
+                        // Extract just the base name without version suffix
+                        const baseName = datasetName.split(':')[0];
+                        return {
+                          id: datasetName, // Keep full name as ID for filtering
+                          name: baseName,  // Display clean name
+                        };
+                      })
+                    : []
+                }
+                loading={loading}
+                disabled={selectedEvaluations.length === 0}
               />
             </div>
           </Tailwind>
@@ -405,6 +474,85 @@ export const useIsEditor = (entity: string) => {
       isEditor: viewer && userInfo?.teams.includes(entity),
     };
   }, [entity, loadingUserInfo, userInfo]);
+};
+
+// Dropdown button component for selecting datasets
+const CompareEvaluationsDropdownButton: FC<{
+  selectedEvaluations: string[];
+  onDatasetSelect: (datasetId: string) => void;
+  availableDatasets?: Array<{id: string; name: string}>;
+  disabled?: boolean;
+  loading?: boolean;
+}> = ({
+  selectedEvaluations,
+  onDatasetSelect,
+  availableDatasets = [],
+  disabled,
+  loading
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const buttonText = selectedEvaluations.length === 1 ? 'View' : 'Compare';
+  
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+      <DropdownMenu.Root open={isOpen} onOpenChange={setIsOpen}>
+        <DropdownMenu.Trigger asChild>
+          <Button
+            size="medium"
+            variant="primary"
+            disabled={disabled || loading}
+            icon="chart-scatterplot"
+            active={isOpen}
+            tooltip="Select dataset to compare evaluations">
+            <div className="flex items-center gap-2">
+              {loading ? (
+                <Loading size={16} />
+              ) : (
+                <>
+                  {buttonText}
+                  <Icon width={16} height={16} name="chevron-down" />
+                </>
+              )}
+            </div>
+          </Button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content 
+            align="start" 
+            sideOffset={4}
+            className="min-w-[200px]">
+            {availableDatasets.length === 0 ? (
+              <DropdownMenu.Item disabled>
+                <div className="flex items-center gap-2 text-moon-500">
+                  <Icon name="info" width={16} height={16} />
+                  No datasets available
+                </div>
+              </DropdownMenu.Item>
+            ) : (
+              availableDatasets.map(dataset => (
+                <DropdownMenu.Item
+                  key={dataset.id}
+                  onClick={() => {
+                    onDatasetSelect(dataset.id);
+                    setIsOpen(false);
+                  }}>
+                  <div className="flex items-center gap-2">
+                    <Icon name="table" width={16} height={16} />
+                    {dataset.name}
+                  </div>
+                </DropdownMenu.Item>
+              ))
+            )}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
+    </Box>
+  );
 };
 
 const StyledReactMarkdown = styled(ReactMarkdown)`
