@@ -12,7 +12,7 @@ def cast_to_calls_filter(obj: Any) -> CallsFilter:
     if isinstance(obj, dict):
         return CallsFilter(**obj)
 
-    raise TypeError("Unable to cast to CallsFilter")
+    raise TypeError(f"Unable to cast to CallsFilter: {obj}")
 
 
 def cast_to_sort_by(obj: Any) -> SortBy:
@@ -32,7 +32,7 @@ def cast_to_query(obj: Any) -> Query:
     if isinstance(obj, dict):
         return Query(**obj)
 
-    raise TypeError("Unable to cast to Query")
+    raise TypeError(f"Unable to cast to Query: {obj}")
 
 
 CallsFilterLike = Annotated[CallsFilter, pydantic.BeforeValidator(cast_to_calls_filter)]
