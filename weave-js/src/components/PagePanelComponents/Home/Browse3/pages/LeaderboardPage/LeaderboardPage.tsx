@@ -290,7 +290,21 @@ export const LeaderboardPageContentInner: React.FC<
                 project={props.project}
                 selectedEvaluations={selectedEvaluations}
                 onDatasetSelect={datasetId => {
-                  // Filter evaluations to only include those for the selected dataset
+                  // For single evaluation, we can skip the complex filtering and just use the selected evaluation
+                  if (selectedEvaluations.length === 1) {
+                    console.log('Single evaluation - navigating directly:', selectedEvaluations[0]);
+                    history.push(
+                      peekingRouter.compareEvaluationsUri(
+                        props.entity,
+                        props.project,
+                        selectedEvaluations,
+                        null
+                      )
+                    );
+                    return;
+                  }
+
+                  // For multiple evaluations, filter to only include those for the selected dataset
                   const filteredEvaluations: string[] = [];
 
                   // Iterate through selected evaluations and find those matching the dataset
@@ -554,6 +568,14 @@ const CompareEvaluationsDropdownButton: FC<{
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const buttonText = selectedEvaluations.length === 1 ? 'View' : 'Compare';
+  const isSingleEvaluation = selectedEvaluations.length === 1;
+
+  // For single evaluation, directly navigate to first available dataset
+  const handleSingleEvaluationClick = () => {
+    if (availableDatasets.length > 0) {
+      onDatasetSelect(availableDatasets[0].id);
+    }
+  };
 
   return (
     <Box
@@ -562,61 +584,77 @@ const CompareEvaluationsDropdownButton: FC<{
         display: 'flex',
         alignItems: 'center',
       }}>
-      <DropdownMenu.Root open={isOpen} onOpenChange={setIsOpen}>
-        <DropdownMenu.Trigger asChild>
-          <Button
-            size="medium"
-            variant="primary"
-            disabled={disabled || loading}
-            icon="chart-scatterplot"
-            active={isOpen}
-            tooltip="Select dataset to compare evaluations">
-            <div className="flex items-center gap-2">
-              {loading ? (
-                <Loading size={16} />
-              ) : (
-                <>
-                  {buttonText}
-                  <Icon width={16} height={16} name="chevron-down" />
-                </>
-              )}
-            </div>
-          </Button>
-        </DropdownMenu.Trigger>
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            align="start"
-            sideOffset={4}
-            className="min-w-[200px]">
-            {availableDatasets.length === 0 ? (
-              <DropdownMenu.Item disabled>
-                <div className="flex items-center gap-2 text-moon-500">
-                  <Icon name="info" width={16} height={16} />
-                  No datasets available
-                </div>
-              </DropdownMenu.Item>
-            ) : (
-              availableDatasets.map(dataset => (
-                <DropdownMenu.Item
-                  key={dataset.id}
-                  onClick={() => {
-                    onDatasetSelect(dataset.id);
-                    setIsOpen(false);
-                  }}>
-                  <div className="flex items-center gap-2">
-                    <Icon name="table" width={16} height={16} />
-                    <DatasetNameWithVersion
-                      entity={entity}
-                      project={project}
-                      datasetFullName={dataset.name}
-                    />
+      {isSingleEvaluation ? (
+        // Direct button for single evaluation
+        <Button
+          size="medium"
+          variant="primary"
+          disabled={disabled || loading || availableDatasets.length === 0}
+          icon="chart-scatterplot"
+          onClick={handleSingleEvaluationClick}
+          tooltip="View evaluation">
+          <div className="flex items-center gap-2">
+            {loading ? <Loading size={16} /> : buttonText}
+          </div>
+        </Button>
+      ) : (
+        // Dropdown for multiple evaluations
+        <DropdownMenu.Root open={isOpen} onOpenChange={setIsOpen}>
+          <DropdownMenu.Trigger asChild>
+            <Button
+              size="medium"
+              variant="primary"
+              disabled={disabled || loading}
+              icon="chart-scatterplot"
+              active={isOpen}
+              tooltip="Select dataset to compare evaluations">
+              <div className="flex items-center gap-2">
+                {loading ? (
+                  <Loading size={16} />
+                ) : (
+                  <>
+                    {buttonText}
+                    <Icon width={16} height={16} name="chevron-down" />
+                  </>
+                )}
+              </div>
+            </Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              align="start"
+              sideOffset={4}
+              className="min-w-[200px]">
+              {availableDatasets.length === 0 ? (
+                <DropdownMenu.Item disabled>
+                  <div className="flex items-center gap-2 text-moon-500">
+                    <Icon name="info" width={16} height={16} />
+                    No datasets available
                   </div>
                 </DropdownMenu.Item>
-              ))
-            )}
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
+              ) : (
+                availableDatasets.map(dataset => (
+                  <DropdownMenu.Item
+                    key={dataset.id}
+                    onClick={() => {
+                      onDatasetSelect(dataset.id);
+                      setIsOpen(false);
+                    }}>
+                    <div className="flex items-center gap-2">
+                      <Icon name="table" width={16} height={16} />
+                      <DatasetNameWithVersion
+                        entity={entity}
+                        project={project}
+                        datasetFullName={dataset.name}
+                      />
+                    </div>
+                  </DropdownMenu.Item>
+                ))
+              )}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      )}
     </Box>
   );
 };
