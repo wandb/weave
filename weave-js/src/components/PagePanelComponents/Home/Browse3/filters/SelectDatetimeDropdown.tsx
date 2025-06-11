@@ -17,6 +17,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import * as userEvents from '../../../../../integrations/analytics/userEvents';
 import {formatDate, formatDateOnly, parseDate} from '../../../../../util/date';
+import {FILTER_INPUT_DEBOUNCE_MS} from './FilterBar';
 
 type PredefinedSuggestion = {
   abbreviation: string;
@@ -31,7 +32,6 @@ const PREDEFINED_SUGGESTIONS: PredefinedSuggestion[] = [
   {abbreviation: '2d', label: '2 Days'},
   {abbreviation: '1w', label: '1 Week'},
   {abbreviation: '1mo', label: '1 Month'},
-  {abbreviation: '3mo', label: '3 Months'},
   {abbreviation: 'custom', label: 'Custom datetime', isCustomDate: true},
 ];
 
@@ -50,7 +50,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   onChange,
   isActive,
 }) => {
-  const [inputValue, setInputValue] = useState(value);
+  const [inputValue, setInputValue] = useState('');
   const [isDropdownVisible, setDropdownVisible] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(
@@ -66,19 +66,21 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const dropdownRef = useRef<HTMLUListElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Set default value to 1mo if no valid date
+  // Format and set input value whenever the value prop changes
   useEffect(() => {
-    if (!value) {
-      const defaultDate = parseDate('1mo');
-      if (defaultDate) {
-        const localDate = formatDate(defaultDate);
-        onChange(localDate);
-        setInputValue(localDate);
+    if (value) {
+      const date = parseDate(value);
+      if (date) {
+        const formattedDate = formatDate(date);
+        setInputValue(formattedDate);
+      } else {
+        // If parseDate fails, use the raw value as fallback
+        setInputValue(value);
       }
+    } else {
+      setInputValue('');
     }
-    // Only run on first render
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [value]);
 
   // Add analytics hook
   useFireAnalyticsForDateFilterDropdownUsed(entity, project, inputValue, value);
@@ -128,8 +130,9 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
         onChange(formattedDate);
         setIsInvalid(false);
       } else {
+        // Don't update the filter state when input is invalid
+        // Just mark it as invalid and keep the current input value
         setIsInvalid(true);
-        onChange('');
       }
     },
     [onChange]
@@ -142,7 +145,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       }
       debounceTimeoutRef.current = setTimeout(() => {
         parseAndUpdateDate(newInputValue);
-      }, 500);
+      }, FILTER_INPUT_DEBOUNCE_MS);
     },
     [parseAndUpdateDate]
   );
@@ -170,24 +173,54 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     }
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      // Clear any pending debounced parse
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      // Immediately parse the current input value
+      parseAndUpdateDate(inputValue, true);
+      setDropdownVisible(false);
+      if (inputRef.current) {
+        inputRef.current.blur();
+      }
+    }
+  };
+
   const handleDateChange = (date: Date | null) => {
     if (date) {
       const formattedDate = formatDate(date);
       setInputValue(formattedDate);
-      onChange(formattedDate);
       setIsInvalid(false);
+      // Don't auto update the date until the calendar is closed
     }
   };
 
   const handleIconClick = (event: React.MouseEvent) => {
     event.stopPropagation();
-    setIsCalendarOpen(true);
+    setIsCalendarOpen(prev => !prev);
   };
 
   // Add handler for closing when Ok button is clicked
-  const handleAccept = (date: Date | null) => {
+  const handleClose = (date: Date | null) => {
+    setIsCalendarOpen(false);
+    setDropdownVisible(false);
+    if (inputRef.current) {
+      inputRef.current.blur();
+    }
+    // Clear any pending debounced parse first
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
     if (date) {
-      setIsCalendarOpen(false);
+      // When OK is clicked, use the provided date
+      const formattedDate = formatDate(date);
+      parseAndUpdateDate(formattedDate, true);
+    } else {
+      // When clicking outside, immediately parse the current input value
+      parseAndUpdateDate(inputValue, true);
     }
   };
 
@@ -283,6 +316,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
             aria-label="Date input"
             value={inputValue}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
             onFocus={() => setDropdownVisible(true)}
             onBlur={event => {
               if (
@@ -292,6 +326,15 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
                 setDropdownVisible(false);
               }
               setIsInputFocused(false);
+
+              // When user leaves the input, immediately parse what they've typed
+              // Clear any pending debounced parse first
+              if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+              }
+              if (inputValue !== value) {
+                parseAndUpdateDate(inputValue, true);
+              }
             }}
             onMouseEnter={() => setIsInputHovered(true)}
             onMouseLeave={() => setIsInputHovered(false)}
@@ -322,10 +365,12 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
           />
           <DateTimePicker
             open={isCalendarOpen}
-            onClose={() => setIsCalendarOpen(false)}
+            onClose={() => handleClose(null)}
             value={new Date(inputValue) ?? null}
             onChange={handleDateChange}
-            onAccept={handleAccept}
+            onAccept={handleClose}
+            reduceAnimations
+            closeOnSelect={false}
             slotProps={{
               textField: {
                 style: {display: 'none'},

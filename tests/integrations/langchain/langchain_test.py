@@ -709,7 +709,7 @@ def test_weave_attributes_in_call(client: WeaveClient) -> None:
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "*.googleapis.com"],
     before_record_request=filter_body,
     match_on=["method", "scheme", "path", "query"],

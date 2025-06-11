@@ -164,7 +164,9 @@ export const ModelDetailsLoaded = ({
       : CODE_EXAMPLES_CHAT;
   let codeExample = codeExamples[selectedLanguage] ?? '';
   codeExample = codeExample.trim();
-  codeExample = codeExample.replace('{model_id}', model.idPlayground);
+  if (model.idPlayground) {
+    codeExample = codeExample.replace('{model_id}', model.idPlayground);
+  }
 
   const onClickCopy = useCallback(() => {
     copyToClipboard(codeExample);
@@ -199,17 +201,15 @@ export const ModelDetailsLoaded = ({
       </div>
       <div className="mb-8 mt-16 text-lg font-semibold">Model overview</div>
 
-      <div className="mb-16 flex gap-10">
-        <Tooltip
-          trigger={
-            <DetailTile header="Price" footer="Input - Output">
-              <div className="text-xl font-semibold">
-                {getPriceString(model, false, '-')}
-              </div>
-            </DetailTile>
-          }
-          content="Price per million tokens"
-        />
+      <div className="mb-16 flex flex-wrap gap-10">
+        <DetailTile
+          header="Price"
+          footer="Input - Output"
+          tooltip="Price per million tokens">
+          <div className="text-xl font-semibold">
+            {getPriceString(model, false, '-')}
+          </div>
+        </DetailTile>
         {model.contextWindow && (
           <DetailTile header="Context window">
             <div className="text-xl font-semibold">
@@ -310,14 +310,13 @@ export const ModelDetailsLoaded = ({
           <Button variant="ghost" icon="copy" onClick={onClickCopy} />
         </div>
       </div>
-      <div>
+      <div className="[&_.monaco-editor]:!absolute">
         <CodeEditor
           value={codeExample}
           language={CODE_LANGUAGE_MAP[selectedLanguage]}
           readOnly
           handleMouseWheel
           alwaysConsumeMouseWheel={false}
-          // wrapLines={wrapLines}
         />
       </div>
     </div>
