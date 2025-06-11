@@ -73,6 +73,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       if (date) {
         const formattedDate = formatDate(date);
         setInputValue(formattedDate);
+        setIsInvalid(false);
       } else {
         // If parseDate fails, use the raw value as fallback
         setInputValue(value);
@@ -125,6 +126,9 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     (newInputValue: string, skipDebounce = false) => {
       const date = parseDate(newInputValue);
       if (date) {
+        if (skipDebounce && debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
+        }
         const formattedDate = formatDate(date);
         setInputValue(formattedDate);
         onChange(formattedDate);
@@ -175,10 +179,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
-      // Clear any pending debounced parse
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
       // Immediately parse the current input value
       parseAndUpdateDate(inputValue, true);
       setDropdownVisible(false);
@@ -209,18 +209,16 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
     if (inputRef.current) {
       inputRef.current.blur();
     }
-    // Clear any pending debounced parse first
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
 
     if (date) {
       // When OK is clicked, use the provided date
       const formattedDate = formatDate(date);
       parseAndUpdateDate(formattedDate, true);
     } else {
-      // When clicking outside, immediately parse the current input value
-      parseAndUpdateDate(inputValue, true);
+      // When clicking outside, parse immediately if the input value has changed
+      if (inputValue !== value) {
+        parseAndUpdateDate(inputValue, true);
+      }
     }
   };
 
@@ -234,7 +232,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
         setIsCalendarOpen(true);
         return;
       }
-
       // Use the absolute date time if provided, otherwise use the abbreviation
       const valueToUse = absoluteDateTime || suggestionValue;
       setInputValue(valueToUse);
@@ -244,6 +241,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
 
       setSelectedSuggestion(suggestionValue);
       setDropdownVisible(false);
+      setIsInvalid(false);
       if (inputRef.current) {
         inputRef.current.blur();
       }
@@ -328,10 +326,6 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               setIsInputFocused(false);
 
               // When user leaves the input, immediately parse what they've typed
-              // Clear any pending debounced parse first
-              if (debounceTimeoutRef.current) {
-                clearTimeout(debounceTimeoutRef.current);
-              }
               if (inputValue !== value) {
                 parseAndUpdateDate(inputValue, true);
               }
