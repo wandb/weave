@@ -21,10 +21,14 @@ export const ChatView = ({chat}: ChatViewProps) => {
 
   // Check if we should show loading state
   const shouldShowLoading = useMemo(() => {
-    if (!playgroundContext.isPlayground) return false;
+    if (!playgroundContext.isPlayground) {
+      return false;
+    }
 
     const messages = chat.request?.messages || [];
-    if (messages.length === 0) return false;
+    if (messages.length === 0) {
+      return false;
+    }
 
     // Check if the last message is from user and we have no result yet
     const lastMessage = messages[messages.length - 1];
