@@ -1,29 +1,42 @@
 import datetime
 from typing import Optional, Protocol
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
-class ObjectBackedThing(BaseModel):
-    project_id: str
-    _object_id: str
-    _object_digest: str
+# class ObjectBackedThing(BaseModel):
+#     project_id: str
+#     _object_id: str
+#     _object_digest: str
+#     name: str
+#     description: Optional[str]
+#     created_at: datetime.datetime
+#     updated_at: datetime.datetime
+#     deleted_at: Optional[datetime.datetime]
+
+class ModelClass(BaseModel):
+    id: str
     name: str
-    description: Optional[str]
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
-    deleted_at: Optional[datetime.datetime]
+    description: Optional[str] = None
+
+class ModelConfig(BaseModel):
+    id: str
+
+class ModelInstance(BaseModel):
+    id: str
+    model_class_id: str # needs to be immutable after creation
+    model_config_id: str # needs to be immutable after creation
+    name: str
+    description: Optional[str] = None
+    
 
 
-class Model(ObjectBackedThing):
+
+class Task(BaseModel):
     id: str
 
 
-class Task(ObjectBackedThing):
-    id: str
-
-
-class Scorer(ObjectBackedThing):
+class Scorer(BaseModel):
     id: str
 
 
@@ -75,4 +88,6 @@ class Summary(BaseModel):
     taskId: str
 
 
-class TraceServerEvaluationInterfaceMixin(Protocol): ...
+class TraceServerEvaluationInterfaceMixin(Protocol):
+    def create_model(self, name, config) -> str:
+        pass
