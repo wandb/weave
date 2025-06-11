@@ -14,7 +14,7 @@ RUN python -m ensurepip --upgrade; \
     python -m pip install --upgrade pip
 
 # Install pytest and build tools
-RUN python -m pip install pytest build setuptools wheel
+RUN python -m pip install pytest build setuptools wheel hatchling
 
 # Set working directory
 WORKDIR /app
@@ -22,6 +22,7 @@ WORKDIR /app
 # Copy package files
 COPY pyproject.toml .
 COPY README.md .
+COPY LICENSE .
 COPY weave/ ./weave/
 
 # Install weave in development mode
