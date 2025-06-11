@@ -1,15 +1,17 @@
 ---
 marp: true
-theme: gaia
-class: 
+# theme: gaia
+# class: 
 #   - lead
 #   - invert
 ---
 
 # Vibe Coding
-_Presented by Tim Sweeney_
+_Prompted by Tim Sweeney_
+_Written by Claude_
 
-![bg right:40% 80%](placeholder-hero-image.png)
+<!-- IMG_GEN: {"prompt": "Modern developer sitting at a desk with holographic AI assistant, coding on multiple screens, futuristic tech workspace, blue and purple color scheme"} -->
+![bg right:40% 80%](images/placeholder-hero-image.png)
 
 <!-- 
 Presenter Notes:
@@ -88,7 +90,8 @@ Outline:
 
 ## What is Vibe Coding?
 
-![bg right:40% 80%](placeholder-ai-pair-programming.png)
+<!-- IMG_GEN: {"prompt": "Two developers collaborating - one human and one AI robot, sitting side by side at computers, friendly partnership, modern office setting, warm lighting"} -->
+![bg right:40% 80%](images/placeholder-ai-pair-programming.png)
 
 <!-- 
 Presenter Notes:
@@ -124,12 +127,10 @@ Presenter Notes:
 **Traditional Coding:**
 * Write → Test → Debug → Repeat
 * Context exists only in your head
-* Documentation is separate from code
 
 **Vibe Coding:**
-* Think → Discuss → Code → Iterate (with AI)
+* Think → Discuss → Code → Iterate
 * Context is shared with your AI partner
-* AI helps with reasoning, not just syntax
 
 ![bg right:30% 80%](placeholder-workflow-comparison.png)
 
@@ -165,7 +166,8 @@ Presenter Notes:
 
 ## Impact - Will I Still Have a Job?
 
-![bg right:40% 80%](placeholder-abstraction-layers.png)
+<!-- IMG_GEN: {"prompt": "Layered pyramid diagram showing evolution of programming - assembly code at bottom, high-level languages in middle, AI assistance at top, upward arrows showing progression", "size": "1792x1024"} -->
+![bg right:40% 80%](images/placeholder-abstraction-layers.png)
 
 <!-- 
 Presenter Notes:
