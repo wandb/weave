@@ -26,7 +26,7 @@ To create and customize leaderboards directly in the Weave UI:
 5. [Add columns](#add-columns) to define which evaluations and metrics to display.
 6. Once you're happy with the layout, save and publish your leaderboard to share it with others.
 
-#### Add Columns
+#### Add columns
 
 Each column in a leaderboard represents a metric from a specific evaluation. To configure a column, you specify:
 
