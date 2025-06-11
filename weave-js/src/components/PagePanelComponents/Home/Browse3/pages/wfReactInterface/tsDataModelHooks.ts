@@ -651,24 +651,6 @@ const useCallsStreamNoExpansion = (
  *
  * This hook provides the same interface as useCalls but streams results progressively
  * as they arrive from the server instead of waiting for the complete response.
- *
- * Key differences from useCalls:
- * - Results are yielded incrementally as the server streams data
- * - loading remains true until the stream completes (isComplete = true)
- * - Partial results are returned as they arrive, enabling real-time UI updates
- * - Same parameters and return type as useCalls for drop-in replacement
- *
- * Usage:
- * Simply replace useCalls with useCallsStream in your component:
- *
- * const calls = useCallsStream({
- *   entity,
- *   project,
- *   filter: myFilter,
- *   // ... other parameters same as useCalls
- * });
- *
- * The results will appear in the table progressively as they stream in!
  */
 export const useCallsStream = (
   params: UseCallsParams
@@ -682,7 +664,6 @@ export const useCallsStream = (
 
   const loading = calls.loading || isExpanding;
   return useMemo(() => {
-    // Return partial results as they arrive, even while still loading
     const result = expandedCalls.map(traceCallToUICallSchema);
     return {
       loading,

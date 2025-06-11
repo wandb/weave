@@ -6,7 +6,7 @@
  */
 
 import * as _ from 'lodash';
-import {useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {isWeaveObjectRef, parseRef} from '../../../../../../react';
 import {isWeaveRef} from '../../filters/common';
@@ -36,6 +36,54 @@ export const useClientSideCallRefExpansion = (
   >([]);
   const [isExpanding, setIsExpanding] = useState(false);
 
+  // Local cache to store expanded calls by call ID
+  // Key: callId, Value: {expandedCall, inputHash}
+  const expandedCallsCache = useRef<
+    Map<
+      string,
+      {
+        expandedCall: traceServerClientTypes.TraceCallSchema;
+        inputHash: string;
+      }
+    >
+  >(new Map());
+
+  // Reset cache when expansion parameters change significantly
+  // Use useMemo to avoid recreating the parameters object on every render
+  const stableParameters = useMemo(
+    () => ({
+      expandedRefColumns: expandedRefColumns
+        ? Array.from(expandedRefColumns).sort()
+        : [],
+      expansionDepth: options?.expansionDepth ?? 0,
+      expandAttr: options?.expandAttr ?? false,
+    }),
+    [expandedRefColumns, options?.expansionDepth, options?.expandAttr]
+  );
+
+  // Helper function to create a hash of the inputs that affect expansion
+  const createInputHash = useCallback(
+    (call: CallSchema) => {
+      // Create a hash that includes the call content and expansion parameters
+      // that could affect the expansion result
+      const hashInput = {
+        callId: call.callId,
+        traceCall: call.traceCall,
+        ...stableParameters,
+      };
+      return JSON.stringify(hashInput);
+    },
+    [stableParameters]
+  );
+
+  const parametersRef = useRef<any>(null);
+  const currentParametersString = JSON.stringify(stableParameters);
+
+  if (parametersRef.current !== currentParametersString) {
+    expandedCallsCache.current.clear();
+    parametersRef.current = currentParametersString;
+  }
+
   useEffect(() => {
     let mounted = true;
     if (
@@ -54,18 +102,83 @@ export const useClientSideCallRefExpansion = (
     }
 
     const callResultStart = calls.result;
+    const currentExpandedRefColumns = expandedRefColumns ?? new Set<string>();
+
+    // Separate calls into cached and new calls
+    const newCalls: CallSchema[] = [];
+    const cachedExpandedCalls: traceServerClientTypes.TraceCallSchema[] = [];
+    const callIdToIndex = new Map<string, number>();
+
+    callResultStart.forEach((call, index) => {
+      callIdToIndex.set(call.callId, index);
+      const inputHash = createInputHash(call);
+      const cached = expandedCallsCache.current.get(call.callId);
+
+      if (cached && cached.inputHash === inputHash) {
+        // Use cached result
+        cachedExpandedCalls[index] = cached.expandedCall;
+      } else {
+        // Need to process this call
+        newCalls.push(call);
+      }
+    });
+    // If all calls are cached, return immediately
+    if (newCalls.length === 0) {
+      if (mounted) {
+        setExpandedCalls(cachedExpandedCalls);
+        setIsExpanding(false);
+      }
+      return;
+    }
 
     doExpansionIteration(
-      callResultStart.map(c => c.traceCall!),
-      expandedRefColumns ?? new Set<string>(),
+      newCalls.map(c => c.traceCall!),
+      currentExpandedRefColumns,
       getTsClient(),
       options?.expansionDepth ?? 0,
       0,
       10,
       options?.expandAttr ?? false
-    ).then(innerExpandedCalls => {
+    ).then(newExpandedCalls => {
       if (calls.result === callResultStart && mounted) {
-        setExpandedCalls(innerExpandedCalls);
+        // Update cache with new results
+        newCalls.forEach((call, i) => {
+          const inputHash = createInputHash(call);
+          expandedCallsCache.current.set(call.callId, {
+            expandedCall: newExpandedCalls[i],
+            inputHash,
+          });
+        });
+
+        // Build final result array combining cached and new results
+        const finalExpandedCalls: traceServerClientTypes.TraceCallSchema[] = [];
+        const newCallsMap = new Map<
+          string,
+          traceServerClientTypes.TraceCallSchema
+        >();
+
+        // Create a map from callId to expanded call for new calls
+        newCalls.forEach((call, i) => {
+          newCallsMap.set(call.callId, newExpandedCalls[i]);
+        });
+
+        callResultStart.forEach((call, index) => {
+          const cached = expandedCallsCache.current.get(call.callId);
+          if (cached) {
+            finalExpandedCalls[index] = cached.expandedCall;
+          } else {
+            // Use the newly processed result
+            const newResult = newCallsMap.get(call.callId);
+            if (newResult) {
+              finalExpandedCalls[index] = newResult;
+            } else {
+              // This shouldn't happen, but fallback to original
+              finalExpandedCalls[index] = call.traceCall!;
+            }
+          }
+        });
+
+        setExpandedCalls(finalExpandedCalls);
         setIsExpanding(false);
       }
     });
@@ -82,6 +195,7 @@ export const useClientSideCallRefExpansion = (
     options?.expansionDepth,
     options?.expandAttr,
     options?.returnPartialResults,
+    createInputHash,
   ]);
 
   return useMemo(() => {
