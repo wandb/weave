@@ -42,8 +42,6 @@ interface LeaderboardGridProps {
   data: GroupedLeaderboardData;
   columnOrder?: LeaderboardColumnOrderType;
   loading: boolean;
-  selectedEvaluations?: string[];
-  onSelectedEvaluationsChange?: (evaluations: string[]) => void;
 }
 
 type RowData = {
@@ -58,32 +56,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   data,
   loading,
   columnOrder,
-  selectedEvaluations: controlledSelectedEvaluations,
-  onSelectedEvaluationsChange,
 }) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
 
-  // Internal state for uncontrolled mode
-  const [internalSelectedEvaluations, setInternalSelectedEvaluations] =
-    useState<string[]>([]);
-
-  // Use controlled value if provided, otherwise use internal state
-  const isControlled = controlledSelectedEvaluations !== undefined;
-  const selectedEvaluations = isControlled
-    ? controlledSelectedEvaluations
-    : internalSelectedEvaluations;
-
-  const setSelectedEvaluations = useCallback(
-    (evaluations: string[]) => {
-      if (isControlled && onSelectedEvaluationsChange) {
-        onSelectedEvaluationsChange(evaluations);
-      } else {
-        setInternalSelectedEvaluations(evaluations);
-      }
-    },
-    [isControlled, onSelectedEvaluationsChange]
-  );
+  const [selectedEvaluations, setSelectedEvaluations] = useState<string[]>([]);
 
   const onCellClick = useCallback(
     (record: LeaderboardValueRecord, event: React.MouseEvent) => {
@@ -93,9 +70,9 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
         if (isMultiSelect) {
           // Toggle selection using alt/option key
-          setSelectedEvaluations(prev => {
+          setSelectedEvaluations((prev: string[]) => {
             if (prev.includes(sourceCallId)) {
-              return prev.filter(id => id !== sourceCallId);
+              return prev.filter((id: string) => id !== sourceCallId);
             } else {
               return [...prev, sourceCallId];
             }
@@ -127,33 +104,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     ]
   );
 
-  // Navigate to compare drawer when Enter is pressed with multiple evaluations selected
-  useEffect(() => {
-    if (selectedEvaluations.length > 0) {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Enter' && selectedEvaluations.length > 0) {
-          const to = peekingRouter.compareEvaluationsUri(
-            entity,
-            project,
-            selectedEvaluations,
-            null
-          );
-          history.push(to);
-          setSelectedEvaluations([]);
-        }
-      };
 
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [
-    selectedEvaluations,
-    entity,
-    project,
-    peekingRouter,
-    history,
-    setSelectedEvaluations,
-  ]);
 
   const columnStats = useMemo(() => getColumnStats(data), [data]);
 
