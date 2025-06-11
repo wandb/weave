@@ -1,6 +1,6 @@
 # Leaderboards
 
-Weave _Leaderboards_ make it easy to evaluate and compare multiple models across multiple metrics—whether you're measuring accuracy, generation quality, latency, or custom evaluation logic. They provide a unified way to visualize model performance, track changes over time, and align on team-wide benchmarks.
+Use Weave _Leaderboards_ to evaluate and compare multiple models across multiple metrics and measure accuracy, generation quality, latency, or custom evaluation logic. A leaderboard helps you visualize model performance in a central location, track changes over time, and align on team-wide benchmarks.
 
 Leaderboards are ideal for:
 
@@ -9,7 +9,7 @@ Leaderboards are ideal for:
 - Tracking model performance regressions
 - Coordinating shared evaluation workflows
 
-You can create leaderboards either through the [Weave UI](#ui) or [in Python](#python).
+You can create a leaderboard either through the [Weave UI](#ui) or the [Python API](#python).
 
 ## Create a Leaderboard
 
@@ -17,26 +17,26 @@ You can create a leaderboard via the [Weave UI](#ui) or [programmatically](#pyth
 
 ### UI
 
-You can create and customize leaderboards directly in the Weave UI:
+To create and customize leaderboards directly in the Weave UI:
 
 1. In the Weave UI, Navigate to the **Leaders** section. If it's not visible, click **More** → **Leaders**.
 2. Click **+ New Leaderboard**.
 3. In the **Leaderboard Title** field, enter a descriptive name (e.g., `summarization-benchmark-v1`).
 4. Optionally, add a description to explain what this leaderboard compares.
 5. [Add columns](#add-columns) to define which evaluations and metrics to display.
-6. Once you're happy with the layout, your leaderboard is saved and ready to publish.
+6. Once you're happy with the layout, save and publish your leaderboard to share it with others.
 
 #### Add Columns
 
-Each column represents a metric from a specific evaluation. To configure a column, set the following columns:
+Each column in a leaderboard represents a metric from a specific evaluation. To configure a column, you specify:
 
 - **Evaluation**: Select an evaluation run from the dropdown (must be previously created).
 - **Scorer**: Choose a scoring function (e.g., `jaccard_similarity`, `simple_accuracy`) used in that evaluation.
 - **Metric**: Choose a summary metric to display (e.g., `mean`, `true_fraction`, etc.).
 
-To add more columns, click **+ Add Column**.
+To add more columns, click **Add Column**.
 
-Click the three-dot menu (`⋯`) on the right of any column to:
+To edit a column, click its three-dot menu (`⋯`) on the right. You can:
 
 - **Move before / after** – Reorder columns
 - **Duplicate** – Copy the column definition
@@ -46,10 +46,10 @@ Click the three-dot menu (`⋯`) on the right of any column to:
 ### Python
 
 :::tip
-Looking for a complete, runnable code sample? See the [End-to-End Python example](#end-to-end-python-example).
+Looking for a complete, runnable code sample? See the [End-to-end Python example](#end-to-end-python-example).
 :::
 
-Follow these steps to create and publish a leaderboard:
+To create and publish a leaderboard:
 
 1. Define a test dataset. You can use the built-in [`Dataset`](datasets.md), or define a list of inputs and targets manually:
 
@@ -113,7 +113,7 @@ Follow these steps to create and publish a leaderboard:
    )
    ```
 
-7. Publish it:
+7. Publish the leaderboard.
 
    ```python
    weave.publish(spec)
@@ -211,14 +211,14 @@ print(results)
 
 ### View and interpret the Leaderboard
 
-Once you've run the script, follow these steps to view the leaderboard:
+After the script finishes running, view view the leaderboard:
 
 1. In the **Weave UI**, go to the **Leaders** tab. If it's not visible, click **More**, then select **Leaders**.
 2. Click on the name of your leaderboard—e.g. `Summarization Model Comparison`.
 
-You’ll see a leaderboard table, where each row represents one model (`model_humanlike`, `model_vanilla`, `model_messy`). The `mean` column shows the average Jaccard similarity between that model's output and the reference summaries.
+In the leaderboard table, each row represents a given model (`model_humanlike`, `model_vanilla`, `model_messy`). The `mean` column shows the average Jaccard similarity between the model's output and the reference summaries.
 
-![A Leaderboard in the Weave UI](imgs/leaderboard-example.png)
+![A leaderboard in the Weave UI](imgs/leaderboard-example.png)
 
 For this example:
 
