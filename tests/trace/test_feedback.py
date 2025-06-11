@@ -8,6 +8,7 @@ from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     FeedbackQueryReq,
@@ -628,3 +629,83 @@ def test_feedback_replace(client) -> None:
     new_feedback = next(f for f in feedbacks if f["id"] == replaced_feedback.id)
     assert new_feedback["feedback_type"] == "reaction"
     assert new_feedback["payload"] == {"emoji": "👍"}
+
+
+def test_get_feedback_with_dict_query(client) -> None:
+    """Test that get_feedback works with dict queries as shown in the docstring example."""
+    # Create some test feedback using the server API
+    project_id = client._project_id()
+
+    # Create a call to attach feedback to
+    call_ref_uri = f"weave:///{project_id}/call/call_id_123"
+
+    # Create feedback with specific feedback_type
+    feedback_req1 = FeedbackCreateReq(
+        project_id=project_id,
+        weave_ref=call_ref_uri,
+        feedback_type="wandb.reaction.1",
+        payload={"emoji": "👍"},
+    )
+    feedback_res1 = client.server.feedback_create(feedback_req1)
+
+    # Create feedback with different feedback_type
+    feedback_req2 = FeedbackCreateReq(
+        project_id=project_id,
+        weave_ref=call_ref_uri,
+        feedback_type="custom.score.1",
+        payload={"score": 0.95},
+    )
+    feedback_res2 = client.server.feedback_create(feedback_req2)
+
+    # Test the dict query example from the docstring
+    query = Query(
+        **{
+            "$expr": {
+                "$eq": [
+                    {"$getField": "feedback_type"},
+                    {"$literal": "wandb.reaction.1"},
+                ]
+            }
+        }
+    )
+
+    feedback_results = client.get_feedback(query=query)
+
+    # Verify we get the expected feedback
+    feedback_list = list(feedback_results)
+    assert len(feedback_list) == 1
+    assert feedback_list[0].feedback_type == "wandb.reaction.1"
+    assert feedback_list[0].payload["emoji"] == "👍"
+
+    # Test another dict query for the custom feedback type
+    custom_query = Query(
+        **{
+            "$expr": {
+                "$eq": [
+                    {"$getField": "feedback_type"},
+                    {"$literal": "custom.score.1"},
+                ],
+            }
+        }
+    )
+
+    custom_feedback_results = client.get_feedback(query=custom_query)
+    custom_feedback_list = list(custom_feedback_results)
+    assert len(custom_feedback_list) == 1
+    assert custom_feedback_list[0].feedback_type == "custom.score.1"
+    assert custom_feedback_list[0].payload["score"] == 0.95
+
+    # Test dict query that should return no results
+    no_results_query = Query(
+        **{
+            "$expr": {
+                "$eq": [
+                    {"$getField": "feedback_type"},
+                    {"$literal": "nonexistent.type"},
+                ],
+            }
+        }
+    )
+
+    no_results = client.get_feedback(query=no_results_query)
+    assert len(list(no_results)) == 0

@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal, Optional, Union
 from pydantic import BaseModel, BeforeValidator, Field
 
 from weave import Model, op
-from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 from weave.trace_server.trace_server_interface import (
     CompletionsCreateReq,
@@ -150,7 +150,11 @@ class LLMStructuredCompletionModel(Model):
             config: Optional configuration to override default parameters
             **template_vars: Variables to substitute in the messages template using {variable_name} syntax
         """
-        current_client = require_weave_client()
+        current_client = get_weave_client()
+        if current_client is None:
+            raise WeaveInitError(
+                "You must call `weave.init(<project_name>)` first, to predict with a LLMStructuredCompletionModel"
+            )
 
         req = self.prepare_completion_request(
             project_id=f"{current_client.entity}/{current_client.project}",

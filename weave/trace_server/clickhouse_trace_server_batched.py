@@ -2834,7 +2834,7 @@ def _setup_completion_model_info(
     elif model_name.startswith("coreweave/"):
         # See https://docs.litellm.ai/docs/providers/openai_compatible
         # but ignore the bit about omitting the /v1 because it is actually necessary
-        req.inputs.model = "openai/" + model_name.split("/")[1]
+        req.inputs.model = "openai/" + model_name.replace("coreweave/", "", 1)
         provider = "custom"
         base_url = "https://infr.cw4637-staging.coreweave.app/v1"
         # The API key should have been passed in as an extra header.

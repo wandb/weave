@@ -10,6 +10,8 @@ import React, {
   useState,
 } from 'react';
 
+import {getModelsByIds} from '../../inference/modelInfo';
+import {getPlaygroundModelString} from '../../inference/util';
 import {normalizeChatTraceCall} from '../ChatView/hooks';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -18,6 +20,7 @@ import {
   useLeafObjectInstances,
 } from '../wfReactInterface/objectClassQuery';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {LLM_MAX_TOKENS, LLMMaxTokensKey} from './llmMaxTokens';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {useConfiguredProviders} from './useConfiguredProviders';
@@ -27,6 +30,8 @@ export type PlaygroundPageProps = {
   entity: string;
   project: string;
   callId: string;
+  // IDs of models from the inference catalog
+  modelIds: string[];
 };
 
 type PlaygroundPageInnerProps = PlaygroundPageProps &
@@ -35,15 +40,25 @@ type PlaygroundPageInnerProps = PlaygroundPageProps &
     setSettingsTab: Dispatch<SetStateAction<number | null>>;
   };
 
+const isLLMMaxTokensKey = (key: string): key is LLMMaxTokensKey => {
+  return key in LLM_MAX_TOKENS;
+};
+
 export const PlaygroundPage = (props: PlaygroundPageProps) => {
   const [settingsTab, setSettingsTab] = useState<number | null>(null);
+
+  // We expect the passed in models to all be in LLM_MAX_TOKENS,
+  // but ignore them if they are not.
+  const initialModelStrings = getModelsByIds(
+    props.modelIds.filter(isLLMMaxTokensKey)
+  ).map(getPlaygroundModelString);
 
   const {
     setPlaygroundStates,
     playgroundStates,
     setPlaygroundStateField,
     setPlaygroundStateFromTraceCall,
-  } = usePlaygroundState();
+  } = usePlaygroundState(initialModelStrings);
 
   return (
     <SimplePageLayoutWithHeader

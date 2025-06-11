@@ -188,10 +188,10 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.require_weave_client"
+    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_text_response(
-    mock_require_client, client: WeaveClient
+    mock_get_client, client: WeaveClient
 ):
     """Test the predict function with mocked LLM API response for text format."""
     # Setup mock client
@@ -213,7 +213,7 @@ def test_llm_structured_completion_model_predict_text_response(
         }
     )
     mock_client.server.completions_create.return_value = mock_response
-    mock_require_client.return_value = mock_client
+    mock_get_client.return_value = mock_client
 
     # Create model with text response format
     model = LLMStructuredCompletionModel(
@@ -242,10 +242,10 @@ def test_llm_structured_completion_model_predict_text_response(
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.require_weave_client"
+    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_json_response(
-    mock_require_client, client: WeaveClient
+    mock_get_client, client: WeaveClient
 ):
     """Test the predict function with mocked LLM API response for JSON format."""
     # Setup mock client
@@ -263,7 +263,7 @@ def test_llm_structured_completion_model_predict_json_response(
         }
     )
     mock_client.server.completions_create.return_value = mock_response
-    mock_require_client.return_value = mock_client
+    mock_get_client.return_value = mock_client
 
     # Create model with JSON response format
     model = LLMStructuredCompletionModel(
@@ -283,10 +283,10 @@ def test_llm_structured_completion_model_predict_json_response(
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.require_weave_client"
+    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_with_template(
-    mock_require_client, client: WeaveClient
+    mock_get_client, client: WeaveClient
 ):
     """Test the predict function with message templates and template variables."""
     # Setup mock client
@@ -307,7 +307,7 @@ def test_llm_structured_completion_model_predict_with_template(
         }
     )
     mock_client.server.completions_create.return_value = mock_response
-    mock_require_client.return_value = mock_client
+    mock_get_client.return_value = mock_client
 
     # Create model with message template
     model = LLMStructuredCompletionModel(
@@ -344,10 +344,10 @@ def test_llm_structured_completion_model_predict_with_template(
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.require_weave_client"
+    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_with_config_override(
-    mock_require_client, client: WeaveClient
+    mock_get_client, client: WeaveClient
 ):
     """Test the predict function with config parameter overriding defaults."""
     # Setup mock client
@@ -368,7 +368,7 @@ def test_llm_structured_completion_model_predict_with_config_override(
         }
     )
     mock_client.server.completions_create.return_value = mock_response
-    mock_require_client.return_value = mock_client
+    mock_get_client.return_value = mock_client
 
     # Create model with default parameters
     model = LLMStructuredCompletionModel(
@@ -398,10 +398,10 @@ def test_llm_structured_completion_model_predict_with_config_override(
 
 
 @patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.require_weave_client"
+    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
 )
 def test_llm_structured_completion_model_predict_error_handling(
-    mock_require_client, client: WeaveClient
+    mock_get_client, client: WeaveClient
 ):
     """Test the predict function error handling."""
     # Setup mock client
@@ -414,7 +414,7 @@ def test_llm_structured_completion_model_predict_error_handling(
         response={"error": "API rate limit exceeded"}
     )
     mock_client.server.completions_create.return_value = mock_error_response
-    mock_require_client.return_value = mock_client
+    mock_get_client.return_value = mock_client
 
     model = LLMStructuredCompletionModel(
         llm_model_id="gpt-4",
