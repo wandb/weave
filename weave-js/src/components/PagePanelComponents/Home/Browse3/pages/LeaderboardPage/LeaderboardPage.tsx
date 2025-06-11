@@ -18,6 +18,7 @@ import React, {
 import ReactMarkdown from 'react-markdown';
 import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
+import {parseRefMaybe} from '@wandb/weave/react';
 
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
@@ -33,6 +34,7 @@ import {
   useCreateBuiltinObjectInstance,
 } from '../wfReactInterface/objectClassQuery';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {useObjectVersion} from '../wfReactInterface/tsDataModelHooks';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 
 type LeaderboardPageProps = {
@@ -286,6 +288,8 @@ export const LeaderboardPageContentInner: React.FC<
                 selected:
               </div>
               <CompareEvaluationsDropdownButton
+                entity={props.entity}
+                project={props.project}
                 selectedEvaluations={selectedEvaluations}
                 onDatasetSelect={(datasetId) => {
                   // Filter evaluations to only include those for the selected dataset
@@ -332,14 +336,10 @@ export const LeaderboardPageContentInner: React.FC<
                   data && Object.keys(data.modelGroups).length > 0
                     ? Object.keys(
                         Object.values(data.modelGroups)[0].datasetGroups || {}
-                      ).map(datasetName => {
-                        // Extract just the base name without version suffix
-                        const baseName = datasetName.split(':')[0];
-                        return {
-                          id: datasetName, // Keep full name as ID for filtering
-                          name: baseName,  // Display clean name
-                        };
-                      })
+                      ).map(datasetName => ({
+                        id: datasetName,   // Keep full name as ID for filtering
+                        name: datasetName, // Pass full name, formatting is done in the component
+                      }))
                     : []
                 }
                 loading={loading}
@@ -476,14 +476,65 @@ export const useIsEditor = (entity: string) => {
   }, [entity, loadingUserInfo, userInfo]);
 };
 
+// Component to fetch and display dataset name with proper version
+const DatasetNameWithVersion: FC<{
+  entity: string;
+  project: string;
+  datasetFullName: string;
+}> = ({ entity, project, datasetFullName }) => {
+  const ref = useMemo(() => 
+    parseRefMaybe(`weave:///${entity}/${project}/object/${datasetFullName}`),
+    [entity, project, datasetFullName]
+  );
+  
+  // Check if it's a WeaveObjectRef
+  const isWeaveRef = ref && 'entityName' in ref && 'weaveKind' in ref;
+  
+  const objectVersion = useObjectVersion(
+    isWeaveRef
+      ? {
+          key: {
+            scheme: 'weave',
+            entity: ref.entityName,
+            project: ref.projectName,
+            weaveKind: ref.weaveKind,
+            objectId: ref.artifactName,
+            versionHash: ref.artifactVersion,
+            path: '',
+            refExtra: ref.artifactRefExtra,
+          },
+          metadataOnly: true,
+        }
+      : undefined
+  );
+  
+  if (!ref || !('artifactName' in ref)) {
+    return <>{datasetFullName}</>;
+  }
+  
+  const versionIndex = objectVersion?.result?.versionIndex ?? -1;
+  const baseName = ref.artifactName;
+  
+  // Format like SmallRef does
+  const displayName = versionIndex >= 0 
+    ? `${baseName}:v${versionIndex}`
+    : `${baseName}:${ref.artifactVersion.slice(0, 6)}`;
+    
+  return <>{displayName}</>;
+};
+
 // Dropdown button component for selecting datasets
 const CompareEvaluationsDropdownButton: FC<{
+  entity: string;
+  project: string;
   selectedEvaluations: string[];
   onDatasetSelect: (datasetId: string) => void;
   availableDatasets?: Array<{id: string; name: string}>;
   disabled?: boolean;
   loading?: boolean;
 }> = ({
+  entity,
+  project,
   selectedEvaluations,
   onDatasetSelect,
   availableDatasets = [],
@@ -543,7 +594,11 @@ const CompareEvaluationsDropdownButton: FC<{
                   }}>
                   <div className="flex items-center gap-2">
                     <Icon name="table" width={16} height={16} />
-                    {dataset.name}
+                    <DatasetNameWithVersion
+                      entity={entity}
+                      project={project}
+                      datasetFullName={dataset.name}
+                    />
                   </div>
                 </DropdownMenu.Item>
               ))
