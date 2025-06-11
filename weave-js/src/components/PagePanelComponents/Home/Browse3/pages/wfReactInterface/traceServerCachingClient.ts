@@ -1,8 +1,6 @@
 import LRUCache from 'lru-cache';
 
 import {
-  TraceCallSchema,
-  TraceCallsQueryReq,
   TraceFileContentReadReq,
   TraceFileContentReadRes,
   TraceObjReadReq,

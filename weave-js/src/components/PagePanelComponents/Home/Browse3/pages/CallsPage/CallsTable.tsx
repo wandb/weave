@@ -329,25 +329,36 @@ export const CallsTable: FC<{
       // has no effective impact (frozen vs. not frozen) we need to
       // manually refetch
       calls.refetch();
-    } else if (!calls.loading) {
+    } else if (calls.result.length > callsResult.length) {
+      // Streaming: only update when we have more results
       setCallsResult(calls.result);
+    } else if (!calls.loading) {
+      // Update total when loading is complete
       setCallsTotal(calls.total);
       callsEffectiveFilter.current = effectiveFilter;
       prevViewIdRef.current = currentViewIdResolved;
-    } else if (calls.result.length !== callsResult.length) {
-      console.log('calls result changed', calls.result.length);
-      setCallsResult(calls.result);
     }
-  }, [calls, effectiveFilter, currentViewIdResolved, hasStructuralChange]);
+  }, [
+    calls,
+    effectiveFilter,
+    currentViewIdResolved,
+    hasStructuralChange,
+    callsResult.length,
+  ]);
 
   // Construct Flattened Table Data
   const tableData: FlattenedCallData[] = useMemo(() => {
     const flattened = prepareFlattenedCallDataForTable(
       hasStructuralChange ? [] : callsResult
     );
-    console.log('table data computed', flattened?.length);
     return flattened;
   }, [callsResult, hasStructuralChange]);
+
+  const doCallsRefetch = useCallback(() => {
+    calls.refetch();
+    setCallsResult([]);
+    setCallsTotal(0);
+  }, [calls]);
 
   // This is a specific helper that is used when the user attempts to option-click
   // a cell that is a child cell of an expanded ref. In this case, we want to
@@ -498,8 +509,6 @@ export const CallsTable: FC<{
     shouldIncludeTotalStorageSize && calls.storageSizeLoading,
     !!calls.storageSizeError
   );
-
-  console.log('columns', columns.cols.length);
 
   // This contains columns which are suitable for selection and raw data
   // entry. Notably, not children of expanded refs.
@@ -658,7 +667,6 @@ export const CallsTable: FC<{
   }, [isEvaluateTable, clearSelectedCalls]);
 
   const muiColumns = useMemo(() => {
-    console.log('recomputing mui columns');
     const cols: GridColDef[] = [
       {
         minWidth: 30,
@@ -883,7 +891,7 @@ export const CallsTable: FC<{
           {selectedCalls.length === 0 ? (
             <>
               <RefreshButton
-                onClick={() => calls.refetch()}
+                onClick={() => doCallsRefetch?.()}
                 disabled={callsLoading}
               />
               {columnVisibilityModel && setColumnVisibilityModel && (
@@ -1104,9 +1112,7 @@ export const CallsTable: FC<{
         // End Column Menu
         columnHeaderHeight={40}
         apiRef={apiRef}
-        loading={
-          callsLoading && tableData.length < paginationModelResolved.pageSize
-        }
+        loading={callsLoading}
         rows={tableData}
         // initialState={initialState}
         onColumnVisibilityModelChange={onColumnVisibilityModelChange}

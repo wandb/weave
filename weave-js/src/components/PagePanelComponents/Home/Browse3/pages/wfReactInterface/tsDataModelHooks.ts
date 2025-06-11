@@ -127,15 +127,15 @@ const makeTraceServerEndpointHook = <
         return;
       }
       const client = getTsClient();
-      client[traceServerFnName](req.params as any)
-        .then(res => {
+      (client[traceServerFnName] as any)(req.params as any)
+        .then((res: any) => {
           if (params !== loadingInputRef.current) {
             return;
           }
           const output = postprocessFn(res as any, params);
           setState({loading: false, result: output, error: null});
         })
-        .catch(err => {
+        .catch((err: any) => {
           if (params !== loadingInputRef.current) {
             return;
           }
@@ -172,11 +172,11 @@ const useMakeTraceServerEndpoint = <
   const client = getTsClient();
   const traceServerRequest = useCallback(
     (...input: Input): Promise<Output> => {
-      return client[traceServerFnName](preprocessFn(...input) as any).then(
-        res => {
-          return postprocessFn(res as any);
-        }
-      );
+      return (client[traceServerFnName] as any)(
+        preprocessFn(...input) as any
+      ).then((res: any) => {
+        return postprocessFn(res as any);
+      });
     },
     [client, postprocessFn, preprocessFn, traceServerFnName]
   );
