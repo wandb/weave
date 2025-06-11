@@ -36,6 +36,22 @@ import {
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {useObjectVersion} from '../wfReactInterface/tsDataModelHooks';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
+import {GroupedLeaderboardData, LeaderboardValueRecord} from '../../views/Leaderboard/query/leaderboardQuery';
+
+// Utility function to flatten all evaluation records from grouped data
+const getAllEvaluationRecords = (data: GroupedLeaderboardData): LeaderboardValueRecord[] => {
+  const records: LeaderboardValueRecord[] = [];
+  Object.values(data.modelGroups).forEach(modelGroup => {
+    Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
+      Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
+        Object.values(scorerGroup.metricPathGroups).forEach(metricPathGroup => {
+          records.push(...metricPathGroup);
+        });
+      });
+    });
+  });
+  return records;
+};
 
 type LeaderboardPageProps = {
   entity: string;
@@ -244,61 +260,36 @@ export const LeaderboardPageContentInner: React.FC<
       return 0;
     }
 
-    // Each model group (row) is selected if it contains any selected evaluations
-    return Object.keys(data.modelGroups).filter(modelGroupName => {
-      const modelGroup = data.modelGroups[modelGroupName];
-
-      // Check if this model group contains any selected evaluations using .some() for efficiency
-      return Object.values(modelGroup.datasetGroups).some(datasetGroup =>
-        Object.values(datasetGroup.scorerGroups).some(scorerGroup =>
-          Object.values(scorerGroup.metricPathGroups).some(records =>
-            records.some(
-              record =>
-                record.sourceEvaluationCallId &&
-                selectedEvaluations.includes(record.sourceEvaluationCallId)
-            )
-          )
+    // Get unique model names from selected evaluations
+    const allRecords = getAllEvaluationRecords(data);
+    const selectedModelNames = new Set(
+      allRecords
+        .filter(record => 
+          record.sourceEvaluationCallId && 
+          selectedEvaluations.includes(record.sourceEvaluationCallId)
         )
-      );
-    }).length;
+        .map(record => record.modelName)
+    );
+
+    return selectedModelNames.size;
   }, [data, selectedEvaluations]);
 
   // Calculate available datasets based on selected evaluations
   const availableDatasets = useMemo(() => {
-    if (
-      !data ||
-      Object.keys(data.modelGroups).length === 0 ||
-      selectedEvaluations.length === 0
-    ) {
+    if (!data || selectedEvaluations.length === 0) {
       return [];
     }
 
-    // Find all datasets that contain any of the selected evaluations
-    const datasetsWithSelectedEvaluations = new Set<string>();
-
-    // Iterate through all model groups to find datasets containing selected evaluations
-    Object.values(data.modelGroups).forEach(modelGroup => {
-      Object.entries(modelGroup.datasetGroups).forEach(
-        ([datasetName, datasetGroup]) => {
-          // Check if this dataset contains any selected evaluations
-          const hasSelectedEvaluation = Object.values(
-            datasetGroup.scorerGroups
-          ).some(scorerGroup =>
-            Object.values(scorerGroup.metricPathGroups).some(records =>
-              records.some(
-                record =>
-                  record.sourceEvaluationCallId &&
-                  selectedEvaluations.includes(record.sourceEvaluationCallId)
-              )
-            )
-          );
-
-          if (hasSelectedEvaluation) {
-            datasetsWithSelectedEvaluations.add(datasetName);
-          }
-        }
-      );
-    });
+    // Get unique dataset names from selected evaluations
+    const allRecords = getAllEvaluationRecords(data);
+    const datasetsWithSelectedEvaluations = new Set(
+      allRecords
+        .filter(record =>
+          record.sourceEvaluationCallId &&
+          selectedEvaluations.includes(record.sourceEvaluationCallId)
+        )
+        .map(record => record.datasetName)
+    );
 
     // Convert to array and sort for consistent ordering
     return Array.from(datasetsWithSelectedEvaluations)
@@ -354,37 +345,17 @@ export const LeaderboardPageContentInner: React.FC<
                   }
 
                   // For multiple evaluations, filter to only include those for the selected dataset
-                  const filteredEvaluations: string[] = [];
-
-                  // Iterate through selected evaluations and find those matching the dataset
-                  selectedEvaluations.forEach(evalId => {
-                    // Find the model group that contains this evaluation
-                    Object.values(data.modelGroups).forEach(modelGroup => {
-                      const datasetGroup = modelGroup.datasetGroups[datasetId];
-                      if (datasetGroup) {
-                        // Check if this evaluation ID exists in this dataset's records
-                        Object.values(datasetGroup.scorerGroups).forEach(
-                          scorerGroup => {
-                            Object.values(scorerGroup.metricPathGroups).forEach(
-                              records => {
-                                records.forEach(record => {
-                                  if (
-                                    record.sourceEvaluationCallId === evalId
-                                  ) {
-                                    filteredEvaluations.push(evalId);
-                                  }
-                                });
-                              }
-                            );
-                          }
-                        );
-                      }
-                    });
-                  });
-
-                  // Remove duplicates
+                  const allRecords = getAllEvaluationRecords(data);
                   const uniqueFilteredEvaluations = [
-                    ...new Set(filteredEvaluations),
+                    ...new Set(
+                      allRecords
+                        .filter(record =>
+                          record.sourceEvaluationCallId &&
+                          selectedEvaluations.includes(record.sourceEvaluationCallId) &&
+                          record.datasetName === datasetId
+                        )
+                        .map(record => record.sourceEvaluationCallId)
+                    ),
                   ];
 
                   console.log('Selected dataset:', datasetId);
