@@ -164,7 +164,9 @@ export const ModelDetailsLoaded = ({
       : CODE_EXAMPLES_CHAT;
   let codeExample = codeExamples[selectedLanguage] ?? '';
   codeExample = codeExample.trim();
-  codeExample = codeExample.replace('{model_id}', model.idPlayground);
+  if (model.idPlayground) {
+    codeExample = codeExample.replace('{model_id}', model.idPlayground);
+  }
 
   const onClickCopy = useCallback(() => {
     copyToClipboard(codeExample);
