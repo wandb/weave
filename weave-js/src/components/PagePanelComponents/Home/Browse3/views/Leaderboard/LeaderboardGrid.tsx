@@ -127,33 +127,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     ]
   );
 
-  // Navigate to compare drawer when Enter is pressed with multiple evaluations selected
-  useEffect(() => {
-    if (selectedEvaluations.length > 0) {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Enter' && selectedEvaluations.length > 0) {
-          const to = peekingRouter.compareEvaluationsUri(
-            entity,
-            project,
-            selectedEvaluations,
-            null
-          );
-          history.push(to);
-          setSelectedEvaluations([]);
-        }
-      };
 
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [
-    selectedEvaluations,
-    entity,
-    project,
-    peekingRouter,
-    history,
-    setSelectedEvaluations,
-  ]);
 
   const columnStats = useMemo(() => getColumnStats(data), [data]);
 
