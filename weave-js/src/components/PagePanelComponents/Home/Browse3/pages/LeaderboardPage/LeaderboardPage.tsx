@@ -525,23 +525,21 @@ const DatasetNameWithVersion: FC<{
   // Check if it's a WeaveObjectRef
   const isWeaveRef = ref && 'entityName' in ref && 'weaveKind' in ref;
 
-  const objectVersion = useObjectVersion(
-    isWeaveRef
+  const objectVersion = useObjectVersion({
+    key: isWeaveRef
       ? {
-          key: {
-            scheme: 'weave',
-            entity: ref.entityName,
-            project: ref.projectName,
-            weaveKind: ref.weaveKind,
-            objectId: ref.artifactName,
-            versionHash: ref.artifactVersion,
-            path: '',
-            refExtra: ref.artifactRefExtra,
-          },
-          metadataOnly: true,
+          scheme: 'weave',
+          entity: ref.entityName,
+          project: ref.projectName,
+          weaveKind: ref.weaveKind,
+          objectId: ref.artifactName,
+          versionHash: ref.artifactVersion,
+          path: '',
+          refExtra: ref.artifactRefExtra,
         }
-      : undefined
-  );
+      : null,
+    metadataOnly: true,
+  });
 
   if (!ref || !('artifactName' in ref)) {
     return <>{datasetFullName}</>;
