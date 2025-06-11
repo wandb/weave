@@ -4,7 +4,6 @@
 
 import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
-import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
@@ -33,7 +32,7 @@ import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
-const DEBOUNCE_MS = 1_000;
+export const FILTER_INPUT_DEBOUNCE_MS = 1000;
 
 type FilterBarProps = {
   entity: string;
@@ -72,7 +71,7 @@ export const FilterBar = ({
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
   // local filter model is used to avoid triggering a re-render of the trace
-  // table on every keystroke. debounced DEBOUNCE_MS ms
+  // table on every keystroke.
   const [localFilterModel, setLocalFilterModel] = useState(filterModel);
   const [activeEditId, setActiveEditId] = useState<FilterId | null>(null);
 
@@ -224,14 +223,8 @@ export const FilterBar = ({
     [setFilterModel]
   );
 
-  const debouncedSetFilterModel = useMemo(
-    () => _.debounce(applyCompletedFilters, DEBOUNCE_MS),
-    [applyCompletedFilters]
-  );
-
   const onUpdateFilter = useCallback(
     (item: GridFilterItem) => {
-      debouncedSetFilterModel.cancel();
       const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);
 
@@ -241,7 +234,7 @@ export const FilterBar = ({
       if (index === -1) {
         const newModel = {...localFilterModel, items: [item]};
         setLocalFilterModel(newModel);
-        debouncedSetFilterModel(newModel);
+        applyCompletedFilters(newModel);
         return;
       }
 
@@ -252,9 +245,9 @@ export const FilterBar = ({
       ];
       const newItemsModel = {...localFilterModel, items: newItems};
       setLocalFilterModel(newItemsModel);
-      debouncedSetFilterModel(newItemsModel);
+      applyCompletedFilters(newItemsModel);
     },
-    [localFilterModel, debouncedSetFilterModel]
+    [localFilterModel, applyCompletedFilters]
   );
 
   const onRemoveFilter = useCallback(
