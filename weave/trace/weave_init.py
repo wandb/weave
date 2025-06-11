@@ -103,7 +103,12 @@ def init_weave(
     wandb_api.init()
     wandb_context = wandb_api.get_wandb_api_context()
     if wandb_context is None:
-        import wandb
+        try:
+            import wandb  # type: ignore
+        except ImportError as e:
+            raise WeaveWandbAuthenticationException(
+                "WANDB_API_KEY environment variable must be set or install `wandb` for interactive login"
+            ) from e
 
         logger.info(
             "Please login to Weights & Biases (https://wandb.ai/) to continue..."

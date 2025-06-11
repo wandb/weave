@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from weave.trace import urls
 from weave.utils.pypi_version_check import check_available
@@ -30,17 +30,25 @@ def _parse_version(version: str) -> packaging.version.Version:
 
 
 def _print_version_check() -> None:
-    import wandb
+    wandb: Any | None
+    try:
+        import wandb as wandb_module  # type: ignore
+
+        wandb = wandb_module
+    except ImportError:
+        wandb = None
 
     import weave
 
-    if _parse_version(REQUIRED_WANDB_VERSION) > _parse_version(wandb.__version__):
+    if wandb is not None and _parse_version(REQUIRED_WANDB_VERSION) > _parse_version(
+        wandb.__version__
+    ):
         message = (
             "wandb version >= 0.16.4 is required.  To upgrade, please run:\n"
             " $ pip install wandb --upgrade"
         )
         logger.info(message)
-    else:
+    elif wandb is not None:
         wandb_messages = check_available(wandb.__version__, "wandb")
         if wandb_messages:
             # Don't print the upgrade message, only the delete or yank message

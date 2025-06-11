@@ -1,6 +1,18 @@
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
-from wandb import util as wb_util
+
+def _app_url(api_base_url: str) -> str:
+    """Return the W&B app URL for a given API base URL."""
+    parsed = urlparse(api_base_url)
+    host = parsed.netloc
+    if host.startswith("api."):
+        host = host[len("api.") :]
+    if host.startswith("api-"):
+        host = "app-" + host[len("api-") :]
+    if not host.startswith("app.") and not host.startswith("app-"):
+        host = "app." + host
+    return f"{parsed.scheme}://{host}"
+
 
 from weave.trace import env
 
@@ -9,9 +21,7 @@ WEAVE_SLUG = "weave"
 
 
 def remote_project_root_url(entity_name: str, project_name: str) -> str:
-    return (
-        f"{wb_util.app_url(env.wandb_base_url())}/{entity_name}/{quote(project_name)}"
-    )
+    return f"{_app_url(env.wandb_base_url())}/{entity_name}/{quote(project_name)}"
 
 
 def project_weave_root_url(entity_name: str, project_name: str) -> str:
