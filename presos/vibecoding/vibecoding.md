@@ -9,6 +9,7 @@ marp: true
 # Vibe Coding
 _Prompted by Tim Sweeney_
 _Written by Claude_
+_Images by GPT_
 
 <!-- IMG_GEN: {"prompt": "Modern developer sitting at a desk with holographic AI assistant, coding on multiple screens, futuristic tech workspace, blue and purple color scheme"} -->
 ![bg right:50%](images/hero-image.png)
@@ -104,16 +105,16 @@ Presenter Notes:
 
 ### What is Vibe Coding? 🤔
 
-**Vibe Coding** = Coding with AI as your pair programming partner 🤝
+**Vibe Coding** = Coding with AI as your pair programming partner
 
-**Traditional:** Write → Test → Debug → Repeat 🔄  
-**Vibe Coding:** Think → Discuss → Code → Iterate 💭✨
+**Traditional:** Write → Test → Debug → Repeat  
+**Vibe Coding:** Think → Discuss → Code → Iterate
 
 **Key Shifts:**
-* 🎯 From "What syntax?" → "What am I achieving?"
-* 🧠 From isolated solving → collaborative reasoning  
-* ⚡ From perfect drafts → rapid iteration
-* 🤖 From Stack Overflow → asking your AI pair
+* From "What syntax?" → "What am I achieving?"
+* From isolated solving → collaborative reasoning  
+* From perfect drafts → rapid iteration
+* From Stack Overflow → asking your AI pair
 
 > *"Like having a senior dev who never gets tired, never judges, and has read every doc ever written."*
 
@@ -150,15 +151,15 @@ Presenter Notes:
 ### We've Been Here Before 📈
 
 **Abstraction Evolution:**
-* Assembly → High-Level Languages (C, Java, Python) 💻
-* Raw SQL → ORMs (SQLAlchemy, Hibernate) 🗄️
-* Manual Memory → Garbage Collection 🗑️
-* Monoliths → Microservices → Serverless ☁️
+* Assembly → High-Level Languages  
+* Raw SQL → ORMs  
+* Manual Memory → Garbage Collection
+* Monoliths → Microservices → Serverless
 
-**Now:** Manual Coding → AI-Assisted Coding 🤖
+**Now:** Manual Coding → AI-Assisted Coding
 
-**What Changes:** ⚡ Speed, 🎯 Focus (syntax→architecture), 🔧 AI debugging, 📝 AI docs
-**What Stays Critical:** 🧠 System design, 🔍 Code review, 🎯 Business requirements, 🚀 Performance, 🛡️ Security
+**What Changes:** Speed, focus (syntax→architecture), AI debugging  
+**What Stays Critical:** System design, code review, business requirements
 
 <!-- IMG_GEN: {"prompt": "Abstract data visualization: skills as interconnected nodes, some nodes fading (manual coding) while others grow brighter (architecture, creative thinking), network effect visualization with pulsing energy, clean modern infographic style"} -->
 ![bg right:35% 75%](images/skills-evolution.png)
@@ -216,13 +217,12 @@ Presenter Notes:
 
 ---
 
-### 🖥️ Co-Pilot IDEs
-*Your primary coding environment with AI built-in*
+### Co-Pilot IDEs 🖥️
 
-**🚀 Cursor** - Multi-file editing, background agents  
-**🌊 Windsurf** - Autonomous code changes across files  
-**⚡ Zed** - Real-time collaboration, lightning-fast  
-**📝 VSCode + Copilot** - Most widely adopted, beginner-friendly
+**Cursor** - Multi-file editing, background agents  
+**Windsurf** - Autonomous code changes across files  
+**Zed** - Real-time collaboration, lightning-fast  
+**VSCode + Copilot** - Most widely adopted, beginner-friendly
 
 ![bg right:35% 80%](images/ide-comparison.png)
 
@@ -236,13 +236,12 @@ Presenter Notes:
 
 ---
 
-### 🎯 Task-Oriented Tools
-*Specialized AI for specific coding tasks*
+### Task-Oriented Tools 🎯
 
-**🤖 Claude Code** - Deep reasoning, CLI-based  
-**🔧 Cursor Agents** - Autonomous workers, cloud-based  
-**👨‍💻 Devin** - Full-stack development & deployment  
-**⚙️ OpenAI Codex** - Code generation API, powers many tools
+**Claude Code** - Deep reasoning, CLI-based  
+**Cursor Agents** - Autonomous workers, cloud-based  
+**Devin** - Full-stack development & deployment  
+**OpenAI Codex** - Code generation API, powers many tools
 
 <!-- IMG_GEN: {"prompt": "Specialist AI entities as mystical beings: Claude as wise oracle with ancient scrolls of code, Cursor agents as busy worker sprites, Devin as powerful wizard orchestrating entire projects, fantasy art meets cyberpunk"} -->
 ![bg right:35% 85%](images/specialized-tools.png)
@@ -257,11 +256,10 @@ Presenter Notes:
 
 ---
 
-### 🔍 CI/Bug Detection Tools
-*AI-powered code review and quality*
+### CI/Bug Detection Tools 🔍
 
-**🐰 CodeRabbit** - Automated PR reviews & suggestions  
-**🐛 Cursor BugBot** - Intelligent debugging & root cause analysis
+**CodeRabbit** - Automated PR reviews & suggestions  
+**Cursor BugBot** - Intelligent debugging & root cause analysis
 
 <!-- IMG_GEN: {"prompt": "Security checkpoint scene: CodeRabbit as detective with magnifying glass examining code scrolls, BugBot as friendly robot medic healing broken code with rainbow laser beams, whimsical cartoon style with bright colors"} -->
 ![bg left:35% 75%](images/ci-tools.png)
@@ -275,10 +273,9 @@ Presenter Notes:
 
 ---
 
-### ⚡ AI-Enhanced Terminals
-*Smarter command line experience*
+### AI-Enhanced Terminals ⚡
 
-**⚡ Warp** - Natural language → shell commands, smart suggestions & AI assistant
+**Warp** - Natural language → shell commands, smart suggestions & AI assistant
 
 <!-- IMG_GEN: {"prompt": "Magical command portal: terminal window as ancient stone archway with mystical runes, natural language floating in as glowing spells, transforming into command line incantations, magical realism art style", "size": "1792x1024"} -->
 ![bg right:35%](images/warp-terminal.png)
@@ -307,10 +304,9 @@ Presenter Notes:
 
 ---
 
-### 🖥️ Shell Commands
-*AI helps you navigate the command line*
+### Shell Commands 🖥️
 
-**Pattern:** Natural language → Shell command 🗣️➡️💻
+**Pattern:** Natural language → Shell command
 
 * "Find all Python files modified in the last week"
 * "Show me memory usage by process"  
@@ -328,14 +324,13 @@ Presenter Notes:
 
 ---
 
-### ⚡ Typeahead
-*Intelligent code completion on steroids*
+### Typeahead ⚡
 
-**Beyond autocomplete:** 🚀
-* 🎯 Context-aware across multiple files  
-* 🧠 Learns your coding patterns & style
-* 🏗️ Suggests entire function implementations
-* ⚡ Reduces cognitive load, speeds up boilerplate
+**Beyond autocomplete:**
+* Context-aware across multiple files  
+* Learns your coding patterns & style
+* Suggests entire function implementations
+* Reduces cognitive load, speeds up boilerplate
 
 <!-- IMG_GEN: {"prompt": "Intelligent completion visualization: developer typing with ghostly helpful hands appearing to complete the code, multiple timeline suggestions flowing like river branches, ethereal and flowing, impressionist painting style with digital elements"} -->
 ![bg left:35% 85%](images/typeahead.png)
@@ -349,14 +344,13 @@ Presenter Notes:
 
 ---
 
-### 🎯 Spot Requests
-*Quick, targeted AI assistance*
+### Spot Requests 🎯
 
-**Use cases:** 🎪
-* 🐛 "Fix this bug" (highlight problematic code)
-* 🛡️ "Add error handling to this function"  
-* ⚡ "Convert this to use async/await"
-* 📝 "Add type hints to this module"
+**Use cases:**
+* "Fix this bug" (highlight problematic code)
+* "Add error handling to this function"  
+* "Convert this to use async/await"
+* "Add type hints to this module"
 
 <!-- IMG_GEN: {"prompt": "Precision targeting concept: developer with laser-guided crosshairs selecting specific code sections, AI responding with surgical precision tools, medical operation meets sniper precision, clean vector illustration style"} -->
 ![bg right:35% 80%](images/spot-requests.png)
@@ -370,16 +364,15 @@ Presenter Notes:
 
 ---
 
-### ❓ Ask Questions
-*Your AI pair programming partner*
+### Ask Questions ❓
 
-**Types of questions:** 🤔
-* 📖 **Explanatory:** "What does this regex do?"
-* 🏗️ **Architectural:** "Should I use a factory pattern here?"
-* 🐛 **Debugging:** "Why isn't this working as expected?"
-* ✨ **Best practices:** "Is there a more Pythonic way to do this?"
+**Types of questions:**
+* **Explanatory:** "What does this regex do?"
+* **Architectural:** "Should I use a factory pattern here?"
+* **Debugging:** "Why isn't this working as expected?"
+* **Best practices:** "Is there a more Pythonic way to do this?"
 
-**Flow:** Ask → Get explanations + examples → Iterate → Learn 🔄
+**Flow:** Ask → Get explanations + examples → Iterate → Learn
 
 <!-- IMG_GEN: {"prompt": "Socratic dialogue scene: developer and AI as ancient philosophers in a modern setting, thought bubbles containing code patterns and architectural diagrams, wisdom-sharing atmosphere, renaissance art style with modern coding elements"} -->
 ![bg left:35% 85%](images/ask-questions.png)
@@ -393,17 +386,16 @@ Presenter Notes:
 
 ---
 
-### 🤖 Agent Mode
-*AI takes the wheel for complex tasks*
+### Agent Mode 🤖
 
-**When to use:** 🚁
-* 🔄 Large refactoring across multiple files
-* 🏗️ Implementing new features end-to-end  
-* 🔀 Migrating between frameworks/libraries
-* 📁 Setting up complex project structures
+**When to use:**
+* Large refactoring across multiple files
+* Implementing new features end-to-end  
+* Migrating between frameworks/libraries
+* Setting up complex project structures
 
-**AI handles:** Planning, multi-file changes, consistency, testing ✅  
-**Your role:** Guide, review, approve 👨‍✈️
+**AI handles:** Planning, multi-file changes, consistency, testing  
+**Your role:** Guide, review, approve
 
 <!-- IMG_GEN: {"prompt": "AI autopilot taking control: futuristic spacecraft cockpit with AI avatar piloting while developer sits back as mission commander, multiple screens showing autonomous code generation across files, space opera cinematic style", "size": "1792x1024"} -->
 ![bg right:35%](images/agent-mode.png)
@@ -432,28 +424,22 @@ Presenter Notes:
 
 ---
 
-### 📋 AGENTS.md (or equivalent)
+### AGENTS.md (or equivalent) 📋
 *Your AI's instruction manual for your project*
 
-**What to include:**
+**Include in your project:**
 ```markdown
 # Project Context
-- Architecture overview
-- Key patterns and conventions
-- Coding standards and style guide
-- Common gotchas and pitfalls
+- Architecture overview & key patterns
+- Coding standards & style guide
 
-# AI Instructions
+# AI Instructions  
 - "Always use TypeScript strict mode"
-- "Follow the Repository pattern for data access"
+- "Follow Repository pattern for data access"
 - "Include comprehensive error handling"
-- "Write tests for all public methods"
 ```
 
-**Benefits:**
-* Consistent AI behavior across sessions
-* Faster onboarding for new features
-* Maintains code quality automatically
+**Benefits:** Consistent AI behavior, faster feature work, automatic quality
 
 <!-- IMG_GEN: {"prompt": "Living instruction manual: AGENTS.md file as glowing tome with pages that float and rearrange themselves, AI reading and memorizing the patterns, library of knowledge with floating texts, magical realism meets technical documentation"} -->
 ![bg right:30% 75%](images/agents-md.png)
@@ -467,25 +453,22 @@ Presenter Notes:
 
 ---
 
-### 📝 PR.md
+### PR.md 📝
 *Template for AI-generated pull request descriptions*
 
 **Template structure:**
 ```markdown
 ## What changed
-<!-- AI fills this automatically -->
+<!-- AI fills automatically -->
 
-## Why this change
-<!-- AI explains the reasoning -->
+## Why this change  
+<!-- AI explains reasoning -->
 
-## Testing notes
-<!-- AI lists what to test -->
-
-## Review focus areas
-<!-- AI highlights potential concerns -->
+## Testing & Review notes
+<!-- AI lists what to test & review -->
 ```
 
-**Demo opportunity:** Generate PR descriptions automatically
+**Result:** Comprehensive PR descriptions with zero effort
 
 ![bg right:30% 80%](images/pr-template.png)
 
@@ -498,19 +481,15 @@ Presenter Notes:
 
 ---
 
-### 🧠 Context Summarization
+### Context Summarization 🧠
 *Keeping AI focused on what matters*
 
-**Techniques:**
+**Key techniques:**
 * **File summaries:** AI creates 2-3 line summaries of complex files
-* **Session context:** Regularly summarize what you're working on
-* **Decision logs:** Track architectural decisions and rationale
+* **Session context:** Regularly summarize current work
+* **Decision logs:** Track architectural decisions & rationale
 
-**Pattern:**
-```
-"Summarize our conversation so far and the current state 
-of the refactoring we're working on"
-```
+**Magic phrase:** "Summarize our conversation and current state"
 
 ![bg right:30% 80%](images/context-summary.png)
 
@@ -523,18 +502,16 @@ Presenter Notes:
 
 ---
 
-### 🎯 Templating
+### Templating 🎯
 *Standardize common patterns*
 
-**Code templates:**
-* API endpoint patterns
-* Test file structures  
-* Component boilerplates
-* Configuration files
+**What to template:**
+* API endpoints & test structures
+* Component boilerplates & config files
 
-**AI prompt templates:**
+**Prompt templates:**
 * "Implement [PATTERN] for [FEATURE] following our [STANDARD]"
-* "Add comprehensive error handling to [FUNCTION] using our standard patterns"
+* "Add error handling to [FUNCTION] using our patterns"
 * "Create tests for [MODULE] covering [SCENARIOS]"
 
 ![bg right:30% 80%](images/templating.png)
@@ -548,19 +525,17 @@ Presenter Notes:
 
 ---
 
-### 📚 Notes
+### Notes 📚
 *Building your AI knowledge base*
 
-**Capture patterns:**
-* Solutions to tricky problems
-* Architecture decisions
-* Performance optimizations
-* Debugging techniques
+**What to capture:**
+* Solutions to tricky problems & architecture decisions
+* Performance optimizations & debugging techniques
 
-**Share with AI:**
-* "Here's how we solved a similar problem before..."
-* "Apply the same pattern we used in the auth module"
-* "Use the optimization technique from our notes"
+**How to use:**
+* "Here's how we solved this before..."
+* "Apply the pattern from our auth module"
+* "Use the optimization from our notes"
 
 ![bg right:30% 80%](images/notes-system.png)
 
@@ -573,17 +548,16 @@ Presenter Notes:
 
 ---
 
-### 🔄 PR Summarization
+### PR Summarization 🔄
 *AI writes your commit messages and PR descriptions*
 
-**Process:**
-1. Make changes with AI assistance
-2. AI reviews the diff
-3. AI generates meaningful commit messages
-4. AI creates comprehensive PR description
-5. AI suggests review criteria
+**The process:**
+1. Make changes with AI assistance → AI reviews diff
+2. AI generates meaningful commit messages  
+3. AI creates comprehensive PR descriptions
+4. AI suggests review criteria
 
-**Benefits:** Better documentation, easier code review, improved team communication
+**Result:** Better docs, easier reviews, improved team communication
 
 ![bg right:30% 80%](images/pr-workflow.png)
 
@@ -596,20 +570,16 @@ Presenter Notes:
 
 ---
 
-### 🎯 Using Staging & Commits as Checkpoints
+### Using Staging & Commits as Checkpoints 🎯
 *Version control as collaboration tool*
 
-**Pattern:**
-1. **Explore:** Let AI try different approaches in working directory
+**The pattern:**
+1. **Explore:** Let AI try different approaches  
 2. **Checkpoint:** Commit working solutions
-3. **Branch:** Create branches for different AI-generated approaches
-4. **Compare:** Use AI to analyze differences between approaches
-5. **Merge:** Combine best parts of different solutions
+3. **Branch & Compare:** AI analyzes different approaches
+4. **Merge:** Combine best parts of solutions
 
-**AI helps with:**
-* Comparing different implementations
-* Explaining trade-offs between approaches
-* Suggesting which approach to keep
+**AI helps:** Compare implementations, explain trade-offs, suggest best approach
 
 ![bg right:30% 80%](images/git-workflow.png)
 
@@ -637,27 +607,12 @@ Presenter Notes:
 
 ---
 
-### Service Provider Options
-*Cloud-based AI models*
+### Service Provider Options ☁️
 
-**🧠 Anthropic Claude Family**
-* **Claude 3.5 Sonnet:** Best for complex reasoning and code architecture
-* **Claude 3 Haiku:** Fast responses for simple tasks
-* **Strengths:** Code explanation, debugging, architectural advice
-
-**🤖 OpenAI GPT Family**  
-* **GPT-4o:** Well-rounded for most coding tasks
-* **GPT-4o Mini:** Quick responses for simpler requests
-* **Strengths:** Wide knowledge base, good at following instructions
-
-**🌟 Google Gemini Family**
-* **Gemini 1.5 Pro:** Large context window (great for big codebases)
-* **Gemini 1.5 Flash:** Fast responses with decent capability
-* **Strengths:** Multi-modal capabilities, excellent context retention
-
-**🚀 X.ai Grok Family**
-* **Grok-2:** Real-time information access
-* **Strengths:** Up-to-date knowledge, web integration
+**Anthropic Claude** - Best for complex reasoning & architecture  
+**OpenAI GPT** - Well-rounded, wide knowledge base  
+**Google Gemini** - Large context window, multi-modal  
+**X.ai Grok** - Real-time information access
 
 ![bg right:25% 80%](images/service-providers.png)
 
@@ -670,17 +625,13 @@ Presenter Notes:
 
 ---
 
-### Self-Hosted Options
-*Run AI models on your own infrastructure*
+### Self-Hosted Options 🏠
 
-**🔥 Deepseek Family**
-* **DeepSeek Coder:** Specialized for code generation
-* **Benefits:** Privacy, cost control, customization
+**DeepSeek Coder** - Specialized for code generation  
+**Code Llama** - Open-source coding specialist  
+**Llama 3.1** - General-purpose with good coding abilities
 
-**🦙 Meta Llama Family**
-* **Code Llama:** Open-source coding specialist
-* **Llama 3.1:** General-purpose with good coding abilities
-* **Benefits:** Full control, no API costs, offline capability
+**Benefits:** Privacy, cost control, offline capability
 
 ![bg right:30% 80%](images/self-hosted.png)
 
@@ -693,14 +644,14 @@ Presenter Notes:
 
 ---
 
-### 🛠️ Building Your Toolkit Strategy
+### Building Your Toolkit Strategy 🛠️
 
-**The Multi-Model Approach:** 🎯
-1. **Primary:** Main model for most work (Claude 3.5 Sonnet) 🏆
-2. **Specialist:** Code-specific for complex algorithms (DeepSeek Coder) 🧠  
-3. **Speed:** Fast model for simple tasks (GPT-4o Mini) ⚡
+**The Multi-Model Approach:**
+1. **Primary:** Main model for most work (Claude 3.5 Sonnet)
+2. **Specialist:** Code-specific for complex algorithms (DeepSeek Coder)  
+3. **Speed:** Fast model for simple tasks (GPT-4o Mini)
 
-**Consider:** 💭 Cost vs. Capability, 🔐 Privacy, 📏 Context window, ⚡ Speed
+**Consider:** Cost vs. Capability, Privacy, Context window, Speed
 
 ![bg right:30% 80%](images/strategy-matrix.png)
 
@@ -764,24 +715,21 @@ Presenter Notes:
 
 ---
 
-### Understanding Tools & MCP
-*Model Context Protocol - The future of AI tool integration*
+### Understanding Tools & MCP 🔧
+*The future of AI tool integration*
 
-**What is MCP?**
-* Standard protocol for AI models to interact with external tools
-* Allows AI to use databases, APIs, file systems, etc.
-* Makes AI more capable and autonomous
+**Model Context Protocol (MCP)** - Standard way for AI to use external tools
 
-**Examples:**
-* AI directly queries your database
-* AI reads and writes files across your system  
+**What it enables:**
+* AI directly queries databases  
+* AI reads/writes files across your system
 * AI interacts with external APIs
 * AI runs tests and sees results
 
-**Benefits:**
-* More powerful AI capabilities
-* Standardized tool integration
-* Better context awareness
+**Why it matters:**
+* Makes AI significantly more capable
+* Standardized tool ecosystem emerging
+* Your AI becomes a true development partner
 
 ![bg right:30% 80%](images/mcp-diagram.png)
 
@@ -808,19 +756,18 @@ Presenter Notes:
 
 ---
 
-#### 📓 Notebooks
-*AI-powered data science and research*
+#### Notebooks 📓
+*AI-powered data science workflows*
 
-**Jupyter/Google Colab + AI:**
+**What AI can do:**
 * Generate analysis code from natural language
-* Explain complex data science concepts
-* Debug statistical models
-* Create visualizations automatically
+* Explain complex data science concepts  
+* Debug statistical models & create visualizations
 
-**Demo opportunities:**
-* "Create a plot showing correlation between X and Y"
+**Example prompts:**
+* "Create a correlation plot between X and Y"
 * "Explain why this model is overfitting"
-* "Generate code to clean this messy dataset"
+* "Clean this messy dataset"
 
 ![bg right:30% 80%](images/notebooks.png)
 
@@ -833,16 +780,14 @@ Presenter Notes:
 
 ---
 
-#### 📝 Markdown
+#### Markdown 📝
 *AI as your writing and documentation partner*
 
-**Use cases:**
-* Generate technical documentation
-* Create README files
-* Write API documentation
-* Convert code comments to docs
+**What AI creates:**
+* Technical documentation & README files
+* API documentation from code comments
 
-**Patterns:**
+**Example prompts:**
 * "Convert these function signatures to API docs"
 * "Write a README for this project"
 * "Explain this algorithm in simple terms"
@@ -858,16 +803,15 @@ Presenter Notes:
 
 ---
 
-#### 🎯 Presentations
+#### Presentations 🎯
 *AI helps create and structure presentations*
 
-**What AI can do:**
+**AI capabilities:**
 * Generate slide content from bullet points
-* Create presentation outlines
-* Suggest visual elements
+* Create presentation outlines & suggest visuals
 * Format content for different audiences
 
-**This presentation was built with AI assistance!**
+**Meta moment:** This presentation was built with AI assistance!
 
 ![bg right:30% 80%](images/presentation-creation.png)
 
@@ -880,23 +824,20 @@ Presenter Notes:
 
 ---
 
-#### 📊 Diagrams  
-*AI generates visual representations*
+#### Diagrams 📊
+*AI creates visual system representations*
 
-**Types:**
-* Architecture diagrams
-* Database schemas
-* Flow charts
-* UML diagrams
-* Network diagrams
+**What AI generates:**
+* Architecture & database diagrams
+* Flow charts & UML diagrams  
+* Network topology & sequence diagrams
 
-**Tools:**
-* Mermaid integration in many AI tools
-* PlantUML generation
-* ASCII art diagrams
-* SVG/drawing code generation
+**Format options:**
+* Mermaid (widely supported)
+* PlantUML & ASCII art
+* SVG code generation
 
-**Example:** "Create a diagram showing the data flow in our microservices architecture"
+**Example:** "Create a data flow diagram for our microservices"
 
 ![bg right:30% 80%](images/diagram-generation.png)
 
@@ -909,16 +850,21 @@ Presenter Notes:
 
 ---
 
-## Thank You!
-### Questions?
+## Thank You! 🚀
 
-**Contact:** Tim Sweeney  
-**Resources:**
-* This presentation: [GitHub link]
-* Recommended starting tool: Cursor
-* Practice projects: [Link to examples]
+### Your Journey Starts Now
+
+**Next Steps:**
+1. **Try Cursor** - Start with the most beginner-friendly AI IDE
+2. **Practice workflows** - Focus on shell commands & spot requests  
+3. **Build confidence** - Start with simple tasks, grow complexity
+4. **Join the community** - Share experiences, learn from others
+
+**Key Takeaway:** You're not being replaced - you're being amplified
 
 *"The best time to start vibe coding was yesterday. The second best time is now."*
+
+### Questions?
 
 <!-- IMG_GEN: {"prompt": "Celebration of new coding era: developer and AI raising hands in victory together, confetti of code symbols falling like celebration, sunrise over a futuristic coding city, inspirational poster art style with vibrant colors"} -->
 ![bg right:50%](images/thank-you.png)

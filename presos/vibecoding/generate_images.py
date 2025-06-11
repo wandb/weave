@@ -12,7 +12,8 @@ This script parses the markdown file, finds image placeholders with IMG_GEN tags
 and generates images using OpenAI's DALL-E API.
 
 Usage: 
-  uv run generate_images.py                    # Generate all images with IMG_GEN tags
+  uv run generate_images.py                    # Generate missing images with IMG_GEN tags
+  uv run generate_images.py --all              # Generate all images (including existing ones)
   uv run generate_images.py --target=PATH      # Generate only the specified image
 """
 
@@ -43,7 +44,7 @@ def extract_images_with_prompts(markdown_content: str) -> List[Dict]:
     
     for i, line in enumerate(lines):
         # Look for image placeholders
-        img_match = re.search(r'!\[.*?\]\((.*?placeholder-.*?\.png)\)', line)
+        img_match = re.search(r'!\[.*?\]\((.*?\.png)\)', line)
         if img_match:
             full_path = img_match.group(1)
             
@@ -118,10 +119,13 @@ def main():
     """Main function to generate images for presentation."""
     # Parse command line arguments
     target_path = None
+    generate_all = False
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if arg.startswith('--target='):
                 target_path = arg.split('=', 1)[1]
+            elif arg == '--all':
+                generate_all = True
             elif arg in ['--help', '-h']:
                 print(__doc__)
                 return
@@ -153,6 +157,32 @@ def main():
         print("Add IMG_GEN tags like: <!-- IMG_GEN: {\"prompt\": \"your prompt here\"} -->")
         return
     
+    # Filter out existing images unless --all or --target is specified
+    if not generate_all and not target_path:
+        missing_images = []
+        existing_images = []
+        for img in all_images:
+            img_path = Path(img['path'])
+            if img_path.exists():
+                existing_images.append(img)
+            else:
+                missing_images.append(img)
+        
+        if existing_images:
+            print(f"Found {len(existing_images)} existing images (use --all to regenerate):")
+            for img in existing_images:
+                print(f"  ✅ {img['path']} (line {img['line_number']})")
+            print()
+        
+        if not missing_images:
+            print("🎉 All images already exist! Use --all to regenerate or --target=PATH for specific images.")
+            return
+        
+        all_images = missing_images
+        print(f"Found {len(missing_images)} missing images to generate:")
+    else:
+        print(f"Found {len(all_images)} images with IMG_GEN tags:")
+    
     # Filter by target if specified
     if target_path:
         images = [img for img in all_images if img['path'] == target_path]
@@ -165,9 +195,10 @@ def main():
         print(f"🎯 Targeting specific image: {target_path}")
     else:
         images = all_images
-        print(f"Found {len(images)} images with IMG_GEN tags:")
-        for img in images:
-            print(f"  - {img['path']} (line {img['line_number']})")
+    
+    # Show list of images to generate
+    for img in images:
+        print(f"  - {img['path']} (line {img['line_number']})")
     
     print()
     
@@ -190,7 +221,8 @@ def main():
         else:
             print(f"❌ Failed to regenerate {target_path}")
     else:
-        print(f"✅ Successfully generated {success_count}/{len(images)} images")
+        action = "regenerated" if generate_all else "generated"
+        print(f"✅ Successfully {action} {success_count}/{len(images)} images")
 
 if __name__ == "__main__":
     main() 
