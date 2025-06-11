@@ -11,7 +11,7 @@ _Prompted by Tim Sweeney_
 _Written by Claude_
 
 <!-- IMG_GEN: {"prompt": "Modern developer sitting at a desk with holographic AI assistant, coding on multiple screens, futuristic tech workspace, blue and purple color scheme"} -->
-![bg right:50%](images/placeholder-hero-image.png)
+![bg right:50%](images/hero-image.png)
 
 <!-- 
 Presenter Notes:
@@ -91,7 +91,7 @@ Outline:
 ## What is Vibe Coding?
 
 <!-- IMG_GEN: {"prompt": "Two developers collaborating - one human and one AI robot, sitting side by side at computers, friendly partnership, modern office setting, warm lighting"} -->
-![bg right:50%](images/placeholder-ai-pair-programming.png)
+![bg right:50%](images/ai-pair-programming.png)
 
 <!-- 
 Presenter Notes:
@@ -102,67 +102,32 @@ Presenter Notes:
 
 ---
 
-### Definition
+### What is Vibe Coding? 🤔
 
-**Vibe Coding** = Coding with AI as your pair programming partner
+**Vibe Coding** = Coding with AI as your pair programming partner 🤝
 
-* Not just autocomplete or code generation
-* A continuous conversation with AI about your code
-* AI understands context, intent, and helps reason through problems
-* You're the architect, AI is your collaborator
+**Traditional:** Write → Test → Debug → Repeat 🔄  
+**Vibe Coding:** Think → Discuss → Code → Iterate 💭✨
 
-<!-- IMG_GEN: {"prompt": "Abstract flowing conversation bubbles between human and AI, speech patterns visualized as colorful flowing ribbons, minimalist design with soft gradients", "size": "1024x1024"} -->
-![bg left:35% 90%](placeholder-conversation-flow.png)
+**Key Shifts:**
+* 🎯 From "What syntax?" → "What am I achieving?"
+* 🧠 From isolated solving → collaborative reasoning  
+* ⚡ From perfect drafts → rapid iteration
+* 🤖 From Stack Overflow → asking your AI pair
 
-<!-- 
-Presenter Notes:
-- Emphasize the conversational aspect
-- This is about reasoning together, not just generating code
-- You maintain control and decision-making authority
--->
-
----
-
-### Why It's Different
-
-**Traditional Coding:**
-* Write → Test → Debug → Repeat
-* Context exists only in your head
-
-**Vibe Coding:**
-* Think → Discuss → Code → Iterate
-* Context is shared with your AI partner
+> *"Like having a senior dev who never gets tired, never judges, and has read every doc ever written."*
 
 <!-- IMG_GEN: {"prompt": "Split-screen artistic comparison: left side shows isolated programmer in dark room with single screen, right side shows collaborative workspace with AI hologram, bright and connected, cyberpunk aesthetic"} -->
-![bg right:40% 95%](placeholder-workflow-comparison.png)
+![bg right:35% 95%](images/workflow-comparison.png)
 
 <!-- 
 Presenter Notes:
-- Draw the contrast clearly
-- Traditional coding is more isolated and sequential
-- Vibe coding is more collaborative and iterative
+- Emphasize the conversational aspect - this is about reasoning together, not just generating code
+- You maintain control and decision-making authority
+- Traditional coding is more isolated and sequential, vibe coding is collaborative and iterative
 - Context sharing is KEY - AI remembers what you're working on
--->
-
----
-
-### The Mindset Shift
-
-1. From "What syntax do I need?" to "What am I trying to achieve?"
-2. From isolated problem-solving to collaborative reasoning
-3. From perfect first drafts to rapid iteration
-4. From searching Stack Overflow to asking your AI pair
-
-> *"It's like having a senior developer who never gets tired, never judges, and has read every piece of documentation ever written."*
-
-<!-- IMG_GEN: {"prompt": "Surreal transformation scene: developer's mind opening like a flower, traditional code symbols transforming into flowing AI energy streams, dreamlike watercolor style with golden hour lighting"} -->
-![bg left:45% 80%](placeholder-mindset-shift.png)
-
-<!-- 
-Presenter Notes:
-- This is the most important slide - the mindset shift is everything
-- Emphasize moving from implementation details to high-level problem solving
-- The quote is important - it's about capability, not replacement
+- This is the most important concept - the mindset shift is everything
+- Moving from implementation details to high-level problem solving
 -->
 
 ---
@@ -170,7 +135,7 @@ Presenter Notes:
 ## Impact - Will I Still Have a Job?
 
 <!-- IMG_GEN: {"prompt": "Layered pyramid diagram showing evolution of programming - assembly code at bottom, high-level languages in middle, AI assistance at top, upward arrows showing progression", "size": "1792x1024"} -->
-![bg right:50%](images/placeholder-abstraction-layers.png)
+![bg right:50%](images/abstraction-layers.png)
 
 <!-- 
 Presenter Notes:
@@ -182,55 +147,30 @@ Presenter Notes:
 
 ---
 
-### The Abstraction Layer Progression
+### We've Been Here Before 📈
 
-**We've been here before:**
+**Abstraction Evolution:**
+* Assembly → High-Level Languages (C, Java, Python) 💻
+* Raw SQL → ORMs (SQLAlchemy, Hibernate) 🗄️
+* Manual Memory → Garbage Collection 🗑️
+* Monoliths → Microservices → Serverless ☁️
 
-* **Assembly Language → High-Level Languages** (C, Java, Python)
-* **Raw SQL → ORMs** (SQLAlchemy, Hibernate)
-* **Manual Memory Management → Garbage Collection**
-* **Procedural → Object-Oriented → Functional**
-* **Monoliths → Microservices → Serverless**
+**Now:** Manual Coding → AI-Assisted Coding 🤖
 
-**Now:** **Manual Coding → AI-Assisted Coding**
+**What Changes:** ⚡ Speed, 🎯 Focus (syntax→architecture), 🔧 AI debugging, 📝 AI docs
+**What Stays Critical:** 🧠 System design, 🔍 Code review, 🎯 Business requirements, 🚀 Performance, 🛡️ Security
 
-<!-- IMG_GEN: {"prompt": "Retro-futuristic timeline showing evolution of programming: punch cards morphing into high-level code morphing into AI collaboration, illustrated as a flowing river of technology through time, vaporwave color palette"} -->
-![bg right:35% 85%](placeholder-evolution-timeline.png)
+<!-- IMG_GEN: {"prompt": "Abstract data visualization: skills as interconnected nodes, some nodes fading (manual coding) while others grow brighter (architecture, creative thinking), network effect visualization with pulsing energy, clean modern infographic style"} -->
+![bg right:35% 75%](images/skills-evolution.png)
 
 <!-- 
 Presenter Notes:
 - Each transition was feared but ultimately made us more productive
 - We didn't stop being programmers when we moved from assembly to Python
-- Same pattern applies here
-- Ask: "Did anyone become unemployed when we got IDEs with autocomplete?"
--->
-
----
-
-### What Changes vs. What Stays the Same
-
-**What Changes:**
-* ✅ **Speed of implementation** - faster development
-* ✅ **Focus shifts** - from syntax to architecture and logic
-* ✅ **Debugging approaches** - AI helps identify and fix issues
-* ✅ **Documentation** - AI generates and maintains docs
-
-**What Stays Critical:**
-* 🧠 **System design and architecture decisions**
-* 🔍 **Code review and quality assurance**
-* 🎯 **Understanding business requirements**
-* 🚀 **Performance optimization and scaling**
-* 🛡️ **Security considerations**
-
-<!-- IMG_GEN: {"prompt": "Abstract data visualization: skills as interconnected nodes, some nodes fading (manual coding) while others grow brighter (architecture, creative thinking), network effect visualization with pulsing energy, clean modern infographic style"} -->
-![bg left:30% 75%](placeholder-skills-evolution.png)
-
-<!-- 
-Presenter Notes:
+- Same pattern applies here - Ask: "Did anyone become unemployed when we got IDEs with autocomplete?"
 - Emphasize that the HARD parts of engineering remain
 - AI doesn't understand business context like you do
-- AI doesn't make architectural decisions
-- AI doesn't understand the trade-offs in your specific domain
+- AI doesn't make architectural decisions or understand trade-offs in your specific domain
 -->
 
 ---
@@ -248,7 +188,7 @@ Presenter Notes:
 **The demand for great engineers increases, not decreases**
 
 <!-- IMG_GEN: {"prompt": "Epic superhero-style illustration: developer in flowing cape standing atop multiple floating project platforms, AI assistants as glowing orbs orbiting around them, dramatic lighting with city skyline background, comic book art style with dynamic action lines"} -->
-![bg right:25% 90%](placeholder-superpowers.png)
+![bg right:25% 90%](images/superpowers.png)
 
 <!-- 
 Presenter Notes:
@@ -264,7 +204,7 @@ Presenter Notes:
 *10 minutes + demos*
 
 <!-- IMG_GEN: {"prompt": "Futuristic tool workshop floating in space: various AI coding tools as crystalline floating workstations connected by energy bridges, holographic interfaces everywhere, space station aesthetic with cosmic background", "size": "1792x1024"} -->
-![bg right:55%](placeholder-tools-landscape.png)
+![bg right:55%](images/tools-landscape.png)
 
 <!-- 
 Presenter Notes:
@@ -276,26 +216,15 @@ Presenter Notes:
 
 ---
 
-### Co-Pilot IDEs
+### 🖥️ Co-Pilot IDEs
 *Your primary coding environment with AI built-in*
 
-**🚀 Cursor** - The heavyweight champion
-* Multi-file editing, codebase understanding
-* Background agents for complex tasks
+**🚀 Cursor** - Multi-file editing, background agents  
+**🌊 Windsurf** - Autonomous code changes across files  
+**⚡ Zed** - Real-time collaboration, lightning-fast  
+**📝 VSCode + Copilot** - Most widely adopted, beginner-friendly
 
-**🌊 Windsurf** - Agentic coding
-* Autonomous code changes across multiple files
-* Strong at understanding project structure
-
-**⚡ Zed** - Fast and collaborative
-* Real-time collaboration with AI
-* Lightning-fast performance
-
-**📝 VSCode + GitHub Copilot** - The classic
-* Most widely adopted
-* Great for beginners transitioning to AI coding
-
-![bg right:35% 80%](placeholder-ide-comparison.png)
+![bg right:35% 80%](images/ide-comparison.png)
 
 <!-- 
 Presenter Notes:
@@ -307,25 +236,16 @@ Presenter Notes:
 
 ---
 
-### Task-Oriented Tools
+### 🎯 Task-Oriented Tools
 *Specialized AI for specific coding tasks*
 
-**🤖 Claude Code** - Deep reasoning - CLI based
-* Excellent for complex algorithms and architecture
-* Great at explaining code and debugging
-
-**🔧 Cursor Background Agents** - Autonomous workers - Cloud Based
-* Handles repetitive tasks while you focus on core logic
-* Can work on multiple files simultaneously
-
-**👨‍💻 Devin** - Full-stack AI developer
-* Complete project development
-* Handles deployment and testing
-
-**OpenAI Codex**
+**🤖 Claude Code** - Deep reasoning, CLI-based  
+**🔧 Cursor Agents** - Autonomous workers, cloud-based  
+**👨‍💻 Devin** - Full-stack development & deployment  
+**⚙️ OpenAI Codex** - Code generation API, powers many tools
 
 <!-- IMG_GEN: {"prompt": "Specialist AI entities as mystical beings: Claude as wise oracle with ancient scrolls of code, Cursor agents as busy worker sprites, Devin as powerful wizard orchestrating entire projects, fantasy art meets cyberpunk"} -->
-![bg right:35% 85%](placeholder-specialized-tools.png)
+![bg right:35% 85%](images/specialized-tools.png)
 
 <!-- 
 Presenter Notes:
@@ -337,19 +257,14 @@ Presenter Notes:
 
 ---
 
-### CI/Bug Detection Tools
+### 🔍 CI/Bug Detection Tools
 *AI-powered code review and quality*
 
-**🐰 CodeRabbit** - PR review automation
-* Automated code review with intelligent suggestions
-* Catches bugs and style issues
-
-**🐛 Cursor BugBot** - Intelligent debugging
-* Identifies and fixes bugs automatically
-* Explains the root cause of issues
+**🐰 CodeRabbit** - Automated PR reviews & suggestions  
+**🐛 Cursor BugBot** - Intelligent debugging & root cause analysis
 
 <!-- IMG_GEN: {"prompt": "Security checkpoint scene: CodeRabbit as detective with magnifying glass examining code scrolls, BugBot as friendly robot medic healing broken code with rainbow laser beams, whimsical cartoon style with bright colors"} -->
-![bg left:30% 75%](placeholder-ci-tools.png)
+![bg left:35% 75%](images/ci-tools.png)
 
 <!-- 
 Presenter Notes:
@@ -360,16 +275,13 @@ Presenter Notes:
 
 ---
 
-### AI-Enhanced Terminals
+### ⚡ AI-Enhanced Terminals
 *Smarter command line experience*
 
-**⚡ Warp** - The AI-powered terminal
-* Natural language to shell commands
-* Smart suggestions and command completion
-* Built-in AI assistant for terminal tasks
+**⚡ Warp** - Natural language → shell commands, smart suggestions & AI assistant
 
 <!-- IMG_GEN: {"prompt": "Magical command portal: terminal window as ancient stone archway with mystical runes, natural language floating in as glowing spells, transforming into command line incantations, magical realism art style", "size": "1792x1024"} -->
-![bg right:35%](placeholder-warp-terminal.png)
+![bg right:35%](images/warp-terminal.png)
 
 <!-- 
 Presenter Notes:
@@ -384,7 +296,7 @@ Presenter Notes:
 *15 minutes + workflow demos*
 
 <!-- IMG_GEN: {"prompt": "Dynamic workflow symphony: five different work patterns as musical instruments in an orchestra, each element creating visual music notes in the air, conductor coordinating the harmony, art deco poster style", "size": "1792x1024"} -->
-![bg left:50%](placeholder-workflow-elements.png)
+![bg left:50%](images/workflow-elements.png)
 
 <!-- 
 Presenter Notes:
@@ -398,18 +310,14 @@ Presenter Notes:
 ### 🖥️ Shell Commands
 *AI helps you navigate the command line*
 
-**Pattern:** Natural language → Shell command
+**Pattern:** Natural language → Shell command 🗣️➡️💻
+
 * "Find all Python files modified in the last week"
 * "Show me memory usage by process"  
 * "Deploy this to staging with rollback capability"
 
-**Demo opportunities:**
-* Complex `find` commands
-* Git operations with specific conditions
-* System administration tasks
-
 <!-- IMG_GEN: {"prompt": "Translation machine concept: casual human speech bubbles on one side, complex shell commands emerging on the other, connected by swirling transformation gears and clockwork mechanisms, steampunk meets modern UI design"} -->
-![bg right:35% 80%](placeholder-shell-commands.png)
+![bg right:35% 80%](images/shell-commands.png)
 
 <!-- 
 Presenter Notes:
@@ -423,19 +331,14 @@ Presenter Notes:
 ### ⚡ Typeahead
 *Intelligent code completion on steroids*
 
-**Beyond autocomplete:**
-* Context-aware suggestions across multiple files
-* Understands your coding patterns and style
-* Suggests entire function implementations
-* Adapts to your project's architecture
-
-**Key benefits:**
-* Reduces cognitive load
-* Maintains consistency across codebase
-* Speeds up boilerplate code generation
+**Beyond autocomplete:** 🚀
+* 🎯 Context-aware across multiple files  
+* 🧠 Learns your coding patterns & style
+* 🏗️ Suggests entire function implementations
+* ⚡ Reduces cognitive load, speeds up boilerplate
 
 <!-- IMG_GEN: {"prompt": "Intelligent completion visualization: developer typing with ghostly helpful hands appearing to complete the code, multiple timeline suggestions flowing like river branches, ethereal and flowing, impressionist painting style with digital elements"} -->
-![bg left:40% 85%](placeholder-typeahead.png)
+![bg left:35% 85%](images/typeahead.png)
 
 <!-- 
 Presenter Notes:
@@ -449,20 +352,14 @@ Presenter Notes:
 ### 🎯 Spot Requests
 *Quick, targeted AI assistance*
 
-**Use cases:**
-* "Fix this bug" (highlight problematic code)
-* "Add error handling to this function"
-* "Convert this to use async/await"
-* "Add type hints to this module"
-
-**Demo opportunities:**
-* Refactoring legacy code
-* Adding documentation
-* Performance optimizations
-* Code style improvements
+**Use cases:** 🎪
+* 🐛 "Fix this bug" (highlight problematic code)
+* 🛡️ "Add error handling to this function"  
+* ⚡ "Convert this to use async/await"
+* 📝 "Add type hints to this module"
 
 <!-- IMG_GEN: {"prompt": "Precision targeting concept: developer with laser-guided crosshairs selecting specific code sections, AI responding with surgical precision tools, medical operation meets sniper precision, clean vector illustration style"} -->
-![bg right:30% 80%](placeholder-spot-requests.png)
+![bg right:35% 80%](images/spot-requests.png)
 
 <!-- 
 Presenter Notes:
@@ -476,20 +373,16 @@ Presenter Notes:
 ### ❓ Ask Questions
 *Your AI pair programming partner*
 
-**Types of questions:**
-* **Explanatory:** "What does this regex do?"
-* **Architectural:** "Should I use a factory pattern here?"
-* **Debugging:** "Why isn't this working as expected?"
-* **Best practices:** "Is there a more Pythonic way to do this?"
+**Types of questions:** 🤔
+* 📖 **Explanatory:** "What does this regex do?"
+* 🏗️ **Architectural:** "Should I use a factory pattern here?"
+* 🐛 **Debugging:** "Why isn't this working as expected?"
+* ✨ **Best practices:** "Is there a more Pythonic way to do this?"
 
-**The conversation flow:**
-1. Ask specific questions about your code
-2. Get detailed explanations with examples
-3. Iterate on solutions together
-4. Learn new patterns and techniques
+**Flow:** Ask → Get explanations + examples → Iterate → Learn 🔄
 
 <!-- IMG_GEN: {"prompt": "Socratic dialogue scene: developer and AI as ancient philosophers in a modern setting, thought bubbles containing code patterns and architectural diagrams, wisdom-sharing atmosphere, renaissance art style with modern coding elements"} -->
-![bg left:35% 85%](placeholder-ask-questions.png)
+![bg left:35% 85%](images/ask-questions.png)
 
 <!-- 
 Presenter Notes:
@@ -503,22 +396,17 @@ Presenter Notes:
 ### 🤖 Agent Mode
 *AI takes the wheel for complex tasks*
 
-**When to use Agent Mode:**
-* Large refactoring across multiple files
-* Implementing new features end-to-end
-* Migrating between frameworks/libraries
-* Setting up complex project structures
+**When to use:** 🚁
+* 🔄 Large refactoring across multiple files
+* 🏗️ Implementing new features end-to-end  
+* 🔀 Migrating between frameworks/libraries
+* 📁 Setting up complex project structures
 
-**What AI handles:**
-* Planning the implementation
-* Making changes across multiple files
-* Ensuring consistency and best practices
-* Testing and validation
-
-**Your role:** Guide, review, and approve
+**AI handles:** Planning, multi-file changes, consistency, testing ✅  
+**Your role:** Guide, review, approve 👨‍✈️
 
 <!-- IMG_GEN: {"prompt": "AI autopilot taking control: futuristic spacecraft cockpit with AI avatar piloting while developer sits back as mission commander, multiple screens showing autonomous code generation across files, space opera cinematic style", "size": "1792x1024"} -->
-![bg right:50%](placeholder-agent-mode.png)
+![bg right:35%](images/agent-mode.png)
 
 <!-- 
 Presenter Notes:
@@ -533,7 +421,7 @@ Presenter Notes:
 *10 minutes + tips demos*
 
 <!-- IMG_GEN: {"prompt": "Master craftsman's workshop: ancient scrolls transforming into digital interfaces, traditional tools morphing into AI assistants, blend of medieval craftsmanship and futuristic technology, golden hour lighting with mystical atmosphere", "size": "1792x1024"} -->
-![bg left:50%](placeholder-advanced-tips.png)
+![bg left:50%](images/advanced-tips.png)
 
 <!-- 
 Presenter Notes:
@@ -568,7 +456,7 @@ Presenter Notes:
 * Maintains code quality automatically
 
 <!-- IMG_GEN: {"prompt": "Living instruction manual: AGENTS.md file as glowing tome with pages that float and rearrange themselves, AI reading and memorizing the patterns, library of knowledge with floating texts, magical realism meets technical documentation"} -->
-![bg right:30% 75%](placeholder-agents-md.png)
+![bg right:30% 75%](images/agents-md.png)
 
 <!-- 
 Presenter Notes:
@@ -599,7 +487,7 @@ Presenter Notes:
 
 **Demo opportunity:** Generate PR descriptions automatically
 
-![bg right:30% 80%](placeholder-pr-template.png)
+![bg right:30% 80%](images/pr-template.png)
 
 <!-- 
 Presenter Notes:
@@ -624,7 +512,7 @@ Presenter Notes:
 of the refactoring we're working on"
 ```
 
-![bg right:30% 80%](placeholder-context-summary.png)
+![bg right:30% 80%](images/context-summary.png)
 
 <!-- 
 Presenter Notes:
@@ -649,7 +537,7 @@ Presenter Notes:
 * "Add comprehensive error handling to [FUNCTION] using our standard patterns"
 * "Create tests for [MODULE] covering [SCENARIOS]"
 
-![bg right:30% 80%](placeholder-templating.png)
+![bg right:30% 80%](images/templating.png)
 
 <!-- 
 Presenter Notes:
@@ -674,7 +562,7 @@ Presenter Notes:
 * "Apply the same pattern we used in the auth module"
 * "Use the optimization technique from our notes"
 
-![bg right:30% 80%](placeholder-notes-system.png)
+![bg right:30% 80%](images/notes-system.png)
 
 <!-- 
 Presenter Notes:
@@ -697,7 +585,7 @@ Presenter Notes:
 
 **Benefits:** Better documentation, easier code review, improved team communication
 
-![bg right:30% 80%](placeholder-pr-workflow.png)
+![bg right:30% 80%](images/pr-workflow.png)
 
 <!-- 
 Presenter Notes:
@@ -723,7 +611,7 @@ Presenter Notes:
 * Explaining trade-offs between approaches
 * Suggesting which approach to keep
 
-![bg right:30% 80%](placeholder-git-workflow.png)
+![bg right:30% 80%](images/git-workflow.png)
 
 <!-- 
 Presenter Notes:
@@ -738,7 +626,7 @@ Presenter Notes:
 *10 minutes*
 
 <!-- IMG_GEN: {"prompt": "AI dream team assembly: diverse AI personalities as superhero squad, each with unique powers and visual design representing their capabilities, team lineup poster style with dramatic lighting and heroic poses", "size": "1792x1024"} -->
-![bg right:55%](placeholder-ai-team.png)
+![bg right:55%](images/ai-team.png)
 
 <!-- 
 Presenter Notes:
@@ -771,7 +659,7 @@ Presenter Notes:
 * **Grok-2:** Real-time information access
 * **Strengths:** Up-to-date knowledge, web integration
 
-![bg right:25% 80%](placeholder-service-providers.png)
+![bg right:25% 80%](images/service-providers.png)
 
 <!-- 
 Presenter Notes:
@@ -794,7 +682,7 @@ Presenter Notes:
 * **Llama 3.1:** General-purpose with good coding abilities
 * **Benefits:** Full control, no API costs, offline capability
 
-![bg right:30% 80%](placeholder-self-hosted.png)
+![bg right:30% 80%](images/self-hosted.png)
 
 <!-- 
 Presenter Notes:
@@ -805,20 +693,16 @@ Presenter Notes:
 
 ---
 
-### Building Your Toolkit Strategy
+### 🛠️ Building Your Toolkit Strategy
 
-**The Multi-Model Approach:**
-1. **Primary:** One main model for most work (e.g., Claude 3.5 Sonnet)
-2. **Specialist:** Code-specific model for complex algorithms (e.g., DeepSeek Coder)  
-3. **Speed:** Fast model for simple tasks (e.g., GPT-4o Mini)
+**The Multi-Model Approach:** 🎯
+1. **Primary:** Main model for most work (Claude 3.5 Sonnet) 🏆
+2. **Specialist:** Code-specific for complex algorithms (DeepSeek Coder) 🧠  
+3. **Speed:** Fast model for simple tasks (GPT-4o Mini) ⚡
 
-**Consider:**
-* **Cost** vs. **Capability**
-* **Privacy** requirements
-* **Context window** needs
-* **Response speed** requirements
+**Consider:** 💭 Cost vs. Capability, 🔐 Privacy, 📏 Context window, ⚡ Speed
 
-![bg right:30% 80%](placeholder-strategy-matrix.png)
+![bg right:30% 80%](images/strategy-matrix.png)
 
 <!-- 
 Presenter Notes:
@@ -833,7 +717,7 @@ Presenter Notes:
 *10 minutes*
 
 <!-- IMG_GEN: {"prompt": "Interactive Q&A constellation: questions floating as glowing orbs around a central discussion space, answers materializing as connecting light streams, community gathering in digital space, warm and welcoming atmosphere"} -->
-![bg left:45% 80%](placeholder-qa.png)
+![bg left:45% 80%](images/qa.png)
 
 <!-- 
 Presenter Notes:
@@ -869,7 +753,7 @@ Presenter Notes:
 ## Bonus Content
 *If time permits*
 
-![bg right:50%](placeholder-bonus.png)
+![bg right:50%](images/bonus.png)
 
 <!-- 
 Presenter Notes:
@@ -899,7 +783,7 @@ Presenter Notes:
 * Standardized tool integration
 * Better context awareness
 
-![bg right:30% 80%](placeholder-mcp-diagram.png)
+![bg right:30% 80%](images/mcp-diagram.png)
 
 <!-- 
 Presenter Notes:
@@ -913,7 +797,7 @@ Presenter Notes:
 ### Uncommon Use Cases
 *AI coding beyond traditional software development*
 
-![bg right:50%](placeholder-uncommon-cases.png)
+![bg right:50%](images/uncommon-cases.png)
 
 <!-- 
 Presenter Notes:
@@ -938,7 +822,7 @@ Presenter Notes:
 * "Explain why this model is overfitting"
 * "Generate code to clean this messy dataset"
 
-![bg right:30% 80%](placeholder-notebooks.png)
+![bg right:30% 80%](images/notebooks.png)
 
 <!-- 
 Presenter Notes:
@@ -963,7 +847,7 @@ Presenter Notes:
 * "Write a README for this project"
 * "Explain this algorithm in simple terms"
 
-![bg right:30% 80%](placeholder-markdown-docs.png)
+![bg right:30% 80%](images/markdown-docs.png)
 
 <!-- 
 Presenter Notes:
@@ -985,7 +869,7 @@ Presenter Notes:
 
 **This presentation was built with AI assistance!**
 
-![bg right:30% 80%](placeholder-presentation-creation.png)
+![bg right:30% 80%](images/presentation-creation.png)
 
 <!-- 
 Presenter Notes:
@@ -1014,7 +898,7 @@ Presenter Notes:
 
 **Example:** "Create a diagram showing the data flow in our microservices architecture"
 
-![bg right:30% 80%](placeholder-diagram-generation.png)
+![bg right:30% 80%](images/diagram-generation.png)
 
 <!-- 
 Presenter Notes:
@@ -1037,7 +921,7 @@ Presenter Notes:
 *"The best time to start vibe coding was yesterday. The second best time is now."*
 
 <!-- IMG_GEN: {"prompt": "Celebration of new coding era: developer and AI raising hands in victory together, confetti of code symbols falling like celebration, sunrise over a futuristic coding city, inspirational poster art style with vibrant colors"} -->
-![bg right:50%](placeholder-thank-you.png)
+![bg right:50%](images/thank-you.png)
 
 <!-- 
 Presenter Notes:
