@@ -27,6 +27,7 @@ export const useClientSideCallRefExpansion = (
   options?: {
     expansionDepth?: number;
     expandAttr?: boolean;
+    returnPartialResults?: boolean;
   }
 ) => {
   const getTsClient = useGetTraceServerClientContext();
@@ -37,7 +38,10 @@ export const useClientSideCallRefExpansion = (
 
   useEffect(() => {
     let mounted = true;
-    if (calls.loading || calls.result == null) {
+    if (
+      (calls.loading && !options?.returnPartialResults) ||
+      calls.result == null
+    ) {
       setExpandedCalls([]);
       setIsExpanding(true);
       return;
@@ -77,6 +81,7 @@ export const useClientSideCallRefExpansion = (
     getTsClient,
     options?.expansionDepth,
     options?.expandAttr,
+    options?.returnPartialResults,
   ]);
 
   return useMemo(() => {

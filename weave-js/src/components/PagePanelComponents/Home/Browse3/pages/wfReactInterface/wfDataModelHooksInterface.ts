@@ -376,6 +376,9 @@ export interface UseGetRefsTypeParams {
 export type WFDataModelHooksInterface = {
   useCall: (params: UseCallParams) => Loadable<CallSchema | null>;
   useCalls: (params: UseCallsParams) => Loadable<CallSchema[]> & Refetchable;
+  useCallsStream: (
+    params: UseCallsParams
+  ) => Loadable<CallSchema[]> & Refetchable;
   useCallsStats: (
     params: UseCallsStatsParams
   ) => Loadable<traceServerClientTypes.TraceCallsQueryStatsRes> & Refetchable;

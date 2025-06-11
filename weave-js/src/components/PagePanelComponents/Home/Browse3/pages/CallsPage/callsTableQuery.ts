@@ -67,7 +67,7 @@ export const useCallsForQuery = (
   costsError?: Error | null;
   storageSizeError?: Error | null;
 } => {
-  const {useCalls, useCallsStats} = useWFHooks();
+  const {useCalls, useCallsStream, useCallsStats} = useWFHooks();
   const effectiveOffset = gridPage?.page * gridPage?.pageSize;
   const effectiveLimit = gridPage.pageSize;
   const {sortBy, lowLevelFilter, filterBy} = useFilterSortby(
@@ -76,7 +76,7 @@ export const useCallsForQuery = (
     gridSort
   );
 
-  const calls = useCalls({
+  const calls = useCallsStream({
     entity,
     project,
     filter: lowLevelFilter,
@@ -175,8 +175,8 @@ export const useCallsForQuery = (
       return {
         costsLoading: costs.loading,
         loading: calls.loading,
-        result: [],
-        total: 0,
+        result: callResults,
+        total,
         refetch,
         storageSizeLoading: storageSize.loading,
         storageSizeResults: null,
@@ -190,7 +190,7 @@ export const useCallsForQuery = (
       loading: calls.loading,
       // Return faster calls query results until cost query finishes
       result: calls.loading
-        ? []
+        ? callResults
         : costResults.length > 0
         ? addCostsToCallResults(callResults, costResults)
         : callResults,

@@ -179,6 +179,115 @@ export class DirectTraceServerClient {
     });
   }
 
+  /**
+   * Progressive streaming version of callsStreamQuery that yields results as they arrive
+   */
+  public callsStreamQueryProgressive(
+    req: TraceCallsQueryReq,
+    onPartialResults: (
+      partialResults: TraceCallSchema[],
+      isComplete: boolean
+    ) => void
+  ): Promise<void> {
+    const url = `${this.baseUrl}/calls/stream_query`;
+    const reqBody = JSON.stringify(req);
+
+    const headers: {[key: string]: string} = {
+      'Content-Type': 'application/json',
+      Authorization: 'Basic ' + btoa(':'),
+    };
+    const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';
+    if (useAdminPrivileges) {
+      headers['use-admin-privileges'] = 'true';
+    }
+
+    return new Promise((resolve, reject) => {
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: reqBody,
+      })
+        .then(response => {
+          if (!response.ok || !response.body) {
+            throw new HTTPError(
+              response.statusText,
+              response.status,
+              'Stream response not available'
+            );
+          }
+          return this.processCallsStream(response.body, onPartialResults);
+        })
+        .then(() => {
+          resolve();
+        })
+        .catch(err => {
+          reject(err);
+        });
+    });
+  }
+
+  /**
+   * Process a ReadableStream of JSON lines from calls stream, yielding partial results
+   */
+  private processCallsStream(
+    stream: ReadableStream,
+    onPartialResults: (
+      partialResults: TraceCallSchema[],
+      isComplete: boolean
+    ) => void
+  ): Promise<void> {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const accumulatedCalls: TraceCallSchema[] = [];
+
+    // Process a single line of JSON
+    const processLine = (line: string) => {
+      if (line.trim() === '') return;
+      try {
+        const parsed = JSON.parse(line);
+        accumulatedCalls.push(parsed);
+        // Yield partial results every time we get a new call
+        onPartialResults([...accumulatedCalls], false);
+      } catch (err) {
+        console.error('Error parsing calls stream line:', line, err);
+      }
+    };
+
+    // Read and process the stream
+    const read = (): Promise<void> => {
+      return reader.read().then(({done, value}) => {
+        if (done) {
+          // Process any remaining data in the buffer
+          if (buffer.trim() !== '') {
+            processLine(buffer);
+          }
+          // Signal completion with final results
+          onPartialResults([...accumulatedCalls], true);
+          return;
+        }
+
+        // Decode the new chunk and add it to our buffer
+        buffer += decoder.decode(value, {stream: true});
+
+        // Process complete lines from the buffer
+        let newlineIndex;
+        while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, newlineIndex);
+          buffer = buffer.slice(newlineIndex + 1);
+          processLine(line);
+        }
+
+        // Continue reading
+        return read();
+      });
+    };
+
+    return read();
+  }
+
   /*
   This implementation of the calls stream query is a convenience in order
   to explicitly handle large streams of data. It should be kept in close
