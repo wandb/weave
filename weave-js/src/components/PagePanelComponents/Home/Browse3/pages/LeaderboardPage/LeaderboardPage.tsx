@@ -263,6 +263,52 @@ export const LeaderboardPageContentInner: React.FC<
     }).length;
   }, [data, selectedEvaluations]);
 
+  // Calculate available datasets based on selected evaluations
+  const availableDatasets = useMemo(() => {
+    if (
+      !data ||
+      Object.keys(data.modelGroups).length === 0 ||
+      selectedEvaluations.length === 0
+    ) {
+      return [];
+    }
+
+    // Find all datasets that contain any of the selected evaluations
+    const datasetsWithSelectedEvaluations = new Set<string>();
+
+    // Iterate through all model groups to find datasets containing selected evaluations
+    Object.values(data.modelGroups).forEach(modelGroup => {
+      Object.entries(modelGroup.datasetGroups).forEach(
+        ([datasetName, datasetGroup]) => {
+          // Check if this dataset contains any selected evaluations
+          const hasSelectedEvaluation = Object.values(
+            datasetGroup.scorerGroups
+          ).some(scorerGroup =>
+            Object.values(scorerGroup.metricPathGroups).some(records =>
+              records.some(
+                record =>
+                  record.sourceEvaluationCallId &&
+                  selectedEvaluations.includes(record.sourceEvaluationCallId)
+              )
+            )
+          );
+
+          if (hasSelectedEvaluation) {
+            datasetsWithSelectedEvaluations.add(datasetName);
+          }
+        }
+      );
+    });
+
+    // Convert to array and sort for consistent ordering
+    return Array.from(datasetsWithSelectedEvaluations)
+      .sort()
+      .map(datasetName => ({
+        id: datasetName, // Keep full name as ID for filtering
+        name: datasetName, // Pass full name, formatting is done in the component
+      }));
+  }, [data, selectedEvaluations]);
+
   return (
     <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
       <Box
@@ -292,7 +338,10 @@ export const LeaderboardPageContentInner: React.FC<
                 onDatasetSelect={datasetId => {
                   // For single evaluation, we can skip the complex filtering and just use the selected evaluation
                   if (selectedEvaluations.length === 1) {
-                    console.log('Single evaluation - navigating directly:', selectedEvaluations[0]);
+                    console.log(
+                      'Single evaluation - navigating directly:',
+                      selectedEvaluations[0]
+                    );
                     history.push(
                       peekingRouter.compareEvaluationsUri(
                         props.entity,
@@ -355,16 +404,7 @@ export const LeaderboardPageContentInner: React.FC<
                     );
                   }
                 }}
-                availableDatasets={
-                  data && Object.keys(data.modelGroups).length > 0
-                    ? Object.keys(
-                        Object.values(data.modelGroups)[0].datasetGroups || {}
-                      ).map(datasetName => ({
-                        id: datasetName, // Keep full name as ID for filtering
-                        name: datasetName, // Pass full name, formatting is done in the component
-                      }))
-                    : []
-                }
+                availableDatasets={availableDatasets}
                 loading={loading}
                 disabled={selectedEvaluations.length === 0}
               />

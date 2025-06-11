@@ -7,7 +7,6 @@ import {
   GridSortDirection,
   GridSortItem,
 } from '@mui/x-data-grid-pro';
-import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
@@ -118,7 +117,14 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         }
       }
     },
-    [entity, history, peekingRouter, project, selectedEvaluations, setSelectedEvaluations]
+    [
+      entity,
+      history,
+      peekingRouter,
+      project,
+      selectedEvaluations,
+      setSelectedEvaluations,
+    ]
   );
 
   // Navigate to compare drawer when Enter is pressed with multiple evaluations selected
@@ -140,7 +146,14 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [selectedEvaluations, entity, project, peekingRouter, history, setSelectedEvaluations]);
+  }, [
+    selectedEvaluations,
+    entity,
+    project,
+    peekingRouter,
+    history,
+    setSelectedEvaluations,
+  ]);
 
   const columnStats = useMemo(() => getColumnStats(data), [data]);
 
