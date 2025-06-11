@@ -191,11 +191,7 @@ MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE = {
 
 # Mock response for bedrock-agent-runtime invoke_agent
 MOCK_INVOKE_AGENT_EVENTS = [
-    {
-        "chunk": {
-            "bytes": b"Hello! I'm here to help you. How can I assist you today?"
-        }
-    },
+    {"chunk": {"bytes": b"Hello! I'm here to help you. How can I assist you today?"}},
     {
         "trace": {
             "trace": {
@@ -204,13 +200,13 @@ MOCK_INVOKE_AGENT_EVENTS = [
                     "orchestrationTrace": {
                         "invocationInput": {
                             "invocationType": "ACTION",
-                            "actionInvocationType": "RESULT"
+                            "actionInvocationType": "RESULT",
                         }
                     }
-                }
+                },
             }
         }
-    }
+    },
 ]
 
 MOCK_INVOKE_AGENT_RESPONSE = {
@@ -224,13 +220,13 @@ MOCK_INVOKE_AGENT_RESPONSE = {
             "connection": "keep-alive",
             "x-amzn-requestid": "test-request-id",
             "x-amz-bedrock-agent-session-id": "test-session",
-            "x-amzn-bedrock-agent-content-type": "application/json"
+            "x-amzn-bedrock-agent-content-type": "application/json",
         },
-        "RetryAttempts": 0
+        "RetryAttempts": 0,
     },
     "completion": MOCK_INVOKE_AGENT_EVENTS,
     "contentType": "application/json",
-    "sessionId": "test-session"
+    "sessionId": "test-session",
 }
 
 # Original botocore _make_api_call function
@@ -587,9 +583,13 @@ def test_bedrock_invoke_exception_handling(
 
 @pytest.mark.skip_clickhouse_client
 @mock_aws
-def test_bedrock_agent_invoke_agent(client: weave.trace.weave_client.WeaveClient) -> None:
+def test_bedrock_agent_invoke_agent(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
     """Test that bedrock-agent-runtime invoke_agent method is properly traced."""
-    bedrock_agent_client = boto3.client("bedrock-agent-runtime", region_name="us-east-1")
+    bedrock_agent_client = boto3.client(
+        "bedrock-agent-runtime", region_name="us-east-1"
+    )
     patch_client(bedrock_agent_client)
 
     with patch(
@@ -599,7 +599,7 @@ def test_bedrock_agent_invoke_agent(client: weave.trace.weave_client.WeaveClient
             agentId="test-agent-id",
             agentAliasId="test-alias-id",
             sessionId="test-session-id",
-            inputText="Hello, how can you help me?"
+            inputText="Hello, how can you help me?",
         )
 
         # Basic assertions on the response
@@ -612,7 +612,7 @@ def test_bedrock_agent_invoke_agent(client: weave.trace.weave_client.WeaveClient
     calls = list(client.calls())
     assert len(calls) == 1, "Expected exactly one trace call for invoke_agent"
     call = calls[0]
-    
+
     assert call.exception is None
     assert call.ended_at is not None
     assert call.op_name == "BedrockAgentRuntime.invoke_agent"
