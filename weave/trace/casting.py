@@ -35,6 +35,8 @@ def cast_to_query(obj: Any) -> Query:
     raise TypeError("Unable to cast to Query")
 
 
-CallsFilterLike = Annotated[CallsFilter, pydantic.BeforeValidator(cast_to_calls_filter)]
-SortByLike = Annotated[SortBy, pydantic.BeforeValidator(cast_to_sort_by)]
-QueryLike = Annotated[Query, pydantic.BeforeValidator(cast_to_query)]
+CallsFilterLike = Annotated[
+    CallsFilter | None, pydantic.BeforeValidator(cast_to_calls_filter)
+]
+SortByLike = Annotated[SortBy | None, pydantic.BeforeValidator(cast_to_sort_by)]
+QueryLike = Annotated[Query | None, pydantic.BeforeValidator(cast_to_query)]
