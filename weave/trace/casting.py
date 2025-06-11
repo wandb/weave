@@ -38,5 +38,5 @@ def cast_to_query(obj: Any) -> Query:
 CallsFilterLike = Annotated[
     CallsFilter | None, pydantic.BeforeValidator(cast_to_calls_filter)
 ]
-SortByLike = Annotated[SortBy | None, pydantic.BeforeValidator(cast_to_sort_by)]
+SortByLike = Annotated[SortBy, pydantic.BeforeValidator(cast_to_sort_by)]
 QueryLike = Annotated[Query | None, pydantic.BeforeValidator(cast_to_query)]
