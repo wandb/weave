@@ -30,19 +30,19 @@ def safe_serialize_strands_object(obj: Any) -> Any:
     # Return primitive types directly
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
-    
+
     # Skip type objects that can't be serialized
     if isinstance(obj, type):
         return f"<class '{obj.__name__}'>"
-    
+
     # Handle lists and tuples
     if isinstance(obj, (list, tuple)):
         return [safe_serialize_strands_object(item) for item in obj]
-    
+
     # Handle dicts
     if isinstance(obj, dict):
         return {k: safe_serialize_strands_object(v) for k, v in obj.items()}
-    
+
     # For complex objects, try to extract meaningful attributes
     if hasattr(obj, "__dict__"):
         result = {"type": obj.__class__.__name__}
@@ -54,7 +54,7 @@ def safe_serialize_strands_object(obj: Any) -> Any:
                 except Exception:
                     result[attr_name] = f"<{type(attr_value).__name__}>"
         return result
-    
+
     # Fallback for other objects
     return str(obj)
 
@@ -62,11 +62,11 @@ def safe_serialize_strands_object(obj: Any) -> Any:
 def strands_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     """Postprocess inputs for Strands calls."""
     processed = {}
-    
+
     # Safely serialize all inputs
     for key, value in inputs.items():
         processed[key] = safe_serialize_strands_object(value)
-    
+
     # Extract the main prompt/message if it's the first argument
     if "args" in processed:
         args = processed["args"]
@@ -74,7 +74,7 @@ def strands_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
             first_arg = args[0]
             if isinstance(first_arg, str):
                 processed["prompt"] = first_arg
-    
+
     return processed
 
 
@@ -155,13 +155,12 @@ def get_strands_patcher(
     event_loop_cycle_settings = base.model_copy(
         update={
             "name": base.name or "strands.event_loop.event_loop_cycle",
-            "call_display_name": base.call_display_name 
+            "call_display_name": base.call_display_name
             or default_call_display_name_event_loop_cycle,
             "postprocess_inputs": strands_postprocess_inputs,
             "postprocess_output": strands_postprocess_outputs,
         }
     )
-
 
     # Tool execution
     tool_call_settings = base.model_copy(
@@ -177,18 +176,20 @@ def get_strands_patcher(
     patchers = []
 
     # Core Agent patchers
-    patchers.extend([
-        SymbolPatcher(
-            lambda: importlib.import_module("strands"),
-            "Agent.__call__",
-            strands_wrapper(agent_call_settings),
-        ),
-        SymbolPatcher(
-            lambda: importlib.import_module("strands.agent.agent"),
-            "Agent._run_loop",
-            strands_wrapper(agent_run_loop_settings),
-        ),
-    ])
+    patchers.extend(
+        [
+            SymbolPatcher(
+                lambda: importlib.import_module("strands"),
+                "Agent.__call__",
+                strands_wrapper(agent_call_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("strands.agent.agent"),
+                "Agent._run_loop",
+                strands_wrapper(agent_run_loop_settings),
+            ),
+        ]
+    )
 
     # Event loop patcher
     try:
@@ -204,10 +205,10 @@ def get_strands_patcher(
 
     # TODO: Model method patchers temporarily disabled to fix nesting issues
     # The nested calls were likely due to:
-    # 1. Multiple inheritance levels being patched 
+    # 1. Multiple inheritance levels being patched
     # 2. converse() internally calling stream() or other methods
     # 3. Parallel calls being treated as nested calls
-    # 
+    #
     # For now, focus on Agent-level tracing which provides the most value
     # Model-level tracing can be added back selectively once nesting is resolved
 
