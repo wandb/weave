@@ -7,6 +7,7 @@ import {
   GridSortDirection,
   GridSortItem,
 } from '@mui/x-data-grid-pro';
+import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
@@ -86,25 +87,60 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   );
 
   const onCellClick = useCallback(
-    (record: LeaderboardValueRecord) => {
+    (record: LeaderboardValueRecord, event: React.MouseEvent) => {
       const sourceCallId = record.sourceEvaluationCallId;
-      if (sourceCallId && selectedEvaluations.length === 0) {
-        let to: string;
-        if (USE_COMPARE_EVALUATIONS_PAGE) {
-          to = peekingRouter.compareEvaluationsUri(
-            entity,
-            project,
-            [sourceCallId],
-            null
-          );
-        } else {
-          to = peekingRouter.callUIUrl(entity, project, '', sourceCallId);
+      if (sourceCallId) {
+        const isMultiSelect = event.altKey || event.metaKey;
+
+        if (isMultiSelect) {
+          // Toggle selection using alt/option key
+          setSelectedEvaluations(prev => {
+            if (prev.includes(sourceCallId)) {
+              return prev.filter(id => id !== sourceCallId);
+            } else {
+              return [...prev, sourceCallId];
+            }
+          });
+        } else if (selectedEvaluations.length === 0) {
+          // Single selection - navigate immediately only if no selections
+          let to: string;
+          if (USE_COMPARE_EVALUATIONS_PAGE) {
+            to = peekingRouter.compareEvaluationsUri(
+              entity,
+              project,
+              [sourceCallId],
+              null
+            );
+          } else {
+            to = peekingRouter.callUIUrl(entity, project, '', sourceCallId);
+          }
+          history.push(to);
         }
-        history.push(to);
       }
     },
-    [entity, history, peekingRouter, project, selectedEvaluations.length]
+    [entity, history, peekingRouter, project, selectedEvaluations, setSelectedEvaluations]
   );
+
+  // Navigate to compare drawer when Enter is pressed with multiple evaluations selected
+  useEffect(() => {
+    if (selectedEvaluations.length > 0) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Enter' && selectedEvaluations.length > 0) {
+          const to = peekingRouter.compareEvaluationsUri(
+            entity,
+            project,
+            selectedEvaluations,
+            null
+          );
+          history.push(to);
+          setSelectedEvaluations([]);
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [selectedEvaluations, entity, project, peekingRouter, history, setSelectedEvaluations]);
 
   const columnStats = useMemo(() => getColumnStats(data), [data]);
 
@@ -278,7 +314,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           const modelRef = parseRefMaybe(
             `weave:///${entity}/${project}/${isOp ? 'op' : 'object'}/${
               params.value
-            }` ?? ''
+            }`
           );
           if (modelRef) {
             return (
@@ -330,6 +366,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                         metricPathGroupName
                       );
                       const value = record?.metricValue;
+                      const isSelected =
+                        record?.sourceEvaluationCallId &&
+                        selectedEvaluations.includes(
+                          record.sourceEvaluationCallId
+                        );
                       let inner: React.ReactNode = value;
                       if (inner == null) {
                         inner = <NotApplicable />;
@@ -361,7 +402,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                             overflow: 'hidden',
                             padding: '2px',
                           }}
-                          onClick={() => record && onCellClick(record)}>
+                          onClick={e => record && onCellClick(record, e)}>
                           <div
                             style={{
                               width: '100%',
@@ -383,6 +424,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                                 selectedEvaluations.length > 0
                                   ? 'default'
                                   : 'pointer',
+                              border: isSelected ? '2px solid #13A9BA' : 'none',
+                              boxSizing: 'border-box',
                             }}>
                             {inner}
                           </div>
@@ -420,7 +463,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           children: [],
           renderHeaderGroup: params => {
             const ref = parseRefMaybe(
-              `weave:///${entity}/${project}/object/${datasetGroupName}` ?? ''
+              `weave:///${entity}/${project}/object/${datasetGroupName}`
             );
             if (ref) {
               return <SmallRef objRef={ref} />;
@@ -438,7 +481,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               children: [],
               renderHeaderGroup: params => {
                 const ref = parseRefMaybe(
-                  `weave:///${entity}/${project}/op/${scorerGroupName}` ?? ''
+                  `weave:///${entity}/${project}/op/${scorerGroupName}`
                 );
                 if (ref) {
                   return <SmallRef objRef={ref} />;
