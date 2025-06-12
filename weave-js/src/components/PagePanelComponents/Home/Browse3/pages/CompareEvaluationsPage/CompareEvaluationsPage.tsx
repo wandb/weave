@@ -123,7 +123,9 @@ export const CompareEvaluationsPageContent: React.FC<
       setSelectedInputDigest={setSelectedInputDigest}>
       <CustomWeaveTypeProjectContext.Provider
         value={{entity: props.entity, project: props.project}}>
-        <CompareEvaluationsPageInner evaluationCallIds={props.evaluationCallIds} />
+        <CompareEvaluationsPageInner
+          evaluationCallIds={props.evaluationCallIds}
+        />
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
   );
@@ -174,7 +176,9 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
   );
 };
 
-const CompareEvaluationsPageInner: React.FC<{evaluationCallIds: string[]}> = props => {
+const CompareEvaluationsPageInner: React.FC<{
+  evaluationCallIds: string[];
+}> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const showExamples =
