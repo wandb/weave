@@ -219,55 +219,80 @@ export const CreateMonitorDrawer = ({
   }, [scorers.length]);
 
   useEffect(() => {
-    const newScorers: ObjectVersionSchema[] = [];
-    
-    if (validationType === 'json') {
-      newScorers.push({
-        scheme: 'weave',
-        weaveKind: 'object',
-        entity,
-        project,
-        objectId: '',
-        versionHash: '',
-        path: '',
-        versionIndex: 0,
-        baseObjectClass: 'ValidJSONScorer',
-        createdAtMs: Date.now(),
-        val: {_type: 'ValidJSONScorer'},
-      });
-    } else if (validationType === 'xml') {
-      newScorers.push({
-        scheme: 'weave',
-        weaveKind: 'object',
-        entity,
-        project,
-        objectId: '',
-        versionHash: '',
-        path: '',
-        versionIndex: 0,
-        baseObjectClass: 'ValidXMLScorer',
-        createdAtMs: Date.now(),
-        val: {_type: 'ValidXMLScorer'},
-      });
-    }
+    setScorers(currentScorers => {
+      const newScorers: ObjectVersionSchema[] = [];
+      
+      // Find existing scorers to preserve their configurations
+      const existingJSONScorer = currentScorers.find(s => s.val['_type'] === 'ValidJSONScorer');
+      const existingXMLScorer = currentScorers.find(s => s.val['_type'] === 'ValidXMLScorer');
+      const existingLLMScorer = currentScorers.find(s => s.val['_type'] === 'LLMAsAJudgeScorer');
+      
+      if (validationType === 'json') {
+        if (existingJSONScorer) {
+          // Preserve existing JSON scorer configuration
+          newScorers.push(existingJSONScorer);
+        } else {
+          // Create new JSON scorer with default configuration
+          newScorers.push({
+            scheme: 'weave',
+            weaveKind: 'object',
+            entity,
+            project,
+            objectId: '',
+            versionHash: '',
+            path: '',
+            versionIndex: 0,
+            baseObjectClass: 'ValidJSONScorer',
+            createdAtMs: Date.now(),
+            val: {_type: 'ValidJSONScorer'},
+          });
+        }
+      } else if (validationType === 'xml') {
+        if (existingXMLScorer) {
+          // Preserve existing XML scorer configuration
+          newScorers.push(existingXMLScorer);
+        } else {
+          // Create new XML scorer with default configuration
+          newScorers.push({
+            scheme: 'weave',
+            weaveKind: 'object',
+            entity,
+            project,
+            objectId: '',
+            versionHash: '',
+            path: '',
+            versionIndex: 0,
+            baseObjectClass: 'ValidXMLScorer',
+            createdAtMs: Date.now(),
+            val: {_type: 'ValidXMLScorer'},
+          });
+        }
+      }
 
-    if (llmAsJudgeEnabled) {
-      newScorers.push({
-        scheme: 'weave',
-        weaveKind: 'object',
-        entity,
-        project,
-        objectId: '',
-        versionHash: '',
-        path: '',
-        versionIndex: 0,
-        baseObjectClass: 'LLMAsAJudgeScorer',
-        createdAtMs: Date.now(),
-        val: {_type: 'LLMAsAJudgeScorer'},
-      });
-    }
+      if (llmAsJudgeEnabled) {
+        if (existingLLMScorer) {
+          // Preserve existing LLM-as-a-judge scorer configuration
+          newScorers.push(existingLLMScorer);
+        } else {
+          // Create new LLM-as-a-judge scorer with default configuration
+          newScorers.push({
+            scheme: 'weave',
+            weaveKind: 'object',
+            entity,
+            project,
+            objectId: '',
+            versionHash: '',
+            path: '',
+            versionIndex: 0,
+            baseObjectClass: 'LLMAsAJudgeScorer',
+            createdAtMs: Date.now(),
+            val: {_type: 'LLMAsAJudgeScorer'},
+          });
+        }
+      }
 
-    setScorers(newScorers);
+      return newScorers;
+    });
   }, [validationType, llmAsJudgeEnabled, entity, project]);
 
   const {result: callsResults, loading: callsLoading} = useCalls({
