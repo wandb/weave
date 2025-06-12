@@ -135,20 +135,23 @@ export const ExplorerLoaded = ({
     );
   };
 
-  // TODO: Hardcoding number of columns until we can discuss with design team.
-  // const availableWidth = width - 2 * 32; // remove padding
+  const availableWidth = width - 2 * 32; // remove padding
   const tileWidth = 500;
   const gap = 12;
-  const numColumns = 2;
-  // const numColumns = Math.max(
-  //   1,
-  //   Math.floor((availableWidth + gap) / (tileWidth + gap))
-  // );
+  const numColumns = Math.max(
+    1,
+    Math.floor((availableWidth + gap) / (tileWidth + gap))
+  );
 
   return (
     <div className="px-32 py-24" onClick={onClickBackground}>
       <div className="mb-16 flex items-center gap-8">
-        <div className="flex-grow text-xl font-semibold">W&B hosted models</div>
+        <div className="flex-grow">
+          <div className="text-xl font-semibold text-moon-800">
+            W&B hosted models
+          </div>
+          <div className="text-md text-moon-650">Prices per 1M tokens</div>
+        </div>
         <ToggleButtonGroup
           options={[
             {value: 'All'},
@@ -176,7 +179,7 @@ export const ExplorerLoaded = ({
           gridTemplateColumns: `repeat(${numColumns}, ${tileWidth}px)`,
           gap,
         }}
-        className="mx-auto grid">
+        className="absolute mx-auto grid">
         <AnimatePresence>
           {models.map(m => {
             return (

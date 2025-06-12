@@ -35,6 +35,7 @@ import {convertDefaultParamsToOptionalPlaygroundModelParams} from '../useSaveMod
 export const SAVED_MODEL_OPTION_VALUE = 'saved-models';
 
 export interface LLMOption {
+  catalogId?: string; // Model Catalog ID
   label: string;
   subLabel?: string | React.ReactNode;
   value: LLMMaxTokensKey | string;
@@ -115,7 +116,7 @@ const SubMenu = ({
         //       display tiles, link to comparison and details, etc.
         const isCoreWeaveModel = value === 'coreweave';
         const catalogModel = isCoreWeaveModel
-          ? MODEL_INDEX[llm.value.split('/')[1]]
+          ? MODEL_INDEX[llm.catalogId ?? '']
           : null;
         const isUnspportedCoreWeaveModel =
           isCoreWeaveModel &&
@@ -544,13 +545,28 @@ export const useLLMDropdownOptions = (
       if (provider === 'coreweave' && !inferenceContext.isInferenceEnabled) {
         return;
       }
-      const providerLLMs = Object.entries(LLM_MAX_TOKENS)
-        .filter(([_, config]) => config.provider === provider)
-        .map(([llmKey]) => ({
-          label: llmKey,
-          value: llmKey as LLMMaxTokensKey,
-          max_tokens: LLM_MAX_TOKENS[llmKey as LLMMaxTokensKey].max_tokens,
-        }));
+      const providerLLMs = [];
+      if (provider === 'coreweave') {
+        // Insert hosted models
+        providerLLMs.push(
+          ...getHostedModels().map(model => ({
+            catalogId: model.id,
+            value: `coreweave/${model.idPlayground}`, // What gets sent to completion endpoint
+            label: model.label ?? model.id, // What gets shown as selected
+            max_tokens: 1000, // TODO: Get max tokens from model info
+          }))
+        );
+      } else {
+        providerLLMs.push(
+          ...Object.entries(LLM_MAX_TOKENS)
+            .filter(([_, config]) => config.provider === provider)
+            .map(([llmKey]) => ({
+              label: llmKey,
+              value: llmKey as LLMMaxTokensKey,
+              max_tokens: LLM_MAX_TOKENS[llmKey as LLMMaxTokensKey].max_tokens,
+            }))
+        );
+      }
 
       const option = {
         label:
@@ -566,18 +582,6 @@ export const useLLMDropdownOptions = (
         options.push(option);
       }
     });
-  }
-
-  // Insert hosted models
-  if (inferenceContext.isInferenceEnabled) {
-    const hostedOptions = options[0].llms;
-    for (const model of getHostedModels()) {
-      hostedOptions.push({
-        label: model.label ?? model.id,
-        value: `coreweave/${model.idPlayground}`,
-        max_tokens: 1000, // TODO: Get max tokens from model info
-      });
-    }
   }
 
   // Add custom providers

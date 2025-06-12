@@ -4,7 +4,6 @@
 
 import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
-import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
@@ -16,11 +15,13 @@ import {
   convertFeedbackFieldToBackendFilter,
   parseFeedbackType,
 } from '../feedback/HumanFeedback/tsHumanFeedback';
+import {DeleteModal} from '../pages/common/DeleteModal';
 import {ColumnInfo} from '../types';
 import {
   FIELD_DESCRIPTIONS,
   FIELD_LABELS,
   FilterId,
+  getFieldType,
   getOperatorOptions,
   isValuelessOperator,
   MONITORED_FILTER_VALUE,
@@ -33,7 +34,7 @@ import {combineRangeFilters, getNextFilterId} from './filterUtils';
 import {GroupedOption, SelectFieldOption} from './SelectField';
 import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
-const DEBOUNCE_MS = 1_000;
+export const FILTER_INPUT_DEBOUNCE_MS = 1000;
 
 type FilterBarProps = {
   entity: string;
@@ -70,9 +71,11 @@ export const FilterBar = ({
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [showDeleteWarning, setShowDeleteWarning] = useState(false);
+  const [filterToDelete, setFilterToDelete] = useState<FilterId | null>(null);
 
   // local filter model is used to avoid triggering a re-render of the trace
-  // table on every keystroke. debounced DEBOUNCE_MS ms
+  // table on every keystroke.
   const [localFilterModel, setLocalFilterModel] = useState(filterModel);
   const [activeEditId, setActiveEditId] = useState<FilterId | null>(null);
 
@@ -124,6 +127,10 @@ export const FilterBar = ({
       label: 'attributes',
       options: [],
     },
+    {
+      label: 'Annotations',
+      options: [],
+    },
   ];
   for (const col of cols) {
     if (UNFILTERABLE_FIELDS.includes(col.field)) {
@@ -150,15 +157,14 @@ export const FilterBar = ({
         label: (col.headerName ?? col.field).substring('attributes.'.length),
         description: FIELD_DESCRIPTIONS[col.field],
       });
-    } else if (
-      col.field.startsWith('summary.weave.feedback.wandb.annotation')
-    ) {
-      const parsed = parseFeedbackType(col.field);
+    } else if (col.field.startsWith('feedback.[wandb.annotation')) {
+      const field = col.field.slice();
+      const parsed = parseFeedbackType(field);
       if (!parsed) {
         continue;
       }
       const backendFilter = convertFeedbackFieldToBackendFilter(parsed.field);
-      (options[0] as GroupedOption).options.push({
+      (options[4] as GroupedOption).options.push({
         value: backendFilter,
         label: parsed ? parsed.displayName : col.field,
       });
@@ -184,9 +190,25 @@ export const FilterBar = ({
   }
 
   const onRemoveAll = () => {
-    const emptyModel = {items: []};
-    setLocalFilterModel(emptyModel);
-    setFilterModel(emptyModel);
+    // Check if there's only one filter and it's a datetime filter
+    if (
+      localFilterModel.items.length === 1 &&
+      getFieldType(localFilterModel.items[0].field) === 'datetime'
+    ) {
+      setFilterToDelete(localFilterModel.items[0].id);
+      setShowDeleteWarning(true);
+      return;
+    }
+
+    // Remove all filters except the first datetime filter
+    const firstDatetimeFilter = localFilterModel.items.find(
+      item => getFieldType(item.field) === 'datetime'
+    );
+    const newItems = firstDatetimeFilter ? [firstDatetimeFilter] : [];
+
+    const newModel = {items: newItems};
+    setLocalFilterModel(newModel);
+    setFilterModel(newModel);
     setAnchorEl(null);
   };
 
@@ -221,14 +243,8 @@ export const FilterBar = ({
     [setFilterModel]
   );
 
-  const debouncedSetFilterModel = useMemo(
-    () => _.debounce(applyCompletedFilters, DEBOUNCE_MS),
-    [applyCompletedFilters]
-  );
-
   const onUpdateFilter = useCallback(
     (item: GridFilterItem) => {
-      debouncedSetFilterModel.cancel();
       const oldItems = localFilterModel.items;
       const index = oldItems.findIndex(f => f.id === item.id);
 
@@ -238,7 +254,7 @@ export const FilterBar = ({
       if (index === -1) {
         const newModel = {...localFilterModel, items: [item]};
         setLocalFilterModel(newModel);
-        debouncedSetFilterModel(newModel);
+        applyCompletedFilters(newModel);
         return;
       }
 
@@ -249,13 +265,26 @@ export const FilterBar = ({
       ];
       const newItemsModel = {...localFilterModel, items: newItems};
       setLocalFilterModel(newItemsModel);
-      debouncedSetFilterModel(newItemsModel);
+      applyCompletedFilters(newItemsModel);
     },
-    [localFilterModel, debouncedSetFilterModel]
+    [localFilterModel, applyCompletedFilters]
   );
 
   const onRemoveFilter = useCallback(
     (filterId: FilterId) => {
+      // Check if this is the first datetime filter
+      const isFirstDatetimeFilter =
+        localFilterModel.items.length > 0 &&
+        localFilterModel.items[0].id === filterId &&
+        getFieldType(localFilterModel.items[0].field) === 'datetime';
+
+      if (isFirstDatetimeFilter) {
+        setFilterToDelete(filterId);
+        setShowDeleteWarning(true);
+        return;
+      }
+
+      // Proceed with normal deletion
       const items = localFilterModel.items.filter(f => f.id !== filterId);
       const newModel = {...localFilterModel, items};
       setLocalFilterModel(newModel);
@@ -268,6 +297,28 @@ export const FilterBar = ({
     },
     [localFilterModel, applyCompletedFilters, activeEditId]
   );
+
+  const handleConfirmDelete = useCallback(() => {
+    if (filterToDelete !== null) {
+      const items = localFilterModel.items.filter(f => f.id !== filterToDelete);
+      const newModel = {...localFilterModel, items};
+      setLocalFilterModel(newModel);
+      applyCompletedFilters(newModel);
+
+      // Clear active edit if removed
+      if (activeEditId === filterToDelete) {
+        setActiveEditId(null);
+      }
+    }
+
+    setShowDeleteWarning(false);
+    setFilterToDelete(null);
+  }, [filterToDelete, localFilterModel, applyCompletedFilters, activeEditId]);
+
+  const handleCancelDelete = useCallback(() => {
+    setShowDeleteWarning(false);
+    setFilterToDelete(null);
+  }, []);
 
   const onSetSelected = useCallback(() => {
     const newFilter =
@@ -400,19 +451,26 @@ export const FilterBar = ({
               </div>
             </DraggableHandle>
             <div className="grid grid-cols-[auto_auto_auto_30px] gap-4">
-              {localFilterModel.items.map(item => (
-                <FilterRow
-                  key={item.id}
-                  entity={entity}
-                  project={project}
-                  item={item}
-                  options={options}
-                  onAddFilter={onAddFilter}
-                  onUpdateFilter={onUpdateFilter}
-                  onRemoveFilter={onRemoveFilter}
-                  activeEditId={activeEditId}
-                />
-              ))}
+              {(() => {
+                return localFilterModel.items.map((item, index) => {
+                  const isFirstDatetimeFilter =
+                    index === 0 && getFieldType(item.field) === 'datetime';
+                  return (
+                    <FilterRow
+                      key={item.id}
+                      entity={entity}
+                      project={project}
+                      item={item}
+                      options={options}
+                      onAddFilter={onAddFilter}
+                      onUpdateFilter={onUpdateFilter}
+                      onRemoveFilter={onRemoveFilter}
+                      activeEditId={activeEditId}
+                      disabled={isFirstDatetimeFilter}
+                    />
+                  );
+                });
+              })()}
             </div>
             {localFilterModel.items.length === 0 && (
               <FilterRow
@@ -453,6 +511,16 @@ export const FilterBar = ({
           </div>
         </Tailwind>
       </Popover>
+      <DeleteModal
+        open={showDeleteWarning}
+        onClose={handleCancelDelete}
+        deleteTitleStr="date range"
+        deleteBodyStrs={[
+          'Removing the date range can significantly reduce performance in large projects.',
+        ]}
+        onDelete={() => Promise.resolve(handleConfirmDelete())}
+        actionWord="Remove"
+      />
     </>
   );
 };

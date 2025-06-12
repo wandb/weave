@@ -18,7 +18,7 @@ interactions:
           - langchain-google-genai/2.1.5-ChatGoogleGenerativeAI:models/gemini-1.5-pro
             gl-python/3.12.9 grpc/1.71.0 gax/2.24.2 gccl/2.1.5-ChatGoogleGenerativeAI:models/gemini-1.5-pro
         x-goog-api-key:
-          - AIzaSyBMFtq5UrvJTtFw20Zjh3Oy1rhKpj-zQ3U
+          - SUPER_FAKE_API-KEY
         x-goog-request-params:
           - model=models/gemini-1.5-pro
       method: POST

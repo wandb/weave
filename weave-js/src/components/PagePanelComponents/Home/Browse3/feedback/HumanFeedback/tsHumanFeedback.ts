@@ -21,9 +21,11 @@ export const parseFeedbackType = (
   // If the field is coming from the flattened table, remove the
   // summary portion
   const field = inputField.startsWith('summary.weave.feedback')
-    ? inputField.replace('summary.weave.feedback.', '')
+    ? inputField.slice('summary.weave.feedback.'.length)
+    : inputField.startsWith('feedback.[wandb.annotation')
+    ? inputField.slice('feedback.'.length)
     : inputField;
-  const deBracketed = field.replace(/\[.*\]/g, '');
+  const deBracketed = field.replace('[', '').replace(']', '');
   const split = deBracketed.split('.');
   if (split.length !== 5) {
     return null;

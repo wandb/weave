@@ -12,9 +12,9 @@ Weave is a toolkit for developing Generative AI applications, built by [Weights 
 
 You can use Weave to:
 
-- Log and debug language model inputs, outputs, and traces
-- Build rigorous, apples-to-apples evaluations for language model use cases
-- Organize all the information generated across the LLM workflow, from experimentation to evaluations to production
+- **Log and debug** language model inputs, outputs, and traces
+- **Build rigorous, apples-to-apples evaluations** for language model use cases
+- **Organize all the information** generated across the LLM workflow, from experimentation to evaluations to production
 
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing Generative AI software, without introducing cognitive overhead.
 
@@ -26,10 +26,32 @@ Our goal is to bring rigor, best-practices, and composability to the inherently 
 
 Our documentation site can be found [here](https://wandb.me/weave).
 
-## Installation
-```
-pip install weave
-```
+## Prerequisites
+
+- Python 3.8 or higher
+- A [Weights & Biases account](https://wandb.ai/signup) (free tier available)
+
+
+## Quick Start
+
+1. **Install Weave**:
+   ```bash
+   pip install weave
+   ```
+
+2. **Import and initialize**:
+   ```python
+   import weave
+   weave.init("my-project-name")
+   ```
+
+3. **Trace your functions**:
+   ```python
+   @weave.op()
+   def my_function():
+       # Your tracked code!
+       pass
+   ```
 
 ## Usage
 
