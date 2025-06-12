@@ -587,27 +587,26 @@ export const CreateMonitorDrawer = ({
                         frozenFilter={undefined}
                         sx={{width: '100%', height: undefined}}
                       />
-                    </Box>
-                    <Box>
-                      <FieldName name="Additional filters" />
                       {selectedOpVersionOption.length > 0 ? (
-                        <FilterPanel
-                          entity={entity}
-                          project={project}
-                          filterModel={filterModel}
-                          setFilterModel={setFilterModel}
-                          columnInfo={columns}
-                          selectedCalls={[]}
-                          clearSelectedCalls={() => {}}
-                        />
+                        <Box className="mt-4">
+                          <FilterPanel
+                            entity={entity}
+                            project={project}
+                            filterModel={filterModel}
+                            setFilterModel={setFilterModel}
+                            columnInfo={columns}
+                            selectedCalls={[]}
+                            clearSelectedCalls={() => {}}
+                          />
+                        </Box>
                       ) : (
                         <Typography
-                          className="mt-1 text-sm font-normal"
+                          className="mt-4 text-sm font-normal"
                           sx={{
                             ...typographyStyle,
                             color: 'text.secondary',
                           }}>
-                          Select an op to add filters.
+                          Select an op to add additional filters.
                         </Typography>
                       )}
                     </Box>
