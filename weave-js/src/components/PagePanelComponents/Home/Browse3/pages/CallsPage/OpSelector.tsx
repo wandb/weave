@@ -63,34 +63,6 @@ export const OpSelector = ({
   );
 
   return (
-    <Autocomplete
-      multiple={multiple}
-      sx={sx}
-      disabled={frozenOpFilter}
-      value={selectedOpVersionOption}
-      onChange={handleChange}
-      getOptionLabel={option => opVersionOptions[option]?.title ?? ''}
-      disableClearable={selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY}
-      groupBy={option => opVersionOptions[option]?.group}
-      options={Object.keys(opVersionOptions)}
-    />
-  );
-};
-
-type AutocompleteProps = {
-  multiple?: boolean;
-  sx?: SxProps;
-  disabled?: boolean;
-  value: string | string[];
-  onChange: (event: any, newValue: string | string[] | null) => void;
-  getOptionLabel?: (option: any) => string;
-  disableClearable?: boolean;
-  groupBy?: (option: any) => string;
-  options: string[];
-};
-
-export const Autocomplete = (props: AutocompleteProps) => {
-  return (
     <div className="flex-none">
       <ListItem
         sx={{
@@ -98,10 +70,18 @@ export const Autocomplete = (props: AutocompleteProps) => {
           width: '320px',
           height: '32px',
           padding: '0px',
-          ...(props.sx as any),
+          ...(sx as any),
         }}>
         <FormControl fullWidth sx={{borderColor: MOON_200, width: '100%'}}>
           <MuiAutocomplete
+            multiple={multiple}
+            disabled={frozenOpFilter}
+            value={selectedOpVersionOption}
+            onChange={handleChange}
+            getOptionLabel={option => opVersionOptions[option]?.title ?? ''}
+            disableClearable={selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY}
+            groupBy={option => opVersionOptions[option]?.group}
+            options={Object.keys(opVersionOptions)}
             PaperComponent={paperProps => <StyledPaper {...paperProps} />}
             ListboxProps={{
               sx: {
@@ -119,7 +99,7 @@ export const Autocomplete = (props: AutocompleteProps) => {
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
-                height: props.multiple ? 'auto' : '32px',
+                height: multiple ? 'auto' : '32px',
                 fontFamily: 'Source Sans Pro',
                 '& fieldset': {
                   borderColor: MOON_200,
@@ -145,7 +125,6 @@ export const Autocomplete = (props: AutocompleteProps) => {
             renderInput={renderParams => <StyledTextField {...renderParams} />}
             popupIcon={<Icon name="chevron-down" width={16} height={16} />}
             clearIcon={<Icon name="close" width={16} height={16} />}
-            {...props}
           />
         </FormControl>
       </ListItem>
