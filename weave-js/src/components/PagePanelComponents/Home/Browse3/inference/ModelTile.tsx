@@ -65,6 +65,10 @@ export const ModelTile = ({
 
   const urlDetails = urlInference(model.provider, model.id);
 
+  const hasPrice =
+    (model.priceCentsPerBillionTokensInput ?? 0) > 0 ||
+    (model.priceCentsPerBillionTokensOutput ?? 0) > 0;
+
   const hasPlayground = !!model.idPlayground && inferenceContext.isLoggedIn;
   const textPlayground =
     selected && selected.selectedWithPlayground.length > 1 && hasPlayground
@@ -127,8 +131,7 @@ export const ModelTile = ({
             content="Model release date"
           />
         )}
-        {(model.priceCentsPerBillionTokensInput ||
-          model.priceCentsPerBillionTokensOutput) && (
+        {hasPrice && (
           <Tooltip
             trigger={
               <div className="flex items-center gap-2">

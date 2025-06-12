@@ -67,6 +67,10 @@ export type Model = {
   // Hugging Face data
   likesHuggingFace?: number;
   downloadsHuggingFace?: number;
+  license?: string;
+
+  parameterCountTotal?: number;
+  parameterCountActive?: number;
 
   // The maximum number of tokens the model can attend to at once
   contextWindow?: number;
@@ -82,10 +86,6 @@ export type Model = {
   supportsFunctionCalling?: boolean;
 
   urlHuggingFace?: string;
-  card: {
-    text: string;
-    data: Record<string, any>;
-  };
 };
 
 export type Models = Model[];
