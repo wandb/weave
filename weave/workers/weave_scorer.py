@@ -422,10 +422,10 @@ KAFKA_CONSUMER_GROUP_ID = "weave-worker-scorer"
 async def process_project_ended_calls(
     project_id: str,
     ended_calls: list[tsi.EndedCallSchemaForInsert],
-) -> list[str]:
+) -> set[str]:
     if len(ended_calls) == 0:
         logger.warning("No ended calls to process, this should not happen")
-        return []
+        return set()
 
     project_id = ended_calls[0].project_id
 
@@ -433,7 +433,7 @@ async def process_project_ended_calls(
 
     call_ids = [ended_call.id for ended_call in ended_calls]
 
-    async def _process_monitor(active_monitor: ActiveMonitor) -> list[str]:
+    async def _process_monitor(active_monitor: ActiveMonitor) -> set[str]:
         monitor = active_monitor["monitor"]
         monitor_internal_ref = active_monitor["internal_ref"]
         wb_user_id = active_monitor["wb_user_id"]
@@ -450,7 +450,7 @@ async def process_project_ended_calls(
             monitor.query,
         )
 
-        sampled_calls: list[Call] = []
+        sampled_scored_call_ids: list[str] = []
 
         with get_trace_server().call_batch():
             scoring_tasks = []
@@ -459,9 +459,8 @@ async def process_project_ended_calls(
                 if random.random() > monitor.sampling_rate:
                     continue
 
-                sampled_calls.append(call)
-
                 for scorer in monitor.scorers:
+                    sampled_scored_call_ids.append(call.id)
                     scoring_tasks.append(
                         apply_scorer(
                             monitor_internal_ref, scorer, call, project_id, wb_user_id
@@ -471,18 +470,18 @@ async def process_project_ended_calls(
             results = await asyncio.gather(*scoring_tasks)
 
         failed_call_ids = [
-            cast(str, call.id)
-            for result, call in zip(results, sampled_calls)
+            call_id
+            for result, call_id in zip(results, sampled_scored_call_ids)
             if isinstance(result, Exception)
         ]
 
-        return failed_call_ids
+        return set(failed_call_ids)
 
     results = await asyncio.gather(
         *[_process_monitor(active_monitor) for active_monitor in active_monitors]
     )
 
-    failed_call_ids = [call_id for call_ids in results for call_id in call_ids]
+    failed_call_ids = {call_id for call_ids in results for call_id in call_ids}
 
     return failed_call_ids
 
