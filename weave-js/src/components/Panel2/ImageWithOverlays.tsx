@@ -66,10 +66,27 @@ const IframeImage = ({src, alt}: IframeImageProps) => {
     const iframeDoc = iframe.contentWindow?.document;
     if (iframeDoc) {
       try {
-        iframeDoc.open();
-        const parsedSrc = new URL(src).toString();
-        iframeDoc.writeln(`<img src="${parsedSrc}" alt="${alt}">`);
-        iframeDoc.close();
+        // iframeDoc.open();
+        const img = iframeDoc.createElement('img');
+        img.src = src;
+        img.alt = alt;
+        iframeDoc.body.appendChild(img);
+        // iframeDoc.close();
+        const styleElement = iframeDoc.createElement('style');
+        styleElement.textContent = `
+          html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+          }
+          img {
+            object-fit: contain;
+            height: 100%;
+          }
+        `;
+        iframeDoc.head.appendChild(styleElement);
       } catch (error) {
         console.error('Error writing to iframe document:', error);
       }
