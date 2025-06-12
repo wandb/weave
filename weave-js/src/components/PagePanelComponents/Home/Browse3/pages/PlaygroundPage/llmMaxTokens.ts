@@ -261,6 +261,81 @@ export const LLM_MAX_TOKENS = {
   },
 
   // Azure models
+  'azure/gpt-4.1': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4.1-2025-04-14': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4.1-mini': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4.1-mini-2025-04-14': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4.1-nano': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4.1-nano-2025-04-14': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/o3': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o3-2025-04-16': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o3-mini': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o3-mini-2025-01-31': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o4-mini': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o4-mini-2025-04-16': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o1-pro': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o1-pro-2025-03-19': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o1-2024-12-17': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
   'azure/o1-mini': {
     provider: 'azure',
     max_tokens: 65536,
@@ -288,7 +363,7 @@ export const LLM_MAX_TOKENS = {
   },
   'azure/gpt-4o': {
     provider: 'azure',
-    max_tokens: 4096,
+    max_tokens: 16384,
     supports_function_calling: true,
   },
   'azure/gpt-4o-2024-08-06': {
