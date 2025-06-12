@@ -173,28 +173,36 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     return rowData;
   }, [data]);
 
-  // Get all evaluation IDs from the current row data
+  // Get all evaluation IDs from the current row data using allRecords
   const getAllEvaluationIds = useCallback(
     (row: RowData): string[] => {
-      const evaluationIds = new Set<string>();
+      const modelGroupName = row.modelGroupName;
       
-      // Iterate through all dataset groups, scorer groups, and metric groups
-      // to collect all evaluation IDs for this model
-      Object.values(row.modelGroup.datasetGroups).forEach(datasetGroup => {
-        Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
-          Object.values(scorerGroup.metricPathGroups).forEach(metricPathGroup => {
-            metricPathGroup.forEach(record => {
-              if (record.sourceEvaluationCallId) {
-                evaluationIds.add(record.sourceEvaluationCallId);
-              }
-            });
-          });
-        });
+      // Split modelGroupName into name and version parts
+      const [modelName, modelVersion] = modelGroupName.includes(':') 
+        ? modelGroupName.split(':')
+        : [modelGroupName, undefined];
+      
+      // Filter records by both modelName and modelVersion
+      const matchingRecords = allRecords.filter(record => {
+        if (!record.sourceEvaluationCallId) return false;
+        
+        // Check if model name matches
+        if (record.modelName !== modelName) return false;
+        
+        // If we have a version in the group name, check if it matches
+        if (modelVersion && record.modelVersion !== modelVersion) return false;
+        
+        return true;
       });
       
-      return Array.from(evaluationIds);
+      return [
+        ...new Set(
+          matchingRecords.map(record => record.sourceEvaluationCallId)
+        ),
+      ];
     },
-    []
+    [allRecords]
   );
 
   // Get all available evaluation IDs from all rows
