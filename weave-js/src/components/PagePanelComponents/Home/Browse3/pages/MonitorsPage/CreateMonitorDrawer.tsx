@@ -24,10 +24,7 @@ import {
   getFilterByRaw,
   useFilterSortby,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableQuery';
-import {
-  Autocomplete,
-  OpSelector,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/OpSelector';
+import {OpSelector} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/OpSelector';
 import {
   FieldName,
   typographyStyle,
@@ -45,6 +42,7 @@ import {
   ObjectVersionKey,
   ObjectVersionSchema,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {Radio} from '@wandb/weave/components';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import * as Switch from '@wandb/weave/components/Switch';
 import {parseRef} from '@wandb/weave/react';
@@ -202,7 +200,15 @@ export const CreateMonitorDrawer = ({
   );
   const [scorerValids, setScorerValids] = useState<boolean[]>([]);
   const [active, setActive] = useState<boolean>(
-    monitor?.val['active'] || false
+    monitor?.val['active'] ?? true
+  );
+  const [validationType, setValidationType] = useState<'none' | 'json' | 'xml'>(() => {
+    if (existingScorers?.some(s => s.val['_type'] === 'ValidJSONScorer')) return 'json';
+    if (existingScorers?.some(s => s.val['_type'] === 'ValidXMLScorer')) return 'xml';
+    return 'none';
+  });
+  const [llmAsJudgeEnabled, setLlmAsJudgeEnabled] = useState<boolean>(
+    existingScorers ? existingScorers.some(s => s.val['_type'] === 'LLMAsAJudgeScorer') : true
   );
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const {sortBy, lowLevelFilter} = useFilterSortby(filter, {items: []}, [
@@ -212,6 +218,58 @@ export const CreateMonitorDrawer = ({
   useEffect(() => {
     setScorerValids(currentValids => currentValids.slice(0, scorers.length));
   }, [scorers.length]);
+
+  useEffect(() => {
+    const newScorers: ObjectVersionSchema[] = [];
+    
+    if (validationType === 'json') {
+      newScorers.push({
+        scheme: 'weave',
+        weaveKind: 'object',
+        entity,
+        project,
+        objectId: '',
+        versionHash: '',
+        path: '',
+        versionIndex: 0,
+        baseObjectClass: 'ValidJSONScorer',
+        createdAtMs: Date.now(),
+        val: {_type: 'ValidJSONScorer'},
+      });
+    } else if (validationType === 'xml') {
+      newScorers.push({
+        scheme: 'weave',
+        weaveKind: 'object',
+        entity,
+        project,
+        objectId: '',
+        versionHash: '',
+        path: '',
+        versionIndex: 0,
+        baseObjectClass: 'ValidXMLScorer',
+        createdAtMs: Date.now(),
+        val: {_type: 'ValidXMLScorer'},
+      });
+    }
+
+    if (llmAsJudgeEnabled) {
+      newScorers.push({
+        scheme: 'weave',
+        weaveKind: 'object',
+        entity,
+        project,
+        objectId: '',
+        versionHash: '',
+        path: '',
+        versionIndex: 0,
+        baseObjectClass: 'LLMAsAJudgeScorer',
+        createdAtMs: Date.now(),
+        val: {_type: 'LLMAsAJudgeScorer'},
+      });
+    }
+
+    setScorers(newScorers);
+  }, [validationType, llmAsJudgeEnabled, entity, project]);
 
   const {result: callsResults, loading: callsLoading} = useCalls({
     entity,
@@ -557,7 +615,7 @@ export const CreateMonitorDrawer = ({
                             onChange={setSamplingRate}
                             min={0}
                             max={100}
-                            step={1}
+                            step={10}
                             hasInput
                             className="w-full"
                           />
@@ -576,42 +634,46 @@ export const CreateMonitorDrawer = ({
                   </Typography>
                   <Box className="flex flex-col gap-16 px-20">
                     <Box>
-                      <FieldName name="Scorers" />
-                      <Autocomplete
-                        multiple
-                        options={Array.from(SCORER_FORMS.keys())}
-                        sx={{width: '100%'}}
-                        value={scorers.map(
-                          scorer => scorer.objectId || scorer.val['_type']
-                        )}
-                        onChange={(
-                          unused,
-                          newScorers: string | string[] | null
-                        ) => {
-                          if (newScorers === null) {
-                            setScorers([]);
-                            return;
-                          }
-                          const newScorerArray = _.isArray(newScorers)
-                            ? (newScorers as string[])
-                            : [newScorers as string];
-                          setScorers(
-                            newScorerArray.map(newScorer => ({
-                              scheme: 'weave',
-                              weaveKind: 'object',
-                              entity,
-                              project,
-                              objectId: '',
-                              versionHash: '',
-                              path: '',
-                              versionIndex: 0,
-                              baseObjectClass: newScorer,
-                              createdAtMs: Date.now(),
-                              val: {_type: newScorer},
-                            }))
-                          );
-                        }}
-                      />
+                      <FieldName name="Format validation" />
+                      <Radio.Root
+                        className="flex items-center gap-16"
+                        aria-label="Validation type selection"
+                        name="validation-type"
+                        onValueChange={(value: 'none' | 'json' | 'xml') => setValidationType(value)}
+                        value={validationType}>
+                        
+                        <label className="flex items-center">
+                          <Radio.Item id="no-validation" value="none">
+                            <Radio.Indicator />
+                          </Radio.Item>
+                          <span className="ml-6 cursor-pointer">No validation</span>
+                        </label>
+                        
+                        <label className="flex items-center">
+                          <Radio.Item id="json-validation" value="json">
+                            <Radio.Indicator />
+                          </Radio.Item>
+                          <span className="ml-6 cursor-pointer">Valid JSON</span>
+                        </label>
+                        
+                        <label className="flex items-center">
+                          <Radio.Item id="xml-validation" value="xml">
+                            <Radio.Indicator />
+                          </Radio.Item>
+                          <span className="ml-6 cursor-pointer">Valid XML</span>
+                        </label>
+                      </Radio.Root>
+                    </Box>
+                    
+                    <Box className="flex items-center mt-8 gap-8">
+                      <Switch.Root
+                        checked={llmAsJudgeEnabled}
+                        onCheckedChange={setLlmAsJudgeEnabled}
+                        size="medium"
+                      >
+                        <Switch.Thumb size="medium" checked={llmAsJudgeEnabled} />
+                      </Switch.Root>
+                      <span className="font-semibold">Enable LLM-as-a-judge scoring</span>
                     </Box>
                   </Box>
                 </Box>
