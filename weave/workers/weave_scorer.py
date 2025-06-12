@@ -450,12 +450,16 @@ async def process_project_ended_calls(
             monitor.query,
         )
 
+        sampled_calls: list[Call] = []
+
         with get_trace_server().call_batch():
             scoring_tasks = []
             for call in calls:
                 # Apply sampling rate
                 if random.random() > monitor.sampling_rate:
                     continue
+
+                sampled_calls.append(call)
 
                 for scorer in monitor.scorers:
                     scoring_tasks.append(
@@ -468,7 +472,7 @@ async def process_project_ended_calls(
 
         failed_call_ids = [
             cast(str, call.id)
-            for result, call in zip(results, calls)
+            for result, call in zip(results, sampled_calls)
             if isinstance(result, Exception)
         ]
 
