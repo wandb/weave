@@ -44,6 +44,7 @@ interface LeaderboardGridProps {
   loading: boolean;
   selectedEvaluations?: string[];
   onSelectedEvaluationsChange?: (evaluations: string[]) => void;
+  allRecords?: LeaderboardValueRecord[];
 }
 
 type RowData = {
@@ -60,6 +61,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   columnOrder,
   selectedEvaluations: controlledSelectedEvaluations,
   onSelectedEvaluationsChange,
+  allRecords = [],
 }) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
@@ -167,35 +169,32 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     return rowData;
   }, [data]);
 
-  // Get all evaluation IDs from the current row data
-  const getAllEvaluationIds = useCallback((row: RowData): string[] => {
-    const evaluationIds: string[] = [];
-    const modelGroup = row.modelGroup;
-
-    Object.values(modelGroup.datasetGroups).forEach(datasetGroup => {
-      Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
-        Object.values(scorerGroup.metricPathGroups).forEach(records => {
-          records.forEach(record => {
-            if (record.sourceEvaluationCallId) {
-              evaluationIds.push(record.sourceEvaluationCallId);
-            }
-          });
-        });
-      });
-    });
-
-    // Return unique IDs
-    return [...new Set(evaluationIds)];
-  }, []);
+  // Get all evaluation IDs from the current row data using allRecords
+  const getAllEvaluationIds = useCallback(
+    (row: RowData): string[] => {
+      const modelName = row.modelGroupName.split(':')[0];
+      return [
+        ...new Set(
+          allRecords
+            .filter(
+              record =>
+                record.modelName === modelName && record.sourceEvaluationCallId
+            )
+            .map(record => record.sourceEvaluationCallId)
+        ),
+      ];
+    },
+    [allRecords]
+  );
 
   // Get all available evaluation IDs from all rows
   const allAvailableEvaluationIds = useMemo(() => {
-    const allIds: string[] = [];
-    rows.forEach(row => {
-      allIds.push(...getAllEvaluationIds(row));
-    });
-    return [...new Set(allIds)];
-  }, [rows, getAllEvaluationIds]);
+    return [
+      ...new Set(
+        allRecords.map(record => record.sourceEvaluationCallId).filter(Boolean)
+      ),
+    ];
+  }, [allRecords]);
 
   const columns: Array<GridColDef<RowData>> = useMemo(
     () => [

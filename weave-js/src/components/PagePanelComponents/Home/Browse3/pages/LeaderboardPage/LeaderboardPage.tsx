@@ -306,7 +306,7 @@ export const LeaderboardPageContentInner: React.FC<
         datasetsWithSelectedEvaluations.set(key, {
           name: record.datasetName,
           version: record.datasetVersion,
-          fullName: `${record.datasetName}:${record.datasetVersion}`
+          fullName: `${record.datasetName}:${record.datasetVersion}`,
         });
       }
     });
@@ -377,7 +377,9 @@ export const LeaderboardPageContentInner: React.FC<
 
                   // For multiple evaluations, filter to only include those for the selected dataset+version
                   // Parse the dataset name and version from the full name
-                  const selectedDataset = availableDatasets.find(d => d.name === datasetFullName);
+                  const selectedDataset = availableDatasets.find(
+                    d => d.name === datasetFullName
+                  );
                   if (!selectedDataset) return;
 
                   const uniqueFilteredEvaluations = [
@@ -389,8 +391,10 @@ export const LeaderboardPageContentInner: React.FC<
                             selectedEvaluations.includes(
                               record.sourceEvaluationCallId
                             ) &&
-                            record.datasetName === selectedDataset.datasetName &&
-                            record.datasetVersion === selectedDataset.datasetVersion
+                            record.datasetName ===
+                              selectedDataset.datasetName &&
+                            record.datasetVersion ===
+                              selectedDataset.datasetVersion
                         )
                         .map(record => record.sourceEvaluationCallId)
                     ),
@@ -447,6 +451,7 @@ export const LeaderboardPageContentInner: React.FC<
             columnOrder={columnOrder}
             selectedEvaluations={selectedEvaluations}
             onSelectedEvaluationsChange={setSelectedEvaluations}
+            allRecords={allRecords}
           />
         </Box>
       </Box>
@@ -542,14 +547,18 @@ export const useIsEditor = (entity: string) => {
   }, [entity, loadingUserInfo, userInfo]);
 };
 
-
 // Dropdown button component for selecting datasets
 const CompareEvaluationsDropdownButton: FC<{
   entity: string;
   project: string;
   selectedEvaluations: string[];
   onDatasetSelect: (datasetId: string) => void;
-  availableDatasets?: Array<{id: string; name: string; datasetName: string; datasetVersion: string}>;
+  availableDatasets?: Array<{
+    id: string;
+    name: string;
+    datasetName: string;
+    datasetVersion: string;
+  }>;
   disabled?: boolean;
   loading?: boolean;
 }> = ({
@@ -620,7 +629,7 @@ const CompareEvaluationsDropdownButton: FC<{
               align="start"
               sideOffset={4}
               className="min-w-[200px]">
-{availableDatasets.length === 0 ? (
+              {availableDatasets.length === 0 ? (
                 <DropdownMenu.Item disabled>
                   <div className="flex items-center gap-2 text-moon-500">
                     <Icon name="info" width={16} height={16} />
@@ -631,11 +640,11 @@ const CompareEvaluationsDropdownButton: FC<{
                 <>
                   {/* Decorative subheader */}
                   <DropdownMenu.Item disabled>
-                    <div className="text-sm text-moon-500 font-medium px-2 py-0.5">
+                    <div className="py-0.5 px-2 text-sm font-medium text-moon-500">
                       Compare evals in:
                     </div>
                   </DropdownMenu.Item>
-                  
+
                   {/* Dataset options */}
                   {availableDatasets.map(dataset => (
                     <DropdownMenu.Item
@@ -647,19 +656,23 @@ const CompareEvaluationsDropdownButton: FC<{
                       <div className="flex items-center gap-2">
                         {(() => {
                           // Construct ref with version if we have it
-                          const refString = dataset.name.startsWith('weave:///') 
-                            ? dataset.name 
+                          const refString = dataset.name.startsWith('weave:///')
+                            ? dataset.name
                             : `weave:///${entity}/${project}/object/${dataset.datasetName}:${dataset.datasetVersion}`;
                           const ref = parseRefMaybe(refString);
                           return ref ? (
-                            <SmallRef objRef={ref} iconOnly={false} noLink={true} />
+                            <SmallRef
+                              objRef={ref}
+                              iconOnly={false}
+                              noLink={true}
+                            />
                           ) : (
                             <span>{dataset.name}</span>
                           );
                         })()}
                       </div>
                     </DropdownMenu.Item>
-                  ))}                  
+                  ))}
                   <DropdownMenu.Separator />
                   {/* Compare all evaluations option */}
                   <DropdownMenu.Item
@@ -669,7 +682,9 @@ const CompareEvaluationsDropdownButton: FC<{
                     }}>
                     <div className="flex items-center gap-2">
                       <Icon name="chart-scatterplot" width={16} height={16} />
-                      <span className="font-semibold ml-6">Compare all evaluations</span>
+                      <span className="ml-6 font-semibold">
+                        Compare all evaluations
+                      </span>
                     </div>
                   </DropdownMenu.Item>
                 </>
