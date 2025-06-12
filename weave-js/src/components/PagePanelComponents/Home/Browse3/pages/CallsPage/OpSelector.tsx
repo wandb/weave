@@ -1,19 +1,12 @@
-import {
-  Autocomplete as MuiAutocomplete,
-  FormControl,
-  ListItem,
-  SxProps,
-} from '@mui/material';
-import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
-import {Icon} from '@wandb/weave/components/Icon';
+import {SxProps} from '@mui/material';
+import {Select} from '@wandb/weave/components/Form/Select';
+import {SelectMultiple} from '@wandb/weave/components/Form/SelectMultiple';
 import {
   ALL_TRACES_OR_CALLS_REF_KEY,
   WFHighLevelCallFilter,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 import {OpVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
-import {StyledPaper} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/StyledAutocomplete';
-import {StyledTextField} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/StyledTextField';
-import React, {useCallback} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
 export const OpSelector = ({
   frozenFilter,
@@ -41,93 +34,99 @@ export const OpSelector = ({
   sx?: SxProps;
 }) => {
   const frozenOpFilter = Object.keys(frozenFilter ?? {}).includes('opVersions');
+
+  const options = useMemo(() => {
+    const groupedOptions = Object.entries(opVersionOptions).reduce((acc, [key, value]) => {
+      const group = value.group;
+      if (!acc[group]) {
+        acc[group] = [];
+      }
+      acc[group].push({
+        value: key,
+        label: value.title,
+      });
+      return acc;
+    }, {} as Record<string, Array<{value: string; label: string}>>);
+
+    return Object.entries(groupedOptions).map(([group, items]) => ({
+      label: group,
+      options: items,
+    }));
+  }, [opVersionOptions]);
+
+  const selectedValue = useMemo(() => {
+    if (multiple) {
+      return Array.isArray(selectedOpVersionOption)
+        ? selectedOpVersionOption.map(opt => ({
+            value: opt,
+            label: opVersionOptions[opt]?.title ?? opt,
+          }))
+        : [];
+    }
+    return selectedOpVersionOption && typeof selectedOpVersionOption === 'string'
+      ? {
+          value: selectedOpVersionOption,
+          label: opVersionOptions[selectedOpVersionOption]?.title ?? selectedOpVersionOption,
+        }
+      : null;
+  }, [multiple, selectedOpVersionOption, opVersionOptions]);
+
   const handleChange = useCallback(
-    (event: any, newValue: string | string[] | null) => {
-      if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
+    (newValue: any) => {
+      if (multiple) {
+        const values = newValue ? newValue.map((item: any) => item.value) : [];
         setFilter({
           ...filter,
-          opVersionRefs: [],
+          opVersionRefs: values,
         });
       } else {
-        setFilter({
-          ...filter,
-          opVersionRefs: newValue
-            ? Array.isArray(newValue)
-              ? newValue
-              : [newValue]
-            : [],
-        });
+        const value = newValue?.value;
+        if (value === ALL_TRACES_OR_CALLS_REF_KEY) {
+          setFilter({
+            ...filter,
+            opVersionRefs: [],
+          });
+        } else {
+          setFilter({
+            ...filter,
+            opVersionRefs: value ? [value] : [],
+          });
+        }
       }
     },
-    [filter, setFilter]
+    [filter, setFilter, multiple]
   );
 
+  const SelectComponent = multiple ? SelectMultiple : Select;
+
+  const containerStyle = useMemo(() => {
+    const baseStyle: React.CSSProperties = {
+      minWidth: '190px',
+      width: '320px',
+    };
+    
+    if (sx && typeof sx === 'object' && 'width' in sx) {
+      baseStyle.width = sx.width as string;
+    }
+    
+    return baseStyle;
+  }, [sx]);
+
   return (
-    <div className="flex-none">
-      <ListItem
-        sx={{
-          minWidth: '190px',
-          width: '320px',
-          height: '32px',
-          padding: '0px',
-          ...(sx as any),
-        }}>
-        <FormControl fullWidth sx={{borderColor: MOON_200, width: '100%'}}>
-          <MuiAutocomplete
-            multiple={multiple}
-            disabled={frozenOpFilter}
-            value={selectedOpVersionOption}
-            onChange={handleChange}
-            getOptionLabel={option => opVersionOptions[option]?.title ?? ''}
-            disableClearable={selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY}
-            groupBy={option => opVersionOptions[option]?.group}
-            options={Object.keys(opVersionOptions)}
-            PaperComponent={paperProps => <StyledPaper {...paperProps} />}
-            ListboxProps={{
-              sx: {
-                fontSize: '14px',
-                fontFamily: 'Source Sans Pro',
-                '& .MuiAutocomplete-option': {
-                  fontSize: '14px',
-                  fontFamily: 'Source Sans Pro',
-                },
-                '& .MuiAutocomplete-groupLabel': {
-                  fontSize: '14px',
-                  fontFamily: 'Source Sans Pro',
-                },
-              },
-            }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                height: multiple ? 'auto' : '32px',
-                fontFamily: 'Source Sans Pro',
-                '& fieldset': {
-                  borderColor: MOON_200,
-                },
-                '&:hover fieldset': {
-                  borderColor: `rgba(${TEAL_300}, 0.48)`,
-                },
-              },
-              '& .MuiOutlinedInput-input': {
-                fontSize: '14px',
-                height: '32px',
-                padding: '0 14px',
-                boxSizing: 'border-box',
-                fontFamily: 'Source Sans Pro',
-              },
-              '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator':
-                {
-                  backgroundColor: 'transparent',
-                  marginBottom: '2px',
-                },
-            }}
-            size="small"
-            renderInput={renderParams => <StyledTextField {...renderParams} />}
-            popupIcon={<Icon name="chevron-down" width={16} height={16} />}
-            clearIcon={<Icon name="close" width={16} height={16} />}
-          />
-        </FormControl>
-      </ListItem>
-    </div>
+      <SelectComponent
+        value={selectedValue}
+        options={options}
+        onChange={handleChange}
+        isDisabled={frozenOpFilter}
+        isClearable={selectedOpVersionOption !== ALL_TRACES_OR_CALLS_REF_KEY}
+        size="small"
+        placeholder="Select operation..."
+        styles={{
+          container: (base: any) => ({
+            ...base,
+            ...containerStyle,
+          }),
+        }}
+      />
   );
 };
