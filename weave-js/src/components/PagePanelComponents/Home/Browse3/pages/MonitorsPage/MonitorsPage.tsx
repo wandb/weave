@@ -236,7 +236,7 @@ const MonitorsPageHeaderExtra: React.FC<{
           variant="ghost"
           onClick={onCreateMonitor}
           tooltip="Create a new monitor">
-          Create monitor
+          New monitor
         </Button>
       </div>
     </Tailwind>

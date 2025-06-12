@@ -6,6 +6,7 @@ import {TargetBlank} from '../../../../../../common/util/links';
 import {Button} from '../../../../../Button';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
+import {MonitorDrawerRouter} from '../MonitorsPage/CreateMonitorDrawer';
 import {EmptyProps} from './Empty';
 import {Link} from './Links';
 
@@ -33,6 +34,30 @@ const NewDatasetButton: React.FC = () => {
         onSaveDataset={handleSaveDataset}
         isCreating={isCreatingDataset}
         data-testid="create-dataset-drawer"
+      />
+    </>
+  );
+};
+
+const NewMonitorButton: React.FC = () => {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const {entity, project} = useParams<{entity: string; project: string}>();
+
+  return (
+    <>
+      <Button
+        variant="primary"
+        icon="add-new"
+        onClick={() => setIsDrawerOpen(true)}
+        data-testid="create-monitor-button">
+        New monitor
+      </Button>
+      <MonitorDrawerRouter
+        entity={entity}
+        project={project}
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        monitor={undefined}
       />
     </>
   );
@@ -253,6 +278,9 @@ export const EMPTY_PROPS_MONITORS: EmptyProps = {
         use monitors within an evaluation pipeline
       </TargetBlank>
       .
+      <Box sx={{mt: 2}}>
+        <NewMonitorButton />
+      </Box>
     </>
   ),
 };
