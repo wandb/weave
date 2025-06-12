@@ -557,9 +557,9 @@ export const CreateMonitorDrawer = ({
                       <Switch.Root
                         checked={active}
                         onCheckedChange={setActive}
-                        size="medium"
+                        size="small"
                       >
-                        <Switch.Thumb size="medium" checked={active} />
+                        <Switch.Thumb size="small" checked={active} />
                       </Switch.Root>
                       <span className="font-semibold">Active monitor</span>
                     </Box>
@@ -672,9 +672,9 @@ export const CreateMonitorDrawer = ({
                       <Switch.Root
                         checked={llmAsJudgeEnabled}
                         onCheckedChange={setLlmAsJudgeEnabled}
-                        size="medium"
+                        size="small"
                       >
-                        <Switch.Thumb size="medium" checked={llmAsJudgeEnabled} />
+                        <Switch.Thumb size="small" checked={llmAsJudgeEnabled} />
                       </Switch.Root>
                       <span className="font-semibold">Enable LLM-as-a-judge scoring</span>
                     </Box>
