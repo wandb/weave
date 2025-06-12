@@ -94,8 +94,8 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
     from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
-    from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
     from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
+    from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
     get_openai_patcher(settings.openai).attempt_patch()
     get_mistral_patcher(settings.mistral).attempt_patch()
@@ -152,8 +152,8 @@ def reset_autopatch() -> None:
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
     from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
-    from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
     from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
+    from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
     get_openai_patcher().undo_patch()
     get_mistral_patcher().undo_patch()

@@ -16,9 +16,6 @@ def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
         assert call.exception is None
 
 
-
-
-
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
@@ -28,10 +25,9 @@ def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
 def test_simple_verdict_pipeline(client: WeaveClient) -> None:
     """Test that a simple Verdict pipeline is traced to Weave."""
     try:
-        import verdict
         from verdict import Pipeline
-        from verdict.schema import Schema
         from verdict.common.judge import JudgeUnit
+        from verdict.schema import Schema
     except ImportError:
         pytest.skip("verdict not available")
 
@@ -50,7 +46,6 @@ def test_simple_verdict_pipeline(client: WeaveClient) -> None:
 
     # Assert that we got some calls
     assert len(calls) > 0
-
 
     # Verify the first call is our pipeline
     pipeline_call = calls[0]

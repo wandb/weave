@@ -1,10 +1,11 @@
-from typing import Any, Optional
-from weave.integrations.patcher import Patcher, NoOpPatcher
-from weave.trace.autopatch import IntegrationSettings
+from typing import Any, Callable, Optional
+
+from weave.integrations.patcher import NoOpPatcher, Patcher
 from weave.integrations.verdict.tracer import VerdictTracer
+from weave.trace.autopatch import IntegrationSettings
 
 
-def get_verdict_module():
+def get_verdict_module() -> Optional[Any]:
     """Get the verdict module if it's available."""
     try:
         import verdict
@@ -15,9 +16,9 @@ def get_verdict_module():
 
 
 class VerdictPatcher(Patcher):
-    def __init__(self):
+    def __init__(self) -> None:
         self._patched = False
-        self._orig_pipeline_init = None
+        self._orig_pipeline_init: Optional[Callable[..., None]] = None
         self._tracer = VerdictTracer()
 
     def attempt_patch(self) -> bool:
@@ -27,13 +28,19 @@ class VerdictPatcher(Patcher):
         if verdict is None:
             return False
 
-        # Patch Pipeline.__init__
+            # Patch Pipeline.__init__
         Pipeline = verdict.core.pipeline.Pipeline
         self._orig_pipeline_init = Pipeline.__init__
         default_tracer = self._tracer
         orig_pipeline_init = self._orig_pipeline_init
 
-        def pipeline_init(self, name="Pipeline", tracer=None):
+        # Defensive check - if we couldn't get the original init, don't patch
+        if orig_pipeline_init is None:
+            return False
+
+        def pipeline_init(
+            self: Any, name: str = "Pipeline", tracer: Optional[Any] = None
+        ) -> None:
             orig_pipeline_init(
                 self, name, tracer if tracer is not None else default_tracer
             )

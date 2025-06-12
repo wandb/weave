@@ -1,23 +1,25 @@
-import time
 import contextvars
-from contextlib import contextmanager, AbstractContextManager
-from typing import Any, Dict, Optional, Iterator
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any, Optional
 
-from verdict.util.tracing import Tracer, Call, TraceContext, current_trace_context
+from verdict.util.tracing import Call, TraceContext, Tracer, current_trace_context
+
 from weave.trace.context import weave_client_context
 
+
 class VerdictTracer(Tracer):
-    """
-    A tracer that logs calls to the Weave tracing backend.
-    """
+    """A tracer that logs calls to the Weave tracing backend."""
+
     def __init__(self) -> None:
-        self._call_map: Dict[tuple[str, str], Any] = {}  # (trace_id, call_id) -> Weave Call
+        self._call_map: dict[tuple[str, str], Any] = {}
 
     @contextmanager
     def start_call(
         self,
         name: str,
-        inputs: Dict[str, Any],
+        inputs: dict[str, Any],
         trace_id: Optional[str] = None,
         parent_id: Optional[str] = None,
     ) -> Iterator[Call]:
