@@ -1,8 +1,8 @@
 import logging
 import os
-from functools import lru_cache
 
 import aiohttp
+from cachetools import TLRUCache, cached
 from gql import Client, gql
 from gql.transport.requests import RequestsHTTPTransport
 
@@ -65,7 +65,7 @@ CONVERT_INT_TO_EXT_PROJECT_ID_PARTS_QUERY = gql(
 )
 
 
-@lru_cache(maxsize=1000)
+@cached(cache=TLRUCache(maxsize=1000, ttu=lambda key, value, now: now + 600))
 def get_external_project_id(project_id: str) -> tuple[str, str]:
     client = get_authenticated_client()
     logger.info(f"Querying Gorilla for external project ID for {project_id} ")
@@ -94,7 +94,7 @@ GET_USERNAME_FROM_USER_ID_QUERY = gql(
 )
 
 
-@lru_cache(maxsize=1000)
+@cached(cache=TLRUCache(maxsize=1000, ttu=lambda key, value, now: now + 600))
 def get_username_from_user_id(user_id: str) -> str:
     client = get_authenticated_client()
 

@@ -1,12 +1,14 @@
 import asyncio
 import logging
 import os
-from collections import OrderedDict, defaultdict
-from datetime import datetime, timedelta
+import random
+from collections import defaultdict
+from datetime import datetime
 from typing import Any, Optional, TypedDict, cast
 
 import ddtrace
 import sentry_sdk
+from cachetools import TLRUCache, cached
 from confluent_kafka import KafkaError, Message
 from tenacity import (
     RetryError,
@@ -74,49 +76,11 @@ def get_trace_server() -> ClickHouseTraceServer:
     return _TRACE_SERVER
 
 
+# Encapsulates a few data that are received from the server and need to be passed around
 class ActiveMonitor(TypedDict):
-    """Type definition for the output of get_active_monitors."""
-
     monitor: Monitor
     internal_ref: InternalObjectRef
     wb_user_id: Optional[str]
-
-
-class MonitorsCache:
-    """Cache for active monitors."""
-
-    _cache: OrderedDict[str, tuple[datetime, list[ActiveMonitor]]] = OrderedDict()
-    _ttl_seconds = 60
-    _capacity = 100
-
-    @classmethod
-    def get(cls, project_id: str) -> Optional[list[ActiveMonitor]]:
-        if (cached_value := cls._cache.get(project_id)) is not None:
-            if cached_value[0] > datetime.now() - timedelta(seconds=cls._ttl_seconds):
-                cls._cache.move_to_end(project_id)
-                return cached_value[1]
-            else:
-                del cls._cache[project_id]
-
-        return None
-
-    @classmethod
-    def set(cls, project_id: str, monitors: list[ActiveMonitor]) -> None:
-        cls._cache[project_id] = (datetime.now(), monitors)
-        if len(cls._cache) > cls._capacity:
-            cls._cache.popitem(last=False)
-
-
-def get_active_monitors(project_id: str) -> list[ActiveMonitor]:
-    """Returns cached active monitors for a given project."""
-    if (cached_monitors := MonitorsCache.get(project_id)) is not None:
-        return cached_monitors
-
-    monitors = fetch_active_monitors(project_id)
-
-    MonitorsCache.set(project_id, monitors)
-
-    return monitors
 
 
 def _make_active_monitor(project_id: str, obj: tsi.ObjSchema) -> ActiveMonitor:
@@ -137,6 +101,7 @@ def _make_active_monitor(project_id: str, obj: tsi.ObjSchema) -> ActiveMonitor:
     )
 
 
+@cached(cache=TLRUCache(maxsize=1000, ttu=lambda key, value, now: now + 60))
 def fetch_active_monitors(project_id: str) -> list[ActiveMonitor]:
     """Returns active monitors for a given project."""
     obj_query = tsi.ObjQueryReq(
@@ -459,7 +424,7 @@ async def process_project_ended_calls(
 
     project_id = ended_calls[0].project_id
 
-    active_monitors = get_active_monitors(project_id)
+    active_monitors = fetch_active_monitors(project_id)
 
     call_ids = [ended_call.id for ended_call in ended_calls]
 
@@ -481,15 +446,20 @@ async def process_project_ended_calls(
         )
 
         with get_trace_server().call_batch():
-            results = await asyncio.gather(
-                *[
-                    apply_scorer(
-                        monitor_internal_ref, scorer, call, project_id, wb_user_id
+            scoring_tasks = []
+            for call in calls:
+                # Apply sampling rate
+                if random.random() > monitor.sampling_rate:
+                    continue
+
+                for scorer in monitor.scorers:
+                    scoring_tasks.append(
+                        apply_scorer(
+                            monitor_internal_ref, scorer, call, project_id, wb_user_id
+                        )
                     )
-                    for scorer in monitor.scorers
-                    for call in calls
-                ]
-            )
+
+            results = await asyncio.gather(*scoring_tasks)
 
         failed_call_ids = [
             cast(str, call.id)
