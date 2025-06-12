@@ -184,12 +184,6 @@ def resolve_scorer_refs(scorer_ref_uris: list[str], project_id: str) -> list[Sco
                     0
                 ]
                 scorer_dict[k] = from_json(ref_dict, project_id, server)
-                # scorer_dict[k] = make_trace_obj(
-                #    from_json(ref_dict, project_id, server),
-                #    None,
-                #    server,
-                #    None,
-                # )
 
         scorer = maybe_objectify(
             make_trace_obj(

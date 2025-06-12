@@ -38,6 +38,7 @@ def get_authenticated_client(impersonate_as: str | None = None) -> Client:
 
     headers = {
         "Authorization": f"{INTERNAL_SERVICE_TOKEN_PREFIX} {internal_service_token}",
+        # "X-Wandb-Force-Trace": "true",
     }
     if impersonate_as:
         headers["impersonated-username"] = impersonate_as
@@ -144,7 +145,11 @@ def get_permissions() -> None:
         }
     """
         ),
-        {"projectName": "monitor-test", "entityName": "weave-team"},
+        {"projectName": "monitor-test", "entityName": "wandb"},
+        # {
+        #    "projectName": "performance-tests",
+        #    "entityName": "artifacts-sdk-tests",
+        # },
     )
     print(payload)
 
@@ -162,6 +167,8 @@ def ext_to_int_project_id():
     """
         ),
         {"entityName": "wandb", "projectName": "monitor-test"},
+        # {"entityName": "weave-team", "projectName": "monitor-test"},
+        # {"entityName": "artifacts-sdk-tests", "projectName": "performance-tests"},
     )
     print(payload)
 
@@ -182,9 +189,9 @@ if __name__ == "__main__":
     )
     # result = asyncio.run(get_completion(req, "VXNlcjoyMzU4MjI0"))
     # print(result)
-    # logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
     # print(get_permissions())
-    # print(ext_to_int_project_id())
+    print(ext_to_int_project_id())
     # print(get_username_from_user_id("VXNlcjo5Njc="))
     # print(get_username_from_user_id("VXNlcjo2Mzg4Nw=="))
     # print(get_username_from_user_id("VXNlcjoyMzU4MjI0"))

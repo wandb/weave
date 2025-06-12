@@ -81,9 +81,11 @@ export const LLMAsAJudgeScorerForm = ({
         ...scorer,
         versionHash,
         objectId: scorerName || 'LLMAsAJudgeScorer',
+        baseObjectClass: 'LLMAsAJudgeScorer',
         val: {
           ...scorer?.val,
           _type: 'LLMAsAJudgeScorer',
+          _class_name: 'LLMAsAJudgeScorer',
           name: scorerName,
           model: judgeModelRef,
           scoring_prompt: scoringPrompt,
