@@ -157,7 +157,7 @@ export const ExplorerLoaded = ({
             {value: 'All'},
             {value: 'Text'},
             {value: 'Vision'},
-            {value: 'Embedding'},
+            // {value: 'Embedding'},
           ]}
           value={filterModality}
           size="small"
