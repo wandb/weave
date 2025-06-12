@@ -1,4 +1,3 @@
-import {SxProps} from '@mui/material';
 import {Select} from '@wandb/weave/components/Form/Select';
 import {SelectMultiple} from '@wandb/weave/components/Form/SelectMultiple';
 import {
@@ -15,7 +14,8 @@ export const OpSelector = ({
   selectedOpVersionOption,
   opVersionOptions,
   multiple = false,
-  sx,
+  useMenuPortalBody = false,
+  width,
 }: {
   frozenFilter: WFHighLevelCallFilter | undefined;
   filter: WFHighLevelCallFilter;
@@ -31,7 +31,8 @@ export const OpSelector = ({
     }
   >;
   multiple?: boolean;
-  sx?: SxProps;
+  useMenuPortalBody?: boolean;
+  width?: string;
 }) => {
   const frozenOpFilter = Object.keys(frozenFilter ?? {}).includes('opVersions');
 
@@ -99,34 +100,38 @@ export const OpSelector = ({
 
   const SelectComponent = multiple ? SelectMultiple : Select;
 
-  const containerStyle = useMemo(() => {
-    const baseStyle: React.CSSProperties = {
-      minWidth: '190px',
-      width: '320px',
-    };
-    
-    if (sx && typeof sx === 'object' && 'width' in sx) {
-      baseStyle.width = sx.width as string;
-    }
-    
-    return baseStyle;
-  }, [sx]);
+  const containerStyle: React.CSSProperties = {
+    minWidth: '190px',
+  };
+
+  const wrapperStyle: React.CSSProperties = width ? { width } : { width: '100%' };
 
   return (
+    <div style={wrapperStyle}>
       <SelectComponent
         value={selectedValue}
         options={options}
         onChange={handleChange}
         isDisabled={frozenOpFilter}
         isClearable={selectedOpVersionOption !== ALL_TRACES_OR_CALLS_REF_KEY}
-        size="small"
+        size={multiple ? "small" : "medium"}
         placeholder="Select operation..."
+        menuPortalTarget={useMenuPortalBody ? document.body : undefined}
         styles={{
           container: (base: any) => ({
             ...base,
             ...containerStyle,
           }),
+          menu: (base: any) => ({
+            ...base,
+            zIndex: 9999,
+          }),
+          menuPortal: (base: any) => ({
+            ...base,
+            zIndex: 9999,
+          }),
         }}
       />
+    </div>
   );
 };
