@@ -1,18 +1,27 @@
+// Flattened type is a type that has all non-object keys and flattened object values.
+export type Flattened<T> = {
+  [K in keyof T as T[K] extends Record<string, any> | null | undefined
+    ? never
+    : K]: T[K];
+} & {
+  [key: string]: unknown;
+};
+
 /**
  * Flatten an object, but preserve any object that has a `_type` field.
  * This is critical for handling "Weave Types" - payloads that should be
  * treated as holistic objects, rather than flattened.
  */
-export const flattenObjectPreservingWeaveTypes = (obj: {
+export const flattenObjectPreservingWeaveTypes = <T>(obj: {
   [key: string]: any;
-}) => {
+}): Flattened<T> => {
   return flattenObject(obj, '', {}, (key, value) => {
     return (
       typeof value !== 'object' ||
       value == null ||
       value._type !== 'CustomWeaveType'
     );
-  });
+  }) as Flattened<T>;
 };
 
 const flattenObject = (
