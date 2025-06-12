@@ -78,7 +78,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const contextValue = useMemo(() => {
     if (isPeeking && isEditor) {
       return {
-        ...simplePageLayoutContext,
+        ...(simplePageLayoutContext ?? {}),
         headerSuffix: (
           <>
             <Box
@@ -95,12 +95,12 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
                 isPeeking={isPeeking}
               />
             </Box>
-            {simplePageLayoutContext.headerSuffix}
+            {simplePageLayoutContext?.headerSuffix}
           </>
         ),
       };
     }
-    return simplePageLayoutContext;
+    return simplePageLayoutContext ?? {};
   }, [
     isPeeking,
     isEditor,
