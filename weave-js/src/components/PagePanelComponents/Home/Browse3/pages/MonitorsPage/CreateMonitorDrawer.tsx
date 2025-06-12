@@ -46,7 +46,6 @@ import {
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRef} from '@wandb/weave/react';
-import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {toast} from 'react-toastify';
 
