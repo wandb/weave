@@ -19,6 +19,77 @@ import * as Controls from './controlsImage';
 import {ClassSetControls, ClassSetState, ClassState} from './controlsImage';
 import {useSignedUrlWithExpiration} from './useAssetFromArtifact';
 
+interface IframeImageProps {
+  src: string;
+  alt: string;
+}
+
+/**
+ * This is the only way to render an image in a way that complelely ignores the filter applied
+ * for night mode. CSS properties like filter are applied to the pixels within the document before
+ * things like Shadow DOM so we can't use that here.
+ */
+const IframeImage = ({src, alt}: IframeImageProps) => {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+
+    if (!iframe) {
+      return;
+    }
+
+    const injectStyles = () => {
+      const iframeDoc = iframe.contentWindow?.document;
+      if (iframeDoc) {
+        // Creates a style element for the iframe's head
+        const styleElement = iframeDoc.createElement('style');
+        styleElement.textContent = `
+          html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+          }
+          img {
+            object-fit: contain;
+            height: 100%;
+          }
+        `;
+        iframeDoc.head.appendChild(styleElement);
+      }
+    };
+
+    iframe.addEventListener('load', injectStyles);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.writeln(`<img src="${src}" alt="${alt}">`);
+      iframeDoc.close();
+    }
+
+    // Cleanup function: remove the event listener when the component unmounts or deps change
+    return () => {
+      iframe.removeEventListener('load', injectStyles);
+    };
+  }, [src, alt]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      style={{
+        width: '100%',
+        height: '100%',
+        border: 'none',
+        display: 'block',
+      }}
+      title={alt}
+      sandbox="allow-scripts allow-same-origin"></iframe>
+  );
+};
+
 // Copied from media.tsx, for some reason importing media.tsx
 // doesn't work with storybook, at least at the moment I'm doing
 // this on the plane with no wifi (and therefore no ability to
@@ -101,7 +172,8 @@ export const CardImage: FC<CardImageProps> = ({
                   position: 'relative',
                   height: image.caption ? '80%' : '100%',
                 }}>
-                <img style={imageStyle} alt={image.path} src={signedUrl} />
+                <IframeImage alt={image.path} src={signedUrl} />
+                {/* <img style={imageStyle} alt={image.path} src={signedUrl} /> */}
                 {masks != null &&
                   maskControls?.map((maskControl, i) => {
                     const mask = masks[i];
