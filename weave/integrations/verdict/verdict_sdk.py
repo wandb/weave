@@ -3,13 +3,13 @@ import importlib
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context import weave_client_context
 
-_verdict_patcher: MultiPatcher | None = None
+_verdict_patcher: Union[MultiPatcher, None] = None
 
 
 def get_verdict_module() -> Optional[Any]:
@@ -121,7 +121,7 @@ def create_pipeline_init_wrapper(
 
 def get_verdict_patcher(
     settings: Optional[IntegrationSettings] = None,
-) -> MultiPatcher | NoOpPatcher:
+) -> Union[MultiPatcher, NoOpPatcher]:
     if settings is None:
         settings = IntegrationSettings()
 
