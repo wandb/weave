@@ -7,7 +7,6 @@ import {Icon} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRefMaybe} from '@wandb/weave/react';
-import {SmallRef} from '../../smallRef/SmallRef';
 import _ from 'lodash';
 import React, {
   FC,
@@ -23,6 +22,7 @@ import styled from 'styled-components';
 
 import {useWeaveflowRouteContext, WeaveflowPeekContext} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
+import {SmallRef} from '../../smallRef/SmallRef';
 import {
   LeaderboardColumnOrderType,
   LeaderboardGrid,
@@ -298,13 +298,6 @@ export const LeaderboardPageContentInner: React.FC<
         selectedEvaluations.includes(record.sourceEvaluationCallId)
     );
 
-    // Debug: Log what we have in records
-    console.log('Filtered records for availableDatasets:', filteredRecords);
-    if (filteredRecords.length > 0) {
-      console.log('First record properties:', Object.keys(filteredRecords[0]));
-      console.log('First record:', filteredRecords[0]);
-    }
-
     // Get unique dataset name+version combinations from selected evaluations
     const datasetsWithSelectedEvaluations = new Map();
     filteredRecords.forEach(record => {
@@ -317,8 +310,6 @@ export const LeaderboardPageContentInner: React.FC<
         });
       }
     });
-
-    console.log('Unique datasets with versions:', Array.from(datasetsWithSelectedEvaluations.values()));
 
     // Convert to array and sort for consistent ordering
     return Array.from(datasetsWithSelectedEvaluations.values())
@@ -357,7 +348,20 @@ export const LeaderboardPageContentInner: React.FC<
                 entity={props.entity}
                 project={props.project}
                 selectedEvaluations={selectedEvaluations}
-                onDatasetSelect={datasetId => {
+                onDatasetSelect={datasetFullName => {
+                  // Handle "Compare all evaluations" option
+                  if (datasetFullName === '__all__') {
+                    history.push(
+                      peekingRouter.compareEvaluationsUri(
+                        props.entity,
+                        props.project,
+                        selectedEvaluations,
+                        null
+                      )
+                    );
+                    return;
+                  }
+
                   // For single evaluation, we can skip the complex filtering and just use the selected evaluation
                   if (selectedEvaluations.length === 1) {
                     history.push(
@@ -371,7 +375,11 @@ export const LeaderboardPageContentInner: React.FC<
                     return;
                   }
 
-                  // For multiple evaluations, filter to only include those for the selected dataset
+                  // For multiple evaluations, filter to only include those for the selected dataset+version
+                  // Parse the dataset name and version from the full name
+                  const selectedDataset = availableDatasets.find(d => d.name === datasetFullName);
+                  if (!selectedDataset) return;
+
                   const uniqueFilteredEvaluations = [
                     ...new Set(
                       allRecords
@@ -381,7 +389,8 @@ export const LeaderboardPageContentInner: React.FC<
                             selectedEvaluations.includes(
                               record.sourceEvaluationCallId
                             ) &&
-                            record.datasetName === datasetId
+                            record.datasetName === selectedDataset.datasetName &&
+                            record.datasetVersion === selectedDataset.datasetVersion
                         )
                         .map(record => record.sourceEvaluationCallId)
                     ),
@@ -540,7 +549,7 @@ const CompareEvaluationsDropdownButton: FC<{
   project: string;
   selectedEvaluations: string[];
   onDatasetSelect: (datasetId: string) => void;
-  availableDatasets?: Array<{id: string; name: string}>;
+  availableDatasets?: Array<{id: string; name: string; datasetName: string; datasetVersion: string}>;
   disabled?: boolean;
   loading?: boolean;
 }> = ({
@@ -559,7 +568,7 @@ const CompareEvaluationsDropdownButton: FC<{
   // For single evaluation, directly navigate to first available dataset
   const handleSingleEvaluationClick = () => {
     if (availableDatasets.length > 0) {
-      onDatasetSelect(availableDatasets[0].id);
+      onDatasetSelect(availableDatasets[0].name);
     }
   };
 
@@ -611,7 +620,7 @@ const CompareEvaluationsDropdownButton: FC<{
               align="start"
               sideOffset={4}
               className="min-w-[200px]">
-              {availableDatasets.length === 0 ? (
+{availableDatasets.length === 0 ? (
                 <DropdownMenu.Item disabled>
                   <div className="flex items-center gap-2 text-moon-500">
                     <Icon name="info" width={16} height={16} />
@@ -619,32 +628,51 @@ const CompareEvaluationsDropdownButton: FC<{
                   </div>
                 </DropdownMenu.Item>
               ) : (
-                availableDatasets.map(dataset => (
+                <>
+                  {/* Decorative subheader */}
+                  <DropdownMenu.Item disabled>
+                    <div className="text-sm text-moon-500 font-medium px-2 py-0.5">
+                      Compare evals in:
+                    </div>
+                  </DropdownMenu.Item>
+                  
+                  {/* Dataset options */}
+                  {availableDatasets.map(dataset => (
+                    <DropdownMenu.Item
+                      key={dataset.name}
+                      onClick={() => {
+                        onDatasetSelect(dataset.name);
+                        setIsOpen(false);
+                      }}>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          // Construct ref with version if we have it
+                          const refString = dataset.name.startsWith('weave:///') 
+                            ? dataset.name 
+                            : `weave:///${entity}/${project}/object/${dataset.datasetName}:${dataset.datasetVersion}`;
+                          const ref = parseRefMaybe(refString);
+                          return ref ? (
+                            <SmallRef objRef={ref} iconOnly={false} noLink={true} />
+                          ) : (
+                            <span>{dataset.name}</span>
+                          );
+                        })()}
+                      </div>
+                    </DropdownMenu.Item>
+                  ))}                  
+                  <DropdownMenu.Separator />
+                  {/* Compare all evaluations option */}
                   <DropdownMenu.Item
-                    key={dataset.id}
                     onClick={() => {
-                      onDatasetSelect(dataset.id);
+                      onDatasetSelect('__all__');
                       setIsOpen(false);
                     }}>
                     <div className="flex items-center gap-2">
-                      {(() => {
-                        // Construct ref with version if we have it
-                        const refString = dataset.name.startsWith('weave:///') 
-                          ? dataset.name 
-                          : `weave:///${entity}/${project}/object/${dataset.datasetName}:${dataset.datasetVersion}`;
-                        console.log('Trying to parse ref with version:', refString);
-                        console.log('Dataset object:', dataset);
-                        const ref = parseRefMaybe(refString);
-                        console.log('Parsed ref result:', ref);
-                        return ref ? (
-                          <SmallRef objRef={ref} iconOnly={false} noLink={true} />
-                        ) : (
-                          <span>{dataset.name}</span>
-                        );
-                      })()}
+                      <Icon name="chart-scatterplot" width={16} height={16} />
+                      <span className="font-semibold ml-6">Compare all evaluations</span>
                     </div>
                   </DropdownMenu.Item>
-                ))
+                </>
               )}
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
