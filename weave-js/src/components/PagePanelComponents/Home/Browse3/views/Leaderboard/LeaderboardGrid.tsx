@@ -177,25 +177,25 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   const getAllEvaluationIds = useCallback(
     (row: RowData): string[] => {
       const modelGroupName = row.modelGroupName;
-      
+
       // Split modelGroupName into name and version parts
-      const [modelName, modelVersion] = modelGroupName.includes(':') 
+      const [modelName, modelVersion] = modelGroupName.includes(':')
         ? modelGroupName.split(':')
         : [modelGroupName, undefined];
-      
+
       // Filter records by both modelName and modelVersion
       const matchingRecords = allRecords.filter(record => {
         if (!record.sourceEvaluationCallId) return false;
-        
+
         // Check if model name matches
         if (record.modelName !== modelName) return false;
-        
+
         // If we have a version in the group name, check if it matches
         if (modelVersion && record.modelVersion !== modelVersion) return false;
-        
+
         return true;
       });
-      
+
       return [
         ...new Set(
           matchingRecords.map(record => record.sourceEvaluationCallId)
