@@ -150,10 +150,10 @@ def get_permissions() -> None:
         }
     """
         ),
-        {"projectName": "monitor-test", "entityName": "wandb"},
+        {"projectName": "monitor-test", "entityName": "weave-team"},
         # {
-        #    "projectName": "performance-tests",
-        #    "entityName": "artifacts-sdk-tests",
+        #     "projectName": "performance-tests",
+        #     "entityName": "artifacts-sdk-tests",
         # },
     )
     print(payload)
@@ -171,8 +171,8 @@ def ext_to_int_project_id() -> None:
         }
     """
         ),
-        {"entityName": "wandb", "projectName": "monitor-test"},
-        # {"entityName": "weave-team", "projectName": "monitor-test"},
+        # {"entityName": "wandb", "projectName": "monitor-test"},
+        {"entityName": "weave-team", "projectName": "monitor-test"},
         # {"entityName": "artifacts-sdk-tests", "projectName": "performance-tests"},
     )
     print(payload)
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     # result = asyncio.run(get_completion(req, "VXNlcjoyMzU4MjI0"))
     # print(result)
     logging.basicConfig(level=logging.DEBUG)
-    # print(get_permissions())
+    print(get_permissions())
     # print(ext_to_int_project_id())
     # print(get_username_from_user_id("VXNlcjo5Njc="))
     # print(get_username_from_user_id("VXNlcjo2Mzg4Nw=="))

@@ -19,11 +19,10 @@ from weave.trace_server.refs_internal import InternalCallRef, InternalObjectRef
 from weave.trace_server.trace_server_interface import ObjQueryRes, ObjSchema
 from weave.workers.weave_scorer import (
     ActiveMonitor,
-    MonitorsCache,
     _do_score_call,
     _make_active_monitor,
     apply_scorer,
-    get_active_monitors,
+    fetch_active_monitors,
     process_project_ended_calls,
 )
 
@@ -90,7 +89,7 @@ def mock_monitor_object_res():
     )
 
 
-def test_get_active_monitors(
+def test_fetch_active_monitors(
     mock_get_trace_server: MagicMock, mock_monitor_object_res: ObjQueryRes
 ):
     # Setup
@@ -105,7 +104,7 @@ def test_get_active_monitors(
         return_value=[Mock(spec=Scorer)],
     ):
         # Call the function
-        result = get_active_monitors(project_id)
+        result = fetch_active_monitors(project_id)
 
         # Verify the trace server was called correctly
         mock_get_trace_server.return_value.objs_query.assert_called_once_with(
@@ -141,12 +140,9 @@ def test_get_active_monitors(
         # Check user ID
         assert user_id == "user1"
 
-        # Check cache is populated
-        assert MonitorsCache.get(project_id) is not None
-
         # Check cache is not hit after reset
         mock_get_trace_server.objs_query.reset_mock()
-        get_active_monitors(project_id)
+        fetch_active_monitors(project_id)
         mock_get_trace_server.objs_query.assert_not_called()
 
 
@@ -162,7 +158,7 @@ def mock_resolve_scorer_refs():
 
 
 @pytest.fixture
-def mock_get_active_monitors(
+def mock_fetch_active_monitors(
     mock_monitor_object_res: ObjQueryRes, mock_resolve_scorer_refs
 ):
     active_monitors = [
@@ -170,7 +166,7 @@ def mock_get_active_monitors(
         for obj in mock_monitor_object_res.objs
     ]
     with patch(
-        "weave.workers.weave_scorer.get_active_monitors", return_value=active_monitors
+        "weave.workers.weave_scorer.fetch_active_monitors", return_value=active_monitors
     ) as mock:
         yield mock
 
@@ -190,11 +186,11 @@ def mock_get_filtered_calls():
 
 @pytest.mark.asyncio
 async def test_process_project_ended_calls_general_case(
-    mock_get_active_monitors: MagicMock,
+    mock_fetch_active_monitors: MagicMock,
     mock_get_trace_server: MagicMock,
     mock_get_filtered_calls: MagicMock,
 ):
-    active_monitors: list[ActiveMonitor] = mock_get_active_monitors.return_value
+    active_monitors: list[ActiveMonitor] = mock_fetch_active_monitors.return_value
 
     project_id = active_monitors[0]["internal_ref"].project_id
 
@@ -209,11 +205,12 @@ async def test_process_project_ended_calls_general_case(
     ended_calls = [mock_ended_call1, mock_ended_call2]
     call_ids = ["call_id_1", "call_id_2"]
 
-    with patch("weave.workers.weave_scorer.apply_scorer", return_value=None):
-        with patch("weave.workers.weave_scorer.apply_scorer") as mock_apply_scorer:
-            await process_project_ended_calls(project_id, ended_calls)
+    with patch(
+        "weave.workers.weave_scorer.apply_scorer", return_value=None
+    ) as mock_apply_scorer:
+        await process_project_ended_calls(project_id, ended_calls)
 
-    mock_get_active_monitors.assert_called_once_with(project_id)
+    mock_fetch_active_monitors.assert_called_once_with(project_id)
 
     mock_get_filtered_calls.assert_has_calls(
         [
@@ -250,7 +247,7 @@ async def test_process_project_ended_calls_general_case(
 
 @pytest.mark.asyncio
 async def test_apply_scorer(
-    mock_get_trace_server: MagicMock, mock_get_active_monitors: MagicMock
+    mock_get_trace_server: MagicMock, mock_fetch_active_monitors: MagicMock
 ):
     mock_scorer = Mock(spec=Scorer)
     mock_scorer.name = "TestScorer"
@@ -267,14 +264,16 @@ async def test_apply_scorer(
         return_value=("score_call_id", "result"),
     ) as mock_do_score_call:
         await apply_scorer(
-            mock_get_active_monitors.return_value[0]["internal_ref"],
+            mock_fetch_active_monitors.return_value[0]["internal_ref"],
             mock_scorer,
             mock_call,
             project_id,
             wb_user_id,
         )
 
-    mock_do_score_call.assert_called_once_with(mock_scorer, mock_call, project_id)
+    mock_do_score_call.assert_called_once_with(
+        mock_scorer, mock_call, project_id, wb_user_id
+    )
 
     mock_get_trace_server.return_value.feedback_create.assert_called_once_with(
         FeedbackCreateReq(
@@ -285,12 +284,15 @@ async def test_apply_scorer(
             runnable_ref=mock_scorer.__dict__["internal_ref"].uri(),
             call_ref=InternalCallRef(project_id=project_id, id="score_call_id").uri(),
             wb_user_id=wb_user_id,
-            trigger_ref=mock_get_active_monitors.return_value[0]["internal_ref"].uri(),
+            trigger_ref=mock_fetch_active_monitors.return_value[0][
+                "internal_ref"
+            ].uri(),
         )
     )
 
 
-def test_do_score_call(mock_get_trace_server: MagicMock):
+@pytest.mark.asyncio
+async def test_do_score_call(mock_get_trace_server: MagicMock):
     scorer = ValidJSONScorer()
     mock_call = Mock(spec=Call)
     mock_call.output = json.dumps({"foo": "bar"})
@@ -303,7 +305,9 @@ def test_do_score_call(mock_get_trace_server: MagicMock):
     )
 
     with freezegun.freeze_time("2025-03-06"):
-        call_start_id, result = _do_score_call(scorer, mock_call, project_id)
+        call_start_id, result = await _do_score_call(
+            scorer, mock_call, project_id, "wb_user_id"
+        )
 
         assert call_start_id == "score_call_id"
         assert result == {"json_valid": True}
