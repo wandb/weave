@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
 
+MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{9}>", re.ASCII)
+
 CODE_DEP_ERROR_SENTINEL = "<error>"
 
 
@@ -466,9 +468,6 @@ def _get_code_deps(
                     )
                     code.append(code_paragraph)
     return {"import_code": import_code, "code": code, "warnings": warnings}
-
-
-MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{9}>")
 
 
 def _has_memory_address(obj: Any) -> bool:
