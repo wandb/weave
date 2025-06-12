@@ -187,6 +187,7 @@ export const getDefaultInferenceContext = (): InferenceContextType => {
   return {
     isLoggedIn: false,
     isInferenceEnabled: false,
+    availabilityMessage: '',
     playgroundEntity: '',
     playgroundProject: '',
     projectExists: false,
