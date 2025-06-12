@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Optional
 
 import aiohttp
 from cachetools import TLRUCache, cached
@@ -28,7 +29,7 @@ def get_internal_service_token() -> str:
 INTERNAL_SERVICE_TOKEN_PREFIX = "X-Wandb-Internal-Service"
 
 
-def get_authenticated_client(impersonate_as: str | None = None) -> Client:
+def get_authenticated_client(impersonate_as: Optional[str] = None) -> Client:
     try:
         wandb_base_url = os.environ["WANDB_BASE_URL"]
     except KeyError:
