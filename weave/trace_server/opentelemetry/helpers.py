@@ -203,7 +203,7 @@ def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def flatten_attributes(
-    data: dict[str, Any], json_attributes: list[str] = []
+    data: dict[str, Any], json_attributes: list[str] | None = None
 ) -> dict[str, Any]:
     """
     Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
@@ -215,6 +215,9 @@ def flatten_attributes(
     Returns:
         A flattened dictionary with dot-separated keys
     """
+    if json_attributes is None:
+        json_attributes = []
+
     result: dict[str, Any] = {}
 
     def _flatten(obj: Union[dict[str, Any], list[Any]], prefix: str = "") -> None:
@@ -341,9 +344,7 @@ def try_convert_numeric_keys_to_list(value: Any) -> Any:
     return value
 
 
-def capture_parts(
-    s: str, delimiters: list[str] = [",", ";", "|", " ", "/", "?", "."]
-) -> list[str]:
+def capture_parts(s: str, delimiters: list[str] | None = None) -> list[str]:
     """Split a string on multiple delimiters while preserving the delimiters in the result.
 
     This function splits a string using the specified delimiters and includes those
@@ -361,6 +362,9 @@ def capture_parts(
         >>> capture_parts("hello/world.txt")
         ['hello', '/', 'world', '.', 'txt']
     """
+    if delimiters is None:
+        delimiters = [",", ";", "|", " ", "/", "?", "."]
+
     # Escape special regex characters and join with | for regex alternation
     capture = "|".join(map(re.escape, delimiters))
     pattern = f"({(capture)})"
