@@ -15,10 +15,7 @@ import {
   OnUpdateFilter,
 } from '../../../filters/CellFilterWrapper';
 import {isWeaveRef} from '../../../filters/common';
-import {
-  Flattened,
-  flattenObjectPreservingWeaveTypes,
-} from '../../../flattenObject';
+import {flattenObjectPreservingWeaveTypes} from '../../../flattenObject';
 import {NotApplicable} from '../../../NotApplicable';
 import {SmallRef} from '../../../smallRef/SmallRef';
 import {isCustomWeaveTypePayload} from '../../../typeViews/customWeaveType.types';
@@ -65,7 +62,7 @@ import {ExpandHeader} from './ExpandHeader';
  */
 export function prepareFlattenedDataForTable<T>(
   data: T[]
-): Array<Flattened<T>> {
+): Array<T & {[key: string]: string}> {
   return data.map(r => {
     // First, flatten the inner object
     let flattened = flattenObjectPreservingWeaveTypes(r ?? {});
@@ -115,7 +112,7 @@ export function prepareFlattenedDataForTable<T>(
       cleaned[newKey] = flattened[key];
     });
 
-    return cleaned as Flattened<T>;
+    return cleaned as T & {[key: string]: string};
   });
 }
 /**

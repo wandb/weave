@@ -55,10 +55,7 @@ import {
 import {OnUpdateFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
-import {
-  Flattened,
-  flattenObjectPreservingWeaveTypes,
-} from '../../flattenObject';
+import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
@@ -379,10 +376,7 @@ export const CallsTable: FC<{
                 flattenedCandidateRow[
                   ancestorFieldCandidate + '.' + EXPANDED_REF_REF_KEY
                 ];
-              if (
-                targetRefCandidate != null &&
-                typeof targetRefCandidate === 'string'
-              ) {
+              if (targetRefCandidate != null) {
                 ancestorField = ancestorFieldCandidate;
                 targetRef = targetRefCandidate;
                 break;
@@ -1178,7 +1172,7 @@ const getPeekId = (peekPath: string | null): string | null => {
   return pathname.split('/').pop() ?? null;
 };
 
-export type FlattenedCallData = Flattened<TraceCallSchema>;
+export type FlattenedCallData = TraceCallSchema & {[key: string]: string};
 
 export function prepareFlattenedCallDataForTable(
   callsResult: CallSchema[]
