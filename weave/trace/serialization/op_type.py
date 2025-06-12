@@ -477,7 +477,14 @@ def _has_memory_address(obj: Any) -> bool:
 
 def _replace_memory_address(json_val: str) -> str:
     """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>"""
-    return MEMORY_ADDRESS_PATTERN.sub("0x000000000>", json_val)
+
+    def _replacement_with_same_length(match: re.Match[str]) -> str:
+        # Get matched text and replace with 0s of the same length
+        address = match.group(0)
+        # Keep the 0x prefix and > suffix, replace the rest with 0s
+        return "0x" + "0" * (len(address) - 3) + ">"
+
+    return MEMORY_ADDRESS_PATTERN.sub(_replacement_with_same_length, json_val)
 
 
 def find_last_weave_op_function(
