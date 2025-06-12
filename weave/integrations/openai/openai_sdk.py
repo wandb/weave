@@ -158,7 +158,7 @@ def openai_accumulator(
         to the message content of acc or first_chunk.
         """
         for chunk_choice in chunk.choices:
-            for i in range(chunk_choice.index + 1 - len(acc_choices)):
+            for _i in range(chunk_choice.index + 1 - len(acc_choices)):
                 acc_choices.append(
                     {
                         "index": len(acc_choices),

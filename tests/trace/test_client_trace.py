@@ -2644,7 +2644,7 @@ def test_sort_and_filter_through_refs(client):
         {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})},
     )
 
-    for first, last, sort_by in [
+    for first, _last, sort_by in [
         (0, 21, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
         (21, 0, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
         (0, 21, [tsi.SortBy(field="output.a.b.c.d", direction="asc")]),
@@ -2660,7 +2660,7 @@ def test_sort_and_filter_through_refs(client):
         assert inner_res.calls[0].inputs["label"] == first
         assert inner_res.calls[1].inputs["label"] == first
 
-    for first, last, count, query in [
+    for first, _last, count, query in [
         (
             6,
             21,
