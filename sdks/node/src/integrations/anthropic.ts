@@ -63,6 +63,9 @@ const streamReducer: StreamReducer<StreamChunk, ResultState> = {
     }
     return state;
   },
+  finalizeFn: () => {
+    // no-op
+  },
 };
 
 function summarizer(result: any) {
@@ -190,6 +193,9 @@ const batchStreamReducer: StreamReducer<BatchChunk, ResultState> = {
       state.messages.push(chunk.result.message);
     }
     return state;
+  },
+  finalizeFn: state => {
+    // no-op
   },
 };
 
