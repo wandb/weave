@@ -39,39 +39,16 @@ const IframeImage = ({src, alt}: IframeImageProps) => {
       return;
     }
 
-    const injectStyles = () => {
-      const iframeDoc = iframe.contentWindow?.document;
-      if (iframeDoc) {
-        // Creates a style element for the iframe's head
-        const styleElement = iframeDoc.createElement('style');
-        styleElement.textContent = `
-          html, body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            width: 100%;
-            height: 100%;
-          }
-          img {
-            object-fit: contain;
-            height: 100%;
-          }
-        `;
-        iframeDoc.head.appendChild(styleElement);
-      }
-    };
-
-    iframe.addEventListener('load', injectStyles);
-
     const iframeDoc = iframe.contentWindow?.document;
     if (iframeDoc) {
       try {
-        // iframeDoc.open();
+        iframeDoc.head.innerHTML = '';
+        iframeDoc.body.innerHTML = '';
+        iframeDoc.hasChildNodes();
         const img = iframeDoc.createElement('img');
         img.src = src;
         img.alt = alt;
         iframeDoc.body.appendChild(img);
-        // iframeDoc.close();
         const styleElement = iframeDoc.createElement('style');
         styleElement.textContent = `
           html, body {
@@ -91,11 +68,6 @@ const IframeImage = ({src, alt}: IframeImageProps) => {
         console.error('Error writing to iframe document:', error);
       }
     }
-
-    // Cleanup function: remove the event listener when the component unmounts or deps change
-    return () => {
-      iframe.removeEventListener('load', injectStyles);
-    };
   }, [src, alt]);
 
   return (
@@ -195,7 +167,6 @@ export const CardImage: FC<CardImageProps> = ({
                   height: image.caption ? '80%' : '100%',
                 }}>
                 <IframeImage alt={image.path} src={signedUrl} />
-                {/* <img style={imageStyle} alt={image.path} src={signedUrl} /> */}
                 {masks != null &&
                   maskControls?.map((maskControl, i) => {
                     const mask = masks[i];
