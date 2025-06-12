@@ -531,7 +531,7 @@ def _preload_autogen_extensions() -> None:
         logger.warning(f"Error preloading autogen extensions: {e}", stacklevel=2)
 
 
-def get_patcher(
+def get_autogen_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
     """Creates and returns a patcher for autogen-agentchat.
