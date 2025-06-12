@@ -1,8 +1,15 @@
+import contextvars
+import importlib
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any, Callable, Optional
 
-from weave.integrations.patcher import NoOpPatcher, Patcher
-from weave.integrations.verdict.tracer import VerdictTracer
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
+from weave.trace.context import weave_client_context
+
+_verdict_patcher: MultiPatcher | None = None
 
 
 def get_verdict_module() -> Optional[Any]:
@@ -15,55 +22,131 @@ def get_verdict_module() -> Optional[Any]:
         return verdict
 
 
-class VerdictPatcher(Patcher):
-    def __init__(self) -> None:
-        self._patched = False
-        self._orig_pipeline_init: Optional[Callable[..., None]] = None
-        self._tracer = VerdictTracer()
+def create_verdict_tracer_class() -> Optional[type]:
+    """Create VerdictTracer class if verdict.util.tracing is available."""
+    try:
+        from verdict.util.tracing import (
+            Call,
+            TraceContext,
+            Tracer,
+            current_trace_context,
+        )
+    except (ImportError, ModuleNotFoundError):
+        return None
 
-    def attempt_patch(self) -> bool:
-        if self._patched:
-            return True
-        verdict = get_verdict_module()
-        if verdict is None:
-            return False
+    class VerdictTracerImpl(Tracer):
+        """A tracer that logs calls to the Weave tracing backend."""
 
-            # Patch Pipeline.__init__
-        Pipeline = verdict.core.pipeline.Pipeline
-        self._orig_pipeline_init = Pipeline.__init__
-        default_tracer = self._tracer
-        orig_pipeline_init = self._orig_pipeline_init
+        def __init__(self) -> None:
+            self._call_map: dict[tuple[str, str], Any] = {}
 
-        # Defensive check - if we couldn't get the original init, don't patch
-        if orig_pipeline_init is None:
-            return False
+        @contextmanager
+        def start_call(
+            self,
+            name: str,
+            inputs: dict[str, Any],
+            trace_id: Optional[str] = None,
+            parent_id: Optional[str] = None,
+        ) -> Iterator[Call]:
+            # Use contextvars to get parent context if not provided
+            parent_ctx = current_trace_context.get()
+            if parent_id is None and parent_ctx is not None:
+                parent_id = parent_ctx.call_id
+            if trace_id is None and parent_ctx is not None:
+                trace_id = parent_ctx.trace_id
 
-        def pipeline_init(
-            self: Any, name: str = "Pipeline", tracer: Optional[Any] = None
-        ) -> None:
-            orig_pipeline_init(
-                self, name, tracer if tracer is not None else default_tracer
+            client = weave_client_context.require_weave_client()
+
+            # Find parent Weave Call using call_map
+            parent_call = None
+            if trace_id and parent_id:
+                parent_call = self._call_map.get((trace_id, parent_id))
+
+            weave_call = client.create_call(
+                op=name,
+                inputs=inputs,
+                parent=parent_call,
+                attributes={"trace_id": trace_id, "parent_id": parent_id},
             )
 
-        Pipeline.__init__ = pipeline_init
+            verdict_call = Call(
+                name=name,
+                inputs=inputs,
+                trace_id=trace_id,
+                parent_id=parent_id,
+                call_id=str(weave_call.id),
+            )
 
-        self._patched = True
-        return True
+            # Store in call_map for children to find
+            if trace_id and verdict_call.call_id:
+                self._call_map[(trace_id, verdict_call.call_id)] = weave_call
 
-    def undo_patch(self) -> bool:
-        if not self._patched:
-            return False
-        verdict = get_verdict_module()
-        if verdict is None:
-            return False
-        verdict.core.pipeline.Pipeline.__init__ = self._orig_pipeline_init
-        self._patched = False
-        return True
+            token: contextvars.Token = current_trace_context.set(
+                TraceContext(trace_id, verdict_call.call_id, parent_id)
+            )
+            try:
+                yield verdict_call
+            except Exception as e:
+                verdict_call.exception = e
+                raise
+            finally:
+                verdict_call.end_time = time.time()
+                client.finish_call(
+                    weave_call,
+                    output=verdict_call.outputs,
+                    exception=verdict_call.exception,
+                )
+                current_trace_context.reset(token)
+
+    return VerdictTracerImpl
 
 
-def get_verdict_patcher(settings: Optional[IntegrationSettings] = None) -> Patcher:
+def create_pipeline_init_wrapper(
+    tracer: Any,
+) -> Callable[[Callable], Callable]:
+    """Create a wrapper that injects the default tracer into Pipeline.__init__"""
+
+    def wrapper(original_init: Callable) -> Callable:
+        def pipeline_init(
+            self: Any, name: str = "Pipeline", tracer_param: Optional[Any] = None
+        ) -> None:
+            return original_init(
+                self, name, tracer_param if tracer_param is not None else tracer
+            )
+
+        return pipeline_init
+
+    return wrapper
+
+
+def get_verdict_patcher(
+    settings: Optional[IntegrationSettings] = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
+
     if not settings.enabled:
         return NoOpPatcher()
-    return VerdictPatcher()
+
+    # Check if verdict tracing is available
+    VerdictTracer = create_verdict_tracer_class()
+    if VerdictTracer is None:
+        return NoOpPatcher()
+
+    global _verdict_patcher
+    if _verdict_patcher is not None:
+        return _verdict_patcher
+
+    tracer = VerdictTracer()
+
+    _verdict_patcher = MultiPatcher(
+        [
+            SymbolPatcher(
+                lambda: importlib.import_module("verdict.core.pipeline"),
+                "Pipeline.__init__",
+                create_pipeline_init_wrapper(tracer),
+            ),
+        ]
+    )
+
+    return _verdict_patcher
