@@ -1,4 +1,3 @@
-import {Box} from '@mui/material';
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
 import {Button} from '@wandb/weave/components/Button';
 import {IconPencilEdit} from '@wandb/weave/components/Icon';
@@ -6,6 +5,7 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
 import {ALL_TRACES_OR_CALLS_REF_KEY} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 import {EMPTY_PROPS_MONITORS} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/EmptyContent';
+import {SimplePageLayout} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/SimplePageLayout';
 import {MonitorDrawerRouter} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/CreateMonitorDrawer';
 import {FilterableObjectVersionsTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectVersionsTable';
 import {Query} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientInterface/query';
@@ -30,146 +30,158 @@ export const MonitorsPage = ({
   const [selectedMonitor, setSelectedMonitor] = useState<
     ObjectVersionSchema | undefined
   >();
+
+  const handleCreateMonitor = () => {
+    setSelectedMonitor(undefined);
+    setIsCreateDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setIsCreateDrawerOpen(false);
+  };
+
   return (
-    <Tailwind>
-      <Box>
-        <Box className="mx-16 my-16 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Monitors</h1>
-          <Button
-            icon="add-new"
-            variant="ghost"
-            tooltip="Create a new monitor"
-            onClick={() => {
-              setSelectedMonitor(undefined);
-              setIsCreateDrawerOpen(true);
-            }}>
-            Create monitor
-          </Button>
-        </Box>
-        <FilterableObjectVersionsTable
-          entity={entity}
-          project={project}
-          objectTitle="Monitor"
-          hideCategoryColumn
-          frozenFilter={{
-            baseObjectClass: 'Monitor',
-          }}
-          metadataOnly={false}
-          propsEmpty={EMPTY_PROPS_MONITORS}
-          keepNestedVal={['query']}
-          hidePeerVersionsColumn
-          hideVersionSuffix
-          actionMenu={obj => (
-            <PopupDropdown
-              sections={[
-                [
+    <>
+      <SimplePageLayout
+        title="Monitors"
+        hideTabsIfSingle
+        headerExtra={
+          <MonitorsPageHeaderExtra onCreateMonitor={handleCreateMonitor} />
+        }
+        tabs={[
+          {
+            label: '',
+            content: (
+              <FilterableObjectVersionsTable
+                entity={entity}
+                project={project}
+                objectTitle="Monitor"
+                hideCategoryColumn
+                frozenFilter={{
+                  baseObjectClass: 'Monitor',
+                }}
+                metadataOnly={false}
+                propsEmpty={EMPTY_PROPS_MONITORS}
+                keepNestedVal={['query']}
+                hidePeerVersionsColumn
+                hideVersionSuffix
+                actionMenu={obj => (
+                  <PopupDropdown
+                    sections={[
+                      [
+                        {
+                          key: 'edit',
+                          text: 'Edit',
+                          icon: <IconPencilEdit style={{marginRight: '8px'}} />,
+                          onClick: () => setIsCreateDrawerOpen(true),
+                        },
+                      ],
+                    ]}
+                    trigger={
+                      <Button icon="overflow-horizontal" variant="ghost" />
+                    }
+                    offset="0px, -20px"
+                    onOpen={() => setSelectedMonitor(obj)}
+                  />
+                )}
+                customColumns={[
                   {
-                    key: 'edit',
-                    text: 'Edit',
-                    icon: <IconPencilEdit style={{marginRight: '8px'}} />,
-                    onClick: () => setIsCreateDrawerOpen(true),
+                    field: 'description',
+                    headerName: 'Description',
+                    flex: 1,
+                    valueGetter: (_, row) => row.obj.val['description'],
+                    renderCell: params => <CellValue value={params.value} />,
                   },
-                ],
-              ]}
-              trigger={<Button icon="overflow-horizontal" variant="ghost" />}
-              offset="0px, -20px"
-              onOpen={() => setSelectedMonitor(obj)}
-            />
-          )}
-          customColumns={[
-            {
-              field: 'description',
-              headerName: 'Description',
-              flex: 1,
-              valueGetter: (_, row) => row.obj.val['description'],
-              renderCell: params => <CellValue value={params.value} />,
-            },
-            {
-              field: 'samplingRate',
-              headerName: 'Sampling rate',
-              width: 120,
-              valueGetter: (_, row) => row.obj.val['sampling_rate'],
-              renderCell: params => (
-                <CellValue value={`${params.value * 100}%`} />
-              ),
-            },
-            {
-              field: 'ops',
-              headerName: 'Ops',
-              flex: 1,
-              valueGetter: (_, row) => row.obj.val['op_names'],
-              renderCell: params => {
-                const opRefs: string[] = params.value;
-                if (opRefs.length === 0) {
-                  return null;
-                }
-                return (
-                  <div className="flex items-center gap-2">
-                    {opRefs[0] !== ALL_TRACES_OR_CALLS_REF_KEY ? (
-                      <SafeOpRef opRef={opRefs[0]} />
-                    ) : null}
-                    {opRefs[0] === ALL_TRACES_OR_CALLS_REF_KEY ? (
-                      <span>All calls</span>
-                    ) : null}
-                    {opRefs.length > 1 ? (
-                      <span>{`+${opRefs.length - 1}`}</span>
-                    ) : null}
-                  </div>
-                );
-              },
-            },
-            {
-              field: 'scorers',
-              headerName: 'Scorers',
-              flex: 1,
-              valueGetter: (_, row) => row.obj.val['scorers'],
-              renderCell: params => {
-                const scorerRefs: string[] = params.value;
-                return scorerRefs.length > 0 ? (
-                  <div className="flex items-center gap-2">
-                    <CellValue value={scorerRefs[0]} />
-                    {scorerRefs.length > 1 ? (
-                      <span>{`+${scorerRefs.length - 1}`}</span>
-                    ) : null}
-                  </div>
-                ) : null;
-              },
-            },
-            {
-              field: 'active',
-              headerName: 'Active',
-              valueGetter: (_, row) => {
-                return row.obj.val['active'];
-              },
-              renderCell: params => {
-                return <CellValue value={params.value} />;
-              },
-            },
-            {
-              field: 'callCount',
-              headerName: 'Calls',
-              valueGetter: (_, row) => {
-                return row.id;
-              },
-              renderCell: params => (
-                <CallCountCell
-                  monitorRef={params.value}
-                  entity={entity}
-                  project={project}
-                />
-              ),
-            },
-          ]}
-        />
-      </Box>
+                  {
+                    field: 'samplingRate',
+                    headerName: 'Sampling rate',
+                    width: 120,
+                    valueGetter: (_, row) => row.obj.val['sampling_rate'],
+                    renderCell: params => (
+                      <CellValue value={`${params.value * 100}%`} />
+                    ),
+                  },
+                  {
+                    field: 'ops',
+                    headerName: 'Ops',
+                    flex: 1,
+                    valueGetter: (_, row) => row.obj.val['op_names'],
+                    renderCell: params => {
+                      const opRefs: string[] = params.value;
+                      if (opRefs.length === 0) {
+                        return null;
+                      }
+                      return (
+                        <div className="flex items-center gap-2">
+                          {opRefs[0] !== ALL_TRACES_OR_CALLS_REF_KEY ? (
+                            <SafeOpRef opRef={opRefs[0]} />
+                          ) : null}
+                          {opRefs[0] === ALL_TRACES_OR_CALLS_REF_KEY ? (
+                            <span>All calls</span>
+                          ) : null}
+                          {opRefs.length > 1 ? (
+                            <span>{`+${opRefs.length - 1}`}</span>
+                          ) : null}
+                        </div>
+                      );
+                    },
+                  },
+                  {
+                    field: 'scorers',
+                    headerName: 'Scorers',
+                    flex: 1,
+                    valueGetter: (_, row) => row.obj.val['scorers'],
+                    renderCell: params => {
+                      const scorerRefs: string[] = params.value;
+                      return scorerRefs.length > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <CellValue value={scorerRefs[0]} />
+                          {scorerRefs.length > 1 ? (
+                            <span>{`+${scorerRefs.length - 1}`}</span>
+                          ) : null}
+                        </div>
+                      ) : null;
+                    },
+                  },
+                  {
+                    field: 'active',
+                    headerName: 'Active',
+                    valueGetter: (_, row) => {
+                      return row.obj.val['active'];
+                    },
+                    renderCell: params => {
+                      return <CellValue value={params.value} />;
+                    },
+                  },
+                  {
+                    field: 'callCount',
+                    headerName: 'Calls',
+                    valueGetter: (_, row) => {
+                      return row.id;
+                    },
+                    renderCell: params => (
+                      <CallCountCell
+                        monitorRef={params.value}
+                        entity={entity}
+                        project={project}
+                      />
+                    ),
+                  },
+                ]}
+              />
+            ),
+          },
+        ]}
+      />
+
       <MonitorDrawerRouter
         entity={entity}
         project={project}
         open={isCreateDrawerOpen}
-        onClose={() => setIsCreateDrawerOpen(false)}
+        onClose={handleCloseDrawer}
         monitor={selectedMonitor}
       />
-    </Tailwind>
+    </>
   );
 };
 
@@ -210,6 +222,24 @@ const CallCountCell = ({
         'call'
       )}`}
     />
+  );
+};
+
+const MonitorsPageHeaderExtra: React.FC<{
+  onCreateMonitor: () => void;
+}> = ({onCreateMonitor}) => {
+  return (
+    <Tailwind>
+      <div className="mr-16 flex gap-8">
+        <Button
+          icon="add-new"
+          variant="ghost"
+          onClick={onCreateMonitor}
+          tooltip="Create a new monitor">
+          Create monitor
+        </Button>
+      </div>
+    </Tailwind>
   );
 };
 

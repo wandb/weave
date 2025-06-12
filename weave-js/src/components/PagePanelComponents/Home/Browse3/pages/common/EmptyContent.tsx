@@ -239,11 +239,20 @@ export const EMPTY_PROPS_OBJECT_VERSIONS: EmptyProps = {
 
 export const EMPTY_PROPS_MONITORS: EmptyProps = {
   icon: 'job-automation' as const,
-  heading: 'No monitors yet',
-  description: 'Use monitors to automatically run scorers on incoming traces.',
+  heading: 'Create your first monitor',
+  description:
+    'Use monitors to automatically run scorers on incoming traces to track performance over time.',
   moreInformation: (
     <>
-      Learn about <TargetBlank href="">monitors</TargetBlank>.
+      Learn{' '}
+      <TargetBlank href="http://wandb.me/weave_monitors">
+        monitor basics
+      </TargetBlank>{' '}
+      or see how you can{' '}
+      <TargetBlank href="http://wandb.me/weave_eval_tut">
+        use monitors within an evaluation pipeline
+      </TargetBlank>
+      .
     </>
   ),
 };
