@@ -3,10 +3,11 @@ import React, {useCallback, useEffect, useState, memo, useMemo} from 'react';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
-import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {ContentHandler} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/ContentHandler';
 import {getIconName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Handlers/Shared';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
+import { ContentImage } from './Views/ImageView2';
+import { ContentMetadata, ContentViewMetadataLoadedProps, ContentViewProps } from './types';
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
@@ -21,25 +22,6 @@ const saveBlob = (blob: Blob, filename: string) => {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   });
-};
-
-type ContentTypePayload = CustomWeaveTypePayload<
-  'weave.type_wrappers.Content.content.Content',
-  {content: string; 'metadata.json': string}
->;
-
-type ContentViewProps = {
-  entity: string;
-  project: string;
-  mode?: string;
-  data: ContentTypePayload;
-};
-
-type ContentMetadata = {
-  original_path?: string;
-  mimetype: string;
-  size: number;
-  filename: string;
 };
 
 export const ContentView = ({entity, project, data}: ContentViewProps) => {
@@ -71,6 +53,26 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
 
   const content = data.files['content'];
 
+  if (metadataJson.mimetype.startsWith('image')) {
+    return (
+      <ContentImage
+        entity={entity}
+        project={project}
+        metadata={metadataJson}
+        content={content}
+      />
+    )
+  }
+  else if (metadataJson.mimetype.startsWith('image')) {
+    return (
+      <ContentVideo
+        entity={entity}
+        project={project}
+        metadata={metadataJson}
+        content={content}
+      />
+    )
+  }
   return (
     <ContentViewMetadataLoaded
       entity={entity}
@@ -79,13 +81,6 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
       content={content}
     />
   );
-};
-
-type ContentViewMetadataLoadedProps = {
-  entity: string;
-  project: string;
-  metadata: ContentMetadata;
-  content: string;
 };
 
 // Memoized component that doesn't re-render on size changes
