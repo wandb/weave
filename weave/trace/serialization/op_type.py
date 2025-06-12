@@ -446,6 +446,8 @@ def _get_code_deps(
                         json_val = REDACTED_VALUE
                     else:
                         json_val = to_json(var_value, client._project_id(), client)
+                        if _has_memory_address(json_val):
+                            json_val = _replace_memory_address(json_val)
                 except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
@@ -464,6 +466,18 @@ def _get_code_deps(
                     )
                     code.append(code_paragraph)
     return {"import_code": import_code, "code": code, "warnings": warnings}
+
+
+MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{9}>")
+
+
+def _has_memory_address(obj: Any) -> bool:
+    return isinstance(obj, str) and MEMORY_ADDRESS_PATTERN.search(obj) is not None
+
+
+def _replace_memory_address(json_val: str) -> str:
+    """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>"""
+    return MEMORY_ADDRESS_PATTERN.sub("0x000000000>", json_val)
 
 
 def find_last_weave_op_function(
