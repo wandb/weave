@@ -8,18 +8,11 @@ import {StyledTooltip, TooltipHint} from '@wandb/weave/components/DraggablePopup
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotApplicable';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
-import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
-import { ContentMetadata } from '../types';
+import {ContentViewMetadataLoadedProps} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/types';
 
 
-type ContentImageProps = {
-  entity: string;
-  project: string;
-  metadata: ContentMetadata;
-  content: string
-};
 
-export const ContentImage = (props: ContentImageProps) => (
+export const ContentImage = (props: ContentViewMetadataLoadedProps) => (
   <AutoSizer style={{height: '100%', width: '100%'}}>
     {({width, height}) => {
       if (width === 0 || height === 0) {
@@ -36,7 +29,7 @@ export const ContentImage = (props: ContentImageProps) => (
   </AutoSizer>
 );
 
-type ContentImageWithSizeProps = ContentImageProps & {
+type ContentImageWithSizeProps = ContentViewMetadataLoadedProps & {
   containerWidth: number;
   containerHeight: number;
 };

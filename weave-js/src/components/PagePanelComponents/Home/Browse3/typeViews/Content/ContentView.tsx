@@ -8,6 +8,7 @@ import {getIconName} from '@wandb/weave/components/PagePanelComponents/Home/Brow
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import { ContentImage } from './Views/ImageView2';
 import { ContentMetadata, ContentViewMetadataLoadedProps, ContentViewProps } from './types';
+import { ContentAudio } from './Views/AudioView2';
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
@@ -63,9 +64,9 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
       />
     )
   }
-  else if (metadataJson.mimetype.startsWith('image')) {
+  else if (metadataJson.mimetype.startsWith('audio')) {
     return (
-      <ContentVideo
+      <ContentAudio
         entity={entity}
         project={project}
         metadata={metadataJson}
