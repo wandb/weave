@@ -22,8 +22,8 @@ import {
   getModelLicense,
   getModelLogo,
   getModelSourceName,
+  getParameterCountString,
   getPriceString,
-  getShortNumberString,
   INFERENCE_PATH,
 } from './util';
 
@@ -158,6 +158,14 @@ export const ModelDetailsLoaded = ({
     ? 'This model is not available in the playground'
     : 'You must be logged in to use the playground';
 
+  const hasPrice =
+    (model.priceCentsPerBillionTokensInput ?? 0) > 0 ||
+    (model.priceCentsPerBillionTokensOutput ?? 0) > 0;
+
+  const hasParameterCounts =
+    (model.parameterCountTotal ?? 0) > 0 ||
+    (model.parameterCountActive ?? 0) > 0;
+
   const codeExamples =
     model.apiStyle === 'embedding'
       ? CODE_EXAMPLES_EMBEDDING
@@ -202,14 +210,25 @@ export const ModelDetailsLoaded = ({
       <div className="mb-8 mt-16 text-lg font-semibold">Model overview</div>
 
       <div className="mb-16 flex flex-wrap gap-10">
-        <DetailTile
-          header="Price"
-          footer="Input - Output"
-          tooltip="Price per million tokens">
-          <div className="text-xl font-semibold">
-            {getPriceString(model, false, '-')}
-          </div>
-        </DetailTile>
+        {hasPrice && (
+          <DetailTile
+            header="Price"
+            footer="Input - Output"
+            tooltip="Price per million tokens">
+            <div className="text-xl font-semibold">
+              {getPriceString(model, false, '-')}
+            </div>
+          </DetailTile>
+        )}
+        {hasParameterCounts && (
+          <DetailTile
+            header="Parameters"
+            footer={model.parameterCountActive ? 'Active - Total' : 'Total'}>
+            <div className="text-xl font-semibold">
+              {getParameterCountString(model)}
+            </div>
+          </DetailTile>
+        )}
         {model.contextWindow && (
           <DetailTile header="Context window">
             <div className="text-xl font-semibold">
@@ -221,20 +240,6 @@ export const ModelDetailsLoaded = ({
           <DetailTile header="Release date">
             <div className="text-xl font-semibold">
               {getLaunchDateString(model)}
-            </div>
-          </DetailTile>
-        )}
-        {model.likesHuggingFace && (
-          <DetailTile header="HuggingFace Likes">
-            <div className="text-xl font-semibold">
-              {getShortNumberString(model.likesHuggingFace, 0)}
-            </div>
-          </DetailTile>
-        )}
-        {model.downloadsHuggingFace && (
-          <DetailTile header="HuggingFace Downloads">
-            <div className="text-xl font-semibold">
-              {getShortNumberString(model.downloadsHuggingFace, 0)}
             </div>
           </DetailTile>
         )}
@@ -250,11 +255,16 @@ export const ModelDetailsLoaded = ({
               <img width={18} height={18} src={logo} alt="" />
             </div>
             <div className="flex items-center">{getModelSourceName(model)}</div>
-            <div className="flex items-center">
-              <IconPrivacyOpen width={18} height={18} />
-            </div>
-            <div className="flex items-center">{getModelLicense(model)}</div>
-
+            {model.license && (
+              <>
+                <div className="flex items-center">
+                  <IconPrivacyOpen width={18} height={18} />
+                </div>
+                <div className="flex items-center">
+                  {getModelLicense(model)}
+                </div>
+              </>
+            )}
             {model.supportsFunctionCalling !== undefined && (
               <>
                 <div className="flex items-center">
