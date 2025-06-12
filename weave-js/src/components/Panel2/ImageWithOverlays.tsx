@@ -26,8 +26,7 @@ interface IframeImageProps {
 
 /**
  * This is the only way to render an image in a way that complelely ignores the filter applied
- * for night mode. CSS properties like filter are applied to the pixels within the document before
- * things like Shadow DOM so we can't use that here.
+ * for night mode. CSS properties like filter are special and even ShadowDOM cannot escape them.
  */
 const IframeImage = ({src, alt}: IframeImageProps) => {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
