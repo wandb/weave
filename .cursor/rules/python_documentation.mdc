@@ -4,7 +4,6 @@ globs:
 alwaysApply: true
 ---
 ---
->>>>>>> 5eb787c70e (test)
 description: Python Documentation
 globs: *.py
 alwaysApply: true
