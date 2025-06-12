@@ -23,6 +23,38 @@ T = TypeVar("T")
 
 
 def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], property]:
+    """
+    Create a deprecated property decorator that issues warnings when accessed.
+
+    This decorator factory creates a property that acts as a deprecated alias
+    for another field. When the deprecated property is accessed (either for
+    getting or setting), it logs a warning message and delegates to the new
+    field name.
+
+    Args:
+        new_field_name (str): The name of the new field that should be used
+            instead of the deprecated one.
+
+    Returns:
+        Callable[[Callable[[Any], T]], property]: A decorator function that
+            takes a method and returns a property with getter and setter that
+            issue deprecation warnings.
+
+    Example:
+        ```python
+        class MyClass:
+            new_field: str = "value"
+
+            @deprecated_field("new_field")
+            def old_field(self) -> str:
+                pass  # Implementation not used, just for type hints
+
+        obj = MyClass()
+        # This will log a warning and return "value"
+        value = obj.old_field
+        ```
+    """
+
     def decorator(func: Callable[[Any], T]) -> property:
         warning_msg = f"Use `{new_field_name}` instead of `{func.__name__}`, which is deprecated and will be removed in a future version."
 
