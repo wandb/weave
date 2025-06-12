@@ -125,6 +125,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             # handle 413 explicitly to provide actionable error message
             reason = json.loads(r.text)["reason"]
             raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
+        response = tsi.CallCreateBatchRes.model_validate(r.json())
+        for item in response.res:
+            if isinstance(item, tsi.CallStartRes) and item.warnings:
+                for warning in item.warnings:
+                    logger.warning(warning)
         r.raise_for_status()
 
     def _flush_calls(

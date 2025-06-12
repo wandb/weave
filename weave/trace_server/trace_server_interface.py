@@ -258,6 +258,7 @@ class CallStartReq(BaseModel):
 class CallStartRes(BaseModel):
     id: str
     trace_id: str
+    warnings: Optional[list[str]] = None
 
 
 class CallEndReq(BaseModel):

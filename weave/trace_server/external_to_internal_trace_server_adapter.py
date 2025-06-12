@@ -1,4 +1,5 @@
 import abc
+import logging
 import typing
 from collections.abc import Iterator
 from typing import Callable, TypeVar
@@ -38,6 +39,8 @@ class IdConverter:
 
 A = TypeVar("A")
 B = TypeVar("B")
+
+logger = logging.getLogger(__name__)
 
 
 class ExternalTraceServer(tsi.TraceServerInterface):
@@ -107,11 +110,26 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
+        exceptions = []
         if req.start.wb_run_id is not None:
-            req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
+            try:
+                req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
+            except Exception as e:
+                exceptions.append(e)
+                req.start.wb_run_id = None
+                req.start.wb_run_step = None
         if req.start.wb_user_id is not None:
             req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.call_start, req)
+        res = self._ref_apply(self._internal_trace_server.call_start, req)
+        trace_id = res.trace_id
+        if exceptions:
+            for exception in exceptions:
+                logger.exception(exception)
+            res.warnings = [
+                f"Error associating run {req.start.wb_run_id} with trace {trace_id}: {str(e)}"
+                for e in exceptions
+            ]
+        return res
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
