@@ -9,9 +9,7 @@ globs: *.py
 alwaysApply: true
 ---
 
-1. Always include docstrings when writing functions.
-2. Short or otherwise obvious functions can have a 1-line docstring.
-3. Use Google-style docstrings.  See below for an example:
+1. When writing functions, always include Google-style docstrings with examples.  Short or otherwise obvious functions can have a 1-line docstring.  See below for an example.
 
 ```python
 def function(param1: str, param2: float) -> bool:
@@ -27,6 +25,11 @@ def function(param1: str, param2: float) -> bool:
 
     Raises:
         KeyError: Raises an exception.
+
+    Examples:
+        Examples should be be written in doctest format, and should illustrate how
+        to use the function.
+
     """
     ...
 ```
