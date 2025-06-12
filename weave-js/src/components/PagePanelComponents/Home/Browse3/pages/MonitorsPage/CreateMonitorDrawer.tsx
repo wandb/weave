@@ -363,7 +363,7 @@ export const CreateMonitorDrawer = ({
       <Tailwind style={{height: '100%'}}>
         <Box className="flex h-full flex-col pt-60">
           <Box
-            className="flex h-56 items-center justify-between border-b px-20 py-8"
+            className="flex h-44 items-center justify-between border-b px-20"
             sx={{
               borderColor: 'divider',
             }}>
@@ -371,7 +371,7 @@ export const CreateMonitorDrawer = ({
               variant="h6"
               className="text-xl font-semibold"
               sx={typographyStyle}>
-              Create monitor
+              Create new monitor
             </Typography>
             <Box className="flex gap-2">
               <Button
@@ -382,22 +382,22 @@ export const CreateMonitorDrawer = ({
               />
             </Box>
           </Box>
-          <Box className="flex flex-1 flex-col overflow-y-scroll px-20 pb-24 pt-12">
+          <Box className="flex flex-1 flex-col overflow-y-scroll pt-20 pb-60">
             {isCreating ? (
               <Box className="flex h-full flex-1 flex-col items-center justify-center">
                 <WaveLoader size="huge" />
               </Box>
             ) : (
               <Box className="flex flex-grow flex-col gap-16">
-                <Box className="flex flex-col gap-16">
+                <Box className="flex flex-col gap-16 px-20">
                   {error && (
                     <Box
-                      className="mb-2 rounded-sm bg-red-300 text-red-600"
+                      className="rounded-sm bg-red-300 text-red-600"
                       sx={typographyStyle}>
                       {error}
                     </Box>
                   )}
-                  <Box className="mb-2">
+                  <Box>
                     <FieldName name="Name" />
                     <TextField
                       value={monitorName}
@@ -426,7 +426,7 @@ export const CreateMonitorDrawer = ({
                       underscores.
                     </Typography>
                   </Box>
-                  <Box className="mb-2">
+                  <Box>
                     <FieldName name="Description" />
                     <TextArea
                       value={description}
@@ -435,7 +435,7 @@ export const CreateMonitorDrawer = ({
                       onChange={e => setDescription(e.target.value)}
                     />
                   </Box>
-                  <Box className="mb-2">
+                  <Box>
                     <FieldName name="Active" />
                     <ToggleButtonGroup
                       value={active ? 'active' : 'inactive'}
@@ -445,10 +445,11 @@ export const CreateMonitorDrawer = ({
                     />
                   </Box>
                 </Box>
-                <Box className="flex flex-col gap-8">
+
+                <Box className="flex flex-col pt-16 gap-8">
                   <Typography
                     sx={typographyStyle}
-                    className="text-lg font-semibold">
+                    className="py-16 px-20 border-t border-moon-250 uppercase tracking-wide text-moon-500 font-semibold">
                     Calls to monitor
                   </Typography>
                   <Box className="flex flex-col gap-16">
@@ -557,7 +558,7 @@ export const CreateMonitorDrawer = ({
               </Box>
             )}
           </Box>
-          <Box className="flex gap-16 px-24 py-20">
+          <Box className="flex gap-8 p-20 py-16 border-t border-moon-250">
             <Button
               variant="secondary"
               onClick={onClose}
