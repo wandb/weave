@@ -111,7 +111,7 @@ export const LLMAsAJudgeScorerForm = ({
       <Typography
         sx={typographyStyle}
         className="border-t border-moon-250 px-20 pb-8 pt-16 font-semibold uppercase tracking-wide text-moon-500">
-        LLM-as-a-Judge
+        LLM-as-a-Judge configuration
       </Typography>
 
       <Box className="flex flex-col gap-16 px-20">

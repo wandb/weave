@@ -44,7 +44,7 @@ import {
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Radio} from '@wandb/weave/components';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import * as Switch from '@wandb/weave/components/Switch';
+import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
@@ -553,15 +553,14 @@ export const CreateMonitorDrawer = ({
                       onChange={e => setDescription(e.target.value)}
                     />
                   </Box>
-                  <Box className="flex items-center gap-8">
-                  <Switch.Root
-                      checked={active}
-                      onCheckedChange={setActive}
+                  <Box>
+                    <FieldName name="Active" />
+                    <ToggleButtonGroup
+                      value={active ? 'active' : 'inactive'}
+                      options={[{value: 'active'}, {value: 'inactive'}]}
+                      onValueChange={value => setActive(value === 'active')}
                       size="medium"
-                    >
-                      <Switch.Thumb size="medium" checked={active} />
-                    </Switch.Root>
-                    <span className="font-semibold">Active</span>
+                    />
                   </Box>
                 </Box>
 
@@ -585,6 +584,9 @@ export const CreateMonitorDrawer = ({
                         frozenFilter={undefined}
                         sx={{width: '100%', height: undefined}}
                       />
+                    </Box>
+                    <Box>
+                      <FieldName name="Additional filters" />
                       {selectedOpVersionOption.length > 0 ? (
                         <FilterPanel
                           entity={entity}
@@ -597,7 +599,7 @@ export const CreateMonitorDrawer = ({
                         />
                       ) : (
                         <Typography
-                          className="mt-4 text-sm font-normal"
+                          className="mt-1 text-sm font-normal"
                           sx={{
                             ...typographyStyle,
                             color: 'text.secondary',
