@@ -3,10 +3,9 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import React, {useEffect, useContext, useState, useRef} from 'react';
 import {IconPlay} from '@wandb/weave/components/Icon';
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
-import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {VideoPopup, VideoThumbnail, VideoContent} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
 import {HandlerProps, ContentTooltipWrapper, ContentMetadataTooltip} from './Shared';
-import { WeaveflowPeekContext, WeaveMediaDisplayContext } from '../../../context';
+import { WeaveflowPeekContext } from '../../../context';
 
 type CreateToolTipPreviewProps = {
   contentResult: Blob | null;
@@ -237,8 +236,7 @@ const VideoPreview = ({
 
 export const VideoHandler = (props: HandlerProps) => {
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  const {showVideoThumbnail} = useContext(WeaveMediaDisplayContext);
-  if (isPeeking || showVideoThumbnail) {
+  if (isPeeking) {
     return <VideoPreview {...props} />;
   }
   return <VideoHandlerComponent {...props} />;

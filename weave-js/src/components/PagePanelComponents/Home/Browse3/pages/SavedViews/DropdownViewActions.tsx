@@ -1,12 +1,10 @@
 import {Button} from '@wandb/weave/components/Button';
 import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {Icon} from '@wandb/weave/components/Icon';
-import {Switch} from '@wandb/weave/components';
 import copyToClipboard from 'copy-to-clipboard';
 import React, {useCallback, useContext, useState} from 'react';
 import {toast} from 'react-toastify';
 
-import {WeaveMediaDisplayContext} from '../../context';
 import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
 import {ConfirmDeleteDialog} from './ConfirmDeleteDialog';
 import {SavedViewsInfo} from './savedViewUtil';
@@ -27,12 +25,6 @@ export const DropdownViewActions = ({
 }: DropdownViewActionsProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const {
-    showVideoThumbnail,
-    showImageThumbnail,
-    setShowVideoThumbnail,
-    setShowImageThumbnail,
-  } = useContext(WeaveMediaDisplayContext);
 
   const onCopy = useCallback(() => {
     const url = getObjSchemaUrl(savedViewsInfo.baseView);
@@ -56,38 +48,6 @@ export const DropdownViewActions = ({
               <Icon name="add-new" /> Save as new view
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
-            <DropdownMenu.Item
-              className="flex items-center gap-2 cursor-pointer"
-              onSelect={e => {
-                e.preventDefault();
-              }}
-              onClick={() => setShowVideoThumbnail(!showVideoThumbnail)}>
-              <div onClick={e => e.stopPropagation()}>
-                <Switch.Root
-                  size="small"
-                  checked={showVideoThumbnail}
-                  onCheckedChange={setShowVideoThumbnail}>
-                  <Switch.Thumb size="small" checked={showVideoThumbnail} />
-                </Switch.Root>
-              </div>
-              <span>Show video thumbnails</span>
-            </DropdownMenu.Item>
-            <DropdownMenu.Item
-              className="flex items-center gap-2 cursor-pointer"
-              onSelect={e => {
-                e.preventDefault();
-              }}
-              onClick={() => setShowImageThumbnail(!showImageThumbnail)}>
-              <div onClick={e => e.stopPropagation()}>
-                <Switch.Root
-                  size="small"
-                  checked={showImageThumbnail}
-                  onCheckedChange={setShowImageThumbnail}>
-                  <Switch.Thumb size="small" checked={showImageThumbnail} />
-                </Switch.Root>
-              </div>
-              <span>Show image thumbnails</span>
-            </DropdownMenu.Item>
             {ENABLE_DEBUG_ACTIONS && (
               <>
                 <DropdownMenu.Separator />

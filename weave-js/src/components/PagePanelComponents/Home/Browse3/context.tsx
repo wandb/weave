@@ -834,36 +834,3 @@ export const WeaveHeaderExtrasProvider = ({
     </WeaveHeaderExtrasContext.Provider>
   );
 };
-
-export const WeaveMediaDisplayContext = createContext<{
-  showVideoThumbnail: boolean;
-  showImageThumbnail: boolean;
-  setShowVideoThumbnail: (show: boolean) => void;
-  setShowImageThumbnail: (show: boolean) => void;
-}>({
-  showVideoThumbnail: true,
-  showImageThumbnail: true,
-  setShowVideoThumbnail: () => {},
-  setShowImageThumbnail: () => {},
-});
-
-export const WeaveMediaDisplayProvider = ({
-  children,
-}: {
-  children: ReactNode;
-}) => {
-  const [showVideoThumbnail, setShowVideoThumbnail] = useState(true);
-  const [showImageThumbnail, setShowImageThumbnail] = useState(true);
-
-  return (
-    <WeaveMediaDisplayContext.Provider
-      value={{
-        showVideoThumbnail,
-        showImageThumbnail,
-        setShowVideoThumbnail,
-        setShowImageThumbnail,
-      }}>
-      {children}
-    </WeaveMediaDisplayContext.Provider>
-  );
-};

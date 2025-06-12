@@ -5,7 +5,7 @@ import React, {useEffect, useContext, useState, useMemo, useCallback} from 'reac
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {ImageThumbnail, ImageViewport} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/Views';
 import {HandlerProps, ContentTooltipWrapper, ContentMetadataTooltip} from './Shared';
-import { WeaveflowPeekContext, WeaveMediaDisplayContext } from '../../../context';
+import { WeaveflowPeekContext } from '../../../context';
 
 
 type CreateToolTipPreviewProps = {
@@ -256,8 +256,7 @@ const ImagePreview = ({
 
 export const ImageHandler = (props: HandlerProps) => {
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  const {showImageThumbnail} = useContext(WeaveMediaDisplayContext);
-  if (isPeeking || showImageThumbnail) {
+  if (isPeeking) {
     return <ImagePreview {...props} />;
   }
   return <ImageHandlerComponent {...props} />;
