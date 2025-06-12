@@ -259,12 +259,6 @@ export const LeaderboardPageContentInner: React.FC<
       .filter(c => c != null) as LeaderboardColumnOrderType;
   }, [workingLeaderboardValCopy, evalData]);
 
-  // Memoize expensive getAllEvaluationRecords
-  const allRecords = useMemo(() => {
-    if (!data) return [];
-    return getAllEvaluationRecords(data);
-  }, [data]);
-
   // Calculate the number of selected models (rows) based on selectedEvaluations
   const selectedModelsCount = useMemo(() => {
     if (!data || selectedEvaluations.length === 0) {
@@ -272,6 +266,7 @@ export const LeaderboardPageContentInner: React.FC<
     }
 
     // Get unique model names from selected evaluations
+    const allRecords = getAllEvaluationRecords(data);
     const selectedModelNames = new Set(
       allRecords
         .filter(
@@ -283,7 +278,7 @@ export const LeaderboardPageContentInner: React.FC<
     );
 
     return selectedModelNames.size;
-  }, [allRecords, selectedEvaluations]);
+  }, [data, selectedEvaluations]);
 
   // Calculate available datasets based on selected evaluations
   const availableDatasets = useMemo(() => {
@@ -292,6 +287,7 @@ export const LeaderboardPageContentInner: React.FC<
     }
 
     // Get unique dataset names from selected evaluations
+    const allRecords = getAllEvaluationRecords(data);
     const datasetsWithSelectedEvaluations = new Set(
       allRecords
         .filter(
@@ -309,7 +305,7 @@ export const LeaderboardPageContentInner: React.FC<
         id: datasetName, // Keep full name as ID for filtering
         name: datasetName, // Pass full name, formatting is done in the component
       }));
-  }, [allRecords, selectedEvaluations]);
+  }, [data, selectedEvaluations]);
 
   return (
     <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
@@ -352,6 +348,7 @@ export const LeaderboardPageContentInner: React.FC<
                   }
 
                   // For multiple evaluations, filter to only include those for the selected dataset
+                  const allRecords = getAllEvaluationRecords(data);
                   const uniqueFilteredEvaluations = [
                     ...new Set(
                       allRecords
