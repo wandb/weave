@@ -283,7 +283,7 @@ export const LeaderboardPageContentInner: React.FC<
     );
 
     return selectedModelNames.size;
-  }, [allRecords, selectedEvaluations]);
+  }, [data, allRecords, selectedEvaluations]);
 
   // Calculate available datasets based on selected evaluations
   const availableDatasets = useMemo(() => {
@@ -320,7 +320,7 @@ export const LeaderboardPageContentInner: React.FC<
         datasetName: dataset.name,
         datasetVersion: dataset.version,
       }));
-  }, [allRecords, selectedEvaluations]);
+  }, [data, allRecords, selectedEvaluations]);
 
   return (
     <Box display="flex" flexDirection="row" height="100%" flexGrow={1}>
