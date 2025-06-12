@@ -9,7 +9,8 @@ from typing import Any, Optional, TypedDict, cast
 import ddtrace
 import sentry_sdk
 from cachetools import TLRUCache, cached
-from confluent_kafka import KafkaError, Message
+from confluent_kafka import KafkaError
+from confluent_kafka import Message as KafkaMessage
 from tenacity import (
     RetryError,
     before_log,
@@ -44,6 +45,7 @@ from weave.trace_server.environment import (
     wf_scoring_worker_batch_timeout,
 )
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
+    Message,
     parse_response,
 )
 from weave.trace_server.kafka import CALL_ENDED_TOPIC, KafkaConsumer
@@ -160,6 +162,8 @@ def resolve_scorer_refs(scorer_ref_uris: list[str], project_id: str) -> list[Sco
         )
 
         scorer.__dict__["internal_ref"] = scorer_ref
+
+        scorer = cast(Scorer, scorer)
 
         scorers.append(scorer)
 
@@ -310,7 +314,7 @@ async def _do_score_call_llm_as_a_judge(
     wb_user_id: Optional[str],
 ) -> Any:
     scoring_prompt = scorer.scoring_prompt.format(**inputs_with_defaults)
-    user_input = [{"role": "user", "content": scoring_prompt}]
+    user_input = [Message(role="user", content=scoring_prompt)]
     entity_name, project_name = get_external_project_id(project_id)
 
     req = scorer.model.prepare_completion_request(
@@ -320,11 +324,14 @@ async def _do_score_call_llm_as_a_judge(
         **inputs_with_defaults,
     )
     req.track_llm_call = False
-    result = await get_completion(req, wb_user_id)
+    result = await get_completion(req, wb_user_id)  # type: ignore
     response_payload = result.response
-    return parse_response(
-        response_payload, req.inputs.response_format.get("type", "text")
+    response_format = (
+        req.inputs.response_format.get("type")
+        if req.inputs.response_format is not None
+        else None
     )
+    return parse_response(response_payload, response_format)
 
 
 @ddtrace.tracer.wrap(name="weave_scorer.apply_scorer")
@@ -337,8 +344,6 @@ async def apply_scorer(
 ) -> None:
     """Actually apply the scorer to the call."""
     score_call_id, result = await _do_score_call(scorer, call, project_id, wb_user_id)
-
-    # score_call = _get_score_call(score_call_id, project_id)
 
     call_ref = InternalCallRef(project_id=project_id, id=call.id)  # type: ignore
     score_call_ref = InternalCallRef(project_id=project_id, id=score_call_id)  # type: ignore
@@ -488,7 +493,7 @@ async def run_consumer() -> None:
 
     try:
         while True:
-            messages: list[Message] = consumer.consume(
+            messages: list[KafkaMessage] = consumer.consume(
                 num_messages=wf_scoring_worker_batch_size(),
                 timeout=wf_scoring_worker_batch_timeout(),
             )
@@ -496,7 +501,7 @@ async def run_consumer() -> None:
                 continue
 
             ended_calls_by_project_id: dict[
-                str, tuple[list[tsi.EndedCallSchemaForInsert], list[Message]]
+                str, tuple[list[tsi.EndedCallSchemaForInsert], list[KafkaMessage]]
             ] = defaultdict(lambda: ([], []))
             for message in messages:
                 if not handle_kafka_errors(message):

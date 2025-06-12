@@ -129,6 +129,10 @@ async def get_completion(
             return CompletionsCreateRes.model_validate(await response.json())
 
 
+# EVERYTHING BELOW THIS LINE IS FOR TESTING PURPOSES ONLY
+# WILL BE YANKED BEFORE MERGING
+
+
 def get_permissions() -> None:
     client = get_authenticated_client()
     payload = client.execute(
@@ -154,7 +158,7 @@ def get_permissions() -> None:
     print(payload)
 
 
-def ext_to_int_project_id():
+def ext_to_int_project_id() -> None:
     client = get_authenticated_client()
     payload = client.execute(
         gql(
@@ -191,7 +195,7 @@ if __name__ == "__main__":
     # print(result)
     logging.basicConfig(level=logging.DEBUG)
     # print(get_permissions())
-    print(ext_to_int_project_id())
+    # print(ext_to_int_project_id())
     # print(get_username_from_user_id("VXNlcjo5Njc="))
     # print(get_username_from_user_id("VXNlcjo2Mzg4Nw=="))
     # print(get_username_from_user_id("VXNlcjoyMzU4MjI0"))

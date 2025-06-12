@@ -9,7 +9,6 @@ import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/H
 import {FilterPanel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/FilterPanel';
 import {prepareFlattenedCallDataForTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTable';
 import {useCallsTableColumns} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableColumns';
-import {LLMAsAJudgeScorerForm} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
 import {
   useOpVersionOptions,
   WFHighLevelCallFilter,
@@ -23,6 +22,11 @@ import {
   Autocomplete,
   OpSelector,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/OpSelector';
+import {
+  FieldName,
+  typographyStyle,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/FormComponents';
+import {LLMAsAJudgeScorerForm} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
 import {queryToGridFilterModel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/SavedViews/savedViewUtil';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {
@@ -41,10 +45,6 @@ import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {toast} from 'react-toastify';
-import {
-  FieldName,
-  typographyStyle,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/FormComponents';
 
 const PAGE_SIZE = 10;
 const PAGE_OFFSET = 0;
