@@ -7,6 +7,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRefMaybe} from '@wandb/weave/react';
+import {SmallRef} from '../../smallRef/SmallRef';
 import _ from 'lodash';
 import React, {
   FC,
@@ -38,7 +39,6 @@ import {
   useCreateBuiltinObjectInstance,
 } from '../wfReactInterface/objectClassQuery';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
-import {useObjectVersion} from '../wfReactInterface/tsDataModelHooks';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
 
 // Utility function to flatten all evaluation records from grouped data
@@ -291,23 +291,43 @@ export const LeaderboardPageContentInner: React.FC<
       return [];
     }
 
-    // Get unique dataset names from selected evaluations
-    const datasetsWithSelectedEvaluations = new Set(
-      allRecords
-        .filter(
-          record =>
-            record.sourceEvaluationCallId &&
-            selectedEvaluations.includes(record.sourceEvaluationCallId)
-        )
-        .map(record => record.datasetName)
+    // Get filtered records for selected evaluations
+    const filteredRecords = allRecords.filter(
+      record =>
+        record.sourceEvaluationCallId &&
+        selectedEvaluations.includes(record.sourceEvaluationCallId)
     );
 
+    // Debug: Log what we have in records
+    console.log('Filtered records for availableDatasets:', filteredRecords);
+    if (filteredRecords.length > 0) {
+      console.log('First record properties:', Object.keys(filteredRecords[0]));
+      console.log('First record:', filteredRecords[0]);
+    }
+
+    // Get unique dataset name+version combinations from selected evaluations
+    const datasetsWithSelectedEvaluations = new Map();
+    filteredRecords.forEach(record => {
+      const key = `${record.datasetName}:${record.datasetVersion}`;
+      if (!datasetsWithSelectedEvaluations.has(key)) {
+        datasetsWithSelectedEvaluations.set(key, {
+          name: record.datasetName,
+          version: record.datasetVersion,
+          fullName: `${record.datasetName}:${record.datasetVersion}`
+        });
+      }
+    });
+
+    console.log('Unique datasets with versions:', Array.from(datasetsWithSelectedEvaluations.values()));
+
     // Convert to array and sort for consistent ordering
-    return Array.from(datasetsWithSelectedEvaluations)
-      .sort()
-      .map(datasetName => ({
-        id: datasetName, // Keep full name as ID for filtering
-        name: datasetName, // Pass full name, formatting is done in the component
+    return Array.from(datasetsWithSelectedEvaluations.values())
+      .sort((a, b) => a.fullName.localeCompare(b.fullName))
+      .map(dataset => ({
+        id: dataset.name, // Use just the name as ID for filtering (backward compatible)
+        name: dataset.fullName, // Full name with version for display
+        datasetName: dataset.name,
+        datasetVersion: dataset.version,
       }));
   }, [allRecords, selectedEvaluations]);
 
@@ -513,52 +533,6 @@ export const useIsEditor = (entity: string) => {
   }, [entity, loadingUserInfo, userInfo]);
 };
 
-// Component to fetch and display dataset name with proper version
-const DatasetNameWithVersion: FC<{
-  entity: string;
-  project: string;
-  datasetFullName: string;
-}> = ({entity, project, datasetFullName}) => {
-  const ref = useMemo(
-    () =>
-      parseRefMaybe(`weave:///${entity}/${project}/object/${datasetFullName}`),
-    [entity, project, datasetFullName]
-  );
-
-  // Check if it's a WeaveObjectRef
-  const isWeaveRef = ref && 'entityName' in ref && 'weaveKind' in ref;
-
-  const objectVersion = useObjectVersion({
-    key: isWeaveRef
-      ? {
-          scheme: 'weave',
-          entity: ref.entityName,
-          project: ref.projectName,
-          weaveKind: ref.weaveKind,
-          objectId: ref.artifactName,
-          versionHash: ref.artifactVersion,
-          path: '',
-          refExtra: ref.artifactRefExtra,
-        }
-      : null,
-    metadataOnly: true,
-  });
-
-  if (!ref || !('artifactName' in ref)) {
-    return <>{datasetFullName}</>;
-  }
-
-  const versionIndex = objectVersion?.result?.versionIndex ?? -1;
-  const baseName = ref.artifactName;
-
-  // Format like SmallRef does
-  const displayName =
-    versionIndex >= 0
-      ? `${baseName}:v${versionIndex}`
-      : `${baseName}:${ref.artifactVersion.slice(0, 6)}`;
-
-  return <>{displayName}</>;
-};
 
 // Dropdown button component for selecting datasets
 const CompareEvaluationsDropdownButton: FC<{
@@ -653,12 +627,21 @@ const CompareEvaluationsDropdownButton: FC<{
                       setIsOpen(false);
                     }}>
                     <div className="flex items-center gap-2">
-                      <Icon name="table" width={16} height={16} />
-                      <DatasetNameWithVersion
-                        entity={entity}
-                        project={project}
-                        datasetFullName={dataset.name}
-                      />
+                      {(() => {
+                        // Construct ref with version if we have it
+                        const refString = dataset.name.startsWith('weave:///') 
+                          ? dataset.name 
+                          : `weave:///${entity}/${project}/object/${dataset.datasetName}:${dataset.datasetVersion}`;
+                        console.log('Trying to parse ref with version:', refString);
+                        console.log('Dataset object:', dataset);
+                        const ref = parseRefMaybe(refString);
+                        console.log('Parsed ref result:', ref);
+                        return ref ? (
+                          <SmallRef objRef={ref} iconOnly={false} noLink={true} />
+                        ) : (
+                          <span>{dataset.name}</span>
+                        );
+                      })()}
                     </div>
                   </DropdownMenu.Item>
                 ))
