@@ -1,4 +1,10 @@
 ---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+>>>>>>> 5eb787c70e (test)
 description: Python Documentation
 globs: *.py
 alwaysApply: true
@@ -24,7 +30,6 @@ def function(param1: str, param2: float) -> bool:
     Examples:
         Examples should be be written in doctest format, and should illustrate how
         to use the function.
-
     """
     ...
 ```
