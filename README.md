@@ -49,7 +49,7 @@ Our documentation site can be found [here](https://wandb.me/weave).
    ```python
    @weave.op()
    def my_function():
-       # Your code here
+       # Your tracked code
        pass
    ```
 
