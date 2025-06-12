@@ -688,13 +688,6 @@ export const CreateMonitorDrawer = ({
           </Box>
           <Box className="flex gap-8 border-t border-moon-250 p-20 py-16">
             <Button
-              variant="secondary"
-              onClick={onClose}
-              twWrapperStyles={{flexGrow: 1}}
-              className="w-full">
-              Cancel
-            </Button>
-            <Button
               disabled={!enableCreateButton}
               variant="primary"
               onClick={createMonitor}
