@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
 
-MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{9}>", re.ASCII)
+# Memory address with at least 4 charaters (decrease false positives)
+MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{4,}>", re.ASCII)
 
 CODE_DEP_ERROR_SENTINEL = "<error>"
 
