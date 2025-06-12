@@ -1,12 +1,14 @@
 import {Box, Drawer, Typography} from '@mui/material';
-import {GridFilterModel} from '@mui/x-data-grid-pro';
 import {styled} from '@mui/material/styles';
+import {GridFilterModel} from '@mui/x-data-grid-pro';
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
 import {
   MOON_250,
   MOON_350,
   TEAL_500,
 } from '@wandb/weave/common/css/color.styles';
+import {Radio} from '@wandb/weave/components';
+import {Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
@@ -42,8 +44,6 @@ import {
   ObjectVersionKey,
   ObjectVersionSchema,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
-import {Radio} from '@wandb/weave/components';
-import {Switch} from '@wandb/weave/components';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRef} from '@wandb/weave/react';
 import _ from 'lodash';
