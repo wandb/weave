@@ -31,11 +31,6 @@ Our documentation site can be found [here](https://wandb.me/weave).
 - Python 3.8 or higher
 - A [Weights & Biases account](https://wandb.ai/signup) (free tier available)
 
-## Installation
-
-```bash
-pip install weave
-```
 
 ## Quick Start
 
@@ -121,14 +116,6 @@ sentence = "There are many fruits that were found on the recently discovered pla
 
 extract_fruit(sentence)
 ```
-
-## Learn More
-
-- 📚 [Full Documentation](https://wandb.me/weave)
-- 💬 [Discord Community](https://wandb.me/discord)
-- 🎓 [Tutorials and Examples](https://github.com/wandb/weave/tree/master/examples)
-- 🐛 [Report Issues](https://github.com/wandb/weave/issues)
-- ⭐ [Star us on GitHub](https://github.com/wandb/weave)
 
 ## Contributing
 
