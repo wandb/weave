@@ -14,6 +14,8 @@ import {
 import _ from 'lodash';
 import React, {useMemo} from 'react';
 
+import {DeleteLeaderboardButton} from './LeaderboardDeleteButton';
+
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {
   EvaluationHelperObj,
@@ -32,6 +34,7 @@ export const LeaderboardConfigEditor: React.FC<{
   setWorkingCopy: (leaderboardVal: LeaderboardObjectVal) => void;
   discardChanges: () => void;
   commitChanges: () => void;
+  leaderboardName: string;
 }> = ({
   entity,
   project,
@@ -41,6 +44,7 @@ export const LeaderboardConfigEditor: React.FC<{
   setWorkingCopy,
   discardChanges,
   commitChanges,
+  leaderboardName,
 }) => {
   const handleNameChange = (value: string) => {
     setWorkingCopy({...leaderboardVal, name: value});
@@ -167,17 +171,25 @@ export const LeaderboardConfigEditor: React.FC<{
         height="52px"
         display="flex"
         alignItems="center"
-        justifyContent="flex-end">
-        <Button
-          variant="ghost"
-          onClick={discardChanges}
-          disabled={saving}
-          style={{marginRight: 8}}>
-          {isDirty ? 'Discard' : 'Close'}
-        </Button>
-        <Button onClick={commitChanges} disabled={!isDirty || saving}>
-          {saving ? 'Saving...' : isDirty ? 'Save' : 'Saved'}
-        </Button>
+        justifyContent="space-between">
+        <DeleteLeaderboardButton
+          entity={entity}
+          project={project}
+          leaderboardName={leaderboardName}
+          variant="full"
+        />
+        <Box display="flex" alignItems="center">
+          <Button
+            variant="ghost"
+            onClick={discardChanges}
+            disabled={saving}
+            style={{marginRight: 8}}>
+            {isDirty ? 'Discard' : 'Close'}
+          </Button>
+          <Button onClick={commitChanges} disabled={!isDirty || saving}>
+            {saving ? 'Saving...' : isDirty ? 'Save' : 'Saved'}
+          </Button>
+        </Box>
       </Box>
     </Box>
   );

@@ -38,7 +38,6 @@ import {
 } from '../wfReactInterface/objectClassQuery';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 import {LeaderboardConfigEditor} from './LeaderboardConfigEditor';
-import {DeleteLeaderboardButton} from './LeaderboardDeleteButton';
 
 type LeaderboardPageProps = {
   entity: string;
@@ -72,11 +71,6 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
           setIsEditing={setIsEditing}
           isPeeking={isPeeking}
         />
-        <DeleteLeaderboardButton
-          entity={props.entity}
-          project={props.project}
-          leaderboardName={props.leaderboardName}
-        />
       </Box>
     ) : null;
 
@@ -87,7 +81,7 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
         ...simplePageLayoutContext,
         headerSuffix: (
           <>
-            <Box display="flex" gap="4px" alignItems="center">
+            <Box display="flex" gap="4px" marginRight="-8px" alignItems="center">
               <EditLeaderboardButton
                 entity={props.entity}
                 project={props.project}
@@ -95,11 +89,6 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
                 isEditing={isEditing}
                 setIsEditing={setIsEditing}
                 isPeeking={isPeeking}
-              />
-              <DeleteLeaderboardButton
-                entity={props.entity}
-                project={props.project}
-                leaderboardName={props.leaderboardName}
               />
             </Box>
             {simplePageLayoutContext.headerSuffix}
@@ -344,6 +333,7 @@ export const LeaderboardPageContentInner: React.FC<
             setWorkingCopy={setWorkingLeaderboardValCopy}
             discardChanges={discardChanges}
             commitChanges={commitChanges}
+            leaderboardName={props.leaderboardName}
           />
         </Box>
       )}
@@ -394,18 +384,18 @@ const EditLeaderboardButton: FC<{
 
   const handleClick = useCallback(() => {
     if (isPeeking) {
-      // When in peek mode, close the peek drawer first
-      closePeek();
-      // Then navigate to the full page with edit mode enabled after a brief delay
+      // When in peek mode, navigate first then close the peek
+      const editUrl = baseRouter.leaderboardsUIUrl(
+        entity,
+        project,
+        leaderboardName,
+        true
+      );
+      history.push(editUrl);
+      // Close peek after navigation to avoid flash
       setTimeout(() => {
-        const editUrl = baseRouter.leaderboardsUIUrl(
-          entity,
-          project,
-          leaderboardName,
-          true
-        );
-        history.push(editUrl);
-      }, 0);
+        closePeek();
+      }, 50);
     } else {
       // When not in peek mode, just toggle edit mode
       setIsEditing(!isEditing);

@@ -20,7 +20,6 @@ import {
   projectIdFromParts,
 } from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {DeleteLeaderboardButton} from './LeaderboardDeleteButton';
 import {useIsEditor} from './LeaderboardPage';
 
 const Container = styled.div`
@@ -153,18 +152,6 @@ const LeaderboardTable: React.FC<{
       hideCategoryColumn
       hideVersionSuffix
       onRowClick={onClick}
-      actionMenu={
-        isEditor
-          ? obj => (
-              <DeleteLeaderboardButton
-                entity={props.entity}
-                project={props.project}
-                leaderboardName={obj.objectId}
-                variant="icon"
-              />
-            )
-          : undefined
-      }
     />
   );
 };

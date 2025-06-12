@@ -52,8 +52,9 @@ export const DeleteLeaderboardButton: React.FC<{
         icon="delete"
         variant="ghost"
         onClick={() => setDeleteModalOpen(true)}
-        tooltip="Delete leaderboard"
-      />
+        tooltip="Delete leaderboard">
+        {variant === 'full' ? 'Delete' : undefined}
+      </Button>
       <DeleteModal
         open={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
