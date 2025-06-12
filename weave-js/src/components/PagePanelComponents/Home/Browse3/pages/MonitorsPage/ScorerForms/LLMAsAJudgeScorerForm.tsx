@@ -107,40 +107,87 @@ export const LLMAsAJudgeScorerForm = ({
   );
 
   return (
-    <Box className="mb-2 flex flex-col gap-8">
-      <Typography sx={typographyStyle} className="font-semibold">
+    <Box className="flex flex-col pt-16 gap-8">
+      <Typography sx={typographyStyle} 
+        className="pt-16 pb-8 px-20 border-t border-moon-250 uppercase tracking-wide text-moon-500 font-semibold"
+      >
         LLM-as-a-Judge configuration
       </Typography>
-      <Box>
-        <FieldName name="Name" />
-        <TextField value={scorerName} onChange={onScorerNameChange} />
-        {nameError && (
+
+      <Box className="flex flex-col gap-16 px-20">
+        <Box>
+          <FieldName name="Name" />
+          <TextField value={scorerName} onChange={onScorerNameChange} />
+          {nameError && (
+            <Typography
+              className="mt-1 text-sm"
+              sx={{
+                ...typographyStyle,
+                color: 'error.main',
+              }}>
+              {nameError}
+            </Typography>
+          )}
           <Typography
-            className="mt-1 text-sm"
+            className="mt-4 text-sm font-normal"
             sx={{
               ...typographyStyle,
-              color: 'error.main',
+              color: 'text.secondary',
             }}>
-            {nameError}
+            Valid names must start with a letter or number and can only contain
+            letters, numbers, hyphens, and underscores.
           </Typography>
-        )}
-        <Typography
-          className="mt-1 text-sm font-normal"
-          sx={{
-            ...typographyStyle,
-            color: 'text.secondary',
-          }}>
-          Valid names must start with a letter or number and can only contain
-          letters, numbers, hyphens, and underscores.
-        </Typography>
-      </Box>
-      <Box>
-        <FieldName name="Judge Model" />
-        {!savedModelsLoading && modelOptions.length === 0 ? (
-          <Typography sx={typographyStyle} className="text-sm">
-            No saved models found. Create one in the Playground.
-            <br />
-            See{' '}
+        </Box>
+
+        <Box>
+          <FieldName name="Judge Model" />
+          {!savedModelsLoading && modelOptions.length === 0 ? (
+            <Typography sx={typographyStyle} className="text-sm">
+              No saved models found. Create one in the Playground.
+              <br />
+              See{' '}
+              <Link
+                to="https://docs.wandb.ai/guides/monitors/scorers#llm-as-a-judge-scorer"
+                target="_blank"
+                className="text-blue-500">
+                docs
+              </Link>{' '}
+              for more details.
+            </Typography>
+          ) : (
+            <Select<{label: string; ref: string}, false>
+              isDisabled={savedModelsLoading}
+              placeholder={
+                savedModelsLoading ? 'Loading...' : 'Select a judge model'
+              }
+              options={modelOptions}
+              value={selectedModel}
+              onChange={newValue => {
+                setJudgeModelRef(newValue?.ref);
+                onChangeCallback(scoringPrompt, newValue?.ref, scorerName);
+              }}
+            />
+          )}
+        </Box>
+
+        <Box>
+          <FieldName name="Scoring Prompt" />
+          <TextArea
+            value={scoringPrompt}
+            placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
+            onChange={e => {
+              setScoringPrompt(e.target.value);
+              onChangeCallback(e.target.value, judgeModelRef, scorerName);
+            }}
+          />
+          <Typography
+            className="mt-1 text-sm font-normal"
+            sx={{
+              ...typographyStyle,
+              color: 'text.secondary',
+            }}>
+            The scoring prompt will be used to score the output of your ops. You
+            can use the following variables: {'{output}'} and {'{input}'}. See{' '}
             <Link
               to="https://docs.wandb.ai/guides/monitors/scorers#llm-as-a-judge-scorer"
               target="_blank"
@@ -149,47 +196,8 @@ export const LLMAsAJudgeScorerForm = ({
             </Link>{' '}
             for more details.
           </Typography>
-        ) : (
-          <Select<{label: string; ref: string}, false>
-            isDisabled={savedModelsLoading}
-            placeholder={
-              savedModelsLoading ? 'Loading...' : 'Select a judge model'
-            }
-            options={modelOptions}
-            value={selectedModel}
-            onChange={newValue => {
-              setJudgeModelRef(newValue?.ref);
-              onChangeCallback(scoringPrompt, newValue?.ref, scorerName);
-            }}
-          />
-        )}
-      </Box>
-      <Box>
-        <FieldName name="Scoring Prompt" />
-        <TextArea
-          value={scoringPrompt}
-          placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
-          onChange={e => {
-            setScoringPrompt(e.target.value);
-            onChangeCallback(e.target.value, judgeModelRef, scorerName);
-          }}
-        />
-        <Typography
-          className="mt-1 text-sm font-normal"
-          sx={{
-            ...typographyStyle,
-            color: 'text.secondary',
-          }}>
-          The scoring prompt will be used to score the output of your ops. You
-          can use the following variables: {'{output}'} and {'{input}'}. See{' '}
-          <Link
-            to="https://docs.wandb.ai/guides/monitors/scorers#llm-as-a-judge-scorer"
-            target="_blank"
-            className="text-blue-500">
-            docs
-          </Link>{' '}
-          for more details.
-        </Typography>
+        </Box>
+        
       </Box>
     </Box>
   );

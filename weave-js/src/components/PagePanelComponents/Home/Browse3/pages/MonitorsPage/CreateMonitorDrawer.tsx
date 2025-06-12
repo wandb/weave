@@ -416,7 +416,7 @@ export const CreateMonitorDrawer = ({
                       </Typography>
                     )}
                     <Typography
-                      className="mt-1 text-sm font-normal"
+                      className="mt-4 text-sm font-normal"
                       sx={{
                         ...typographyStyle,
                         color: 'text.secondary',
@@ -449,10 +449,10 @@ export const CreateMonitorDrawer = ({
                 <Box className="flex flex-col pt-16 gap-8">
                   <Typography
                     sx={typographyStyle}
-                    className="py-16 px-20 border-t border-moon-250 uppercase tracking-wide text-moon-500 font-semibold">
+                    className="pt-16 pb-8 px-20 border-t border-moon-250 uppercase tracking-wide text-moon-500 font-semibold">
                     Calls to monitor
                   </Typography>
-                  <Box className="flex flex-col gap-16">
+                  <Box className="flex flex-col gap-16 px-20">
                     <Box>
                       <FieldName name="Operations" />
                       <OpSelector
@@ -507,13 +507,14 @@ export const CreateMonitorDrawer = ({
                     </Box>
                   </Box>
                 </Box>
-                <Box className="flex flex-col gap-8">
+
+                <Box className="flex flex-col pt-16 gap-8">
                   <Typography
                     sx={typographyStyle}
-                    className="text-lg font-semibold">
-                    Scorers to apply to selected calls
+                    className="pt-16 pb-8 px-20 border-t border-moon-250 uppercase tracking-wide text-moon-500 font-semibold">
+                    Scorers
                   </Typography>
-                  <Box className="flex flex-col gap-16">
+                  <Box className="flex flex-col gap-16 px-20">
                     <Box>
                       <FieldName name="Scorers" />
                       <Autocomplete
@@ -552,9 +553,10 @@ export const CreateMonitorDrawer = ({
                         }}
                       />
                     </Box>
-                    {scorerForms}
                   </Box>
                 </Box>
+
+                {scorerForms}
               </Box>
             )}
           </Box>
