@@ -29,11 +29,11 @@ export const ContentAudio = (props: ContentViewMetadataLoadedProps) => {
   const audioBinary = useFileContent(fileContentParams);
 
   // TODO: Use memo
-  useEffect(() => {
+  useMemo(() => {
     setAudioFileName(metadata.filename);
   }, [audioFileName]);
 
-  useEffect(() => {
+  useMemo(() => {
     if (audioBinary.result) {
       setAudioUrl(URL.createObjectURL(new Blob([audioBinary.result])));
     }
@@ -93,13 +93,13 @@ export const AudioPlayer: FC<{
 
   const audioBinary = useFileContent(fileContentParams);
 
-  useEffect(() => {
+  useMemo(() => {
     if (audioFile) {
       setAudioFileName(audioFile);
     }
   }, [audioFile]);
 
-  useEffect(() => {
+  useMemo(() => {
     if (audioBinary.result) {
       setAudioUrl(URL.createObjectURL(new Blob([audioBinary.result])));
     }

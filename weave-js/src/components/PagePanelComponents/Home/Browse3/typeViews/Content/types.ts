@@ -25,9 +25,7 @@ export type ContentMetadata = {
   mimetype: string;
 };
 
-export type ContentViewMetadataLoadedProps = {
-  entity: string;
-  project: string;
+export type ContentViewMetadataLoadedProps = ContentViewProps & {
   metadata: ContentMetadata;
   content: string;
 };
