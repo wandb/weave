@@ -105,7 +105,6 @@ const LeaderboardTable: React.FC<{
 }> = props => {
   const history = useHistory();
   const {peekingRouter} = useWeaveflowRouteContext();
-  const {isEditor} = useIsEditor(props.entity);
 
   // TODO: Once `useCollectionObjects` lands from the online
   // evals project, switch to that (much more type safe)

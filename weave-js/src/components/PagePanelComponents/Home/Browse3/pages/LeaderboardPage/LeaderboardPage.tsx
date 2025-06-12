@@ -81,7 +81,11 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
         ...simplePageLayoutContext,
         headerSuffix: (
           <>
-            <Box display="flex" gap="4px" marginRight="-8px" alignItems="center">
+            <Box
+              display="flex"
+              gap="4px"
+              marginRight="-8px"
+              alignItems="center">
               <EditLeaderboardButton
                 entity={props.entity}
                 project={props.project}

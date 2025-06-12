@@ -14,8 +14,6 @@ import {
 import _ from 'lodash';
 import React, {useMemo} from 'react';
 
-import {DeleteLeaderboardButton} from './LeaderboardDeleteButton';
-
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
 import {
   EvaluationHelperObj,
@@ -23,6 +21,7 @@ import {
   useMetrics,
   useScorers,
 } from './leaderboardConfigEditorHooks';
+import {DeleteLeaderboardButton} from './LeaderboardDeleteButton';
 import {SimpleCodeLikeTextArea} from './SimpleCodeLikeTextArea';
 
 export const LeaderboardConfigEditor: React.FC<{
