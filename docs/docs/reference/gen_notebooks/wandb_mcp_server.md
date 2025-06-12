@@ -19,7 +19,7 @@ title: Weights & Biases MCP Server
 The W&B MCP Server enables AI assistants like Cursor, Windsurf, Claude Code and Claude Desktop to directly query and analyze your Weights & Biases data. This gives your AI coding assistant powerful capabilities to help you understand experiments, debug issues, and generate insights from your W&B Models and W&B Weave data.
 
 :::note
-The **[wandb MCP server documentation on GitHub](https://github.com/wandb/wandb-mcp-server/blob/main/README.md)** contains a full, in-depth guide on installation, available tools and troubleshooting.
+The **[wandb MCP server documentation on GitHub](https://github.com/wandb/wandb-mcp-server/blob/main/README.md)** contains a fuller, in-depth guide on installation, available tools and troubleshooting.
 :::
 
 ## Why use the W&B MCP Server?
@@ -90,3 +90,8 @@ Once configured, you can ask your AI assistant questions like:
 ## Learn more
 
 For detailed configuration options, sandbox setup, and troubleshooting, see the [full documentation on GitHub](https://github.com/wandb/wandb-mcp-server/blob/main/README.md).
+
+
+```python
+
+```
