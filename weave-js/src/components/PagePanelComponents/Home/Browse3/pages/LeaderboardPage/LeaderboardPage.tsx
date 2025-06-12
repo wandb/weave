@@ -340,10 +340,6 @@ export const LeaderboardPageContentInner: React.FC<
                 onDatasetSelect={datasetId => {
                   // For single evaluation, we can skip the complex filtering and just use the selected evaluation
                   if (selectedEvaluations.length === 1) {
-                    console.log(
-                      'Single evaluation - navigating directly:',
-                      selectedEvaluations[0]
-                    );
                     history.push(
                       peekingRouter.compareEvaluationsUri(
                         props.entity,
@@ -370,12 +366,6 @@ export const LeaderboardPageContentInner: React.FC<
                         .map(record => record.sourceEvaluationCallId)
                     ),
                   ];
-
-                  console.log('Selected dataset:', datasetId);
-                  console.log(
-                    'Filtered evaluations:',
-                    uniqueFilteredEvaluations
-                  );
 
                   if (uniqueFilteredEvaluations.length > 0) {
                     history.push(
