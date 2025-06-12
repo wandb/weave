@@ -357,7 +357,9 @@ async def _do_score_call_llm_as_a_judge(
     req.track_llm_call = False
     result = await get_completion(req, wb_user_id)
     response_payload = result.response
-    return parse_response(response_payload, req.inputs.response_format)
+    return parse_response(
+        response_payload, req.inputs.response_format.get("type", "text")
+    )
 
 
 @ddtrace.tracer.wrap(name="weave_scorer.apply_scorer")
