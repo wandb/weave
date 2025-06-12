@@ -95,13 +95,17 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
 
         if (isMultiSelect) {
           // Toggle selection using alt/option key
-          setSelectedEvaluations(prev => {
-            if (prev.includes(sourceCallId)) {
-              return prev.filter(id => id !== sourceCallId);
-            } else {
-              return [...prev, sourceCallId];
+          if (selectedEvaluations.includes(sourceCallId)) {
+            // Remove from selection
+            setSelectedEvaluations(
+              selectedEvaluations.filter(id => id !== sourceCallId)
+            );
+          } else {
+            // Add to selection (enforce MAX_SELECT limit)
+            if (selectedEvaluations.length < MAX_SELECT) {
+              setSelectedEvaluations([...selectedEvaluations, sourceCallId]);
             }
-          });
+          }
         } else if (selectedEvaluations.length === 0) {
           // Single selection - navigate immediately only if no selections
           let to: string;
@@ -169,22 +173,28 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     return rowData;
   }, [data]);
 
-  // Get all evaluation IDs from the current row data using allRecords
+  // Get all evaluation IDs from the current row data
   const getAllEvaluationIds = useCallback(
     (row: RowData): string[] => {
-      const modelName = row.modelGroupName.split(':')[0];
-      return [
-        ...new Set(
-          allRecords
-            .filter(
-              record =>
-                record.modelName === modelName && record.sourceEvaluationCallId
-            )
-            .map(record => record.sourceEvaluationCallId)
-        ),
-      ];
+      const evaluationIds = new Set<string>();
+      
+      // Iterate through all dataset groups, scorer groups, and metric groups
+      // to collect all evaluation IDs for this model
+      Object.values(row.modelGroup.datasetGroups).forEach(datasetGroup => {
+        Object.values(datasetGroup.scorerGroups).forEach(scorerGroup => {
+          Object.values(scorerGroup.metricPathGroups).forEach(metricPathGroup => {
+            metricPathGroup.forEach(record => {
+              if (record.sourceEvaluationCallId) {
+                evaluationIds.add(record.sourceEvaluationCallId);
+              }
+            });
+          });
+        });
+      });
+      
+      return Array.from(evaluationIds);
     },
-    [allRecords]
+    []
   );
 
   // Get all available evaluation IDs from all rows
