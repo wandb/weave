@@ -9,7 +9,12 @@ from urllib.parse import urlparse
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import Op, ProcessedInputs, _add_accumulator
+from weave.trace.op import (
+    Op,
+    ProcessedInputs,
+    _add_accumulator,
+    _default_on_input_handler,
+)
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
@@ -300,26 +305,58 @@ def should_use_accumulator(inputs: dict) -> bool:
     )
 
 
+def convert_completion_to_dict(obj: Any) -> dict:
+    return {
+        "client": {
+            "base_url": str(obj._client._base_url),
+            "version": obj._client._version,
+        },
+    }
+
+
+def completion_instance_check(obj: Any) -> bool:
+    return (
+        hasattr(obj, "messages")
+        and hasattr(obj, "_client")
+        and hasattr(obj._client, "_base_url")
+        and hasattr(obj._client, "_version")
+    )
+
+
 def openai_on_input_handler(
     func: Op, args: tuple, kwargs: dict
 ) -> ProcessedInputs | None:
+    original_args = args
+    original_kwargs = kwargs
+
+    processed_inputs = _default_on_input_handler(func, tuple(args), kwargs)
+    inputs = processed_inputs.inputs
+
+    args = list(args)  # type: ignore[assignment]
+    if len(args) > 0 and completion_instance_check(args[0]):
+        # This will be the `self` argument to the function, convert it to a dict
+        args[0] = convert_completion_to_dict(args[0])  # type: ignore[index]
+        inputs.update({"self": args[0]})
+
     if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
         original_args = args
         original_kwargs = kwargs
         prompt = args[1]
         args = args[:-1]
         kwargs.update(prompt.as_dict())
-        inputs = {
-            "prompt": prompt,
-        }
-        return ProcessedInputs(
-            original_args=original_args,
-            original_kwargs=original_kwargs,
-            args=args,
-            kwargs=kwargs,
-            inputs=inputs,
+        inputs.update(
+            {
+                "prompt": prompt,
+            }
         )
-    return None
+
+    return ProcessedInputs(
+        original_args=original_args,
+        original_kwargs=original_kwargs,
+        args=tuple(args),
+        kwargs=kwargs,
+        inputs=inputs,
+    )
 
 
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
