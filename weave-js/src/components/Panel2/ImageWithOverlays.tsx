@@ -65,9 +65,14 @@ const IframeImage = ({src, alt}: IframeImageProps) => {
 
     const iframeDoc = iframe.contentWindow?.document;
     if (iframeDoc) {
-      iframeDoc.open();
-      iframeDoc.writeln(`<img src="${src}" alt="${alt}">`);
-      iframeDoc.close();
+      try {
+        iframeDoc.open();
+        const parsedSrc = new URL(src).toString();
+        iframeDoc.writeln(`<img src="${parsedSrc}" alt="${alt}">`);
+        iframeDoc.close();
+      } catch (error) {
+        console.error('Error writing to iframe document:', error);
+      }
     }
 
     // Cleanup function: remove the event listener when the component unmounts or deps change
