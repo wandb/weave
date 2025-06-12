@@ -382,7 +382,7 @@ export const CreateMonitorDrawer = ({
               />
             </Box>
           </Box>
-          <Box className="flex flex-1 flex-col overflow-y-scroll pt-20 pb-60">
+          <Box className="flex flex-1 flex-col overflow-y-scroll pb-60 pt-20">
             {isCreating ? (
               <Box className="flex h-full flex-1 flex-col items-center justify-center">
                 <WaveLoader size="huge" />
@@ -446,10 +446,10 @@ export const CreateMonitorDrawer = ({
                   </Box>
                 </Box>
 
-                <Box className="flex flex-col pt-16 gap-8">
+                <Box className="flex flex-col gap-8 pt-16">
                   <Typography
                     sx={typographyStyle}
-                    className="pt-16 pb-8 px-20 border-t border-moon-250 uppercase tracking-wide text-moon-500 font-semibold">
+                    className="border-t border-moon-250 px-20 pb-8 pt-16 font-semibold uppercase tracking-wide text-moon-500">
                     Calls to monitor
                   </Typography>
                   <Box className="flex flex-col gap-16 px-20">
@@ -508,10 +508,10 @@ export const CreateMonitorDrawer = ({
                   </Box>
                 </Box>
 
-                <Box className="flex flex-col pt-16 gap-8">
+                <Box className="flex flex-col gap-8 pt-16">
                   <Typography
                     sx={typographyStyle}
-                    className="pt-16 pb-8 px-20 border-t border-moon-250 uppercase tracking-wide text-moon-500 font-semibold">
+                    className="border-t border-moon-250 px-20 pb-8 pt-16 font-semibold uppercase tracking-wide text-moon-500">
                     Scorers
                   </Typography>
                   <Box className="flex flex-col gap-16 px-20">
@@ -560,7 +560,7 @@ export const CreateMonitorDrawer = ({
               </Box>
             )}
           </Box>
-          <Box className="flex gap-8 p-20 py-16 border-t border-moon-250">
+          <Box className="flex gap-8 border-t border-moon-250 p-20 py-16">
             <Button
               variant="secondary"
               onClick={onClose}

@@ -107,10 +107,10 @@ export const LLMAsAJudgeScorerForm = ({
   );
 
   return (
-    <Box className="flex flex-col pt-16 gap-8">
-      <Typography sx={typographyStyle} 
-        className="pt-16 pb-8 px-20 border-t border-moon-250 uppercase tracking-wide text-moon-500 font-semibold"
-      >
+    <Box className="flex flex-col gap-8 pt-16">
+      <Typography
+        sx={typographyStyle}
+        className="border-t border-moon-250 px-20 pb-8 pt-16 font-semibold uppercase tracking-wide text-moon-500">
         LLM-as-a-Judge configuration
       </Typography>
 
@@ -197,7 +197,6 @@ export const LLMAsAJudgeScorerForm = ({
             for more details.
           </Typography>
         </Box>
-        
       </Box>
     </Box>
   );
