@@ -44,6 +44,7 @@ export type LeaderboardValueRecord = {
   // A bit hacky to denormalize `shouldMinimize` here, but it's convenient
   // for the caller and not externally visible
   shouldMinimize?: boolean;
+  isRunning?: boolean;
 };
 
 type GroupableLeaderboardValueRecord = {
@@ -241,6 +242,7 @@ const getLeaderboardGroupableData = async (
       createdAt: convertISOToDate(call.started_at),
       sourceEvaluationCallId: call.id,
       sourceEvaluationObjectRef: evalObjectRefUri,
+      isRunning: !call.ended_at,
     };
 
     const scorerRefUris = (evalObject.val.scorers ?? []) as string[];
@@ -659,6 +661,7 @@ const getLeaderboardObjectGroupableData = async (
             sourceEvaluationCallId: call.id,
             sourceEvaluationObjectRef: col.evaluation_object_ref,
             shouldMinimize: col.should_minimize ?? false,
+            isRunning: !call.ended_at,
           },
         };
         data.push(row);

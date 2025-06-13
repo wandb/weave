@@ -176,7 +176,12 @@ export const ModelDetailsLoaded = ({
     codeExample = codeExample.replace('{model_id}', model.idPlayground);
   }
 
-  const onClickCopy = useCallback(() => {
+  const onClickCopyModelId = useCallback(() => {
+    copyToClipboard(model.idPlayground ?? '');
+    toast('Copied to clipboard');
+  }, [model.idPlayground]);
+
+  const onClickCopyCode = useCallback(() => {
     copyToClipboard(codeExample);
     toast.success('Copied to clipboard');
   }, [codeExample]);
@@ -198,6 +203,15 @@ export const ModelDetailsLoaded = ({
           </div>
         </div>
         <div className="flex items-center gap-8">
+          {model.idPlayground && (
+            <Button
+              size="large"
+              icon="copy"
+              variant="secondary"
+              onClick={onClickCopyModelId}
+              tooltip="Copy ID for API use to clipboard"
+            />
+          )}
           <Button
             size="large"
             onClick={onOpenPlayground}
@@ -299,36 +313,40 @@ export const ModelDetailsLoaded = ({
         </div>
       </div>
 
-      <div className="mt-16 text-lg font-semibold leading-8">
-        Use this model
-      </div>
+      {model.idPlayground && (
+        <>
+          <div className="mt-16 text-lg font-semibold leading-8">
+            Use this model
+          </div>
 
-      <div className="mb-8 flex items-center">
-        <div className="flex-grow">
-          <ToggleButtonGroup
-            options={[
-              {value: 'Python'},
-              // TODO {value: 'TypeScript'},
-              {value: 'Curl'},
-            ]}
-            value={selectedLanguage}
-            size="small"
-            onValueChange={setSelectedLanguage}
-          />
-        </div>
-        <div>
-          <Button variant="ghost" icon="copy" onClick={onClickCopy} />
-        </div>
-      </div>
-      <div className="[&_.monaco-editor]:!absolute">
-        <CodeEditor
-          value={codeExample}
-          language={CODE_LANGUAGE_MAP[selectedLanguage]}
-          readOnly
-          handleMouseWheel
-          alwaysConsumeMouseWheel={false}
-        />
-      </div>
+          <div className="mb-8 flex items-center">
+            <div className="flex-grow">
+              <ToggleButtonGroup
+                options={[
+                  {value: 'Python'},
+                  // TODO {value: 'TypeScript'},
+                  {value: 'Curl'},
+                ]}
+                value={selectedLanguage}
+                size="small"
+                onValueChange={setSelectedLanguage}
+              />
+            </div>
+            <div>
+              <Button variant="ghost" icon="copy" onClick={onClickCopyCode} />
+            </div>
+          </div>
+          <div className="[&_.monaco-editor]:!absolute">
+            <CodeEditor
+              value={codeExample}
+              language={CODE_LANGUAGE_MAP[selectedLanguage]}
+              readOnly
+              handleMouseWheel
+              alwaysConsumeMouseWheel={false}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
