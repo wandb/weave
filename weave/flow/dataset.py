@@ -16,12 +16,6 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
-def non_empty_list(rows: list) -> list:
-    if len(rows) == 0:
-        raise ValueError("Unable to cast to Table: list cannot be empty.")
-    return rows
-
-
 @register_object
 class Dataset(Object):
     """

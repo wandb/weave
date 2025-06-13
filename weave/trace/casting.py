@@ -72,6 +72,12 @@ def cast_to_table(obj: Any) -> Table | WeaveTable:
     raise TypeError("Unable to cast to Table")
 
 
+def non_empty_list(rows: list) -> list:
+    if len(rows) == 0:
+        raise ValueError("Unable to cast to Table: list cannot be empty.")
+    return rows
+
+
 CallsFilterLike = Annotated[CallsFilter, pydantic.BeforeValidator(cast_to_calls_filter)]
 SortByLike = Annotated[SortBy, pydantic.BeforeValidator(cast_to_sort_by)]
 QueryLike = Annotated[Query, pydantic.BeforeValidator(cast_to_query)]
