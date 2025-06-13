@@ -55,6 +55,7 @@ export interface ProviderOption {
   llms: Array<LLMOption>;
   isDisabled?: boolean;
   providers?: ProviderOption[];
+  isPreview?: boolean; // If true, show a preview pill in the dropdown
 }
 
 export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
@@ -347,7 +348,10 @@ const SubMenuOption = ({
                 whiteSpace: 'normal',
                 width: '90%',
               }}>
-              {children}
+              <div className="flex items-center gap-8">
+                {children}
+                {props.data.isPreview && <Pill label="Preview" color="moon" />}
+              </div>
             </Box>
             <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
               {hasOptions && <Icon name="chevron-next" color="moon_500" />}
@@ -573,6 +577,7 @@ export const useLLMDropdownOptions = (
         label:
           LLM_PROVIDER_LABELS[provider as keyof typeof LLM_PROVIDER_LABELS],
         value: provider,
+        isPreview: provider === 'coreweave',
         llms: status ? providerLLMs : [],
         isDisabled: !status,
       };
