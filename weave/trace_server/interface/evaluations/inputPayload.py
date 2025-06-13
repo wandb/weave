@@ -22,11 +22,11 @@ class InputPayloadImmutableProperties(BaseModel):
 
 
 class InputPayloadUserDefinedProperties(
-    BaseModel, InputPayloadMutableProperties, InputPayloadImmutableProperties
+    InputPayloadMutableProperties, InputPayloadImmutableProperties
 ): ...
 
 
-class InputPayload(BaseModel, InputPayloadUserDefinedProperties):
+class InputPayload(InputPayloadUserDefinedProperties):
     id: str
 
 

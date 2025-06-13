@@ -25,11 +25,11 @@ class ExampleLabelImmutableProperties(BaseModel):
 
 
 class ExampleLabelUserDefinedProperties(
-    BaseModel, ExampleLabelMutableProperties, ExampleLabelImmutableProperties
+    ExampleLabelMutableProperties, ExampleLabelImmutableProperties
 ): ...
 
 
-class ExampleLabel(BaseModel, ExampleLabelUserDefinedProperties):
+class ExampleLabel(ExampleLabelUserDefinedProperties):
     id: str
 
 

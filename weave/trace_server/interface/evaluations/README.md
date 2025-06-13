@@ -47,7 +47,7 @@ class EntityNameUserDefinedProperties(
 ### 2. Main Entity Class
 
 ```python
-class EntityName(BaseModel, EntityNameUserDefinedProperties):
+class EntityName(EntityNameUserDefinedProperties):
     id: str  # Every entity has a unique ID
 ```
 

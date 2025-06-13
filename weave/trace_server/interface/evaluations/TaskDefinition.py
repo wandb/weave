@@ -23,11 +23,11 @@ class TaskDefinitionImmutableProperties(BaseModel):
 
 
 class TaskDefinitionUserDefinedProperties(
-    BaseModel, TaskDefinitionMutableProperties, TaskDefinitionImmutableProperties
+ TaskDefinitionMutableProperties, TaskDefinitionImmutableProperties
 ): ...
 
 
-class TaskDefinition(BaseModel, TaskDefinitionUserDefinedProperties):
+class TaskDefinition(TaskDefinitionUserDefinedProperties):
     id: str
 
 

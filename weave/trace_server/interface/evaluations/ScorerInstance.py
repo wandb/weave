@@ -20,11 +20,11 @@ class ScorerInstanceImmutableProperties(BaseModel):
 
 
 class ScorerInstanceUserDefinedProperties(
-    BaseModel, ScorerInstanceMutableProperties, ScorerInstanceImmutableProperties
+ ScorerInstanceMutableProperties, ScorerInstanceImmutableProperties
 ): ...
 
 
-class ScorerInstance(BaseModel, ScorerInstanceUserDefinedProperties):
+class ScorerInstance(ScorerInstanceUserDefinedProperties):
     id: str
 
 

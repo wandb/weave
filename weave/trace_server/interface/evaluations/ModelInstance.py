@@ -23,11 +23,11 @@ class ModelInstanceImmutableProperties(BaseModel):
 
 
 class ModelInstanceUserDefinedProperties(
-    BaseModel, ModelInstanceMutableProperties, ModelInstanceImmutableProperties
+ ModelInstanceMutableProperties, ModelInstanceImmutableProperties
 ): ...
 
 
-class ModelInstance(BaseModel, ModelInstanceUserDefinedProperties):
+class ModelInstance(ModelInstanceUserDefinedProperties):
     id: str  # content hash of ModelInstanceImmutableProperties
 
 

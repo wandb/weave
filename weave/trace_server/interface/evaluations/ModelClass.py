@@ -27,11 +27,11 @@ class ModelClassImmutableProperties(BaseModel):
 
 
 class ModelClassUserDefinedProperties(
-    BaseModel, ModelClassMutableProperties, ModelClassImmutableProperties
+    ModelClassMutableProperties, ModelClassImmutableProperties
 ): ...
 
 
-class ModelClass(BaseModel, ModelClassUserDefinedProperties):
+class ModelClass(ModelClassUserDefinedProperties):
     id: str
 
 

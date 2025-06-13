@@ -25,11 +25,11 @@ class ScoreResultImmutableProperties(BaseModel):
 
 
 class ScoreResultUserDefinedProperties(
-    BaseModel, ScoreResultMutableProperties, ScoreResultImmutableProperties
+ ScoreResultMutableProperties, ScoreResultImmutableProperties
 ): ...
 
 
-class ScoreResult(BaseModel, ScoreResultUserDefinedProperties):
+class ScoreResult(ScoreResultUserDefinedProperties):
     id: str
 
 

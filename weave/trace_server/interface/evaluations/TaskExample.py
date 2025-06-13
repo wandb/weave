@@ -19,11 +19,11 @@ class TaskExampleImmutableProperties(BaseModel):
 
 
 class TaskExampleUserDefinedProperties(
-    BaseModel, TaskExampleMutableProperties, TaskExampleImmutableProperties
+ TaskExampleMutableProperties, TaskExampleImmutableProperties
 ): ...
 
 
-class TaskExample(BaseModel, TaskExampleUserDefinedProperties):
+class TaskExample(TaskExampleUserDefinedProperties):
     id: str
 
 

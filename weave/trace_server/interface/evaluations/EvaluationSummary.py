@@ -35,11 +35,11 @@ class EvaluationSummaryImmutableProperties(BaseModel):
 
 
 class EvaluationSummaryUserDefinedProperties(
-    BaseModel, EvaluationSummaryMutableProperties, EvaluationSummaryImmutableProperties
+ EvaluationSummaryMutableProperties, EvaluationSummaryImmutableProperties
 ): ...
 
 
-class EvaluationSummary(BaseModel, EvaluationSummaryUserDefinedProperties):
+class EvaluationSummary(EvaluationSummaryUserDefinedProperties):
     id: str
 
 

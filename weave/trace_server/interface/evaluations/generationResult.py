@@ -21,11 +21,11 @@ class GenerationResultImmutableProperties(BaseModel):
 
 
 class GenerationResultUserDefinedProperties(
-    BaseModel, GenerationResultMutableProperties, GenerationResultImmutableProperties
+    GenerationResultMutableProperties, GenerationResultImmutableProperties
 ): ...
 
 
-class GenerationResult(BaseModel, GenerationResultUserDefinedProperties):
+class GenerationResult(GenerationResultUserDefinedProperties):
     id: str
 
 
