@@ -1,7 +1,8 @@
 import datetime
+from abc import abstractmethod
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Optional, Protocol, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import (
     BaseModel,
@@ -1033,81 +1034,119 @@ class ProjectStatsRes(BaseModel):
     files_storage_size_bytes: int
 
 
-class TraceServerInterface(Protocol, TraceServerEvaluationInterfaceMixin):
+class TraceServerInterface(TraceServerEvaluationInterfaceMixin):
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
 
     # OTEL API
+    @abstractmethod
     def otel_export(self, req: OtelExportReq) -> OtelExportRes: ...
 
     # Call API
+    @abstractmethod
     def call_start(self, req: CallStartReq) -> CallStartRes: ...
+    @abstractmethod
     def call_end(self, req: CallEndReq) -> CallEndRes: ...
+    @abstractmethod
     def call_read(self, req: CallReadReq) -> CallReadRes: ...
+    @abstractmethod
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
+    @abstractmethod
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
+    @abstractmethod
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
+    @abstractmethod
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    @abstractmethod
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
+    @abstractmethod
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 
     # Op API
+    @abstractmethod
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
+    @abstractmethod
     def op_read(self, req: OpReadReq) -> OpReadRes: ...
+    @abstractmethod
     def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
 
     # Cost API
+    @abstractmethod
     def cost_create(self, req: CostCreateReq) -> CostCreateRes: ...
+    @abstractmethod
     def cost_query(self, req: CostQueryReq) -> CostQueryRes: ...
+    @abstractmethod
     def cost_purge(self, req: CostPurgeReq) -> CostPurgeRes: ...
 
     # Obj API
+    @abstractmethod
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
+    @abstractmethod
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
+    @abstractmethod
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
+    @abstractmethod
     def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes: ...
 
     # Table API
+    @abstractmethod
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
+    @abstractmethod
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
+    @abstractmethod
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
+    @abstractmethod
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]: ...
+    @abstractmethod
     def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes: ...
+    @abstractmethod
     def table_query_stats_batch(
         self, req: TableQueryStatsBatchReq
     ) -> TableQueryStatsBatchRes: ...
 
     # Ref API
+    @abstractmethod
     def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes: ...
 
     # File API
+    @abstractmethod
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
+    @abstractmethod
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
+    @abstractmethod
     def files_stats(self, req: FilesStatsReq) -> FilesStatsRes: ...
 
     # Feedback API
+    @abstractmethod
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
+    @abstractmethod
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
+    @abstractmethod
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
+    @abstractmethod
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
 
     # Action API
+    @abstractmethod
     def actions_execute_batch(
         self, req: ActionsExecuteBatchReq
     ) -> ActionsExecuteBatchRes: ...
 
     # Execute LLM API
+    @abstractmethod
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
 
     # Execute LLM API (Streaming)
     # Returns an iterator of JSON-serializable chunks that together form the streamed
     # response from the model provider. Each element must be a dictionary that can
     # be serialized with ``json.dumps``.
+    @abstractmethod
     def completions_create_stream(
         self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]: ...
 
     # Project statistics API
+    @abstractmethod
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
