@@ -3,81 +3,116 @@ import TabItem from '@theme/TabItem';
 
 # Weights & Biases (W&B) Inference Service
 
-_Weights & Biases (W&B) Inference_ provides access to leading open-source foundation models via the W&B Weave UI and an OpenAI-compliant API. With W&B Inference, you can develop AI applications and agents without signing up for a hosting provider or self-hosting a model. Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference-powered applications.
+   <!-- 
+   TODO list 
+   1. Completely describe all UI flow steps
+   2. Add a few well-chosen screenshots when UI stabilizes
+   3. (??) Add more complex code sample in Python that shows off some of the Weave features
+   4. (??) If a Google Colab will be available, link to it. We can also upload it to our Cookbooks section
+   5. Clean up and address any MD comments
+   6. Add callouts and banners around the docs to let users know they have free credits and direct them here
+   7. Confirm all outbound links to resources (API endpoint, marketing page, pricing page, etc.)
+   !-->
 
-This guide provides an overview of the service and available models, as well as:
+_Weights & Biases (W&B) Inference_ provides access to leading open-source foundation models via the W&B Weave UI and an OpenAI-compliant API. With W&B Inference, you can:
 
+- Develop AI applications and agents without signing up for a hosting provider or self-hosting a model.
+- Try the supported models in the W&B Weave Playground.
+
+Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference-powered applications.
+<!-- 
+Add some more callouts about what users can do with Weave and why it's so great
+!-->
+
+This guide provides the following information:
+
+- [Supported models](#supported-models)
 - [Prerequisites](#prerequisites)
-- [Usage limits](#usage-limits)
+- [Usage infromation and limits](#usage-information-and-limits)
 - [Usage examples](#usage-examples)
-  
+<!-- 
+Finalize TOC
+!-->
+
+## Supported models
+V1 of the W&B Inference service supports the following models:
+
+- Llama 3.1 8B
+- DeepSeek V3-0324
+- Llama 3.3 70B
+- DeepSeek R1-0528
+- LLama 4 Scout
+- Phi 4 Mini
+
+Use the following resources to learn more about using the models:
+
+- [API specification](#api-specification). 
+- [Chat completion examples using Python and the API](#usage-examples)
+- [Access the models via the W&B Weave Playground](#ui) 
+- [Pricing information](http://wandb.com/pricing/inference)
 
 ## Prerequisites
 
-- A Weights & Biases account.
+The following prerequisites are required to access the W&B Infernce service via the API or the W&B Weave UI.
+
+- A W&B account. Sign up [here](https://app.wandb.ai/login?signup=true&_gl=1*1yze8dp*_ga*ODIxMjU5MTk3LjE3NDk0OTE2NDM.*_ga_GMYDGNGKDT*czE3NDk4NDYxMzgkbzEyJGcwJHQxNzQ5ODQ2MTM4JGo2MCRsMCRoMA..*_ga_JH1SJHJQXJ*czE3NDk4NDU2NTMkbzI1JGcxJHQxNzQ5ODQ2MTQ2JGo0NyRsMCRoMA..*_gcl_au*MTE4ODk1MzY1OC4xNzQ5NDkxNjQzLjk1ODA2MjQwNC4xNzQ5NTgyMTUzLjE3NDk1ODIxNTM.).
+- A W&B API key. Get your API key at [https://wandb.ai/authorize](https://wandb.ai/authorize).
+- A W&B project. To create a new project in the W&B UI, complete the following steps:
+   1. In the W&B UI, navigate to the **Overview** tab.
+   2. In the upper right hand corner, click **+ Create new project**.
+   3. Fill out the form with the required project information.
+      :::important
+      Make sure to note your W&B **Team** and project **Name**, as you'll need this information to [use the API](#api-specification).
+      :::
+   4. Click **Create project**.
+- If you will be using the Inference service via Python, see [Additional requirements for using the API via Python](#additional-requirements-for-using-the-api-via-python).
 
 :::tip
 Before using the service, familiarize yourself with the [usage limits](#usage-limits).
 :::
 
-## Usage examples
+### Additional requirements for using the API via Python
 
-This section describes several ways to interact with the W&B Inference service:
+To use the Inference API via Python, first complete the general prerequisites. Then, install the `openai` and `weave` libraries in your local environment:
 
-- [UI]
-- [API: List available models](#list-available-models) — Programmatically retrieve a list of available models for reference or automation.
-- [API: Chat completion](#chat-completion) — Use code examples to interact with specific open-source models.
+```bash
+pip install openai weave
+```
 
-### UI
+:::note
+The `weave` library is only required if you'll be using Weave to 
+:::
 
-![The Inference tab view, showing available models.](imgs/inference-ui-model-cards.png)
+## API specification
 
-### API
+The following section provides API specification information and API usage examples. 
 
-Each supported model includes examples using both Bash (via `curl`) and Python (via the OpenAI-compatible SDK).
+- [Endpoint](#endpoint)
+- [Available methods](#available-methods)
+- [Usage examples](#usage-examples)
 
-- [DeepSeek R1](#deepseek-r1)
-- [Qwen QwQ 32B](#qwen-qwq-32b)
-- [Llama 3.3 70B](#llama-33-70b)
-- [BGE M3](#bge-m3)
-- [Mistral Small 3.1](#mistral-small-31)
-- [Llama 4 Scout](#llama-4-scout)
-- [Qwen 2.5 VL 7B](#qwen-25-vl-7b)
-- [Phi 4 Mini](#phi-4-mini)
-- [Llama 4 Maverick](#llama-4-maverick)
-- [Granite 3.3 8B](#granite-33-8b)
+### Endpoint
 
-You can also [list the available models using the API](#list-available-models).
+The Inference service can be accessed via the following endpoint:
 
-### List available models
+```plaintext
+https://api.inference.wandb.ai/v1
+```
+### Available methods
 
-Use the API to query all currently available models and their IDs. This is useful for selecting models dynamically or inspecting what's available in your environment.
+#### Chat completions
 
-<Tabs groupId="programming-language" queryString>
-  <TabItem value="bash" label="Bash" default>
-    ```bash
-    curl https://infr.cw4637-staging.coreweave.app/v1/models \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer <your key from qa>" \
-      -H "OpenAI-Project: hello-world-team/new-inference-project"
-    ```
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-  </TabItem>
-</Tabs>
-
-#### DeepSeek R1
+The primary API method available is `/chat/completions`, which supports OpenAI-compatible request formats for sending messages to a supported model and receiving a completion. For usage examples involving specific models, see the [API usage examples](#usage-examples)
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="bash" label="Bash" default>
     ```bash
-    curl https://infr.cw4637-staging.coreweave.app/v1/chat/completions \
+    curl https://api.inference.wandb.ai/v1/chat/completions \
       -H "Content-Type: application/json" \
-      -H "Authorization: Bearer some-key-value" \
-      -H "OpenAI-Project: entity1/project1" \
+      -H "Authorization: Bearer <your-api-key>" \
+      -H "OpenAI-Project: <your-entity>/<your-project>" \
       -d '{
-        "model": "cw_deepseek-ai_DeepSeek-R1",
+        "model": "<model-id>",
         "messages": [
           { "role": "system", "content": "You are a helpful assistant." },
           { "role": "user", "content": "Tell me a joke." }
@@ -88,24 +123,22 @@ Use the API to query all currently available models and their IDs. This is usefu
   <TabItem value="python" label="Python">
     ```python
     import openai
-    import weave
 
-    # Set a custom base URL
+    # Initialize the OpenAI-compatible client
     client = openai.OpenAI(
-        base_url='https://infr.cw4637-staging.coreweave.app/v1',
-        # Generally recommend setting OPENAI_API_KEY in the environment
-        api_key="some-key-value"
+        base_url='https://api.inference.wandb.ai/v1',
+        api_key="<your-api-key>"
     )
 
-    # Make a call using the client
+    # Call the chat completion endpoint
     response = client.chat.completions.create(
-        model="cw_deepseek-ai_DeepSeek-R1",
+        model="<model-id>",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
         extra_headers={
-            "OpenAI-Project": "entity1/project1"
+            "OpenAI-Project": "<your-entity>/<your-project>"
         },
     )
 
@@ -114,45 +147,129 @@ Use the API to query all currently available models and their IDs. This is usefu
   </TabItem>
 </Tabs>
 
-#### Qwen QwQ 32B
+#### List supported models
 
-<Tabs groupId="programming-language">
+You can also programmatically list the supported models with the `\models` method. For usage information, see [List available models](#list-available-models).
+
+### Usage examples
+
+This section describes several ways to interact with the W&B Inference service:
+
+- [List the available models using the API](#list-available-models).
+- [Chat completion with Llama 3.1 8B](#llama-31-8b)
+- [Chat completion with DeepSeek V3-0324](#deepseek-v3-0324)
+- [Chat completion with Llama 3.3 70B](#llama-33-70b)
+- [Chat completion with DeepSeek R1-0528](#deepseek-r1-0528)
+- [Chat completion with LLama 4 Scout](#llama-4-scout)
+- [Chat completion with Phi 4 Mini](#phi-4-mini)
+
+#### List available models
+
+Use the API to query all currently available models and their IDs. This is useful for selecting models dynamically or inspecting what's available in your environment.
+
+<Tabs groupId="programming-language" queryString>
   <TabItem value="bash" label="Bash" default>
     ```bash
-  curl https://infr.cw4637-staging.coreweave.app/v1/chat/completions \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer some-key-value" \
-    -H "OpenAI-Project: entity1/project1" \
-    -d '{
-      "model": "cw_Qwen_QwQ-32B",
-      "messages": [
-        { "role": "system", "content": "You are a helpful assistant." },
-        { "role": "user", "content": "Tell me a joke." }
-      ]
-    }'
+    curl https://api.inference.wandb.ai/v1/models \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer <your-apikey>" \
+      -H "OpenAI-Project: hello-world-team/new-inference-project"
+    ```
+  </TabItem>
+  <TabItem value="python" label="Python">
+   <!-- 
+   TODO 
+   Add a Python example showing this functionality
+   !-->
+  </TabItem>
+</Tabs>
+
+#### Llama 3.1 8B
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="bash" label="Bash" default>
+    ```bash
+    curl https://api.inference.wandb.ai/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer <your-apikey>" \
+      -H "OpenAI-Project: <team>/<project>" \
+      -d '{
+        "model": "meta-llama/Llama-3.1-8B-Instruct",
+        "messages": [
+          { "role": "system", "content": "You are a helpful assistant." },
+          { "role": "user", "content": "Tell me a joke." }
+        ]
+      }'
     ```
   </TabItem>
   <TabItem value="python" label="Python">
     ```python
     import openai
-    import weave
 
-    # Set a custom base URL
+    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
-        base_url='https://infr.cw4637-staging.coreweave.app/v1',
-        # Generally recommend setting OPENAI_API_KEY in the environment
-        api_key="some-key-value"
+        base_url='https://api.inference.wandb.ai/v1',
+        # Get your API key from https://wandb.ai/authorize
+        # Consider setting it in the environment as OPENAI_API_KEY instead for safety
+        api_key="<your-apikey>"
     )
 
-    # Make a call using the client
     response = client.chat.completions.create(
-        model="cw_Qwen_QwQ-32B",
+        model="meta-llama/Llama-3.1-8B-Instruct",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
         extra_headers={
-            "OpenAI-Project": "entity1/project1"
+            # Team and project are required for usage tracking
+            "OpenAI-Project": "<team>/<project>"
+        },
+    )
+
+    print(response.choices[0].message.content)
+    ```
+  </TabItem>
+</Tabs>
+
+#### DeepSeek V3-0324
+
+<Tabs groupId="programming-language">
+  <TabItem value="bash" label="Bash" default>
+    ```bash
+    curl https://api.inference.wandb.ai/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer <your-apikey>" \
+      -H "OpenAI-Project: <team>/<project>" \
+      -d '{
+        "model": "deepseek-ai/DeepSeek-V3-0324",
+        "messages": [
+          { "role": "system", "content": "You are a helpful assistant." },
+          { "role": "user", "content": "Tell me a joke." }
+        ]
+      }'
+    ```
+  </TabItem>
+  <TabItem value="python" label="Python">
+    ```python
+    import openai
+
+    # The custom base URL points to W&B Inference
+    client = openai.OpenAI(
+        base_url='https://api.inference.wandb.ai/v1',
+        # Get your API key from https://wandb.ai/authorize
+        # Consider setting it in the environment as OPENAI_API_KEY instead for safety
+        api_key="<your-apikey>"
+    )
+
+    response = client.chat.completions.create(
+        model="deepseek-ai/DeepSeek-V3-0324",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Tell me a joke."}
+        ],
+        extra_headers={
+            # Team and project are required for usage tracking
+            "OpenAI-Project": "<team>/<project>"
         },
     )
 
@@ -166,22 +283,13 @@ Use the API to query all currently available models and their IDs. This is usefu
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="bash" label="Bash" default>
-
-  </TabItem>
-  <TabItem value="python" label="Python">
-
-  </TabItem>
-</Tabs>
-
-<Tabs groupId="programming-language" queryString>
-  <TabItem value="bash" label="Bash" default>
     ```bash
-    curl https://infr.cw4637-staging.coreweave.app/v1/chat/completions \
+    curl https://api.inference.wandb.ai/v1/chat/completions \
       -H "Content-Type: application/json" \
-      -H "Authorization: Bearer some-key-value" \
-      -H "OpenAI-Project: entity1/project1" \
+      -H "Authorization: Bearer <your-apikey>" \
+      -H "OpenAI-Project: <team>/<project>" \
       -d '{
-        "model": "cw_meta-llama_Llama-3.3-70B-Instruct",
+        "model": "meta-llama/Llama-3.3-70B-Instruct",
         "messages": [
           { "role": "system", "content": "You are a helpful assistant." },
           { "role": "user", "content": "Tell me a joke." }
@@ -192,24 +300,24 @@ Use the API to query all currently available models and their IDs. This is usefu
   <TabItem value="python" label="Python">
     ```python
     import openai
-    import weave
 
-    # Set a custom base URL
+    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
-        base_url='https://infr.cw4637-staging.coreweave.app/v1',
-        # Generally recommend setting OPENAI_API_KEY in the environment
-        api_key="some-key-value"
+        base_url='https://api.inference.wandb.ai/v1',
+        # Get your API key from https://wandb.ai/authorize
+        # Consider setting it in the environment as OPENAI_API_KEY instead for safety
+        api_key="<your-apikey>"
     )
 
-    # Make a call using the client
     response = client.chat.completions.create(
-        model="cw_meta-llama_Llama-3.3-70B-Instruct",
+        model="meta-llama/Llama-3.3-70B-Instruct",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
         extra_headers={
-            "OpenAI-Project": "entity1/project1"
+            # Team and project are required for usage tracking
+            "OpenAI-Project": "<team>/<project>"
         },
     )
 
@@ -218,103 +326,17 @@ Use the API to query all currently available models and their IDs. This is usefu
   </TabItem>
 </Tabs>
 
-#### BGE M3
+#### DeepSeek R1-0528
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="bash" label="Bash" default>
     ```bash
-    curl https://api.openai.com/v1/embeddings \
+    curl https://api.inference.wandb.ai/v1/chat/completions \
       -H "Content-Type: application/json" \
-      -H "Authorization: Bearer some-key-value" \
+      -H "Authorization: Bearer <your-apikey>" \
+      -H "OpenAI-Project: <team>/<project>" \
       -d '{
-        "input": "Your text string goes here",
-        "model": "undefined"
-      }'
-    ```
-  </TabItem>
-  <TabItem value="python" label="Python">
-    ```python 
-    from openai import OpenAI
-    client = OpenAI()
-
-    response = client.embeddings.create(
-        input="Your text string goes here",
-        model="undefined"
-    )
-
-    print(response.data[0].embedding)
-    ```
-
-    ```bash
-    curl https://api.openai.com/v1/embeddings \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer some-key-value" \
-      -d '{
-        "input": "Your text string goes here",
-        "model": "undefined"
-      }'
-    ```
-  </TabItem>
-</Tabs>
-
-#### Mistral Small 3.1
-
-<Tabs groupId="programming-language" queryString>
-  <TabItem value="bash" label="Bash" default>
-    ```bash
-    curl https://infr.cw4637-staging.coreweave.app/v1/chat/completions \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer some-key-value" \
-      -H "OpenAI-Project: entity1/project1" \
-      -d '{
-        "model": "cw_mistralai_Mistral-Small-3.1-24B-Instruct-2503",
-        "messages": [
-          { "role": "system", "content": "You are a helpful assistant." },
-          { "role": "user", "content": "Tell me a joke." }
-        ]
-      }'
-    ```
-  </TabItem>
-  <TabItem value="python" label="Python">
-    ```python
-    import openai
-    import weave
-
-    # Set a custom base URL
-    client = openai.OpenAI(
-        base_url='https://infr.cw4637-staging.coreweave.app/v1',
-        # Generally recommend setting OPENAI_API_KEY in the environment
-        api_key="some-key-value"
-    )
-
-    # Make a call using the client
-    response = client.chat.completions.create(
-        model="cw_mistralai_Mistral-Small-3.1-24B-Instruct-2503",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "Tell me a joke."}
-        ],
-        extra_headers={
-            "OpenAI-Project": "entity1/project1"
-        },
-    )
-
-    print(response.choices[0].message.content)
-    ```
-  </TabItem>
-</Tabs>
-
-#### Llama 4 Scout
-
-<Tabs groupId="programming-language" queryString>
-  <TabItem value="bash" label="Bash" default>
-    ```bash
-    curl https://infr.cw4637-staging.coreweave.app/v1/chat/completions \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer some-key-value" \
-      -H "OpenAI-Project: entity1/project1" \
-      -d '{
-        "model": "cw_meta-llama_Llama-4-Scout-17B-16E-Instruct",
+        "model": "deepseek-ai/DeepSeek-R1-0528",
         "messages": [
           { "role": "system", "content": "You are a helpful assistant." },
           { "role": "user", "content": "Tell me a joke." }
@@ -325,24 +347,24 @@ Use the API to query all currently available models and their IDs. This is usefu
   <TabItem value="python" label="Python">
     ```python 
     import openai
-    import weave
 
-    # Set a custom base URL
+    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
-        base_url='https://infr.cw4637-staging.coreweave.app/v1',
-        # Generally recommend setting OPENAI_API_KEY in the environment
-        api_key="some-key-value"
+        base_url='https://api.inference.wandb.ai/v1',
+        # Get your API key from https://wandb.ai/authorize
+        # Consider setting it in the environment as OPENAI_API_KEY instead for safety
+        api_key="<your-apikey>"
     )
 
-    # Make a call using the client
     response = client.chat.completions.create(
-        model="cw_meta-llama_Llama-4-Scout-17B-16E-Instruct",
+        model="deepseek-ai/DeepSeek-R1-0528",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
         extra_headers={
-            "OpenAI-Project": "entity1/project1"
+            # Team and project are required for usage tracking
+            "OpenAI-Project": "<team>/<project>"
         },
     )
 
@@ -351,17 +373,17 @@ Use the API to query all currently available models and their IDs. This is usefu
   </TabItem>
 </Tabs>
 
-#### Qwen 2.5 VL 7B
+#### LLama 4 Scout
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="bash" label="Bash" default>
     ```bash
-    curl https://infr.cw4637-staging.coreweave.app/v1/chat/completions \
+    curl https://api.inference.wandb.ai/v1/chat/completions \
       -H "Content-Type: application/json" \
-      -H "Authorization: Bearer some-key-value" \
-      -H "OpenAI-Project: entity1/project1" \
+      -H "Authorization: Bearer <your-apikey>" \
+      -H "OpenAI-Project: <team>/<project>" \
       -d '{
-        "model": "cw_Qwen_Qwen2.5-VL-7B-Instruct",
+        "model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
         "messages": [
           { "role": "system", "content": "You are a helpful assistant." },
           { "role": "user", "content": "Tell me a joke." }
@@ -372,24 +394,24 @@ Use the API to query all currently available models and their IDs. This is usefu
   <TabItem value="python" label="Python">
     ```python
     import openai
-    import weave
 
-    # Set a custom base URL
+    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
-        base_url='https://infr.cw4637-staging.coreweave.app/v1',
-        # Generally recommend setting OPENAI_API_KEY in the environment
-        api_key="some-key-value"
+        base_url='https://api.inference.wandb.ai/v1',
+        # Get your API key from https://wandb.ai/authorize
+        # Consider setting it in the environment as OPENAI_API_KEY instead for safety
+        api_key="<your-apikey>"
     )
 
-    # Make a call using the client
     response = client.chat.completions.create(
-        model="cw_Qwen_Qwen2.5-VL-7B-Instruct",
+        model="meta-llama/Llama-4-Scout-17B-16E-Instruct",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
         extra_headers={
-            "OpenAI-Project": "entity1/project1"
+            # Team and project are required for usage tracking
+            "OpenAI-Project": "<team>/<project>"
         },
     )
 
@@ -403,59 +425,12 @@ Use the API to query all currently available models and their IDs. This is usefu
 <Tabs groupId="programming-language" queryString>
   <TabItem value="bash" label="Bash" default>
     ```bash
-    curl https://infr.cw4637-staging.coreweave.app/v1/chat/completions \
+    curl https://api.inference.wandb.ai/v1/chat/completions \
       -H "Content-Type: application/json" \
-      -H "Authorization: Bearer some-key-value" \
-      -H "OpenAI-Project: entity1/project1" \
+      -H "Authorization: Bearer <your-apikey>" \
+      -H "OpenAI-Project: <team>/<project>" \
       -d '{
-        "model": "cw_microsoft_Phi-4-mini-instruct",
-        "messages": [
-          { "role": "system", "content": "You are a helpful assistant." },
-          { "role": "user", "content": "Tell me a joke." }
-        ]
-      }'
-    ```
-  </TabItem>
-  <TabItem value="python" label="Python">
-    ```python
-    import openai
-    import weave
-
-    # Set a custom base URL
-    client = openai.OpenAI(
-        base_url='https://infr.cw4637-staging.coreweave.app/v1',
-        # Generally recommend setting OPENAI_API_KEY in the environment
-        api_key="some-key-value"
-    )
-
-    # Make a call using the client
-    response = client.chat.completions.create(
-        model="cw_microsoft_Phi-4-mini-instruct",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "Tell me a joke."}
-        ],
-        extra_headers={
-            "OpenAI-Project": "entity1/project1"
-        },
-    )
-
-    print(response.choices[0].message.content)
-    ```
-  </TabItem>
-</Tabs>
-
-#### Llama 4 Maverick
-
-<Tabs groupId="programming-language" queryString>
-  <TabItem value="bash" label="Bash" default>
-    ```bash
-    curl https://infr.cw4637-staging.coreweave.app/v1/chat/completions \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer some-key-value" \
-      -H "OpenAI-Project: entity1/project1" \
-      -d '{
-        "model": "cw_meta-llama_Llama-4-Maverick-17B-128E-Instruct-FP8",
+        "model": "microsoft/Phi-4-mini-instruct",
         "messages": [
           { "role": "system", "content": "You are a helpful assistant." },
           { "role": "user", "content": "Tell me a joke." }
@@ -466,83 +441,24 @@ Use the API to query all currently available models and their IDs. This is usefu
   <TabItem value="python" label="Python">
     ```python 
     import openai
-    import weave
 
-    # Set a custom base URL
+    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
-        base_url='https://infr.cw4637-staging.coreweave.app/v1',
-        # Generally recommend setting OPENAI_API_KEY in the environment
-        api_key="some-key-value"
+        base_url='https://api.inference.wandb.ai/v1',
+        # Get your API key from https://wandb.ai/authorize
+        # Consider setting it in the environment as OPENAI_API_KEY instead for safety
+        api_key="<your-apikey>"
     )
 
-    # Make a call using the client
     response = client.chat.completions.create(
-        model="cw_meta-llama_Llama-4-Maverick-17B-128E-Instruct-FP8",
+        model="microsoft/Phi-4-mini-instruct",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
         extra_headers={
-            "OpenAI-Project": "entity1/project1"
-        },
-    )
-
-    print(response.choices[0].message.content)
-    ```
-  </TabItem>
-</Tabs>
-
-#### Granite 3.3 8B
-
-<Tabs groupId="programming-language" queryString>
-  <TabItem value="bash" label="Bash" default>
-    ```python
-    import openai
-    import weave
-
-    # Set a custom base URL
-    client = openai.OpenAI(
-        base_url='https://infr.cw4637-staging.coreweave.app/v1',
-        # Generally recommend setting OPENAI_API_KEY in the environment
-        api_key="some-key-value"
-    )
-
-    # Make a call using the client
-    response = client.chat.completions.create(
-        model="cw_ibm-granite_granite-3.3-8b-instruct",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "Tell me a joke."}
-        ],
-        extra_headers={
-            "OpenAI-Project": "entity1/project1"
-        },
-    )
-
-    print(response.choices[0].message.content)
-    ```
-  </TabItem>
-  <TabItem value="python" label="Python">
-    ```python 
-    import openai
-    import weave
-
-    # Set a custom base URL
-    client = openai.OpenAI(
-        base_url='https://infr.cw4637-staging.coreweave.app/v1',
-        # Generally recommend setting OPENAI_API_KEY in the environment
-        api_key="some-key-value"
-    )
-
-    # Make a call using the client
-    response = client.chat.completions.create(
-        model="cw_meta-llama_Llama-4-Maverick-17B-128E-Instruct-FP8",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "Tell me a joke."}
-        ],
-        extra_headers={
-            "OpenAI-Project": "entity1/project1"
+            # Team and project are required for usage tracking
+            "OpenAI-Project": "<team>/<project>"
         },
     )
 
@@ -552,22 +468,102 @@ Use the API to query all currently available models and their IDs. This is usefu
 </Tabs>
 
 
-## Usage limits
+
+## UI
+
+The following section describes how to use the Inference service from the W&B UI. Before you can access the Inference service via the UI, complete the [prerequisites](#prerequisites).
+
+### Access the Inference service
+
+You can access the Inference service via the Weave UI from two difference locations:
+
+- [From the Inference tab](#from-the-inference-tab)
+- [From the Playground tab](#from-the-playground-tab)
+
+#### From the Inference tab
+
+1. Navigate to your W&B account at [https://wandb.ai/](https://wandb.ai/).
+2. From the left sidebar, select **Inference**. A page with available models and model information displays.
+
+#### From the Playground tab
+
+1. From the Weave UI, select **Playground**. The Playground chat UI displays.
+2. From the LLM dropdown list, mouseover **W&B Inference**. A dropdown with available W&B Inference models displays to the right.
+3. From the W&B Inference models dropdown, you can:
+   - Click the name of any available model to [try it in the Playground](#try-a-model-in-the-playground).
+   - Mouseover the information icon to the right of the model name for model information. You can also click the link to [view detailed model information](#view-model-information).
+   - Compare one or models in the Playground
+
+### View model information
+
+<!-- 
+Add steps to view model info in the UI
+!-->
+
+### Try a model in the Playground
+
+Once you've [selected a model using one of the access options](#access-the-inference-service), you can try the model in Playground. The following actions are available:
+
+- [Customize model settings and parameters](../tools/playground.md#customize-settings)
+- [Add, retry, edit, and delete messages](../tools/playground.md#message-controls) 
+- [Save and reuse a model with custom settings](../tools/playground.md#saved-models)
+- [Compare multiple models](#compare-multiple-models)
+
+### Compare multiple models
+
+#### Access the Compare view from the Inference tab 
+
+1. From the left sidebar, select **Inference**. A page with available models and model information displays.
+2. To select models for comparison, click anywhere on a model card (except for the model name). The border of the model card is highlighted in blue to indicate the selection.
+3. Repeat step 2 for each model you want to compare.
+4. In any of the selected cards, click the **Compare N models in the Playground** button (`N` is the number of models you are comparing. For example, when 3 models are selected, the button displays as **Compare 3 models in the Playground**). The comparison view opens
+
+#### Access the Compare view from the Playground tab
+
+1. From the Weave UI, select **Playground**. The Playground chat UI displays.
+2. From the LLM dropdown list, mouseover **W&B Inference**. A dropdown with available W&B Inference models displays to the right.
+3. From the dropdown, select **Compare**. The **Inference** tab displays.
+4. Follow steps 2 through 4 to [access the Compare view from the Inference tab](#access-the-compare-view-from-the-inference-tab).
+
+### View billing information
+
+<!-- 
+Add billing info access steps
+!-->
+
+### Upgrade your plan 
+
+<!-- 
+Add UI steps to upgrade plan from the UI
+!-->
+
+## Usage information and limits 
+
+The folling section describes important usage informatopn and limits. Familiarize yourself with this information before using the service.
 
 ### Geographic restrictions
 
+The Inference service is only accessible from supported geographic limitations. For more information, see the [Terms of Service](https://docs.coreweave.com/docs/policies/terms-of-service/terms-of-use#geographic-restrictions).
 
-https://docs.coreweave.com/docs/policies/terms-of-service/terms-of-use#geographic-restrictions
+### Rate limits
 
-## Troubleshooting
+<!-- 
+Add rate limits when info available 
+!-->
 
-### API errors
+## API errors
 
 | Error Code | Message                                                                     | Cause                                           | Solution                                                                               |
 | ---------- | --------------------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
 | 401        | Invalid Authentication                                                      | Invalid authentication credentials.             | Ensure the correct API key is being used.                                              |
-| 403        | Country, region, or territory not supported                                 | Accessing the API from an unsupported location. | Please see [this page](#) for more information.                                        |
-| 429        | Concurrency limit reached for requests                                      | Too many concurrent requests.                   | Reduce the number of concurrent requests. See the [Rate limit guide](#).               |
-| 429        | You exceeded your current quota, please check your plan and billing details | Out of credits or reached monthly spending cap. | [Buy more credits](#) or learn how to [increase your limits](#).                       |
-| 500        | The server had an error while processing your request                       | Internal server error.                          | Retry after a brief wait and contact support if it persists. See the [status page](#). |
+| 403        | Country, region, or territory not supported                                 | Accessing the API from an unsupported location. | Please see [Geographic restrictions](#geographic-restrictions)                                       |
+| 429        | Concurrency limit reached for requests                                      | Too many concurrent requests.                   | Reduce the number of concurrent requests.               |
+| 429        | You exceeded your current quota, please check your plan and billing details | Out of credits or reached monthly spending cap. | Purchase more credits or increase your limits.                       |
+| 500        | The server had an error while processing your request                       | Internal server error.                          | Retry after a brief wait and contact support if it persists. |
 | 503        | The engine is currently overloaded, please try again later                  | Server is experiencing high traffic.            | Retry your request after a short delay.                                                |
+
+## FAQ
+
+<!-- 
+Add FAQ section?
+!-->
