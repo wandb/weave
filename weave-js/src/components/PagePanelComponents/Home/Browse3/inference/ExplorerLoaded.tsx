@@ -146,13 +146,18 @@ export const ExplorerLoaded = ({
   return (
     <div className="px-32 py-24" onClick={onClickBackground}>
       <div className="mb-16 flex items-center gap-8">
-        <div className="flex-grow text-xl font-semibold">W&B hosted models</div>
+        <div className="flex-grow">
+          <div className="text-xl font-semibold text-moon-800">
+            W&B hosted models
+          </div>
+          <div className="text-md text-moon-650">Prices per 1M tokens</div>
+        </div>
         <ToggleButtonGroup
           options={[
             {value: 'All'},
             {value: 'Text'},
             {value: 'Vision'},
-            {value: 'Embedding'},
+            // {value: 'Embedding'},
           ]}
           value={filterModality}
           size="small"

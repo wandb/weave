@@ -587,7 +587,7 @@ def test_calls_delete(client):
 
     assert len(list(client.get_calls())) == 4
 
-    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call0.op_name])))
+    result = list(client.get_calls(filter={"op_names": [call0.op_name]}))
     assert len(result) == 3
 
     # should deleted call0_child1, _call0_child2, call1, but not call0
