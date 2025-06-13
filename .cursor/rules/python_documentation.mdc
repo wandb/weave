@@ -1,0 +1,30 @@
+---
+description: Python Documentation
+globs: *.py
+alwaysApply: true
+---
+
+1. When writing functions, always include Google-style docstrings with examples.  Short or otherwise obvious functions can have a 1-line docstring.  See below for an example.
+
+```python
+def function(param1: str, param2: float) -> bool:
+    """
+    Short description of what the function does at the top.
+
+    Args:
+        param1 (str): This is the first param.
+        param2 (float): This is a second param.
+
+    Returns:
+        bool: This is a description of what is returned.
+
+    Raises:
+        KeyError: Raises an exception.
+
+    Examples:
+        Examples should be be written in doctest format, and should illustrate how
+        to use the function.
+
+    """
+    ...
+```

@@ -5,50 +5,41 @@ import levenshtein from 'js-levenshtein';
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
 export const LLM_MAX_TOKENS = {
   // CoreWeave hosted models
-  'cw_deepseek-ai_DeepSeek-R1': {
+  'cw_meta-llama_Llama-3.1-8B-Instruct': {
+    label: 'Llama 3.1 8B',
     provider: 'coreweave',
     max_tokens: 1000,
-    supports_function_calling: true,
+    supports_function_calling: false,
+  },
+  'cw_deepseek-ai_DeepSeek-R1-0528': {
+    label: 'DeepSeek R1-0528',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
+  },
+  'cw_deepseek-ai_DeepSeek-V3-0324': {
+    label: 'DeepSeek V3-0324',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
   },
   'cw_meta-llama_Llama-3.3-70B-Instruct': {
+    label: 'Llama 3.3 70B',
     provider: 'coreweave',
     max_tokens: 1000,
-    supports_function_calling: true,
-  },
-  'cw_mistralai_Mistral-Small-3.1-24B-Instruct-2503': {
-    provider: 'coreweave',
-    max_tokens: 1000,
-    supports_function_calling: true,
+    supports_function_calling: false,
   },
   'cw_meta-llama_Llama-4-Scout-17B-16E-Instruct': {
+    label: 'Llama 4 Scout',
     provider: 'coreweave',
     max_tokens: 1000,
-    supports_function_calling: true,
-  },
-  'cw_Qwen_QwQ-32B': {
-    provider: 'coreweave',
-    max_tokens: 1000,
-    supports_function_calling: true,
+    supports_function_calling: false,
   },
   'cw_microsoft_Phi-4-mini-instruct': {
+    label: 'Phi 4 Mini',
     provider: 'coreweave',
     max_tokens: 1000,
-    supports_function_calling: true,
-  },
-  'cw_meta-llama_Llama-4-Maverick-17B-128E-Instruct-FP8': {
-    provider: 'coreweave',
-    max_tokens: 1000,
-    supports_function_calling: true,
-  },
-  'cw_Qwen_Qwen2.5-VL-7B-Instruct': {
-    provider: 'coreweave',
-    max_tokens: 1000,
-    supports_function_calling: true,
-  },
-  'cw_ibm-granite_granite-3.3-8b-instruct': {
-    provider: 'coreweave',
-    max_tokens: 1000,
-    supports_function_calling: true,
+    supports_function_calling: false,
   },
   // End hosted models
   'gpt-4.1-mini-2025-04-14': {

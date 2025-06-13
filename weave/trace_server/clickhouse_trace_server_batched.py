@@ -2842,12 +2842,17 @@ def _setup_completion_model_info(
         # but ignore the bit about omitting the /v1 because it is actually necessary
         req.inputs.model = "openai/" + model_name.replace("coreweave/", "", 1)
         provider = "custom"
-        base_url = "https://infr.cw4637-staging.coreweave.app/v1"
+        inference_service_env = "prod"
         # The API key should have been passed in as an extra header.
         if req.inputs.extra_headers:
+            hostname = req.inputs.extra_headers.get("trace_server_hostname", None)
+            if hostname == "weave-trace.qa.wandb.ai":
+                inference_service_env = "staging"
             api_key = req.inputs.extra_headers.pop("api_key", None)
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None
+        # TODO: Still waiting on DNS changes for prettier URL
+        base_url = f"https://infr.cw4637-{inference_service_env}.coreweave.app/v1"
         return_type = "openai"
     else:
         # Custom provider path

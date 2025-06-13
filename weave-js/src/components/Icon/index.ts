@@ -91,6 +91,7 @@ export {
   IconGhostAgent,
   IconGit,
   IconGithub,
+  IconGrafana,
   IconGroup,
   IconH1,
   IconH2,
