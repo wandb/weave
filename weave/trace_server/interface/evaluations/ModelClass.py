@@ -23,6 +23,7 @@ class ModelClassMutableProperties(BaseModel):
 class ModelClassImmutableProperties(BaseModel):
     signature: TypedSignature
     config_schema: JSONSchema
+    # Implementation id???
 
 
 class ModelClassUserDefinedProperties(

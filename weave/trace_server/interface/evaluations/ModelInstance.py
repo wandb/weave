@@ -28,7 +28,7 @@ class ModelInstanceUserDefinedProperties(
 
 
 class ModelInstance(BaseModel, ModelInstanceUserDefinedProperties):
-    id: str
+    id: str # content hash of ModelInstanceImmutableProperties
 
 
 class CreateModelInstanceReq(BaseModel):

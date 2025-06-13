@@ -6,8 +6,11 @@ from weave.trace_server.interface.evaluations.ModelClass import TSEIMModelClassM
 from weave.trace_server.interface.evaluations.ModelInstance import (
     TSEIMModelInstanceMixin,
 )
-from weave.trace_server.interface.evaluations.TaskDescription import (
-    TSEIMTaskDescriptionMixin,
+from weave.trace_server.interface.evaluations.TaskDefinition import (
+    TSEIMTaskDefinitionMixin,
+)
+from weave.trace_server.interface.evaluations.TaskExample import (
+    TSEIMTaskExampleMixin,
 )
 
 
@@ -16,5 +19,6 @@ class TraceServerEvaluationInterfaceMixin(
     TSEIMModelInstanceMixin,
     TSEIMInputPayloadMixin,
     TSEIMGenerationResultMixin,
-    TSEIMTaskDescriptionMixin,
+    TSEIMTaskDefinitionMixin,
+    TSEIMTaskExampleMixin,
 ): ...
