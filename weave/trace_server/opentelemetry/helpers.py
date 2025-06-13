@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Optional, Union
 from uuid import UUID
 
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
