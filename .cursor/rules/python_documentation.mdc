@@ -1,9 +1,4 @@
 ---
-description: 
-globs: 
-alwaysApply: true
----
----
 description: Python Documentation
 globs: *.py
 alwaysApply: true
