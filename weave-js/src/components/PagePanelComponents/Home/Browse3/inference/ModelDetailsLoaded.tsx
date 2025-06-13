@@ -275,7 +275,7 @@ export const ModelDetailsLoaded = ({
             {model.license && (
               <>
                 <div className="flex items-center">
-                  <Icon name="checkmark-circle" width={18} height={18} />
+                  <Icon name="courthouse-license" width={18} height={18} />
                 </div>
                 <div className="flex items-center">
                   {getModelLicense(model)}
