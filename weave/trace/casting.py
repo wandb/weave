@@ -82,7 +82,7 @@ CallsFilterLike = Annotated[CallsFilter, BeforeValidator(cast_to_calls_filter)]
 SortByLike = Annotated[SortBy, BeforeValidator(cast_to_sort_by)]
 QueryLike = Annotated[Query, BeforeValidator(cast_to_query)]
 TableLike = Annotated[
-    Table | WeaveTable | list[dict],
+    Union[Table, WeaveTable, list[dict]],
     BeforeValidator(cast_to_table),
     BeforeValidator(non_empty_list),
 ]
