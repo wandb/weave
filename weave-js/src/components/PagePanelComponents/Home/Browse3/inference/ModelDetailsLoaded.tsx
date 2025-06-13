@@ -32,7 +32,10 @@ type ModelDetailsLoadedProps = {
   inferenceContext: InferenceContextType;
 };
 
-const BASE_URL = 'https://infr.cw4637-staging.coreweave.app/v1';
+const BASE_URL_QA = 'https://infr.cw4637-staging.coreweave.app/v1';
+const BASE_URL_PROD = 'https://api.inference.wandb.ai/v1';
+const BASE_URL =
+  window.location.hostname === 'qa.wandb.ai' ? BASE_URL_QA : BASE_URL_PROD;
 
 // # Enable HTTPX debugging
 // import logging
@@ -42,16 +45,15 @@ const BASE_URL = 'https://infr.cw4637-staging.coreweave.app/v1';
 const CODE_EXAMPLES_CHAT: Record<string, string> = {
   Python: `
 import openai
-import weave
 
-# Set a custom base URL
+# The custom base URL points to W&B Inference
 client = openai.OpenAI(
     base_url='${BASE_URL}',
-    # Generally recommend setting OPENAI_API_KEY in the environment
-    api_key="some-key-value"
+    # Get your API key from ${window.location.origin}/authorize
+    # Consider setting it in the environment as OPENAI_API_KEY instead for safety
+    api_key="<your-apikey>"
 )
 
-# Make a call using the client
 response = client.chat.completions.create(
     model="{model_id}",
     messages=[
@@ -59,7 +61,8 @@ response = client.chat.completions.create(
         {"role": "user", "content": "Tell me a joke."}
     ],
     extra_headers={
-        "OpenAI-Project": "entity1/project1"
+        # Team and project are required for usage tracking
+        "OpenAI-Project": "<team>/<project>"
     },
 )
 
@@ -69,10 +72,10 @@ import OpenAI from "openai";
 
 // Initialize OpenAI client with API key, base URL, and custom headers
 const client = new OpenAI({
-  apiKey: "some-key-value", // 🔐 Replace with your actual API key
+  apiKey: "<your-apikey>", // 🔐 Replace with your actual API key
   baseURL: "${BASE_URL}", // 🔁 Replace with your actual base URL
   defaultHeaders: {
-    "OpenAI-Project": "entity1/project1",
+    "OpenAI-Project": "<team>/<project>",
   },
 });
 
@@ -91,8 +94,8 @@ console.log(response.choices[0].message.content);
   Curl: `
   curl ${BASE_URL}/chat/completions \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer some-key-value" \\
-  -H "OpenAI-Project: entity1/project1" \\
+  -H "Authorization: Bearer <your-apikey>" \\
+  -H "OpenAI-Project: <team>/<project>" \\
   -d '{
     "model": "{model_id}",
     "messages": [
