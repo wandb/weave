@@ -49,7 +49,11 @@ def test_dataset_laziness(client):
     """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
-    assert _top_level_logs(log) == ["ensure_project_exists"]
+    assert _top_level_logs(log) == [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+    ]
     client.server.attribute_access_log = []
 
     length = len(dataset)
@@ -76,7 +80,11 @@ def test_published_dataset_laziness(client):
     """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
-    assert _top_level_logs(log) == ["ensure_project_exists"]
+    assert _top_level_logs(log) == [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+    ]
     client.server.attribute_access_log = []
 
     ref = weave.publish(dataset)

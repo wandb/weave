@@ -1947,14 +1947,13 @@ const useRefsType = (params: UseGetRefsTypeParams): Loadable<Types.Type[]> => {
 
 /// Converters ///
 
-/**
- * Getting the status code for a trace call has a few complexities.
- */
-export const traceCallStatusCode = (
-  traceCall: traceServerTypes.TraceCallSchema,
+const statusCode = (
+  serverSideStatus: traceServerTypes.ComputedCallStatusType | undefined,
+  exception: string | undefined,
+  endedAt: string | undefined,
+  statusCounts: {error: number} | undefined,
   hasDescendantErrors?: boolean
-): traceServerTypes.ComputedCallStatusType => {
-  const serverSideStatus = traceCall.summary?.weave?.status;
+) => {
   if (serverSideStatus) {
     if (
       serverSideStatus === traceServerTypes.ComputedCallStatuses.success &&
@@ -1964,16 +1963,48 @@ export const traceCallStatusCode = (
     }
     return serverSideStatus;
   }
-  if (traceCall.exception) {
+  if (exception) {
     return traceServerTypes.ComputedCallStatuses.error;
-  } else if (traceCall.ended_at) {
-    const errors = traceCall.summary?.status_counts?.error ?? 0;
+  } else if (endedAt) {
+    const errors = statusCounts?.error ?? 0;
     if (errors > 0 || hasDescendantErrors) {
       return traceServerTypes.ComputedCallStatuses.descendant_error;
     }
     return traceServerTypes.ComputedCallStatuses.success;
   }
   return traceServerTypes.ComputedCallStatuses.running;
+};
+
+/**
+ * Getting the status code for a trace call has a few complexities.
+ */
+export const traceCallStatusCode = (
+  traceCall: traceServerTypes.TraceCallSchema,
+  hasDescendantErrors?: boolean
+): traceServerTypes.ComputedCallStatusType => {
+  return statusCode(
+    traceCall.summary?.weave?.status,
+    traceCall.exception,
+    traceCall.ended_at,
+    traceCall.summary?.status_counts,
+    hasDescendantErrors
+  );
+};
+
+/**
+ * Getting the status code for a trace call has a few complexities.
+ */
+export const flattenedTraceCallStatusCode = (
+  traceCall: {[key: string]: any},
+  hasDescendantErrors?: boolean
+): traceServerTypes.ComputedCallStatusType => {
+  return statusCode(
+    traceCall['summary.weave.status'],
+    traceCall.exception,
+    traceCall.ended_at,
+    traceCall['summary.status_counts.error'],
+    hasDescendantErrors
+  );
 };
 
 export const traceCallLatencyS = (

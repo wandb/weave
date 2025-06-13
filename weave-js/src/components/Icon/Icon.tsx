@@ -91,6 +91,7 @@ import {ReactComponent as ImportFullScreenModeExpand} from '../../assets/icons/i
 import {ReactComponent as ImportGhostAgent} from '../../assets/icons/icon-ghost-agent.svg';
 import {ReactComponent as ImportGit} from '../../assets/icons/icon-git.svg';
 import {ReactComponent as ImportGithub} from '../../assets/icons/icon-github.svg';
+import {ReactComponent as ImportGrafana} from '../../assets/icons/icon-grafana.svg';
 import {ReactComponent as ImportGroup} from '../../assets/icons/icon-group.svg';
 import {ReactComponent as ImportH1} from '../../assets/icons/icon-h1.svg';
 import {ReactComponent as ImportH2} from '../../assets/icons/icon-h2.svg';
@@ -575,6 +576,9 @@ export const IconGit = (props: SVGIconProps) => (
 );
 export const IconGithub = (props: SVGIconProps) => (
   <ImportGithub {...updateIconProps(props)} />
+);
+export const IconGrafana = (props: SVGIconProps) => (
+  <ImportGrafana {...updateIconProps(props)} />
 );
 export const IconGroup = (props: SVGIconProps) => (
   <ImportGroup {...updateIconProps(props)} />
@@ -1251,6 +1255,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'ghost-agent': IconGhostAgent,
   git: IconGit,
   github: IconGithub,
+  grafana: IconGrafana,
   group: IconGroup,
   h1: IconH1,
   h2: IconH2,
