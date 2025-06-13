@@ -38,6 +38,7 @@ import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
 const MAX_EXPORT = 10_000;
+const MAX_CALL_COUNT = 1000;
 
 type SelectionState = 'all' | 'selected' | 'limit';
 
@@ -735,6 +736,8 @@ export const PaginationButtons = ({hideControls}: PaginationButtonsProps) => {
     }
   };
 
+  const plusText = rowCount === MAX_CALL_COUNT ? '+' : '';
+
   return (
     <Box
       display="flex"
@@ -762,6 +765,7 @@ export const PaginationButtons = ({hideControls}: PaginationButtonsProps) => {
             justifyContent: 'center',
           }}>
           {start}-{end} of {rowCount}
+          {plusText}
         </Box>
         <Button
           variant="ghost"

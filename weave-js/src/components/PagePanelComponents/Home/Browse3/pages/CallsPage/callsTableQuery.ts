@@ -90,12 +90,28 @@ export const useCallsForQuery = (
     includeFeedback: true,
   });
 
+  const hasHeavyField = (filterBy: Query | undefined) => {
+    if (filterBy == null) {
+      return false;
+    }
+    const filterStr = JSON.stringify(filterBy);
+    return filterStr.includes('inputs.') || filterStr.includes('output.');
+  };
+
+  const callsStatsLimit = useMemo(() => {
+    if (hasHeavyField(filterBy)) {
+      return 1_000;
+    }
+    return undefined;
+  }, [filterBy]);
+
   const callsStats = useCallsStats({
     entity,
     project,
     filter: lowLevelFilter,
     query: filterBy,
     refetchOnDelete: true,
+    limit: callsStatsLimit,
   });
 
   const callResults = useMemo(() => {
