@@ -381,7 +381,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock litellm to raise an exception
-            mock_litellm.side_effect = Exception("Test error")
+            mock_litellm.side_effect = RuntimeError("Test error")
 
             # Create test request
             req = tsi.CompletionsCreateReq(
@@ -394,7 +394,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             )
 
             # Get the stream and expect an exception
-            with self.assertRaises(Exception):
+            with self.assertRaises(RuntimeError):
                 list(self.server.completions_create_stream(req))
 
     def test_streaming_with_call_tracking(self):
