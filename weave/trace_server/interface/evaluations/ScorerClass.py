@@ -30,7 +30,7 @@ class ScorerClassImmutableProperties(BaseModel):
 
 
 class ScorerClassUserDefinedProperties(
- ScorerClassMutableProperties, ScorerClassImmutableProperties
+    ScorerClassMutableProperties, ScorerClassImmutableProperties
 ): ...
 
 

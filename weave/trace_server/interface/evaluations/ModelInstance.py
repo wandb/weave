@@ -23,7 +23,7 @@ class ModelInstanceImmutableProperties(BaseModel):
 
 
 class ModelInstanceUserDefinedProperties(
- ModelInstanceMutableProperties, ModelInstanceImmutableProperties
+    ModelInstanceMutableProperties, ModelInstanceImmutableProperties
 ): ...
 
 

@@ -35,7 +35,7 @@ class EvaluationSummaryImmutableProperties(BaseModel):
 
 
 class EvaluationSummaryUserDefinedProperties(
- EvaluationSummaryMutableProperties, EvaluationSummaryImmutableProperties
+    EvaluationSummaryMutableProperties, EvaluationSummaryImmutableProperties
 ): ...
 
 
@@ -78,13 +78,21 @@ class DeleteEvaluationSummaryRes(BaseModel):
 
 class TSEIMEvaluationSummaryMixin(ABC):
     @abstractmethod
-    async def async_create_evaluation_summary(self, req: CreateEvaluationSummaryReq) -> CreateEvaluationSummaryRes: ...
+    async def async_create_evaluation_summary(
+        self, req: CreateEvaluationSummaryReq
+    ) -> CreateEvaluationSummaryRes: ...
 
     @abstractmethod
-    async def async_get_evaluation_summary(self, req: GetEvaluationSummaryReq) -> GetEvaluationSummaryRes: ...
+    async def async_get_evaluation_summary(
+        self, req: GetEvaluationSummaryReq
+    ) -> GetEvaluationSummaryRes: ...
 
     @abstractmethod
-    async def async_update_evaluation_summary(self, req: UpdateEvaluationSummaryReq) -> UpdateEvaluationSummaryRes: ...
+    async def async_update_evaluation_summary(
+        self, req: UpdateEvaluationSummaryReq
+    ) -> UpdateEvaluationSummaryRes: ...
 
     @abstractmethod
-    async def async_delete_evaluation_summary(self, req: DeleteEvaluationSummaryReq) -> DeleteEvaluationSummaryRes: ...
+    async def async_delete_evaluation_summary(
+        self, req: DeleteEvaluationSummaryReq
+    ) -> DeleteEvaluationSummaryRes: ...

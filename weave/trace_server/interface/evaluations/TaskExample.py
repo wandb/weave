@@ -19,7 +19,7 @@ class TaskExampleImmutableProperties(BaseModel):
 
 
 class TaskExampleUserDefinedProperties(
- TaskExampleMutableProperties, TaskExampleImmutableProperties
+    TaskExampleMutableProperties, TaskExampleImmutableProperties
 ): ...
 
 

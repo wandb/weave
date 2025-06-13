@@ -23,7 +23,7 @@ class TaskDefinitionImmutableProperties(BaseModel):
 
 
 class TaskDefinitionUserDefinedProperties(
- TaskDefinitionMutableProperties, TaskDefinitionImmutableProperties
+    TaskDefinitionMutableProperties, TaskDefinitionImmutableProperties
 ): ...
 
 

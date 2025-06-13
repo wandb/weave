@@ -25,7 +25,7 @@ class ScoreResultImmutableProperties(BaseModel):
 
 
 class ScoreResultUserDefinedProperties(
- ScoreResultMutableProperties, ScoreResultImmutableProperties
+    ScoreResultMutableProperties, ScoreResultImmutableProperties
 ): ...
 
 
