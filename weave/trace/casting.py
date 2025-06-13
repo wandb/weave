@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Annotated, Any
 
-import pydantic
+from pydantic import BeforeValidator
 
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.table import Table
@@ -78,11 +78,11 @@ def non_empty_list(rows: list) -> list:
     return rows
 
 
-CallsFilterLike = Annotated[CallsFilter, pydantic.BeforeValidator(cast_to_calls_filter)]
-SortByLike = Annotated[SortBy, pydantic.BeforeValidator(cast_to_sort_by)]
-QueryLike = Annotated[Query, pydantic.BeforeValidator(cast_to_query)]
+CallsFilterLike = Annotated[CallsFilter, BeforeValidator(cast_to_calls_filter)]
+SortByLike = Annotated[SortBy, BeforeValidator(cast_to_sort_by)]
+QueryLike = Annotated[Query, BeforeValidator(cast_to_query)]
 TableLike = Annotated[
     Table | WeaveTable | list[dict],
-    pydantic.BeforeValidator(cast_to_table),
-    pydantic.BeforeValidator(non_empty_list),
+    BeforeValidator(cast_to_table),
+    BeforeValidator(non_empty_list),
 ]
