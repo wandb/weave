@@ -577,17 +577,13 @@ class CallsQuery(BaseModel):
             raise ValueError("Missing select columns")
 
         # Determine if the query `has_heavy_fields` by checking
-        # if it `has_heavy_select or has_heavy_filter or has_heavy_order`
         has_heavy_select = any(field.is_heavy() for field in self.select_fields)
-
         has_heavy_filter = any(
             condition.is_heavy() for condition in self.query_conditions
         )
-
         has_heavy_order = any(
             order_field.field.is_heavy() for order_field in self.order_fields
         )
-
         has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
 
         # Determine if `predicate_pushdown_possible` which is
@@ -624,7 +620,7 @@ class CallsQuery(BaseModel):
         # This can occur when there is an out of order call part insertion or worse,
         # when such occurance happens and the client terminates early.
         # Additionally: This condition is also REQUIRED for proper functioning
-        # when using the op_name and trace_id pre-group by optimizations
+        # when using pre-group by (WHERE) optimizations
         self.add_condition(
             tsi_query.NotOperation.model_validate(
                 {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
@@ -632,10 +628,10 @@ class CallsQuery(BaseModel):
         )
 
         # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs:
+        if not has_heavy_fields and not self.include_costs:
             return self._as_sql_base_format(pb, table_alias)
 
-        # If so, build the two queries
+        # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(project_id=self.project_id)
         select_query = CallsQuery(
             project_id=self.project_id,
@@ -648,11 +644,10 @@ class CallsQuery(BaseModel):
         for field in self.select_fields:
             select_query.select_fields.append(field)
 
-        # Query Conditions
+        # Query conditions and filter
         for condition in self.query_conditions:
             filter_query.query_conditions.append(condition)
 
-        # Hardcoded Filter - always light
         filter_query.hardcoded_filter = self.hardcoded_filter
 
         # Order Fields:
