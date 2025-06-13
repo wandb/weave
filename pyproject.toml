@@ -264,6 +264,9 @@ select = [
   "B008",   # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
   "B009",   # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
   "B010",   # https://docs.astral.sh/ruff/rules/set-attr-with-constant/
+  "B017",   # https://docs.astral.sh/ruff/rules/assert-raises-exception/
+  # "B018",
+  # "B019",
 ]
 ignore = [
   # we use Google style
