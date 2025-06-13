@@ -13,9 +13,14 @@ import React, {
   useState,
 } from 'react';
 import ReactMarkdown from 'react-markdown';
+import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
-import {WeaveflowPeekContext} from '../../context';
+import {
+  useClosePeek,
+  useWeaveflowRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {NotFoundPanel} from '../../NotFoundPanel';
 import {
   LeaderboardColumnOrderType,
@@ -23,7 +28,10 @@ import {
 } from '../../views/Leaderboard/LeaderboardGrid';
 import {useSavedLeaderboardData} from '../../views/Leaderboard/query/hookAdapters';
 import {LeaderboardObjectVal} from '../../views/Leaderboard/types/leaderboardConfigType';
-import {SimplePageLayout} from '../common/SimplePageLayout';
+import {
+  SimplePageLayout,
+  SimplePageLayoutContext,
+} from '../common/SimplePageLayout';
 import {
   useBaseObjectInstances,
   useCreateBuiltinObjectInstance,
@@ -43,39 +51,87 @@ export const LeaderboardPage: React.FC<LeaderboardPageProps> = props => {
   const {isPeeking} = useContext(WeaveflowPeekContext);
   const {isEditor} = useIsEditor(props.entity);
   const [isEditing, setIsEditing] = useState(false);
+  const simplePageLayoutContext = useContext(SimplePageLayoutContext);
+
   useEffect(() => {
     if (isEditor && props.openEditorOnMount) {
       setIsEditing(true);
     }
   }, [isEditor, props.openEditorOnMount]);
+
+  // Show buttons in headerExtra when not peeking
+  const headerExtra =
+    isEditor && !isPeeking ? (
+      <Box display="flex" gap="4px" marginRight="16px" alignItems="center">
+        <EditLeaderboardButton
+          entity={props.entity}
+          project={props.project}
+          leaderboardName={props.leaderboardName}
+          isEditing={isEditing}
+          setIsEditing={setIsEditing}
+          isPeeking={isPeeking}
+        />
+      </Box>
+    ) : null;
+
+  // When peeking and user is editor, prepend buttons to headerSuffix
+  const contextValue = useMemo(() => {
+    if (isPeeking && isEditor) {
+      return {
+        ...(simplePageLayoutContext ?? {}),
+        headerSuffix: (
+          <>
+            <Box
+              display="flex"
+              gap="4px"
+              marginRight="-8px"
+              alignItems="center">
+              <EditLeaderboardButton
+                entity={props.entity}
+                project={props.project}
+                leaderboardName={props.leaderboardName}
+                isEditing={isEditing}
+                setIsEditing={setIsEditing}
+                isPeeking={isPeeking}
+              />
+            </Box>
+            {simplePageLayoutContext?.headerSuffix}
+          </>
+        ),
+      };
+    }
+    return simplePageLayoutContext ?? {};
+  }, [
+    isPeeking,
+    isEditor,
+    simplePageLayoutContext,
+    props.entity,
+    props.project,
+    props.leaderboardName,
+    isEditing,
+  ]);
+
   return (
-    <SimplePageLayout
-      title={name}
-      hideTabsIfSingle
-      tabs={[
-        {
-          label: 'Leaderboard',
-          content: (
-            <LeaderboardPageContent
-              {...props}
-              setName={setName}
-              isEditing={isEditing}
-              setIsEditing={setIsEditing}
-            />
-          ),
-        },
-      ]}
-      headerExtra={
-        !isPeeking &&
-        !isEditing &&
-        isEditor && (
-          <EditLeaderboardButton
-            isEditing={isEditing}
-            setIsEditing={setIsEditing}
-          />
-        )
-      }
-    />
+    <SimplePageLayoutContext.Provider value={contextValue}>
+      <SimplePageLayout
+        title={name}
+        hideTabsIfSingle
+        tabs={[
+          {
+            label: 'Leaderboard',
+            content: (
+              <LeaderboardPageContent
+                {...props}
+                setName={setName}
+                isEditing={isEditing}
+                setIsEditing={setIsEditing}
+              />
+            ),
+          },
+        ]}
+        headerExtra={headerExtra}
+      />
+    </SimplePageLayoutContext.Provider>
   );
 };
 
@@ -281,6 +337,7 @@ export const LeaderboardPageContentInner: React.FC<
             setWorkingCopy={setWorkingLeaderboardValCopy}
             discardChanges={discardChanges}
             commitChanges={commitChanges}
+            leaderboardName={props.leaderboardName}
           />
         </Box>
       )}
@@ -311,9 +368,54 @@ export const ToggleLeaderboardConfig: React.FC<{
 };
 
 const EditLeaderboardButton: FC<{
+  entity: string;
+  project: string;
+  leaderboardName: string;
   isEditing: boolean;
   setIsEditing: (isEditing: boolean) => void;
-}> = ({isEditing, setIsEditing}) => {
+  isPeeking?: boolean;
+}> = ({
+  entity,
+  project,
+  leaderboardName,
+  isEditing,
+  setIsEditing,
+  isPeeking,
+}) => {
+  const history = useHistory();
+  const {baseRouter} = useWeaveflowRouteContext();
+  const closePeek = useClosePeek();
+
+  const handleClick = useCallback(() => {
+    if (isPeeking) {
+      // When in peek mode, navigate first then close the peek
+      const editUrl = baseRouter.leaderboardsUIUrl(
+        entity,
+        project,
+        leaderboardName,
+        true
+      );
+      history.push(editUrl);
+      // Close peek after navigation to avoid flash
+      setTimeout(() => {
+        closePeek();
+      }, 50);
+    } else {
+      // When not in peek mode, just toggle edit mode
+      setIsEditing(!isEditing);
+    }
+  }, [
+    isPeeking,
+    isEditing,
+    setIsEditing,
+    baseRouter,
+    entity,
+    project,
+    leaderboardName,
+    history,
+    closePeek,
+  ]);
+
   return (
     <Box
       sx={{
@@ -322,16 +424,12 @@ const EditLeaderboardButton: FC<{
         alignItems: 'center',
       }}>
       <Button
-        className="mx-16"
-        style={{
-          marginLeft: '0px',
-        }}
         size="medium"
-        variant="secondary"
-        onClick={() => setIsEditing(!isEditing)}
-        icon={isEditing ? 'close' : 'pencil-edit'}>
-        {isEditing ? 'Discard Changes' : 'Edit'}
-      </Button>
+        variant="ghost"
+        onClick={handleClick}
+        icon={isEditing ? 'close' : 'pencil-edit'}
+        tooltip={isEditing ? 'Discard Changes' : 'Edit'}
+      />
     </Box>
   );
 };

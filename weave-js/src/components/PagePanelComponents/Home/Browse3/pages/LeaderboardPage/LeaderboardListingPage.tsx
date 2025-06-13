@@ -88,7 +88,7 @@ const CreateLeaderboardButton: FC<{
           marginLeft: '0px',
         }}
         size="medium"
-        variant="secondary"
+        variant="ghost"
         onClick={() => {
           createLeaderboard().then(navigateToLeaderboard);
         }}
