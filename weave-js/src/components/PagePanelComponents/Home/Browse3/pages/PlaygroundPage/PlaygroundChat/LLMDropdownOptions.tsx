@@ -67,7 +67,7 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   project: string;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
-  onViewCatalog?: (provider: string) => void;
+  onViewCatalog?: (path?: string) => void;
 }
 
 const SubMenu = ({
@@ -92,7 +92,7 @@ const SubMenu = ({
   onSelect: () => void;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
-  onViewCatalog?: (provider: string) => void;
+  onViewCatalog?: (path?: string) => void;
   providers?: ProviderOption[];
 }) => {
   return ReactDOM.createPortal(
@@ -197,7 +197,8 @@ const SubMenu = ({
         <Box
           onClick={e => {
             e.stopPropagation();
-            onViewCatalog(value);
+            // TODO: Pass the value as the path if we add comparison for other providers
+            onViewCatalog();
           }}
           sx={{
             display: 'flex',
