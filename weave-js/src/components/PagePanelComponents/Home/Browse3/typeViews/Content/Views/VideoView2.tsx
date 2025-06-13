@@ -9,93 +9,55 @@ import {CustomWeaveTypeProjectContext} from '@wandb/weave/components/PagePanelCo
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React, {useContext, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useContext, useEffect, useRef, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
+import {filenameToExtension, mimeToExtension} from '../mimetypes';
+import { ContentViewMetadataLoadedProps, SizedContentViewMetadataLoadedProps } from '../types';
 
-type VideoFormat = 'gif' | 'mp4' | 'webm';
-type VideoFileKeys = `video.${VideoFormat}`;
-
-type VideoClipTypePayload = CustomWeaveTypePayload<
-  'moviepy.video.VideoClip.VideoClip',
-  {[K in VideoFileKeys]: string}
->;
-
-type VideoPlayerProps = {
-  entity: string;
-  project: string;
-  mode?: string;
-  data: VideoClipTypePayload;
-};
-
-const VIDEO_TYPES: Record<VideoFileKeys, VideoFormat> = {
-  'video.gif': 'gif',
-  'video.mp4': 'mp4',
-  'video.webm': 'webm',
-};
-
-const MIME_TYPES: Record<VideoFormat, string> = {
-  gif: 'image/gif',
-  mp4: 'video/mp4',
-  webm: 'video/webm',
-};
-
-export const VideoPlayer: React.FC<VideoPlayerProps> = props => (
+export const VideoPlayer: React.FC<ContentViewMetadataLoadedProps> = props => (
   <AutoSizer style={{height: '100%', width: '100%'}}>
     {({width, height}) =>
       width === 0 || height === 0 ? null : (
         <VideoPlayerWithSize
           {...props}
-          containerWidth={width}
-          containerHeight={height}
+          width={width}
+          height={height}
         />
       )
     }
   </AutoSizer>
 );
 
-type VideoPlayerWithSizeProps = VideoPlayerProps & {
-  containerWidth: number;
-  containerHeight: number;
-};
-
-const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
+const VideoPlayerWithSize: React.FC<SizedContentViewMetadataLoadedProps> = ({
   entity,
   project,
-  data,
-  containerWidth,
-  containerHeight,
-  mode: propMode,
+  content,
+  metadata,
+  height: containerHeight,
+  width: containerWidth
 }) => {
   const [showPopup, setShowPopup] = useState(false);
   const {useFileContent} = useWFHooks();
   const context = useContext(CustomWeaveTypeProjectContext);
   const {isPeeking} = useContext(WeaveflowPeekContext);
-  const mode = propMode ?? context?.mode;
+  const mode = content ?? context?.mode;
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Find the first available video format
-  const videoKey = Object.keys(data.files).find(key => key in VIDEO_TYPES) as
-    | VideoFileKeys
-    | undefined;
 
+  // We need to change this so that it lazy loads the video
   // Always call the hook with consistent arguments
-  const digest = useMemo(
-    () => (videoKey ? data.files[videoKey] : ''),
-    [videoKey, data.files]
-  );
   const videoBinary = useFileContent({
     entity,
     project,
-    digest,
-    skip: !videoKey,
+    digest: content,
+    skip: !content,
   });
-
-  if (!videoKey) {
-    return <NotApplicable />;
+  const { filename, } = metadata;
+  const fileExt = filenameToExtension(metadata.filename) ?? mimeToExtension(metadata.mimetype)
+  if (!fileExt) {
+    return <NotApplicable />
   }
-
-  const fileExt = VIDEO_TYPES[videoKey];
-  const title = data.custom_name || entity.split('-')[0];
+  const title = metadata.filename;
 
   // Link mode (default view)
   if (!mode || mode !== 'object_viewer' || containerHeight < 50) {
@@ -118,6 +80,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
               {videoBinary.result ? (
                 <>
                   <VideoContent
+                    mimetype={metadata.mimetype}
                     fileExt={fileExt}
                     buffer={videoBinary.result}
                     containerWidth={thumbnailWidth}
@@ -151,6 +114,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
                 <Dialog.Overlay />
                 <Dialog.Content className="h-[60vh] w-[60vw] p-0">
                   <VideoContent
+                    mimetype={metadata.mimetype}
                     fileExt={fileExt}
                     buffer={videoBinary.result}
                     containerWidth={containerWidth}
@@ -183,6 +147,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
                 <Dialog.Overlay />
                 <Dialog.Content className="h-[60vh] w-[60vw] p-0">
                   <VideoContent
+                    mimetype={metadata.mimetype}
                     fileExt={fileExt}
                     buffer={videoBinary.result}
                     containerWidth={containerWidth}
@@ -210,6 +175,7 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
 
   return (
     <VideoContent
+      mimetype={metadata.mimetype}
       fileExt={fileExt}
       buffer={videoBinary.result}
       containerWidth={containerWidth}
@@ -221,7 +187,8 @@ const VideoPlayerWithSize: React.FC<VideoPlayerWithSizeProps> = ({
 };
 
 type VideoContentProps = {
-  fileExt: VideoFormat;
+  fileExt: string;
+  mimetype: string;
   buffer: ArrayBuffer;
   containerWidth: number;
   containerHeight: number;
@@ -233,6 +200,7 @@ type VideoContentProps = {
 
 const VideoContent: React.FC<VideoContentProps> = ({
   fileExt,
+  mimetype,
   buffer,
   containerWidth,
   containerHeight,
@@ -244,8 +212,7 @@ const VideoContent: React.FC<VideoContentProps> = ({
   const [url, setUrl] = useState<string>('');
 
   useEffect(() => {
-    const mimeType = MIME_TYPES[fileExt];
-    const blob = new Blob([buffer], {type: mimeType});
+    const blob = new Blob([buffer], {type: mimetype});
     const objectUrl = URL.createObjectURL(blob);
     setUrl(objectUrl);
 

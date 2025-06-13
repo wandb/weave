@@ -1,10 +1,7 @@
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 
 
-type WithPrefix<T extends string> = `${T}${string}`;
-
-type StartsWithPrefix = WithPrefix<'prefix'>;
-type UnionExample = WithPrefix<'abc' | 'def'>;
+// type WithPrefix<T extends string> = `${T}${string}`;
 
 export type ContentTypePayload = CustomWeaveTypePayload<
   'weave.type_wrappers.Content.content.Content',
@@ -30,3 +27,7 @@ export type ContentViewMetadataLoadedProps = ContentViewProps & {
   content: string;
 };
 
+export type SizedContentViewMetadataLoadedProps = ContentViewMetadataLoadedProps & {
+  width: number
+  height: number
+};
