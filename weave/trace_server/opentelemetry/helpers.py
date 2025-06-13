@@ -203,7 +203,7 @@ def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def flatten_attributes(
-    data: dict[str, Any], json_attributes: list[str] | None = None
+    data: dict[str, Any], json_attributes: Optional[list[str]] = None
 ) -> dict[str, Any]:
     """
     Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
@@ -344,7 +344,7 @@ def try_convert_numeric_keys_to_list(value: Any) -> Any:
     return value
 
 
-def capture_parts(s: str, delimiters: list[str] | None = None) -> list[str]:
+def capture_parts(s: str, delimiters: Optional[list[str]] = None) -> list[str]:
     """Split a string on multiple delimiters while preserving the delimiters in the result.
 
     This function splits a string using the specified delimiters and includes those
