@@ -5,6 +5,7 @@ import pytest
 from weave.trace import refs
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import refs_internal
+from weave.trace_server.refs_internal import InvalidInternalRef
 
 quote = refs_internal.extra_value_quoter
 
@@ -33,7 +34,7 @@ def string_with_every_char(disallowed_chars=None):
 
 
 def test_ref_parsing_external_invalid():
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidInternalRef):
         ref_start = refs.ObjectRef(
             entity="entity",
             project="project",
@@ -61,7 +62,7 @@ def test_ref_parsing_external_sanitized():
 
 
 def test_ref_parsing_internal_invalid():
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidInternalRef):
         ref_start = refs_internal.InternalObjectRef(
             project_id="project",
             name=string_with_every_char(),

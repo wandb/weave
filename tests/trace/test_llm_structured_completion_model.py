@@ -2,6 +2,7 @@ import json
 from unittest.mock import Mock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -633,7 +634,7 @@ def test_cast_to_message():
 def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
     """Test schema validation for LLMStructuredCompletionModel."""
     # Test missing required field
-    with pytest.raises(Exception):  # ValidationError or similar
+    with pytest.raises(ValidationError):
         client.server.obj_create(
             tsi.ObjCreateReq.model_validate(
                 {
