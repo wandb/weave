@@ -441,7 +441,8 @@ class EvaluationLogger(BaseModel):
             attributes=IMPERATIVE_EVAL_MARKER,
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
-        assert self._evaluate_call is not None
+        if self._evaluate_call is None:
+            raise RuntimeError("Evaluation call does not exist, something went wrong!")
 
     def _cleanup_predictions(self) -> None:
         if self._is_finalized:
@@ -463,9 +464,10 @@ class EvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for finalization"
+        if self._evaluate_call is None:
+            raise RuntimeError(
+                "Evaluation call should exist for finalization, something went wrong!"
+            )
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -547,9 +549,9 @@ class EvaluationLogger(BaseModel):
             final_summary = {**final_summary, **summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
 
         # Use set_call_stack to temporarily set the evaluation as the parent
         with call_context.set_call_stack([self._evaluate_call]):
