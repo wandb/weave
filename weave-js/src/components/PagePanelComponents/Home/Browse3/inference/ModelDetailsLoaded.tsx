@@ -336,7 +336,12 @@ export const ModelDetailsLoaded = ({
               />
             </div>
             <div>
-              <Button variant="ghost" icon="copy" onClick={onClickCopyCode} />
+              <Button
+                variant="ghost"
+                icon="copy"
+                onClick={onClickCopyCode}
+                tooltip="Copy code sample to clipboard"
+              />
             </div>
           </div>
           <div className="[&_.monaco-editor]:!absolute">
