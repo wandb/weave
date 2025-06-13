@@ -6,7 +6,7 @@ import {toast} from 'react-toastify';
 import {TargetBlank} from '../../../../../common/util/links';
 import {Button} from '../../../../Button';
 import {CodeEditor} from '../../../../CodeEditor';
-import {Icon, IconPrivacyOpen} from '../../../../Icon';
+import {Icon} from '../../../../Icon';
 import {ToggleButtonGroup} from '../../../../ToggleButtonGroup';
 import {Tooltip} from '../../../../Tooltip';
 import {Link} from '../pages/common/Links';
@@ -258,7 +258,7 @@ export const ModelDetailsLoaded = ({
             {model.license && (
               <>
                 <div className="flex items-center">
-                  <IconPrivacyOpen width={18} height={18} />
+                  <Icon name="checkmark-circle" width={18} height={18} />
                 </div>
                 <div className="flex items-center">
                   {getModelLicense(model)}
