@@ -5,6 +5,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
 import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/datasets/datasetNameValidation';
 import {FilterPanel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/FilterPanel';
 import {prepareFlattenedCallDataForTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTable';
@@ -74,6 +75,7 @@ export const MonitorDrawerRouter = (props: CreateMonitorDrawerProps) => {
 const CreateMonitorDrawerWithScorers = (
   props: CreateMonitorDrawerProps & {monitor: ObjectVersionSchema}
 ) => {
+  const {entity, project} = useEntityProject();
   const scorerIds: string[] = useMemo(() => {
     return (
       props.monitor.val['scorers'].map(
@@ -83,8 +85,8 @@ const CreateMonitorDrawerWithScorers = (
   }, [props.monitor]);
 
   const {result: scorers, loading} = useRootObjectVersions({
-    entity: props.entity,
-    project: props.project,
+    entity,
+    project,
     filter: {
       objectIds: scorerIds,
       latestOnly: true,
@@ -98,8 +100,6 @@ const CreateMonitorDrawerWithScorers = (
 };
 
 type CreateMonitorDrawerProps = {
-  entity: string;
-  project: string;
   open: boolean;
   onClose: () => void;
   monitor?: ObjectVersionSchema;
@@ -107,13 +107,12 @@ type CreateMonitorDrawerProps = {
 };
 
 export const CreateMonitorDrawer = ({
-  entity,
-  project,
   open,
   onClose,
   monitor,
   scorers: existingScorers,
 }: CreateMonitorDrawerProps) => {
+  const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [description, setDescription] = useState<string>(

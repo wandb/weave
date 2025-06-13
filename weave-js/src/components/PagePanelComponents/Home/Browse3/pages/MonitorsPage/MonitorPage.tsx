@@ -3,7 +3,11 @@ import {GridFilterItem} from '@mui/x-data-grid-pro';
 import {Button, ButtonVariants} from '@wandb/weave/components/Button';
 import {IconNames} from '@wandb/weave/components/Icon';
 import {BooleanIcon} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValueBoolean';
-import {useWeaveflowRouteContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
+import {
+  useEntityProject,
+  useWeaveflowRouteContext,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
+import {MONITORED_FILTER_VALUE} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/common';
 import {FilterTagItem} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/FilterTagItem';
 import {NotFoundPanel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotFoundPanel';
 import {CallsTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTable';
@@ -33,19 +37,13 @@ import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {MONITORED_FILTER_VALUE} from '../../filters/common';
-
 const MONITOR_VERSIONS_SORT_KEY: SortBy[] = [
   {field: 'created_at', direction: 'desc'},
 ];
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
-export const MonitorPage = (props: {
-  entity: string;
-  project: string;
-  objectName: string;
-  version: string;
-}) => {
+export const MonitorPage = (props: {objectName: string; version: string}) => {
+  const {entity, project} = useEntityProject();
   const monitorVersionFilter = useMemo(
     () => ({
       objectIds: [props.objectName],
@@ -54,8 +52,8 @@ export const MonitorPage = (props: {
   );
 
   const objectVersionResults = useRootObjectVersions({
-    entity: props.entity,
-    project: props.project,
+    entity,
+    project,
     filter: monitorVersionFilter,
     sortBy: MONITOR_VERSIONS_SORT_KEY,
   });
@@ -64,23 +62,16 @@ export const MonitorPage = (props: {
   return monitorVersions === null || monitorVersions.length === 0 ? (
     <NotFoundPanel title="Monitor not found" />
   ) : (
-    <MonitorPageInner
-      entity={props.entity}
-      project={props.project}
-      monitorVersions={monitorVersions}
-    />
+    <MonitorPageInner monitorVersions={monitorVersions} />
   );
 };
 
 const MonitorPageInner = ({
-  entity,
-  project,
   monitorVersions,
 }: {
-  entity: string;
-  project: string;
   monitorVersions: ObjectVersionSchema[];
 }) => {
+  const {entity, project} = useEntityProject();
   const allVersionRefs = useMemo(() => {
     return monitorVersions.map(v => objectVersionKeyToRefUri(v));
   }, [monitorVersions]);
