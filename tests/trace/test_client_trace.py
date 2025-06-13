@@ -2644,7 +2644,7 @@ def test_sort_and_filter_through_refs(client):
         {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})},
     )
 
-    for first, last, sort_by in [
+    for first, _last, sort_by in [
         (0, 21, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
         (21, 0, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
         (0, 21, [tsi.SortBy(field="output.a.b.c.d", direction="asc")]),
@@ -2660,7 +2660,7 @@ def test_sort_and_filter_through_refs(client):
         assert inner_res.calls[0].inputs["label"] == first
         assert inner_res.calls[1].inputs["label"] == first
 
-    for first, last, count, query in [
+    for _first, _last, count, query in [
         (
             6,
             21,
@@ -2838,7 +2838,7 @@ def test_calls_iter_cached(client):
     calls = func.calls()
 
     elapsed_times = []
-    for i in range(3):
+    for _ in range(3):
         start_time = time.time()
         c = calls[0]
         end_time = time.time()
@@ -3760,7 +3760,7 @@ def test_call_stream_query_heavy_query_batch(client):
     # start 10 calls
     call_ids = []
     project_id = get_client_project_id(client)
-    for i in range(10):
+    for _ in range(10):
         call_id = generate_id()
         call_ids.append(call_id)
         trace_id = generate_id()

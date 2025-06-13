@@ -152,13 +152,16 @@ def openai_accumulator(
     )
 
     def _process_chunk(
-        chunk: ChatCompletionChunk, acc_choices: list[dict] = []
+        chunk: ChatCompletionChunk, acc_choices: list[dict] | None = None
     ) -> list[dict]:
         """Once the first_chunk is set (acc), take the next chunk and append the message content
         to the message content of acc or first_chunk.
         """
+        if acc_choices is None:
+            acc_choices = []
+
         for chunk_choice in chunk.choices:
-            for i in range(chunk_choice.index + 1 - len(acc_choices)):
+            for _i in range(chunk_choice.index + 1 - len(acc_choices)):
                 acc_choices.append(
                     {
                         "index": len(acc_choices),

@@ -175,13 +175,15 @@ export const ModelTile = ({
               Learn more
             </Button>
           </Link>
-          <Button
-            size="small"
-            icon="copy"
-            variant="ghost"
-            onClick={onClickCopy}
-            tooltip="Copy ID for API use to clipboard"
-          />
+          {model.idPlayground && (
+            <Button
+              size="small"
+              icon="copy"
+              variant="ghost"
+              onClick={onClickCopy}
+              tooltip="Copy ID for API use to clipboard"
+            />
+          )}
         </div>
       )}
       {hint && (
