@@ -744,7 +744,7 @@ export const LLM_PROVIDER_LABELS: Record<
   (typeof LLM_PROVIDERS)[number],
   string
 > = {
-  coreweave: 'W&B hosted',
+  coreweave: 'W&B Inference',
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   azure: 'Azure',

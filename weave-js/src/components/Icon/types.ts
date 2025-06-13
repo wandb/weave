@@ -90,6 +90,7 @@ export const IconNames = {
   GhostAgent: 'ghost-agent',
   Git: 'git',
   Github: 'github',
+  Grafana: 'grafana',
   Group: 'group',
   H1: 'h1',
   H2: 'h2',

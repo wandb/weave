@@ -32,6 +32,7 @@ from requests import HTTPError
 
 from weave import version
 from weave.trace import trace_sentry, urls
+from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -1056,14 +1057,15 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
     def get_calls(
         self,
         *,
-        filter: CallsFilter | None = None,
+        filter: CallsFilterLike | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        sort_by: list[SortBy] | None = None,
-        query: Query | None = None,
+        sort_by: list[SortByLike] | None = None,
+        query: QueryLike | None = None,
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
