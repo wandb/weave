@@ -628,7 +628,7 @@ class CallsQuery(BaseModel):
         )
 
         # If we should not optimize, then just build the base query
-        if not has_heavy_fields and not self.include_costs:
+        if not should_optimize and not self.include_costs:
             return self._as_sql_base_format(pb, table_alias)
 
         # Build two queries, first filter query CTE, then select the columns
