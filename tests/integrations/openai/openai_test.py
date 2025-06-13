@@ -238,7 +238,7 @@ def test_openai_stream_usage_quickstart(
         },  # User needs to pass this argument to get usage
     )
 
-    for chunk in response:
+    for _chunk in response:
         pass
     calls = list(client.calls())
     assert len(calls) == 1
@@ -480,7 +480,7 @@ async def test_openai_function_call_async_stream(
         stream=True,
     )
     # TODO: figure out if this is the write pattern
-    async for chunk in response:
+    async for _chunk in response:
         pass
 
     calls = list(client.calls())
@@ -747,7 +747,7 @@ async def test_openai_tool_call_async_stream(
         },  # User needs to pass this argument to get usage
     )
     # TODO: figure out if this is the write pattern
-    async for chunk in response:
+    async for _chunk in response:
         pass
 
     calls = list(client.calls())
@@ -1191,7 +1191,7 @@ async def test_openai_responses_quickstart_async_stream(client: WeaveClient) -> 
         input="Write a one-sentence bedtime story about a unicorn.",
         stream=True,
     )
-    async for chunk in response:
+    async for _chunk in response:
         pass
 
     calls = client.get_calls()
@@ -1408,7 +1408,7 @@ async def test_openai_responses_tool_calling_async_stream(client: WeaveClient) -
         input="What was a positive news story from today?",
         stream=True,
     )
-    async for chunk in response:
+    async for _chunk in response:
         pass
 
     calls = client.get_calls()

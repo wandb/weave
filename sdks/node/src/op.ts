@@ -172,7 +172,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
         result !== null &&
         Symbol.asyncIterator in result
       ) {
-        const {initialStateFn, reduceFn} = options.streamReducer;
+        const {initialStateFn, reduceFn, finalizeFn} = options.streamReducer;
         let state = initialStateFn();
 
         async function* WeaveIterator() {
@@ -184,6 +184,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
           } finally {
             if (client) {
               const endTime = new Date();
+              finalizeFn(state);
               await client.finishCall(
                 call,
                 state,
