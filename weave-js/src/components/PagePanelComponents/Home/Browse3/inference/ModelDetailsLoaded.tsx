@@ -181,7 +181,9 @@ export const ModelDetailsLoaded = ({
 
   const onClickCopyModelId = useCallback(() => {
     copyToClipboard(model.idPlayground ?? '');
-    toast('Copied to clipboard');
+    toast('Copied to clipboard', {
+      position: 'bottom-right',
+    });
   }, [model.idPlayground]);
 
   const onClickCopyCode = useCallback(() => {
@@ -212,8 +214,9 @@ export const ModelDetailsLoaded = ({
               icon="copy"
               variant="secondary"
               onClick={onClickCopyModelId}
-              tooltip="Copy ID for API use to clipboard"
-            />
+              tooltip="Copy model ID to clipboard">
+              {model.idPlayground}
+            </Button>
           )}
           <Button
             size="large"
