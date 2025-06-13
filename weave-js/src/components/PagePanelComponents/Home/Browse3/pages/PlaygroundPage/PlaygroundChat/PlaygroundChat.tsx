@@ -206,7 +206,7 @@ export const PlaygroundChat = ({
 
   return (
     <div className="flex h-full w-full flex-col items-center overflow-hidden">
-      <div className="mx-auto flex h-full w-full overflow-y-hidden overflow-x-scroll">
+      <div className="mx-auto flex h-full w-full overflow-x-auto overflow-y-hidden">
         <div className="mx-auto flex">
           {playgroundStates.map((state, idx) => (
             <React.Fragment key={idx}>
@@ -240,8 +240,8 @@ export const PlaygroundChat = ({
                     customProvidersResult={customProvidersResult}
                   />
                 </div>
-                <div className="h-full w-full flex-grow overflow-scroll px-[16px] pt-[48px]">
-                  <div className=" mx-auto mt-[32px] h-full pb-8">
+                <div className="h-full w-full flex-grow overflow-auto px-[16px] pt-[48px]">
+                  <div className=" mx-auto mt-[32px] pb-8">
                     {state.traceCall && (
                       <PlaygroundContext.Provider
                         value={{
