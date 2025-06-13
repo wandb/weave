@@ -48,6 +48,7 @@ import {ReactComponent as ImportContentWide} from '../../assets/icons/icon-conte
 import {ReactComponent as ImportContextWindow} from '../../assets/icons/icon-context-window.svg';
 import {ReactComponent as ImportContractLeft} from '../../assets/icons/icon-contract-left.svg';
 import {ReactComponent as ImportCopy} from '../../assets/icons/icon-copy.svg';
+import {ReactComponent as ImportCourthouseLicense} from '../../assets/icons/icon-courthouse-license.svg';
 import {ReactComponent as ImportCreditCardPayment} from '../../assets/icons/icon-credit-card-payment.svg';
 import {ReactComponent as ImportCropBeginning} from '../../assets/icons/icon-crop-beginning.svg';
 import {ReactComponent as ImportCropEnd} from '../../assets/icons/icon-crop-end.svg';
@@ -447,6 +448,9 @@ export const IconContractLeft = (props: SVGIconProps) => (
 );
 export const IconCopy = (props: SVGIconProps) => (
   <ImportCopy {...updateIconProps(props)} />
+);
+export const IconCourthouseLicense = (props: SVGIconProps) => (
+  <ImportCourthouseLicense {...updateIconProps(props)} />
 );
 export const IconCreditCardPayment = (props: SVGIconProps) => (
   <ImportCreditCardPayment {...updateIconProps(props)} />
@@ -1212,6 +1216,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'context-window': IconContextWindow,
   'contract-left': IconContractLeft,
   copy: IconCopy,
+  'courthouse-license': IconCourthouseLicense,
   'credit-card-payment': IconCreditCardPayment,
   'crop-beginning': IconCropBeginning,
   'crop-end': IconCropEnd,
