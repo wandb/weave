@@ -55,7 +55,7 @@
       "parameterCountActive": 37000000000,
       "contextWindow": 32000,
       "priceCentsPerBillionTokensInput": 114000,
-      "priceCentsPerBillionTokensOutput": 456000,
+      "priceCentsPerBillionTokensOutput": 275000,
       "apiStyle": "chat",
       "modalities": ["Text"],
       "likesHuggingFace": 2963,
