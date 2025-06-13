@@ -735,7 +735,6 @@ const CallPageBinding = () => {
 };
 
 const MonitorsPageBinding = () => {
-  const {entity, project} = useParamsDecoded<Browse3TabParams>();
   return <MonitorsPage />;
 };
 

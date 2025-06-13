@@ -19,10 +19,7 @@ import {
   getFilterByRaw,
   useFilterSortby,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableQuery';
-import {
-  Autocomplete,
-  OpSelector,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/OpSelector';
+import {OpSelector} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/OpSelector';
 import {
   FieldName,
   typographyStyle,
@@ -43,10 +40,9 @@ import {
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {parseRef} from '@wandb/weave/react';
-import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {toast} from 'react-toastify';
-
+import {useList} from 'react-use';
 const PAGE_SIZE = 10;
 const PAGE_OFFSET = 0;
 
@@ -63,17 +59,17 @@ const SCORER_FORMS: Map<
   ['LLMAsAJudgeScorer', LLMAsAJudgeScorerForm],
 ]);
 
-export const MonitorDrawerRouter = (props: CreateMonitorDrawerProps) => {
+export const MonitorDrawerRouter = (props: MonitorFormDrawerProps) => {
   if (props.monitor) {
     return (
-      <CreateMonitorDrawerWithScorers {...props} monitor={props.monitor} /> // Repeating monitor to appease type checking
+      <EditMonitorDrawerWithScorers {...props} monitor={props.monitor} /> // Repeating monitor to appease type checking
     );
   }
-  return <CreateMonitorDrawer {...props} />;
+  return <MonitorFormDrawer {...props} />;
 };
 
-const CreateMonitorDrawerWithScorers = (
-  props: CreateMonitorDrawerProps & {monitor: ObjectVersionSchema}
+const EditMonitorDrawerWithScorers = (
+  props: MonitorFormDrawerProps & {monitor: ObjectVersionSchema}
 ) => {
   const {entity, project} = useEntityProject();
   const scorerIds: string[] = useMemo(() => {
@@ -95,23 +91,23 @@ const CreateMonitorDrawerWithScorers = (
   return loading || !scorers ? (
     <WaveLoader size="huge" />
   ) : (
-    <CreateMonitorDrawer {...props} scorers={scorers} />
+    <MonitorFormDrawer {...props} scorers={scorers} />
   );
 };
 
-type CreateMonitorDrawerProps = {
+type MonitorFormDrawerProps = {
   open: boolean;
   onClose: () => void;
   monitor?: ObjectVersionSchema;
   scorers?: ObjectVersionSchema[];
 };
 
-export const CreateMonitorDrawer = ({
+export const MonitorFormDrawer = ({
   open,
   onClose,
   monitor,
   scorers: existingScorers,
-}: CreateMonitorDrawerProps) => {
+}: MonitorFormDrawerProps) => {
   const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -136,10 +132,24 @@ export const CreateMonitorDrawer = ({
     }
   );
   const {useCalls} = useWFHooks();
-  const [scorers, setScorers] = useState<ObjectVersionSchema[]>(
-    existingScorers || []
+  const [scorers, {updateAt: updateScorerAt}] = useList<ObjectVersionSchema>(
+    existingScorers || [
+      {
+        scheme: 'weave',
+        weaveKind: 'object',
+        entity,
+        project,
+        objectId: '',
+        versionHash: '',
+        path: '',
+        versionIndex: 0,
+        baseObjectClass: 'LLMAsAJudgeScorer',
+        createdAtMs: Date.now(),
+        val: {_type: 'LLMAsAJudgeScorer'},
+      },
+    ]
   );
-  const [scorerValids, setScorerValids] = useState<boolean[]>([]);
+  const [scorerValids, {updateAt: updateScorerValidAt}] = useList<boolean>([]);
   const [active, setActive] = useState<boolean>(
     monitor?.val['active'] || false
   );
@@ -147,10 +157,6 @@ export const CreateMonitorDrawer = ({
   const {sortBy, lowLevelFilter} = useFilterSortby(filter, {items: []}, [
     {field: 'started_at', sort: 'desc'},
   ]);
-
-  useEffect(() => {
-    setScorerValids(currentValids => currentValids.slice(0, scorers.length));
-  }, [scorers.length]);
 
   const {result: callsResults, loading: callsLoading} = useCalls({
     entity,
@@ -330,23 +336,17 @@ export const CreateMonitorDrawer = ({
               key={index}
               scorer={scorer}
               onChange={(newScorer: ObjectVersionSchema) =>
-                setScorers(currentScorers =>
-                  currentScorers.map((s, i) => (i === index ? newScorer : s))
-                )
+                updateScorerAt(index, newScorer)
               }
               onValidationChange={(isValid: boolean) =>
-                setScorerValids(currentValids => {
-                  const nextValids = [...currentValids];
-                  nextValids[index] = isValid;
-                  return nextValids;
-                })
+                updateScorerValidAt(index, isValid)
               }
             />
           );
         })}
       </>
     );
-  }, [scorers]);
+  }, [scorers, updateScorerAt, updateScorerValidAt]);
 
   return (
     <Drawer
@@ -507,7 +507,7 @@ export const CreateMonitorDrawer = ({
                   </Box>
                 </Box>
 
-                <Box className="flex flex-col gap-8 pt-16">
+                {/*<Box className="flex flex-col gap-8 pt-16">
                   <Typography
                     sx={typographyStyle}
                     className="border-t border-moon-250 px-20 pb-8 pt-16 font-semibold uppercase tracking-wide text-moon-500">
@@ -528,7 +528,8 @@ export const CreateMonitorDrawer = ({
                           newScorers: string | string[] | null
                         ) => {
                           if (newScorers === null) {
-                            setScorers([]);
+                            clearScorers();
+                            clearScorerValids();
                             return;
                           }
                           const newScorerArray = _.isArray(newScorers)
@@ -549,11 +550,14 @@ export const CreateMonitorDrawer = ({
                               val: {_type: newScorer},
                             }))
                           );
+                          setScorerValids(currentValids =>
+                            currentValids.slice(0, newScorerArray.length)
+                          );
                         }}
                       />
                     </Box>
                   </Box>
-                </Box>
+                </Box>*/}
 
                 {scorerForms}
               </Box>
