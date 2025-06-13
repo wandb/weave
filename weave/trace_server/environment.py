@@ -1,5 +1,41 @@
+import logging
 import os
 from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+# Kafka Settings
+
+
+def wf_kafka_broker_host() -> str:
+    """The host of the kafka broker."""
+    return os.environ.get("WF_KAFKA_BROKER_HOST", "localhost")
+
+
+def wf_kafka_broker_port() -> int:
+    """The port of the kafka broker."""
+    return int(os.environ.get("WF_KAFKA_BROKER_PORT", 9092))
+
+
+# Scoring worker settings
+
+
+def wf_enable_online_eval() -> bool:
+    """Whether to enable online evaluation."""
+    return os.environ.get("WF_ENABLE_ONLINE_EVAL", "false").lower() == "true"
+
+
+def wf_scoring_worker_batch_size() -> int:
+    """The batch size for the scoring worker."""
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_SIZE", 100))
+
+
+def wf_scoring_worker_batch_timeout() -> int:
+    """The timeout for the scoring worker."""
+    return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", 5))
+
+
+# Clickhouse Settings
 
 
 def wf_clickhouse_host() -> str:
@@ -34,7 +70,24 @@ def wf_clickhouse_max_memory_usage() -> Optional[int]:
         return None
     try:
         return int(mem)
-    except ValueError:
+    except ValueError as e:
+        logger.exception(
+            f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not a valid. Error: {str(e)}"
+        )
+        return None
+
+
+def wf_clickhouse_max_execution_time() -> Optional[int]:
+    """The maximum execution time for the clickhouse server."""
+    time = os.environ.get("WF_CLICKHOUSE_MAX_EXECUTION_TIME")
+    if time is None:
+        return None
+    try:
+        return int(time)
+    except ValueError as e:
+        logger.exception(
+            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not a valid. Error: {str(e)}"
+        )
         return None
 
 

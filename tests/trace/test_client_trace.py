@@ -29,6 +29,7 @@ from tests.trace.util import (
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
+from weave.trace.context.call_context import require_current_call
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
@@ -1568,7 +1569,7 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:tiRVKBWTP7LOwjBEqe79WFS7HEibm1WG8nfe94VWZBo/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -2785,13 +2786,25 @@ def test_call_has_client_version(client):
 def test_user_cannot_modify_call_weave_dict(client):
     @weave.op
     def test():
+        call = require_current_call()
+
+        # allowed in this context
+        call.attributes["test"] = 123
+
+        with pytest.raises(KeyError):
+            call.attributes["weave"] = {"anything": "blah"}
+
+        with pytest.raises(KeyError):
+            call.attributes["weave"]["anything"] = "blah"
+
         return 1
 
     _, call = test.call()
 
-    call.attributes["test"] = 123
+    with pytest.raises(TypeError):
+        call.attributes["test"] = 123
 
-    with pytest.raises(KeyError):
+    with pytest.raises(TypeError):
         call.attributes["weave"] = {"anything": "blah"}
 
     with pytest.raises(KeyError):
@@ -3124,7 +3137,7 @@ def test_objects_and_keys_with_special_characters(client):
         exp_key
         == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
     )
-    exp_digest = "iVLhViJ3vm8vMMo3Qj35mK7GiyP8jv3OJqasIGXjN0s"
+    exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
     assert obj.ref.uri() == exp_obj_ref
@@ -3855,6 +3868,13 @@ def test_call_stream_query_heavy_query_batch(client):
         assert call.attributes["empty"] == ""
 
 
+@pytest.fixture
+def clickhouse_client(client):
+    if client_is_sqlite(client):
+        return None
+    return client.server._next_trace_server.ch_client
+
+
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with storage size information"""
     if client_is_sqlite(client):
@@ -4065,7 +4085,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
 
     # Verify that storage size is present
     assert queried_obj.size_bytes is not None
-    assert queried_obj.size_bytes == 270  # Should have some size due to the test data
+    assert queried_obj.size_bytes == 257  # Should have some size due to the test data
 
     # Test that a table is created and its size is correct
     table_ref = parse_uri(queried_obj.val["rows"])
