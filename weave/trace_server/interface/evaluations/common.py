@@ -6,5 +6,5 @@ JSONSchema = Any  # TODO: Type this better
 
 
 class TypedSignature(BaseModel):
-    input_type: JSONSchema
-    output_type: JSONSchema
+    input_schema: JSONSchema
+    output_schema: JSONSchema

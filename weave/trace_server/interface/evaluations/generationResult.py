@@ -64,21 +64,21 @@ class DeleteGenerationResultRes(BaseModel):
 
 class TSEIMGenerationResultMixin(ABC):
     @abstractmethod
-    async def async_create_model_instance(
+    async def async_create_generation_result(
         self, req: CreateGenerationResultReq
     ) -> CreateGenerationResultRes: ...
 
     @abstractmethod
-    async def async_get_model_instance(
+    async def async_get_generation_result(
         self, req: GetGenerationResultReq
     ) -> GetGenerationResultRes: ...
 
     @abstractmethod
-    async def async_update_model_instance(
+    async def async_update_generation_result(
         self, req: UpdateGenerationResultReq
     ) -> UpdateGenerationResultRes: ...
 
     @abstractmethod
-    async def async_delete_model_instance(
+    async def async_delete_generation_result(
         self, req: DeleteGenerationResultReq
     ) -> DeleteGenerationResultRes: ...

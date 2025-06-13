@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from weave.trace_server.interface.evaluations.common import JSONSchema
+
 """
 InputPayload
 
@@ -15,7 +17,8 @@ class InputPayloadMutableProperties(BaseModel): ...
 
 
 class InputPayloadImmutableProperties(BaseModel):
-    payload: Any
+    payload_schema: JSONSchema
+    payload_value: Any
 
 
 class InputPayloadUserDefinedProperties(
@@ -62,21 +65,21 @@ class DeleteInputPayloadRes(BaseModel):
 
 class TSEIMInputPayloadMixin(ABC):
     @abstractmethod
-    async def async_create_model_instance(
+    async def async_create_input_payload(
         self, req: CreateInputPayloadReq
     ) -> CreateInputPayloadRes: ...
 
     @abstractmethod
-    async def async_get_model_instance(
+    async def async_get_input_payload(
         self, req: GetInputPayloadReq
     ) -> GetInputPayloadRes: ...
 
     @abstractmethod
-    async def async_update_model_instance(
+    async def async_update_input_payload(
         self, req: UpdateInputPayloadReq
     ) -> UpdateInputPayloadRes: ...
 
     @abstractmethod
-    async def async_delete_model_instance(
+    async def async_delete_input_payload(
         self, req: DeleteInputPayloadReq
     ) -> DeleteInputPayloadRes: ...

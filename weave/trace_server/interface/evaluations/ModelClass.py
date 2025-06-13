@@ -20,8 +20,9 @@ class ModelClassMutableProperties(BaseModel):
     description: Optional[str] = None
 
 
-class ModelClassImmutableProperties(BaseModel, TypedSignature):
-    config_type: JSONSchema
+class ModelClassImmutableProperties(BaseModel):
+    signature: TypedSignature
+    config_schema: JSONSchema
 
 
 class ModelClassUserDefinedProperties(
