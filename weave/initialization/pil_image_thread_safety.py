@@ -90,7 +90,7 @@ def _apply_threadsafe_patch() -> None:
                     # after acquiring the lock to prevent race conditions
                     if not hasattr(self, "_weave_load_lock"):
                         setattr(self, "_weave_load_lock", threading.RLock())
-            lock = self._weave_load_lock
+            lock = getattr(self, "_weave_load_lock")  # noqa: B009
 
         except Exception:
             # If anything goes wrong with the locking mechanism,
