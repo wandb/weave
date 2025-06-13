@@ -16,6 +16,7 @@ The evaluation system is built around a consistent ORM-like pattern with the fol
 - **ScorerInstance**: A specific instance of a ScorerClass with fixed configuration
 - **ScoreResult**: The result of running a ScorerInstance on evaluation data
 - **ExampleLabel**: Ground truth label for a TaskExample
+- **Summary**: Aggregated evaluation results that freeze the example set for reproducibility
 
 ## Architecture Pattern
 
@@ -158,8 +159,10 @@ Represents a class of scorers that conform to the same type signature.
 - `description`: Optional[str] - Description of the scorer class
 
 **Immutable Properties:**
-- `input_schema`: JSONSchema - Schema for what the scorer takes as input
-- `output_schema`: JSONSchema - Schema for what the scorer produces
+- `model_input_schema`: JSONSchema - Schema for model inputs
+- `model_output_schema`: JSONSchema - Schema for model outputs
+- `example_label_schema`: JSONSchema - Schema for example labels
+- `score_output_schema`: JSONSchema - Schema for the score output
 - `config_schema`: JSONSchema - Configuration schema for scorer instances
 
 ### ScorerInstance
@@ -167,7 +170,7 @@ Represents a class of scorers that conform to the same type signature.
 A specific instance of a ScorerClass with fixed configuration.
 
 **Mutable Properties:**
-- `hyperparameters`: dict[str, Any] - Tunable parameters
+- None
 
 **Immutable Properties:**
 - `scorer_class_id`: str - Reference to the ScorerClass
@@ -187,18 +190,38 @@ The result of running a ScorerInstance on evaluation data.
 - `input_payload_id`: str - Reference to the InputPayload
 - `comparison_id`: Optional[str] - Reference for comparative scoring
 - `score`: Any - The actual score output
+- `reason`: Optional[str] - Explanation or reasoning for the score
 
 ### ExampleLabel
 
 Ground truth label for a TaskExample.
 
 **Mutable Properties:**
-- `name`: Optional[str] - Name of the label
 - `description`: Optional[str] - Description of the label
 
 **Immutable Properties:**
 - `task_example_id`: str - Reference to the TaskExample
+- `label_key`: str - The key/name for this label type
+- `label_schema`: JSONSchema - Schema of the label value
 - `label_value`: Any - The actual label/ground truth value
+
+### Summary
+
+Aggregated evaluation results that freeze the specific set of examples used, ensuring reproducibility even as tasks evolve.
+
+**Mutable Properties:**
+- `name`: Optional[str] - Name of the summary
+- `description`: Optional[str] - Description of the summary
+
+**Immutable Properties:**
+- `model_instance_id`: str - Reference to the ModelInstance evaluated
+- `task_definition_id`: str - Reference to the TaskDefinition
+- `scorer_instance_id`: str - Reference to the ScorerInstance used
+- `task_example_ids`: List[str] - Frozen list of TaskExample IDs used
+- `example_label_ids`: List[str] - Frozen list of ExampleLabel IDs used
+- `score_result_ids`: List[str] - The individual ScoreResult IDs
+- `aggregate_metrics`: dict[str, Any] - Aggregated metrics (e.g., mean, std, min, max)
+- `metadata`: Optional[dict[str, Any]] - Additional context (e.g., evaluation date)
 
 ## Usage Example
 
@@ -270,8 +293,9 @@ task_example_res = await evaluator.async_create_task_example(task_example_req)
 example_label_req = CreateExampleLabelReq(
     properties=ExampleLabelUserDefinedProperties(
         task_example_id=task_example_res.id,
+        label_key="expected_output",
+        label_schema={"type": "object", "properties": {"text": {"type": "string"}}},
         label_value={"text": "Code in silicon\nElectrons dance through logic\nPrograms come alive"},
-        name="Expected haiku",
         description="A well-formed haiku about programming"
     )
 )
@@ -282,14 +306,10 @@ scorer_class_req = CreateScorerClassReq(
     properties=ScorerClassUserDefinedProperties(
         name="BLEU Scorer",
         description="Scores text similarity using BLEU metric",
-        input_schema={
-            "type": "object", 
-            "properties": {
-                "generated": {"type": "string"},
-                "reference": {"type": "string"}
-            }
-        },
-        output_schema={
+        model_input_schema={"type": "object", "properties": {"prompt": {"type": "string"}}},
+        model_output_schema={"type": "object", "properties": {"text": {"type": "string"}}},
+        example_label_schema={"type": "object", "properties": {"text": {"type": "string"}}},
+        score_output_schema={
             "type": "object",
             "properties": {
                 "score": {"type": "number"},
@@ -310,8 +330,7 @@ scorer_class_res = await evaluator.async_create_scorer_class(scorer_class_req)
 scorer_instance_req = CreateScorerInstanceReq(
     properties=ScorerInstanceUserDefinedProperties(
         scorer_class_id=scorer_class_res.id,
-        config={"n_gram": 4},
-        hyperparameters={"smoothing": 0.1}
+        config={"n_gram": 4}
     )
 )
 scorer_instance_res = await evaluator.async_create_scorer_instance(scorer_instance_req)
@@ -326,10 +345,38 @@ score_result_req = CreateScoreResultReq(
         score={
             "score": 0.65,
             "explanation": "Partial match on structure and keywords"
-        }
+        },
+        reason="BLEU-4 score computed with smoothing"
     )
 )
 score_result_res = await evaluator.async_create_score_result(score_result_req)
+
+# 11. Create a summary (after running multiple examples)
+# Assume we have lists of example_ids, label_ids, and score_result_ids
+summary_req = CreateSummaryReq(
+    properties=SummaryUserDefinedProperties(
+        name="GPT-4 Haiku Generation Evaluation",
+        description="Evaluation of GPT-4 on haiku generation task",
+        model_instance_id=model_instance_res.id,
+        task_definition_id=task_definition_res.id,
+        scorer_instance_id=scorer_instance_res.id,
+        task_example_ids=[task_example_res.id],  # In practice, this would be many examples
+        example_label_ids=[example_label_res.id],
+        score_result_ids=[score_result_res.id],
+        aggregate_metrics={
+            "mean": 0.65,
+            "std": 0.12,
+            "min": 0.45,
+            "max": 0.89,
+            "count": 1
+        },
+        metadata={
+            "evaluation_date": "2024-01-15T10:30:00Z",
+            "evaluation_config": {"batch_size": 32}
+        }
+    )
+)
+summary_res = await evaluator.async_create_summary(summary_req)
 ```
 
 ## Design Decisions
@@ -351,6 +398,13 @@ The abstract mixin pattern allows:
 - Easy testing with mock implementations
 - Clear separation between interface and implementation
 
+### Why Freeze Examples in Summary?
+
+Tasks can evolve over time with new examples being added or removed. By freezing the specific set of examples, labels, and scores used in a Summary, we ensure:
+- **Reproducibility**: You can always trace back exactly which data was used
+- **Consistency**: Comparisons between summaries are meaningful
+- **Auditability**: Historical evaluations remain intact even as tasks change
+
 ## Future Extensions
 
 The system is designed to be extensible. Planned additions include:
@@ -359,7 +413,6 @@ The system is designed to be extensible. Planned additions include:
 - **Dataset**: Collections of input/output pairs for evaluation
 - **Benchmark**: Standardized evaluation scenarios
 - **Comparison**: Direct comparison between different model instances
-- **Summary**: Aggregated metrics for model/task combinations
 
 ## Contributing
 

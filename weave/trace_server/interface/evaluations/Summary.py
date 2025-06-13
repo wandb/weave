@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional, List
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -22,12 +22,16 @@ class SummaryImmutableProperties(BaseModel):
     task_definition_id: str
     scorer_instance_id: str
     # Freeze the specific examples and labels used
-    task_example_ids: List[str]  # The examples from the task
-    example_label_ids: List[str]  # The corresponding labels
-    score_result_ids: List[str]  # The individual scores
+    task_example_ids: list[str]  # The examples from the task
+    example_label_ids: list[str]  # The corresponding labels
+    score_result_ids: list[str]  # The individual scores
     # Aggregated results
-    aggregate_metrics: dict[str, Any]  # e.g., {"mean": 0.85, "std": 0.1, "min": 0.7, "max": 0.95}
-    metadata: Optional[dict[str, Any]] = None  # Additional context (e.g., evaluation date, config)
+    aggregate_metrics: dict[
+        str, Any
+    ]  # e.g., {"mean": 0.85, "std": 0.1, "min": 0.7, "max": 0.95}
+    metadata: Optional[dict[str, Any]] = (
+        None  # Additional context (e.g., evaluation date, config)
+    )
 
 
 class SummaryUserDefinedProperties(
@@ -74,21 +78,13 @@ class DeleteSummaryRes(BaseModel):
 
 class TSEIMSummaryMixin(ABC):
     @abstractmethod
-    async def async_create_summary(
-        self, req: CreateSummaryReq
-    ) -> CreateSummaryRes: ...
+    async def async_create_summary(self, req: CreateSummaryReq) -> CreateSummaryRes: ...
 
     @abstractmethod
-    async def async_get_summary(
-        self, req: GetSummaryReq
-    ) -> GetSummaryRes: ...
+    async def async_get_summary(self, req: GetSummaryReq) -> GetSummaryRes: ...
 
     @abstractmethod
-    async def async_update_summary(
-        self, req: UpdateSummaryReq
-    ) -> UpdateSummaryRes: ...
+    async def async_update_summary(self, req: UpdateSummaryReq) -> UpdateSummaryRes: ...
 
     @abstractmethod
-    async def async_delete_summary(
-        self, req: DeleteSummaryReq
-    ) -> DeleteSummaryRes: ... 
+    async def async_delete_summary(self, req: DeleteSummaryReq) -> DeleteSummaryRes: ...
