@@ -1,9 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from pydantic import BaseModel
-
-from weave.trace_server.interface.evaluations.common import TypedSignature
 
 """
 TaskExample

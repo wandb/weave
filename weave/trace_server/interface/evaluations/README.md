@@ -11,7 +11,11 @@ The evaluation system is built around a consistent ORM-like pattern with the fol
 - **InputPayload**: Input data for model evaluation
 - **GenerationResult**: The output from running a ModelInstance on an InputPayload
 - **TaskDefinition**: Defines a modeling task with input/output types
-- **TaskExample**: Example data for a task (not yet implemented)
+- **TaskExample**: Example data for a task
+- **ScorerClass**: Defines a class of scorers with the same type signature
+- **ScorerInstance**: A specific instance of a ScorerClass with fixed configuration
+- **ScoreResult**: The result of running a ScorerInstance on evaluation data
+- **ExampleLabel**: Ground truth label for a TaskExample
 
 ## Architecture Pattern
 
@@ -134,6 +138,68 @@ Defines a modeling task by specifying the input and output types.
 **Immutable Properties:**
 - `signature`: TypedSignature - The input/output type signature for the task
 
+### TaskExample
+
+A specific example for a task that can be used for evaluation.
+
+**Mutable Properties:**
+- None
+
+**Immutable Properties:**
+- `task_definition_id`: str - Reference to the TaskDefinition
+- `input_payload_id`: str - Reference to the InputPayload
+
+### ScorerClass
+
+Represents a class of scorers that conform to the same type signature.
+
+**Mutable Properties:**
+- `name`: str - The name of the scorer class
+- `description`: Optional[str] - Description of the scorer class
+
+**Immutable Properties:**
+- `input_schema`: JSONSchema - Schema for what the scorer takes as input
+- `output_schema`: JSONSchema - Schema for what the scorer produces
+- `config_schema`: JSONSchema - Configuration schema for scorer instances
+
+### ScorerInstance
+
+A specific instance of a ScorerClass with fixed configuration.
+
+**Mutable Properties:**
+- `hyperparameters`: dict[str, Any] - Tunable parameters
+
+**Immutable Properties:**
+- `scorer_class_id`: str - Reference to the ScorerClass
+- `config`: Any - Fixed configuration for this instance
+
+### ScoreResult
+
+The result of running a ScorerInstance on evaluation data.
+
+**Mutable Properties:**
+- None
+
+**Immutable Properties:**
+- `scorer_instance_id`: str - Reference to the ScorerInstance
+- `generation_result_id`: str - Reference to the GenerationResult being scored
+- `example_label_id`: str - Reference to the ExampleLabel (ground truth)
+- `input_payload_id`: str - Reference to the InputPayload
+- `comparison_id`: Optional[str] - Reference for comparative scoring
+- `score`: Any - The actual score output
+
+### ExampleLabel
+
+Ground truth label for a TaskExample.
+
+**Mutable Properties:**
+- `name`: Optional[str] - Name of the label
+- `description`: Optional[str] - Description of the label
+
+**Immutable Properties:**
+- `task_example_id`: str - Reference to the TaskExample
+- `label_value`: Any - The actual label/ground truth value
+
 ## Usage Example
 
 ```python
@@ -190,6 +256,80 @@ task_definition_req = CreateTaskDefinitionReq(
     )
 )
 task_definition_res = await evaluator.async_create_task_definition(task_definition_req)
+
+# 6. Create a task example
+task_example_req = CreateTaskExampleReq(
+    properties=TaskExampleUserDefinedProperties(
+        task_definition_id=task_definition_res.id,
+        input_payload_id=input_payload_res.id
+    )
+)
+task_example_res = await evaluator.async_create_task_example(task_example_req)
+
+# 7. Create an example label
+example_label_req = CreateExampleLabelReq(
+    properties=ExampleLabelUserDefinedProperties(
+        task_example_id=task_example_res.id,
+        label_value={"text": "Code in silicon\nElectrons dance through logic\nPrograms come alive"},
+        name="Expected haiku",
+        description="A well-formed haiku about programming"
+    )
+)
+example_label_res = await evaluator.async_create_example_label(example_label_req)
+
+# 8. Create a scorer class
+scorer_class_req = CreateScorerClassReq(
+    properties=ScorerClassUserDefinedProperties(
+        name="BLEU Scorer",
+        description="Scores text similarity using BLEU metric",
+        input_schema={
+            "type": "object", 
+            "properties": {
+                "generated": {"type": "string"},
+                "reference": {"type": "string"}
+            }
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "score": {"type": "number"},
+                "explanation": {"type": "string"}
+            }
+        },
+        config_schema={
+            "type": "object",
+            "properties": {
+                "n_gram": {"type": "integer", "default": 4}
+            }
+        }
+    )
+)
+scorer_class_res = await evaluator.async_create_scorer_class(scorer_class_req)
+
+# 9. Create a scorer instance
+scorer_instance_req = CreateScorerInstanceReq(
+    properties=ScorerInstanceUserDefinedProperties(
+        scorer_class_id=scorer_class_res.id,
+        config={"n_gram": 4},
+        hyperparameters={"smoothing": 0.1}
+    )
+)
+scorer_instance_res = await evaluator.async_create_scorer_instance(scorer_instance_req)
+
+# 10. Create a score result
+score_result_req = CreateScoreResultReq(
+    properties=ScoreResultUserDefinedProperties(
+        scorer_instance_id=scorer_instance_res.id,
+        generation_result_id=generation_result_res.id,
+        example_label_id=example_label_res.id,
+        input_payload_id=input_payload_res.id,
+        score={
+            "score": 0.65,
+            "explanation": "Partial match on structure and keywords"
+        }
+    )
+)
+score_result_res = await evaluator.async_create_score_result(score_result_req)
 ```
 
 ## Design Decisions
@@ -215,11 +355,11 @@ The abstract mixin pattern allows:
 
 The system is designed to be extensible. Planned additions include:
 
-- **TaskExample**: Provide example inputs/outputs for tasks (interface exists but not yet implemented)
 - **EvaluationRun**: Track the execution of evaluations
-- **MetricResult**: Store computed metrics from evaluations
 - **Dataset**: Collections of input/output pairs for evaluation
 - **Benchmark**: Standardized evaluation scenarios
+- **Comparison**: Direct comparison between different model instances
+- **Summary**: Aggregated metrics for model/task combinations
 
 ## Contributing
 
