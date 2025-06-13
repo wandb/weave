@@ -1,25 +1,19 @@
-from typing import Any, Optional, Callable
+from __future__ import annotations
+
+import importlib
+from functools import wraps
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
-from weave.trace.weave_client import Call
-from functools import wraps
-from weave.trace.autopatch import OpSettings
-from weave.trace.op import _add_accumulator
-
-# Add TYPE_CHECKING import 
-from typing import TYPE_CHECKING
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.op import Op, ProcessedInputs, _add_accumulator
 
 if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletion, ChatCompletionChunk
-    from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaFunctionCall,
-        ChoiceDeltaToolCall,
-    )
-    from openai.types.chat.chat_completion_message import FunctionCall
-    from openai.types.chat.chat_completion_message_tool_call import (
-        ChatCompletionMessageToolCall,
-    )
-    from weave.trace.op import Op, ProcessedInputs
+    from openai.types.chat import ChatCompletionChunk
+    from openai.types.responses import Response, ResponseStreamEvent
+
+_openai_patcher: MultiPatcher | None = None
 
 
 def maybe_unwrap_api_response(value: Any) -> Any:
@@ -54,41 +48,7 @@ def maybe_unwrap_api_response(value: Any) -> Any:
     return value
 
 
-def openai_on_input_handler(
-    func: 'Op', args: tuple, kwargs: dict
-) -> 'ProcessedInputs | None':
-    if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
-        original_args = args
-        original_kwargs = kwargs
-        prompt = args[1]
-        args = args[:-1]
-        kwargs.update(prompt.as_dict())
-        inputs = {
-            "prompt": prompt,
-        }
-        return weave.trace.op.ProcessedInputs(
-            original_args=original_args,
-            original_kwargs=original_kwargs,
-            args=args,
-            kwargs=kwargs,
-            inputs=inputs,
-        )
-    return None
-
-
-def should_use_accumulator(inputs: dict) -> bool:
-    return (
-        isinstance(inputs, dict)
-        and bool(inputs.get("stream"))
-        # This is very critical. When `"X-Stainless-Raw-Response` is true, the response
-        # is an APIResponse object. This is very hard to mock/patch for the streaming use
-        # case, so we don't even try.
-        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response")
-        == "true"
-    )
-
-
-def openai_on_finish_post_processor(value: Any) -> dict | None:
+def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict | None:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -171,10 +131,10 @@ def openai_on_finish_post_processor(value: Any) -> dict | None:
 
 
 def openai_accumulator(
-    acc: 'ChatCompletionChunk | None', 
-    value: 'ChatCompletionChunk', 
-    skip_last: bool = False
-) -> 'ChatCompletionChunk':
+    acc: ChatCompletionChunk | None,
+    value: ChatCompletionChunk,
+    skip_last: bool = False,
+) -> ChatCompletionChunk:
     from openai.types.chat import ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -323,7 +283,41 @@ def openai_accumulator(
     return acc
 
 
-# Functions from common_utils.py
+# Unlike other integrations, streaming is based on input flag
+def should_use_accumulator(inputs: dict) -> bool:
+    return (
+        isinstance(inputs, dict)
+        and bool(inputs.get("stream"))
+        # This is very critical. When `"X-Stainless-Raw-Response` is true, the response
+        # is an APIResponse object. This is very hard to mock/patch for the streaming use
+        # case, so we don't even try.
+        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response")
+        == "true"
+    )
+
+
+def openai_on_input_handler(
+    func: Op, args: tuple, kwargs: dict
+) -> ProcessedInputs | None:
+    if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
+        original_args = args
+        original_kwargs = kwargs
+        prompt = args[1]
+        args = args[:-1]
+        kwargs.update(prompt.as_dict())
+        inputs = {
+            "prompt": prompt,
+        }
+        return ProcessedInputs(
+            original_args=original_args,
+            original_kwargs=original_kwargs,
+            args=args,
+            kwargs=kwargs,
+            inputs=inputs,
+        )
+    return None
+
+
 def create_basic_wrapper_sync(
     settings: OpSettings,
     postprocess_inputs: Optional[Callable] = None, 

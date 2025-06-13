@@ -19,44 +19,37 @@ def openai_image_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs
 
 
-def openai_image_postprocess_outputs(outputs: dict[str, Any]) -> dict[str, Any]:
+def openai_image_postprocess_outputs(outputs: dict[str, Any]) -> Any:
     """
     Postprocess outputs of the trace for the OpenAI Image API.
-    Creates a 250x250 thumbnail for logging to Weave while preserving original output.
+    Returns just the PIL Image.
     """
+    from PIL import Image
+    import requests
     from io import BytesIO
-
-    from PIL import Image  # type: ignore
+    import base64
 
     # Unwrap API response if needed
     outputs = maybe_unwrap_api_response(outputs)
-    
-    # Create a copy of outputs for Weave logging
-    weave_outputs = outputs.copy() if isinstance(outputs, dict) else outputs
-    
-    if isinstance(outputs, dict) and "data" in outputs:
-        for i, image_data in enumerate(outputs["data"]):
-            if "b64_json" in image_data:
-                import base64
-                try:
-                    image_bytes = base64.b64decode(image_data["b64_json"])
-                    pil_image = Image.open(BytesIO(image_bytes))
-                    # Create a thumbnail version for Weave logging
-                    thumbnail = pil_image.copy()
-                    thumbnail_size = (250, 250)
-                    thumbnail.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
 
-                    print(f"thumbnail: {thumbnail}")
-                    print("Logging thumbnail to Weave")
-                    # Add thumbnail to weave_outputs for visualization
-                    if isinstance(weave_outputs, dict) and "data" in weave_outputs:
-                        weave_outputs["data"][i]["image"] = thumbnail
-                except Exception as e:
-                    rich.print(f"Error converting image to `PIL.Image.Image`: {e}")
+    if not isinstance(outputs, dict) or "data" not in outputs:
+        return outputs
 
-    # Return original outputs to user, store thumbnail in call for Weave
-    if isinstance(outputs, dict) and hasattr(Call, "current") and Call.current is not None:
-        Call.current.output = weave_outputs
+    # Get first image data
+    image_data = outputs["data"][0]
+
+    rich.print(f"Image data: {image_data}")
+    
+    # Handle URL or base64 response
+    if "url" in image_data:
+        rich.print(f"URL Image found: {image_data['url']}")
+        response = requests.get(image_data["url"])
+        return Image.open(BytesIO(response.content))
+    elif "b64_json" in image_data:
+        rich.print(f"B64 Image found")
+        image_bytes = base64.b64decode(image_data["b64_json"])
+        return Image.open(BytesIO(image_bytes))
+        
     return outputs
 
 
@@ -68,7 +61,7 @@ def openai_image_on_finish(
     metadata is added to the summary of the trace.
     """
     if not (model_name := call.inputs.get("model")):
-        model_name = "dall-e-3"  # Default if not specified
+        model_name = "gpt-image-1"  # Default if not specified
     
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
