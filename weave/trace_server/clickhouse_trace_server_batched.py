@@ -2435,9 +2435,10 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
 def _ch_table_stats_to_table_stats_schema(
     ch_table_stats_row: Sequence[Any],
 ) -> tsi.TableStatsRow:
-    digest, count, storage_size_bytes = (lambda a, b, c=cast(Any, None): (a, b, c))(
-        *ch_table_stats_row
-    )
+    # Unpack the row with a default for the third value if it doesn't exist
+    row_tuple = tuple(ch_table_stats_row)
+    digest, count = row_tuple[:2]
+    storage_size_bytes = row_tuple[2] if len(row_tuple) > 2 else cast(Any, None)
 
     return tsi.TableStatsRow(
         count=count,

@@ -259,7 +259,9 @@ select = [
   "TRY400", # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
   "C",      # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",   # https://docs.astral.sh/ruff/rules/print-statement/
+  "B006",   # https://docs.astral.sh/ruff/rules/mutable-argument-default/
   "B007",   # https://docs.astral.sh/ruff/rules/unused-loop-control-variable/
+  "B008",   # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
 ]
 ignore = [
   # we use Google style
