@@ -22,8 +22,67 @@ logger = logging.getLogger(__name__)
 
 _tracing_enabled = contextvars.ContextVar("tracing_enabled", default=True)
 
+# Interactive session detection (cached for performance)
+_is_interactive_session: bool | None = None
+_last_execution_count: int | None = None
+
+
+def _detect_interactive_session() -> bool:
+    """Check once per process if we're in an interactive session (Jupyter/Colab)."""
+    global _is_interactive_session
+
+    if _is_interactive_session is not None:
+        return _is_interactive_session
+
+    try:
+        from IPython import get_ipython
+
+        ipython = get_ipython()
+        _is_interactive_session = ipython is not None
+    except ImportError:
+        _is_interactive_session = False
+
+    return _is_interactive_session
+
+
+def _clear_stale_context_if_new_execution() -> None:
+    """Clear stale context if we detect a new cell execution (interactive sessions only)."""
+    global _last_execution_count
+
+    # Only check if we're in an interactive session
+    if not _detect_interactive_session():
+        return
+
+    try:
+        from IPython import get_ipython
+
+        ipython = get_ipython()
+
+        if ipython is not None:
+            current_count = ipython.execution_count
+
+            # If execution count changed, we're in a new cell - clear stale context
+            if (
+                _last_execution_count is not None
+                and current_count != _last_execution_count
+                and _call_stack.get()
+            ):
+                _call_stack.set([])
+                logger.debug(
+                    f"Cleared stale call context - new execution {current_count}"
+                )
+
+            _last_execution_count = current_count
+
+    except Exception:
+        # Silently fail - don't break normal operation
+        pass
+
 
 def push_call(call: Call) -> None:
+    # Check for stale context from interrupted executions (interactive sessions only)
+    _clear_stale_context_if_new_execution()
+
     new_stack = copy.copy(_call_stack.get())
     new_stack.append(call)
     _call_stack.set(new_stack)
