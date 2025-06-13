@@ -2,7 +2,7 @@ import {Box, Typography} from '@mui/material';
 import {Select} from '@wandb/weave/components/Form/Select';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
-import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3';
+import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
 import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/datasets/datasetNameValidation';
 import {
   FieldName,
@@ -42,7 +42,7 @@ export const LLMAsAJudgeScorerForm = ({
     }
   }, [scoringPrompt, judgeModelRef, scorerName, nameError, onValidationChange]);
 
-  const {projectId, entity, project} = useEntityProject();
+  const {projectId} = useEntityProject();
 
   const {result: savedModels, loading: savedModelsLoading} =
     useLeafObjectInstances('LLMStructuredCompletionModel', {
@@ -56,7 +56,7 @@ export const LLMAsAJudgeScorerForm = ({
         ref: `weave:///${projectId}/object/${model.val['name']}:${model.digest}`,
       })) ?? []
     );
-  }, [savedModels]);
+  }, [savedModels, projectId]);
 
   const selectedModel = useMemo(() => {
     return modelOptions.find(option => option.ref === judgeModelRef);
@@ -93,7 +93,7 @@ export const LLMAsAJudgeScorerForm = ({
       };
       onChange(newScorer);
     },
-    [onChange, scorer, entity, project]
+    [onChange, scorer]
   );
 
   const onScorerNameChange = useCallback(
