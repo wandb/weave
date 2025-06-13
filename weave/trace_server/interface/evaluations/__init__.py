@@ -14,6 +14,7 @@ from weave.trace_server.interface.evaluations.ScoreResult import TSEIMScoreResul
 from weave.trace_server.interface.evaluations.ScorerInstance import (
     TSEIMScorerInstanceMixin,
 )
+from weave.trace_server.interface.evaluations.Summary import TSEIMSummaryMixin
 from weave.trace_server.interface.evaluations.TaskDefinition import (
     TSEIMTaskDefinitionMixin,
 )
@@ -33,4 +34,5 @@ class TraceServerEvaluationInterfaceMixin(
     TSEIMScorerInstanceMixin,
     TSEIMScoreResultMixin,
     TSEIMExampleLabelMixin,
+    TSEIMSummaryMixin,
 ): ...
