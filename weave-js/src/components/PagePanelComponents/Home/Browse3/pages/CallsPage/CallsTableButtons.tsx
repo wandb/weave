@@ -739,7 +739,8 @@ export const PaginationButtons = ({
     }
   };
 
-  const plusText = callsStatsLimit != null ? '+' : '';
+  const plusText =
+    callsStatsLimit != null && rowCount === callsStatsLimit ? '+' : '';
 
   return (
     <Box
