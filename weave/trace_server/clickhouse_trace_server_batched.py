@@ -1368,7 +1368,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             if len(needed_extra_results) > 0:
                 refs: list[ri.InternalObjectRef] = []
-                for i, extra_result in needed_extra_results:
+                for _, extra_result in needed_extra_results:
                     if extra_result.unresolved_obj_ref is None:
                         raise ValueError("Expected unresolved obj ref")
                     refs.append(extra_result.unresolved_obj_ref)

@@ -24,7 +24,7 @@ def ensure_tiktoken_file() -> Generator[None, None, None]:
 
 
 def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
-    for call, depth in calls:
+    for call, _depth in calls:
         assert call.ended_at is not None
         assert call.exception is None
 

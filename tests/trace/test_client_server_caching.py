@@ -23,7 +23,7 @@ from weave.trace_server.trace_server_interface import (
 
 def create_random_pil_image():
     im = PIL.Image.new("RGB", (100, 100), color=(255, 255, 255))
-    for i in range(100):
+    for _i in range(100):
         im.putpixel(
             (random.randint(0, 99), random.randint(0, 99)),
             (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
