@@ -581,6 +581,30 @@ const CompareEvaluationsDropdownButton: FC<{
     }
   };
 
+  // If there's only one dataset, show a simple button instead of dropdown
+  if (availableDatasets.length === 1) {
+    return (
+      <Box
+        sx={{
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+        }}>
+        <Button
+          size="medium"
+          variant="primary"
+          disabled={disabled || loading}
+          icon="chart-scatterplot"
+          onClick={() => onDatasetSelect(availableDatasets[0].name)}
+          tooltip="Compare evaluations">
+          <div className="flex items-center gap-2">
+            {loading ? <Loading size={16} /> : buttonText}
+          </div>
+        </Button>
+      </Box>
+    );
+  }
+
   return (
     <Box
       sx={{
