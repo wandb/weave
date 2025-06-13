@@ -47,6 +47,7 @@ export const IconNames = {
   ContextWindow: 'context-window',
   ContractLeft: 'contract-left',
   Copy: 'copy',
+  CourthouseLicense: 'courthouse-license',
   CreditCardPayment: 'credit-card-payment',
   CropBeginning: 'crop-beginning',
   CropEnd: 'crop-end',
