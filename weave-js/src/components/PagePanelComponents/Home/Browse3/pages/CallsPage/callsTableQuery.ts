@@ -4,7 +4,7 @@ import {
   GridPaginationModel,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import {useCallback, useMemo} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {
@@ -54,6 +54,7 @@ export const useCallsForQuery = (
   columns?: string[],
   options?: {
     includeTotalStorageSize?: boolean;
+    skipOverride?: boolean;
   }
 ): {
   costsLoading: boolean;
@@ -88,6 +89,7 @@ export const useCallsForQuery = (
     expandedRefColumns: expandedColumns,
     refetchOnDelete: true,
     includeFeedback: true,
+    skip: options?.skipOverride,
   });
 
   const callsStats = useCallsStats({
@@ -96,6 +98,7 @@ export const useCallsForQuery = (
     filter: lowLevelFilter,
     query: filterBy,
     refetchOnDelete: true,
+    skip: options?.skipOverride,
   });
 
   const callResults = useMemo(() => {
@@ -131,7 +134,7 @@ export const useCallsForQuery = (
     limit: effectiveLimit,
     columns: costCols,
     expandedRefColumns: expandedColumns,
-    skip: calls.loading || noCalls,
+    skip: calls.loading || noCalls || options?.skipOverride,
     includeCosts: true,
   });
 
@@ -145,7 +148,11 @@ export const useCallsForQuery = (
     limit: effectiveLimit,
     columns: storageSizeCols,
     expandedRefColumns: expandedColumns,
-    skip: calls.loading || noCalls || !options?.includeTotalStorageSize,
+    skip:
+      calls.loading ||
+      noCalls ||
+      !options?.includeTotalStorageSize ||
+      options?.skipOverride,
     includeTotalStorageSize: true,
   });
 
@@ -459,5 +466,63 @@ export const useMakeInitialDatetimeFilter = (
 
   return {
     initialDatetimeFilter: computedDatetimeFilter ?? defaultDatetimeFilter,
+  };
+};
+
+/**
+ * Custom hook to manage auto-polling functionality for calls.
+ * When enabled, triggers the onNewCalls callback every 3 seconds to allow
+ * the parent component to refetch data as needed.
+ *
+ * @param enabled - Whether auto-polling is enabled
+ * @param onNewCalls - Callback to trigger when polling interval fires
+ * @returns Object with auto-polling state and controls
+ */
+export const useAutoPolling = (
+  enabled: boolean
+): {
+  isAutoPolling: boolean;
+  lastPolledAt: Date | null;
+} => {
+  const [lastPolledAt, setLastPolledAt] = useState<Date | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isActiveRef = useRef(enabled);
+
+  // Update refs when values change
+  useEffect(() => {
+    isActiveRef.current = enabled;
+  });
+
+  // Set up polling interval with stable reference
+  useEffect(() => {
+    if (!enabled) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
+    }
+
+    const pollForNewCalls = () => {
+      if (!isActiveRef.current) return;
+
+      setLastPolledAt(new Date());
+    };
+
+    // Start polling every 3 seconds
+    intervalRef.current = setInterval(pollForNewCalls, 3000);
+
+    // Cleanup on unmount or disable
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [enabled]); // Only depend on enabled state
+
+  return {
+    isAutoPolling: enabled,
+    lastPolledAt,
   };
 };

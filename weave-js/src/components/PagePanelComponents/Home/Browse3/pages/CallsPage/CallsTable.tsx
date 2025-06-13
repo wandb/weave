@@ -53,7 +53,10 @@ import {
   parseFeedbackType,
 } from '../../feedback/HumanFeedback/tsHumanFeedback';
 import {OnUpdateFilter} from '../../filters/CellFilterWrapper';
-import {getDefaultOperatorForValue} from '../../filters/common';
+import {
+  getDefaultOperatorForValue,
+  makeDateFilterSecondsOffset,
+} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
@@ -88,7 +91,11 @@ import {
   WFHighLevelCallFilter,
 } from './callsTableFilter';
 import {CallsTableNoRowsOverlay} from './CallsTableNoRowsOverlay';
-import {DEFAULT_FILTER_CALLS, useCallsForQuery} from './callsTableQuery';
+import {
+  DEFAULT_FILTER_CALLS,
+  useAutoPolling,
+  useCallsForQuery,
+} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 import {OpSelector} from './OpSelector';
@@ -316,6 +323,47 @@ export const CallsTable: FC<{
     }
   );
 
+  // Auto-polling state
+  const [autoPollingEnabled, setAutoPollingEnabled] = useState(false);
+  const autoPolling = useAutoPolling(autoPollingEnabled);
+
+  const autoPollingFilter = useMemo(() => {
+    if (!autoPolling.lastPolledAt) {
+      return {items: []};
+    }
+    const filter = makeDateFilterSecondsOffset(
+      5,
+      101,
+      'started_at',
+      '(date): after'
+    );
+    // remove existing datetime filters
+    const newItems = filterModelResolved.items.filter(
+      item => item.field !== 'started_at'
+    );
+    return {
+      ...filterModelResolved,
+      items: [...newItems, filter],
+    };
+  }, [autoPolling.lastPolledAt, filterModelResolved]);
+
+  const newCalls = useCallsForQuery(
+    entity,
+    project,
+    effectiveFilter,
+    autoPollingFilter!,
+    paginationModelResolved,
+    sortModelResolved,
+    expandedRefCols,
+    undefined,
+    {
+      skipOverride: !autoPollingEnabled,
+      // The total storage size only makes sense for traces,
+      // and not for calls.
+      includeTotalStorageSize: shouldIncludeTotalStorageSize,
+    }
+  );
+
   // Here, we only update our local state once the calls have loaded.
   // If we were not to do this, we would see a flicker of an empty table
   // before the calls are loaded. Since the columns are data-driven, this
@@ -353,6 +401,44 @@ export const CallsTable: FC<{
       prevViewIdRef.current = currentViewIdResolved;
     }
   }, [calls, effectiveFilter, currentViewIdResolved, hasStructuralChange]);
+
+  // handle autopolling incremental calls
+  useEffect(() => {
+    if (newCalls.result?.length > 0) {
+      const maxSize = paginationModelResolved.pageSize;
+
+      setCallsResult(prevCalls => {
+        console.log('Auto-polling update:', {
+          newCallsCount: newCalls.result.length,
+          existingCallsCount: prevCalls.length,
+          newCallIds: newCalls.result.map(c => c.traceCall?.id),
+          existingCallIds: prevCalls.map(c => c.traceCall?.id),
+        });
+
+        // Create a map for faster lookup and to preserve the new call data
+        const newCallsMap = new Map(
+          newCalls.result.map(call => [call.traceCall?.id, call])
+        );
+
+        // Process existing calls: keep ones that aren't being updated
+        const keptCalls = prevCalls.filter(existingCall => {
+          const existingId = existingCall.traceCall?.id;
+          return !newCallsMap.has(existingId);
+        });
+
+        // Add all new calls at the beginning (this includes both new and updated calls)
+        const finalCalls = [...newCalls.result, ...keptCalls];
+
+        console.log('Auto-polling result:', {
+          finalCallsCount: finalCalls.length,
+          trimmedToSize: Math.min(finalCalls.length, maxSize),
+        });
+
+        // Trim to page size, removing oldest calls from the end
+        return finalCalls.slice(0, maxSize);
+      });
+    }
+  }, [newCalls.result, paginationModelResolved.pageSize]); // Back to newCalls.result
 
   // Construct Flattened Table Data
   const tableData: FlattenedCallData[] = useMemo(
@@ -894,6 +980,8 @@ export const CallsTable: FC<{
               <RefreshButton
                 onClick={() => calls.refetch()}
                 disabled={callsLoading}
+                autoPollingEnabled={autoPollingEnabled}
+                onAutoPollingToggle={setAutoPollingEnabled}
               />
               {columnVisibilityModel && setColumnVisibilityModel && (
                 <div className="flex-none">

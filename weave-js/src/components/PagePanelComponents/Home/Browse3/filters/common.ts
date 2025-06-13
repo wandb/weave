@@ -448,6 +448,23 @@ export const makeRawDateFilter = (
   };
 };
 
+// export const makeRawDateRangeFilter = (
+//   start: Date,
+//   end: Date,
+//   field: string = 'started_at'
+// ): Query => {
+//   return {
+//     $expr: {
+//       $and: [
+//         {$gte: [{$getField: field}, {$literal: start.getTime() / 1000}]},
+//         {
+//           $not: [{$gt: [{$getField: field}, {$literal: end.getTime() / 1000}]}],
+//         },
+//       ],
+//     },
+//   };
+// };
+
 /**
  * Creates a date filter for a specified number of days in the past
  * @param days Number of days in the past to filter from
@@ -481,4 +498,19 @@ export const makeMonthFilter = (): GridFilterItem => {
     0
   ).getDate();
   return makeDateFilter(prevMonthDays);
+};
+
+export const makeDateFilterSecondsOffset = (
+  seconds: number,
+  id: number | string = 0,
+  field: string = 'started_at',
+  operator: string = '(date): after'
+): GridFilterItem => {
+  const d = new Date(Date.now() - seconds * 1000);
+  return {
+    id,
+    field,
+    operator,
+    value: d.toISOString(),
+  };
 };

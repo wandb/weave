@@ -23,7 +23,14 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import classNames from 'classnames';
-import React, {Dispatch, FC, SetStateAction, useRef, useState} from 'react';
+import React, {
+  Dispatch,
+  FC,
+  SetStateAction,
+  useCallback,
+  useRef,
+  useState,
+} from 'react';
 
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {Select} from '../../../../../Form/Select';
@@ -522,18 +529,46 @@ export const BulkAddToDatasetButton: FC<{
 export const RefreshButton: FC<{
   onClick: () => void;
   disabled?: boolean;
-}> = ({onClick, disabled}) => {
+  autoPollingEnabled?: boolean;
+  onAutoPollingToggle?: (enabled: boolean) => void;
+}> = ({onClick, disabled, autoPollingEnabled, onAutoPollingToggle}) => {
+  const handleClick = useCallback(
+    (event: React.MouseEvent) => {
+      if (disabled) return;
+
+      // Check if Option/Alt key is pressed
+      if (event.altKey && onAutoPollingToggle) {
+        onAutoPollingToggle(!autoPollingEnabled);
+      } else if (!autoPollingEnabled) {
+        onClick();
+      }
+    },
+    [disabled, autoPollingEnabled, onAutoPollingToggle, onClick]
+  );
+
   return (
     <Box
       sx={{
         height: '100%',
         display: 'flex',
         alignItems: 'center',
+        ...(autoPollingEnabled && {
+          '& button': {
+            backgroundColor: '#22c55e !important',
+            color: 'white !important',
+            '&:hover': {
+              backgroundColor: '#16a34a !important',
+            },
+          },
+          '& svg': {
+            color: 'white !important',
+          },
+        }),
       }}>
       <Button
         variant="ghost"
         size="medium"
-        onClick={onClick}
+        onClick={handleClick}
         disabled={disabled}
         tooltip="Refresh"
         icon="reload-refresh"
