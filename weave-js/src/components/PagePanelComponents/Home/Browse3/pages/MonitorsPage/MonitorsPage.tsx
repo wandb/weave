@@ -161,8 +161,6 @@ export const MonitorsPage = () => {
         />
       </Box>
       <MonitorDrawerRouter
-        entity={entity}
-        project={project}
         open={isCreateDrawerOpen}
         onClose={() => setIsCreateDrawerOpen(false)}
         monitor={selectedMonitor}

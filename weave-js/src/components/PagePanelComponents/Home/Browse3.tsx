@@ -736,7 +736,7 @@ const CallPageBinding = () => {
 
 const MonitorsPageBinding = () => {
   const {entity, project} = useParamsDecoded<Browse3TabParams>();
-  return <MonitorsPage entity={entity} project={project} />;
+  return <MonitorsPage />;
 };
 
 // TODO(tim/weaveflow_improved_nav): Generalize this
