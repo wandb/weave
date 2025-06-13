@@ -453,3 +453,22 @@ def test_op_preserves_type_information():
     }
     # Check that the function can be called with the correct types
     assert typed_func(**values) == decorated_func(**values) == values
+
+
+def test_op_preserves_type_information_method():
+    class A:
+        def method(self, a: int, b: str) -> dict[str, Any]:
+            return {"a": a, "b": b}
+
+        @op
+        def method_op(self, a: int, b: str) -> dict[str, Any]:
+            return {"a": a, "b": b}
+
+    assert get_type_hints(A.method) == get_type_hints(A.method_op)
+    assert inspect.signature(A.method) == inspect.signature(A.method_op)
+
+    a = A()
+
+    values = {"a": 1, "b": "hello"}
+    # Check that the function can be called with the correct types
+    assert a.method(**values) == a.method_op(**values) == values
