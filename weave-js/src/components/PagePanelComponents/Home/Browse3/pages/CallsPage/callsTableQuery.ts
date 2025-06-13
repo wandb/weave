@@ -33,6 +33,8 @@ export const DEFAULT_FILTER_CALLS: GridFilterModel = {
   logicOperator: GridLogicOperator.And,
 };
 
+export const MAX_CALL_STATS_COUNT = 1_000;
+
 /**
  * This Hook is responsible for bridging the gap between the CallsTable
  * component and the underlying data hooks. In particular, it takes a high level
@@ -66,6 +68,7 @@ export const useCallsForQuery = (
   primaryError?: Error | null;
   costsError?: Error | null;
   storageSizeError?: Error | null;
+  callsStatsLimit?: number;
 } => {
   const {useCalls, useCallsStats} = useWFHooks();
   const effectiveOffset = gridPage?.page * gridPage?.pageSize;
@@ -99,11 +102,17 @@ export const useCallsForQuery = (
   };
 
   const callsStatsLimit = useMemo(() => {
+    // If the filter is heavy, limit to 1000 by default. If the user pages up to 1000,
+    // double the limit.
+    let limit = undefined;
     if (hasHeavyField(filterBy)) {
-      return 1_000;
+      limit = MAX_CALL_STATS_COUNT;
+      if (effectiveOffset + effectiveLimit >= MAX_CALL_STATS_COUNT) {
+        limit *= 2;
+      }
     }
-    return undefined;
-  }, [filterBy]);
+    return limit;
+  }, [filterBy, effectiveOffset, effectiveLimit]);
 
   const callsStats = useCallsStats({
     entity,
@@ -215,6 +224,7 @@ export const useCallsForQuery = (
       primaryError: calls.error,
       costsError: costs.error,
       storageSizeError: storageSize.error,
+      callsStatsLimit,
     };
   }, [
     callResults,
@@ -228,6 +238,7 @@ export const useCallsForQuery = (
     calls.error,
     costs.error,
     storageSize.error,
+    callsStatsLimit,
   ]);
 };
 

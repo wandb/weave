@@ -38,7 +38,6 @@ import {WFHighLevelCallFilter} from './callsTableFilter';
 import {useFilterSortby} from './callsTableQuery';
 
 const MAX_EXPORT = 10_000;
-const MAX_CALL_COUNT = 1000;
 
 type SelectionState = 'all' | 'selected' | 'limit';
 
@@ -699,9 +698,13 @@ type PageSizeOption = {
 
 type PaginationButtonsProps = {
   hideControls?: boolean;
+  callsStatsLimit?: number;
 };
 
-export const PaginationButtons = ({hideControls}: PaginationButtonsProps) => {
+export const PaginationButtons = ({
+  hideControls,
+  callsStatsLimit,
+}: PaginationButtonsProps) => {
   const apiRef = useGridApiContext();
   const page = useGridSelector(apiRef, gridPageSelector);
   const pageCount = useGridSelector(apiRef, gridPageCountSelector);
@@ -736,7 +739,7 @@ export const PaginationButtons = ({hideControls}: PaginationButtonsProps) => {
     }
   };
 
-  const plusText = rowCount === MAX_CALL_COUNT ? '+' : '';
+  const plusText = callsStatsLimit != null ? '+' : '';
 
   return (
     <Box
