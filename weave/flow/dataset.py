@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from weave.flow.obj import Object
+from weave.trace.casting import TableLike
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
