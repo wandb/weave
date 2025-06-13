@@ -1,5 +1,5 @@
 import uuid
-from typing import Dict, Optional
+from typing import Optional
 
 from weave.trace_server.interface.evaluations import (
     TraceServerEvaluationInterfaceMixin,
@@ -131,7 +131,7 @@ class InMemoryStore:
     """Generic in-memory store for entities"""
 
     def __init__(self):
-        self.data: Dict[str, dict] = {}
+        self.data: dict[str, dict] = {}
         self.deleted: set = set()
 
     def create(self, id: str, data: dict):
