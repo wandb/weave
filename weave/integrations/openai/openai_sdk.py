@@ -20,7 +20,6 @@ from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
 
 if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletionChunk
     from openai.types.responses import Response, ResponseStreamEvent
 
 _openai_patcher: MultiPatcher | None = None
