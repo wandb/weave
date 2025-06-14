@@ -3,7 +3,11 @@ import {GridFilterItem} from '@mui/x-data-grid-pro';
 import {Button, ButtonVariants} from '@wandb/weave/components/Button';
 import {IconNames} from '@wandb/weave/components/Icon';
 import {BooleanIcon} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValueBoolean';
-import {useWeaveflowRouteContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
+import {
+  useEntityProject,
+  useWeaveflowRouteContext,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
+import {MONITORED_FILTER_VALUE} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/common';
 import {FilterTagItem} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/FilterTagItem';
 import {NotFoundPanel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotFoundPanel';
 import {CallsTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTable';
@@ -12,6 +16,7 @@ import {
   SimpleKeyValueTable,
   SimplePageLayoutWithHeader,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/SimplePageLayout';
+import {SafeOpRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/MonitorsPage';
 import {DeleteObjectButtonWithModal} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectDeleteButtons';
 import {ObjectIcon} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectVersionPage';
 import {queryToGridFilterModel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/SavedViews/savedViewUtil';
@@ -23,29 +28,22 @@ import {
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
 import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
-import {SmallOpVersionsRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallOpVersionsRef';
 import {SmallRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallRef';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
+import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useMemo} from 'react';
 import {useHistory} from 'react-router-dom';
-
-import {MONITORED_FILTER_VALUE} from '../../filters/common';
 
 const MONITOR_VERSIONS_SORT_KEY: SortBy[] = [
   {field: 'created_at', direction: 'desc'},
 ];
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
-export const MonitorPage = (props: {
-  entity: string;
-  project: string;
-  objectName: string;
-  version: string;
-}) => {
+export const MonitorPage = (props: {objectName: string; version: string}) => {
+  const {entity, project} = useEntityProject();
   const monitorVersionFilter = useMemo(
     () => ({
       objectIds: [props.objectName],
@@ -54,8 +52,8 @@ export const MonitorPage = (props: {
   );
 
   const objectVersionResults = useRootObjectVersions({
-    entity: props.entity,
-    project: props.project,
+    entity,
+    project,
     filter: monitorVersionFilter,
     sortBy: MONITOR_VERSIONS_SORT_KEY,
   });
@@ -64,23 +62,16 @@ export const MonitorPage = (props: {
   return monitorVersions === null || monitorVersions.length === 0 ? (
     <NotFoundPanel title="Monitor not found" />
   ) : (
-    <MonitorPageInner
-      entity={props.entity}
-      project={props.project}
-      monitorVersions={monitorVersions}
-    />
+    <MonitorPageInner monitorVersions={monitorVersions} />
   );
 };
 
 const MonitorPageInner = ({
-  entity,
-  project,
   monitorVersions,
 }: {
-  entity: string;
-  project: string;
   monitorVersions: ObjectVersionSchema[];
 }) => {
+  const {entity, project} = useEntityProject();
   const allVersionRefs = useMemo(() => {
     return monitorVersions.map(v => objectVersionKeyToRefUri(v));
   }, [monitorVersions]);
@@ -198,10 +189,7 @@ const MonitorPageInner = ({
                       <Box className="flex gap-2">
                         {monitorVersions[0].val['op_names'].map(
                           (opRefUri: string) => (
-                            <SmallOpVersionsRef
-                              key={opRefUri}
-                              objRef={parseRef(opRefUri) as WeaveObjectRef}
-                            />
+                            <SafeOpRef key={opRefUri} opRef={opRefUri} />
                           )
                         )}
                       </Box>
