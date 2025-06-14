@@ -2,7 +2,7 @@ import {Button} from '@wandb/weave/components/Button';
 import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {Icon} from '@wandb/weave/components/Icon';
 import copyToClipboard from 'copy-to-clipboard';
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useContext, useState} from 'react';
 import {toast} from 'react-toastify';
 
 import {TraceObjSchema} from '../wfReactInterface/traceServerClientTypes';
@@ -47,6 +47,7 @@ export const DropdownViewActions = ({
             <DropdownMenu.Item onClick={savedViewsInfo.onSaveNewView}>
               <Icon name="add-new" /> Save as new view
             </DropdownMenu.Item>
+            <DropdownMenu.Separator />
             {ENABLE_DEBUG_ACTIONS && (
               <>
                 <DropdownMenu.Separator />

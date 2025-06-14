@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx prettier:*)",
+      "Bash(npm run:*)",
+      "Bash(yarn generate)",
+      "Bash(yarn tsc:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": false
+}

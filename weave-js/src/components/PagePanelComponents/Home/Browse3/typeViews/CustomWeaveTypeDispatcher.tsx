@@ -1,9 +1,9 @@
 import React from 'react';
 
 import {AudioPlayer} from './Audio/AudioPlayer';
+import {ContentView} from './Content/ContentView';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {DateTimeView} from './datetime.datetime/DateTimeView';
-import {FileView} from './File/FileView';
 import {MarkdownView} from './Markdown/MarkdownView';
 import {VideoPlayer} from './moviepy.video.VideoClip/VideoPlayer';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
@@ -60,8 +60,8 @@ const customWeaveTypeRegistry: {
   'moviepy.video.VideoClip.VideoClip': {
     component: VideoPlayer,
   },
-  'weave.type_handlers.File.file.File': {
-    component: FileView,
+  'weave.type_wrappers.Content.content.Content': {
+    component: ContentView,
   },
 };
 
