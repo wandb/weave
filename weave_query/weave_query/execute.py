@@ -161,7 +161,7 @@ _top_level_stats_ctx: contextvars.ContextVar[
 
 @contextlib.contextmanager
 def top_level_stats():
-    """Will keep stats for nodes executed within this context, including recurisvely."""
+    """Will keep stats for nodes executed within this context, including recursively."""
     stats = _top_level_stats_ctx.get()
     token = None
     if stats is None:
@@ -603,7 +603,7 @@ def execute_forward_node(
                                 # Sometimes we experience a FileNotFoundError when loading up the AWL instance.
                                 # Unsure how/why this happens in the first place, but handle it by deleting the
                                 # corrupted artifact and sending execution down the cache miss path.
-                                logging.warn(f"AWL local artifact not found: {output_ref.artifact.uri}")
+                                logging.warning(f"AWL local artifact not found: {output_ref.artifact.uri}")
                                 output_ref.artifact.delete()
                 # otherwise, the run's output was not saveable, so we need
                 # to recompute it.
