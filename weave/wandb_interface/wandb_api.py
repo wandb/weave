@@ -8,7 +8,8 @@ import contextlib
 import contextvars
 import dataclasses
 from collections.abc import Generator
-from typing import Any, Optional
+from types import SimpleNamespace
+from typing import Any, Optional, cast
 
 import aiohttp
 import gql
@@ -16,7 +17,15 @@ import graphql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
-from wandb.sdk.internal.internal_api import _thread_local_api_settings
+
+try:
+    from wandb.sdk.internal.internal_api import (
+        _thread_local_api_settings as _tls,  # type: ignore
+    )
+except Exception:  # pragma: no cover - wandb optional
+    _tls = cast(Any, SimpleNamespace(api_key=None, cookies=None, headers=None))
+
+_thread_local_api_settings = cast(Any, _tls)
 
 from weave.trace import env
 
