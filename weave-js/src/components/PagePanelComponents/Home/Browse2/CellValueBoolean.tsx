@@ -6,14 +6,15 @@ import {Tooltip} from '../../../Tooltip';
 
 type CellValueBooleanProps = {
   value: boolean;
+  height?: string;
 };
 
-export const CellValueBoolean = ({value}: CellValueBooleanProps) => {
+export const CellValueBoolean = ({value, height = '100%'}: CellValueBooleanProps) => {
   const label = value ? 'True' : 'False';
   return (
     <div
       style={{
-        height: '100%',
+        height: height,
         width: '100%',
         display: 'flex',
         alignItems: 'center',
