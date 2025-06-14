@@ -499,8 +499,7 @@ export const CreateMonitorDrawer = ({
                       <Switch.Root
                         checked={active}
                         onCheckedChange={setActive}
-                        size="small"
-                      >
+                        size="small">
                         <Switch.Thumb size="small" checked={active} />
                       </Switch.Root>
                       <span className="font-semibold">Active monitor</span>
@@ -531,13 +530,13 @@ export const CreateMonitorDrawer = ({
                       {selectedOpVersionOption.length > 0 ? (
                         <Box className="mt-4">
                           <FilterPanel
-                          entity={entity}
-                          project={project}
-                          filterModel={filterModel}
-                          setFilterModel={setFilterModel}
-                          columnInfo={columns}
-                          selectedCalls={[]}
-                          clearSelectedCalls={() => {}}
+                            entity={entity}
+                            project={project}
+                            filterModel={filterModel}
+                            setFilterModel={setFilterModel}
+                            columnInfo={columns}
+                            selectedCalls={[]}
+                            clearSelectedCalls={() => {}}
                           />
                         </Box>
                       ) : (
@@ -554,7 +553,9 @@ export const CreateMonitorDrawer = ({
                     <Box>
                       <FieldName name="Sampling rate" />
                       <Box className="flex items-center gap-12">
-                        <StyledSliderInput className="w-full" progress={samplingRate}>
+                        <StyledSliderInput
+                          className="w-full"
+                          progress={samplingRate}>
                           <SliderInput
                             value={samplingRate}
                             onChange={setSamplingRate}
