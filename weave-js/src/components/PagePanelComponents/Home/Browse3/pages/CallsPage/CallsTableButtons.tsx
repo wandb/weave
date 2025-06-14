@@ -698,9 +698,13 @@ type PageSizeOption = {
 
 type PaginationButtonsProps = {
   hideControls?: boolean;
+  callsStatsLimit?: number;
 };
 
-export const PaginationButtons = ({hideControls}: PaginationButtonsProps) => {
+export const PaginationButtons = ({
+  hideControls,
+  callsStatsLimit,
+}: PaginationButtonsProps) => {
   const apiRef = useGridApiContext();
   const page = useGridSelector(apiRef, gridPageSelector);
   const pageCount = useGridSelector(apiRef, gridPageCountSelector);
@@ -735,6 +739,9 @@ export const PaginationButtons = ({hideControls}: PaginationButtonsProps) => {
     }
   };
 
+  const plusText =
+    callsStatsLimit != null && rowCount === callsStatsLimit ? '+' : '';
+
   return (
     <Box
       display="flex"
@@ -762,6 +769,7 @@ export const PaginationButtons = ({hideControls}: PaginationButtonsProps) => {
             justifyContent: 'center',
           }}>
           {start}-{end} of {rowCount}
+          {plusText}
         </Box>
         <Button
           variant="ghost"
