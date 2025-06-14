@@ -54,6 +54,7 @@ def lint(session):
         "cohere",
         "crewai",
         "dspy",
+        "exa",
         "google_ai_studio",
         "google_genai",
         "groq",
