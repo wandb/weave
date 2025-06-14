@@ -28,5 +28,5 @@ Are you new to Weave? Set up and start using Weave with the [Python quickstart](
 Learn more about advanced topics:
 
 - [Integrations](./guides/integrations/index.md): Use Weave with popular LLM providers, local models, frameworks, and third-party services.
-- [Cookbooks](./reference/gen_notebooks/01-intro_notebook.md): Build with Weave using Python and TypeScript. Tutorials are available as interactive notebooks.
+- [Cookbooks](./reference/gen_notebooks/intro_notebook.md): Build with Weave using Python and TypeScript. Tutorials are available as interactive notebooks.
 - [W&B AI Academy](https://www.wandb.courses/pages/w-b-courses): Build advanced RAG systems, improve LLM prompting, fine-tune LLMs, and more.
