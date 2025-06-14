@@ -201,8 +201,8 @@ export const MessagePanel = ({
                         </div>
                       )}
                       
-                      {/* Show actual content */}
-                      {_.isString(message.content) ? (
+                      {/* Show actual content - but not during thinking mode while streaming */}
+                      {!(isInThinkingMode && isStreaming) && _.isString(message.content) ? (
                         // Use ThinkingMessage component when not streaming and message contains thinking tags
                         !isStreaming && /^<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/.test(message.content) ? (
                           <ThinkingMessage
@@ -222,8 +222,8 @@ export const MessagePanel = ({
                               displayValue = displayValue.substring(thinkMatch[0].length);
                             }
                             
-                            // Only show content if we're not in thinking mode or if we have content after thinking
-                            if (isInThinkingMode && !displayValue) {
+                            // Don't show anything if there's no content to display
+                            if (!displayValue) {
                               return null;
                             }
                             
@@ -237,7 +237,7 @@ export const MessagePanel = ({
                           })()
                         )
                       ) : (
-                        message.content!.map((p, i) => (
+                        !_.isString(message.content) && !(isInThinkingMode && isStreaming) && message.content!.map((p, i) => (
                           <MessagePanelPart key={i} value={p} />
                         ))
                       )}

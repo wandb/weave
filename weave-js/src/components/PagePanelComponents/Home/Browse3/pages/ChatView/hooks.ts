@@ -273,8 +273,9 @@ export const useAnimatedText = (
     const thinkingEndIndex = thinkMatch ? thinkMatch[0].length : 0;
     
     if (hasOpenThinking && !hasClosedThinking) {
-      // Still in thinking mode, show full text for thinking detection
-      setDisplayedText(targetText);
+      // Still in thinking mode, only show up to the current point (no content inside thinking tags)
+      // This ensures we don't show any thinking content prematurely
+      setDisplayedText(targetText);  // Keep full text for thinking detection
       charIndexRef.current = 0;
       postThinkingIndexRef.current = 0;
       setIsAnimating(false);
