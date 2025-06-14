@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {isWeaveRef} from '../../filters/common';
 import {mapObject, traverse, TraverseContext} from '../CallPage/traverse';
@@ -247,10 +247,11 @@ export const useAnimatedText = (
   speed: number = 20
 ) => {
   const [displayedText, setDisplayedText] = useState('');
+  const [isAnimating, setIsAnimating] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const wordIndexRef = useRef(0);
-  const isAnimatingRef = useRef(false);
+  const charIndexRef = useRef(0);
   const targetTextRef = useRef('');
+  const postThinkingIndexRef = useRef(0);
 
   // Clear any pending timeouts on unmount
   useEffect(() => {
@@ -258,75 +259,93 @@ export const useAnimatedText = (
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      isAnimatingRef.current = false;
     };
   }, []);
+
+  // Animation function
+  const animateText = useCallback(() => {
+    const targetText = targetTextRef.current;
+    
+    // Check if we're in thinking mode
+    const thinkMatch = targetText.match(/^<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/);
+    const hasOpenThinking = thinkMatch !== null;
+    const hasClosedThinking = thinkMatch && thinkMatch[0].length < targetText.length;
+    const thinkingEndIndex = thinkMatch ? thinkMatch[0].length : 0;
+    
+    if (hasOpenThinking && !hasClosedThinking) {
+      // Still in thinking mode, show full text for thinking detection
+      setDisplayedText(targetText);
+      charIndexRef.current = 0;
+      postThinkingIndexRef.current = 0;
+      setIsAnimating(false);
+      return;
+    }
+
+    // Calculate the actual index in the post-thinking content
+    let actualContentStart = hasClosedThinking ? thinkingEndIndex : 0;
+    let postThinkingContent = targetText.substring(actualContentStart);
+    
+    if (postThinkingContent.length === 0) {
+      // No content after thinking yet
+      setDisplayedText(targetText);
+      setIsAnimating(false);
+      return;
+    }
+
+    if (charIndexRef.current < postThinkingContent.length) {
+      // Animate character by character
+      const nextIndex = charIndexRef.current + 1;
+      
+      // Build the displayed text: full thinking tags + animated post-thinking content
+      const animatedPostContent = postThinkingContent.substring(0, nextIndex);
+      const fullDisplay = hasClosedThinking 
+        ? targetText.substring(0, actualContentStart) + animatedPostContent
+        : animatedPostContent;
+      
+      setDisplayedText(fullDisplay);
+      charIndexRef.current = nextIndex;
+      setIsAnimating(true);
+      timeoutRef.current = setTimeout(animateText, speed);
+    } else {
+      setDisplayedText(targetText);
+      setIsAnimating(false);
+    }
+  }, [speed]);
 
   useEffect(() => {
     // If we should not animate, show full text immediately
     if (!shouldAnimate) {
       setDisplayedText(text);
-      wordIndexRef.current = 0;
-      isAnimatingRef.current = false;
+      charIndexRef.current = 0;
+      setIsAnimating(false);
       targetTextRef.current = text;
       return;
     }
 
-    // Update target text for ongoing animation
+    // Update target text
     targetTextRef.current = text;
 
-    // If already animating, let it continue with updated target
-    if (isAnimatingRef.current) {
-      return;
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
 
-    // Start animation
-    const words = text.split(' ');
-    const currentWords = displayedText.split(' ');
+    // Check current state
+    const thinkMatch = text.match(/^<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/);
+    const hasClosedThinking = thinkMatch && thinkMatch[0].length < text.length;
+    const thinkingEndIndex = thinkMatch ? thinkMatch[0].length : 0;
 
-    // If text is shorter, update immediately
-    if (words.length < currentWords.length) {
-      setDisplayedText(text);
-      wordIndexRef.current = words.length;
-      isAnimatingRef.current = false;
-      return;
+    // If we just closed thinking, reset the character index for post-thinking content
+    if (hasClosedThinking && thinkingEndIndex > postThinkingIndexRef.current) {
+      postThinkingIndexRef.current = thinkingEndIndex;
+      charIndexRef.current = 0; // Reset to start animating post-thinking content
     }
 
-    // If text hasn't changed and we're already showing all of it, don't animate
-    if (text === displayedText && wordIndexRef.current >= words.length) {
-      isAnimatingRef.current = false;
-      return;
-    }
-
-    // Reset word index to current displayed words count when starting new animation
-    wordIndexRef.current = Math.min(currentWords.length, words.length);
-    isAnimatingRef.current = true;
-
-    const animateText = () => {
-      const targetWords = targetTextRef.current.split(' ');
-
-      if (!isAnimatingRef.current) {
-        return;
-      }
-
-      if (wordIndexRef.current < targetWords.length) {
-        const wordsToShow = targetWords.slice(0, wordIndexRef.current + 1);
-        const newDisplayText = wordsToShow.join(' ');
-        setDisplayedText(newDisplayText);
-        wordIndexRef.current++;
-        timeoutRef.current = setTimeout(animateText, speed);
-      } else {
-        setDisplayedText(targetTextRef.current);
-        isAnimatingRef.current = false;
-      }
-    };
-
-    // Start animation from current position
+    // Start or continue animation
     animateText();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, shouldAnimate, speed]);
+  }, [text, shouldAnimate, animateText]);
 
-  return {displayedText, isAnimating: isAnimatingRef.current};
+  return {displayedText, isAnimating};
 };
 
 // Hook to detect if content starts with thinking tags and track thinking state

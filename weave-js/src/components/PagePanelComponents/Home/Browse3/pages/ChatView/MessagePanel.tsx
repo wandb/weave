@@ -61,11 +61,11 @@ export const MessagePanel = ({
   const {displayedText, isAnimating} = useAnimatedText(
     messageText,
     shouldAnimateText,
-    50
+    10  // Faster for character-by-character animation
   );
   
   // Detect thinking state
-  const {isInThinkingMode, hasSeenClosingTag} = useThinkingState(
+  const {isInThinkingMode} = useThinkingState(
     displayedText,
     isStreaming
   );
@@ -202,7 +202,7 @@ export const MessagePanel = ({
                       )}
                       
                       {/* Show actual content */}
-                      {!isInThinkingMode && _.isString(message.content) ? (
+                      {_.isString(message.content) ? (
                         // Use ThinkingMessage component when not streaming and message contains thinking tags
                         !isStreaming && /^<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/.test(message.content) ? (
                           <ThinkingMessage
@@ -211,16 +211,33 @@ export const MessagePanel = ({
                             showCursor={false}
                           />
                         ) : (
-                          <MessagePanelPart
-                            value={
-                              shouldAnimateText ? displayedText : message.content
+                          (() => {
+                            // Extract content after thinking tags if present
+                            let displayValue = shouldAnimateText ? displayedText : message.content;
+                            
+                            // If we have thinking tags, extract the content after them
+                            const thinkMatch = displayValue.match(/^<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/);
+                            if (thinkMatch) {
+                              // Get everything after the closing think tag
+                              displayValue = displayValue.substring(thinkMatch[0].length);
                             }
-                            isStructuredOutput={isStructuredOutput}
-                            showCursor={shouldAnimateText && isAnimating}
-                          />
+                            
+                            // Only show content if we're not in thinking mode or if we have content after thinking
+                            if (isInThinkingMode && !displayValue) {
+                              return null;
+                            }
+                            
+                            return (
+                              <MessagePanelPart
+                                value={displayValue}
+                                isStructuredOutput={isStructuredOutput}
+                                showCursor={shouldAnimateText && isAnimating}
+                              />
+                            );
+                          })()
                         )
                       ) : (
-                        !_.isString(message.content) && message.content!.map((p, i) => (
+                        message.content!.map((p, i) => (
                           <MessagePanelPart key={i} value={p} />
                         ))
                       )}
