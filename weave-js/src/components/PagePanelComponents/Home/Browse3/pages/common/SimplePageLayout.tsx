@@ -56,6 +56,8 @@ export const SimplePageLayout: FC<{
   }, [tabs, idxSelected]);
   const tabContent = useMemo(() => tabs[tabValue].content, [tabs, tabValue]);
 
+  const showTabs = !props.hideTabsIfSingle || tabs.length > 1;
+
   return (
     <Box
       sx={{
@@ -74,7 +76,7 @@ export const SimplePageLayout: FC<{
           pb: 0,
           height: 44,
           width: '100%',
-          borderBottom: `1px solid ${MOON_200}`,
+          borderBottom: showTabs ? 'none' : `1px solid ${MOON_200}`,
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'center',
@@ -116,7 +118,7 @@ export const SimplePageLayout: FC<{
           }}>
           {props.headerExtra}
         </Box>
-        {(!props.hideTabsIfSingle || tabs.length > 1) && (
+        {showTabs && (
           <Tabs.Root
             value={tabs[tabValue].label}
             onValueChange={handleTabChange}>
@@ -223,6 +225,8 @@ export const SimplePageLayoutWithHeader: FC<{
     () => props.tabs.map(t => ({...t, value: t.label})),
     [props.tabs]
   );
+  const showTabs = !props.hideTabsIfSingle || tabs.length > 1;
+
   return (
     <Box
       sx={{
@@ -247,7 +251,7 @@ export const SimplePageLayoutWithHeader: FC<{
           zIndex: 1,
           backgroundColor: 'white',
           pb: 0,
-          borderBottom: `1px solid ${MOON_200}`,
+          borderBottom: showTabs ? 'none' : `1px solid ${MOON_200}`,
           justifyContent: 'flex-start',
         }}>
         {simplePageLayoutContextValue.headerPrefix}
@@ -293,6 +297,7 @@ export const SimplePageLayoutWithHeader: FC<{
                   tabValue={tabValueString}
                   hideTabsIfSingle={props.hideTabsIfSingle}
                   handleTabChange={handleTabChange}
+                  showTabs={showTabs}
                 />
               }
             />
@@ -315,11 +320,15 @@ export const SimpleTabView: FC<{
   tabValue: string;
   hideTabsIfSingle?: boolean;
   handleTabChange: (newValue: string) => void;
+  showTabs?: boolean;
 }> = props => {
   const selectedTab = useMemo(
     () => props.tabs.find(t => t.value === props.tabValue),
     [props.tabs, props.tabValue]
   );
+  const showTabs =
+    props.showTabs ?? (!props.hideTabsIfSingle || props.tabs.length > 1);
+
   return (
     <Box
       sx={{
@@ -344,7 +353,7 @@ export const SimpleTabView: FC<{
           {props.headerContent}
         </Box>
       )}
-      {(!props.hideTabsIfSingle || props.tabs.length > 1) && (
+      {showTabs && (
         <Tabs.Root
           style={{
             padding: '8px 16px 0 16px',
