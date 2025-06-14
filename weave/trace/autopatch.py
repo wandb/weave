@@ -116,8 +116,8 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_smolagents_patcher(settings.smolagents).attempt_patch()
     get_openai_agents_patcher(settings.openai_agents).attempt_patch()
 
-    llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
+    llamaindex_patcher.attempt_patch()
 
 
 def reset_autopatch() -> None:
@@ -172,5 +172,5 @@ def reset_autopatch() -> None:
     get_smolagents_patcher().undo_patch()
     get_openai_agents_patcher().undo_patch()
 
-    llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()
+    llamaindex_patcher.undo_patch()
