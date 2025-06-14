@@ -487,6 +487,45 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     return ServerRecorder(server)
 
 
+@pytest.fixture
+def trace_server(request):
+    weave_server_flag = request.config.getoption("--weave-server")
+    server: tsi.TraceServerInterface
+    entity = "shawn"
+
+    if weave_server_flag == "sqlite":
+        sqlite_server = sqlite_trace_server.SqliteTraceServer(
+            "file::memory:?cache=shared"
+        )
+        sqlite_server.drop_tables()
+        sqlite_server.setup_tables()
+        server = TestOnlyUserInjectingExternalTraceServer(
+            sqlite_server, DummyIdConverter(), entity
+        )
+    elif weave_server_flag == "clickhouse":
+        assert ensure_clickhouse_db is not None
+        host, port = request.getfixturevalue("ensure_clickhouse_db")
+
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
+            host=host,
+            port=port,
+        )
+        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
+        ch_server.ch_client.command(
+            f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
+        )
+        ch_server._run_migrations()
+        server = TestOnlyUserInjectingExternalTraceServer(
+            ch_server, DummyIdConverter(), entity
+        )
+    elif weave_server_flag.startswith("http"):
+        raise ValueError("http is not supported for trace_server")
+    elif weave_server_flag == ("prod"):
+        raise ValueError("prod is not supported for trace_server")
+
+    return server
+
+
 def create_client(
     request,
     autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
