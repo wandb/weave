@@ -328,3 +328,31 @@ export const useAnimatedText = (
 
   return {displayedText, isAnimating: isAnimatingRef.current};
 };
+
+// Hook to detect if content starts with thinking tags and track thinking state
+export const useThinkingState = (content: string, isStreaming: boolean) => {
+  const [isInThinkingMode, setIsInThinkingMode] = useState(false);
+  const [hasSeenClosingTag, setHasSeenClosingTag] = useState(false);
+  
+  useEffect(() => {
+    if (!content) {
+      setIsInThinkingMode(false);
+      setHasSeenClosingTag(false);
+      return;
+    }
+    
+    // Check if content starts with thinking tag
+    const startsWithThinking = /^<think(?:ing)?>/.test(content);
+    const hasClosingTag = /<\/think(?:ing)?>/.test(content);
+    
+    if (startsWithThinking && !hasClosingTag && isStreaming) {
+      setIsInThinkingMode(true);
+      setHasSeenClosingTag(false);
+    } else if (hasClosingTag) {
+      setIsInThinkingMode(false);
+      setHasSeenClosingTag(true);
+    }
+  }, [content, isStreaming]);
+  
+  return {isInThinkingMode, hasSeenClosingTag};
+};

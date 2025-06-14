@@ -4,11 +4,12 @@ import _ from 'lodash';
 import React, {useEffect, useRef, useState} from 'react';
 
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
-import {useAnimatedText} from './hooks';
+import {useAnimatedText, useThinkingState} from './hooks';
 import {MessagePanelPart} from './MessagePanelPart';
 import {PlaygroundMessagePanelButtons} from './PlaygroundMessagePanelButtons';
 import {PlaygroundMessagePanelEditor} from './PlaygroundMessagePanelEditor';
 import {ShowMoreButton} from './ShowMoreButton';
+import {ThinkingMessage} from './ThinkingMessage';
 import {ToolCalls} from './ToolCalls';
 import {Message, ToolCall} from './types';
 
@@ -62,6 +63,12 @@ export const MessagePanel = ({
     shouldAnimateText,
     50
   );
+  
+  // Detect thinking state
+  const {isInThinkingMode, hasSeenClosingTag} = useThinkingState(
+    displayedText,
+    isStreaming
+  );
 
   useEffect(() => {
     if (contentRef.current) {
@@ -98,11 +105,23 @@ export const MessagePanel = ({
     : undefined;
 
   return (
-    <div
-      className={classNames('group', {
-        'mb-[16px]': !isNested,
-        'mb-[0]': isNested,
-      })}>
+    <>
+      <style>
+        {`
+          @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+          }
+          .cursor-blink {
+            animation: blink 1s ease-in-out infinite;
+          }
+        `}
+      </style>
+      <div
+        className={classNames('group', {
+          'mb-[16px]': !isNested,
+          'mb-[0]': isNested,
+        })}>
       <div className="flex gap-[16px]">
         {!isNested && !isSystemPrompt && (
           <div className="w-32 flex-shrink-0">
@@ -174,16 +193,34 @@ export const MessagePanel = ({
                       className={classNames(hasToolCalls ? 'pb-8' : '', {
                         'px-16': isSystemPrompt || isUser,
                       })}>
-                      {_.isString(message.content) ? (
-                        <MessagePanelPart
-                          value={
-                            shouldAnimateText ? displayedText : message.content
-                          }
-                          isStructuredOutput={isStructuredOutput}
-                          showCursor={shouldAnimateText && isAnimating}
-                        />
+                      {/* Show thinking indicator during streaming */}
+                      {isInThinkingMode && isStreaming && (
+                        <div className="mb-2 flex items-center text-moon-600">
+                          <span className="mr-2">Thinking...</span>
+                          <span className="cursor-blink -mb-[1px] inline-block h-[8px] w-[8px] rounded-full bg-moon-600" />
+                        </div>
+                      )}
+                      
+                      {/* Show actual content */}
+                      {!isInThinkingMode && _.isString(message.content) ? (
+                        // Use ThinkingMessage component when not streaming and message contains thinking tags
+                        !isStreaming && /^<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/.test(message.content) ? (
+                          <ThinkingMessage
+                            content={message.content}
+                            isStructuredOutput={isStructuredOutput}
+                            showCursor={false}
+                          />
+                        ) : (
+                          <MessagePanelPart
+                            value={
+                              shouldAnimateText ? displayedText : message.content
+                            }
+                            isStructuredOutput={isStructuredOutput}
+                            showCursor={shouldAnimateText && isAnimating}
+                          />
+                        )
                       ) : (
-                        message.content!.map((p, i) => (
+                        !_.isString(message.content) && message.content!.map((p, i) => (
                           <MessagePanelPart key={i} value={p} />
                         ))
                       )}
@@ -229,5 +266,6 @@ export const MessagePanel = ({
         </div>
       ) : null}
     </div>
+    </>
   );
 };
