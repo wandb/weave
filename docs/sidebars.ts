@@ -199,7 +199,9 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/smolagents",
             "guides/integrations/pydantic_ai",
             "guides/integrations/google_adk",
+            "guides/integrations/autogen",
             "guides/integrations/js"
+
           ],
         },
         {
