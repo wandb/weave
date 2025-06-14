@@ -9,7 +9,10 @@ type CellValueBooleanProps = {
   height?: string;
 };
 
-export const CellValueBoolean = ({value, height = '100%'}: CellValueBooleanProps) => {
+export const CellValueBoolean = ({
+  value,
+  height = '100%',
+}: CellValueBooleanProps) => {
   const label = value ? 'True' : 'False';
   return (
     <div

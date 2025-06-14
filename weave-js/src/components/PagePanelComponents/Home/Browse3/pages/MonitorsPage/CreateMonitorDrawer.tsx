@@ -198,16 +198,20 @@ export const CreateMonitorDrawer = ({
     existingScorers || []
   );
   const [scorerValids, setScorerValids] = useState<boolean[]>([]);
-  const [active, setActive] = useState<boolean>(
-    monitor?.val['active'] ?? true
+  const [active, setActive] = useState<boolean>(monitor?.val['active'] ?? true);
+  const [validationType, setValidationType] = useState<'none' | 'json' | 'xml'>(
+    () => {
+      if (existingScorers?.some(s => s.val['_type'] === 'ValidJSONScorer'))
+        return 'json';
+      if (existingScorers?.some(s => s.val['_type'] === 'ValidXMLScorer'))
+        return 'xml';
+      return 'none';
+    }
   );
-  const [validationType, setValidationType] = useState<'none' | 'json' | 'xml'>(() => {
-    if (existingScorers?.some(s => s.val['_type'] === 'ValidJSONScorer')) return 'json';
-    if (existingScorers?.some(s => s.val['_type'] === 'ValidXMLScorer')) return 'xml';
-    return 'none';
-  });
   const [llmAsJudgeEnabled, setLlmAsJudgeEnabled] = useState<boolean>(
-    existingScorers ? existingScorers.some(s => s.val['_type'] === 'LLMAsAJudgeScorer') : true
+    existingScorers
+      ? existingScorers.some(s => s.val['_type'] === 'LLMAsAJudgeScorer')
+      : true
   );
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const {sortBy, lowLevelFilter} = useFilterSortby(filter, {items: []}, [
@@ -220,7 +224,7 @@ export const CreateMonitorDrawer = ({
 
   useEffect(() => {
     const newScorers: ObjectVersionSchema[] = [];
-    
+
     if (validationType === 'json') {
       newScorers.push({
         scheme: 'weave',
@@ -557,8 +561,7 @@ export const CreateMonitorDrawer = ({
                       <Switch.Root
                         checked={active}
                         onCheckedChange={setActive}
-                        size="small"
-                      >
+                        size="small">
                         <Switch.Thumb size="small" checked={active} />
                       </Switch.Root>
                       <span className="font-semibold">Active monitor</span>
@@ -612,7 +615,9 @@ export const CreateMonitorDrawer = ({
                     <Box>
                       <FieldName name="Sampling rate" />
                       <Box className="flex items-center gap-12">
-                        <StyledSliderInput className="w-full" progress={samplingRate}>
+                        <StyledSliderInput
+                          className="w-full"
+                          progress={samplingRate}>
                           <SliderInput
                             value={samplingRate}
                             onChange={setSamplingRate}
@@ -642,23 +647,28 @@ export const CreateMonitorDrawer = ({
                         className="flex items-center gap-16"
                         aria-label="Validation type selection"
                         name="validation-type"
-                        onValueChange={(value: 'none' | 'json' | 'xml') => setValidationType(value)}
+                        onValueChange={(value: 'none' | 'json' | 'xml') =>
+                          setValidationType(value)
+                        }
                         value={validationType}>
-                        
                         <label className="flex items-center">
                           <Radio.Item id="no-validation" value="none">
                             <Radio.Indicator />
                           </Radio.Item>
-                          <span className="ml-6 cursor-pointer">No validation</span>
+                          <span className="ml-6 cursor-pointer">
+                            No validation
+                          </span>
                         </label>
-                        
+
                         <label className="flex items-center">
                           <Radio.Item id="json-validation" value="json">
                             <Radio.Indicator />
                           </Radio.Item>
-                          <span className="ml-6 cursor-pointer">Valid JSON</span>
+                          <span className="ml-6 cursor-pointer">
+                            Valid JSON
+                          </span>
                         </label>
-                        
+
                         <label className="flex items-center">
                           <Radio.Item id="xml-validation" value="xml">
                             <Radio.Indicator />
@@ -667,16 +677,20 @@ export const CreateMonitorDrawer = ({
                         </label>
                       </Radio.Root>
                     </Box>
-                    
-                    <Box className="flex items-center mt-8 gap-8">
+
+                    <Box className="mt-8 flex items-center gap-8">
                       <Switch.Root
                         checked={llmAsJudgeEnabled}
                         onCheckedChange={setLlmAsJudgeEnabled}
-                        size="small"
-                      >
-                        <Switch.Thumb size="small" checked={llmAsJudgeEnabled} />
+                        size="small">
+                        <Switch.Thumb
+                          size="small"
+                          checked={llmAsJudgeEnabled}
+                        />
                       </Switch.Root>
-                      <span className="font-semibold">Enable LLM-as-a-judge scoring</span>
+                      <span className="font-semibold">
+                        Enable LLM-as-a-judge scoring
+                      </span>
                     </Box>
                   </Box>
                 </Box>

@@ -37,17 +37,20 @@ export const OpSelector = ({
   const frozenOpFilter = Object.keys(frozenFilter ?? {}).includes('opVersions');
 
   const options = useMemo(() => {
-    const groupedOptions = Object.entries(opVersionOptions).reduce((acc, [key, value]) => {
-      const group = value.group;
-      if (!acc[group]) {
-        acc[group] = [];
-      }
-      acc[group].push({
-        value: key,
-        label: value.title,
-      });
-      return acc;
-    }, {} as Record<string, Array<{value: string; label: string}>>);
+    const groupedOptions = Object.entries(opVersionOptions).reduce(
+      (acc, [key, value]) => {
+        const group = value.group;
+        if (!acc[group]) {
+          acc[group] = [];
+        }
+        acc[group].push({
+          value: key,
+          label: value.title,
+        });
+        return acc;
+      },
+      {} as Record<string, Array<{value: string; label: string}>>
+    );
 
     return Object.entries(groupedOptions).map(([group, items]) => ({
       label: group,
@@ -64,10 +67,13 @@ export const OpSelector = ({
           }))
         : [];
     }
-    return selectedOpVersionOption && typeof selectedOpVersionOption === 'string'
+    return selectedOpVersionOption &&
+      typeof selectedOpVersionOption === 'string'
       ? {
           value: selectedOpVersionOption,
-          label: opVersionOptions[selectedOpVersionOption]?.title ?? selectedOpVersionOption,
+          label:
+            opVersionOptions[selectedOpVersionOption]?.title ??
+            selectedOpVersionOption,
         }
       : null;
   }, [multiple, selectedOpVersionOption, opVersionOptions]);
@@ -104,7 +110,7 @@ export const OpSelector = ({
     minWidth: '190px',
   };
 
-  const wrapperStyle: React.CSSProperties = width ? { width } : { width: '100%' };
+  const wrapperStyle: React.CSSProperties = width ? {width} : {width: '100%'};
 
   return (
     <div style={wrapperStyle}>
@@ -114,7 +120,7 @@ export const OpSelector = ({
         onChange={handleChange}
         isDisabled={frozenOpFilter}
         isClearable={selectedOpVersionOption !== ALL_TRACES_OR_CALLS_REF_KEY}
-        size={multiple ? "small" : "medium"}
+        size={multiple ? 'small' : 'medium'}
         placeholder="Select operation..."
         menuPortalTarget={useMenuPortalBody ? document.body : undefined}
         styles={{
