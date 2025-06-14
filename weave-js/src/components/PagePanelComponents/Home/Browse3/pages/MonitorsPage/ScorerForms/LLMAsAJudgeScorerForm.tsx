@@ -140,7 +140,7 @@ export const LLMAsAJudgeScorerForm = ({
         </Box>
 
         <Box>
-          <FieldName name="Judge Model" />
+          <FieldName name="Judge model" />
           {!savedModelsLoading && modelOptions.length === 0 ? (
             <Typography sx={typographyStyle} className="text-sm">
               No saved models found. Create one in the Playground.
@@ -171,7 +171,7 @@ export const LLMAsAJudgeScorerForm = ({
         </Box>
 
         <Box>
-          <FieldName name="Scoring Prompt" />
+          <FieldName name="Scoring prompt" />
           <TextArea
             value={scoringPrompt}
             placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
@@ -181,7 +181,7 @@ export const LLMAsAJudgeScorerForm = ({
             }}
           />
           <Typography
-            className="mt-1 text-sm font-normal"
+            className="mt-4 text-sm font-normal"
             sx={{
               ...typographyStyle,
               color: 'text.secondary',
