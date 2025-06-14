@@ -123,6 +123,7 @@ langchain = [
   "pysqlite3",
   "opentelemetry-exporter-otlp",
 ]
+langfair = ["langfair>=0.3.1"]
 langchain_nvidia_ai_endpoints = [
   "langchain-core>=0.2.1",
   "langchain-nvidia-ai-endpoints",
@@ -134,6 +135,7 @@ mistral0 = ["mistralai>=0.1.8,<1.0.0"]
 mistral1 = ["mistralai>=1.0.0"]
 scorers = [
   "Levenshtein>=0.26.0",
+  "langfair>=0.3.1",
   "litellm>=1.58",
   "sentence-transformers>=3.3.1",
   "scikit-learn>=1.5.2",
