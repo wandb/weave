@@ -4,42 +4,56 @@ import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {Loading} from '@wandb/weave/components/Loading';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {annotationsViewed} from '@wandb/weave/integrations/analytics/viewEvents';
 import {makeRefCall} from '@wandb/weave/util/refs';
-import React, {useEffect, useState} from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
-import {useWeaveflowRouteContext} from '../../context';
+import {FeedbackContext, useWeaveflowRouteContext} from '../../context';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_ANNOTATIONS} from '../../pages/common/EmptyContent';
+import {CreateAnnotationFieldDrawer} from '../../pages/ScorersPage/CreateAnnotationFieldDrawer';
+import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {HumanAnnotationCell} from './HumanAnnotation';
 import {tsHumanAnnotationSpec} from './humanAnnotationTypes';
+import {useHumanAnnotationSpecs} from './tsHumanFeedback';
 
 type FeedbackSidebarProps = {
-  humanAnnotationSpecs: tsHumanAnnotationSpec[];
-  specsLoading: boolean;
   callID: string;
   entity: string;
   project: string;
 };
 
 export const FeedbackSidebar = ({
-  humanAnnotationSpecs,
-  specsLoading,
   callID,
   entity,
   project,
 }: FeedbackSidebarProps) => {
-  const history = useHistory();
-  const router = useWeaveflowRouteContext().baseRouter;
   const [isSaving, setIsSaving] = useState(false);
+  const [isNewAnnotationDrawerOpen, setIsNewAnnotationDrawerOpen] =
+    useState(false);
   const [unsavedFeedbackChanges, setUnsavedFeedbackChanges] = useState<
     Record<string, () => Promise<boolean>>
   >({});
-
   const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
   const {loading: orgNameLoading, orgName} = useOrgName({
     entityName: entity,
+  });
+  const history = useHistory();
+  const {baseRouter} = useWeaveflowRouteContext();
+  const {setShowFeedback} = useContext(FeedbackContext);
+
+  const {humanAnnotationSpecs, specsLoading, refetch} = useHumanAnnotationSpecs(
+    entity,
+    project
+  );
+
+  const {useFeedback} = useWFHooks();
+  const query = useFeedback({
+    entity,
+    project,
+    weaveRef: callID,
   });
 
   const save = async () => {
@@ -92,9 +106,43 @@ export const FeedbackSidebar = ({
 
   return (
     <div className="flex h-full w-full flex-col bg-white">
-      <div className="justify-left flex w-full p-12">
-        <div className="text-lg font-semibold">Feedback</div>
-        <div className="flex-grow" />
+      <div className="flex min-h-[32px] w-full items-center justify-between px-12">
+        <div className="text-sm font-semibold">Annotation</div>
+        <div className="flex items-center gap-2">
+          <Tooltip
+            content="Add annotation"
+            trigger={
+              <Button
+                onClick={() => setIsNewAnnotationDrawerOpen(true)}
+                variant="ghost"
+                size="small"
+                icon="add-new"
+                aria-label="Add annotation"
+              />
+            }
+          />
+          <Tooltip
+            content="Manage annotations"
+            trigger={
+              <Button
+                onClick={() =>
+                  history.push(baseRouter.scorersUIUrl(entity, project))
+                }
+                variant="ghost"
+                size="small"
+                icon="settings"
+                aria-label="Manage annotations"
+              />
+            }
+          />
+          <Button
+            onClick={() => setShowFeedback(false)}
+            variant="ghost"
+            size="small"
+            icon="close"
+            aria-label="Close feedback sidebar"
+          />
+        </div>
       </div>
       <div className="min-h-1 mb-8 h-1 overflow-auto bg-moon-300" />
       {humanAnnotationSpecs.length > 0 ? (
@@ -128,18 +176,32 @@ export const FeedbackSidebar = ({
           <Loading centered />
         </div>
       ) : (
-        <div className="mr-10 mt-12 items-center justify-center">
-          <Empty {...EMPTY_PROPS_ANNOTATIONS} />
-          <div className="mt-4 flex w-full justify-center">
+        <div className="flex h-full flex-col items-center justify-center">
+          <div className="mx-8 mt-[41px] flex flex-col items-center gap-16">
+            <Empty {...EMPTY_PROPS_ANNOTATIONS} />
             <Button
-              onClick={() =>
-                history.push(router.scorersUIUrl(entity, project))
-              }>
-              View scorers
+              onClick={() => setIsNewAnnotationDrawerOpen(true)}
+              variant="primary"
+              icon="add-new">
+              Add annotation
             </Button>
           </div>
         </div>
       )}
+      <CreateAnnotationFieldDrawer
+        entity={entity}
+        project={project}
+        open={isNewAnnotationDrawerOpen}
+        onClose={() => {
+          setIsNewAnnotationDrawerOpen(false);
+          query.refetch();
+          refetch();
+        }}
+        onSave={() => {
+          query.refetch();
+          refetch();
+        }}
+      />
     </div>
   );
 };
@@ -172,7 +234,7 @@ const HumanAnnotationInputs = ({
   return (
     <div>
       {humanAnnotationSpecs?.map((field, index) => (
-        <div key={field.ref} className="px-16">
+        <div key={field.ref} className="px-8">
           <div className="bg-gray-50 text-md font-semibold">{field.name}</div>
           {field.description && (
             <div className="bg-gray-50 font-italic text-sm text-moon-700 ">

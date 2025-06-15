@@ -6,7 +6,7 @@ import EmojiPicker, {
   SkinTonePickerLocation,
 } from 'emoji-picker-react';
 import _ from 'lodash';
-import React, {useRef, useState} from 'react';
+import React, {useContext, useRef, useState} from 'react';
 import styled from 'styled-components';
 import {twMerge} from 'tailwind-merge';
 
@@ -14,6 +14,7 @@ import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
 import {Tailwind} from '../../../../Tailwind';
 import {Tooltip as WeaveTooltip} from '../../../../Tooltip';
+import {FeedbackContext} from '../context';
 import {Feedback} from '../pages/wfReactInterface/traceServerClientTypes';
 import {EmojiButton} from './EmojiButton';
 import {Notes} from './Notes';
@@ -55,6 +56,7 @@ export const ReactionsLoaded = ({
   twWrapperStyles,
 }: ReactionsLoadedProps) => {
   const [isMouseOver, setIsMouseOver] = useState(false);
+  const {showFeedback, setShowFeedback} = useContext(FeedbackContext);
   const groupedByType = _.groupBy(reactions, r => r.feedback_type);
   const emojis = groupedByType['wandb.reaction.1'] ?? [];
   const notes = groupedByType['wandb.note.1'] ?? [];
@@ -155,7 +157,7 @@ export const ReactionsLoaded = ({
   // Was trying the approach in https://github.com/mui/material-ui/issues/10595)
   // So instead we have two emoji picker components and choose one or the other
   // to render.
-  const [showFullPicker, setShowFullPicker] = useState(false);
+  const [showCompleteEmojiPicker, setShowCompleteEmojiPicker] = useState(false);
 
   return (
     <Tailwind style={wrapperStyles}>
@@ -197,7 +199,12 @@ export const ReactionsLoaded = ({
                   id={idReactions}
                   open={isOpenReactions}
                   anchorEl={anchorElReactions}
-                  onClose={() => setAnchorElReactions(null)}
+                  onClose={() => {
+                    setAnchorElReactions(null);
+                    setTimeout(() => {
+                      setShowCompleteEmojiPicker(false);
+                    }, 100);
+                  }}
                   anchorOrigin={{
                     vertical: 'bottom',
                     horizontal: 'left',
@@ -210,7 +217,7 @@ export const ReactionsLoaded = ({
                       },
                     },
                   }}>
-                  {!showFullPicker && (
+                  {!showCompleteEmojiPicker && (
                     <WeaveEmojiPicker
                       onEmojiClick={onEmojiClick}
                       skinTonesDisabled={true}
@@ -221,11 +228,11 @@ export const ReactionsLoaded = ({
                         '1f44e', // thumbs down
                       ]}
                       onPlusButtonClick={() => {
-                        setShowFullPicker(true);
+                        setShowCompleteEmojiPicker(true);
                       }}
                     />
                   )}
-                  {showFullPicker && (
+                  {showCompleteEmojiPicker && (
                     <EmojiPicker
                       onEmojiClick={onEmojiClick}
                       skinTonesDisabled={true}
@@ -251,6 +258,18 @@ export const ReactionsLoaded = ({
                 </Button>
               </StyledTooltip>
             )}
+            <WeaveTooltip
+              content={`${showFeedback ? 'Hide' : 'Show'} annotation sidebar`}
+              trigger={
+                <Button
+                  icon="marker"
+                  variant="ghost"
+                  size="small"
+                  active={showFeedback}
+                  onClick={() => setShowFeedback(!showFeedback)}
+                />
+              }
+            />
             <Popover
               id={idNotes}
               open={isOpenNotes}
