@@ -59,8 +59,9 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
 
   // TOOD: Avoid direct url manipulation
   const history = useHistory();
-  const handleViewCatalog = (path: string) => {
-    history.push(`${INFERENCE_PATH}/${path}`);
+  const handleViewCatalog = (path?: string) => {
+    const prefixedPath = path ? `${INFERENCE_PATH}/${path}` : INFERENCE_PATH;
+    history.push(prefixedPath);
   };
 
   const handleCloseDrawer = () => {

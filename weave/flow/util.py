@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import multiprocessing
@@ -123,9 +125,14 @@ def _subproc(
 
 
 def _run_in_process(
-    func: Callable, args: tuple = (), kwargs: dict = {}
+    func: Callable, args: tuple | None = None, kwargs: dict | None = None
 ) -> tuple[multiprocessing.Process, multiprocessing.Queue]:
     """Run a function in a separate process and return the process object and a multiprocessing.Queue for the result."""
+    if args is None:
+        args = ()
+    if kwargs is None:
+        kwargs = {}
+
     queue: multiprocessing.Queue = multiprocessing.Queue()
     process: multiprocessing.Process = multiprocessing.Process(
         target=_subproc, args=(queue, func) + args, kwargs=kwargs

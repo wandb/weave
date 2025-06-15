@@ -36,6 +36,7 @@ import {convertDefaultParamsToOptionalPlaygroundModelParams} from '../useSaveMod
 export const SAVED_MODEL_OPTION_VALUE = 'saved-models';
 
 export interface LLMOption {
+  catalogId?: string; // Model Catalog ID
   label: string;
   subLabel?: string | React.ReactNode;
   value: LLMMaxTokensKey | string;
@@ -55,6 +56,7 @@ export interface ProviderOption {
   llms: Array<LLMOption>;
   isDisabled?: boolean;
   providers?: ProviderOption[];
+  isPreview?: boolean; // If true, show a preview pill in the dropdown
 }
 
 export type OpenDirection = {
@@ -72,7 +74,8 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   project: string;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
-  onViewCatalog?: (provider: string) => void;
+  onViewCatalog?: (path?: string) => void;
+  providers?: ProviderOption[];
   direction: OpenDirection;
 }
 
@@ -99,7 +102,7 @@ const SubMenu = ({
   onSelect: () => void;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
-  onViewCatalog?: (provider: string) => void;
+  onViewCatalog?: (path?: string) => void;
   providers?: ProviderOption[];
   direction: OpenDirection;
 }) => {
@@ -157,14 +160,14 @@ const SubMenu = ({
           overflowY: 'auto',
           border: '1px solid ' + hexToRGB(OBLIVION, 0.1),
           p: '6px',
-          zIndex: 10000,
+          zIndex: 1,
         }}>
         {llms.map(llm => {
           // TODO: Would be nice to have all models in the catalog so we could
           //       display tiles, link to comparison and details, etc.
           const isCoreWeaveModel = value === 'coreweave';
           const catalogModel = isCoreWeaveModel
-            ? MODEL_INDEX[llm.value.split('/')[1]]
+            ? MODEL_INDEX[llm.catalogId ?? '']
             : null;
           const isUnspportedCoreWeaveModel =
             isCoreWeaveModel &&
@@ -245,7 +248,8 @@ const SubMenu = ({
           <Box
             onClick={e => {
               e.stopPropagation();
-              onViewCatalog(value);
+              // TODO: Pass the value as the path if we add comparison for other providers
+              onViewCatalog();
             }}
             sx={{
               display: 'flex',
@@ -322,17 +326,12 @@ const SubMenu = ({
           );
 
           return tooltipContent ? (
-            <Tooltip
-              content={tooltipContent}
-              trigger={trigger}
-              key={provider.value}
-            />
+            <Tooltip content={tooltipContent} trigger={trigger} />
           ) : (
             trigger
           );
         })}
       </Box>
-      ,
     </Tailwind>,
     document.body
   );
@@ -413,7 +412,10 @@ const SubMenuOption = ({
                 whiteSpace: 'normal',
                 width: '90%',
               }}>
-              {children}
+              <div className="flex items-center gap-8">
+                {children}
+                {props.data.isPreview && <Pill label="Preview" color="moon" />}
+              </div>
             </Box>
             {direction.horizontal === 'right' && (
               <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
@@ -615,18 +617,34 @@ export const useLLMDropdownOptions = (
       if (provider === 'coreweave' && !inferenceContext.isInferenceEnabled) {
         return;
       }
-      const providerLLMs = Object.entries(LLM_MAX_TOKENS)
-        .filter(([_, config]) => config.provider === provider)
-        .map(([llmKey]) => ({
-          label: llmKey,
-          value: llmKey as LLMMaxTokensKey,
-          max_tokens: LLM_MAX_TOKENS[llmKey as LLMMaxTokensKey].max_tokens,
-        }));
+      const providerLLMs = [];
+      if (provider === 'coreweave') {
+        // Insert hosted models
+        providerLLMs.push(
+          ...getHostedModels().map(model => ({
+            catalogId: model.id,
+            value: `coreweave/${model.idPlayground}`, // What gets sent to completion endpoint
+            label: model.label ?? model.id, // What gets shown as selected
+            max_tokens: 1000, // TODO: Get max tokens from model info
+          }))
+        );
+      } else {
+        providerLLMs.push(
+          ...Object.entries(LLM_MAX_TOKENS)
+            .filter(([_, config]) => config.provider === provider)
+            .map(([llmKey]) => ({
+              label: llmKey,
+              value: llmKey as LLMMaxTokensKey,
+              max_tokens: LLM_MAX_TOKENS[llmKey as LLMMaxTokensKey].max_tokens,
+            }))
+        );
+      }
 
       const option = {
         label:
           LLM_PROVIDER_LABELS[provider as keyof typeof LLM_PROVIDER_LABELS],
         value: provider,
+        isPreview: provider === 'coreweave',
         llms: status ? providerLLMs : [],
         isDisabled: !status,
       };
@@ -637,18 +655,6 @@ export const useLLMDropdownOptions = (
         options.push(option);
       }
     });
-  }
-
-  // Insert hosted models
-  if (inferenceContext.isInferenceEnabled) {
-    const hostedOptions = options[0].llms;
-    for (const model of getHostedModels()) {
-      hostedOptions.push({
-        label: model.label ?? model.id,
-        value: `coreweave/${model.idPlayground}`,
-        max_tokens: 1000, // TODO: Get max tokens from model info
-      });
-    }
   }
 
   // Add custom providers
