@@ -432,7 +432,9 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
               project={project}
               isAdmin={isTeamAdmin}
               onConfigureProvider={handleConfigureProvider}
-              onViewCatalog={handleViewCatalog}
+              onViewCatalog={path =>
+                path !== undefined && handleViewCatalog(path)
+              }
               direction={direction}
             />
           ),
