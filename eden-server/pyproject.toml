@@ -1,0 +1,52 @@
+[project]
+name = "eden-server"
+version = "0.1.0"
+description = "Eden MCP Server - A unified platform for working with MCP servers"
+authors = [
+    {name = "Weights & Biases", email = "dev@wandb.com"}
+]
+dependencies = [
+    "fastmcp>=0.4.1",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.4.2",
+    "python-dotenv>=1.0.0",
+    "websockets>=12.0",
+    "aiofiles>=24.1.0",
+    "typer>=0.9.0",
+    "rich>=13.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+    "black>=25.1.0",
+    "isort>=5.12.0",
+    "mypy>=1.6.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"] 
