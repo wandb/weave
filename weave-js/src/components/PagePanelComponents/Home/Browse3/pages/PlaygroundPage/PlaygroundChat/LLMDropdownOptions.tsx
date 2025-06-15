@@ -122,25 +122,25 @@ const SubMenu = ({
   const subMenuPosition = useMemo(() => {
     if (direction.horizontal === 'right' && direction.vertical === 'down') {
       return {
-        left: position.right + 4,
+        left: position.right + 1,
         top: position.top,
       };
     }
     if (direction.horizontal === 'right' && direction.vertical === 'up') {
       return {
-        left: position.right + 4,
+        left: position.right + 1,
         bottom: viewportHeight - position.bottom + 4,
       };
     }
     if (direction.horizontal === 'left' && direction.vertical === 'down') {
       return {
-        right: viewportWidth - position.right + 4,
+        right: viewportWidth - position.right + 1,
         top: position.top,
       };
     }
     if (direction.horizontal === 'left' && direction.vertical === 'up') {
       return {
-        right: viewportWidth - position.left + 4,
+        right: viewportWidth - position.left + 1,
         bottom: viewportHeight - position.bottom - 4,
       };
     }
@@ -161,7 +161,7 @@ const SubMenu = ({
           overflowY: 'auto',
           border: '1px solid ' + hexToRGB(OBLIVION, 0.1),
           p: '6px',
-          zIndex: 1,
+          zIndex: 10000,
         }}>
         {llms.map(llm => {
           // TODO: Would be nice to have all models in the catalog so we could
