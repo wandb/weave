@@ -834,3 +834,37 @@ export const WeaveHeaderExtrasProvider = ({
     </WeaveHeaderExtrasContext.Provider>
   );
 };
+
+export const EntityProjectContext = React.createContext<{
+  entity: string;
+  project: string;
+  projectId: string;
+}>({
+  entity: '',
+  project: '',
+  projectId: '',
+});
+
+export const EntityProjectProvider: React.FC<{
+  children: React.ReactNode;
+  entity: string;
+  project: string;
+}> = ({children, entity, project}) => {
+  const value = useMemo(
+    () => ({
+      entity,
+      project,
+      projectId: `${entity}/${project}`,
+    }),
+    [entity, project]
+  );
+  return (
+    <EntityProjectContext.Provider value={value}>
+      {children}
+    </EntityProjectContext.Provider>
+  );
+};
+
+export const useEntityProject = () => {
+  return useContext(EntityProjectContext);
+};

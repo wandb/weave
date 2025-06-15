@@ -2165,35 +2165,29 @@ export const useScorerCreate = () => {
       entity,
       project,
       name,
-      refUri,
+      val,
     }: {
       entity: string;
       project: string;
       name: string;
-      refUri?: string;
+      val: any;
     }): Promise<WeaveObjectVersionKey> => {
-      let scorerDigest: string;
-      if (refUri) {
-        // If the scorer already exists (this is an edit) we do not recreate it.
-        scorerDigest = parseRef(refUri).artifactVersion;
-      } else {
-        // If refUri is undefined the scorer needs to be create.
-        const scorerObj = {
-          _type: name,
-          name: name,
-          description: `${name} created from the UI.`,
-          ref: null,
-          column_map: null,
-          _class_name: name,
-          _bases: ['Scorer', 'Object', 'BaseModel'],
-        };
+      const scorerObj = {
+        _type: name,
+        name: name,
+        description: `${name} created from the UI.`,
+        ref: null,
+        column_map: null,
+        _class_name: name,
+        _bases: ['Scorer', 'Object', 'BaseModel'],
+        ...val,
+      };
 
-        scorerDigest = await objCreate({
-          projectId: `${entity}/${project}`,
-          objectId: name,
-          val: scorerObj,
-        });
-      }
+      const scorerDigest = await objCreate({
+        projectId: `${entity}/${project}`,
+        objectId: name,
+        val: scorerObj,
+      });
 
       const objectVersionKey: WeaveObjectVersionKey = {
         scheme: 'weave',

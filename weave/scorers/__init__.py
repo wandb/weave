@@ -9,6 +9,7 @@ from weave.scorers.hallucination_scorer import (
     WeaveHallucinationScorerV1,
 )
 from weave.scorers.json_scorer import ValidJSONScorer
+from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.scorers.moderation_scorer import (
     OpenAIModerationScorer,
     WeaveBiasScorerV1,
@@ -48,6 +49,7 @@ __all__ = [
     "InstructorLLMScorer",
     "ValidJSONScorer",
     "LevenshteinScorer",
+    "LLMAsAJudgeScorer",
     "LLMScorer",
     "MultiTaskBinaryClassificationF1",
     "OpenAIModerationScorer",
