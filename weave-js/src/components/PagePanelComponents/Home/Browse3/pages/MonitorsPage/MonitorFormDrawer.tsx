@@ -150,9 +150,7 @@ export const MonitorFormDrawer = ({
     existingScorers?.map(s => true) || [false]
   );
 
-  const [active, setActive] = useState<boolean>(
-    monitor?.val['active'] ?? false
-  );
+  const [active, setActive] = useState<boolean>(false);
 
   useEffect(() => {
     if (!monitor) {
