@@ -30,30 +30,32 @@ import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {
   useObjCreate,
   useRootObjectVersions,
-  useScorerCreate,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
-import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
-import {
-  ObjectVersionKey,
-  ObjectVersionSchema,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {parseRef} from '@wandb/weave/react';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
 import {useList} from 'react-use';
+
 const PAGE_SIZE = 10;
 const PAGE_OFFSET = 0;
 
-const SCORER_FORMS: Map<
-  string,
-  React.ComponentType<{
-    scorer: ObjectVersionSchema;
-    onChange: (scorer: ObjectVersionSchema) => void;
-    onValidationChange: (isValid: boolean) => void;
-  }> | null
-> = new Map([
+export interface ScorerFormProps {
+  scorer: ObjectVersionSchema;
+  onValidationChange: (valid: boolean) => void;
+}
+
+type ScorerFormType = React.ForwardRefExoticComponent<
+  ScorerFormProps & React.RefAttributes<ScorerFormRef>
+>;
+
+export interface ScorerFormRef {
+  saveScorer: () => Promise<string | undefined>;
+}
+
+const SCORER_FORMS: Map<string, ScorerFormType | null> = new Map([
   ['ValidJSONScorer', null],
   ['ValidXMLScorer', null],
   ['LLMAsAJudgeScorer', LLMAsAJudgeScorerForm],
@@ -132,7 +134,7 @@ export const MonitorFormDrawer = ({
     }
   );
   const {useCalls} = useWFHooks();
-  const [scorers, {updateAt: updateScorerAt}] = useList<ObjectVersionSchema>(
+  const [scorers] = useList<ObjectVersionSchema>(
     existingScorers || [
       {
         scheme: 'weave',
@@ -149,7 +151,9 @@ export const MonitorFormDrawer = ({
       },
     ]
   );
-  const [scorerValids, {updateAt: updateScorerValidAt}] = useList<boolean>([]);
+  const [scorerValids, {updateAt: updateScorerValidAt}] = useList<boolean>(
+    existingScorers?.map(s => true) || [false]
+  );
   const [active, setActive] = useState<boolean>(
     monitor?.val['active'] || false
   );
@@ -227,9 +231,22 @@ export const MonitorFormDrawer = ({
     allScorersValid,
   ]);
 
-  const objCreate = useObjCreate();
+  const scorerForms = useMemo(
+    () =>
+      scorers
+        .map(scorer => SCORER_FORMS.get(scorer.val['_type']))
+        .filter(f => !!f),
+    [scorers]
+  );
 
-  const scorerCreate = useScorerCreate();
+  const scorerFormRefs = useRef<ScorerFormRef[]>([]);
+
+  // Ensure refs array matches subForms length
+  useEffect(() => {
+    scorerFormRefs.current = scorerFormRefs.current.slice(0, scorers.length);
+  }, [scorerForms.length, scorers.length]);
+
+  const objCreate = useObjCreate();
 
   const createMonitor = useCallback(async () => {
     if (!enableCreateButton) {
@@ -240,29 +257,14 @@ export const MonitorFormDrawer = ({
 
     try {
       const scorerRefs = await Promise.all(
-        scorers.map(async scorer => {
-          let scorerVersionKey: ObjectVersionKey;
-          if (scorer.versionHash) {
-            scorerVersionKey = {
-              scheme: 'weave',
-              weaveKind: 'object',
-              entity: scorer.entity,
-              project: scorer.project,
-              objectId: scorer.objectId,
-              versionHash: scorer.versionHash,
-              path: '',
-            };
-          } else {
-            scorerVersionKey = await scorerCreate({
-              entity,
-              project,
-              name: scorer.objectId,
-              val: scorer.val,
-            });
-          }
-          return objectVersionKeyToRefUri(scorerVersionKey);
-        })
+        scorerFormRefs.current.map(async ref => await ref.saveScorer())
       );
+
+      if (scorerRefs.some(ref => !ref)) {
+        setError('Failed to create scorer');
+        setIsCreating(false);
+        return;
+      }
 
       const mongoQuery = getFilterByRaw(filterModel);
 
@@ -311,7 +313,6 @@ export const MonitorFormDrawer = ({
     selectedOpVersionOption,
     filterModel,
     samplingRate,
-    scorers,
     setIsCreating,
     monitor,
     onClose,
@@ -320,33 +321,8 @@ export const MonitorFormDrawer = ({
     entity,
     objCreate,
     project,
-    scorerCreate,
+    scorerFormRefs,
   ]);
-
-  const scorerForms = useMemo(() => {
-    return (
-      <>
-        {scorers.map((scorer, index) => {
-          const ScorerForm = SCORER_FORMS.get(scorer.val['_type']);
-          if (!ScorerForm) {
-            return null;
-          }
-          return (
-            <ScorerForm
-              key={index}
-              scorer={scorer}
-              onChange={(newScorer: ObjectVersionSchema) =>
-                updateScorerAt(index, newScorer)
-              }
-              onValidationChange={(isValid: boolean) =>
-                updateScorerValidAt(index, isValid)
-              }
-            />
-          );
-        })}
-      </>
-    );
-  }, [scorers, updateScorerAt, updateScorerValidAt]);
 
   return (
     <Drawer
@@ -559,7 +535,18 @@ export const MonitorFormDrawer = ({
                   </Box>
                 </Box>*/}
 
-                {scorerForms}
+                {scorerForms.map((Form, index) => (
+                  <Form
+                    key={index}
+                    scorer={scorers[index]}
+                    onValidationChange={(isValid: boolean) =>
+                      updateScorerValidAt(index, isValid)
+                    }
+                    ref={(el: ScorerFormRef) =>
+                      (scorerFormRefs.current[index] = el)
+                    }
+                  />
+                ))}
               </Box>
             )}
           </Box>
