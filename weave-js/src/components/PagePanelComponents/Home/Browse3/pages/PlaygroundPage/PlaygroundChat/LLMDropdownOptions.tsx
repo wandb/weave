@@ -144,6 +144,7 @@ const SubMenu = ({
         bottom: viewportHeight - position.bottom - 4,
       };
     }
+    return {};
   }, [direction, position, viewportWidth, viewportHeight]);
 
   return ReactDOM.createPortal(

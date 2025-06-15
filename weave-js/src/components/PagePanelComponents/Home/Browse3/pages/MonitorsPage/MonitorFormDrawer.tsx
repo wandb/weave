@@ -244,11 +244,11 @@ export const MonitorFormDrawer = ({
     allScorersValid,
   ]);
 
-  const scorerForms = useMemo(
+  const scorerForms: ScorerFormType[] = useMemo(
     () =>
       scorers
         .map(scorer => SCORER_FORMS.get(scorer.val['_type']))
-        .filter(f => !!f),
+        .filter(f => !!f) as ScorerFormType[],
     [scorers]
   );
 
@@ -548,7 +548,7 @@ export const MonitorFormDrawer = ({
                   </Box>
                 </Box>*/}
 
-                {scorerForms.map((Form, index) => (
+                {scorerForms.map((Form: ScorerFormType, index: number) => (
                   <Form
                     key={index}
                     scorer={scorers[index]}
