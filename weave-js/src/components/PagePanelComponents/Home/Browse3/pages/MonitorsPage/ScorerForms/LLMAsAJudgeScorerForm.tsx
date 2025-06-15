@@ -107,14 +107,8 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           setSystemPrompt(systemPrompt);
         }
       }
-    }, [
-      savedModels,
-      entity,
-      project,
-      onValidationChange,
-      projectId,
-      scorer.val,
-    ]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [savedModels, entity, project, projectId, scorer.val]);
 
     const selectedJudgeModel = useMemo(() => {
       if (judgeModel) {
@@ -224,10 +218,13 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         return undefined;
       }
 
-      const isSavedModel = judgeModel.ref?._digest !== undefined;
+      const modelHasChanged =
+        judgeModelName !== judgeModel.name ||
+        systemPrompt !== getSystemPrompt(judgeModel.default_params || {}) ||
+        responseFormat !== judgeModel.default_params?.response_format;
 
       let judgeModelRef: string | undefined;
-      if (!isSavedModel) {
+      if (modelHasChanged) {
         judgeModelRef = await saveModel();
         if (!judgeModelRef) {
           setJudgeModelError('Failed to save judge model.');
@@ -276,6 +273,9 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       entity,
       project,
       saveModel,
+      judgeModelName,
+      systemPrompt,
+      responseFormat,
     ]);
 
     useImperativeHandle(ref, () => ({
@@ -317,7 +317,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         } else {
           newJudgeModel = {
             llm_model_id: newValue,
-            name: `${newValue}-${scorerName}`,
+            name: judgeModelName || `${scorerName}-judge-model`,
             default_params: {
               max_tokens: maxTokens,
             },
@@ -329,10 +329,56 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         onValidationChange(!!scorerName && !!scoringPrompt);
       },
       [
+        judgeModelName,
         scoringPrompt,
         savedModels,
         scorerName,
         setJudgeModel,
+        onValidationChange,
+      ]
+    );
+
+    const onJudgeModelNameChange = useCallback(
+      value => {
+        setJudgeModelName(value);
+        const validationResult = validateDatasetName(value);
+        setJudgeModelError(validationResult.error);
+        onValidationChange(
+          !validationResult.error &&
+            !!value &&
+            !!systemPrompt &&
+            !!responseFormat &&
+            !!scorerName &&
+            !!scoringPrompt
+        );
+      },
+      [
+        systemPrompt,
+        responseFormat,
+        scorerName,
+        scoringPrompt,
+        setJudgeModelName,
+        setJudgeModelError,
+        onValidationChange,
+      ]
+    );
+
+    const onSystemPromptChange = useCallback(
+      value => {
+        setSystemPrompt(value);
+        onValidationChange(
+          !!value &&
+            !!judgeModelName &&
+            !!scorerName &&
+            !!scoringPrompt &&
+            !!responseFormat
+        );
+      },
+      [
+        judgeModelName,
+        scorerName,
+        scoringPrompt,
+        responseFormat,
         onValidationChange,
       ]
     );
@@ -392,76 +438,35 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           {judgeModel && (
             <Box className="flex flex-col gap-8 rounded-md border border-moon-250 p-12">
               <Box>
-                <FieldName name="Judge Model ID" />
+                <FieldName name="LLM ID" />
                 <Typography sx={{...typographyStyle, color: 'text.secondary'}}>
                   {judgeModel.llm_model_id}
                 </Typography>
               </Box>
-              {judgeModel.ref !== undefined ? (
-                <>
-                  <Box>
-                    <FieldName name="Judge Model System Prompt" />
-                    <Typography
-                      sx={{...typographyStyle, color: 'text.secondary'}}>
-                      {systemPrompt}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <FieldName name="Judge Model Response Format" />
-                    <Typography
-                      sx={{...typographyStyle, color: 'text.secondary'}}>
-                      {judgeModel.default_params?.response_format}
-                    </Typography>
-                  </Box>
-                </>
-              ) : (
-                <>
-                  <Box>
-                    <FieldName name="Judge Model Configuration Name" />
-                    <TextField
-                      value={judgeModelName}
-                      onChange={value => {
-                        setJudgeModelName(value);
-                        const validationResult = validateDatasetName(value);
-                        setJudgeModelError(validationResult.error);
-                        onValidationChange(
-                          !validationResult.error &&
-                            !!systemPrompt &&
-                            !!responseFormat &&
-                            !!scorerName &&
-                            !!scoringPrompt
-                        );
-                      }}
-                    />
-                  </Box>
-                  <Box>
-                    <FieldName name="Judge Model System Prompt" />
-                    <TextArea
-                      value={systemPrompt}
-                      onChange={e => {
-                        setSystemPrompt(e.target.value);
-                        onValidationChange(
-                          !!e.target.value &&
-                            !!judgeModelName &&
-                            !!scorerName &&
-                            !!scoringPrompt &&
-                            !!responseFormat
-                        );
-                      }}
-                    />
-                  </Box>
-                  <Box>
-                    <FieldName name="Judge Model Response Format" />
-                    <ResponseFormatSelect
-                      responseFormat={
-                        (responseFormat ||
-                          'json_object') as PlaygroundResponseFormats
-                      }
-                      setResponseFormat={setResponseFormat}
-                    />
-                  </Box>
-                </>
-              )}
+              <Box>
+                <FieldName name="Judge Model Configuration Name" />
+                <TextField
+                  value={judgeModelName}
+                  onChange={onJudgeModelNameChange}
+                />
+              </Box>
+              <Box>
+                <FieldName name="Judge Model System Prompt" />
+                <TextArea
+                  value={systemPrompt}
+                  onChange={e => onSystemPromptChange(e.target.value)}
+                />
+              </Box>
+              <Box>
+                <FieldName name="Judge Model Response Format" />
+                <ResponseFormatSelect
+                  responseFormat={
+                    (responseFormat ||
+                      'json_object') as PlaygroundResponseFormats
+                  }
+                  setResponseFormat={setResponseFormat}
+                />
+              </Box>
             </Box>
           )}
           <Box>

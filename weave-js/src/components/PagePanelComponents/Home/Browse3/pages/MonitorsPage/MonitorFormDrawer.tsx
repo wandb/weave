@@ -113,28 +113,22 @@ export const MonitorFormDrawer = ({
   const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [description, setDescription] = useState<string>(
-    monitor?.val['description'] || ''
-  );
-  const [monitorName, setMonitorName] = useState<string>(
-    monitor?.val['name'] || ''
-  );
-  const [samplingRate, setSamplingRate] = useState<number>(
-    (monitor?.val['sampling_rate'] || 0.1) * 100
-  );
+  const [description, setDescription] = useState<string>('');
+  const [monitorName, setMonitorName] = useState<string>('');
+  const [samplingRate, setSamplingRate] = useState<number>(10);
   const [selectedOpVersionOption, setSelectedOpVersionOption] = useState<
     string[]
   >([]);
   const [filter, setFilter] = useState<WFHighLevelCallFilter>({
-    opVersionRefs: monitor?.val['op_names'] || [],
+    opVersionRefs: [],
   });
-  const [filterModel, setFilterModel] = useState<GridFilterModel>(
-    queryToGridFilterModel(monitor?.val['query']) || {
-      items: [],
-    }
-  );
+  const [filterModel, setFilterModel] = useState<GridFilterModel>({
+    items: [],
+  });
+
   const {useCalls} = useWFHooks();
-  const [scorers] = useList<ObjectVersionSchema>(
+
+  const [scorers, {set: setScorers}] = useList<ObjectVersionSchema>(
     existingScorers || [
       {
         scheme: 'weave',
@@ -151,13 +145,34 @@ export const MonitorFormDrawer = ({
       },
     ]
   );
+
   const [scorerValids, {updateAt: updateScorerValidAt}] = useList<boolean>(
     existingScorers?.map(s => true) || [false]
   );
+
   const [active, setActive] = useState<boolean>(
-    monitor?.val['active'] || false
+    monitor?.val['active'] ?? false
   );
+
+  useEffect(() => {
+    if (!monitor) {
+      return;
+    }
+    setActive(monitor.val['active'] ?? false);
+    setMonitorName(monitor.val['name'] ?? '');
+    setDescription(monitor.val['description'] ?? '');
+    setSamplingRate((monitor.val['sampling_rate'] || 0.1) * 100);
+    setFilter({
+      opVersionRefs: monitor.val['op_names'] || [],
+    });
+    setFilterModel(queryToGridFilterModel(monitor.val['query']) ?? {items: []});
+    setSelectedOpVersionOption(monitor.val['op_names'] ?? []);
+    setScorers(existingScorers ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monitor]);
+
   const [isCreating, setIsCreating] = useState<boolean>(false);
+
   const {sortBy, lowLevelFilter} = useFilterSortby(filter, {items: []}, [
     {field: 'started_at', sort: 'desc'},
   ]);
