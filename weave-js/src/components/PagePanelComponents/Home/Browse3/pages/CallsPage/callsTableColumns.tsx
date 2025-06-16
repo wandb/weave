@@ -581,7 +581,11 @@ function buildCallsTableColumns(
                   field={field}
                   rowId={params.id.toString()}
                   operation={null}
-                  value={params.value}>
+                  value={params.value}
+                  style={{
+                    height: '100%',
+                    width: '100%',
+                  }}>
                   <CellValue value={params.value} />
                 </CellFilterWrapper>
               );
