@@ -1524,7 +1524,7 @@ class _IteratorWrapper(Generic[V]):
                 log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()
-            raise StopAsyncIteration
+            raise StopAsyncIteration from e
         except Exception as e:
             self._call_on_error_once(e)
             # Always re-raise user exceptions to maintain the expected behavior
