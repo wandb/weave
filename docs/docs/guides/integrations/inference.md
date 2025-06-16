@@ -37,12 +37,14 @@ Finalize TOC
 ## Supported models
 V1 of the W&B Inference service supports the following models:
 
-- Llama 3.1 8B
-- DeepSeek V3-0324
-- Llama 3.3 70B
-- DeepSeek R1-0528
-- LLama 4 Scout
-- Phi 4 Mini
+| Model            | Type(s)       | Context Window | Parameters                  | Description                                                                 |
+|------------------|---------------|----------------|-----------------------------|-----------------------------------------------------------------------------|
+| DeepSeek R1-0528 | Text          | 161K           | 37B - 680B (Active - Total) | Optimized for precise reasoning tasks including complex coding, math, and structured document analysis. |
+| DeepSeek V3-0324 | Text          | 161K           | 37B - 680B (Active - Total) | Robust Mixture-of-Experts model tailored for high-complexity language processing and comprehensive document analysis. |
+| Llama 3.1 8B     | Text          | 128K           | 8B (Total)                  | Efficient conversational model optimized for responsive multilingual chatbot interactions. |
+| Llama 3.3 70B    | Text          | 128K           | 70B (Total)                 | Multilingual model excelling in conversational tasks, detailed instruction-following, and coding. |
+| Llama 4 Scout    | Text, Vision  | 64K            | 17B - 109B (Active - Total) | Multimodal model integrating text and image understanding, ideal for visual tasks and combined analysis. |
+| Phi 4 Mini       | Text          | 128K           | 3.8B (Active - Total)       | Compact, efficient model ideal for fast responses in resource-constrained environments. |
 
 Use the following resources to learn more about using the models:
 
@@ -57,21 +59,14 @@ The following prerequisites are required to access the W&B Infernce service via 
 
 - A W&B account. Sign up [here](https://app.wandb.ai/login?signup=true&_gl=1*1yze8dp*_ga*ODIxMjU5MTk3LjE3NDk0OTE2NDM.*_ga_GMYDGNGKDT*czE3NDk4NDYxMzgkbzEyJGcwJHQxNzQ5ODQ2MTM4JGo2MCRsMCRoMA..*_ga_JH1SJHJQXJ*czE3NDk4NDU2NTMkbzI1JGcxJHQxNzQ5ODQ2MTQ2JGo0NyRsMCRoMA..*_gcl_au*MTE4ODk1MzY1OC4xNzQ5NDkxNjQzLjk1ODA2MjQwNC4xNzQ5NTgyMTUzLjE3NDk1ODIxNTM.).
 - A W&B API key. Get your API key at [https://wandb.ai/authorize](https://wandb.ai/authorize).
-- A W&B project. To create a new project in the W&B UI, complete the following steps:
-   1. In the W&B UI, navigate to the **Overview** tab.
-   2. In the upper right hand corner, click **+ Create new project**.
-   3. Fill out the form with the required project information.
-      :::important
-      Make sure to note your W&B **Team** and project **Name**, as you'll need this information to [use the API](#api-specification).
-      :::
-   4. Click **Create project**.
-- If you will be using the Inference service via Python, see [Additional requirements for using the API via Python](#additional-requirements-for-using-the-api-via-python).
+- A W&B project. 
+- If you are using the Inference service via Python, see [Additional prerequisites for using the API via Python](#additional-prerequisites-for-using-the-api-via-python).
 
 :::tip
 Before using the service, familiarize yourself with the [usage limits](#usage-limits).
 :::
 
-### Additional requirements for using the API via Python
+### Additional prerequisites for using the API via Python
 
 To use the Inference API via Python, first complete the general prerequisites. Then, install the `openai` and `weave` libraries in your local environment:
 
@@ -80,7 +75,7 @@ pip install openai weave
 ```
 
 :::note
-The `weave` library is only required if you'll be using Weave to 
+The `weave` library is only required if you'll be using Weave to trace your LLM applications. For information on getting started with Weave, see the [Quickstart](../../quickstart.md).
 :::
 
 ## API specification
@@ -206,12 +201,16 @@ Use the API to query all currently available models and their IDs. This is usefu
     ```python
     import openai
 
-    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
+        # The custom base URL points to W&B Inference
         base_url='https://api.inference.wandb.ai/v1',
+
         # Get your API key from https://wandb.ai/authorize
         # Consider setting it in the environment as OPENAI_API_KEY instead for safety
-        api_key="<your-apikey>"
+        api_key="<your-apikey>",
+
+        # Team and project are required for usage tracking
+        project="<team>/<project>",
     )
 
     response = client.chat.completions.create(
@@ -220,10 +219,6 @@ Use the API to query all currently available models and their IDs. This is usefu
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
-        extra_headers={
-            # Team and project are required for usage tracking
-            "OpenAI-Project": "<team>/<project>"
-        },
     )
 
     print(response.choices[0].message.content)
@@ -253,12 +248,16 @@ Use the API to query all currently available models and their IDs. This is usefu
     ```python
     import openai
 
-    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
+        # The custom base URL points to W&B Inference
         base_url='https://api.inference.wandb.ai/v1',
+
         # Get your API key from https://wandb.ai/authorize
         # Consider setting it in the environment as OPENAI_API_KEY instead for safety
-        api_key="<your-apikey>"
+        api_key="<your-apikey>",
+
+        # Team and project are required for usage tracking
+        project="<team>/<project>",
     )
 
     response = client.chat.completions.create(
@@ -267,17 +266,12 @@ Use the API to query all currently available models and their IDs. This is usefu
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
-        extra_headers={
-            # Team and project are required for usage tracking
-            "OpenAI-Project": "<team>/<project>"
-        },
     )
 
     print(response.choices[0].message.content)
     ```
   </TabItem>
 </Tabs>
-
 
 #### Llama 3.3 70B
 
@@ -301,12 +295,16 @@ Use the API to query all currently available models and their IDs. This is usefu
     ```python
     import openai
 
-    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
+        # The custom base URL points to W&B Inference
         base_url='https://api.inference.wandb.ai/v1',
+
         # Get your API key from https://wandb.ai/authorize
         # Consider setting it in the environment as OPENAI_API_KEY instead for safety
-        api_key="<your-apikey>"
+        api_key="<your-apikey>",
+
+        # Team and project are required for usage tracking
+        project="<team>/<project>",
     )
 
     response = client.chat.completions.create(
@@ -315,10 +313,6 @@ Use the API to query all currently available models and their IDs. This is usefu
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
-        extra_headers={
-            # Team and project are required for usage tracking
-            "OpenAI-Project": "<team>/<project>"
-        },
     )
 
     print(response.choices[0].message.content)
@@ -348,12 +342,16 @@ Use the API to query all currently available models and their IDs. This is usefu
     ```python 
     import openai
 
-    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
+        # The custom base URL points to W&B Inference
         base_url='https://api.inference.wandb.ai/v1',
+
         # Get your API key from https://wandb.ai/authorize
         # Consider setting it in the environment as OPENAI_API_KEY instead for safety
-        api_key="<your-apikey>"
+        api_key="<your-apikey>",
+
+        # Team and project are required for usage tracking
+        project="<team>/<project>",
     )
 
     response = client.chat.completions.create(
@@ -362,10 +360,6 @@ Use the API to query all currently available models and their IDs. This is usefu
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
-        extra_headers={
-            # Team and project are required for usage tracking
-            "OpenAI-Project": "<team>/<project>"
-        },
     )
 
     print(response.choices[0].message.content)
@@ -395,12 +389,16 @@ Use the API to query all currently available models and their IDs. This is usefu
     ```python
     import openai
 
-    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
+        # The custom base URL points to W&B Inference
         base_url='https://api.inference.wandb.ai/v1',
+
         # Get your API key from https://wandb.ai/authorize
         # Consider setting it in the environment as OPENAI_API_KEY instead for safety
-        api_key="<your-apikey>"
+        api_key="<your-apikey>",
+
+        # Team and project are required for usage tracking
+        project="<team>/<project>",
     )
 
     response = client.chat.completions.create(
@@ -409,10 +407,6 @@ Use the API to query all currently available models and their IDs. This is usefu
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
-        extra_headers={
-            # Team and project are required for usage tracking
-            "OpenAI-Project": "<team>/<project>"
-        },
     )
 
     print(response.choices[0].message.content)
@@ -442,12 +436,16 @@ Use the API to query all currently available models and their IDs. This is usefu
     ```python 
     import openai
 
-    # The custom base URL points to W&B Inference
     client = openai.OpenAI(
+        # The custom base URL points to W&B Inference
         base_url='https://api.inference.wandb.ai/v1',
+
         # Get your API key from https://wandb.ai/authorize
         # Consider setting it in the environment as OPENAI_API_KEY instead for safety
-        api_key="<your-apikey>"
+        api_key="<your-apikey>",
+
+        # Team and project are required for usage tracking
+        project="<team>/<project>",
     )
 
     response = client.chat.completions.create(
@@ -456,10 +454,6 @@ Use the API to query all currently available models and their IDs. This is usefu
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke."}
         ],
-        extra_headers={
-            # Team and project are required for usage tracking
-            "OpenAI-Project": "<team>/<project>"
-        },
     )
 
     print(response.choices[0].message.content)
@@ -487,18 +481,12 @@ You can access the Inference service via the Weave UI from two difference locati
 
 #### From the Playground tab
 
-1. From the Weave UI, select **Playground**. The Playground chat UI displays.
+1. From the left sidebar, select **Playground**. The Playground chat UI displays.
 2. From the LLM dropdown list, mouseover **W&B Inference**. A dropdown with available W&B Inference models displays to the right.
 3. From the W&B Inference models dropdown, you can:
    - Click the name of any available model to [try it in the Playground](#try-a-model-in-the-playground).
    - Mouseover the information icon to the right of the model name for model information. You can also click the link to [view detailed model information](#view-model-information).
    - Compare one or models in the Playground
-
-### View model information
-
-<!-- 
-Add steps to view model info in the UI
-!-->
 
 ### Try a model in the Playground
 
@@ -511,31 +499,35 @@ Once you've [selected a model using one of the access options](#access-the-infer
 
 ### Compare multiple models
 
+You can compare multiple Inference models in the Playground. The compare view can be accessed from two different locations:
+
+- [Access the Compare view from the Inference tab ](#access-the-compare-view-from-the-inference-tab)
+- [Access the Compare view from the Playground tab](#access-the-compare-view-from-the-playground-tab)
+
 #### Access the Compare view from the Inference tab 
 
 1. From the left sidebar, select **Inference**. A page with available models and model information displays.
 2. To select models for comparison, click anywhere on a model card (except for the model name). The border of the model card is highlighted in blue to indicate the selection.
 3. Repeat step 2 for each model you want to compare.
-4. In any of the selected cards, click the **Compare N models in the Playground** button (`N` is the number of models you are comparing. For example, when 3 models are selected, the button displays as **Compare 3 models in the Playground**). The comparison view opens
+4. In any of the selected cards, click the **Compare N models in the Playground** button (`N` is the number of models you are comparing. For example, when 3 models are selected, the button displays as **Compare 3 models in the Playground**). The comparison view opens. 
+
+Now, you can compare models in the Playground, and use any of the features described in [Try a model in the Playground](#try-a-model-in-the-playground).
 
 #### Access the Compare view from the Playground tab
 
-1. From the Weave UI, select **Playground**. The Playground chat UI displays.
+1. From the left sidebar, select **Playground**. The Playground chat UI displays.
 2. From the LLM dropdown list, mouseover **W&B Inference**. A dropdown with available W&B Inference models displays to the right.
 3. From the dropdown, select **Compare**. The **Inference** tab displays.
 4. Follow steps 2 through 4 to [access the Compare view from the Inference tab](#access-the-compare-view-from-the-inference-tab).
 
+Now, you can compare models in the Playground, and use any of the features described in [Try a model in the Playground](#try-a-model-in-the-playground).
+
 ### View billing information
 
-<!-- 
-Add billing info access steps
-!-->
-
-### Upgrade your plan 
-
-<!-- 
-Add UI steps to upgrade plan from the UI
-!-->
+1. In W&B UI, navigate to the W&B **Billing** page.
+2. In the bottom righthand corner, the Inference billing information card is displayed. From here, you can:
+ - Click the **View usage** button in the Inference billing information card to view your usage over time.
+ - Click the **Contact sales** button to upgrade your plan. 
 
 ## Usage information and limits 
 
@@ -547,9 +539,17 @@ The Inference service is only accessible from supported geographic limitations. 
 
 ### Rate limits
 
-<!-- 
-Add rate limits when info available 
-!-->
+The following limits apply to usage of the W&B Inference API:
+
+| Scope     | Limit                         | Description                                                           |
+|-----------|-------------------------------|-----------------------------------------------------------------------|
+| User      | 10 concurrent requests        | A single user can make up to 10 concurrent requests at any given time. |
+| Project   | 30 concurrent requests        | A project (shared across users) can make up to 30 concurrent requests total. |
+| System    | 30% oversubscription allowed  | The system is provisioned to handle 30% more than the nominal concurrency ceiling, to maximize utilization. |
+
+### Pricing
+
+For model pricing information, visit [http://wandb.com/pricing/inference](http://wandb.com/pricing/inference).
 
 ## API errors
 
