@@ -8,6 +8,10 @@ _Weights & Biases (W&B) Inference_ provides access to leading open-source founda
 - Develop AI applications and agents without signing up for a hosting provider or self-hosting a model.
 - Try the supported models in the W&B Weave Playground.
 
+:::tip
+For a limited time, W&B Inference is included in your free tier. For more information, visit [http://wandb.com/pricing/inference](http://wandb.com/pricing/inference).
+:::
+
 Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference-powered applications.
 
 | Model            | Type(s)       | Context Window | Parameters                  | Description                                                                 |
