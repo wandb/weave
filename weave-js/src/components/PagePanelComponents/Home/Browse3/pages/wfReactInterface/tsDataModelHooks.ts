@@ -989,7 +989,11 @@ const useFileContent = (
   return useMemo(() => {
     // Just submit the last known or initial state
     if (params.skip) {
-      return {loading: loadingRef.current, result: fileContentRes?.content ?? null, error };
+      return {
+        loading: loadingRef.current,
+        result: fileContentRes?.content ?? null,
+        error,
+      };
     }
     if (fileContentRes == null || loadingRef.current) {
       return {loading: true, result: null, error};
