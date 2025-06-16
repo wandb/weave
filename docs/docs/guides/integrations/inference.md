@@ -20,22 +20,6 @@ _Weights & Biases (W&B) Inference_ provides access to leading open-source founda
 - Try the supported models in the W&B Weave Playground.
 
 Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference-powered applications.
-<!-- 
-Add some more callouts about what users can do with Weave and why it's so great
-!-->
-
-This guide provides the following information:
-
-- [Supported models](#supported-models)
-- [Prerequisites](#prerequisites)
-- [Usage infromation and limits](#usage-information-and-limits)
-- [Usage examples](#usage-examples)
-<!-- 
-Finalize TOC
-!-->
-
-## Supported models
-V1 of the W&B Inference service supports the following models:
 
 | Model            | Type(s)       | Context Window | Parameters                  | Description                                                                 |
 |------------------|---------------|----------------|-----------------------------|-----------------------------------------------------------------------------|
@@ -46,24 +30,50 @@ V1 of the W&B Inference service supports the following models:
 | Llama 4 Scout    | Text, Vision  | 64K            | 17B - 109B (Active - Total) | Multimodal model integrating text and image understanding, ideal for visual tasks and combined analysis. |
 | Phi 4 Mini       | Text          | 128K           | 3.8B (Active - Total)       | Compact, efficient model ideal for fast responses in resource-constrained environments. |
 
-Use the following resources to learn more about using the models:
+This guide provides the following information:
 
-- [API specification](#api-specification). 
-- [Chat completion examples using Python and the API](#usage-examples)
-- [Access the models via the W&B Weave Playground](#ui) 
-- [Pricing information](http://wandb.com/pricing/inference)
+- [Prerequisites](#prerequisites)
+  - [Additional prerequisites for using the API via Python](#additional-prerequisites-for-using-the-api-via-python)
+- [API specification](#api-specification)
+  - [Endpoint](#endpoint)
+  - [Available methods](#available-methods)
+      - [Chat completions](#chat-completions)
+      - [List supported models](#list-supported-models)
+  - [Usage examples](#usage-examples)
+      - [List available models](#list-available-models)
+      - [Llama 3.1 8B](#llama-31-8b)
+      - [DeepSeek V3-0324](#deepseek-v3-0324)
+      - [Llama 3.3 70B](#llama-33-70b)
+      - [DeepSeek R1-0528](#deepseek-r1-0528)
+      - [Llama 4 Scout](#llama-4-scout)
+      - [Phi 4 Mini](#phi-4-mini)
+- [UI](#ui)
+  - [Access the Inference service](#access-the-inference-service)
+      - [From the Inference tab](#from-the-inference-tab)
+      - [From the Playground tab](#from-the-playground-tab)
+  - [Try a model in the Playground](#try-a-model-in-the-playground)
+  - [Compare multiple models](#compare-multiple-models)
+      - [Access the Compare view from the Inference tab ](#access-the-compare-view-from-the-inference-tab)
+      - [Access the Compare view from the Playground tab](#access-the-compare-view-from-the-playground-tab)
+  - [View billing information](#view-billing-information)
+- [Usage information and limits ](#usage-information-and-limits)
+  - [Geographic restrictions](#geographic-restrictions)
+  - [Rate limits](#rate-limits)
+  - [Pricing](#pricing)
+- [API errors](#api-errors)
+- [FAQ](#faq)
 
 ## Prerequisites
 
-The following prerequisites are required to access the W&B Infernce service via the API or the W&B Weave UI.
+The following prerequisites are required to access the W&B Inference service via the API or the W&B Weave UI.
 
-- A W&B account. Sign up [here](https://app.wandb.ai/login?signup=true&_gl=1*1yze8dp*_ga*ODIxMjU5MTk3LjE3NDk0OTE2NDM.*_ga_GMYDGNGKDT*czE3NDk4NDYxMzgkbzEyJGcwJHQxNzQ5ODQ2MTM4JGo2MCRsMCRoMA..*_ga_JH1SJHJQXJ*czE3NDk4NDU2NTMkbzI1JGcxJHQxNzQ5ODQ2MTQ2JGo0NyRsMCRoMA..*_gcl_au*MTE4ODk1MzY1OC4xNzQ5NDkxNjQzLjk1ODA2MjQwNC4xNzQ5NTgyMTUzLjE3NDk1ODIxNTM.).
-- A W&B API key. Get your API key at [https://wandb.ai/authorize](https://wandb.ai/authorize).
-- A W&B project. 
-- If you are using the Inference service via Python, see [Additional prerequisites for using the API via Python](#additional-prerequisites-for-using-the-api-via-python).
+1. A W&B account. Sign up [here](https://app.wandb.ai/login?signup=true&_gl=1*1yze8dp*_ga*ODIxMjU5MTk3LjE3NDk0OTE2NDM.*_ga_GMYDGNGKDT*czE3NDk4NDYxMzgkbzEyJGcwJHQxNzQ5ODQ2MTM4JGo2MCRsMCRoMA..*_ga_JH1SJHJQXJ*czE3NDk4NDU2NTMkbzI1JGcxJHQxNzQ5ODQ2MTQ2JGo0NyRsMCRoMA..*_gcl_au*MTE4ODk1MzY1OC4xNzQ5NDkxNjQzLjk1ODA2MjQwNC4xNzQ5NTgyMTUzLjE3NDk1ODIxNTM.).
+2. A W&B API key. Get your API key at [https://wandb.ai/authorize](https://wandb.ai/authorize).
+3. A W&B project. 
+4. If you are using the Inference service via Python, see [Additional prerequisites for using the API via Python](#additional-prerequisites-for-using-the-api-via-python).
 
 :::tip
-Before using the service, familiarize yourself with the [usage limits](#usage-limits).
+Before using the service, familiarize yourself with the [usage limits](#usage-information-and-limits).
 :::
 
 ### Additional prerequisites for using the API via Python
@@ -75,7 +85,7 @@ pip install openai weave
 ```
 
 :::note
-The `weave` library is only required if you'll be using Weave to trace your LLM applications. For information on getting started with Weave, see the [Quickstart](../../quickstart.md).
+The `weave` library is only required if you'll be using Weave to trace your LLM applications. For information on getting started with Weave, see the [Weave Quickstart](../../quickstart.md).
 :::
 
 ## API specification
@@ -93,6 +103,11 @@ The Inference service can be accessed via the following endpoint:
 ```plaintext
 https://api.inference.wandb.ai/v1
 ```
+
+:::important
+To access this endpoint, you must have a valid W&B account with Inference service credits allocated, and a valid W&B API key.
+:::
+
 ### Available methods
 
 #### Chat completions
@@ -155,7 +170,7 @@ This section describes several ways to interact with the W&B Inference service:
 - [Chat completion with DeepSeek V3-0324](#deepseek-v3-0324)
 - [Chat completion with Llama 3.3 70B](#llama-33-70b)
 - [Chat completion with DeepSeek R1-0528](#deepseek-r1-0528)
-- [Chat completion with LLama 4 Scout](#llama-4-scout)
+- [Chat completion with Llama 4 Scout](#llama-4-scout)
 - [Chat completion with Phi 4 Mini](#phi-4-mini)
 
 #### List available models
@@ -367,7 +382,7 @@ Use the API to query all currently available models and their IDs. This is usefu
   </TabItem>
 </Tabs>
 
-#### LLama 4 Scout
+#### Llama 4 Scout
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="bash" label="Bash" default>
@@ -469,7 +484,7 @@ The following section describes how to use the Inference service from the W&B UI
 
 ### Access the Inference service
 
-You can access the Inference service via the Weave UI from two difference locations:
+You can access the Inference service via the Weave UI from two different locations:
 
 - [From the Inference tab](#from-the-inference-tab)
 - [From the Playground tab](#from-the-playground-tab)
@@ -499,7 +514,7 @@ Once you've [selected a model using one of the access options](#access-the-infer
 
 ### Compare multiple models
 
-You can compare multiple Inference models in the Playground. The compare view can be accessed from two different locations:
+You can compare multiple Inference models in the Playground. The Compare view can be accessed from two different locations:
 
 - [Access the Compare view from the Inference tab ](#access-the-compare-view-from-the-inference-tab)
 - [Access the Compare view from the Playground tab](#access-the-compare-view-from-the-playground-tab)
@@ -518,24 +533,26 @@ Now, you can compare models in the Playground, and use any of the features descr
 1. From the left sidebar, select **Playground**. The Playground chat UI displays.
 2. From the LLM dropdown list, mouseover **W&B Inference**. A dropdown with available W&B Inference models displays to the right.
 3. From the dropdown, select **Compare**. The **Inference** tab displays.
-4. Follow steps 2 through 4 to [access the Compare view from the Inference tab](#access-the-compare-view-from-the-inference-tab).
+4. To select models for comparison, click anywhere on a model card (except for the model name). The border of the model card is highlighted in blue to indicate the selection.
+5. Repeat step 4 for each model you want to compare.
+6. In any of the selected cards, click the **Compare N models in the Playground** button (`N` is the number of models you are comparing. For example, when 3 models are selected, the button displays as **Compare 3 models in the Playground**). The comparison view opens. 
 
 Now, you can compare models in the Playground, and use any of the features described in [Try a model in the Playground](#try-a-model-in-the-playground).
 
 ### View billing information
 
-1. In W&B UI, navigate to the W&B **Billing** page.
+1. In the W&B UI, navigate to the W&B **Billing** page.
 2. In the bottom righthand corner, the Inference billing information card is displayed. From here, you can:
  - Click the **View usage** button in the Inference billing information card to view your usage over time.
  - Click the **Contact sales** button to upgrade your plan. 
 
 ## Usage information and limits 
 
-The folling section describes important usage informatopn and limits. Familiarize yourself with this information before using the service.
+The following section describes important usage information and limits. Familiarize yourself with this information before using the service.
 
 ### Geographic restrictions
 
-The Inference service is only accessible from supported geographic limitations. For more information, see the [Terms of Service](https://docs.coreweave.com/docs/policies/terms-of-service/terms-of-use#geographic-restrictions).
+The Inference service is only accessible from supported geographic locations. For more information, see the [Terms of Service](https://docs.coreweave.com/docs/policies/terms-of-service/terms-of-use#geographic-restrictions).
 
 ### Rate limits
 
@@ -544,7 +561,7 @@ The following limits apply to usage of the W&B Inference API:
 | Scope     | Limit                         | Description                                                           |
 |-----------|-------------------------------|-----------------------------------------------------------------------|
 | User      | 10 concurrent requests        | A single user can make up to 10 concurrent requests at any given time. |
-| Project   | 30 concurrent requests        | A project (shared across users) can make up to 30 concurrent requests total. |
+| Project   | 30 concurrent requests        | A project (shared across users) can make up to 30 concurrent requests at any given time. |
 | System    | 30% oversubscription allowed  | The system is provisioned to handle 30% more than the nominal concurrency ceiling, to maximize utilization. |
 
 ### Pricing
@@ -561,9 +578,3 @@ For model pricing information, visit [http://wandb.com/pricing/inference](http:/
 | 429        | You exceeded your current quota, please check your plan and billing details | Out of credits or reached monthly spending cap. | Purchase more credits or increase your limits.                       |
 | 500        | The server had an error while processing your request                       | Internal server error.                          | Retry after a brief wait and contact support if it persists. |
 | 503        | The engine is currently overloaded, please try again later                  | Server is experiencing high traffic.            | Retry your request after a short delay.                                                |
-
-## FAQ
-
-<!-- 
-Add FAQ section?
-!-->
