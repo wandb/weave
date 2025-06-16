@@ -165,14 +165,14 @@ class Content(Generic[T]):
 
     @property
     def input_type(self) -> str | None:
-        """type or instance of the input - bytes, str, <class instance>"""
+        # type or instance of the input - bytes, str, class instance
         # We keep this in extra because we never want to expose it directly to the user
         # This should be computed by first factory function and loaded from extra when deserializing
         return self.content_handler.extra.get("input_type")
 
     @property
     def input_category(self) -> str | None:
-        """Category of the input - base64, path, data, object"""
+        # Category of the input - base64, path, data, object
         # We keep this in extra because we never want to expose it directly to the user
         # This should be computed by first factory function and loaded from extra when deserializing
         return self.content_handler.extra.get("input_category")
