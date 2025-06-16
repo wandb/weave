@@ -37,6 +37,7 @@ from zoneinfo import ZoneInfo
 import clickhouse_connect
 import ddtrace
 import emoji
+from clickhouse_connect.driver import httputil
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -198,6 +199,16 @@ ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
 # https://clickhouse.com/docs/operations/settings/settings#max_execution_time
 DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
+
+
+# Global connection pool manager for ClickHouse - shared across all instances
+# maxsize: Maximum number of connections in the pool
+# num_pools: Number of connection pools (one per host)
+def _get_clickhouse_pool_manager() -> httputil.PoolManager:
+    return httputil.get_pool_manager(maxsize=50, num_pools=16)
+
+
+_clickhouse_pool_manager = _get_clickhouse_pool_manager()
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
     or DEFAULT_MAX_MEMORY_USAGE,
@@ -303,7 +314,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._flush_immediately = True
 
     @asynccontextmanager
-    async def async_call_batch(self) -> AsyncIterator[None]:
+    async def call_batch_async(self) -> AsyncIterator[None]:
         # Not thread safe - do not use across threads
         self._flush_immediately = False
         try:
@@ -327,18 +338,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
 
-    async def async_call_start_batch(
+    async def call_start_batch_async(
         self, req: tsi.CallCreateBatchReq
     ) -> tsi.CallCreateBatchRes:
-        async with self.async_call_batch():
+        async with self.call_batch_async():
             res: list[Union[tsi.CallStartRes, tsi.CallEndRes]] = []
             for item in req.batch:
                 if item.mode == "start":
                     assert isinstance(item, tsi.CallBatchStartMode)
-                    res.append(await self.async_call_start(item.req))
+                    res.append(await self.call_start_async(item.req))
                 elif item.mode == "end":
                     assert isinstance(item, tsi.CallBatchEndMode)
-                    res.append(await self.async_call_end(item.req))
+                    res.append(await self.call_end_async(item.req))
                 else:
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
@@ -360,7 +371,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
-    async def async_call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+    async def call_start_async(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
@@ -392,7 +403,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Returns the id of the newly created call
         return tsi.CallEndRes()
 
-    async def async_call_end(
+    async def call_end_async(
         self, req: tsi.CallEndReq, publish: bool = True
     ) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
@@ -777,7 +788,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
 
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+    async def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         processed_result = process_incoming_object_val(
             req.obj.val, req.obj.builtin_object_class
         )
@@ -797,7 +808,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             digest=digest,
         )
 
-        self._insert(
+        await self._async_insert(
             "object_versions",
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
@@ -1509,29 +1520,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return [r.val for r in extra_results]
 
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 
-        if client is not None and use_file_storage:
-            try:
-                self._file_create_bucket(req, digest, client)
-            except FileStorageWriteError as e:
-                self._file_create_clickhouse(req, digest)
-        else:
-            self._file_create_clickhouse(req, digest)
+        await self._file_create_clickhouse(req, digest)
+
+        # if client is not None and use_file_storage:
+        #     try:
+        #         self._file_create_bucket(req, digest, client)
+        #     except FileStorageWriteError as e:
+        #         self._file_create_clickhouse(req, digest)
+        # else:
+        #     self._file_create_clickhouse(req, digest)
         set_root_span_dd_tags({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
-    def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
+    async def _file_create_clickhouse(
+        self, req: tsi.FileCreateReq, digest: str
+    ) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
         chunks = [
             req.content[i : i + FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), FILE_CHUNK_SIZE)
         ]
-        self._insert(
+        await self._async_insert(
             "files",
             data=[
                 (
@@ -2086,6 +2101,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             user=self._user,
             password=self._password,
             secure=self._port == 8443,
+            # Use shared connection pool manager
+            pool_mgr=_clickhouse_pool_manager,
         )
         # Safely create the database if it does not exist
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
@@ -2099,6 +2116,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             user=self._user,
             password=self._password,
             secure=self._port == 8443,
+            # Use shared connection pool manager
+            pool_mgr=_clickhouse_pool_manager,
         )
         # Safely create the database if it does not exist
         await client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
