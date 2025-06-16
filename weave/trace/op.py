@@ -542,6 +542,9 @@ def _call_sync_func(
         if __should_raise:
             raise
         return None, call
+    except (SystemExit, KeyboardInterrupt) as e:
+        finish(exception=e)
+        raise
 
     res = box.box(res)
     try:
@@ -670,6 +673,9 @@ async def _call_async_func(
         if __should_raise:
             raise
         return None, call
+    except (SystemExit, KeyboardInterrupt) as e:
+        finish(exception=e)
+        raise
 
     res = box.box(res)
     try:
