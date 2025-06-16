@@ -2,6 +2,7 @@ import {MOON_900, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
+import {IconOnlyPill} from '@wandb/weave/components/Tag';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import classNames from 'classnames';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
@@ -16,6 +17,14 @@ import {StatusChip} from '../../../pages/common/StatusChip';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {traceCallStatusCode} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber, {ScrubberOption} from '../TraceScrubber';
+import {
+  AGENT_OP_NAMES,
+  COMPLETION_OP_NAMES,
+  EVAL_OP_NAMES,
+  IMAGE_OP_NAMES,
+  QUERY_OP_NAMES,
+  TOOL_OP_NAMES,
+} from './operationNames';
 import {TraceTreeFlat, TraceViewProps} from './types';
 import {formatDuration, getCallDisplayName} from './utils';
 
@@ -174,7 +183,38 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 </span>
               )}
             </div>
-            <StatusChip value={statusCode} iconOnly />
+
+            {statusCode === 'ERROR' ||
+            statusCode === 'DESCENDANT_ERROR' ||
+            statusCode === 'UNSET' ? (
+              <StatusChip value={statusCode} iconOnly />
+            ) : AGENT_OP_NAMES.some((opName: string) =>
+                call.op_name?.toLowerCase().includes(opName.toLowerCase())
+              ) ? (
+              <IconOnlyPill icon="robot-service-member" color="blue" />
+            ) : EVAL_OP_NAMES.some((opName: string) =>
+                call.op_name?.toLowerCase().includes(opName.toLowerCase())
+              ) ? (
+              <IconOnlyPill icon="baseline-alt" color="magenta" />
+            ) : COMPLETION_OP_NAMES.some((opName: string) =>
+                call.op_name?.toLowerCase().includes(opName.toLowerCase())
+              ) ? (
+              <IconOnlyPill icon="forum-chat-bubble" color="purple" />
+            ) : QUERY_OP_NAMES.some((opName: string) =>
+                call.op_name?.toLowerCase().includes(opName.toLowerCase())
+              ) ? (
+              <IconOnlyPill icon="search" color="purple" />
+            ) : TOOL_OP_NAMES.some((opName: string) =>
+                call.op_name?.toLowerCase().includes(opName.toLowerCase())
+              ) ? (
+              <IconOnlyPill icon="code-alt" color="purple" />
+            ) : IMAGE_OP_NAMES.some((opName: string) =>
+                call.op_name?.toLowerCase().includes(opName.toLowerCase())
+              ) ? (
+              <IconOnlyPill icon="photo" color="purple" />
+            ) : (
+              <StatusChip value="SUCCESS" iconOnly />
+            )}
           </div>
         </div>
       </div>
