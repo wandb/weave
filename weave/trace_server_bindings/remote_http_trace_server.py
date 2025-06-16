@@ -199,6 +199,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                         f"Failed to enqueue batch of size {len(batch)} - Processor is shutting down"
                     )
 
+    def get_call_processor(self) -> Union[AsyncBatchProcessor, None]:
+        """
+        Custom method not defined on the formal TraceServerInterface to expose
+        the underlying call processor. Should be formalized in a client-side interface.
+        """
+        return self.call_processor
+
     @with_retry
     def _generic_request_executor(
         self,

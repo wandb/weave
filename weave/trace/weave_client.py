@@ -32,6 +32,7 @@ from requests import HTTPError
 
 from weave import version
 from weave.trace import trace_sentry, urls
+from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -137,7 +138,6 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -441,6 +441,15 @@ def _get_direct_ref(obj: Any) -> Ref | None:
     return get_ref(obj)
 
 
+def _remove_empty_ref(obj: ObjectRecord) -> ObjectRecord:
+    if hasattr(obj, "ref"):
+        if obj.ref != None:
+            raise ValueError(f"Unexpected ref in object record: {obj}")
+        else:
+            del obj.__dict__["ref"]
+    return obj
+
+
 def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, Ref):
         return obj
@@ -448,12 +457,20 @@ def map_to_refs(obj: Any) -> Any:
         return ref
 
     if isinstance(obj, ObjectRecord):
-        return obj.map_values(map_to_refs)
+        # Here, we expect ref to be empty since it would have short circuited
+        # above with `_get_direct_ref`
+        return _remove_empty_ref(obj.map_values(map_to_refs))
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
         obj_record = pydantic_object_record(obj)
+        # Here, we expect ref to be empty since it would have short circuited
+        # above with `_get_direct_ref`
+        obj_record = _remove_empty_ref(obj_record)
         return obj_record.map_values(map_to_refs)
     elif dataclasses.is_dataclass(obj):
         obj_record = dataclass_object_record(obj)
+        # Here, we expect ref to be empty since it would have short circuited
+        # above with `_get_direct_ref`
+        obj_record = _remove_empty_ref(obj_record)
         return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
         return obj.ref
@@ -930,10 +947,7 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
-        if parallelism_upload:
-            self.future_executor_fastlane = FutureExecutor(
-                max_workers=parallelism_upload
-            )
+        self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -941,9 +955,16 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
-        self._server_is_flushable = False
-        if isinstance(self.server, RemoteHTTPTraceServer):
-            self._server_is_flushable = self.server.should_batch
+        self._server_call_processor = None
+        # This is a short-term hack to get around the fact that we are reaching into
+        # the underlying implementation of the specific server to get the call processor.
+        # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
+        # some client-side flushing mechanics. We should move this to the interface layer. However,
+        # we don't really want the server-side implementaitons to need to define no-ops as that is
+        # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
+        # to define no-ops.
+        if hasattr(self.server, "get_call_processor"):
+            self._server_call_processor = self.server.get_call_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
     ################ High Level Convenience Methods ################
@@ -1036,14 +1057,15 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
     def get_calls(
         self,
         *,
-        filter: CallsFilter | None = None,
+        filter: CallsFilterLike | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        sort_by: list[SortBy] | None = None,
-        query: Query | None = None,
+        sort_by: list[SortByLike] | None = None,
+        query: QueryLike | None = None,
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
@@ -1520,6 +1542,22 @@ class WeaveClient:
 
             # Find all feedback objects with a specific reaction.
             client.get_feedback(reaction="👍", limit=10)
+
+            # Find all feedback objects with a specific feedback type with
+            # mongo-style query.
+            from weave.trace_server.interface.query import Query
+
+            query = Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "feedback_type"},
+                            {"$literal": "wandb.reaction.1"},
+                        ],
+                    }
+                }
+            )
+            client.get_feedback(query=query)
             ```
 
         Args:
@@ -1545,7 +1583,7 @@ class WeaveClient:
                 ],
             }
         elif isinstance(query, Query):
-            expr = query.expr_.dict()
+            expr = query.expr_
 
         if reaction:
             expr = {
@@ -1594,9 +1632,7 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: datetime.datetime | None = datetime.datetime.now(
-            datetime.timezone.utc
-        ),
+        effective_date: datetime.datetime | None = None,
         prompt_token_cost_unit: str | None = "USD",
         completion_token_cost_unit: str | None = "USD",
         provider_id: str | None = "default",
@@ -1624,6 +1660,8 @@ class WeaveClient:
             Which has one field called a list of tuples called ids.
             Each tuple contains the llm_id and the id of the created cost object.
         """
+        if effective_date is None:
+            effective_date = datetime.datetime.now(datetime.timezone.utc)
         cost = CostCreateInput(
             prompt_token_cost=prompt_token_cost,
             completion_token_cost=completion_token_cost,
@@ -2177,10 +2215,8 @@ class WeaveClient:
             total += self.future_executor_fastlane.num_outstanding_futures
 
         # Add call batch uploads if available
-        if self._server_is_flushable:
-            server = cast(RemoteHTTPTraceServer, self.server)
-            assert server.call_processor is not None
-            total += server.call_processor.num_outstanding_jobs
+        if self._server_call_processor:
+            total += self._server_call_processor.num_outstanding_jobs
         return total
 
     def finish(
@@ -2306,17 +2342,10 @@ class WeaveClient:
             self.future_executor.flush()
         if self.future_executor_fastlane:
             self.future_executor_fastlane.flush()
-        if self._server_is_flushable:
-            # We don't want to do an instance check here because it could
-            # be susceptible to shutdown race conditions. So we save a boolean
-            # _server_is_flushable and only call this if we know the server is
-            # flushable.
-            server = cast(RemoteHTTPTraceServer, self.server)
-            assert server.call_processor is not None
-            server.call_processor.stop_accepting_new_work_and_flush_queue()
-
+        if self._server_call_processor:
+            self._server_call_processor.stop_accepting_new_work_and_flush_queue()
             # Restart call processor processing thread after flushing
-            server.call_processor.accept_new_work()
+            self._server_call_processor.accept_new_work()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.
@@ -2333,10 +2362,8 @@ class WeaveClient:
         if self.future_executor_fastlane:
             fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
         call_processor_jobs = 0
-        if self._server_is_flushable:
-            server = cast(RemoteHTTPTraceServer, self.server)
-            assert server.call_processor is not None
-            call_processor_jobs = server.call_processor.num_outstanding_jobs
+        if self._server_call_processor:
+            call_processor_jobs = self._server_call_processor.num_outstanding_jobs
 
         return PendingJobCounts(
             main_jobs=main_jobs,

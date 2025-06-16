@@ -2,12 +2,12 @@ import json
 from typing import Any
 
 import weave
-from weave.flow.scorer import BuiltInScorer
+from weave.flow.scorer import Scorer
 from weave.trace.objectify import register_object
 
 
 @register_object
-class ValidJSONScorer(BuiltInScorer):
+class ValidJSONScorer(Scorer):
     """Validate whether a string is valid JSON."""
 
     @weave.op

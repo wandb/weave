@@ -3,8 +3,10 @@
  * and a very brief description.
  */
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React from 'react';
+import copyToClipboard from 'copy-to-clipboard';
+import React, {useCallback} from 'react';
 
+import {toast} from '../../../../../common/components/elements/Toast';
 import {Button} from '../../../../Button';
 import {IconOnlyPill} from '../../../../Tag';
 import {Link} from '../pages/common/Links';
@@ -61,6 +63,12 @@ export const ModelTile = ({
       }
     : undefined;
 
+  const urlDetails = urlInference(model.provider, model.id);
+
+  const hasPrice =
+    (model.priceCentsPerBillionTokensInput ?? 0) > 0 ||
+    (model.priceCentsPerBillionTokensOutput ?? 0) > 0;
+
   const hasPlayground = !!model.idPlayground && inferenceContext.isLoggedIn;
   const textPlayground =
     selected && selected.selectedWithPlayground.length > 1 && hasPlayground
@@ -89,21 +97,27 @@ export const ModelTile = ({
     e.stopPropagation();
   };
 
+  const onClickCopy = useCallback(() => {
+    copyToClipboard(model.idPlayground ?? '');
+    toast('Copied to clipboard');
+  }, [model.idPlayground]);
+
   return (
     <div
-      className={`group w-[500px] cursor-pointer rounded-lg border border-moon-200 bg-white px-16 pb-6 pt-12 ${
-        isSelected ? 'shadow-[0_0_10px_rgb(169,237,242)]' : ''
+      className={`group w-[500px] cursor-pointer rounded-lg border border-moon-250 bg-white px-16 pb-6 pt-12  ${
+        isSelected
+          ? 'border-teal-500 shadow-[0_0_10px_rgb(169,237,242)]'
+          : 'hover:border-moon-350'
       }`}
       onClick={onClickTile}>
-      <div className="flex cursor-pointer items-center gap-8">
-        {/* <Orb /> */}
+      <div className="mb-8 flex items-center gap-8">
         {logoImg}
-        <div className="text-md font-semibold text-teal-600">
-          <Link to={urlInference(model.provider, model.id)}>{label}</Link>
+        <div className="text-lg font-semibold text-teal-600">
+          <Link to={urlDetails}>{label}</Link>
         </div>
         {model.modalities && <Modalities modalities={model.modalities} />}
       </div>
-      <div className="flex items-center gap-16">
+      <div className="mb-8 flex items-center gap-16 text-sm">
         {model.launchDate && (
           <Tooltip
             trigger={
@@ -117,8 +131,7 @@ export const ModelTile = ({
             content="Model release date"
           />
         )}
-        {(model.priceCentsPerBillionTokensInput ||
-          model.priceCentsPerBillionTokensOutput) && (
+        {hasPrice && (
           <Tooltip
             trigger={
               <div className="flex items-center gap-2">
@@ -133,7 +146,7 @@ export const ModelTile = ({
           <Tooltip
             trigger={
               <div className="flex items-center gap-2">
-                <IconOnlyPill color="moon" icon="recent-clock" />
+                <IconOnlyPill color="moon" icon="context-window" />
                 <div className="text-moon-500">
                   {getContextWindowString(model)}
                 </div>
@@ -146,7 +159,7 @@ export const ModelTile = ({
       <div className="text-sm text-moon-650">{model.descriptionShort}</div>
       {onClickPlayground && (
         <div
-          className={`flex gap-8 py-6 transition-opacity duration-200 ${
+          className={`inline-flex gap-8 py-6 pr-6 transition-opacity duration-200 ${
             isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
           onClick={onClickButtonRow}>
@@ -157,6 +170,20 @@ export const ModelTile = ({
             tooltip={tooltipPlayground}>
             {textPlayground}
           </Button>
+          <Link to={urlDetails}>
+            <Button size="small" variant="secondary">
+              Learn more
+            </Button>
+          </Link>
+          {model.idPlayground && (
+            <Button
+              size="small"
+              icon="copy"
+              variant="ghost"
+              onClick={onClickCopy}
+              tooltip="Copy ID for API use to clipboard"
+            />
+          )}
         </div>
       )}
       {hint && (

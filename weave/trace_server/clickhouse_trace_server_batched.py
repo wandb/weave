@@ -194,10 +194,15 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT = 1 * 1024 * 1024  # 1 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
+# https://clickhouse.com/docs/operations/settings/settings#max_memory_usage
 DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
+# https://clickhouse.com/docs/operations/settings/settings#max_execution_time
+DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
-    or DEFAULT_MAX_MEMORY_USAGE
+    or DEFAULT_MAX_MEMORY_USAGE,
+    "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
+    or DEFAULT_MAX_EXECUTION_TIME,
 }
 
 
@@ -1363,7 +1368,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             if len(needed_extra_results) > 0:
                 refs: list[ri.InternalObjectRef] = []
-                for i, extra_result in needed_extra_results:
+                for _, extra_result in needed_extra_results:
                     if extra_result.unresolved_obj_ref is None:
                         raise ValueError("Expected unresolved obj ref")
                     refs.append(extra_result.unresolved_obj_ref)
@@ -2430,9 +2435,10 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
 def _ch_table_stats_to_table_stats_schema(
     ch_table_stats_row: Sequence[Any],
 ) -> tsi.TableStatsRow:
-    digest, count, storage_size_bytes = (lambda a, b, c=cast(Any, None): (a, b, c))(
-        *ch_table_stats_row
-    )
+    # Unpack the row with a default for the third value if it doesn't exist
+    row_tuple = tuple(ch_table_stats_row)
+    digest, count = row_tuple[:2]
+    storage_size_bytes = row_tuple[2] if len(row_tuple) > 2 else cast(Any, None)
 
     return tsi.TableStatsRow(
         count=count,
@@ -2836,9 +2842,12 @@ def _setup_completion_model_info(
         # but ignore the bit about omitting the /v1 because it is actually necessary
         req.inputs.model = "openai/" + model_name.replace("coreweave/", "", 1)
         provider = "custom"
-        base_url = "https://infr.cw4637-staging.coreweave.app/v1"
+        base_url = "https://api.inference.wandb.ai/v1"
         # The API key should have been passed in as an extra header.
         if req.inputs.extra_headers:
+            hostname = req.inputs.extra_headers.get("trace_server_hostname", None)
+            if hostname == "weave-trace.qa.wandb.ai":
+                base_url = "https://api.qa.inference.coreweave.com/v1"
             api_key = req.inputs.extra_headers.pop("api_key", None)
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None

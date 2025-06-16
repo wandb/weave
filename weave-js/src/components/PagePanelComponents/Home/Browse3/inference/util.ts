@@ -140,6 +140,15 @@ export const getPriceString = (
   return '';
 };
 
+export const getParameterCountString = (model: Model) => {
+  const total = model.parameterCountTotal ?? 0;
+  const active = model.parameterCountActive ?? 0;
+  if (active) {
+    return `${getShortNumberString(active)} - ${getShortNumberString(total)}`;
+  }
+  return getShortNumberString(total);
+};
+
 const divideAndRound = (
   value: number,
   divisor: number,
@@ -174,12 +183,12 @@ export const getShortNumberString = (
 
 export const getContextWindowString = (model: Model): string => {
   return model.contextWindow != null
-    ? getShortNumberString(model.contextWindow)
+    ? getShortNumberString(model.contextWindow, 0)
     : '';
 };
 
 export const getModelLicense = (model: Model): string => {
-  return model.card?.data?.license ?? 'Unknown';
+  return 'License: ' + (model.license ?? 'Unknown');
 };
 
 // A default object for when we don't have an inference context.
@@ -187,6 +196,7 @@ export const getDefaultInferenceContext = (): InferenceContextType => {
   return {
     isLoggedIn: false,
     isInferenceEnabled: false,
+    availabilityMessage: '',
     playgroundEntity: '',
     playgroundProject: '',
     projectExists: false,

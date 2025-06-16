@@ -1,5 +1,8 @@
+import logging
 import os
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # Kafka Settings
 
@@ -19,7 +22,7 @@ def wf_kafka_broker_port() -> int:
 
 def wf_enable_online_eval() -> bool:
     """Whether to enable online evaluation."""
-    return os.environ.get("WF_ENABLE_ONLINE_EVAL", "false").lower() == "true"
+    return os.environ.get("WEAVE_ENABLE_ONLINE_EVAL", "false").lower() == "true"
 
 
 def wf_scoring_worker_batch_size() -> int:
@@ -67,7 +70,24 @@ def wf_clickhouse_max_memory_usage() -> Optional[int]:
         return None
     try:
         return int(mem)
-    except ValueError:
+    except ValueError as e:
+        logger.exception(
+            f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not a valid. Error: {str(e)}"
+        )
+        return None
+
+
+def wf_clickhouse_max_execution_time() -> Optional[int]:
+    """The maximum execution time for the clickhouse server."""
+    time = os.environ.get("WF_CLICKHOUSE_MAX_EXECUTION_TIME")
+    if time is None:
+        return None
+    try:
+        return int(time)
+    except ValueError as e:
+        logger.exception(
+            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not a valid. Error: {str(e)}"
+        )
         return None
 
 

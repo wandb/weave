@@ -322,7 +322,6 @@ On a high-level the steps to create custom Scorer are quite simple:
   <TabItem value="python" label="Python" default>
     ```python
     from weave import Scorer
-    from weave import WeaveList
 
     class CorrectnessLLMJudge(Scorer):
         prompt: str
@@ -360,10 +359,10 @@ On a high-level the steps to create custom Scorer are quite simple:
             return {"correct": evaluation}
 
         @weave.op()
-        def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+        def summarize(self, score_rows: list) -> Optional[dict]:
             """Aggregate all the scores that are calculated for each row by the scoring function.
             Args:
-                - score_rows: a WeaveList object, nested dict of metrics and scores
+                - score_rows: a list of dicts. Each dict has metrics and scores
             Returns:
                 - nested dict with the same structure as the input"""
 
