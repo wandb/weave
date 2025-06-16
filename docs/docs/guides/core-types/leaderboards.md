@@ -4,12 +4,9 @@ Use Weave _Leaderboards_ to evaluate and compare multiple models across multiple
 
 Leaderboards are ideal for:
 
-- Prompt engineering comparisons
-- RAG and fine-tuned model evaluation
 - Tracking model performance regressions
 - Coordinating shared evaluation workflows
 
-You can create a leaderboard either through the [Weave UI](#ui) or the [Python API](#python).
 
 ## Create a Leaderboard
 
