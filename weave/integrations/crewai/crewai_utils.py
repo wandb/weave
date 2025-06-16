@@ -42,12 +42,12 @@ def safe_serialize_crewai_agent(obj: Any) -> dict[str, Any]:
                 exclude=EXCLUDE_AGENT_ATTRS,
                 exclude_none=True,
             )
-        
+
         for attr, value in attr_dict.items():
             # CRITICAL FIX: Skip or convert logger attributes
             if isinstance(value, logging.Logger):
                 result[attr] = f"<Logger: {value.name}>"
-            elif hasattr(value, '__dict__'):
+            elif hasattr(value, "__dict__"):
                 # Recursively clean nested objects
                 result[attr] = safe_serialize_crewai_object(value)
             else:
@@ -94,7 +94,7 @@ def safe_serialize_crewai_task(obj: Any) -> dict[str, Any]:
             # CRITICAL FIX: Skip or convert logger attributes
             if isinstance(value, logging.Logger):
                 result[attr] = f"<Logger: {value.name}>"
-            elif hasattr(value, '__dict__'):
+            elif hasattr(value, "__dict__"):
                 # Recursively clean nested objects
                 result[attr] = safe_serialize_crewai_object(value)
             else:
@@ -114,7 +114,7 @@ def safe_serialize_crewai_object(obj: Any) -> Any:
     # CRITICAL FIX: Handle Logger objects explicitly before other processing
     if isinstance(obj, logging.Logger):
         return f"<Logger: {obj.name} (level={logging.getLevelName(obj.level)})>"
-    
+
     # Handle other logging objects
     if isinstance(obj, (logging.Manager, logging.Handler, logging.Filter)):
         return f"<{obj.__class__.__name__}: {id(obj)}>"
