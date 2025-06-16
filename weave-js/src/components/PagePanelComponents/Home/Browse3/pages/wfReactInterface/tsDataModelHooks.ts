@@ -70,6 +70,7 @@ import {
   UseTableQueryStatsParams,
   UseTableRowsQueryParams,
   UseTableUpdateParams,
+  WeaveObjectVersionKey,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
@@ -182,7 +183,7 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
+export const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
 
@@ -343,7 +344,7 @@ const useCallsNoExpansion = (
   ]);
 
   // Keep track of the request we're waiting for, so that we
-  // can ignore requests that are superceded by more recent reqs
+  // can ignore requests that are superseded by more recent reqs
   const expectedRequestRef = useRef(req);
 
   const doFetch = useCallback(() => {
@@ -472,7 +473,7 @@ const useCalls = (
   }, [calls.refetch, expandedCalls, loading, calls.error]);
 };
 
-const useCallsStats = (
+export const useCallsStats = (
   params: UseCallsStatsParams
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -496,17 +497,19 @@ const useCallsStats = (
         entity: params.entity,
         project: params.project,
       }),
-      filter: {
-        op_names: deepFilter?.opVersionRefs,
-        input_refs: deepFilter?.inputObjectVersionRefs,
-        output_refs: deepFilter?.outputObjectVersionRefs,
-        parent_ids: deepFilter?.parentIds,
-        trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter?.callIds,
-        trace_roots_only: deepFilter?.traceRootsOnly,
-        wb_run_ids: deepFilter?.runIds,
-        wb_user_ids: deepFilter?.userIds,
-      },
+      filter: deepFilter
+        ? {
+            op_names: deepFilter?.opVersionRefs,
+            input_refs: deepFilter?.inputObjectVersionRefs,
+            output_refs: deepFilter?.outputObjectVersionRefs,
+            parent_ids: deepFilter?.parentIds,
+            trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
+            call_ids: deepFilter?.callIds,
+            trace_roots_only: deepFilter?.traceRootsOnly,
+            wb_run_ids: deepFilter?.runIds,
+            wb_user_ids: deepFilter?.userIds,
+          }
+        : undefined,
       query: params.query,
       limit: params.limit,
       ...(!!params.includeTotalStorageSize
@@ -568,7 +571,6 @@ const useProjectHasCalls = (
   const callsStats = useCallsStats({
     entity: params.entity,
     project: params.project,
-    filter: {},
     limit: 1,
     skip: params.skip,
   });
@@ -670,6 +672,9 @@ const useCallsExport = () => {
         expand_columns: params.expandedRefCols ?? undefined,
         include_feedback: params.includeFeedback ?? false,
         include_costs: params.includeCosts ?? false,
+        include_total_storage_size: (params.columns ?? []).includes(
+          'total_storage_size_bytes'
+        ),
       };
       return getTsClient().callsStreamDownload(req, params.contentType);
     },
@@ -992,7 +997,7 @@ const useFileContent = (
   }, [fileContentRes, params.skip, error]);
 };
 
-const useObjectVersion = (
+export const useObjectVersion = (
   params: UseObjectVersionParams
 ): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1135,7 +1140,7 @@ export const convertTraceServerObjectVersionToSchema = <
   };
 };
 
-const useRootObjectVersions = (
+export const useRootObjectVersions = (
   params: UseRootObjectVersionsParams
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1169,6 +1174,7 @@ const useRootObjectVersions = (
       },
       limit: params.limit,
       metadata_only: params.metadataOnly,
+      sort_by: params.sortBy,
       ...(!!params.includeStorageSize ? {include_storage_size: true} : null),
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
@@ -1193,6 +1199,7 @@ const useRootObjectVersions = (
     params.limit,
     params.metadataOnly,
     params.includeStorageSize,
+    params.sortBy,
     getTsClient,
   ]);
 
@@ -1347,8 +1354,14 @@ const useObjectDeleteFunc = () => {
 
 const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
   const getTsClient = useGetTraceServerClientContext();
-  const [refsRes, setRefsRes] =
-    useState<traceServerTypes.TraceRefsReadBatchRes | null>(null);
+  // Here we keep track of the result and the uris we fetched for. This is
+  // because repeated calls to this hook with different uris will return
+  // could result in stale results if we just returned the result from the
+  // hook.
+  const [refsRes, setRefsRes] = useState<{
+    res: traceServerTypes.TraceRefsReadBatchRes;
+    forUris: string[];
+  } | null>(null);
   const loadingRef = useRef(false);
 
   const deepRefUris = useDeepMemo(params.refUris);
@@ -1365,7 +1378,7 @@ const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
       })
       .then((res: traceServerTypes.TraceRefsReadBatchRes) => {
         loadingRef.current = false;
-        setRefsRes(res);
+        setRefsRes({res, forUris: deepRefUris});
       })
       .catch((err: Error) => {
         loadingRef.current = false;
@@ -1378,11 +1391,15 @@ const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
     if (params.skip || params.refUris.length === 0) {
       return {loading: false, result: null};
     }
-    if (refsRes == null || loadingRef.current) {
+    if (
+      refsRes == null ||
+      loadingRef.current ||
+      refsRes.forUris !== deepRefUris
+    ) {
       return {loading: true, result: null};
     }
-    return {loading: false, result: refsRes.vals};
-  }, [refsRes, params.skip, params.refUris]);
+    return {loading: false, result: refsRes.res.vals};
+  }, [params.skip, params.refUris.length, refsRes, deepRefUris]);
 };
 
 const useTableQuery = makeTraceServerEndpointHook<
@@ -1930,14 +1947,13 @@ const useRefsType = (params: UseGetRefsTypeParams): Loadable<Types.Type[]> => {
 
 /// Converters ///
 
-/**
- * Getting the status code for a trace call has a few complexities.
- */
-export const traceCallStatusCode = (
-  traceCall: traceServerTypes.TraceCallSchema,
+const statusCode = (
+  serverSideStatus: traceServerTypes.ComputedCallStatusType | undefined,
+  exception: string | undefined,
+  endedAt: string | undefined,
+  statusCounts: {error: number} | undefined,
   hasDescendantErrors?: boolean
-): traceServerTypes.ComputedCallStatusType => {
-  const serverSideStatus = traceCall.summary?.weave?.status;
+) => {
   if (serverSideStatus) {
     if (
       serverSideStatus === traceServerTypes.ComputedCallStatuses.success &&
@@ -1947,16 +1963,48 @@ export const traceCallStatusCode = (
     }
     return serverSideStatus;
   }
-  if (traceCall.exception) {
+  if (exception) {
     return traceServerTypes.ComputedCallStatuses.error;
-  } else if (traceCall.ended_at) {
-    const errors = traceCall.summary?.status_counts?.error ?? 0;
+  } else if (endedAt) {
+    const errors = statusCounts?.error ?? 0;
     if (errors > 0 || hasDescendantErrors) {
       return traceServerTypes.ComputedCallStatuses.descendant_error;
     }
     return traceServerTypes.ComputedCallStatuses.success;
   }
   return traceServerTypes.ComputedCallStatuses.running;
+};
+
+/**
+ * Getting the status code for a trace call has a few complexities.
+ */
+export const traceCallStatusCode = (
+  traceCall: traceServerTypes.TraceCallSchema,
+  hasDescendantErrors?: boolean
+): traceServerTypes.ComputedCallStatusType => {
+  return statusCode(
+    traceCall.summary?.weave?.status,
+    traceCall.exception,
+    traceCall.ended_at,
+    traceCall.summary?.status_counts,
+    hasDescendantErrors
+  );
+};
+
+/**
+ * Getting the status code for a trace call has a few complexities.
+ */
+export const flattenedTraceCallStatusCode = (
+  traceCall: {[key: string]: any},
+  hasDescendantErrors?: boolean
+): traceServerTypes.ComputedCallStatusType => {
+  return statusCode(
+    traceCall['summary.weave.status'],
+    traceCall.exception,
+    traceCall.ended_at,
+    traceCall['summary.status_counts.error'],
+    hasDescendantErrors
+  );
 };
 
 export const traceCallLatencyS = (
@@ -2106,6 +2154,54 @@ export const useObjCreate = () => {
         });
     },
     [getTsClient]
+  );
+};
+
+export const useScorerCreate = () => {
+  const objCreate = useObjCreate();
+
+  return useCallback(
+    async ({
+      entity,
+      project,
+      name,
+      val,
+    }: {
+      entity: string;
+      project: string;
+      name: string;
+      val: any;
+    }): Promise<WeaveObjectVersionKey> => {
+      const scorerObj = {
+        _type: name,
+        name: name,
+        description: `${name} created from the UI.`,
+        ref: null,
+        column_map: null,
+        _class_name: name,
+        _bases: ['Scorer', 'Object', 'BaseModel'],
+        ...val,
+      };
+
+      const scorerDigest = await objCreate({
+        projectId: `${entity}/${project}`,
+        objectId: name,
+        val: scorerObj,
+      });
+
+      const objectVersionKey: WeaveObjectVersionKey = {
+        scheme: 'weave',
+        entity,
+        project,
+        weaveKind: 'object',
+        objectId: name,
+        versionHash: scorerDigest,
+        path: '',
+      };
+
+      return objectVersionKey;
+    },
+    [objCreate]
   );
 };
 

@@ -409,7 +409,7 @@ class Grid:
 
         # Check column types and coerce values if possible
         processed_values: RowValues = []
-        for i, (value, column) in enumerate(zip(values, self.columns)):
+        for _i, (value, column) in enumerate(zip(values, self.columns)):
             if column.type is not None:
                 try:
                     if column.type == "bool" and not isinstance(value, bool):
@@ -548,7 +548,7 @@ class Grid:
 
         height = get_terminal_height()
         if self.num_rows < height:
-            print(self.to_rich_table_str())
+            print(self.to_rich_table_str())  # noqa: T201
             return
 
         height -= 2  # Adjust for pagination and navigation instructions

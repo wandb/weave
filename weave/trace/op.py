@@ -110,7 +110,7 @@ class DisplayNameFuncError(ValueError): ...
 
 def print_call_link(call: Call) -> None:
     if settings.should_print_call_link():
-        print(f"{TRACE_CALL_EMOJI} {call.ui_url}")
+        logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 @dataclass
@@ -375,6 +375,17 @@ def is_placeholder_call(call: Call) -> bool:
     return isinstance(call, NoOpCall)
 
 
+def _set_python_function_type_on_weave_dict(
+    __weave: WeaveKwargs, type_str: str
+) -> None:
+    weave_dict = (
+        __weave.setdefault("attributes", {})
+        .setdefault("weave", {})
+        .setdefault("python", {})
+    )
+    weave_dict["type"] = type_str
+
+
 def _call_sync_func(
     op: Op,
     *args: Any,
@@ -402,7 +413,7 @@ def _call_sync_func(
             return res, call
 
     __weave = setup_dunder_weave_dict(__weave)
-    __weave["attributes"]["python"]["type"] = "function"
+    _set_python_function_type_on_weave_dict(__weave, "function")
 
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
@@ -500,6 +511,9 @@ def _call_sync_func(
         if __should_raise:
             raise
         return None, call
+    except (SystemExit, KeyboardInterrupt) as e:
+        finish(exception=e)
+        raise
 
     res = box.box(res)
     try:
@@ -544,7 +558,7 @@ async def _call_async_func(
             return res, call
 
     __weave = setup_dunder_weave_dict(__weave)
-    __weave["attributes"]["python"]["type"] = "async_function"
+    _set_python_function_type_on_weave_dict(__weave, "async_function")
 
     # Proceed with tracing
     try:
@@ -628,6 +642,9 @@ async def _call_async_func(
         if __should_raise:
             raise
         return None, call
+    except (SystemExit, KeyboardInterrupt) as e:
+        finish(exception=e)
+        raise
 
     res = box.box(res)
     try:
@@ -672,7 +689,7 @@ def _call_sync_gen(
             return gen, call
 
     __weave = setup_dunder_weave_dict(__weave)
-    __weave["attributes"]["python"]["type"] = "generator"
+    _set_python_function_type_on_weave_dict(__weave, "generator")
 
     # Proceed with tracing
     try:
@@ -881,7 +898,7 @@ async def _call_async_gen(
             return gen, call
 
     __weave = setup_dunder_weave_dict(__weave)
-    __weave["attributes"]["python"]["type"] = "async_generator"
+    _set_python_function_type_on_weave_dict(__weave, "async_generator")
 
     # Proceed with tracing
     try:

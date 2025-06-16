@@ -109,7 +109,7 @@ def test_op_return_sync_generator(client):
             size -= 1
             yield size
 
-    for item in fn():
+    for _item in fn():
         pass
 
     res = client.server.calls_query(
@@ -134,7 +134,7 @@ async def test_op_return_async_generator(client):
             size -= 1
             yield size
 
-    async for item in fn():
+    async for _item in fn():
         pass
 
     res = client.server.calls_query(
@@ -167,7 +167,7 @@ def test_op_return_sync_iterator(client):
     def fn():
         return MyIterator()
 
-    for item in fn():
+    for _item in fn():
         pass
 
     res = client.server.calls_query(
@@ -201,7 +201,7 @@ async def test_op_return_async_iterator(client):
     def fn():
         return MyAsyncIterator()
 
-    async for item in fn():
+    async for _item in fn():
         pass
 
     res = client.server.calls_query(
@@ -249,7 +249,7 @@ async def test_op_return_async_generator_never_iter(client):
             size -= 1
             yield size
 
-    async for item in fn():
+    async for _item in fn():
         return
 
     res = client.server.calls_query(
@@ -462,7 +462,7 @@ def test_op_return_sync_generator_exception(client):
                 raise ValueError("test")
 
     try:
-        for item in fn():
+        for _item in fn():
             pass
     except ValueError:
         pass
@@ -493,7 +493,7 @@ async def test_op_return_async_generator_exception(client):
                 raise ValueError("test")
 
     try:
-        async for item in fn():
+        async for _item in fn():
             pass
     except ValueError:
         pass
@@ -532,7 +532,7 @@ def test_op_return_sync_iterator_exception(client):
         return MyIterator()
 
     try:
-        for item in fn():
+        for _item in fn():
             pass
     except ValueError:
         pass
@@ -572,7 +572,7 @@ async def test_op_return_async_iterator_exception(client):
         return MyAsyncIterator()
 
     try:
-        async for item in fn():
+        async for _item in fn():
             pass
     except ValueError:
         pass

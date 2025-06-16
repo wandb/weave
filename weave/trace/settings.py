@@ -52,6 +52,13 @@ class UserSettings(BaseModel):
     If True, prints a link to the Weave UI when calling a weave op.
     Can be overridden with the environment variable `WEAVE_PRINT_CALL_LINK`"""
 
+    log_level: str = "INFO"
+    """Toggles the log level.
+
+    Controls the log level of the weave logger.
+    Valid values are: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    Can be overridden with the environment variable `WEAVE_LOG_LEVEL`"""
+
     capture_code: bool = True
     """Toggles code capture for ops.
 
@@ -98,11 +105,11 @@ class UserSettings(BaseModel):
     This cannot be changed after the client has been initialized.
     """
 
-    use_server_cache: bool = False
+    use_server_cache: bool = True
     """
-    Toggles caching of server responses, defaults to False
+    Toggles caching of server responses, defaults to True
 
-    If True, caches server responses to disk.
+    If True, caches server responses to disk at `WEAVE_SERVER_CACHE_DIR`.
     Can be overridden with the environment variable `WEAVE_USE_SERVER_CACHE`
     """
 
@@ -176,6 +183,10 @@ def should_disable_weave() -> bool:
 
 def should_print_call_link() -> bool:
     return _should("print_call_link")
+
+
+def log_level() -> str:
+    return _optional_str("log_level") or "INFO"
 
 
 def should_capture_code() -> bool:

@@ -263,6 +263,7 @@ jobs:
             "trace",
             "flow",
             "trace_server",
+            "trace_server_bindings",
             "anthropic",
             "bedrock",
             "cerebras",
@@ -284,6 +285,7 @@ jobs:
             "vertexai",
             "pandas-test",
             "mcp",
+            "smolagents",
           ]
       fail-fast: false
     services:
@@ -310,7 +312,7 @@ jobs:
         ports:
           - "10000:10000"
       weave_clickhouse:
-        image: clickhouse/clickhouse-server
+        image: clickhouse/clickhouse-server:24.12
         env:
           CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
           CLICKHOUSE_USER: default

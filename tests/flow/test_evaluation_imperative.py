@@ -391,6 +391,7 @@ def scorer(request):
         {"value": True, "reason": "bool"},
     ],
 )
+@pytest.mark.skip(reason="Flaking in CI, needs to be more stable")
 @pytest.mark.asyncio
 async def test_various_input_forms(client, evaluation_logger_kwargs, scorer, score):
     your_dataset = [

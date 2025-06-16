@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -23,7 +24,10 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace.term import configure_logger
 from weave.trace_server.interface.builtin_object_classes import leaderboard
+
+logger = logging.getLogger(__name__)
 
 _global_postprocess_inputs: PostprocessInputsFunc | None = None
 _global_postprocess_output: PostprocessOutputFunc | None = None
@@ -63,6 +67,8 @@ def init(
     Returns:
         A Weave client.
     """
+    configure_logger()
+
     parse_and_apply_settings(settings)
 
     global _global_postprocess_inputs
@@ -82,6 +88,10 @@ def init(
     )
 
     return initialized_client.client
+
+
+def get_client() -> weave_client.WeaveClient | None:
+    return weave_client_context.get_weave_client()
 
 
 @contextlib.contextmanager
@@ -157,7 +167,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
                 ref.name,
                 ref.digest,
             )
-        print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
+        logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
     return ref
 
 
@@ -293,4 +303,5 @@ __all__ = [
     "weave_client_context",
     "require_current_call",
     "get",
+    "get_client",
 ]
