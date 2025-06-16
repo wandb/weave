@@ -7,6 +7,16 @@ from typing import TYPE_CHECKING, Any, Callable
 from urllib.parse import urlparse
 
 import weave
+from weave.integrations.openai.gpt_image_utils import (
+    openai_image_wrapper_async,
+    openai_image_wrapper_sync,
+)
+from weave.integrations.openai.openai_utils import (
+    openai_accumulator,
+    openai_on_finish_post_processor,
+    openai_on_input_handler,
+    should_use_accumulator,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import (
@@ -731,6 +741,24 @@ def get_openai_patcher(
     async_responses_parse_settings = base.model_copy(
         update={"name": base.name or "openai.responses.parse"}
     )
+    images_generate_settings = base.model_copy(
+        update={"name": base.name or "openai.images.generate"}
+    )
+    async_images_generate_settings = base.model_copy(
+        update={"name": base.name or "openai.images.generate"}
+    )
+    images_edit_settings = base.model_copy(
+        update={"name": base.name or "openai.images.edit"}
+    )
+    async_images_edit_settings = base.model_copy(
+        update={"name": base.name or "openai.images.edit"}
+    )
+    images_create_variation_settings = base.model_copy(
+        update={"name": base.name or "openai.images.create_variation"}
+    )
+    async_images_create_variation_settings = base.model_copy(
+        update={"name": base.name or "openai.images.create_variation"}
+    )
 
     _openai_patcher = MultiPatcher(
         [
@@ -799,6 +827,36 @@ def get_openai_patcher(
                 lambda: importlib.import_module("openai.resources.responses"),
                 "AsyncResponses.parse",
                 create_wrapper_responses_async(settings=async_responses_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "Images.generate",
+                openai_image_wrapper_sync(settings=images_generate_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "AsyncImages.generate",
+                openai_image_wrapper_async(settings=async_images_generate_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "Images.edit",
+                openai_image_wrapper_sync(settings=images_edit_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "AsyncImages.edit",
+                openai_image_wrapper_async(settings=async_images_edit_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "Images.create_variation",
+                openai_image_wrapper_sync(settings=images_create_variation_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "AsyncImages.create_variation",
+                openai_image_wrapper_async(settings=async_images_create_variation_settings),
             ),
         ]
     )
