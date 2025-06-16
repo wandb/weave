@@ -108,9 +108,6 @@ export const FilterableOpVersionsTable: React.FC<{
   const columns: GridColDef[] = [
     basicField('op', 'Op', {
       hideable: false,
-      valueGetter: (unused: any, row: any) => {
-        return row.obj.opId;
-      },
       renderCell: cellParams => {
         // Icon to indicate navigation to the object version
         const obj: OpVersionSchema = cellParams.row.obj;
