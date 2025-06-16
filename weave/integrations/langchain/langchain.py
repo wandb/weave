@@ -428,8 +428,8 @@ def _extract_usage_data(call: Call, output: Any) -> None:
 def _extract_openai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
     usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-    for output in output["outputs"]:
-        for generation_list in output["generations"]:
+    for output_item in output["outputs"]:
+        for generation_list in output_item["generations"]:
             for generation in generation_list:
                 response_metadata = generation["message"]["kwargs"]["response_metadata"]
                 model = response_metadata["model_name"]
@@ -447,8 +447,8 @@ def _extract_openai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
 def _extract_google_vertexai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
     usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-    for output in output["outputs"]:
-        for generation_list in output["generations"]:
+    for output_item in output["outputs"]:
+        for generation_list in output_item["generations"]:
             for generation in generation_list:
                 response_metadata = generation["message"]["kwargs"]["response_metadata"]
                 model = response_metadata["model_name"]
@@ -470,8 +470,8 @@ def _extract_google_vertexai_usage(output: dict) -> dict[ModelName, LLMUsageSche
 def _extract_google_genai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
     usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-    for output in output["outputs"]:
-        for generation_list in output["generations"]:
+    for output_item in output["outputs"]:
+        for generation_list in output_item["generations"]:
             for generation in generation_list:
                 generation_info = generation["generation_info"]
                 model = generation_info["model_name"]

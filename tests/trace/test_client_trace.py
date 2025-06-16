@@ -478,7 +478,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
     )
     assert len(input_object_version_refs) > 3  # > 3
 
-    for input_object_version_refs, exp_count in [
+    for input_refs, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -515,7 +515,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(input_refs=input_object_version_refs),
+                filter=tsi.CallsFilter(input_refs=input_refs),
             )
         )
 
@@ -590,7 +590,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
     )
     assert len(output_object_version_refs) > 3
 
-    for output_object_version_refs, exp_count in [
+    for output_refs, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -627,7 +627,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(output_refs=output_object_version_refs),
+                filter=tsi.CallsFilter(output_refs=output_refs),
             )
         )
 
@@ -644,7 +644,7 @@ def test_trace_call_query_filter_parent_ids(client):
     )
     assert len(parent_ids) > 3
 
-    for parent_ids, exp_count in [
+    for parent_id_list, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -663,7 +663,7 @@ def test_trace_call_query_filter_parent_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(parent_ids=parent_ids),
+                filter=tsi.CallsFilter(parent_ids=parent_id_list),
             )
         )
 
@@ -677,7 +677,7 @@ def test_trace_call_query_filter_trace_ids(client):
 
     trace_ids = [call.trace_id for call in res.calls]
 
-    for trace_ids, exp_count in [
+    for trace_id_list, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -690,7 +690,7 @@ def test_trace_call_query_filter_trace_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(trace_ids=trace_ids),
+                filter=tsi.CallsFilter(trace_ids=trace_id_list),
             )
         )
 
@@ -704,7 +704,7 @@ def test_trace_call_query_filter_call_ids(client):
 
     call_ids = [call.id for call in res.calls]
 
-    for call_ids, exp_count in [
+    for call_id_list, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -717,7 +717,7 @@ def test_trace_call_query_filter_call_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(call_ids=call_ids),
+                filter=tsi.CallsFilter(call_ids=call_id_list),
             )
         )
 
