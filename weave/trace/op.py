@@ -38,6 +38,11 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from weave.trace import box, settings
+from weave.trace.annotation_parser import (
+    ContentAnnotation,
+    parse_content_annotation,
+    parse_from_signature,
+)
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -49,6 +54,7 @@ from weave.trace.context.call_context import (
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
+from weave.type_wrappers import Content
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
@@ -288,12 +294,37 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
         raise OpCallError(f"Error calling {func.name}: {e}") from e
 
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
+
+    # Annotated input type flow
+    # If user defines postprocess_inputs manually, trust it instead of running this
+    to_weave_inputs = {}
+    if not func.postprocess_inputs:
+        parsed_annotations = parse_from_signature(sig)
+        for param_name, value in inputs_with_defaults.items():
+            # Check if we found an annotation which requires substitution
+            parsed = parsed_annotations.get(param_name)
+            # We don't need to do anything with this if a special annotation is not found
+            if not parsed:
+                to_weave_inputs[param_name] = value
+                continue
+            elif isinstance(parsed, ContentAnnotation):
+                to_weave_inputs[param_name] = Content(value, parsed.type_hint)
+    else:
+        to_weave_inputs = inputs_with_defaults
+
+    # Annotated return type flow
+    # If user defines postprocess_output manually, trust it instead of running this
+    if not func.postprocess_output and sig.return_annotation:
+        parsed = parse_content_annotation(str(sig.return_annotation))
+        if isinstance(parsed, ContentAnnotation):
+            func.postprocess_output = lambda x: Content(x, parsed.type_hint)
+
     return ProcessedInputs(
         original_args=args,
         original_kwargs=kwargs,
         args=args,
         kwargs=kwargs,
-        inputs=inputs_with_defaults,
+        inputs=to_weave_inputs,
     )
 
 
