@@ -181,7 +181,11 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
 
     @classmethod
     def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
-        """Expected format: `[feedback.type].dot.path`"""
+        """
+        Expected format: `[feedback.type].dot.path`
+
+        feedback.type can be '*' to select all feedback types.
+        """
         regex = re.compile(r"^(\[.+\])\.(.+)$")
         match = regex.match(path)
         if not match:
@@ -201,6 +205,10 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
             return CallsMergedFeedbackPayloadField(
                 field="runnable_ref", feedback_type=feedback_type, extra_path=[]
             )
+        elif extra_path[0] == "trigger_ref":
+            return CallsMergedFeedbackPayloadField(
+                field="trigger_ref", feedback_type=feedback_type, extra_path=[]
+            )
         raise InvalidFieldError(f"Invalid feedback path: {path}")
 
     def is_heavy(self) -> bool:
@@ -213,8 +221,11 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         inner = super().as_sql(pb, "feedback")
-        param_name = pb.add_param(self.feedback_type)
-        res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
+        if self.feedback_type == "*":
+            res = f"any({inner})"
+        else:
+            param_name = pb.add_param(self.feedback_type)
+            res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
         # If there is no extra path, then we can just return the inner sql (JSON_VALUE does not like empty extra_path)
         if not self.extra_path:
             return res
@@ -739,6 +750,13 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
+        # parent_id is valid as null, so we must always include the HAVING filter
+        # in addition to this optimization
+        parent_ids_filter_sql = process_parent_ids_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
 
         optimization_conditions = process_query_to_optimization_sql(
             self.query_conditions,
@@ -785,8 +803,9 @@ class CallsQuery(BaseModel):
         feedback_join_sql = ""
         if needs_feedback:
             feedback_join_sql = f"""
-            LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
+            LEFT JOIN feedback ON (
+                feedback.project_id = {param_slot(project_param, "String")} AND
+                feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
 
         storage_size_sql = ""
@@ -824,6 +843,7 @@ class CallsQuery(BaseModel):
         {id_subquery_sql}
         {sortable_datetime_sql}
         {trace_roots_only_sql}
+        {parent_ids_filter_sql}
         {op_name_sql}
         {trace_id_sql}
         {str_filter_opt_sql}
@@ -1193,6 +1213,28 @@ def process_trace_roots_only_filter_to_sql(
     )
 
     return f"AND ({parent_id_field_sql} IS NULL)"
+
+
+def process_parent_ids_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the parent_id and returns a sql string if there are any parent_ids."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.parent_ids:
+        return ""
+
+    parent_id_field = get_field_by_name("parent_id")
+    if not isinstance(parent_id_field, CallsMergedAggField):
+        raise TypeError("parent_id is not an aggregate field")
+
+    parent_id_field_sql = parent_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
+
+    return f"AND ({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
 
 
 def process_ref_filters_to_sql(

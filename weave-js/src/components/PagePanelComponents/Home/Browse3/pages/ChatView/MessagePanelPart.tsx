@@ -8,11 +8,16 @@ import {CodeEditor} from '../../../../../CodeEditor';
 import {ToolCalls} from './ToolCalls';
 import {MessagePart, ToolCall} from './types';
 
-type MessagePanelPartProps = {value: MessagePart; isStructuredOutput?: boolean};
+type MessagePanelPartProps = {
+  value: MessagePart;
+  isStructuredOutput?: boolean;
+  showCursor?: boolean;
+};
 
 export const MessagePanelPart = ({
   value,
   isStructuredOutput,
+  showCursor = false,
 }: MessagePanelPartProps) => {
   if (typeof value === 'string') {
     if (isStructuredOutput) {
@@ -24,7 +29,27 @@ export const MessagePanelPart = ({
     // if (isLikelyMarkdown(value)) {
     //   return <Markdown content={value} />;
     // }
-    return <span className="whitespace-break-spaces">{value}</span>;
+    return (
+      <>
+        <style>
+          {`
+            @keyframes blink {
+              0%, 100% { opacity: 1; }
+              50% { opacity: 0; }
+            }
+            .cursor-blink {
+              animation: blink 1s ease-in-out infinite;
+            }
+          `}
+        </style>
+        <div>
+          <span className="whitespace-break-spaces">{value}</span>
+          {showCursor && (
+            <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[12px] w-[12px] rounded-full bg-gold-500" />
+          )}
+        </div>
+      </>
+    );
   }
   if (value.type === 'text' && 'text' in value) {
     return <div className="whitespace-break-spaces">{value.text}</div>;
