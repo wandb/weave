@@ -71,7 +71,7 @@ class Dataset(Object):
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         return pd.DataFrame(self.rows)
 

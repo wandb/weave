@@ -297,7 +297,7 @@ class PaginatedIterator(Generic[T, R]):
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         records = []
         for item in self:
@@ -584,7 +584,7 @@ class Call:
             try:
                 entity, project = self.project_id.split("/")
             except ValueError:
-                raise ValueError(f"Invalid project_id: {self.project_id}")
+                raise ValueError(f"Invalid project_id: {self.project_id}") from None
             weave_ref = CallRef(entity, project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
@@ -599,7 +599,7 @@ class Call:
         try:
             entity, project = self.project_id.split("/")
         except ValueError:
-            raise ValueError(f"Invalid project_id: {self.project_id}")
+            raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
 
     @property
