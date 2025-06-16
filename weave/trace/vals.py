@@ -451,6 +451,10 @@ class WeaveTable(Traceable):
                 return
 
         for i, _ in enumerate(self._prefetched_rows):
+            print(
+                ">>> _local_iter_with_remote_fallback, deferring to thread:",
+                wc.future_executor.num_outstanding_futures,
+            )
             next_id_future = wc.future_executor.defer(
                 lambda closure=i: cached_table_ref.row_digests[closure]
             )
@@ -528,6 +532,10 @@ class WeaveTable(Traceable):
                         self.root,
                     )
 
+                print(
+                    ">>> _remote_iter, deferring to thread:",
+                    wc.future_executor.num_outstanding_futures,
+                )
                 future = wc.future_executor.defer(
                     lambda v=val, r=new_ref: process_row(v, r)
                 )

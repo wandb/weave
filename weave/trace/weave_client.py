@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import threading 
 import copy
 import dataclasses
 import datetime
@@ -1259,6 +1259,11 @@ class WeaveClient:
             attributes_dict._set_weave_item("os_version", platform.version())
             attributes_dict._set_weave_item("os_release", platform.release())
 
+        print(
+            ">>> create_call, deferring op_name_future to thread:",
+            self.future_executor.num_outstanding_futures,
+            threading.current_thread().name,
+        )
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
         call_id = generate_id()
@@ -2039,6 +2044,10 @@ class WeaveClient:
             )
             return self.server.obj_create(req)
 
+        print(
+            ">>> _save_object_basic, deferring, queue size:",
+            self.future_executor.num_outstanding_futures,
+        )
         res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
@@ -2192,8 +2201,16 @@ class WeaveClient:
 
         if self.future_executor_fastlane:
             # If we have a separate upload worker pool, use it
+            print(
+                ">>> _send_file_create, deferring to fastlane thread:",
+                self.future_executor_fastlane.num_outstanding_futures,
+            )
             res = self.future_executor_fastlane.defer(self.server.file_create, req)
         else:
+            print(
+                ">>> _send_file_create, deferring to thread:",
+                self.future_executor.num_outstanding_futures,
+            )
             res = self.future_executor.defer(self.server.file_create, req)
 
         self.send_file_cache.put(req, res)

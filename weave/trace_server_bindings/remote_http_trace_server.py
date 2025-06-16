@@ -1,3 +1,4 @@
+import threading
 import io
 import json
 import logging
@@ -115,6 +116,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
         This method is separated from _flush_calls to avoid recursive retries.
         """
+        print(f"send_batch_to_server. thread: {threading.current_thread().name}")
         r = requests.post(
             self.trace_server_url + "/call/upsert_batch",
             data=encoded_data,  # type: ignore
@@ -376,11 +378,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def obj_create(
         self, req: Union[tsi.ObjCreateReq, dict[str, Any]]
     ) -> tsi.ObjCreateRes:
+        print(f"obj_create. thread: {threading.current_thread().name}")
         return self._generic_request(
             "/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes
         )
 
     def obj_read(self, req: Union[tsi.ObjReadReq, dict[str, Any]]) -> tsi.ObjReadRes:
+        print(f"obj_read. thread: {threading.current_thread().name}")
         return self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes)
 
     def objs_query(
@@ -511,6 +515,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @with_retry
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        print(f"file_create. thread: {threading.current_thread().name}")
         r = requests.post(
             self.trace_server_url + "/files/create",
             auth=self._auth,
@@ -523,6 +528,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @with_retry
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+        print(f"file_content_read. thread: {threading.current_thread().name}")
         r = requests.post(
             self.trace_server_url + "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},

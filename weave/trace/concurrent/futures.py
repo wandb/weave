@@ -35,6 +35,7 @@ import logging
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
 from threading import Lock
+import threading
 from typing import Any, Callable, TypeVar
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
@@ -224,14 +225,20 @@ class FutureExecutor:
         """
         wrapped = self._make_deadlock_safe(f)
 
-        if self._executor is None or self._in_thread_context.get():
-            return self._execute_directly(wrapped, *args, **kwargs)
+        # if self._executor is None or self._in_thread_context.get():
+        #     print(
+        #         ">>> execute_directly, in thread context:",
+        #         self._in_thread_context.get(),
+        #         threading.current_thread().name,
+        #     )
+        #     return self._execute_directly(wrapped, *args, **kwargs)
 
         try:
             future = self._executor.submit(wrapped, *args, **kwargs)
         except Exception as e:
             if get_raise_on_captured_errors():
                 raise
+            print(">>> execute_directly, exception:", e)
             return self._execute_directly(wrapped, *args, **kwargs)
 
         with self._active_futures_lock:
