@@ -29,8 +29,8 @@ import json
 import logging
 import threading
 from collections import defaultdict
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import AsyncIterator, Iterator, Sequence
+from contextlib import asynccontextmanager, contextmanager
 from typing import Any, Callable, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
@@ -282,7 +282,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         ]
                     )
         # TODO: Actually populate the error fields if call_start_batch fails
-        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        tsi_calls = []
+        for call in calls:
+            if call["mode"] == "start":
+                tsi_calls.append(tsi.CallBatchStartMode(mode="start", req=call["req"]))
+            elif call["mode"] == "end":
+                tsi_calls.append(tsi.CallBatchEndMode(mode="end", req=call["req"]))
+        self.call_start_batch(tsi.CallCreateBatchReq(batch=tsi_calls))
         return tsi.OtelExportRes()
 
     @contextmanager
@@ -296,14 +302,43 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._call_batch = []
             self._flush_immediately = True
 
+    @asynccontextmanager
+    async def async_call_batch(self) -> AsyncIterator[None]:
+        # Not thread safe - do not use across threads
+        self._flush_immediately = False
+        try:
+            yield
+            await self._async_flush_calls()
+        finally:
+            self._call_batch = []
+            self._flush_immediately = True
+
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         with self.call_batch():
-            res = []
+            res: list[Union[tsi.CallStartRes, tsi.CallEndRes]] = []
             for item in req.batch:
                 if item.mode == "start":
+                    assert isinstance(item, tsi.CallBatchStartMode)
                     res.append(self.call_start(item.req))
                 elif item.mode == "end":
+                    assert isinstance(item, tsi.CallBatchEndMode)
                     res.append(self.call_end(item.req))
+                else:
+                    raise ValueError("Invalid mode")
+        return tsi.CallCreateBatchRes(res=res)
+
+    async def async_call_start_batch(
+        self, req: tsi.CallCreateBatchReq
+    ) -> tsi.CallCreateBatchRes:
+        async with self.async_call_batch():
+            res: list[Union[tsi.CallStartRes, tsi.CallEndRes]] = []
+            for item in req.batch:
+                if item.mode == "start":
+                    assert isinstance(item, tsi.CallBatchStartMode)
+                    res.append(await self.async_call_start(item.req))
+                elif item.mode == "end":
+                    assert isinstance(item, tsi.CallBatchEndMode)
+                    res.append(await self.async_call_end(item.req))
                 else:
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
@@ -325,6 +360,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
+    async def async_call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        # Converts the user-provided call details into a clickhouse schema.
+        # This does validation and conversion of the input data as well
+        # as enforcing business rules and defaults
+        ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start)
+
+        # Inserts the call into the clickhouse database, verifying that
+        # the call does not already exist
+        await self._async_insert_call(ch_call)
+
+        # Returns the id of the newly created call
+        return tsi.CallStartRes(
+            id=ch_call.id,
+            trace_id=ch_call.trace_id,
+        )
+
     def call_end(self, req: tsi.CallEndReq, publish: bool = True) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
@@ -334,6 +385,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
+
+        if wf_env.wf_enable_online_eval() and publish:
+            self.kafka_producer.produce_call_end(req.end)
+
+        # Returns the id of the newly created call
+        return tsi.CallEndRes()
+
+    async def async_call_end(
+        self, req: tsi.CallEndReq, publish: bool = True
+    ) -> tsi.CallEndRes:
+        # Converts the user-provided call details into a clickhouse schema.
+        # This does validation and conversion of the input data as well
+        # as enforcing business rules and defaults
+        ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end)
+
+        # Inserts the call into the clickhouse database, verifying that
+        # the call does not already exist
+        await self._async_insert_call(ch_call)
 
         if wf_env.wf_enable_online_eval() and publish:
             self.kafka_producer.produce_call_end(req.end)
@@ -2003,6 +2072,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
 
+    @property
+    async def async_ch_client(self) -> CHClient:
+        """Returns and creates (if necessary) the async clickhouse client"""
+        if not hasattr(self._thread_local, "async_ch_client"):
+            self._thread_local.async_ch_client = await self._mint_async_client()
+        return self._thread_local.async_ch_client
+
     def _mint_client(self) -> CHClient:
         client = clickhouse_connect.get_client(
             host=self._host,
@@ -2013,6 +2089,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         # Safely create the database if it does not exist
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
+        client.database = self._database
+        return client
+
+    async def _mint_async_client(self) -> CHClient:
+        client = await clickhouse_connect.get_async_client(
+            host=self._host,
+            port=self._port,
+            user=self._user,
+            password=self._password,
+            secure=self._port == 8443,
+        )
+        # Safely create the database if it does not exist
+        await client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
         client.database = self._database
         return client
 
@@ -2058,6 +2147,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # are caught, reverting to default behavior.
                 settings["wait_for_async_insert"] = 1
             self._insert(
+                "call_parts",
+                data=batch,
+                column_names=all_call_insert_columns,
+                settings=settings,
+            )
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._async_insert_call_batch"
+    )
+    async def _async_insert_call_batch(self, batch: list) -> None:
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._async_insert_call_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
+                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
+                # are caught, reverting to default behavior.
+                settings["wait_for_async_insert"] = 1
+            await self._async_insert(
                 "call_parts",
                 data=batch,
                 column_names=all_call_insert_columns,
@@ -2246,6 +2362,45 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             raise
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._async_insert")
+    async def _async_insert(
+        self,
+        table: str,
+        data: Sequence[Sequence[Any]],
+        column_names: list[str],
+        settings: Optional[dict[str, Any]] = None,
+    ) -> QuerySummary:
+        try:
+            client = await self.async_ch_client
+            return await client.insert(
+                table, data=data, column_names=column_names, settings=settings
+            )
+        except ValueError as e:
+            if "negative shift count" in str(e):
+                raise InsertTooLarge(
+                    "Database insertion failed. Record too large. "
+                    "A likely cause is that a single row or cell exceeded "
+                    "the limit. If logging images, save them as `Image.PIL`."
+                )
+            raise
+        except Exception as e:
+            # Do potentially expensive data length calculation, only on
+            # error, which should be very rare!
+            data_bytes = sum(_num_bytes(row) for row in data)
+            logger.exception(
+                "clickhouse_async_insert_error",
+                extra={
+                    "error_str": str(e),
+                    "table": table,
+                    "data_len": len(data),
+                    "data_bytes": data_bytes,
+                    "example_data": None if len(data) == 0 else data[0],
+                    "column_names": column_names,
+                    "settings": settings,
+                },
+            )
+            raise
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         parameters = ch_call.model_dump()
@@ -2256,6 +2411,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if self._flush_immediately:
             self._flush_calls()
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._async_insert_call")
+    async def _async_insert_call(self, ch_call: CallCHInsertable) -> None:
+        parameters = ch_call.model_dump()
+        row = []
+        for key in all_call_insert_columns:
+            row.append(parameters.get(key, None))
+        self._call_batch.append(row)
+        if self._flush_immediately:
+            await self._async_flush_calls()
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         try:
@@ -2264,6 +2429,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             logger.info("Retrying with large objects stripped.")
             batch = self._strip_large_values(self._call_batch)
             self._insert_call_batch(batch)
+
+        self._call_batch = []
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._async_flush_calls")
+    async def _async_flush_calls(self) -> None:
+        try:
+            await self._async_insert_call_batch(self._call_batch)
+        except InsertTooLarge:
+            logger.info("Retrying with large objects stripped.")
+            batch = self._strip_large_values(self._call_batch)
+            await self._async_insert_call_batch(batch)
 
         self._call_batch = []
 

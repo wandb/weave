@@ -16,6 +16,10 @@ class IdConverter:
         raise NotImplementedError()
 
     @abc.abstractmethod
+    async def async_ext_to_int_project_id(self, project_id: str) -> str:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
         raise NotImplementedError()
 
@@ -93,6 +97,18 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         for item in res:
             yield universal_int_to_ext_ref_converter(item, cached_int_to_ext_project_id)
 
+    async def _async_ref_apply(
+        self, method: Callable[[A], typing.Awaitable[B]], req: A
+    ) -> B:
+        req_conv = universal_ext_to_int_ref_converter(
+            req, self._idc.ext_to_int_project_id
+        )
+        res = await method(req_conv)
+        res_conv = universal_int_to_ext_ref_converter(
+            res, self._idc.int_to_ext_project_id
+        )
+        return res_conv
+
     # Standard API Below:
     def ensure_project_exists(
         self, entity: str, project: str
@@ -116,6 +132,28 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
         return self._ref_apply(self._internal_trace_server.call_end, req)
+
+    async def async_call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        """Async version of call_start with proper external-to-internal conversion."""
+        original_project_id = req.start.project_id
+        req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
+        if req.start.wb_run_id is not None:
+            req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
+        if req.start.wb_user_id is not None:
+            req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
+        return await self._async_ref_apply(
+            self._internal_trace_server.async_call_start, req
+        )
+
+    async def async_call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+        """Async version of call_end with proper external-to-internal conversion."""
+        original_project_id = req.end.project_id
+        req.end.project_id = await self._idc.async_ext_to_int_project_id(
+            req.end.project_id
+        )
+        return await self._async_ref_apply(
+            self._internal_trace_server.async_call_end, req
+        )
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         original_project_id = req.project_id
