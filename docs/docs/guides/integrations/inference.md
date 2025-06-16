@@ -3,17 +3,6 @@ import TabItem from '@theme/TabItem';
 
 # Weights & Biases (W&B) Inference Service
 
-   <!-- 
-   TODO list 
-   1. Completely describe all UI flow steps
-   2. Add a few well-chosen screenshots when UI stabilizes
-   3. (??) Add more complex code sample in Python that shows off some of the Weave features
-   4. (??) If a Google Colab will be available, link to it. We can also upload it to our Cookbooks section
-   5. Clean up and address any MD comments
-   6. Add callouts and banners around the docs to let users know they have free credits and direct them here
-   7. Confirm all outbound links to resources (API endpoint, marketing page, pricing page, etc.)
-   !-->
-
 _Weights & Biases (W&B) Inference_ provides access to leading open-source foundation models via the W&B Weave UI and an OpenAI-compliant API. With W&B Inference, you can:
 
 - Develop AI applications and agents without signing up for a hosting provider or self-hosting a model.
@@ -187,10 +176,23 @@ Use the API to query all currently available models and their IDs. This is usefu
     ```
   </TabItem>
   <TabItem value="python" label="Python">
-   <!-- 
-   TODO 
-   Add a Python example showing this functionality
-   !-->
+    ```python
+    import openai
+
+    client = openai.OpenAI(
+        base_url="https://api.inference.wandb.ai/v1",
+        api_key="<your-apikey>"
+    )
+
+    response = client.models.list(
+        extra_headers={
+            "OpenAI-Project": "hello-world-team/new-inference-project"
+        }
+    )
+
+    for model in response.data:
+        print(model.id)
+    ```
   </TabItem>
 </Tabs>
 
