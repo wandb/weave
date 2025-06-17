@@ -9,7 +9,7 @@ _Weights & Biases (W&B) Inference_ provides access to leading open-source founda
 - Try the supported models in the W&B Weave Playground.
 
 :::important
-W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise and deprecated Personal plans. Once credits are consumed:
+W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise. Once credits are consumed:
 
 - Free accounts must upgrade to a Pro plan to continue using Inference.
 - Pro plan users will be billed for Inference overages on a monthly basis, based on the model-specific pricing.
@@ -84,7 +84,7 @@ https://api.inference.wandb.ai/v1
 ```
 
 :::important
-To access this endpoint, you must have a W&B account with Inference service credits allocated, a valid W&B API key, and a W&B entity (also referred to as "team") and a project. In the code samples in this guide, entity (team) and project are referred to as `<your-team>\<your-project>`.
+To access this endpoint, you must have a W&B account with Inference service credits allocated, a valid W&B API key, and a W&B entity (also referred to as "team") and project. In the code samples in this guide, entity (team) and project are referred to as `<your-team>\<your-project>`.
 :::
 
 ### Available methods
