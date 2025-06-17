@@ -360,7 +360,6 @@ def _make_calls_iterator(
         return make_client_call(entity, project, call, server)
 
     def size_func() -> int:
-        print("SIZE FUNC", expand_columns)
         response = server.calls_query_stats(
             CallsQueryStatsReq(
                 project_id=project_id,
