@@ -132,6 +132,7 @@ const StyledSliderInput: React.FC<{
 export interface ScorerFormProps {
   scorer: ObjectVersionSchema;
   onValidationChange: (valid: boolean) => void;
+  monitorName?: string;
 }
 
 type ScorerFormType = React.ForwardRefExoticComponent<
@@ -652,6 +653,7 @@ export const MonitorFormDrawer = ({
                     ref={(el: ScorerFormRef) =>
                       (scorerFormRefs.current[index] = el)
                     }
+                    monitorName={monitorName}
                   />
                 ))}
               </Box>

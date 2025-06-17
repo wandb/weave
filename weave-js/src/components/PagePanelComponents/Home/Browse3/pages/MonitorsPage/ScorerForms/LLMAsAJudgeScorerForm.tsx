@@ -1,9 +1,7 @@
 import {Box, Typography} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
-import {TextField} from '@wandb/weave/components/Form/TextField';
 import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
-import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/datasets/datasetNameValidation';
 import {
   FieldName,
   typographyStyle,
@@ -34,13 +32,12 @@ import {useScorerCreate} from '../../wfReactInterface/tsDataModelHooks';
 import {ScorerFormProps, ScorerFormRef} from '../MonitorFormDrawer';
 
 export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
-  ({scorer, onValidationChange}, ref) => {
+  ({scorer, onValidationChange, monitorName}, ref) => {
     //const [isValid, setIsValid] = useState(false);
     const [scorerName, setScorerName] = useState<string | undefined>(
-      scorer.objectId
+      scorer.objectId || (monitorName ? `${monitorName}-scorer` : undefined)
     );
 
-    const [nameError, setNameError] = useState<string | null>(null);
 
     const [scoringPrompt, setScoringPrompt] = useState<string | undefined>(
       scorer.val['scoring_prompt']
@@ -116,6 +113,13 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [savedModels, entity, project, projectId, scorer.val]);
 
+    // Update scorer name automatically when monitor name changes
+    useEffect(() => {
+      if (monitorName) {
+        setScorerName(`${monitorName}-scorer`);
+      }
+    }, [monitorName]);
+
     const selectedJudgeModel = useMemo(() => {
       if (judgeModel) {
         if (judgeModel.ref) {
@@ -137,16 +141,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     }, [judgeModel]);
 
     const validateScorer = useCallback(() => {
-      if (!scorerName) {
-        setNameError('A scorer name is required.');
-        return false;
-      } else {
-        const validationResult = validateDatasetName(scorerName);
-        if (validationResult.error) {
-          setNameError(validationResult.error);
-          return false;
-        }
-      }
       if (!scoringPrompt) {
         setScoringPromptError('A scoring prompt is required.');
         return false;
@@ -155,7 +149,8 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         return false;
       }
       return true;
-    }, [scorerName, scoringPrompt, validateJudgeModel]);
+    }, [scoringPrompt, validateJudgeModel]);
+
 
     const createLLMStructuredCompletionModel = useCreateBuiltinObjectInstance(
       'LLMStructuredCompletionModel'
@@ -292,17 +287,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       saveScorer,
     }));
 
-    const onScorerNameChange = useCallback(
-      (value: string) => {
-        setScorerName(value);
-        const validationResult = validateDatasetName(value);
-        setNameError(validationResult.error);
-        onValidationChange(
-          !validationResult.error && validateJudgeModel() && !!scoringPrompt
-        );
-      },
-      [scoringPrompt, validateJudgeModel, onValidationChange]
-    );
 
     useMemo(() => {
       setJudgeModelName(judgeModel?.name || undefined);
@@ -357,14 +341,10 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
           setIsProviderModel(true);
         }
         setJudgeModel(newJudgeModel);
-        onValidationChange(!!scorerName && !!scoringPrompt);
       },
       [
-        scoringPrompt,
         savedModels,
-        scorerName,
         setJudgeModel,
-        onValidationChange,
       ]
     );
 
@@ -378,29 +358,6 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
         </Typography>
 
         <Box className="flex flex-col gap-16 px-20">
-          <Box>
-            <FieldName name="Scorer Name" />
-            <TextField value={scorerName} onChange={onScorerNameChange} />
-            {nameError && (
-              <Typography
-                className="mt-1 text-sm"
-                sx={{
-                  ...typographyStyle,
-                  color: 'error.main',
-                }}>
-                {nameError}
-              </Typography>
-            )}
-            <Typography
-              className="mt-4 text-sm font-normal"
-              sx={{
-                ...typographyStyle,
-                color: 'text.secondary',
-              }}>
-              Valid names must start with a letter or number and can only
-              contain letters, numbers, hyphens, and underscores.
-            </Typography>
-          </Box>
 
           <div className="flex flex-col gap-8">
             <Box>
@@ -495,9 +452,6 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
               placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
               onChange={e => {
                 setScoringPrompt(e.target.value);
-                onValidationChange(
-                  !!e.target.value && !!scorerName && validateJudgeModel()
-                );
               }}
             />
             {scoringPromptError && (
