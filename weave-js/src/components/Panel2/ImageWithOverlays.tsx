@@ -2,6 +2,7 @@ import {LineStyle, Style} from '@wandb/weave/common/components/MediaCard';
 import {BoundingBox2D, LayoutType} from '@wandb/weave/common/types/media';
 import {colorFromString} from '@wandb/weave/common/util/colors';
 import {boxColor} from '@wandb/weave/common/util/media';
+import * as Tooltip from '@wandb/weave/components/RadixTooltip';
 import {
   constString,
   File,
@@ -18,7 +19,7 @@ import {compare} from '../../compare';
 import * as Controls from './controlsImage';
 import {ClassSetControls, ClassSetState, ClassState} from './controlsImage';
 import {useSignedUrlWithExpiration} from './useAssetFromArtifact';
-import Color from 'color';
+import * as RadixTooltip from '@radix-ui/react-tooltip';
 
 // Copied from media.tsx, for some reason importing media.tsx
 // doesn't work with storybook, at least at the moment I'm doing
@@ -393,6 +394,7 @@ const SegmentationMaskFromCG: FC<SegmentationMaskFromCGProps> = props => {
 
 export interface BoundingBoxCanvasProps {
   mediaSize: {width: number; height: number};
+  cardSize?: {width: number; height: number};
   boxData: BoundingBox2D[];
   bboxControls: Controls.BoxControlState;
   sliders?: Controls.BoxSliderState;
@@ -441,6 +443,7 @@ const isBoundingBoxHidden = (
 
 export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
   mediaSize,
+  cardSize,
   boxData,
   bboxControls,
   classStates,
@@ -450,7 +453,7 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
   const {lineStyle, classOverlayStates} = bboxControls;
 
   useEffect(() => {
-    if (canvasRef.current == null) {
+    if (canvasRef.current == null || cardSize != null) {
       return;
     }
 
@@ -485,7 +488,98 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
     sliderControls,
   ]);
 
-  return <OverlayCanvas {...mediaSize} ref={canvasRef} />;
+  const collisionBoundary = useRef<HTMLDivElement>(null);
+
+  return (
+    <div className="relative" ref={collisionBoundary}>
+      {cardSize &&
+        boxData.map(box => {
+          const isHidden = isBoundingBoxHidden(
+            box,
+            bboxControls,
+            sliderControls
+          );
+          if (isHidden) {
+            return null;
+          }
+
+          const {class_id: classId} = box;
+          const name = classStates?.[classId]?.name ?? `ID: ${box.class_id}`;
+
+          let color = boxColor(classId);
+          if (classStates?.[classId]?.color) {
+            color = classStates?.[classId]?.color;
+          }
+          const position = box.position;
+          const widthMultiplier =
+            box.domain === 'pixel'
+              ? cardSize.width / mediaSize.width
+              : cardSize.width;
+          const heightMultiplier =
+            box.domain === 'pixel'
+              ? cardSize.height / mediaSize.height
+              : cardSize.height;
+
+          let left, top, width, height;
+          if ('minX' in position) {
+            left = position.minX * widthMultiplier;
+            top = position.minY * heightMultiplier;
+            width = (position.maxX - position.minX) * widthMultiplier;
+            height = (position.maxY - position.minY) * heightMultiplier;
+          } else {
+            left = (position.middle[0] - position.width / 2) * widthMultiplier;
+            top = (position.middle[1] - position.height / 2) * heightMultiplier;
+            width = position.width * widthMultiplier;
+            height = position.height * heightMultiplier;
+          }
+
+          return (
+            <div
+              key={classId}
+              className="absolute"
+              style={{
+                left,
+                top: top,
+              }}>
+              <div className="relative">
+                <Tooltip.Provider delayDuration={0}>
+                  <RadixTooltip.Root>
+                    <Tooltip.Trigger>
+                      <div
+                        style={{
+                          outline: 3,
+                          outlineColor: color,
+                          outlineStyle:
+                            lineStyle === 'line'
+                              ? 'solid'
+                              : lineStyle ?? 'solid',
+                          width,
+                          height,
+                        }}
+                      />
+                    </Tooltip.Trigger>
+                    <Tooltip.Content
+                      hideWhenDetached={true}
+                      style={{backgroundColor: color}}
+                      avoidCollisions
+                      side="top"
+                      align="start"
+                      collisionBoundary={collisionBoundary.current}>
+                      <div
+                        style={{backgroundColor: color}}
+                        className="text-white">
+                        {name}
+                      </div>
+                    </Tooltip.Content>
+                  </RadixTooltip.Root>
+                </Tooltip.Provider>
+              </div>
+            </div>
+          );
+        })}
+      <OverlayCanvas {...mediaSize} ref={canvasRef} />
+    </div>
+  );
 };
 
 export interface BoundingBoxesProps {
