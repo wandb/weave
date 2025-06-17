@@ -9,9 +9,9 @@ _Weights & Biases (W&B) Inference_ provides access to leading open-source founda
 - Try the supported models in the W&B Weave Playground.
 
 :::important
-W&B Inference credits are included with most Free, Pro, and Academic plans. Availability may vary for Enterprise and deprecated Personal plans. Once credits are consumed:
+W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise and deprecated Personal plans. Once credits are consumed:
 
-- Free plan users must upgrade to a Pro plan to continue using Inference.
+- Free accounts must upgrade to a Pro plan to continue using Inference.
 - Pro plan users will be billed for Inference overages on a monthly basis, based on the model-specific pricing.
 
 To learn more, see the [pricing page](https://wandb.ai/site/pricing/) and [W&B Inference model costs](https://wandb.ai/site/pricing/inference).
@@ -84,7 +84,7 @@ https://api.inference.wandb.ai/v1
 ```
 
 :::important
-To access this endpoint, you must have a valid W&B account with Inference service credits allocated, and a valid W&B API key.
+To access this endpoint, you must have a W&B account with Inference service credits allocated, a valid W&B API key, and a W&B entity (also referred to as "team" and project).
 :::
 
 ### Available methods
@@ -102,7 +102,7 @@ To create a chat completion, you will need:
 
 - The Inference service base URL `https://api.inference.wandb.ai/v1`
 - Your W&B API key `<your-api-key>`
-- Your W&B entity and project names `<team>/<project>`
+- Your W&B entity and project names `<your-team>/<your-project>`
 - The ID for the model you want to use, one of:
   - `meta-llama/Llama-3.1-8B-Instruct`
   - `deepseek-ai/DeepSeek-V3-0324`
@@ -117,7 +117,7 @@ To create a chat completion, you will need:
     curl https://api.inference.wandb.ai/v1/chat/completions \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer <your-api-key>" \
-      -H "OpenAI-Project: <your-entity>/<your-project>" \
+      -H "OpenAI-Project: <your-team>/<your-project>" \
       -d '{
         "model": "<model-id>",
         "messages": [
@@ -140,7 +140,7 @@ To create a chat completion, you will need:
         api_key="<your-api-key>",
 
         # Team and project are required for usage tracking
-        project="<team>/<project>",
+        project="<your-team>/<your-project>",
     )
 
     # Replace <model-id> with any of the following values:
@@ -174,7 +174,7 @@ Use the API to query all currently available models and their IDs. This is usefu
     curl https://api.inference.wandb.ai/v1/models \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer <your-api-key>" \
-      -H "OpenAI-Project: <your-entity>/<your-project>" \
+      -H "OpenAI-Project: <your-team>/<your-project>" \
     ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -184,7 +184,7 @@ Use the API to query all currently available models and their IDs. This is usefu
     client = openai.OpenAI(
         base_url="https://api.inference.wandb.ai/v1",
         api_key="<your-api-key>",
-        project="<your-entity>/<your-project>"
+        project="<your-team>/<your-project>"
     )
 
     response = client.models.list()
@@ -213,7 +213,7 @@ Learn more about [tracing in Weave](../tracking/tracing.mdx).
 In this example:
 
 - You define a `@weave.op()`-decorated function, `run_chat`, which makes a chat completion request using the OpenAI-compatible client.
-- Your traces are recorded and associated with your W&B entity and project `project="<your-entity>/<your-project>`
+- Your traces are recorded and associated with your W&B entity and project `project="<your-team>/<your-project>`
 - The function is automatically traced by Weave, so its inputs, outputs, latency, and metadata (like model ID) are logged.
 - The result is printed in the terminal, and the trace appears in your **Traces** tab at [https://wandb.ai](https://wandb.ai) under the specified project.
 
@@ -253,7 +253,8 @@ output = run_chat()
 print(output)
 ```
 
-Once you run the code sample:
+Once you run the code sample, you can view the trace in Weave by clicking the link printed in the terminal (e.g. `https://wandb.ai/<your-team>/<your-project>/r/call/01977f8f-839d-7dda-b0c2-27292ef0e04g`), or:
+
 1. Navigate to [https://wandb.ai](https://wandb.ai).
 2. Select the **Traces** tab to view your Weave traces.
 
@@ -357,8 +358,13 @@ The following section describes how to use the Inference service from the W&B UI
 
 You can access the Inference service via the Weave UI from two different locations:
 
+- [Direct link](#direct-link)
 - [From the Inference tab](#from-the-inference-tab)
 - [From the Playground tab](#from-the-playground-tab)
+
+#### Direct link
+
+Navigate to [https://wandb.ai/inference](https://wandb.ai/inference).
 
 #### From the Inference tab
 
@@ -419,7 +425,7 @@ Now, you can compare models in the Playground, and use any of the features descr
 
 ### View billing and usage information
 
-You can track your current Inference credit balance, usage history, and projected billing (if applicable) directly from the W&B UI:
+Organization admins can track current Inference credit balance, usage history, and upcoming billing (if applicable) directly from the W&B UI:
 
 1. In the W&B UI, navigate to the W&B **Billing** page.
 2. In the bottom righthand corner, the Inference billing information card is displayed. From here, you can:
