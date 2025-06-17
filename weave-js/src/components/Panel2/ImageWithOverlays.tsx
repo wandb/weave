@@ -10,6 +10,7 @@ import {
   opAssetFile,
   VoidNode,
 } from '@wandb/weave/core';
+import Color from 'color';
 import * as _ from 'lodash';
 import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import styled from 'styled-components';
@@ -18,7 +19,6 @@ import {compare} from '../../compare';
 import * as Controls from './controlsImage';
 import {ClassSetControls, ClassSetState, ClassState} from './controlsImage';
 import {useSignedUrlWithExpiration} from './useAssetFromArtifact';
-import Color from 'color';
 
 // Copied from media.tsx, for some reason importing media.tsx
 // doesn't work with storybook, at least at the moment I'm doing
