@@ -89,6 +89,7 @@ export const EvaluationExplorerPageInner: React.FC<
 > = ({entity, project}) => {
   const [selectedDatasetId, setSelectedDatasetId] = React.useState<string>('dataset-1');
   const [isDatasetEdited, setIsDatasetEdited] = React.useState(false);
+  const [selectedModelIds, setSelectedModelIds] = React.useState<string[]>([]);
   const [originalRows, setOriginalRows] = React.useState<GridRowsProp>([
     {
       id: "1",
@@ -285,6 +286,12 @@ export const EvaluationExplorerPageInner: React.FC<
     }
   };
 
+  const handleModelsChange = (modelIds: string[]) => {
+    setSelectedModelIds(modelIds);
+    // TODO: Update output columns based on selected models
+    console.log('Selected models:', modelIds);
+  };
+
   // Generate columns dynamically
   const columns: GridColDef[] = React.useMemo(() => {
     const cols: GridColDef[] = [];
@@ -408,6 +415,8 @@ export const EvaluationExplorerPageInner: React.FC<
         selectedDatasetId={selectedDatasetId}
         isDatasetEdited={isDatasetEdited}
         onDatasetChange={handleDatasetChange}
+        selectedModelIds={selectedModelIds}
+        onModelsChange={handleModelsChange}
       />
       <Column>
         <StyledDataGrid 
