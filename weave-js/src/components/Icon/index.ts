@@ -48,6 +48,7 @@ export {
   IconContextWindow,
   IconContractLeft,
   IconCopy,
+  IconCourthouseLicense,
   IconCreditCardPayment,
   IconCropBeginning,
   IconCropEnd,

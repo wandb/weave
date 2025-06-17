@@ -38,7 +38,7 @@ class OpenAIStream:
         if self.first_chunk is None:
             self.first_chunk = chunk
         for chunk_choice in chunk.choices:
-            for i in range(chunk_choice.index + 1 - len(self.output_choices)):
+            for _i in range(chunk_choice.index + 1 - len(self.output_choices)):
                 self.output_choices.append(
                     {
                         "index": len(self.output_choices),
@@ -75,7 +75,7 @@ class OpenAIStream:
                 if choice["message"]["tool_calls"] is None:
                     choice["message"]["tool_calls"] = []
                 for tool_call_delta in chunk_choice.delta.tool_calls:
-                    for i in range(
+                    for _i in range(
                         tool_call_delta.index + 1 - len(choice["message"]["tool_calls"])  # type: ignore
                     ):
                         choice["message"]["tool_calls"].append(  # type: ignore

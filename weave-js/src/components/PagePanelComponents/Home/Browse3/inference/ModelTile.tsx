@@ -159,7 +159,7 @@ export const ModelTile = ({
       <div className="text-sm text-moon-650">{model.descriptionShort}</div>
       {onClickPlayground && (
         <div
-          className={`flex gap-8 py-6 transition-opacity duration-200 ${
+          className={`inline-flex gap-8 py-6 pr-6 transition-opacity duration-200 ${
             isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
           onClick={onClickButtonRow}>
@@ -175,13 +175,15 @@ export const ModelTile = ({
               Learn more
             </Button>
           </Link>
-          <Button
-            size="small"
-            icon="copy"
-            variant="ghost"
-            onClick={onClickCopy}
-            tooltip="Copy ID for API use to clipboard"
-          />
+          {model.idPlayground && (
+            <Button
+              size="small"
+              icon="copy"
+              variant="ghost"
+              onClick={onClickCopy}
+              tooltip="Copy ID for API use to clipboard"
+            />
+          )}
         </div>
       )}
       {hint && (

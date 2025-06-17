@@ -2063,7 +2063,7 @@ def test_calls_query_filter_by_strings(client):
     test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
     test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
 
-    for i in range(5):
+    for _i in range(5):
         dummy_op()
 
     # Flush to ensure all calls are persisted
