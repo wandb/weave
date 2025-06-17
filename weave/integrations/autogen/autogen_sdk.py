@@ -511,7 +511,7 @@ def _preload_autogen_extensions() -> None:
 
         import autogen_ext
 
-        for finder, name, ispkg in pkgutil.walk_packages(
+        for _, name, _ in pkgutil.walk_packages(
             autogen_ext.__path__, autogen_ext.__name__ + "."
         ):
             try:
