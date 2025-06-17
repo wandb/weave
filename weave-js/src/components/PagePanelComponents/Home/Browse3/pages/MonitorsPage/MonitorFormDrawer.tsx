@@ -237,7 +237,7 @@ export const MonitorFormDrawer = ({
     existingScorers?.map(s => true) || [false]
   );
 
-  const [active, setActive] = useState<boolean>(false);
+  const [active, setActive] = useState<boolean>(true);
 
   useEffect(() => {
     if (!monitor) {
@@ -510,6 +510,7 @@ export const MonitorFormDrawer = ({
                       onChange={e => setDescription(e.target.value)}
                     />
                   </Box>
+                  {/* Active monitor control hidden - monitors are enabled by default
                   <Box>
                     <Box className="flex items-center gap-8">
                       <Switch.Root
@@ -521,6 +522,7 @@ export const MonitorFormDrawer = ({
                       <span className="font-semibold">Active monitor</span>
                     </Box>
                   </Box>
+                  */}
                 </Box>
 
                 <Box className="flex flex-col gap-8 pt-16">
