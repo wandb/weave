@@ -1,12 +1,13 @@
 import {Box, Typography} from '@mui/material';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
-import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/datasets/datasetNameValidation';
 import {
   FieldName,
   typographyStyle,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/FormComponents';
+import {transformToValidName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/nameTransformUtils';
 import {
   useCreateBuiltinObjectInstance,
   useLeafObjectInstances,
@@ -39,7 +40,8 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       scorer.objectId
     );
 
-    const [nameError, setNameError] = useState<string | null>(null);
+    const [nameTransformMessage, setNameTransformMessage] = useState<React.ReactNode | null>(null);
+    const [transformedScorerName, setTransformedScorerName] = useState<string>('');
 
     const [scoringPrompt, setScoringPrompt] = useState<string | undefined>(
       scorer.val['scoring_prompt']
@@ -56,6 +58,8 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const [judgeModelError, setJudgeModelError] = useState<string | null>(null);
 
     const [judgeModelName, setJudgeModelName] = useState<string | undefined>();
+    const [transformedJudgeModelName, setTransformedJudgeModelName] = useState<string>('');
+    const [judgeModelNameTransformMessage, setJudgeModelNameTransformMessage] = useState<string | null>(null);
 
     const [systemPrompt, setSystemPrompt] = useState<string | undefined>();
 
@@ -147,15 +151,8 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     }, [judgeModel, judgeModelName, responseFormat]);
 
     const validateScorer = useCallback(() => {
-      if (!scorerName) {
-        setNameError('A scorer name is required.');
+      if (!transformedScorerName) {
         return false;
-      } else {
-        const validationResult = validateDatasetName(scorerName);
-        if (validationResult.error) {
-          setNameError(validationResult.error);
-          return false;
-        }
       }
       if (!scoringPrompt) {
         setScoringPromptError('A scoring prompt is required.');
@@ -165,7 +162,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         return false;
       }
       return true;
-    }, [scorerName, scoringPrompt, validateJudgeModel]);
+    }, [transformedScorerName, scoringPrompt, validateJudgeModel]);
 
     const createLLMStructuredCompletionModel = useCreateBuiltinObjectInstance(
       'LLMStructuredCompletionModel'
@@ -178,7 +175,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
 
       const model: LlmStructuredCompletionModel = {
         llm_model_id: judgeModel.llm_model_id,
-        name: judgeModelName,
+        name: transformedJudgeModelName,
         default_params: {
           ...judgeModel.default_params,
           messages_template: systemPrompt
@@ -205,7 +202,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     }, [
       projectId,
       judgeModel,
-      judgeModelName,
+      transformedJudgeModelName,
       systemPrompt,
       responseFormat,
       createLLMStructuredCompletionModel,
@@ -214,12 +211,12 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const scorerCreate = useScorerCreate();
 
     const saveScorer = useCallback(async (): Promise<string | undefined> => {
-      if (!validateScorer() || !judgeModel || !scorerName) {
+      if (!validateScorer() || !judgeModel || !transformedScorerName) {
         return undefined;
       }
 
       const modelHasChanged =
-        judgeModelName !== judgeModel.name ||
+        transformedJudgeModelName !== judgeModel.name ||
         systemPrompt !== getSystemPrompt(judgeModel.default_params || {}) ||
         responseFormat !== judgeModel.default_params?.response_format;
 
@@ -238,7 +235,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       const scorerHasChanged =
         scoringPrompt !== scorer.val['scoring_prompt'] ||
         judgeModelRef !== scorer.val['model'] ||
-        scorerName !== scorer.objectId;
+        transformedScorerName !== scorer.objectId;
 
       let scorerDigest: string;
       if (!scorerHasChanged) {
@@ -248,24 +245,24 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           _type: 'LLMAsAJudgeScorer',
           _class_name: 'LLMAsAJudgeScorer',
           _bases: ['Scorer', 'Object', 'BaseModel'],
-          name: scorerName,
+          name: transformedScorerName,
           model: judgeModelRef,
           scoring_prompt: scoringPrompt,
         };
         const response = await scorerCreate({
           entity,
           project,
-          name: scorerName,
+          name: transformedScorerName,
           val,
         });
         scorerDigest = response.versionHash;
       }
 
-      return `weave:///${projectId}/object/${scorerName}:${scorerDigest}`;
+      return `weave:///${projectId}/object/${transformedScorerName}:${scorerDigest}`;
     }, [
       validateScorer,
       scorer,
-      scorerName,
+      transformedScorerName,
       scoringPrompt,
       judgeModel,
       scorerCreate,
@@ -273,7 +270,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       entity,
       project,
       saveModel,
-      judgeModelName,
+      transformedJudgeModelName,
       systemPrompt,
       responseFormat,
     ]);
@@ -285,10 +282,11 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const onScorerNameChange = useCallback(
       (value: string) => {
         setScorerName(value);
-        const validationResult = validateDatasetName(value);
-        setNameError(validationResult.error);
+        const transformResult = transformToValidName(value);
+        setTransformedScorerName(transformResult.transformedName);
+        setNameTransformMessage(transformResult.message);
         onValidationChange(
-          !validationResult.error && validateJudgeModel() && !!scoringPrompt
+          !!transformResult.transformedName && validateJudgeModel() && !!scoringPrompt
         );
       },
       [scoringPrompt, validateJudgeModel, onValidationChange]
@@ -317,7 +315,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         } else {
           newJudgeModel = {
             llm_model_id: newValue,
-            name: judgeModelName || `${scorerName}-judge-model`,
+            name: judgeModelName || `${transformedScorerName}-judge-model`,
             default_params: {
               max_tokens: maxTokens,
             },
@@ -326,13 +324,13 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           };
         }
         setJudgeModel(newJudgeModel);
-        onValidationChange(!!scorerName && !!scoringPrompt);
+        onValidationChange(!!transformedScorerName && !!scoringPrompt);
       },
       [
         judgeModelName,
         scoringPrompt,
         savedModels,
-        scorerName,
+        transformedScorerName,
         setJudgeModel,
         onValidationChange,
       ]
@@ -341,21 +339,22 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const onJudgeModelNameChange = useCallback(
       value => {
         setJudgeModelName(value);
-        const validationResult = validateDatasetName(value);
-        setJudgeModelError(validationResult.error);
+        const transformResult = transformToValidName(value);
+        setTransformedJudgeModelName(transformResult.transformedName);
+        setJudgeModelNameTransformMessage(transformResult.message);
+        setJudgeModelError(null);
         onValidationChange(
-          !validationResult.error &&
-            !!value &&
+          !!transformResult.transformedName &&
             !!systemPrompt &&
             !!responseFormat &&
-            !!scorerName &&
+            !!transformedScorerName &&
             !!scoringPrompt
         );
       },
       [
         systemPrompt,
         responseFormat,
-        scorerName,
+        transformedScorerName,
         scoringPrompt,
         setJudgeModelName,
         setJudgeModelError,
@@ -369,14 +368,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         onValidationChange(
           !!value &&
             !!judgeModelName &&
-            !!scorerName &&
+            !!transformedScorerName &&
             !!scoringPrompt &&
             !!responseFormat
         );
       },
       [
         judgeModelName,
-        scorerName,
+        transformedScorerName,
         scoringPrompt,
         responseFormat,
         onValidationChange,
@@ -384,25 +383,26 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     );
 
     return (
-      <Box className="flex flex-col gap-8 pt-16">
-        <Typography
-          sx={typographyStyle}
-          className="border-t border-moon-250 px-20 pb-8 pt-16 font-semibold uppercase tracking-wide text-moon-500">
-          LLM-as-a-Judge configuration
-        </Typography>
+      <Tailwind>
+        <Box className="flex flex-col gap-8 pt-16">
+          <Typography
+            sx={typographyStyle}
+            className="border-t border-moon-250 px-20 pb-8 pt-16 font-semibold uppercase tracking-wide text-moon-500">
+            LLM-as-a-Judge configuration
+          </Typography>
 
-        <Box className="flex flex-col gap-16 px-20">
+          <Box className="flex flex-col gap-16 px-20">
           <Box>
             <FieldName name="Scorer Name" />
             <TextField value={scorerName} onChange={onScorerNameChange} />
-            {nameError && (
+            {nameTransformMessage && (
               <Typography
-                className="mt-1 text-sm"
+                className="mt-4 text-sm"
                 sx={{
                   ...typographyStyle,
-                  color: 'error.main',
+                  color: 'text.secondary',
                 }}>
-                {nameError}
+                {nameTransformMessage}
               </Typography>
             )}
             <Typography
@@ -427,10 +427,10 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             />
             {judgeModelError && (
               <Typography
-                className="mt-1 text-sm"
+                className="mt-4 text-sm"
                 sx={{
                   ...typographyStyle,
-                  color: 'error.main',
+                  color: 'info.warning',
                 }}
               />
             )}
@@ -449,6 +449,16 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                   value={judgeModelName}
                   onChange={onJudgeModelNameChange}
                 />
+                {judgeModelNameTransformMessage && (
+                  <Typography
+                    className="mt-4 text-sm"
+                    sx={{
+                      ...typographyStyle,
+                      color: 'text.secondary',
+                    }}>
+                    {judgeModelNameTransformMessage}
+                  </Typography>
+                )}
               </Box>
               <Box>
                 <FieldName name="Judge Model System Prompt" />
@@ -477,7 +487,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               onChange={e => {
                 setScoringPrompt(e.target.value);
                 onValidationChange(
-                  !!e.target.value && !!scorerName && validateJudgeModel()
+                  !!e.target.value && !!transformedScorerName && validateJudgeModel()
                 );
               }}
             />
@@ -509,8 +519,9 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               for more details.
             </Typography>
           </Box>
+          </Box>
         </Box>
-      </Box>
+      </Tailwind>
     );
   }
 );

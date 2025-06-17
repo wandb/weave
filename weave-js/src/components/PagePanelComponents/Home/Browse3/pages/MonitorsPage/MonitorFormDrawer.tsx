@@ -6,7 +6,6 @@ import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
-import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/datasets/datasetNameValidation';
 import {FilterPanel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/FilterPanel';
 import {prepareFlattenedCallDataForTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTable';
 import {useCallsTableColumns} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableColumns';
@@ -24,6 +23,7 @@ import {
   FieldName,
   typographyStyle,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/FormComponents';
+import {transformToValidName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/nameTransformUtils';
 import {LLMAsAJudgeScorerForm} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
 import {queryToGridFilterModel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/SavedViews/savedViewUtil';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
@@ -112,9 +112,10 @@ export const MonitorFormDrawer = ({
 }: MonitorFormDrawerProps) => {
   const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
-  const [nameError, setNameError] = useState<string | null>(null);
+  const [nameTransformMessage, setNameTransformMessage] = useState<React.ReactNode | null>(null);
   const [description, setDescription] = useState<string>('');
   const [monitorName, setMonitorName] = useState<string>('');
+  const [transformedMonitorName, setTransformedMonitorName] = useState<string>('');
   const [samplingRate, setSamplingRate] = useState<number>(10);
   const [selectedOpVersionOption, setSelectedOpVersionOption] = useState<
     string[]
@@ -206,10 +207,11 @@ export const MonitorFormDrawer = ({
   const handleNameChange = useCallback(
     (value: string) => {
       setMonitorName(value);
-      const validationResult = validateDatasetName(value);
-      setNameError(validationResult.error);
+      const transformResult = transformToValidName(value);
+      setTransformedMonitorName(transformResult.transformedName);
+      setNameTransformMessage(transformResult.message);
     },
-    [setNameError]
+    []
   );
 
   const opVersionOptions = useOpVersionOptions(entity, project, {});
@@ -230,17 +232,15 @@ export const MonitorFormDrawer = ({
 
   const enableCreateButton = useMemo(() => {
     return (
-      monitorName.length > 0 &&
+      transformedMonitorName.length > 0 &&
       selectedOpVersionOption.length > 0 &&
       scorers.length > 0 &&
-      nameError === null &&
       allScorersValid
     );
   }, [
-    monitorName,
+    transformedMonitorName,
     selectedOpVersionOption,
     scorers,
-    nameError,
     allScorersValid,
   ]);
 
@@ -289,7 +289,7 @@ export const MonitorFormDrawer = ({
 
       const monitorObj = {
         _type: 'Monitor',
-        name: monitorName,
+        name: transformedMonitorName,
         description,
         ref: null,
         _class_name: 'Monitor',
@@ -303,7 +303,7 @@ export const MonitorFormDrawer = ({
 
       await objCreate({
         projectId: `${entity}/${project}`,
-        objectId: monitorName,
+        objectId: transformedMonitorName,
         val: monitorObj,
         baseObjectClass: 'Monitor',
       });
@@ -311,7 +311,7 @@ export const MonitorFormDrawer = ({
       setIsCreating(false);
 
       toast.success(
-        `Monitor ${monitorName} ${monitor ? 'updated' : 'created'}`,
+        `Monitor ${transformedMonitorName} ${monitor ? 'updated' : 'created'}`,
         {
           autoClose: 2500,
         }
@@ -321,7 +321,7 @@ export const MonitorFormDrawer = ({
       setError('Failed to create monitor');
     }
   }, [
-    monitorName,
+    transformedMonitorName,
     description,
     selectedOpVersionOption,
     filterModel,
@@ -390,17 +390,16 @@ export const MonitorFormDrawer = ({
                     <TextField
                       value={monitorName}
                       placeholder="Enter a name for your monitor"
-                      errorState={nameError !== null}
                       onChange={handleNameChange}
                     />
-                    {nameError && (
+                    {nameTransformMessage && (
                       <Typography
-                        className="mt-1 text-sm"
+                        className="mt-4 text-sm"
                         sx={{
                           ...typographyStyle,
-                          color: 'error.main',
+                          color: 'text.secondary',
                         }}>
-                        {nameError}
+                        {nameTransformMessage}
                       </Typography>
                     )}
                     <Typography
@@ -469,7 +468,7 @@ export const MonitorFormDrawer = ({
                         />
                       ) : (
                         <Typography
-                          className="mt-1 text-sm font-normal"
+                          className="mt-4 text-sm font-normal"
                           sx={{
                             ...typographyStyle,
                             color: 'text.secondary',
