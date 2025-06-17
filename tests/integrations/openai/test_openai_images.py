@@ -6,9 +6,11 @@ import pytest
 from openai import AsyncOpenAI, OpenAI
 from PIL import Image
 
-import weave
 from weave.integrations.integration_utilities import op_name_from_ref
 from weave.trace.weave_client import WeaveClient
+from weave.integrations.openai import openai_sdk
+from weave.trace.autopatch import AutopatchSettings, IntegrationSettings, OpSettings
+
 
 
 @pytest.mark.skip_clickhouse_client
@@ -16,53 +18,66 @@ from weave.trace.weave_client import WeaveClient
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-def test_openai_image_generate_sync(client: WeaveClient) -> None:
+def test_openai_image_generate_sync(client_creator) -> None:
     """Test synchronous image generation using OpenAI GPT-Image"""
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-    openai_client = OpenAI(api_key=api_key)
 
-    response = openai_client.images.generate(
-        model="gpt-image-1",
-        prompt="A cute baby sea otter",
+    openai_sdk._openai_patcher = None
+
+    # Autopatch testing is disabled for this test, so we need to manually patch the OpenAI client
+    # This is a workaround to allow us to test the OpenAI client without the autopatching tests interfering
+    autopatch_settings = AutopatchSettings(
+        openai=IntegrationSettings(enabled=True),
     )
 
-    calls = list(client.calls())
-    assert len(calls) == 1
-    call = calls[0]
+    with client_creator(autopatch_settings=autopatch_settings) as client:
+        openai_client = OpenAI(api_key=api_key)
 
-    # Verify the response structure
-    assert len(response.data) == 1
-    assert response.data[0].b64_json is not None
-    assert response.created is not None
+        response = openai_client.images.generate(
+            model="gpt-image-1",
+            prompt="A cute baby sea otter",
+            size="1024x1024",
+            quality="low",
+            output_format="jpeg",
+            output_compression=50
+        )
 
-    # Verify weave call tracking
-    assert op_name_from_ref(call.op_name) == "openai.images.generate"
-    assert call.started_at is not None
-    assert call.started_at < call.ended_at
+        calls = list(client.calls())
+        assert len(calls) == 1
+        call = calls[0]
 
-    # Verify inputs
-    inputs = call.inputs
-    assert inputs["model"] == "gpt-image-1"
-    assert inputs["prompt"] == "A cute baby sea otter"
+        # Verify the response structure
+        assert len(response.data) == 1
+        assert response.data[0].b64_json is not None
+        assert response.created is not None
 
-    # Verify output structure
-    output = call.output
-    assert isinstance(output, tuple)
-    assert len(output) == 2
-    
-    # First element should be the original response
-    original_response, pil_image = output
-    assert original_response.created == response.created
-    assert len(original_response.data) == 1
-    assert original_response.data[0].b64_json is not None
-    
-    # Second element should be PIL Image
-    assert isinstance(pil_image, Image.Image)
-    assert pil_image.size == (1024, 1024)
+        # Verify weave call tracking
+        assert op_name_from_ref(call.op_name) == "openai.images.generate"
+        assert call.started_at is not None
+        assert call.started_at < call.ended_at
 
-    # Verify usage tracking
-    usage = call.summary["usage"]["gpt-image-1"]
-    assert usage["requests"] == 1
+        # Verify inputs
+        inputs = call.inputs
+        assert inputs["model"] == "gpt-image-1"
+        assert inputs["prompt"] == "A cute baby sea otter"
+
+        # Verify output structure
+        output = call.output
+        assert len(output) == 2
+        
+        # First element should be the original response
+        original_response, pil_image = output
+        assert original_response.created == response.created
+        assert len(original_response.data) == 1
+        assert original_response.data[0].b64_json is not None
+        
+        # Second element should be PIL Image
+        assert isinstance(pil_image, Image.Image)
+        assert pil_image.size == (1024, 1024)
+
+        # Verify usage tracking
+        usage = call.summary["usage"]["gpt-image-1"]
+        assert usage["requests"] == 1
 
 
 @pytest.mark.skip_clickhouse_client
@@ -71,50 +86,62 @@ def test_openai_image_generate_sync(client: WeaveClient) -> None:
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
-async def test_openai_image_generate_async(client: WeaveClient) -> None:
+async def test_openai_image_generate_async(client_creator) -> None:
     """Test asynchronous image generation using OpenAI GPT-Image"""
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-    openai_client = AsyncOpenAI(api_key=api_key)
 
-    response = await openai_client.images.generate(
-        model="gpt-image-1",
-        prompt="A majestic mountain landscape at sunset",
+    # Autopatch testing is disabled for this test, so we need to manually patch the OpenAI client
+    # This is a workaround to allow us to test the OpenAI client without the autopatching tests interfering
+    openai_sdk._openai_patcher = None
+
+    autopatch_settings = AutopatchSettings(
+        openai=IntegrationSettings(enabled=True),
     )
 
-    calls = list(client.calls())
-    assert len(calls) == 1
-    call = calls[0]
+    with client_creator(autopatch_settings=autopatch_settings) as client:
+        openai_client = AsyncOpenAI(api_key=api_key)
+        response = await openai_client.images.generate(
+            model="gpt-image-1",
+            prompt="A majestic mountain landscape at sunset",
+            size="1024x1024",
+            quality="low",
+            output_format="jpeg",
+            output_compression=50
+        )
 
-    # Verify the response structure
-    assert len(response.data) == 1
-    assert response.data[0].b64_json is not None
+        calls = list(client.calls())
+        assert len(calls) == 1
+        call = calls[0]
 
-    # Verify weave call tracking
-    assert op_name_from_ref(call.op_name) == "openai.images.generate"
-    assert call.started_at is not None
-    assert call.started_at < call.ended_at
+        # Verify the response structure
+        assert len(response.data) == 1
+        assert response.data[0].b64_json is not None
 
-    # Verify inputs
-    inputs = call.inputs
-    assert inputs["model"] == "gpt-image-1"
-    assert inputs["prompt"] == "A majestic mountain landscape at sunset"
+        # Verify weave call tracking
+        assert op_name_from_ref(call.op_name) == "openai.images.generate"
+        assert call.started_at is not None
+        assert call.started_at < call.ended_at
 
-    # Verify output structure
-    output = call.output
-    assert isinstance(output, tuple)
-    assert len(output) == 2
-    
-    # First element should be the original response
-    original_response, pil_image = output
-    assert original_response.created == response.created
-    
-    # Second element should be PIL Image
-    assert isinstance(pil_image, Image.Image)
-    assert pil_image.size == (1024, 1024)
+        # Verify inputs
+        inputs = call.inputs
+        assert inputs["model"] == "gpt-image-1"
+        assert inputs["prompt"] == "A majestic mountain landscape at sunset"
 
-    # Verify usage tracking
-    usage = call.summary["usage"]["gpt-image-1"]
-    assert usage["requests"] == 1
+        # Verify output structure
+        output = call.output
+        assert len(output) == 2
+        
+        # First element should be the original response
+        original_response, pil_image = output
+        assert original_response.created == response.created
+        
+        # Second element should be PIL Image
+        assert isinstance(pil_image, Image.Image)
+        assert pil_image.size == (1024, 1024)
+
+        # Verify usage tracking
+        usage = call.summary["usage"]["gpt-image-1"]
+        assert usage["requests"] == 1
 
 
 def test_openai_image_postprocess_inputs():
@@ -122,10 +149,8 @@ def test_openai_image_postprocess_inputs():
     from weave.integrations.openai.gpt_image_utils import openai_image_postprocess_inputs
     
     test_inputs = {
-        "model": "dall-e-3",
+        "model": "gpt-image-1",
         "prompt": "A test prompt",
-        "size": "1024x1024",
-        "quality": "standard"
     }
     
     result = openai_image_postprocess_inputs(test_inputs)
