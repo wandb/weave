@@ -84,7 +84,7 @@ https://api.inference.wandb.ai/v1
 ```
 
 :::important
-To access this endpoint, you must have a W&B account with Inference service credits allocated, a valid W&B API key, and a W&B entity (also referred to as "team" and project).
+To access this endpoint, you must have a W&B account with Inference service credits allocated, a valid W&B API key, and a W&B entity (also referred to as "team") and a project. In the code samples in this guide, entity (team) and project are referred to as `<your-team>\<your-project>`.
 :::
 
 ### Available methods
