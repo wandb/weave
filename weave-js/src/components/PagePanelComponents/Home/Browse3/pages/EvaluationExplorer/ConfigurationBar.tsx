@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import { ConfigurationBarProps } from './types';
 import { useAvailableDatasets, useAvailableModels, useAvailableScorers } from './queries';
-import { DatasetSection, ModelsSection, ScorersSection, DetailDrawer, DrawerSection } from './components';
+import { DatasetSection, ModelsSection, ScorersSection, DetailDrawer, DrawerSection, ModelDetailContent } from './components';
 
 export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
   selectedDatasetId,
@@ -16,105 +16,142 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
   onModelsChange,
   onModelDetailOpen
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedModelForDetail, setSelectedModelForDetail] = useState<string | null>(null);
   const { datasets, isLoading: datasetsLoading } = useAvailableDatasets();
   const { models, isLoading: modelsLoading } = useAvailableModels();
   const { scorers, isLoading: scorersLoading } = useAvailableScorers();
 
-  if (isCollapsed) {
-    return (
+  // Handle model detail opening
+  const handleModelDetailOpen = (modelId: string) => {
+    setSelectedModelForDetail(modelId);
+  };
+
+  const handleModelDetailClose = () => {
+    setSelectedModelForDetail(null);
+  };
+
+  const handleToggle = () => {
+    setIsOpen(!isOpen);
+  };
+
+  const handleCloseDrawer = () => {
+    setIsOpen(false);
+    setSelectedModelForDetail(null);
+  };
+
+  // Create panels array for expanded drawer
+  const panels = selectedModelForDetail ? [{
+    id: 'model-detail',
+    title: 'Model Configuration',
+    content: <ModelDetailContent modelId={selectedModelForDetail} />,
+    width: 400,
+    onClose: handleModelDetailClose
+  }] : [];
+
+  return (
+    <>
+      {/* Toggle button */}
       <Box
         sx={{
+          position: 'absolute',
+          right: 0,
+          top: 0,
           width: '48px',
           height: '100%',
-          borderRight: '1px solid #E0E0E0',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
+          paddingTop: 1,
+          zIndex: 8,
           backgroundColor: '#FAFAFA',
-          paddingTop: 1
+          borderLeft: '1px solid #E0E0E0',
+          boxShadow: '-2px 0 4px rgba(0, 0, 0, 0.04)'
         }}
       >
         <IconButton
-          onClick={() => setIsCollapsed(false)}
+          onClick={handleToggle}
           sx={{ 
-            marginBottom: 2,
             '&:hover': {
               backgroundColor: 'rgba(0, 0, 0, 0.04)'
             }
           }}
         >
-          <ChevronRight />
+          {isOpen ? <ChevronRight /> : <ChevronLeft />}
         </IconButton>
         
-        {/* Vertical text */}
-        <Typography
-          sx={{
-            writingMode: 'vertical-rl',
-            transform: 'rotate(180deg)',
-            fontSize: '0.875rem',
-            fontWeight: 600,
-            color: 'text.secondary',
-            userSelect: 'none'
-          }}
-        >
-          Configuration
-        </Typography>
+        {/* Vertical text when closed */}
+        {!isOpen && (
+          <Typography
+            sx={{
+              writingMode: 'vertical-rl',
+              transform: 'rotate(180deg)',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              color: 'text.secondary',
+              userSelect: 'none',
+              marginTop: 2
+            }}
+          >
+            Configuration
+          </Typography>
+        )}
       </Box>
-    );
-  }
 
-  return (
-    <DetailDrawer
-      open={!isCollapsed}
-      title="Configuration"
-      width={300}
-      side="left"
-      showCloseButton={false}
-      headerExtra={
-        <IconButton
-          size="small"
-          onClick={() => setIsCollapsed(true)}
-          sx={{ 
-            '&:hover': { 
-              backgroundColor: 'rgba(0, 0, 0, 0.04)' 
-            } 
-          }}
-        >
-          <ChevronLeft />
-        </IconButton>
-      }
-    >
-      <DrawerSection noPadding>
-        <DatasetSection
-          selectedDatasetId={selectedDatasetId}
-          isDatasetEdited={isDatasetEdited}
-          onDatasetChange={onDatasetChange}
-          datasets={datasets}
-          isLoading={datasetsLoading}
-        />
-      </DrawerSection>
+      {/* Drawer */}
+      <DetailDrawer
+        open={isOpen}
+        onClose={handleCloseDrawer}
+        title="Configuration"
+        width={300}
+        side="right"
+        showCloseButton={false}
+        headerExtra={
+          <IconButton
+            size="small"
+            onClick={handleCloseDrawer}
+            sx={{ 
+              '&:hover': { 
+                backgroundColor: 'rgba(0, 0, 0, 0.04)' 
+              } 
+            }}
+          >
+            <ChevronRight />
+          </IconButton>
+        }
+        panels={panels}
+      >
+        <DrawerSection noPadding>
+          <DatasetSection
+            selectedDatasetId={selectedDatasetId}
+            isDatasetEdited={isDatasetEdited}
+            onDatasetChange={onDatasetChange}
+            datasets={datasets}
+            isLoading={datasetsLoading}
+          />
+        </DrawerSection>
 
-      <Divider />
+        <Divider />
 
-      <DrawerSection noPadding>
-        <ModelsSection
-          selectedModelIds={selectedModelIds}
-          onModelsChange={onModelsChange}
-          models={models}
-          isLoading={modelsLoading}
-          onModelDetailOpen={onModelDetailOpen}
-        />
-      </DrawerSection>
+        <DrawerSection noPadding>
+          <ModelsSection
+            selectedModelIds={selectedModelIds}
+            onModelsChange={onModelsChange}
+            models={models}
+            isLoading={modelsLoading}
+            onModelDetailOpen={handleModelDetailOpen}
+          />
+        </DrawerSection>
 
-      <Divider />
+        <Divider />
 
-      <DrawerSection noPadding>
-        <ScorersSection
-          scorers={scorers}
-          isLoading={scorersLoading}
-        />
-      </DrawerSection>
-    </DetailDrawer>
+        <DrawerSection noPadding>
+          <ScorersSection
+            scorers={scorers}
+            isLoading={scorersLoading}
+          />
+        </DrawerSection>
+      </DetailDrawer>
+    </>
   );
 }; 

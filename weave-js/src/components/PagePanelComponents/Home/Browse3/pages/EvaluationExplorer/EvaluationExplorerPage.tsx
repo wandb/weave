@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { SimplePageLayoutWithHeader } from '../common/SimplePageLayout';
 import { ConfigurationBar } from './ConfigurationBar';
 import { EvaluationDataGrid } from './components';
-import { ModelDetailPanel } from './components/ModelDetailPanel';
 import { EvaluationExplorerPageProps, EvaluationRow } from './types';
 import { calculateRowDigest, deepCloneRow, createEmptyRow } from './utils';
 
@@ -49,7 +48,6 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>('dataset-1');
   const [isDatasetEdited, setIsDatasetEdited] = useState(false);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
-  const [openModelDetail, setOpenModelDetail] = useState<string | null>(null);
   
   const initialRow = createInitialRow();
   const [originalRows, setOriginalRows] = useState<GridRowsProp>([initialRow]);
@@ -176,14 +174,6 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
 
   return (
     <Container>
-      <ConfigurationBar
-        selectedDatasetId={selectedDatasetId}
-        isDatasetEdited={isDatasetEdited}
-        onDatasetChange={handleDatasetChange}
-        selectedModelIds={selectedModelIds}
-        onModelsChange={handleModelsChange}
-        onModelDetailOpen={setOpenModelDetail}
-      />
       <DataContainer>
         <EvaluationDataGrid
           rows={rows}
@@ -197,11 +187,14 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
           onDeleteRow={handleDeleteRow}
           onDuplicateRow={handleDuplicateRow}
         />
-        <ModelDetailPanel 
-          modelId={openModelDetail} 
-          onClose={() => setOpenModelDetail(null)} 
-        />
       </DataContainer>
+      <ConfigurationBar
+        selectedDatasetId={selectedDatasetId}
+        isDatasetEdited={isDatasetEdited}
+        onDatasetChange={handleDatasetChange}
+        selectedModelIds={selectedModelIds}
+        onModelsChange={handleModelsChange}
+      />
     </Container>
   );
 };
@@ -209,10 +202,10 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
 // Styled components
 const Container: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div style={{
-    display: 'flex',
-    flexDirection: 'row',
     width: '100%',
-    height: '100%'
+    height: '100%',
+    position: 'relative',
+    overflow: 'hidden'
   }}>
     {children}
   </div>
@@ -224,6 +217,7 @@ const DataContainer: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     flexDirection: 'column',
     width: '100%',
     height: '100%',
+    paddingRight: '48px',
     position: 'relative',
     overflow: 'hidden'
   }}>

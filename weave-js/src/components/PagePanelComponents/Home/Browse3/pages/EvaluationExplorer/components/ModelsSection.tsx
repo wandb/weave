@@ -3,15 +3,10 @@ import { Add, Settings, Close } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import Checkbox from '@mui/material/Checkbox';
-import ListItemText from '@mui/material/ListItemText';
-import Chip from '@mui/material/Chip';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
 import Button from '@mui/material/Button';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemSecondaryAction from '@mui/material/ListItemSecondaryAction';
 import { ModelsSectionProps } from '../types';
 
 interface ExtendedModelsSectionProps extends ModelsSectionProps {
@@ -25,24 +20,36 @@ export const ModelsSection: React.FC<ExtendedModelsSectionProps> = ({
   isLoading,
   onModelDetailOpen
 }) => {
-  const handleModelToggle = (modelId: string) => {
-    const newIds = selectedModelIds.includes(modelId)
-      ? selectedModelIds.filter(id => id !== modelId)
-      : [...selectedModelIds, modelId];
+  const handleModelChange = (index: number, newModelId: string) => {
+    const newIds = [...selectedModelIds];
+    
+    if (newModelId === 'create-new') {
+      // Handle creating new model
+      const tempModelId = 'new-model-' + Date.now();
+      newIds[index] = tempModelId;
+      if (onModelDetailOpen) {
+        onModelDetailOpen(tempModelId);
+      }
+    } else if (newModelId === 'remove') {
+      // Remove this dropdown
+      newIds.splice(index, 1);
+    } else {
+      newIds[index] = newModelId;
+    }
     
     if (onModelsChange) {
       onModelsChange(newIds);
     }
   };
 
-  const handleAddNewModel = () => {
-    // TODO: Handle creating new model
-    console.log('Create new model');
-    const newModelId = 'new-model-' + Date.now();
+  const handleAddDropdown = () => {
     if (onModelsChange) {
-      onModelsChange([...selectedModelIds, newModelId]);
+      onModelsChange([...selectedModelIds, '']);
     }
   };
+
+  // Ensure at least one dropdown exists
+  const dropdownIds = selectedModelIds.length > 0 ? selectedModelIds : [''];
 
   return (
     <Box sx={{ padding: 2 }}>
@@ -53,148 +60,112 @@ export const ModelsSection: React.FC<ExtendedModelsSectionProps> = ({
         marginBottom: 2 
       }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Model(s) {selectedModelIds.length > 0 && (
-            <Chip 
-              size="small" 
-              label={selectedModelIds.length} 
-              sx={{ 
-                marginLeft: 1,
-                height: 20,
-                fontSize: '0.75rem'
-              }} 
-            />
-          )}
+          Models
         </Typography>
+      </Box>
+      
+      {/* Model Selection Dropdowns */}
+      <Box sx={{ 
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1
+      }}>
+        {dropdownIds.map((modelId, index) => (
+          <Box 
+            key={index} 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              gap: 1
+            }}
+          >
+            <FormControl size="small" sx={{ flex: 1 }}>
+              <Select
+                value={modelId || ''}
+                onChange={(e) => handleModelChange(index, e.target.value)}
+                displayEmpty
+                sx={{ 
+                  fontSize: '0.875rem',
+                  '& .MuiSelect-select': {
+                    paddingY: 1
+                  }
+                }}
+                disabled={isLoading}
+              >
+                <MenuItem value="" disabled>
+                  <em>Select a model</em>
+                </MenuItem>
+                {models.map(model => (
+                  <MenuItem 
+                    key={model.id} 
+                    value={model.id}
+                    disabled={selectedModelIds.includes(model.id) && model.id !== modelId}
+                  >
+                    {model.name}
+                  </MenuItem>
+                ))}
+                <MenuItem value="create-new">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Add fontSize="small" />
+                    <span>Create new model</span>
+                  </Box>
+                </MenuItem>
+              </Select>
+            </FormControl>
+            
+            {/* Settings button */}
+            {modelId && modelId !== '' && (
+              <IconButton 
+                size="small"
+                onClick={() => onModelDetailOpen && onModelDetailOpen(modelId)}
+                sx={{ 
+                  '&:hover': { 
+                    backgroundColor: 'rgba(0, 0, 0, 0.04)' 
+                  } 
+                }}
+              >
+                <Settings fontSize="small" />
+              </IconButton>
+            )}
+            
+            {/* Remove button */}
+            {dropdownIds.length > 1 && (
+              <IconButton 
+                size="small"
+                onClick={() => handleModelChange(index, 'remove')}
+                sx={{ 
+                  '&:hover': { 
+                    backgroundColor: 'rgba(0, 0, 0, 0.04)' 
+                  } 
+                }}
+              >
+                <Close fontSize="small" />
+              </IconButton>
+            )}
+          </Box>
+        ))}
+        
+        {/* Add new dropdown button */}
         <Button 
           size="small" 
           startIcon={<Add fontSize="small" />} 
-          onClick={handleAddNewModel}
+          onClick={handleAddDropdown}
           sx={{ 
-            minWidth: 'auto', 
+            alignSelf: 'flex-start',
+            marginTop: 1,
             padding: '4px 12px',
             textTransform: 'none',
-            fontSize: '0.875rem'
+            fontSize: '0.875rem',
+            color: 'primary.main',
+            '&:hover': {
+              backgroundColor: 'rgba(25, 118, 210, 0.04)'
+            }
           }}
           disabled={isLoading}
         >
-          New
+          Add model
         </Button>
       </Box>
-      
-      {/* Model Selection List */}
-      <List sx={{ 
-        maxHeight: 240, 
-        overflowY: 'auto', 
-        border: '1px solid #E0E0E0',
-        borderRadius: 1,
-        padding: 0.5
-      }}>
-        {models.map((model) => (
-          <ListItem
-            key={model.id}
-            disablePadding
-            dense
-          >
-            <ListItemButton
-              role={undefined}
-              onClick={() => handleModelToggle(model.id)}
-              dense
-              sx={{ py: 0.5 }}
-            >
-              <ListItemIcon sx={{ minWidth: 36 }}>
-                <Checkbox
-                  edge="start"
-                  checked={selectedModelIds.includes(model.id)}
-                  tabIndex={-1}
-                  disableRipple
-                  size="small"
-                  disabled={isLoading}
-                />
-              </ListItemIcon>
-              <ListItemText 
-                primary={model.name}
-                secondary={model.description}
-                primaryTypographyProps={{ 
-                  variant: 'body2',
-                  fontSize: '0.875rem'
-                }}
-                secondaryTypographyProps={{ 
-                  variant: 'caption',
-                  fontSize: '0.75rem'
-                }}
-              />
-              {selectedModelIds.includes(model.id) && onModelDetailOpen && (
-                <ListItemSecondaryAction>
-                  <IconButton 
-                    edge="end" 
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onModelDetailOpen(model.id);
-                    }}
-                    sx={{ 
-                      '&:hover': { 
-                        backgroundColor: 'rgba(0, 0, 0, 0.04)' 
-                      } 
-                    }}
-                  >
-                    <Settings fontSize="small" />
-                  </IconButton>
-                </ListItemSecondaryAction>
-              )}
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-
-      {/* Selected Models Summary */}
-      {selectedModelIds.length > 0 && (
-        <Box sx={{ 
-          marginTop: 2,
-          padding: 1.5,
-          backgroundColor: '#F5F5F5',
-          borderRadius: 1,
-          border: '1px solid #E0E0E0'
-        }}>
-          <Typography 
-            variant="caption" 
-            sx={{ 
-              fontWeight: 600, 
-              color: 'text.secondary',
-              fontSize: '0.75rem'
-            }}
-          >
-            Selected Models:
-          </Typography>
-          <Box sx={{ 
-            display: 'flex', 
-            flexWrap: 'wrap', 
-            gap: 0.5, 
-            marginTop: 1 
-          }}>
-            {selectedModelIds.map((modelId) => {
-              const model = models.find(m => m.id === modelId) || { 
-                id: modelId, 
-                name: modelId 
-              };
-              
-              return (
-                <Chip
-                  key={modelId}
-                  label={model.name}
-                  size="small"
-                  onDelete={() => handleModelToggle(modelId)}
-                  deleteIcon={<Close fontSize="small" />}
-                  sx={{ 
-                    fontSize: '0.75rem',
-                    height: 24
-                  }}
-                />
-              );
-            })}
-          </Box>
-        </Box>
-      )}
     </Box>
   );
 }; 
