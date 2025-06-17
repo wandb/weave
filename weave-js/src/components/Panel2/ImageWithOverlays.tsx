@@ -18,6 +18,7 @@ import {compare} from '../../compare';
 import * as Controls from './controlsImage';
 import {ClassSetControls, ClassSetState, ClassState} from './controlsImage';
 import {useSignedUrlWithExpiration} from './useAssetFromArtifact';
+import Color from 'color';
 
 // Copied from media.tsx, for some reason importing media.tsx
 // doesn't work with storybook, at least at the moment I'm doing
@@ -466,7 +467,10 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
       const isHidden = isBoundingBoxHidden(box, bboxControls, sliderControls);
 
       if (!isHidden) {
-        const color = boxColor(classId);
+        let color = boxColor(classId);
+        if (classStates?.[classId]?.color) {
+          color = classStates?.[classId]?.color;
+        }
         const name = classStates?.[classId]?.name ?? `ID: ${box.class_id}`;
         drawBox(canvas, box, name, mediaSize, color, opts);
       }
