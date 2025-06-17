@@ -9,7 +9,7 @@ _Weights & Biases (W&B) Inference_ provides access to leading open-source founda
 - Try the supported models in the W&B Weave Playground.
 
 :::tip
-For a limited time, W&B Inference is included in your free tier. For more information, visit [http://wandb.com/pricing/inference](http://wandb.com/pricing/inference).
+For a limited time, W&B Inference is included in your free tier. For more information, visit [https://wandb.ai/site/inference](https://wandb.ai/site/inference).
 :::
 
 Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference-powered applications.
@@ -48,10 +48,10 @@ This guide provides the following information:
   - [Compare multiple models](#compare-multiple-models)
       - [Access the Compare view from the Inference tab ](#access-the-compare-view-from-the-inference-tab)
       - [Access the Compare view from the Playground tab](#access-the-compare-view-from-the-playground-tab)
-  - [View billing information](#view-billing-information)
+  - [View billing information](#view-billing-and-usage-information)
 - [Usage information and limits ](#usage-information-and-limits)
   - [Geographic restrictions](#geographic-restrictions)
-  - [Rate limits](#rate-limits)
+  - [Concurrency limits](#concurrency-limits)
   - [Pricing](#pricing)
 - [API errors](#api-errors)
 - [FAQ](#faq)
@@ -64,10 +64,6 @@ The following prerequisites are required to access the W&B Inference service via
 2. A W&B API key. Get your API key at [https://wandb.ai/authorize](https://wandb.ai/authorize).
 3. A W&B project. 
 4. If you are using the Inference service via Python, see [Additional prerequisites for using the API via Python](#additional-prerequisites-for-using-the-api-via-python).
-
-:::tip
-Before using the service, familiarize yourself with the [usage limits](#usage-information-and-limits).
-:::
 
 ### Additional prerequisites for using the API via Python
 
@@ -176,7 +172,7 @@ Use the API to query all currently available models and their IDs. This is usefu
     curl https://api.inference.wandb.ai/v1/models \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer <your-apikey>" \
-      -H "OpenAI-Project: hello-world-team/new-inference-project"
+      -H "OpenAI-Project: <your-entity>/<your-project>" \
     ```
   </TabItem>
   <TabItem value="python" label="Python">
@@ -545,12 +541,10 @@ Now, you can compare models in the Playground, and use any of the features descr
 
 Now, you can compare models in the Playground, and use any of the features described in [Try a model in the Playground](#try-a-model-in-the-playground).
 
-### View billing information
+### View billing and usage information
 
 1. In the W&B UI, navigate to the W&B **Billing** page.
-2. In the bottom righthand corner, the Inference billing information card is displayed. From here, you can:
- - Click the **View usage** button in the Inference billing information card to view your usage over time.
- - Click the **Contact sales** button to upgrade your plan. 
+2. In the bottom righthand corner, the Inference billing information card is displayed. From here, you can click the **View usage** button in the Inference billing information card to view your usage over time.
 
 ## Usage information and limits 
 
@@ -560,25 +554,25 @@ The following section describes important usage information and limits. Familiar
 
 The Inference service is only accessible from supported geographic locations. For more information, see the [Terms of Service](https://docs.coreweave.com/docs/policies/terms-of-service/terms-of-use#geographic-restrictions).
 
-### Rate limits
+### Concurrency limits
 
-The following limits apply to usage of the W&B Inference API:
+To ensure fair usage and stable performance, the W&B Inference API enforces rate limits at the user and project level. These limits help:
 
-| Scope     | Limit                         | Description                                                           |
-|-----------|-------------------------------|-----------------------------------------------------------------------|
-| User      | 10 concurrent requests        | A single user can make up to 10 concurrent requests at any given time. |
-| Project   | 30 concurrent requests        | A project (shared across users) can make up to 30 concurrent requests at any given time. |
-| System    | 30% oversubscription allowed  | The system is provisioned to handle 30% more than the nominal concurrency ceiling, to maximize utilization. |
+- Prevent misuse and protect API stability
+- Ensure access for all users
+- Manage infrastructure load effectively
+
+If a rate limit is exceeded, the API will return a `429 Concurrency limit reached for requests ` response. To resolve this error, reduce the number of concurrent requests. 
 
 ### Pricing
 
-For model pricing information, visit [http://wandb.com/pricing/inference](http://wandb.com/pricing/inference).
+For model pricing information, visit [http://wandb.com/site/pricing/inference](http://wandb.com/site/pricing/inference).
 
 ## API errors
 
 | Error Code | Message                                                                     | Cause                                           | Solution                                                                               |
 | ---------- | --------------------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
-| 401        | Invalid Authentication                                                      | Invalid authentication credentials.             | Ensure the correct API key is being used.                                              |
+| 401        | Invalid Authentication                                                      | Invalid authentication credentials or your W&B project entity and/or name are incorrect.              | Ensure the correct API key is being used and/or that yourW&B project name and entity are correct.                                              |
 | 403        | Country, region, or territory not supported                                 | Accessing the API from an unsupported location. | Please see [Geographic restrictions](#geographic-restrictions)                                       |
 | 429        | Concurrency limit reached for requests                                      | Too many concurrent requests.                   | Reduce the number of concurrent requests.               |
 | 429        | You exceeded your current quota, please check your plan and billing details | Out of credits or reached monthly spending cap. | Purchase more credits or increase your limits.                       |
