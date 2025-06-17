@@ -33,6 +33,7 @@ This guide provides the following information:
       - [Chat completions](#chat-completions)
       - [List supported models](#list-supported-models)
   - [Usage examples](#usage-examples)
+      - [Use Weave with the inference service](#use-weave-with-the-inference-service) 
       - [List available models](#list-available-models)
       - [Llama 3.1 8B](#llama-31-8b)
       - [DeepSeek V3-0324](#deepseek-v3-0324)
@@ -154,6 +155,7 @@ You can also programmatically list the supported models with the `\models` metho
 
 This section describes several ways to interact with the W&B Inference service:
 
+- [Use Weave with the inference service](#use-weave-with-the-inference-service) 
 - [List the available models using the API](#list-available-models).
 - [Chat completion with Llama 3.1 8B](#llama-31-8b)
 - [Chat completion with DeepSeek V3-0324](#deepseek-v3-0324)
@@ -162,7 +164,7 @@ This section describes several ways to interact with the W&B Inference service:
 - [Chat completion with Llama 4 Scout](#llama-4-scout)
 - [Chat completion with Phi 4 Mini](#phi-4-mini)
 
-#### Using Weave wuth the infernce service
+#### Use Weave with the inference service
 
 Use Weave with the Inference service to [trace model calls](../tracking/tracing.mdx), [evaluate performance](../core-types/evaluations.md), and [publish a leaderboard](../core-types/leaderboards.md). The following Python code sample  compares two models on a simple question–answer dataset.
 
