@@ -104,7 +104,13 @@ export const EvaluationDataGrid: React.FC<EvaluationDataGridProps> = ({
           return { ...params.row, dataset: newDataset };
         },
         renderHeader: (params) => (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            width: '100%',
+            paddingRight: 8
+          }}>
             <span>{params.colDef.headerName}</span>
             <IconButton
               size="small"
@@ -112,8 +118,18 @@ export const EvaluationDataGrid: React.FC<EvaluationDataGridProps> = ({
                 e.stopPropagation();
                 onDeleteColumn(colName);
               }}
+              sx={{
+                padding: '2px',
+                color: 'text.secondary',
+                opacity: 0.5,
+                transition: 'opacity 0.2s',
+                '&:hover': {
+                  opacity: 1,
+                  backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                }
+              }}
             >
-              <DeleteIcon fontSize="small" />
+              <DeleteIcon sx={{ fontSize: 16 }} />
             </IconButton>
           </div>
         ),
@@ -145,16 +161,22 @@ export const EvaluationDataGrid: React.FC<EvaluationDataGridProps> = ({
       getActions: ({ id }) => {
         return [
           <GridActionsCellItem
-            icon={<ContentCopyIcon />}
+            icon={<ContentCopyIcon fontSize="small" />}
             label="Duplicate"
             onClick={handleDuplicateRow(id)}
-            color="inherit"
+            sx={{ 
+              color: 'text.secondary',
+              '&:hover': { color: 'primary.main' }
+            }}
           />,
           <GridActionsCellItem
-            icon={<DeleteIcon />}
+            icon={<DeleteIcon fontSize="small" />}
             label="Delete"
             onClick={handleDeleteRow(id)}
-            color="inherit"
+            sx={{ 
+              color: 'text.secondary',
+              '&:hover': { color: 'error.main' }
+            }}
           />,
         ];
       },

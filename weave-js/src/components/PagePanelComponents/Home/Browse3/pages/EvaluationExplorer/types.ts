@@ -57,6 +57,7 @@ export interface ConfigurationBarProps {
   onDatasetChange?: (datasetId: string) => void;
   selectedModelIds?: string[];
   onModelsChange?: (modelIds: string[]) => void;
+  onModelDetailOpen?: (modelId: string | null) => void;
 }
 
 // Section component props
@@ -73,6 +74,7 @@ export interface ModelsSectionProps {
   onModelsChange?: (modelIds: string[]) => void;
   models: Model[];
   isLoading: boolean;
+  onModelDetailOpen?: (modelId: string) => void;
 }
 
 export interface ScorersSectionProps {
@@ -80,4 +82,9 @@ export interface ScorersSectionProps {
   onScorersChange?: (scorerIds: string[]) => void;
   scorers?: Scorer[];
   isLoading?: boolean;
+}
+
+export interface ModelDetailPanelProps {
+  modelId: string | null;
+  onClose: () => void;
 } 

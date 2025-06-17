@@ -31,7 +31,8 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
   isDatasetEdited = false,
   onDatasetChange,
   selectedModelIds = [],
-  onModelsChange
+  onModelsChange,
+  onModelDetailOpen
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { datasets, isLoading: datasetsLoading } = useAvailableDatasets();
@@ -48,17 +49,35 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          paddingTop: 2,
-          backgroundColor: '#FAFAFA'
+          backgroundColor: '#FAFAFA',
+          paddingTop: 1
         }}
       >
         <IconButton
-          size="small"
           onClick={() => setIsCollapsed(false)}
-          sx={{ marginBottom: 2 }}
+          sx={{ 
+            marginBottom: 2,
+            '&:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)'
+            }
+          }}
         >
           <ChevronRight />
         </IconButton>
+        
+        {/* Vertical text */}
+        <Typography
+          sx={{
+            writingMode: 'vertical-rl',
+            transform: 'rotate(180deg)',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            color: 'text.secondary',
+            userSelect: 'none'
+          }}
+        >
+          Configuration
+        </Typography>
       </Box>
     );
   }
@@ -71,7 +90,8 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
         borderRight: '1px solid #E0E0E0',
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: '#FAFAFA'
+        backgroundColor: '#FAFAFA',
+        overflow: 'hidden'
       }}
     >
       {/* Header */}
@@ -95,29 +115,37 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
         </IconButton>
       </Box>
 
-      <DatasetSection
-        selectedDatasetId={selectedDatasetId}
-        isDatasetEdited={isDatasetEdited}
-        onDatasetChange={onDatasetChange}
-        datasets={datasets}
-        isLoading={datasetsLoading}
-      />
+      {/* Scrollable content area */}
+      <Box sx={{ 
+        flex: 1, 
+        overflowY: 'auto',
+        overflowX: 'hidden'
+      }}>
+        <DatasetSection
+          selectedDatasetId={selectedDatasetId}
+          isDatasetEdited={isDatasetEdited}
+          onDatasetChange={onDatasetChange}
+          datasets={datasets}
+          isLoading={datasetsLoading}
+        />
 
-      <Divider />
+        <Divider />
 
-      <ModelsSection
-        selectedModelIds={selectedModelIds}
-        onModelsChange={onModelsChange}
-        models={models}
-        isLoading={modelsLoading}
-      />
+        <ModelsSection
+          selectedModelIds={selectedModelIds}
+          onModelsChange={onModelsChange}
+          models={models}
+          isLoading={modelsLoading}
+          onModelDetailOpen={onModelDetailOpen}
+        />
 
-      <Divider />
+        <Divider />
 
-      <ScorersSection
-        scorers={scorers}
-        isLoading={scorersLoading}
-      />
+        <ScorersSection
+          scorers={scorers}
+          isLoading={scorersLoading}
+        />
+      </Box>
     </Box>
   );
 }; 

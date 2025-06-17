@@ -62,18 +62,29 @@ export const DatasetSection: React.FC<DatasetSectionProps> = ({
         </Select>
       </FormControl>
       {isDatasetEdited && (
-        <Typography 
-          variant="caption" 
+        <Box
           sx={{ 
-            color: '#FFA500',
             display: 'flex',
             alignItems: 'center',
-            marginTop: 0.5
+            marginTop: 1,
+            padding: '4px 8px',
+            backgroundColor: 'rgba(255, 165, 0, 0.1)',
+            borderRadius: 1,
+            border: '1px solid rgba(255, 165, 0, 0.3)'
           }}
         >
-          <Star sx={{ fontSize: 12, marginRight: 0.5 }} />
-          Dataset has been edited
-        </Typography>
+          <Star sx={{ fontSize: 14, marginRight: 0.5, color: '#FFA500' }} />
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              color: '#FF8C00',
+              fontSize: '0.75rem',
+              fontWeight: 500
+            }}
+          >
+            Dataset has been edited
+          </Typography>
+        </Box>
       )}
     </Box>
   );
