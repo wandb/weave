@@ -11,7 +11,7 @@ from weave.trace_server import trace_server_interface as tsi
 
 def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
     """Helper function to check that all calls ended without errors."""
-    for call, depth in calls:
+    for call, _ in calls:
         assert call.ended_at is not None
         assert call.exception is None
 
