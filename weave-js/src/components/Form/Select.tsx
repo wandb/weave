@@ -194,7 +194,7 @@ const getStyles = <
     indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
     clearIndicator: baseStyles => ({
       ...baseStyles,
-      padding: CLEAR_INDICATOR_PADDING[size],
+      padding: '4px 12px 4px 4px',
       cursor: 'pointer',
     }),
     input: baseStyles => {
@@ -204,8 +204,8 @@ const getStyles = <
         margin: 0,
       };
     },
-    valueContainer: baseStyles => {
-      const padding = PADDING[size];
+    valueContainer: (baseStyles, state) => {
+      const padding = state.hasValue ? '4px' : PADDING[size];
       return {...baseStyles, padding, gap: '2px'};
     },
     multiValueLabel: baseStyles => {
