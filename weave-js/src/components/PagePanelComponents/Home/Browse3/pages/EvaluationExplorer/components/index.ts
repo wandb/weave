@@ -3,6 +3,5 @@ export * from './ModelsSection';
 export * from './ScorersSection';
 export * from './EditToolbar';
 export * from './EvaluationDataGrid';
-export * from './ModelDetailPanel';
 export * from './DetailDrawer';
 export * from './ModelDetailContent'; 
