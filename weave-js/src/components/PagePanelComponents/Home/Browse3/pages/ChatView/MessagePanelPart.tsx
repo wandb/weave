@@ -5,6 +5,7 @@ import React from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {CodeEditor} from '../../../../../CodeEditor';
+import {StructuredOutputsMessagePart} from './StructuredOutputsMessagePart';
 import {ToolCalls} from './ToolCalls';
 import {MessagePart, ToolCall} from './types';
 
@@ -21,8 +22,12 @@ export const MessagePanelPart = ({
 }: MessagePanelPartProps) => {
   if (typeof value === 'string') {
     if (isStructuredOutput) {
-      const reformat = JSON.stringify(JSON.parse(value), null, 2);
-      return <CodeEditor language="json" value={reformat} />;
+      try {
+        const reformat = JSON.stringify(JSON.parse(value), null, 2);
+        return <StructuredOutputsMessagePart value={reformat} />;
+        // If it is a structured output, but parsing fails, just return the raw string
+        // This happens when streaming the object, and the current chunk is not valid JSON.
+      } catch (error) {}
     }
     // Markdown is slowing down chat view, disable for now
     // Bring back if we can find a faster way to render markdown
