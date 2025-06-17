@@ -1,169 +1,277 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Box, 
-  Typography, 
-  IconButton, 
-  Divider,
   TextField,
-  Slider,
+  Select,
+  MenuItem,
   FormControl,
-  FormLabel,
-  Paper
+  InputLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  Box,
+  Divider,
+  Typography
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import { ModelDetailPanelProps } from '../types';
-import { useAvailableModels } from '../queries';
+import { ModelDetailPanelProps, ModelType, ModelConfiguration } from '../types';
+import { useAvailableModels, useWeavePlaygroundModels, useFoundationModels } from '../queries';
+import { DetailDrawer, DrawerSection, DrawerFormField } from './DetailDrawer';
 
 export const ModelDetailPanel: React.FC<ModelDetailPanelProps> = ({ 
   modelId, 
   onClose 
 }) => {
   const { models } = useAvailableModels();
+  const { models: weavePlaygroundModels } = useWeavePlaygroundModels();
+  const { models: foundationModels } = useFoundationModels();
+  
   const model = models.find(m => m.id === modelId);
+  
+  // Initialize configuration state
+  const [config, setConfig] = useState<ModelConfiguration>({
+    type: 'weave-playground',
+    weavePlaygroundId: '',
+    name: model?.name || '',
+    description: model?.description || '',
+    foundationModel: '',
+    systemTemplate: '',
+    userTemplate: ''
+  });
+
+  // Update config when model changes
+  useEffect(() => {
+    if (model) {
+      setConfig(prev => ({
+        ...prev,
+        name: model.name,
+        description: model.description
+      }));
+    }
+  }, [model]);
+
+  // Load Weave Playground model configuration
+  const handleWeavePlaygroundSelect = (playgroundId: string) => {
+    if (playgroundId === 'create-new') {
+      setConfig(prev => ({
+        ...prev,
+        weavePlaygroundId: playgroundId,
+        foundationModel: '',
+        systemTemplate: '',
+        userTemplate: ''
+      }));
+    } else {
+      const playgroundModel = weavePlaygroundModels.find(m => m.id === playgroundId);
+      if (playgroundModel) {
+        setConfig(prev => ({
+          ...prev,
+          weavePlaygroundId: playgroundId,
+          name: playgroundModel.name,
+          description: playgroundModel.description,
+          foundationModel: playgroundModel.foundationModel,
+          systemTemplate: playgroundModel.systemTemplate,
+          userTemplate: playgroundModel.userTemplate
+        }));
+      }
+    }
+  };
 
   if (!modelId || !model) return null;
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        width: '400px',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: 'white',
-        borderLeft: '1px solid #E0E0E0',
-        zIndex: 10,
-        transform: modelId ? 'translateX(0)' : 'translateX(100%)',
-        transition: 'transform 0.3s ease-in-out'
-      }}
+    <DetailDrawer
+      open={!!modelId}
+      onClose={onClose}
+      title={`Configure ${model.name}`}
+      width={500}
     >
-      {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: 2,
-          borderBottom: '1px solid #E0E0E0'
-        }}
-      >
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Configure {model.name}
-        </Typography>
-        <IconButton
-          size="small"
-          onClick={onClose}
-          sx={{ 
-            '&:hover': { 
-              backgroundColor: 'rgba(0, 0, 0, 0.04)' 
-            } 
-          }}
+      {/* Model Type Selection */}
+      <DrawerSection>
+        <DrawerFormField 
+          label="Model Type" 
+          description="Choose between Weave Playground models or define your own"
+          required
         >
-          <CloseIcon />
-        </IconButton>
-      </Box>
+          <RadioGroup
+            value={config.type}
+            onChange={(e) => setConfig(prev => ({ ...prev, type: e.target.value as ModelType }))}
+          >
+            <FormControlLabel 
+              value="weave-playground" 
+              control={<Radio size="small" />} 
+              label={
+                <Box>
+                  <Typography variant="body2">Weave Playground</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Use pre-configured models or create new ones
+                  </Typography>
+                </Box>
+              }
+              sx={{ mb: 1 }}
+            />
+            <FormControlLabel 
+              value="user-defined" 
+              control={<Radio size="small" />} 
+              label={
+                <Box>
+                  <Typography variant="body2">User Defined</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Bring your own model implementation
+                  </Typography>
+                </Box>
+              }
+            />
+          </RadioGroup>
+        </DrawerFormField>
+      </DrawerSection>
 
-      {/* Content */}
-      <Box sx={{ 
-        flex: 1, 
-        overflowY: 'auto', 
-        padding: 3,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 3
-      }}>
-        <Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            {model.description}
-          </Typography>
-        </Box>
+      {/* Weave Playground Configuration */}
+      {config.type === 'weave-playground' && (
+        <>
+          <DrawerSection>
+            <DrawerFormField 
+              label="Weave Playground Model" 
+              description="Select a pre-configured model or create a new one"
+              required
+            >
+              <FormControl fullWidth size="small">
+                <Select
+                  value={config.weavePlaygroundId || ''}
+                  onChange={(e) => handleWeavePlaygroundSelect(e.target.value)}
+                >
+                  <MenuItem value="">
+                    <em>Select a model</em>
+                  </MenuItem>
+                  <MenuItem value="create-new">
+                    <em>Create New Model</em>
+                  </MenuItem>
+                  <Divider />
+                  {weavePlaygroundModels.map((pm) => (
+                    <MenuItem key={pm.id} value={pm.id}>
+                      <Box>
+                        <Typography variant="body2">{pm.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {pm.description}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </DrawerFormField>
+          </DrawerSection>
 
-        <Divider />
+          {/* Model Configuration Fields */}
+          {(config.weavePlaygroundId === 'create-new' || config.weavePlaygroundId) && (
+            <DrawerSection>
+              <DrawerFormField 
+                label="Name" 
+                description="A short, descriptive name for your model"
+                required
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={config.name}
+                  onChange={(e) => setConfig(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g., Customer Support Agent"
+                />
+              </DrawerFormField>
 
-        {/* Temperature */}
-        <FormControl fullWidth>
-          <FormLabel sx={{ fontSize: '0.875rem', fontWeight: 600, mb: 1 }}>
-            Temperature
-          </FormLabel>
-          <Slider
-            defaultValue={0.7}
-            min={0}
-            max={2}
-            step={0.1}
-            valueLabelDisplay="auto"
-            marks={[
-              { value: 0, label: '0' },
-              { value: 1, label: '1' },
-              { value: 2, label: '2' }
-            ]}
-            sx={{ mb: 2 }}
-          />
-          <Typography variant="caption" color="text.secondary">
-            Controls randomness: lowering results in less random completions
-          </Typography>
-        </FormControl>
+              <DrawerFormField 
+                label="Description" 
+                description="Explain what this model does"
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  multiline
+                  rows={2}
+                  value={config.description}
+                  onChange={(e) => setConfig(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="e.g., Handles customer inquiries with empathy and efficiency"
+                />
+              </DrawerFormField>
 
-        {/* Max Tokens */}
-        <FormControl fullWidth>
-          <FormLabel sx={{ fontSize: '0.875rem', fontWeight: 600, mb: 1 }}>
-            Max Tokens
-          </FormLabel>
-          <TextField
-            type="number"
-            defaultValue={1000}
-            size="small"
-            fullWidth
-            inputProps={{ min: 1, max: 4096 }}
-          />
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-            Maximum number of tokens to generate
-          </Typography>
-        </FormControl>
+              <DrawerFormField 
+                label="Foundation Model" 
+                description="Select the base language model"
+                required
+              >
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={config.foundationModel || ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, foundationModel: e.target.value }))}
+                  >
+                    <MenuItem value="">
+                      <em>Select foundation model</em>
+                    </MenuItem>
+                    {foundationModels.map((fm) => (
+                      <MenuItem key={fm.id} value={fm.id}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                          <Typography variant="body2">{fm.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {fm.provider}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </DrawerFormField>
 
-        {/* System Prompt */}
-        <FormControl fullWidth>
-          <FormLabel sx={{ fontSize: '0.875rem', fontWeight: 600, mb: 1 }}>
-            System Prompt
-          </FormLabel>
-          <TextField
-            multiline
-            rows={4}
-            defaultValue="You are a helpful assistant."
-            size="small"
-            fullWidth
-          />
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-            Instructions to guide the model's behavior
-          </Typography>
-        </FormControl>
+              <DrawerFormField 
+                label="System Template" 
+                description="Instructions that define the model's behavior and personality"
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  multiline
+                  rows={4}
+                  value={config.systemTemplate}
+                  onChange={(e) => setConfig(prev => ({ ...prev, systemTemplate: e.target.value }))}
+                  placeholder="You are a helpful assistant..."
+                  sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}
+                />
+              </DrawerFormField>
 
-        {/* API Endpoint */}
-        <FormControl fullWidth>
-          <FormLabel sx={{ fontSize: '0.875rem', fontWeight: 600, mb: 1 }}>
-            API Endpoint
-          </FormLabel>
-          <TextField
-            defaultValue="https://api.openai.com/v1/chat/completions"
-            size="small"
-            fullWidth
-          />
-        </FormControl>
+              <DrawerFormField 
+                label="User Template" 
+                description="Template for formatting user inputs. Use {{variable}} for placeholders"
+              >
+                <TextField
+                  fullWidth
+                  size="small"
+                  multiline
+                  rows={4}
+                  value={config.userTemplate}
+                  onChange={(e) => setConfig(prev => ({ ...prev, userTemplate: e.target.value }))}
+                  placeholder="User query: {{query}}"
+                  sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}
+                />
+              </DrawerFormField>
+            </DrawerSection>
+          )}
+        </>
+      )}
 
-        {/* Placeholder for more settings */}
-        <Box sx={{ 
-          mt: 'auto', 
-          pt: 3, 
-          borderTop: '1px solid #E0E0E0' 
-        }}>
-          <Typography variant="caption" color="text.secondary">
-            Additional model-specific settings can be configured here
-          </Typography>
-        </Box>
-      </Box>
-    </Paper>
+      {/* User Defined Configuration */}
+      {config.type === 'user-defined' && (
+        <DrawerSection>
+          <Box sx={{ 
+            padding: 3, 
+            backgroundColor: '#F5F5F5', 
+            borderRadius: 1,
+            textAlign: 'center'
+          }}>
+            <Typography variant="body2" color="text.secondary">
+              User-defined model configuration coming soon
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              You'll be able to integrate your own model endpoints
+            </Typography>
+          </Box>
+        </DrawerSection>
+      )}
+    </DetailDrawer>
   );
 }; 

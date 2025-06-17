@@ -1,30 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  ChevronLeft, 
-  ChevronRight,
-  Star,
-  ExpandMore,
-  Add,
-  Delete
-} from '@mui/icons-material';
+import { ChevronLeft, ChevronRight } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
-import Checkbox from '@mui/material/Checkbox';
-import ListItemText from '@mui/material/ListItemText';
-import Accordion from '@mui/material/Accordion';
-import AccordionSummary from '@mui/material/AccordionSummary';
-import AccordionDetails from '@mui/material/AccordionDetails';
-import Chip from '@mui/material/Chip';
-import Button from '@mui/material/Button';
 import { ConfigurationBarProps } from './types';
 import { useAvailableDatasets, useAvailableModels, useAvailableScorers } from './queries';
-import { DatasetSection, ModelsSection, ScorersSection } from './components';
+import { DatasetSection, ModelsSection, ScorersSection, DetailDrawer, DrawerSection } from './components';
 
 export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
   selectedDatasetId,
@@ -83,44 +65,27 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
   }
 
   return (
-    <Box
-      sx={{
-        width: '300px',
-        height: '100%',
-        borderRight: '1px solid #E0E0E0',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: '#FAFAFA',
-        overflow: 'hidden'
-      }}
-    >
-      {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: 2,
-          borderBottom: '1px solid #E0E0E0'
-        }}
-      >
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Configuration
-        </Typography>
+    <DetailDrawer
+      open={!isCollapsed}
+      title="Configuration"
+      width={300}
+      side="left"
+      showCloseButton={false}
+      headerExtra={
         <IconButton
           size="small"
           onClick={() => setIsCollapsed(true)}
+          sx={{ 
+            '&:hover': { 
+              backgroundColor: 'rgba(0, 0, 0, 0.04)' 
+            } 
+          }}
         >
           <ChevronLeft />
         </IconButton>
-      </Box>
-
-      {/* Scrollable content area */}
-      <Box sx={{ 
-        flex: 1, 
-        overflowY: 'auto',
-        overflowX: 'hidden'
-      }}>
+      }
+    >
+      <DrawerSection noPadding>
         <DatasetSection
           selectedDatasetId={selectedDatasetId}
           isDatasetEdited={isDatasetEdited}
@@ -128,9 +93,11 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
           datasets={datasets}
           isLoading={datasetsLoading}
         />
+      </DrawerSection>
 
-        <Divider />
+      <Divider />
 
+      <DrawerSection noPadding>
         <ModelsSection
           selectedModelIds={selectedModelIds}
           onModelsChange={onModelsChange}
@@ -138,14 +105,16 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
           isLoading={modelsLoading}
           onModelDetailOpen={onModelDetailOpen}
         />
+      </DrawerSection>
 
-        <Divider />
+      <Divider />
 
+      <DrawerSection noPadding>
         <ScorersSection
           scorers={scorers}
           isLoading={scorersLoading}
         />
-      </Box>
-    </Box>
+      </DrawerSection>
+    </DetailDrawer>
   );
 }; 

@@ -87,4 +87,32 @@ export interface ScorersSectionProps {
 export interface ModelDetailPanelProps {
   modelId: string | null;
   onClose: () => void;
+}
+
+// Model configuration types
+export type ModelType = 'weave-playground' | 'user-defined';
+
+export interface WeavePlaygroundModel {
+  id: string;
+  name: string;
+  description: string;
+  foundationModel: string;
+  systemTemplate: string;
+  userTemplate: string;
+}
+
+export interface FoundationModel {
+  id: string;
+  name: string;
+  provider: string;
+}
+
+export interface ModelConfiguration {
+  type: ModelType;
+  weavePlaygroundId?: string;
+  name: string;
+  description: string;
+  foundationModel?: string;
+  systemTemplate?: string;
+  userTemplate?: string;
 } 
