@@ -1,16 +1,23 @@
-import { GridColDef, GridColumnGroupingModel, GridRowsProp, GridRowModesModel, GridRowModel, GridEventListener, GridRowId, GridRowModes, GridActionsCellItem, GridRowParams, GridToolbarContainer, GridAddIcon, GridCellParams, GridRenderEditCellParams, GridPreProcessEditCellProps } from '@mui/x-data-grid-pro';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
+import { 
+  GridColDef, 
+  GridColumnGroupingModel, 
+  GridRowsProp, 
+  GridRowModesModel, 
+  GridRowModel, 
+  GridEventListener, 
+  GridRowId, 
+  GridRowModes, 
+  GridActionsCellItem, 
+  GridRowParams, 
+  GridToolbarContainer
+} from '@mui/x-data-grid-pro';
 import React from 'react';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import TextField from '@mui/material/TextField';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
+
 import { v4 as uuidv4 } from 'uuid';
 
 import { StyledDataGrid } from '../../StyledDataGrid';
@@ -41,105 +48,7 @@ export const EvaluationExplorerPage = (props: EvaluationExplorerPageProps) => {
   );
 };
 
-const dummyRows:GridRowsProp = [
-    {
-        id: "1",
-        dataset: {
-            rowDigest: "1234567890",
-            columnA: "1234567890",
-            columnB: "1234567890",
-        },
-        "output": {
-            "modelA": [
-                {"key": "val"}
-            ],
-            "modelB": [
-                {"key": "val"}
-            ]
-        },
-        "scores": {
-            "scorerA": {
-                "modelA": {
-                    "score": "1",
-                    "reason": "A"
-                },
-                "modelB": {
-                    "score": "1",
-                    "reason": "A"
-                }
-            }
-        }
-    }
-]
 
-const dummyColumns:GridColDef<typeof dummyRows[0]>[] = [
-    {
-        field: "dataset.rowDigest",
-        headerName: "Row Digest",
-        width: 100,
-        valueGetter: (value, row) => {
-            return row.dataset.rowDigest;
-        }
-    },
-    {
-        field: "dataset.columnA",
-        headerName: "Column A",
-        width: 100,
-    },
-    {
-        field: "dataset.columnB",
-        headerName: "Column B",
-        width: 100,
-    },
-    {
-        field: "output.modelA",
-        headerName: "Model A",
-        width: 100,
-    },
-    {
-        field: "output.modelB",
-        headerName: "Model B",
-        width: 100,
-    },
-]
-
-const dummyColumnGroups: GridColumnGroupingModel = [
-    {
-        groupId: "Datset",
-        children: [
-            {
-                field: "dataset.rowDigest",
-                headerName: "Row Digest",
-                
-            },
-            {
-                field: "dataset.columnA",
-                headerName: "Column A",
-                
-            },  
-            {
-                field: "dataset.columnB",
-                headerName: "Column B",
-                
-            }
-        ]
-    },
-    {
-        groupId: "Output",
-        children: [
-            {
-                field: "output.modelA",
-                headerName: "Model A",
-                
-            },
-            {
-                field: "output.modelB",
-                headerName: "Model B",
-                
-            }
-        ]
-    },
-]
 
 // Helper function to calculate row digest
 const calculateRowDigest = (row: any): string => {
@@ -160,10 +69,8 @@ const calculateRowDigest = (row: any): string => {
 };
 
 // Custom toolbar component
-const EditToolbar: React.FC<{
-  onAddRow: () => void;
-  onAddColumn: () => void;
-}> = ({ onAddRow, onAddColumn }) => {
+const EditToolbar = (props: any) => {
+  const { onAddRow, onAddColumn } = props;
   return (
     <GridToolbarContainer>
       <Button color="primary" startIcon={<AddIcon />} onClick={onAddRow}>
@@ -201,11 +108,7 @@ export const EvaluationExplorerPageInner: React.FC<
 
   const [datasetColumns, setDatasetColumns] = React.useState<string[]>(['columnA', 'columnB']);
   const [rowModesModel, setRowModesModel] = React.useState<GridRowModesModel>({});
-  const [contextMenu, setContextMenu] = React.useState<{
-    mouseX: number;
-    mouseY: number;
-    rowId: GridRowId;
-  } | null>(null);
+
 
   // Update row digests whenever rows change
   React.useEffect(() => {
@@ -226,16 +129,10 @@ export const EvaluationExplorerPageInner: React.FC<
     }
   };
 
-  const handleEditClick = (id: GridRowId) => () => {
-    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } });
-  };
 
-  const handleSaveClick = (id: GridRowId) => () => {
-    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
-  };
 
   const handleDeleteRow = (id: GridRowId) => () => {
-    setRows(rows.filter((row) => row.id !== id));
+    setRows(prevRows => prevRows.filter((row) => row.id !== id));
   };
 
   const handleDuplicateRow = (id: GridRowId) => () => {
@@ -244,18 +141,19 @@ export const EvaluationExplorerPageInner: React.FC<
       const newRow = {
         ...rowToDuplicate,
         id: uuidv4(),
-        dataset: { ...rowToDuplicate.dataset }
+        dataset: { ...rowToDuplicate.dataset },
+        output: { 
+          ...rowToDuplicate.output,
+          modelA: Array.isArray(rowToDuplicate.output?.modelA) ? [...rowToDuplicate.output.modelA] : [],
+          modelB: Array.isArray(rowToDuplicate.output?.modelB) ? [...rowToDuplicate.output.modelB] : []
+        },
+        scores: JSON.parse(JSON.stringify(rowToDuplicate.scores || {}))
       };
-      setRows([...rows, newRow]);
+      setRows(prevRows => [...prevRows, newRow]);
     }
   };
 
-  const handleCancelClick = (id: GridRowId) => () => {
-    setRowModesModel({
-      ...rowModesModel,
-      [id]: { mode: GridRowModes.View, ignoreModifications: true },
-    });
-  };
+
 
   const processRowUpdate = (newRow: GridRowModel) => {
     const updatedRow = { 
@@ -265,53 +163,61 @@ export const EvaluationExplorerPageInner: React.FC<
         rowDigest: calculateRowDigest(newRow)
       }
     };
-    setRows(rows.map((row) => (row.id === newRow.id ? updatedRow : row)));
+    setRows(prevRows => prevRows.map((row) => (row.id === newRow.id ? updatedRow : row)));
     return updatedRow;
   };
 
   const handleAddRow = () => {
     const newId = uuidv4();
-    const newDataset: any = {};
-    datasetColumns.forEach(col => {
-      newDataset[col] = '';
+    
+    setDatasetColumns(currentColumns => {
+      const newDataset: any = {};
+      currentColumns.forEach(col => {
+        newDataset[col] = '';
+      });
+      
+      const newRow = {
+        id: newId,
+        dataset: newDataset,
+        output: {
+          modelA: [],
+          modelB: []
+        },
+        scores: {}
+      };
+      
+      setRows(prevRows => [...prevRows, newRow]);
+      setRowModesModel(prevModel => ({
+        ...prevModel,
+        [newId]: { mode: GridRowModes.Edit },
+      }));
+      
+      return currentColumns; // Return unchanged columns
     });
-    
-    const newRow = {
-      id: newId,
-      dataset: newDataset,
-      output: {
-        modelA: [],
-        modelB: []
-      },
-      scores: {}
-    };
-    
-    setRows((oldRows) => [...oldRows, newRow]);
-    setRowModesModel((oldModel) => ({
-      ...oldModel,
-      [newId]: { mode: GridRowModes.Edit },
-    }));
   };
 
   const handleAddColumn = () => {
-    const columnName = `column${datasetColumns.length + 1}`;
-    setDatasetColumns([...datasetColumns, columnName]);
-    
-    // Add the new column to all existing rows
-    setRows(rows.map(row => ({
-      ...row,
-      dataset: {
-        ...row.dataset,
-        [columnName]: ''
-      }
-    })));
+    setDatasetColumns(prevColumns => {
+      const columnName = `column${prevColumns.length + 1}`;
+      
+      // Add the new column to all existing rows
+      setRows(prevRows => prevRows.map(row => ({
+        ...row,
+        dataset: {
+          ...row.dataset,
+          [columnName]: ''
+        }
+      })));
+      
+      return [...prevColumns, columnName];
+    });
   };
 
   const handleDeleteColumn = (columnName: string) => {
-    setDatasetColumns(datasetColumns.filter(col => col !== columnName));
+    setDatasetColumns(prevColumns => prevColumns.filter(col => col !== columnName));
     
     // Remove the column from all rows
-    setRows(rows.map(row => {
+    setRows(prevRows => prevRows.map(row => {
       const newDataset = { ...row.dataset };
       delete newDataset[columnName];
       return {
@@ -321,22 +227,7 @@ export const EvaluationExplorerPageInner: React.FC<
     }));
   };
 
-  const handleContextMenu = (event: React.MouseEvent, rowId: GridRowId) => {
-    event.preventDefault();
-    setContextMenu(
-      contextMenu === null
-        ? {
-            mouseX: event.clientX + 2,
-            mouseY: event.clientY - 6,
-            rowId,
-          }
-        : null
-    );
-  };
 
-  const handleCloseContextMenu = () => {
-    setContextMenu(null);
-  };
 
   // Generate columns dynamically
   const columns: GridColDef[] = React.useMemo(() => {
@@ -364,6 +255,10 @@ export const EvaluationExplorerPageInner: React.FC<
         editable: true,
         valueGetter: (value, row) => row.dataset?.[colName] || '',
         valueSetter: (params) => {
+          if (!params.row || !params.row.dataset) {
+            console.warn('Row or dataset is undefined in valueSetter', params);
+            return params.row || {};
+          }
           const newDataset = { ...params.row.dataset, [colName]: params.value };
           return { ...params.row, dataset: newDataset };
         },
@@ -425,7 +320,7 @@ export const EvaluationExplorerPageInner: React.FC<
     });
 
     return cols;
-  }, [datasetColumns]);
+  }, [datasetColumns, rows, handleDuplicateRow, handleDeleteRow]);
 
   // Generate column groups
   const columnGroupingModel: GridColumnGroupingModel = React.useMemo(() => {
@@ -472,46 +367,10 @@ export const EvaluationExplorerPageInner: React.FC<
           slotProps={{
             toolbar: { onAddRow: handleAddRow, onAddColumn: handleAddColumn },
           }}
-          experimentalFeatures={{ newEditingApi: true }}
-          onRowContextMenu={(params, event) => handleContextMenu(event as React.MouseEvent, params.id)}
           columnVisibilityModel={{
             'dataset.rowDigest': false, // Hide the row digest column
           }}
         />
-        
-        <Menu
-          open={contextMenu !== null}
-          onClose={handleCloseContextMenu}
-          anchorReference="anchorPosition"
-          anchorPosition={
-            contextMenu !== null
-              ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
-              : undefined
-          }
-        >
-          <MenuItem onClick={() => {
-            if (contextMenu) {
-              handleDuplicateRow(contextMenu.rowId)();
-              handleCloseContextMenu();
-            }
-          }}>
-            <ListItemIcon>
-              <ContentCopyIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Duplicate Row</ListItemText>
-          </MenuItem>
-          <MenuItem onClick={() => {
-            if (contextMenu) {
-              handleDeleteRow(contextMenu.rowId)();
-              handleCloseContextMenu();
-            }
-          }}>
-            <ListItemIcon>
-              <DeleteIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Delete Row</ListItemText>
-          </MenuItem>
-        </Menu>
       </Column>
     </div>
   );
