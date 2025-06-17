@@ -213,7 +213,7 @@ export const useOpVersionOptions = (
         : {}),
       ...opVersionOptionsWithoutAllSection,
     };
-  }, [effectiveFilter, opVersionOptionsWithoutAllSection]);
+  }, [effectiveFilter, opVersionOptionsWithoutAllSection, includeAllOpsOption]);
 };
 
 export const useOutputObjectVersionOptions = (
