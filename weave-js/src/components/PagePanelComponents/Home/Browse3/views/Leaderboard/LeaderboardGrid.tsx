@@ -540,6 +540,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     });
   }, [columns, columnOrder]);
 
+  const [sortModelInitialized, setSortModelInitialized] = useState(false);
+
   const defaultSortModel: GridSortItem[] = useMemo(() => {
     if (!columnOrder) {
       return columns.map(c => ({field: c.field, sort: 'desc'}));
@@ -552,10 +554,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   }, [columnOrder, columns]);
 
   useEffect(() => {
-    if (columns.length > 1 && !loading) {
+    if (columns.length > 1 && !loading && !sortModelInitialized) {
       setSortModel(defaultSortModel);
+      setSortModelInitialized(true);
     }
-  }, [columns, defaultSortModel, loading]);
+  }, [columns.length, defaultSortModel, loading, sortModelInitialized]);
 
   if (loading) {
     return <Loading centered />;
