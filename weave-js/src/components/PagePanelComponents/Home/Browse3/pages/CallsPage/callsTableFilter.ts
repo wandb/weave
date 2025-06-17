@@ -119,7 +119,8 @@ export const useInputObjectVersionOptions = (
 export const useOpVersionOptions = (
   entity: string,
   project: string,
-  effectiveFilter: WFHighLevelCallFilter
+  effectiveFilter: WFHighLevelCallFilter,
+  includeAllOpsOption: boolean = true
 ): {
   [ref: string]: {
     title: string;
@@ -196,20 +197,25 @@ export const useOpVersionOptions = (
 
   return useMemo(() => {
     return {
-      [ALL_TRACES_OR_CALLS_REF_KEY]: {
-        title: filterShouldUseTraceRootsOnly({
-          ...effectiveFilter,
-          opVersionRefs: [],
-        })
-          ? ALL_TRACES_TITLE
-          : ALL_CALLS_TITLE,
-        ref: '',
-        group: ANY_OP_GROUP_HEADER,
-      },
+      ...(includeAllOpsOption
+        ? {
+            [ALL_TRACES_OR_CALLS_REF_KEY]: {
+              title: filterShouldUseTraceRootsOnly({
+                ...effectiveFilter,
+                opVersionRefs: [],
+              })
+                ? ALL_TRACES_TITLE
+                : ALL_CALLS_TITLE,
+              ref: '',
+              group: ANY_OP_GROUP_HEADER,
+            },
+          }
+        : {}),
       ...opVersionOptionsWithoutAllSection,
     };
   }, [effectiveFilter, opVersionOptionsWithoutAllSection]);
 };
+
 export const useOutputObjectVersionOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {
