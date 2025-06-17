@@ -34,12 +34,14 @@ export const Explorer = ({collectionId, inferenceContext}: ExplorerProps) => {
 
   return (
     <div ref={containerRef} className="h-full w-full">
-      <ExplorerLoaded
-        modelInfo={MODEL_INFO}
-        collectionId={collectionId}
-        width={width}
-        inferenceContext={inferenceContext}
-      />
+      {width > 0 ? (
+        <ExplorerLoaded
+          modelInfo={MODEL_INFO}
+          collectionId={collectionId}
+          width={width}
+          inferenceContext={inferenceContext}
+        />
+      ) : null}
     </div>
   );
 };

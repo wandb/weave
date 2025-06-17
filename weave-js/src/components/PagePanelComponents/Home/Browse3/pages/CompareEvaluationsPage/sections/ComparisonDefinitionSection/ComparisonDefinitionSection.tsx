@@ -100,7 +100,7 @@ const AddEvaluationButton: React.FC<{
     <>
       <div ref={refBar} onClick={onClick}>
         <Button variant="ghost" size="large" icon="add-new">
-          Add evaluation
+          Compare evaluation
         </Button>
       </div>
       <EvaluationSelector

@@ -284,7 +284,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     in_expr = ", ".join(f"'{x}'" for x in non_wildcarded_names)
                     or_conditions += [f"op_name IN ({', '.join({in_expr})})"]
 
-                for name_ndx, name in enumerate(wildcarded_names):
+                for _name_ndx, name in enumerate(wildcarded_names):
                     like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
                     or_conditions.append(f"op_name LIKE '{like_name}'")
 

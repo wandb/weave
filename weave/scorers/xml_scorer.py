@@ -2,12 +2,12 @@ import xml.etree.ElementTree as ET
 from typing import Any, Union
 
 import weave
-from weave.flow.scorer import BuiltInScorer
+from weave.flow.scorer import Scorer
 from weave.trace.objectify import register_object
 
 
 @register_object
-class ValidXMLScorer(BuiltInScorer):
+class ValidXMLScorer(Scorer):
     """Score an XML string."""
 
     @weave.op
