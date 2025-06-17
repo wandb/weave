@@ -6,8 +6,15 @@ import { ConfigurationBar } from './ConfigurationBar';
 import { EvaluationDataGrid } from './components';
 import { EvaluationExplorerPageProps, EvaluationRow } from './types';
 import { calculateRowDigest, deepCloneRow, createEmptyRow } from './utils';
+import SettingsIcon from '@mui/icons-material/Settings';
+import IconButton from '@mui/material/IconButton';
 
 export const EvaluationExplorerPage = (props: EvaluationExplorerPageProps) => {
+  const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
+
+  const handleOpenConfigDrawer = () => setConfigDrawerOpen(true);
+  const handleCloseConfigDrawer = () => setConfigDrawerOpen(false);
+
   return (
     <SimplePageLayoutWithHeader
       title="EvaluationExplorer"
@@ -16,7 +23,7 @@ export const EvaluationExplorerPage = (props: EvaluationExplorerPageProps) => {
       tabs={[
         {
           label: 'main',
-          content: <EvaluationExplorerPageInner {...props} />
+          content: <EvaluationExplorerPageInner {...props} configDrawerOpen={configDrawerOpen} onOpenConfigDrawer={handleOpenConfigDrawer} onCloseConfigDrawer={handleCloseConfigDrawer} />
         },
       ]}
       headerExtra={null}
@@ -32,19 +39,15 @@ const createInitialRow = (): EvaluationRow => ({
     columnA: "Value A1",
     columnB: "Value B1",
   },
-  output: {
-    modelA: [{"key": "val"}],
-    modelB: [{"key": "val"}]
-  },
-  scores: {
-    scorerA: {
-      modelA: { score: "1", reason: "A" },
-      modelB: { score: "1", reason: "A" }
-    }
-  }
+  output: {},
+  scores: {}
 });
 
-export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({ entity, project }) => {
+export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps & {
+  configDrawerOpen: boolean;
+  onOpenConfigDrawer: () => void;
+  onCloseConfigDrawer: () => void;
+}> = ({ entity, project, configDrawerOpen, onOpenConfigDrawer, onCloseConfigDrawer }) => {
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>('dataset-1');
   const [isDatasetEdited, setIsDatasetEdited] = useState(false);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
@@ -55,13 +58,11 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
   const [datasetColumns, setDatasetColumns] = useState<string[]>(DEFAULT_DATASET_COLUMNS);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
 
-  // Check if dataset has been edited
   useEffect(() => {
     const hasBeenEdited = JSON.stringify(rows) !== JSON.stringify(originalRows);
     setIsDatasetEdited(hasBeenEdited);
   }, [rows, originalRows]);
 
-  // Update row digests whenever rows change
   useEffect(() => {
     setRows(prevRows => 
       prevRows.map(row => ({
@@ -72,7 +73,7 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
         }
       }))
     );
-  }, [rows.length]); // Only recalculate when rows are added/removed
+  }, [rows.length]);
 
   const handleDeleteRow = (id: GridRowId) => {
     setRows(prevRows => prevRows.filter((row) => row.id !== id));
@@ -108,7 +109,6 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
     setDatasetColumns(prevColumns => {
       const columnName = `column${prevColumns.length + 1}`;
       
-      // Add the new column to all existing rows
       setRows(prevRows => prevRows.map(row => ({
         ...row,
         dataset: {
@@ -124,7 +124,6 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
   const handleDeleteColumn = (columnName: string) => {
     setDatasetColumns(prevColumns => prevColumns.filter(col => col !== columnName));
     
-    // Remove the column from all rows
     setRows(prevRows => prevRows.map(row => {
       const newDataset = { ...row.dataset };
       delete newDataset[columnName];
@@ -137,17 +136,13 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
 
   const handleDatasetChange = (datasetId: string) => {
     if (datasetId === 'create-new') {
-      // Clear all data for new dataset
       setSelectedDatasetId('new-dataset');
       setRows([]);
       setOriginalRows([]);
       setIsDatasetEdited(false);
-      // Reset columns to default
       setDatasetColumns(DEFAULT_DATASET_COLUMNS);
     } else {
       setSelectedDatasetId(datasetId);
-      // TODO: Load dataset data
-      // For now, just reset to example data
       const newRows = [{
         id: "1",
         dataset: {
@@ -168,16 +163,59 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
 
   const handleModelsChange = (modelIds: string[]) => {
     setSelectedModelIds(modelIds);
-    // TODO: Update output columns based on selected models
-    console.log('Selected models:', modelIds);
+    
+    setRows(prevRows => prevRows.map(row => {
+      const newOutput = { ...row.output };
+      
+      modelIds.forEach(modelId => {
+        if (!newOutput[modelId]) {
+          newOutput[modelId] = null;
+        }
+      });
+      
+      Object.keys(newOutput).forEach(modelId => {
+        if (!modelIds.includes(modelId)) {
+          delete newOutput[modelId];
+        }
+      });
+      
+      return { ...row, output: newOutput };
+    }));
   };
+
+  const handleRunModel = (rowId: string, modelId: string) => {
+    console.log(`Running model ${modelId} for row ${rowId}`);
+    
+    setTimeout(() => {
+      setRows(prevRows => prevRows.map(row => {
+        if (row.id === rowId) {
+          return {
+            ...row,
+            output: {
+              ...row.output,
+              [modelId]: [{ result: `Generated output for ${modelId}` }]
+            }
+          };
+        }
+        return row;
+      }));
+    }, 1000);
+  };
+
+  const availableModels = [
+    { id: 'gpt-4', name: 'GPT-4', description: 'OpenAI GPT-4' },
+    { id: 'claude-2', name: 'Claude 2', description: 'Anthropic Claude 2' },
+    { id: 'llama-2', name: 'Llama 2', description: 'Meta Llama 2' },
+  ];
 
   return (
     <Container>
       <DataContainer>
-        <EvaluationDataGrid
+        <EvaluationDataGrid 
           rows={rows}
           datasetColumns={datasetColumns}
+          selectedModelIds={selectedModelIds}
+          models={availableModels}
           rowModesModel={rowModesModel}
           onRowsChange={setRows}
           onRowModesModelChange={setRowModesModel}
@@ -186,6 +224,8 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
           onDeleteColumn={handleDeleteColumn}
           onDeleteRow={handleDeleteRow}
           onDuplicateRow={handleDuplicateRow}
+          onRunModel={handleRunModel}
+          onOpenConfig={onOpenConfigDrawer}
         />
       </DataContainer>
       <ConfigurationBar
@@ -194,12 +234,14 @@ export const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> 
         onDatasetChange={handleDatasetChange}
         selectedModelIds={selectedModelIds}
         onModelsChange={handleModelsChange}
+        availableModels={availableModels}
+        forceOpen={configDrawerOpen}
+        onForceClose={onCloseConfigDrawer}
       />
     </Container>
   );
 };
 
-// Styled components
 const Container: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div style={{
     width: '100%',
@@ -217,7 +259,6 @@ const DataContainer: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     flexDirection: 'column',
     width: '100%',
     height: '100%',
-    paddingRight: '48px',
     position: 'relative',
     overflow: 'hidden'
   }}>

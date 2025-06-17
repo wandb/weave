@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { 
   GridColDef, 
   GridColumnGroupingModel, 
@@ -9,31 +9,47 @@ import {
   GridRowId, 
   GridRowModes, 
   GridActionsCellItem,
+  GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
 import IconButton from '@mui/material/IconButton';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Box from '@mui/material/Box';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import { StyledDataGrid } from '../../../StyledDataGrid';
 import { EditToolbar } from './EditToolbar';
 import { calculateRowDigest } from '../utils';
-import { EvaluationRow } from '../types';
+import { EvaluationRow, Model } from '../types';
 
-interface EvaluationDataGridProps {
+export interface EvaluationDataGridProps {
   rows: GridRowsProp;
   datasetColumns: string[];
+  selectedModelIds: string[];
+  models: Model[];
   rowModesModel: GridRowModesModel;
   onRowsChange: (rows: GridRowsProp) => void;
-  onRowModesModelChange: (model: GridRowModesModel) => void;
+  onRowModesModelChange: React.Dispatch<React.SetStateAction<GridRowModesModel>>;
   onAddRow: () => void;
   onAddColumn: () => void;
   onDeleteColumn: (columnName: string) => void;
   onDeleteRow: (id: GridRowId) => void;
   onDuplicateRow: (id: GridRowId) => void;
+  onRunModel: (rowId: string, modelId: string) => void;
+  onOpenConfig?: () => void;
 }
 
 export const EvaluationDataGrid: React.FC<EvaluationDataGridProps> = ({
   rows,
   datasetColumns,
+  selectedModelIds,
+  models,
   rowModesModel,
   onRowsChange,
   onRowModesModelChange,
@@ -42,7 +58,36 @@ export const EvaluationDataGrid: React.FC<EvaluationDataGridProps> = ({
   onDeleteColumn,
   onDeleteRow,
   onDuplicateRow,
+  onRunModel,
+  onOpenConfig
 }) => {
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, rowId: string) => {
+    setMenuAnchorEl(event.currentTarget);
+    setSelectedRowId(rowId);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+    setSelectedRowId(null);
+  };
+
+  const handleDuplicate = () => {
+    if (selectedRowId) {
+      onDuplicateRow(selectedRowId);
+    }
+    handleMenuClose();
+  };
+
+  const handleDelete = () => {
+    if (selectedRowId) {
+      onDeleteRow(selectedRowId);
+    }
+    handleMenuClose();
+  };
+
   const handleRowEditStop: GridEventListener<'rowEditStop'> = useCallback((params, event) => {
     if (params.reason === 'rowFocusOut') {
       event.defaultMuiPrevented = true;
@@ -73,6 +118,28 @@ export const EvaluationDataGrid: React.FC<EvaluationDataGridProps> = ({
   // Generate columns dynamically
   const columns: GridColDef[] = useMemo(() => {
     const cols: GridColDef[] = [];
+
+    // Actions column (now first)
+    cols.push({
+      field: 'actions',
+      type: 'actions',
+      headerName: '',
+      width: 40,
+      cellClassName: 'actions',
+      getActions: ({ id }) => {
+        return [
+          <GridActionsCellItem
+            icon={<MoreVertIcon fontSize="small" />}
+            label="More"
+            onClick={(e) => handleMenuOpen(e, id as string)}
+            sx={{ 
+              color: 'text.secondary',
+              '&:hover': { color: 'primary.main' }
+            }}
+          />,
+        ];
+      },
+    });
 
     // Hidden row digest column
     cols.push({
@@ -136,96 +203,174 @@ export const EvaluationDataGrid: React.FC<EvaluationDataGridProps> = ({
       });
     });
 
-    // Output columns - TODO: Make dynamic based on selected models
-    cols.push({
-      field: 'output.modelA',
-      headerName: 'Model A',
-      width: 150,
-      valueGetter: (value, row) => JSON.stringify(row.output?.modelA || []),
-    });
-
-    cols.push({
-      field: 'output.modelB',
-      headerName: 'Model B',
-      width: 150,
-      valueGetter: (value, row) => JSON.stringify(row.output?.modelB || []),
-    });
-
-    // Actions column
-    cols.push({
-      field: 'actions',
-      type: 'actions',
-      headerName: 'Actions',
-      width: 100,
-      cellClassName: 'actions',
-      getActions: ({ id }) => {
-        return [
-          <GridActionsCellItem
-            icon={<ContentCopyIcon fontSize="small" />}
-            label="Duplicate"
-            onClick={handleDuplicateRow(id)}
-            sx={{ 
-              color: 'text.secondary',
-              '&:hover': { color: 'primary.main' }
-            }}
-          />,
-          <GridActionsCellItem
-            icon={<DeleteIcon fontSize="small" />}
-            label="Delete"
-            onClick={handleDeleteRow(id)}
-            sx={{ 
-              color: 'text.secondary',
-              '&:hover': { color: 'error.main' }
-            }}
-          />,
-        ];
-      },
+    // Dynamic model output columns
+    selectedModelIds.forEach(modelId => {
+      const model = models.find(m => m.id === modelId);
+      const modelName = model?.name || modelId;
+      
+      cols.push({
+        field: `output.${modelId}`,
+        headerName: modelName,
+        width: 200,
+        valueGetter: (value, row) => row.output?.[modelId],
+        renderCell: (params: GridRenderCellParams) => {
+          const output = params.value;
+          
+          if (output && output.length > 0) {
+            // Model has output
+            return (
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 0.5,
+                width: '100%',
+                height: '100%',
+                px: 1
+              }}>
+                <Chip 
+                  label={`Output: ${JSON.stringify(output).substring(0, 30)}...`}
+                  size="small"
+                  variant="outlined"
+                  sx={{ 
+                    fontSize: '0.75rem',
+                    height: 24,
+                    maxWidth: '100%'
+                  }}
+                />
+              </Box>
+            );
+          } else {
+            // No output - show run button
+            return (
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                height: '100%'
+              }}>
+                <Button
+                  size="small"
+                  startIcon={<PlayArrowIcon fontSize="small" />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onRunModel) {
+                      onRunModel(params.row.id as string, modelId);
+                    }
+                  }}
+                  sx={{ 
+                    fontSize: '0.75rem',
+                    py: 0.25,
+                    px: 1,
+                    minWidth: 'auto',
+                    textTransform: 'none'
+                  }}
+                >
+                  Run
+                </Button>
+              </Box>
+            );
+          }
+        },
+      });
     });
 
     return cols;
-  }, [datasetColumns, handleDuplicateRow, handleDeleteRow, onDeleteColumn]);
+  }, [datasetColumns, handleDuplicateRow, handleDeleteRow, onDeleteColumn, selectedModelIds, models, onRunModel]);
 
   // Generate column groups
   const columnGroupingModel: GridColumnGroupingModel = useMemo(() => {
     const datasetFields = datasetColumns.map(col => ({ field: `dataset.${col}` }));
+    const outputFields = selectedModelIds.map(modelId => ({ field: `output.${modelId}` }));
     
-    return [
+    const groups: any[] = [
       {
         groupId: 'Dataset',
         children: datasetFields,
       },
-      {
-        groupId: 'Output',
-        children: [
-          { field: 'output.modelA' },
-          { field: 'output.modelB' }
-        ]
-      },
     ];
-  }, [datasetColumns]);
+    
+    if (outputFields.length > 0) {
+      groups.push({
+        groupId: 'Output',
+        children: outputFields
+      });
+    }
+    
+    return groups;
+  }, [datasetColumns, selectedModelIds]);
 
   return (
-    <StyledDataGrid 
-      rows={rows} 
-      columns={columns}
-      rowHeight={36}
-      columnGroupingModel={columnGroupingModel}
-      columnHeaderHeight={36}
-      editMode="row"
-      rowModesModel={rowModesModel}
-      onRowModesModelChange={onRowModesModelChange}
-      onRowEditStop={handleRowEditStop}
-      processRowUpdate={processRowUpdate}
-      onProcessRowUpdateError={(error) => console.error(error)}
-      slots={{
-        toolbar: EditToolbar as any,
-      }}
-      slotProps={{
-        toolbar: { onAddRow, onAddColumn },
-      }}
-      columnVisibilityModel={{
-        'dataset.rowDigest': false, // Hide the row digest column
-      }}
-    />
+    <>
+      <StyledDataGrid 
+        rows={rows} 
+        columns={columns}
+        rowHeight={36}
+        columnGroupingModel={columnGroupingModel}
+        columnHeaderHeight={36}
+        editMode="row"
+        rowModesModel={rowModesModel}
+        onRowModesModelChange={onRowModesModelChange}
+        onRowEditStop={handleRowEditStop}
+        processRowUpdate={processRowUpdate}
+        onProcessRowUpdateError={(error) => console.error(error)}
+        slots={{
+          toolbar: EditToolbar as any,
+        }}
+        slotProps={{
+          toolbar: { onAddRow, onAddColumn, onOpenConfig },
+        }}
+        columnVisibilityModel={{
+          'dataset.rowDigest': false, // Hide the row digest column
+        }}
+      />
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleMenuClose}
+        onClick={handleMenuClose}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.15))',
+            mt: 1.5,
+            '& .MuiAvatar-root': {
+              width: 32,
+              height: 32,
+              ml: -0.5,
+              mr: 1,
+            },
+            '&:before': {
+              content: '""',
+              display: 'block',
+              position: 'absolute',
+              top: 0,
+              right: 14,
+              width: 10,
+              height: 10,
+              bgcolor: 'background.paper',
+              transform: 'translateY(-50%) rotate(45deg)',
+              zIndex: 0,
+            },
+          },
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem onClick={handleDuplicate}>
+          <ListItemIcon>
+            <ContentCopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Duplicate</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDelete}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+      </Menu>
+    </>
   );
 }; 

@@ -58,6 +58,9 @@ export interface ConfigurationBarProps {
   selectedModelIds?: string[];
   onModelsChange?: (modelIds: string[]) => void;
   onModelDetailOpen?: (modelId: string | null) => void;
+  availableModels?: Model[];
+  forceOpen?: boolean;
+  onForceClose?: () => void;
 }
 
 // Section component props

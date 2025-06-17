@@ -14,13 +14,19 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
   onDatasetChange,
   selectedModelIds = [],
   onModelsChange,
-  onModelDetailOpen
+  onModelDetailOpen,
+  availableModels,
+  forceOpen,
+  onForceClose
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedModelForDetail, setSelectedModelForDetail] = useState<string | null>(null);
   const { datasets, isLoading: datasetsLoading } = useAvailableDatasets();
-  const { models, isLoading: modelsLoading } = useAvailableModels();
+  const { models: fetchedModels, isLoading: modelsLoading } = useAvailableModels();
   const { scorers, isLoading: scorersLoading } = useAvailableScorers();
+  
+  // Use availableModels prop if provided, otherwise use fetched models
+  const models = availableModels || fetchedModels;
 
   // Handle model detail opening
   const handleModelDetailOpen = (modelId: string) => {
@@ -31,13 +37,15 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
     setSelectedModelForDetail(null);
   };
 
-  const handleToggle = () => {
-    setIsOpen(!isOpen);
-  };
-
-  const handleCloseDrawer = () => {
-    setIsOpen(false);
+  // Only use internal state if forceOpen is not provided
+  const drawerOpen = forceOpen !== undefined ? forceOpen : isOpen;
+  const handleDrawerClose = () => {
     setSelectedModelForDetail(null);
+    if (forceOpen !== undefined && onForceClose) {
+      onForceClose();
+    } else {
+      setIsOpen(false);
+    }
   };
 
   // Create panels array for expanded drawer
@@ -51,57 +59,58 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
 
   return (
     <>
-      {/* Toggle button */}
-      <Box
-        sx={{
-          position: 'absolute',
-          right: 0,
-          top: 0,
-          width: '48px',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          paddingTop: 1,
-          zIndex: 8,
-          backgroundColor: '#FAFAFA',
-          borderLeft: '1px solid #E0E0E0',
-          boxShadow: '-2px 0 4px rgba(0, 0, 0, 0.04)'
-        }}
-      >
-        <IconButton
-          onClick={handleToggle}
-          sx={{ 
-            '&:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)'
-            }
+      {/* Only render the vertical toggle bar if not controlled by forceOpen */}
+      {forceOpen === undefined && (
+        <Box
+          sx={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            width: '48px',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            paddingTop: 1,
+            zIndex: 8,
+            backgroundColor: '#FAFAFA',
+            borderLeft: '1px solid #E0E0E0',
+            boxShadow: '-2px 0 4px rgba(0, 0, 0, 0.04)'
           }}
         >
-          {isOpen ? <ChevronRight /> : <ChevronLeft />}
-        </IconButton>
-        
-        {/* Vertical text when closed */}
-        {!isOpen && (
-          <Typography
-            sx={{
-              writingMode: 'vertical-rl',
-              transform: 'rotate(180deg)',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: 'text.secondary',
-              userSelect: 'none',
-              marginTop: 2
+          <IconButton
+            onClick={() => setIsOpen(!isOpen)}
+            sx={{ 
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+              }
             }}
           >
-            Configuration
-          </Typography>
-        )}
-      </Box>
+            {isOpen ? <ChevronRight /> : <ChevronLeft />}
+          </IconButton>
+          {/* Vertical text when closed */}
+          {!isOpen && (
+            <Typography
+              sx={{
+                writingMode: 'vertical-rl',
+                transform: 'rotate(180deg)',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: 'text.secondary',
+                userSelect: 'none',
+                marginTop: 2
+              }}
+            >
+              Configuration
+            </Typography>
+          )}
+        </Box>
+      )}
 
       {/* Drawer */}
       <DetailDrawer
-        open={isOpen}
-        onClose={handleCloseDrawer}
+        open={drawerOpen}
+        onClose={handleDrawerClose}
         title="Configuration"
         width={300}
         side="right"
@@ -109,7 +118,7 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
         headerExtra={
           <IconButton
             size="small"
-            onClick={handleCloseDrawer}
+            onClick={handleDrawerClose}
             sx={{ 
               '&:hover': { 
                 backgroundColor: 'rgba(0, 0, 0, 0.04)' 

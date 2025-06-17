@@ -95,7 +95,8 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: 2,
+              padding: '8px 16px',
+              minHeight: 44,
               borderBottom: '1px solid #E0E0E0',
               backgroundColor: 'white'
             }}
@@ -106,6 +107,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                   size="small"
                   onClick={panel.onClose}
                   sx={{ 
+                    padding: '4px',
                     '&:hover': { 
                       backgroundColor: 'rgba(0, 0, 0, 0.04)' 
                     } 
@@ -114,7 +116,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
                   <ChevronRight />
                 </IconButton>
               )}
-              <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem' }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>
                 {panel.title}
               </Typography>
             </Box>
@@ -144,12 +146,13 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: 2,
+            padding: '8px 16px',
+            minHeight: 44,
             borderBottom: '1px solid #E0E0E0',
             backgroundColor: '#FFFFFF'
           }}
         >
-          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem' }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>
             {title}
           </Typography>
           {headerExtra}
@@ -158,6 +161,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
               size="small"
               onClick={onClose}
               sx={{ 
+                padding: '4px',
                 '&:hover': { 
                   backgroundColor: 'rgba(0, 0, 0, 0.04)' 
                 } 
