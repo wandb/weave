@@ -22,6 +22,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { StyledDataGrid } from '../../StyledDataGrid';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import { ConfigurationBar } from './ConfigurationBar';
 
 export type EvaluationExplorerPageProps = {
   entity: string;
@@ -86,6 +87,27 @@ const EditToolbar = (props: any) => {
 export const EvaluationExplorerPageInner: React.FC<
   EvaluationExplorerPageProps
 > = ({entity, project}) => {
+  const [selectedDatasetId, setSelectedDatasetId] = React.useState<string>('dataset-1');
+  const [isDatasetEdited, setIsDatasetEdited] = React.useState(false);
+  const [originalRows, setOriginalRows] = React.useState<GridRowsProp>([
+    {
+      id: "1",
+      dataset: {
+        columnA: "Value A1",
+        columnB: "Value B1",
+      },
+      output: {
+        modelA: [{"key": "val"}],
+        modelB: [{"key": "val"}]
+      },
+      scores: {
+        scorerA: {
+          modelA: { score: "1", reason: "A" },
+          modelB: { score: "1", reason: "A" }
+        }
+      }
+    }
+  ]);
   const [rows, setRows] = React.useState<GridRowsProp>([
     {
       id: "1",
@@ -109,6 +131,11 @@ export const EvaluationExplorerPageInner: React.FC<
   const [datasetColumns, setDatasetColumns] = React.useState<string[]>(['columnA', 'columnB']);
   const [rowModesModel, setRowModesModel] = React.useState<GridRowModesModel>({});
 
+  // Check if dataset has been edited
+  React.useEffect(() => {
+    const hasBeenEdited = JSON.stringify(rows) !== JSON.stringify(originalRows);
+    setIsDatasetEdited(hasBeenEdited);
+  }, [rows, originalRows]);
 
   // Update row digests whenever rows change
   React.useEffect(() => {
@@ -227,7 +254,36 @@ export const EvaluationExplorerPageInner: React.FC<
     }));
   };
 
-
+  const handleDatasetChange = (datasetId: string) => {
+    if (datasetId === 'create-new') {
+      // Clear all data for new dataset
+      setSelectedDatasetId('new-dataset');
+      setRows([]);
+      setOriginalRows([]);
+      setIsDatasetEdited(false);
+      // Reset columns to default
+      setDatasetColumns(['columnA', 'columnB']);
+    } else {
+      setSelectedDatasetId(datasetId);
+      // TODO: Load dataset data
+      // For now, just reset to example data
+      const newRows = [{
+        id: "1",
+        dataset: {
+          columnA: `Data from ${datasetId}`,
+          columnB: "New Value",
+        },
+        output: {
+          modelA: [],
+          modelB: []
+        },
+        scores: {}
+      }];
+      setRows(newRows);
+      setOriginalRows(newRows);
+      setIsDatasetEdited(false);
+    }
+  };
 
   // Generate columns dynamically
   const columns: GridColDef[] = React.useMemo(() => {
@@ -348,6 +404,11 @@ export const EvaluationExplorerPageInner: React.FC<
       width: '100%',
       height: '100%'
     }}>
+      <ConfigurationBar
+        selectedDatasetId={selectedDatasetId}
+        isDatasetEdited={isDatasetEdited}
+        onDatasetChange={handleDatasetChange}
+      />
       <Column>
         <StyledDataGrid 
           rows={rows} 
