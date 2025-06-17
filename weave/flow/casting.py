@@ -42,6 +42,8 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
         res = weave.op(obj)
     elif isinstance(obj, OpRef):
         res = obj.get()
+    elif isinstance(obj, ObjectRef):
+        res = Scorer.from_obj(obj.get())
     else:
         raise TypeError("Unable to cast to Scorer")
 
