@@ -300,17 +300,48 @@ class ObjectRefCondition(BaseModel):
         None
     )
 
-    def get_expand_column_match(self) -> Optional[str]:
-        """Find the matching expand column for this field path"""
-        # Find the shortest matching expand column to build full chain
-        for expand_col in sorted(self.expand_columns, key=len):
+    def get_expand_column_match(self, shortest: bool = True) -> Optional[str]:
+        """Find the matching expand column for this field path.
+
+        Args:
+            shortest (bool): If True, returns the shortest matching expand column.
+                If False, returns the longest matching expand column.
+
+        Returns:
+            Optional[str]: The matching expand column or None if no match found.
+
+        Examples:
+            >>> condition = ObjectRefCondition(field_path="inputs.model.config.temperature", expand_columns=["inputs", "inputs.model"])
+            >>> condition.get_expand_column_match(shortest=True)
+            'inputs'
+            >>> condition.get_expand_column_match(shortest=False)
+            'inputs.model'
+        """
+        for expand_col in sorted(self.expand_columns, key=len, reverse=not shortest):
             if self.field_path.startswith(expand_col + "."):
                 return expand_col
         return None
 
     def get_object_property_path(self) -> str:
-        """Get the property path within the object (after the expand column)"""
+        """Get the property path within the object (after the shortest expand column)
+        this represents the path that contains object references that need to be expanded
+        e.g. "inputs.model.config.temperature" -> "config.temperature"
+
+        where expand_columns = ["inputs.model", "inputs.model.config"]
+        """
         expand_match = self.get_expand_column_match()
+        if expand_match:
+            return self.field_path[len(expand_match) + 1 :]  # +1 for the dot
+        return self.field_path
+
+    def get_leaf_object_property_path(self) -> str:
+        """Get the property path within the object (after the longest expand column)
+        this represents the path that **doesn't** contain object references
+        e.g. "inputs.model.config.temperature.val" -> "temperature.val"
+
+        where expand_columns = ["inputs.model", "inputs.model.config"]
+        """
+        expand_match = self.get_expand_column_match(shortest=False)
         if expand_match:
             return self.field_path[len(expand_match) + 1 :]  # +1 for the dot
         return self.field_path
@@ -634,56 +665,123 @@ def process_query_to_optimization_sql(
     )
 
 
-def _create_like_condition(
-    field: str,
-    like_pattern: str,
-    pb: "ParamBuilder",
-    table_alias: str,
-    case_insensitive: bool = False,
-) -> str:
-    """Creates a LIKE condition for a JSON field."""
-    field_name = f"{table_alias}.{field}"
-
-    if case_insensitive:
-        param_name = pb.add_param(like_pattern.lower())
-        return f"lower({field_name}) LIKE {param_slot(param_name, 'String')}"
-    else:
-        param_name = pb.add_param(like_pattern)
-        return f"{field_name} LIKE {param_slot(param_name, 'String')}"
-
-
-def _extract_field_and_literal(
-    operation: Union[
-        tsi_query.EqOperation, tsi_query.GtOperation, tsi_query.GteOperation
-    ],
-) -> tuple[Optional[tsi_query.GetFieldOperator], Optional[tsi_query.LiteralOperation]]:
-    """Extract field and literal operands from a binary operation.
-
-    Returns a tuple of (field_operand, literal_operand) or (None, None) if invalid.
+class OperationHandlerBase:
     """
-    ops = (
-        operation.eq_
-        if hasattr(operation, "eq_")
-        else (operation.gt_ if hasattr(operation, "gt_") else operation.gte_)
-    )
+    Base class for handling common patterns in query operation processing.
 
-    if len(ops) != 2:
-        return None, None
+    This class provides shared functionality for extracting fields and literals
+    from binary operations, reducing code duplication across different processors.
+    """
 
-    field_operand = None
-    literal_operand = None
+    @staticmethod
+    def extract_field_and_literal(
+        operation: Union[
+            tsi_query.EqOperation,
+            tsi_query.GtOperation,
+            tsi_query.GteOperation,
+            tsi_query.ContainsOperation,
+            tsi_query.InOperation,
+        ],
+    ) -> tuple[
+        Optional[tsi_query.GetFieldOperator], Optional[tsi_query.LiteralOperation]
+    ]:
+        """
+        Extract field and literal operands from a binary operation.
 
-    if isinstance(ops[0], tsi_query.GetFieldOperator):
-        field_operand = ops[0]
-        literal_operand = ops[1]
-    elif isinstance(ops[1], tsi_query.GetFieldOperator):
-        field_operand = ops[1]
-        literal_operand = ops[0]
+        Args:
+            operation: The binary operation to extract operands from
 
-    if not isinstance(literal_operand, tsi_query.LiteralOperation):
-        return None, None
+        Returns:
+            tuple[Optional[GetFieldOperator], Optional[LiteralOperation]]:
+                A tuple of (field_operand, literal_operand) or (None, None) if invalid.
 
-    return field_operand, literal_operand
+        Examples:
+            >>> op = EqOperation(eq_=[GetFieldOperator(get_field_="test"), LiteralOperation(literal_="value")])
+            >>> field_op, literal_op = OperationHandlerBase.extract_field_and_literal(op)
+            >>> field_op.get_field_
+            'test'
+            >>> literal_op.literal_
+            'value'
+        """
+        # Handle different operation types
+        if hasattr(operation, "eq_"):
+            ops = operation.eq_
+        elif hasattr(operation, "gt_"):
+            ops = operation.gt_
+        elif hasattr(operation, "gte_"):
+            ops = operation.gte_
+        elif hasattr(operation, "contains_"):
+            # Contains operation has a different structure
+            if isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
+                field_operand = operation.contains_.input
+                literal_operand = operation.contains_.substr
+                if isinstance(literal_operand, tsi_query.LiteralOperation):
+                    return field_operand, literal_operand
+            return None, None
+        elif hasattr(operation, "in_"):
+            # IN operation has a different structure
+            if len(operation.in_) >= 2 and isinstance(
+                operation.in_[0], tsi_query.GetFieldOperator
+            ):
+                field_operand = operation.in_[0]
+                # For IN operations, we don't extract a single literal but validate the structure
+                # The caller should handle the list of values separately
+                return field_operand, None
+            return None, None
+        else:
+            return None, None
+
+        if len(ops) != 2:
+            return None, None
+
+        field_operand_res = None
+        literal_operand = None
+
+        if isinstance(ops[0], tsi_query.GetFieldOperator):
+            field_operand_res = ops[0]
+            literal_operand = ops[1]
+        elif isinstance(ops[1], tsi_query.GetFieldOperator):
+            field_operand_res = ops[1]
+            literal_operand = ops[0]
+
+        if not isinstance(literal_operand, tsi_query.LiteralOperation):
+            return None, None
+
+        return field_operand_res, literal_operand
+
+    @staticmethod
+    def create_like_condition(
+        field: str,
+        like_pattern: str,
+        pb: "ParamBuilder",
+        table_alias: str,
+        case_insensitive: bool = False,
+    ) -> str:
+        """
+        Creates a LIKE condition for a JSON field.
+
+        Args:
+            field: The field name to apply the LIKE condition to
+            like_pattern: The pattern to match against
+            pb: Parameter builder for SQL parameters
+            table_alias: Table alias to use in the condition
+            case_insensitive: Whether to perform case-insensitive matching
+
+        Returns:
+            str: SQL LIKE condition
+
+        Examples:
+            >>> OperationHandlerBase.create_like_condition("inputs_dump", "%test%", pb, "calls")
+            'calls.inputs_dump LIKE {param_slot}'
+        """
+        field_name = f"{table_alias}.{field}"
+
+        if case_insensitive:
+            param_name = pb.add_param(like_pattern.lower())
+            return f"lower({field_name}) LIKE {param_slot(param_name, 'String')}"
+        else:
+            param_name = pb.add_param(like_pattern)
+            return f"{field_name} LIKE {param_slot(param_name, 'String')}"
 
 
 def _create_like_optimized_eq_condition(
@@ -692,7 +790,9 @@ def _create_like_optimized_eq_condition(
     table_alias: str,
 ) -> Optional[str]:
     """Creates a LIKE-optimized condition for equality operations."""
-    field_operand, literal_operand = _extract_field_and_literal(operation)
+    field_operand, literal_operand = OperationHandlerBase.extract_field_and_literal(
+        operation
+    )
     if field_operand is None or literal_operand is None:
         return None
 
@@ -720,7 +820,9 @@ def _create_like_optimized_eq_condition(
     else:
         like_pattern = f'%"{literal_value}"%'
 
-    like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
+    like_condition = OperationHandlerBase.create_like_condition(
+        field, like_pattern, pb, table_alias
+    )
     if _field_requires_null_check(field):
         return f"({like_condition} OR {table_alias}.{field} IS NULL)"
     return like_condition
@@ -757,7 +859,7 @@ def _create_like_optimized_contains_condition(
     case_insensitive = operation.contains_.case_insensitive or False
     like_pattern = f'%"%{substr_value}%"%'
 
-    like_condition = _create_like_condition(
+    like_condition = OperationHandlerBase.create_like_condition(
         field, like_pattern, pb, table_alias, case_insensitive
     )
     if _field_requires_null_check(field):
@@ -802,7 +904,9 @@ def _create_like_optimized_in_condition(
             return None
 
         like_pattern = f'%"{value_operand.literal_}"%'
-        like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
+        like_condition = OperationHandlerBase.create_like_condition(
+            field, like_pattern, pb, table_alias
+        )
         like_conditions.append(like_condition)
 
     or_sql = "(" + " OR ".join(like_conditions) + ")"
@@ -830,7 +934,9 @@ def _create_datetime_optimization_sql(
     - For normal context: Subtracts buffer from timestamp
     - For NOT context: Adds buffer to timestamp
     """
-    field_operand, literal_operand = _extract_field_and_literal(operation)
+    field_operand, literal_operand = OperationHandlerBase.extract_field_and_literal(
+        operation
+    )
     if field_operand is None or literal_operand is None:
         return None
 
@@ -885,6 +991,145 @@ def process_query_for_object_refs(
     return transformed_sql, processor.object_ref_conditions
 
 
+class ObjectRefConditionHandler:
+    """
+    Handles the creation of SQL conditions for object reference filtering.
+
+    This class encapsulates the logic for building SQL conditions for different
+    operation types while reducing code duplication.
+    """
+
+    def __init__(self, pb: "ParamBuilder", json_path_param: str):
+        self.pb = pb
+        self.json_path_param = json_path_param
+
+    def _create_json_extract_expression(
+        self, conversion_type: Optional[tsi_query.CastTo] = None
+    ) -> str:
+        """
+        Creates a JSON_VALUE expression with optional type conversion.
+
+        Args:
+            conversion_type: Optional type to convert the extracted value to
+
+        Returns:
+            str: The JSON extraction expression
+
+        Examples:
+            >>> handler._create_json_extract_expression()
+            'JSON_VALUE(val_dump, {param_slot})'
+            >>> handler._create_json_extract_expression('double')
+            'toFloat64(JSON_VALUE(val_dump, {param_slot}))'
+        """
+        json_extract = (
+            f"JSON_VALUE(val_dump, {param_slot(self.json_path_param, 'String')})"
+        )
+
+        if conversion_type:
+            from weave.trace_server.orm import clickhouse_cast
+
+            return clickhouse_cast(json_extract, conversion_type)
+
+        return json_extract
+
+    def _create_filter_param(self, value: typing.Any) -> tuple[str, str]:
+        """
+        Creates a filter parameter and determines its type.
+
+        Args:
+            value: The value to create a parameter for
+
+        Returns:
+            tuple[str, str]: A tuple of (parameter_name, parameter_type)
+
+        Examples:
+            >>> handler._create_filter_param("test")
+            ('param_1', 'String')
+            >>> handler._create_filter_param(42)
+            ('param_2', 'Int64')
+        """
+        from weave.trace_server.orm import python_value_to_ch_type
+
+        filter_param = self.pb.add_param(value)
+        filter_type = python_value_to_ch_type(value)
+        return filter_param, filter_type
+
+    def handle_eq_operation(self, condition: ObjectRefCondition) -> str:
+        """
+        Handle equality operations for object references.
+
+        Args:
+            condition: The object reference condition
+
+        Returns:
+            str: SQL condition for equality comparison
+        """
+        filter_param, filter_type = self._create_filter_param(condition.value)
+        json_extract = self._create_json_extract_expression(condition.conversion_type)
+
+        return f"{json_extract} = {param_slot(filter_param, filter_type)}"
+
+    def handle_contains_operation(self, condition: ObjectRefCondition) -> str:
+        """
+        Handle contains operations for object references.
+
+        Args:
+            condition: The object reference condition
+
+        Returns:
+            str: SQL condition for contains comparison
+        """
+        filter_param = self.pb.add_param(f"%{condition.value}%")
+        json_extract = self._create_json_extract_expression()
+
+        if condition.case_insensitive:
+            return f"lower({json_extract}) LIKE lower({param_slot(filter_param, 'String')})"
+        else:
+            return f"{json_extract} LIKE {param_slot(filter_param, 'String')}"
+
+    def handle_comparison_operation(
+        self, condition: ObjectRefCondition, operator: str
+    ) -> str:
+        """
+        Handle gt/gte operations for object references.
+
+        Args:
+            condition: The object reference condition
+            operator: The comparison operator ('>' or '>=')
+
+        Returns:
+            str: SQL condition for comparison
+        """
+        filter_param, filter_type = self._create_filter_param(condition.value)
+        json_extract = self._create_json_extract_expression(condition.conversion_type)
+
+        return f"{json_extract} {operator} {param_slot(filter_param, filter_type)}"
+
+    def handle_in_operation(self, condition: ObjectRefCondition) -> str:
+        """
+        Handle IN operations for object references.
+
+        Args:
+            condition: The object reference condition
+
+        Returns:
+            str: SQL condition for IN comparison
+        """
+        if not isinstance(condition.value, list):
+            raise TypeError("IN operation requires a list value")
+
+        if not condition.value:
+            return "1=0"  # Empty IN list matches nothing
+
+        from weave.trace_server.orm import python_value_to_ch_type
+
+        filter_param = self.pb.add_param(condition.value)
+        filter_type = f"Array({python_value_to_ch_type(condition.value[0])})"
+        json_extract = self._create_json_extract_expression(condition.conversion_type)
+
+        return f"{json_extract} IN {param_slot(filter_param, filter_type)}"
+
+
 def build_object_ref_ctes(
     pb: "ParamBuilder", project_id: str, object_ref_conditions: list[ObjectRefCondition]
 ) -> tuple[str, dict[str, str]]:
@@ -908,96 +1153,37 @@ def build_object_ref_ctes(
     field_to_cte_alias_map = {}
     cte_counter = 0
 
-    for i, condition in enumerate(object_ref_conditions):
+    for condition in object_ref_conditions:
         # Get the expand column match and property path
         expand_match = condition.get_expand_column_match()
         if not expand_match:
             continue
 
         object_property_path = condition.get_object_property_path()
-        property_parts = object_property_path.split(".")
+        leaf_property = condition.get_leaf_object_property_path()
+        # the number of refs in the path:
+        intermediate_parts = object_property_path.replace(leaf_property, "").split(".")
 
         # Build the leaf-level CTE (filters on the actual property value)
-        leaf_property = property_parts[-1]  # The final property to filter on
         leaf_cte_name = f"obj_filter_{cte_counter}"
         cte_counter += 1
 
         # Parameterize the JSON path
         json_path_param = pb.add_param(f"$.{leaf_property}")
 
-        # Generate the appropriate SQL condition based on operation type
+        # Create condition handler and generate the appropriate SQL condition
+        handler = ObjectRefConditionHandler(pb, json_path_param)
+
         if condition.operation_type == "eq":
-            from weave.trace_server.orm import python_value_to_ch_type
-
-            filter_param = pb.add_param(condition.value)
-            filter_type = python_value_to_ch_type(condition.value)
-
-            # Apply conversion if needed
-            if condition.conversion_type:
-                from weave.trace_server.orm import clickhouse_cast
-
-                json_extract = (
-                    f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')})"
-                )
-                converted_extract = clickhouse_cast(
-                    json_extract, condition.conversion_type
-                )
-                val_condition = (
-                    f"{converted_extract} = {param_slot(filter_param, filter_type)}"
-                )
-            else:
-                val_condition = f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')}) = {param_slot(filter_param, filter_type)}"
+            val_condition = handler.handle_eq_operation(condition)
         elif condition.operation_type == "contains":
-            filter_param = pb.add_param(f"%{condition.value}%")
-            if condition.case_insensitive:
-                val_condition = f"lower(JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')})) LIKE lower({param_slot(filter_param, 'String')})"
-            else:
-                val_condition = f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')}) LIKE {param_slot(filter_param, 'String')}"
-        elif condition.operation_type in ["gt", "gte"]:
-            from weave.trace_server.orm import python_value_to_ch_type
-
-            filter_param = pb.add_param(condition.value)
-            filter_type = python_value_to_ch_type(condition.value)
-            op_symbol = ">" if condition.operation_type == "gt" else ">="
-
-            # Apply conversion if needed
-            if condition.conversion_type:
-                from weave.trace_server.orm import clickhouse_cast
-
-                json_extract = (
-                    f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')})"
-                )
-                converted_extract = clickhouse_cast(
-                    json_extract, condition.conversion_type
-                )
-                val_condition = f"{converted_extract} {op_symbol} {param_slot(filter_param, filter_type)}"
-            else:
-                val_condition = f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')}) {op_symbol} {param_slot(filter_param, filter_type)}"
+            val_condition = handler.handle_contains_operation(condition)
+        elif condition.operation_type == "gt":
+            val_condition = handler.handle_comparison_operation(condition, ">")
+        elif condition.operation_type == "gte":
+            val_condition = handler.handle_comparison_operation(condition, ">=")
         elif condition.operation_type == "in":
-            # Handle IN operation with multiple values
-            if not isinstance(condition.value, list):
-                continue
-            from weave.trace_server.orm import python_value_to_ch_type
-
-            if condition.value:
-                filter_param = pb.add_param(condition.value)
-                filter_type = f"Array({python_value_to_ch_type(condition.value[0])})"
-
-                # Apply conversion if needed
-                if condition.conversion_type:
-                    from weave.trace_server.orm import clickhouse_cast
-
-                    json_extract = (
-                        f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')})"
-                    )
-                    converted_extract = clickhouse_cast(
-                        json_extract, condition.conversion_type
-                    )
-                    val_condition = f"{converted_extract} IN {param_slot(filter_param, filter_type)}"
-                else:
-                    val_condition = f"JSON_VALUE(val_dump, {param_slot(json_path_param, 'String')}) IN {param_slot(filter_param, filter_type)}"
-            else:
-                val_condition = "1=0"  # Empty IN list matches nothing
+            val_condition = handler.handle_in_operation(condition)
         else:
             continue
 
@@ -1018,10 +1204,10 @@ def build_object_ref_ctes(
         current_cte_name = leaf_cte_name
 
         # If we have nested properties, build intermediate CTEs
-        if len(property_parts) > 1:
+        if len(intermediate_parts) > 1:
             # Work backwards from the leaf to build the chain
-            remaining_properties = property_parts[:-1]  # All but the last property
-            for j, prop in enumerate(reversed(remaining_properties)):
+            remaining_properties = intermediate_parts[:-1]  # All but the last property
+            for prop in reversed(remaining_properties):
                 intermediate_cte_name = f"obj_filter_{cte_counter}"
                 cte_counter += 1
 
@@ -1045,17 +1231,20 @@ def build_object_ref_ctes(
                 cte_parts.append(intermediate_cte)
                 current_cte_name = intermediate_cte_name
 
-        # Map a unique condition key to the final CTE name
-        # Use field_path + operation + value to create unique key for each condition
-        condition_key = (
-            f"{condition.field_path}_{condition.operation_type}_{condition.value}"
-        )
+        condition_key = _make_condition_key(condition)
         field_to_cte_alias_map[condition_key] = current_cte_name
 
     if not cte_parts:
         return "", {}
 
     return ",\n".join(cte_parts), field_to_cte_alias_map
+
+
+def _make_condition_key(condition: ObjectRefCondition) -> str:
+    """Map a unique condition key to the final CTE name.
+    Use field_path + operation + value to create unique key for each condition
+    """
+    return f"{condition.field_path}_{condition.operation_type}_{condition.value}"
 
 
 def is_object_ref_operand(

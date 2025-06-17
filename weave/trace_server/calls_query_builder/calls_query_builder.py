@@ -375,13 +375,14 @@ class Condition(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        expand_columns: list[str] = [],
+        expand_columns: Optional[list[str]] = None,
         field_to_object_join_alias_map: Optional[dict[str, str]] = None,
     ) -> str:
         # Check if this condition involves object references
-        if expand_columns and is_object_ref_operand(self.operand, expand_columns):
+        expand_cols = expand_columns or []
+        if expand_cols and is_object_ref_operand(self.operand, expand_cols):
             return self._as_object_ref_sql(
-                pb, table_alias, expand_columns, field_to_object_join_alias_map
+                pb, table_alias, expand_cols, field_to_object_join_alias_map
             )
         else:
             # Handle normal (non-object-ref) conditions
@@ -558,18 +559,17 @@ class Condition(BaseModel):
         return False
 
     def get_object_ref_conditions(
-        self, expand_columns: list[str] = []
+        self, expand_columns: Optional[list[str]] = None
     ) -> list[ObjectRefCondition]:
         """Get any object ref conditions for CTE building"""
-        if not expand_columns or not is_object_ref_operand(
-            self.operand, expand_columns
-        ):
+        expand_cols = expand_columns or []
+        if not expand_cols or not is_object_ref_operand(self.operand, expand_cols):
             return []
 
         query_for_condition = tsi_query.Query.model_validate({"$expr": self.operand})
         pb = ParamBuilder()  # Dummy param builder for parsing
         _, object_ref_conditions = process_query_for_object_refs(
-            query_for_condition, pb, "calls_merged", expand_columns
+            query_for_condition, pb, "calls_merged", expand_cols
         )
         return object_ref_conditions
 
@@ -844,12 +844,16 @@ class CallsQuery(BaseModel):
                 )
                 all_object_ref_conditions.extend(object_ref_conditions)
 
+        print(f"{all_object_ref_conditions=}")
+
         # Build CTEs for object reference filtering
         cte_result = build_object_ref_ctes(
             pb, self.project_id, all_object_ref_conditions
         )
         object_join_cte = cte_result[0]
         field_to_object_join_alias_map = cte_result[1]
+
+        print(f"{object_join_cte=} {field_to_object_join_alias_map=}")
 
         # Query Conditions
         for condition in self.query_conditions:
@@ -907,7 +911,7 @@ class CallsQuery(BaseModel):
         table_alias: str,
         id_subquery_name: Optional[str] = None,
         field_to_object_join_alias_map: Optional[dict[str, str]] = None,
-        expand_columns: list[str] = [],
+        expand_columns: Optional[list[str]] = None,
     ) -> str:
         needs_feedback = False
         select_fields_sql = ", ".join(
@@ -971,11 +975,11 @@ class CallsQuery(BaseModel):
         )
 
         # Filter out object ref conditions from optimization since they're handled via CTEs
+        expand_cols = expand_columns or []
         non_object_ref_conditions = []
         for condition in self.query_conditions:
             if not (
-                expand_columns
-                and is_object_ref_operand(condition.operand, expand_columns)
+                expand_cols and is_object_ref_operand(condition.operand, expand_cols)
             ):
                 non_object_ref_conditions.append(condition)
 
