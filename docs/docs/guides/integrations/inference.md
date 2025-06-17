@@ -10,6 +10,7 @@ _Weights & Biases (W&B) Inference_ provides access to leading open-source founda
 
 :::important
 W&B Inference credits are included with most Free, Pro, and Academic plans. Availability may vary for Enterprise and deprecated Personal plans. Once credits are consumed:
+
 - Free plan users must upgrade to a Pro plan to continue using Inference.
 - Pro plan users will be billed for Inference overages on a monthly basis, based on the model-specific pricing.
 
@@ -88,7 +89,7 @@ To access this endpoint, you must have a valid W&B account with Inference servic
 
 ### Available methods
 
-The Inference service provides two primary methods:
+The Inference service supports the following API methods:
 
 - [Chat completions](#chat-completions)
 - [List supported models](#list-supported-models)
@@ -100,7 +101,7 @@ The primary API method available is `/chat/completions`, which supports OpenAI-c
 To create a chat completion, you will need:
 
 - The Inference service base URL `https://api.inference.wandb.ai/v1`
-- Your W&B API key `<your-apikey>`
+- Your W&B API key `<your-api-key>`
 - Your W&B entity and project names `<team>/<project>`
 - The ID for the model you want to use, one of:
   - `meta-llama/Llama-3.1-8B-Instruct`
@@ -136,7 +137,7 @@ To create a chat completion, you will need:
 
         # Get your API key from https://wandb.ai/authorize
         # Consider setting it in the environment as OPENAI_API_KEY instead for safety
-        api_key="<your-apikey>",
+        api_key="<your-api-key>",
 
         # Team and project are required for usage tracking
         project="<team>/<project>",
@@ -172,7 +173,7 @@ Use the API to query all currently available models and their IDs. This is usefu
     ```bash
     curl https://api.inference.wandb.ai/v1/models \
       -H "Content-Type: application/json" \
-      -H "Authorization: Bearer <your-apikey>" \
+      -H "Authorization: Bearer <your-api-key>" \
       -H "OpenAI-Project: <your-entity>/<your-project>" \
     ```
   </TabItem>
@@ -182,7 +183,7 @@ Use the API to query all currently available models and their IDs. This is usefu
 
     client = openai.OpenAI(
         base_url="https://api.inference.wandb.ai/v1",
-        api_key="<your-apikey>",
+        api_key="<your-api-key>",
         project="<your-entity>/<your-project>"
     )
 
@@ -372,7 +373,7 @@ You can access the Inference service via the Weave UI from two different locatio
 2. From the LLM dropdown list, mouseover **W&B Inference**. A dropdown with available W&B Inference models displays to the right.
 3. From the W&B Inference models dropdown, you can:
    - Click the name of any available model to [try it in the Playground](#try-a-model-in-the-playground).
-   - [Compare one or models in the Playground](#compare-multiple-models)
+   - [Compare one or more models in the Playground](#compare-multiple-models)
 
 ![The Inference models dropdown in Playground](imgs/inference-playground.png)
 
@@ -445,7 +446,7 @@ To ensure fair usage and stable performance, the W&B Inference API enforces rate
 - Ensure access for all users
 - Manage infrastructure load effectively
 
-If a rate limit is exceeded, the API will return a `429 Concurrency limit reached for requests ` response. To resolve this error, reduce the number of concurrent requests. 
+If a rate limit is exceeded, the API will return a `429 Concurrency limit reached for requests` response. To resolve this error, reduce the number of concurrent requests. 
 
 ### Pricing
 
