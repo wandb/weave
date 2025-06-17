@@ -13,6 +13,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
 import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/datasets/datasetNameValidation';
 import {FilterPanel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/FilterPanel';
 import {prepareFlattenedCallDataForTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTable';
@@ -37,100 +38,49 @@ import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {
   useObjCreate,
   useRootObjectVersions,
-  useScorerCreate,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
-import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
-import {
-  ObjectVersionKey,
-  ObjectVersionSchema,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRef} from '@wandb/weave/react';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
+import {useList} from 'react-use';
 
 const PAGE_SIZE = 10;
 const PAGE_OFFSET = 0;
 
-const StyledSliderInput = styled('div')<{progress: number}>(({progress}) => ({
-  '& .slider-input': {
-    '& input[type="range"]': {
-      appearance: 'none',
-      width: '100%',
-      height: '8px',
-      borderRadius: '4px',
-      background: `linear-gradient(to right, ${TEAL_500} 0%, ${TEAL_500} ${progress}%, ${MOON_250} ${progress}%, ${MOON_250} 100%)`,
-      outline: 'none',
-      padding: 0,
-      margin: '8px 0',
-      '&::-webkit-slider-track': {
-        width: '100%',
-        height: '8px',
-        borderRadius: '4px',
-        background: 'transparent',
-      },
-      '&::-moz-range-track': {
-        width: '100%',
-        height: '8px',
-        borderRadius: '4px',
-        background: 'transparent',
-      },
-      '&::-webkit-slider-thumb': {
-        appearance: 'none',
-        width: '16px',
-        height: '16px',
-        borderRadius: '50%',
-        background: '#fff',
-        cursor: 'pointer',
-        border: `1px solid ${MOON_350}`,
-        boxShadow: '0 0 2px 0px rgba(0, 0, 0, 0.1)',
-        transition: 'box-shadow 0.2s',
-        '&:hover': {
-          boxShadow: '0 0 8px 0px rgba(0, 0, 0, 0.2)',
-        },
-      },
-      '&::-moz-range-thumb': {
-        width: '12px',
-        height: '12px',
-        borderRadius: '50%',
-        background: '#fff',
-        cursor: 'pointer',
-        border: `1px solid ${MOON_350}`,
-        boxShadow: '0 0 2px 0px rgba(0, 0, 0, 0.1)',
-        transition: 'box-shadow 0.2s',
-        '&:hover': {
-          boxShadow: '0 0 8px 0px rgba(0, 0, 0, 0.2)',
-        },
-      },
-    },
-  },
-}));
+export interface ScorerFormProps {
+  scorer: ObjectVersionSchema;
+  onValidationChange: (valid: boolean) => void;
+}
 
-const SCORER_FORMS: Map<
-  string,
-  React.ComponentType<{
-    scorer: ObjectVersionSchema;
-    onChange: (scorer: ObjectVersionSchema) => void;
-    onValidationChange: (isValid: boolean) => void;
-  }> | null
-> = new Map([
+type ScorerFormType = React.ForwardRefExoticComponent<
+  ScorerFormProps & React.RefAttributes<ScorerFormRef>
+>;
+
+export interface ScorerFormRef {
+  saveScorer: () => Promise<string | undefined>;
+}
+
+const SCORER_FORMS: Map<string, ScorerFormType | null> = new Map([
   ['ValidJSONScorer', null],
   ['ValidXMLScorer', null],
   ['LLMAsAJudgeScorer', LLMAsAJudgeScorerForm],
 ]);
 
-export const MonitorDrawerRouter = (props: CreateMonitorDrawerProps) => {
+export const MonitorDrawerRouter = (props: MonitorFormDrawerProps) => {
   if (props.monitor) {
     return (
-      <CreateMonitorDrawerWithScorers {...props} monitor={props.monitor} /> // Repeating monitor to appease type checking
+      <EditMonitorDrawerWithScorers {...props} monitor={props.monitor} /> // Repeating monitor to appease type checking
     );
   }
-  return <CreateMonitorDrawer {...props} />;
+  return <MonitorFormDrawer {...props} />;
 };
 
-const CreateMonitorDrawerWithScorers = (
-  props: CreateMonitorDrawerProps & {monitor: ObjectVersionSchema}
+const EditMonitorDrawerWithScorers = (
+  props: MonitorFormDrawerProps & {monitor: ObjectVersionSchema}
 ) => {
+  const {entity, project} = useEntityProject();
   const scorerIds: string[] = useMemo(() => {
     return (
       props.monitor.val['scorers'].map(
@@ -140,8 +90,8 @@ const CreateMonitorDrawerWithScorers = (
   }, [props.monitor]);
 
   const {result: scorers, loading} = useRootObjectVersions({
-    entity: props.entity,
-    project: props.project,
+    entity,
+    project,
     filter: {
       objectIds: scorerIds,
       latestOnly: true,
@@ -150,27 +100,24 @@ const CreateMonitorDrawerWithScorers = (
   return loading || !scorers ? (
     <WaveLoader size="huge" />
   ) : (
-    <CreateMonitorDrawer {...props} scorers={scorers} />
+    <MonitorFormDrawer {...props} scorers={scorers} />
   );
 };
 
-type CreateMonitorDrawerProps = {
-  entity: string;
-  project: string;
+type MonitorFormDrawerProps = {
   open: boolean;
   onClose: () => void;
   monitor?: ObjectVersionSchema;
   scorers?: ObjectVersionSchema[];
 };
 
-export const CreateMonitorDrawer = ({
-  entity,
-  project,
+export const MonitorFormDrawer = ({
   open,
   onClose,
   monitor,
   scorers: existingScorers,
-}: CreateMonitorDrawerProps) => {
+}: MonitorFormDrawerProps) => {
+  const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [description, setDescription] = useState<string>(
@@ -186,77 +133,17 @@ export const CreateMonitorDrawer = ({
     string[]
   >([]);
   const [filter, setFilter] = useState<WFHighLevelCallFilter>({
-    opVersionRefs: monitor?.val['op_names'] || [],
+    opVersionRefs: [],
   });
-  const [filterModel, setFilterModel] = useState<GridFilterModel>(
-    queryToGridFilterModel(monitor?.val['query']) || {
-      items: [],
-    }
-  );
+  const [filterModel, setFilterModel] = useState<GridFilterModel>({
+    items: [],
+  });
+
   const {useCalls} = useWFHooks();
-  const [scorers, setScorers] = useState<ObjectVersionSchema[]>(
-    existingScorers || []
-  );
-  const [scorerValids, setScorerValids] = useState<boolean[]>([]);
-  const [active, setActive] = useState<boolean>(monitor?.val['active'] ?? true);
-  const [validationType, setValidationType] = useState<'none' | 'json' | 'xml'>(
-    () => {
-      if (existingScorers?.some(s => s.val['_type'] === 'ValidJSONScorer'))
-        return 'json';
-      if (existingScorers?.some(s => s.val['_type'] === 'ValidXMLScorer'))
-        return 'xml';
-      return 'none';
-    }
-  );
-  const [llmAsJudgeEnabled, setLlmAsJudgeEnabled] = useState<boolean>(
-    existingScorers
-      ? existingScorers.some(s => s.val['_type'] === 'LLMAsAJudgeScorer')
-      : true
-  );
-  const [isCreating, setIsCreating] = useState<boolean>(false);
-  const {sortBy, lowLevelFilter} = useFilterSortby(filter, {items: []}, [
-    {field: 'started_at', sort: 'desc'},
-  ]);
 
-  useEffect(() => {
-    setScorerValids(currentValids => currentValids.slice(0, scorers.length));
-  }, [scorers.length]);
-
-  useEffect(() => {
-    const newScorers: ObjectVersionSchema[] = [];
-
-    if (validationType === 'json') {
-      newScorers.push({
-        scheme: 'weave',
-        weaveKind: 'object',
-        entity,
-        project,
-        objectId: '',
-        versionHash: '',
-        path: '',
-        versionIndex: 0,
-        baseObjectClass: 'ValidJSONScorer',
-        createdAtMs: Date.now(),
-        val: {_type: 'ValidJSONScorer'},
-      });
-    } else if (validationType === 'xml') {
-      newScorers.push({
-        scheme: 'weave',
-        weaveKind: 'object',
-        entity,
-        project,
-        objectId: '',
-        versionHash: '',
-        path: '',
-        versionIndex: 0,
-        baseObjectClass: 'ValidXMLScorer',
-        createdAtMs: Date.now(),
-        val: {_type: 'ValidXMLScorer'},
-      });
-    }
-
-    if (llmAsJudgeEnabled) {
-      newScorers.push({
+  const [scorers, {set: setScorers}] = useList<ObjectVersionSchema>(
+    existingScorers || [
+      {
         scheme: 'weave',
         weaveKind: 'object',
         entity,
@@ -268,11 +155,38 @@ export const CreateMonitorDrawer = ({
         baseObjectClass: 'LLMAsAJudgeScorer',
         createdAtMs: Date.now(),
         val: {_type: 'LLMAsAJudgeScorer'},
-      });
-    }
+      },
+    ]
+  );
 
-    setScorers(newScorers);
-  }, [validationType, llmAsJudgeEnabled, entity, project]);
+  const [scorerValids, {updateAt: updateScorerValidAt}] = useList<boolean>(
+    existingScorers?.map(s => true) || [false]
+  );
+
+  const [active, setActive] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!monitor) {
+      return;
+    }
+    setActive(monitor.val['active'] ?? false);
+    setMonitorName(monitor.val['name'] ?? '');
+    setDescription(monitor.val['description'] ?? '');
+    setSamplingRate((monitor.val['sampling_rate'] || 0.1) * 100);
+    setFilter({
+      opVersionRefs: monitor.val['op_names'] || [],
+    });
+    setFilterModel(queryToGridFilterModel(monitor.val['query']) ?? {items: []});
+    setSelectedOpVersionOption(monitor.val['op_names'] ?? []);
+    setScorers(existingScorers ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monitor]);
+
+  const [isCreating, setIsCreating] = useState<boolean>(false);
+
+  const {sortBy, lowLevelFilter} = useFilterSortby(filter, {items: []}, [
+    {field: 'started_at', sort: 'desc'},
+  ]);
 
   const {result: callsResults, loading: callsLoading} = useCalls({
     entity,
@@ -343,9 +257,22 @@ export const CreateMonitorDrawer = ({
     allScorersValid,
   ]);
 
-  const objCreate = useObjCreate();
+  const scorerForms: ScorerFormType[] = useMemo(
+    () =>
+      scorers
+        .map(scorer => SCORER_FORMS.get(scorer.val['_type']))
+        .filter(f => !!f) as ScorerFormType[],
+    [scorers]
+  );
 
-  const scorerCreate = useScorerCreate();
+  const scorerFormRefs = useRef<ScorerFormRef[]>([]);
+
+  // Ensure refs array matches subForms length
+  useEffect(() => {
+    scorerFormRefs.current = scorerFormRefs.current.slice(0, scorers.length);
+  }, [scorerForms.length, scorers.length]);
+
+  const objCreate = useObjCreate();
 
   const createMonitor = useCallback(async () => {
     if (!enableCreateButton) {
@@ -356,29 +283,14 @@ export const CreateMonitorDrawer = ({
 
     try {
       const scorerRefs = await Promise.all(
-        scorers.map(async scorer => {
-          let scorerVersionKey: ObjectVersionKey;
-          if (scorer.versionHash) {
-            scorerVersionKey = {
-              scheme: 'weave',
-              weaveKind: 'object',
-              entity: scorer.entity,
-              project: scorer.project,
-              objectId: scorer.objectId,
-              versionHash: scorer.versionHash,
-              path: '',
-            };
-          } else {
-            scorerVersionKey = await scorerCreate({
-              entity,
-              project,
-              name: scorer.objectId,
-              val: scorer.val,
-            });
-          }
-          return objectVersionKeyToRefUri(scorerVersionKey);
-        })
+        scorerFormRefs.current.map(async ref => await ref.saveScorer())
       );
+
+      if (scorerRefs.some(ref => !ref)) {
+        setError('Failed to create scorer');
+        setIsCreating(false);
+        return;
+      }
 
       const mongoQuery = getFilterByRaw(filterModel);
 
@@ -427,7 +339,6 @@ export const CreateMonitorDrawer = ({
     selectedOpVersionOption,
     filterModel,
     samplingRate,
-    scorers,
     setIsCreating,
     monitor,
     onClose,
@@ -436,7 +347,7 @@ export const CreateMonitorDrawer = ({
     entity,
     objCreate,
     project,
-    scorerCreate,
+    scorerFormRefs,
   ]);
 
   const scorerForms = useMemo(() => {
@@ -557,15 +468,13 @@ export const CreateMonitorDrawer = ({
                     />
                   </Box>
                   <Box>
-                    <Box className="flex items-center gap-8">
-                      <Switch.Root
-                        checked={active}
-                        onCheckedChange={setActive}
-                        size="small">
-                        <Switch.Thumb size="small" checked={active} />
-                      </Switch.Root>
-                      <span className="font-semibold">Active monitor</span>
-                    </Box>
+                    <FieldName name="Active" />
+                    <ToggleButtonGroup
+                      value={active ? 'active' : 'inactive'}
+                      options={[{value: 'active'}, {value: 'inactive'}]}
+                      onValueChange={value => setActive(value === 'active')}
+                      size="medium"
+                    />
                   </Box>
                 </Box>
 
@@ -634,7 +543,7 @@ export const CreateMonitorDrawer = ({
                   </Box>
                 </Box>
 
-                <Box className="flex flex-col gap-8 pt-16">
+                {/*<Box className="flex flex-col gap-8 pt-16">
                   <Typography
                     sx={typographyStyle}
                     className="border-t border-moon-250 px-20 pb-8 pt-16 font-semibold uppercase tracking-wide text-moon-500">
@@ -642,64 +551,73 @@ export const CreateMonitorDrawer = ({
                   </Typography>
                   <Box className="flex flex-col gap-16 px-20">
                     <Box>
-                      <FieldName name="Format validation" />
-                      <Radio.Root
-                        className="flex items-center gap-16"
-                        aria-label="Validation type selection"
-                        name="validation-type"
-                        onValueChange={(value: 'none' | 'json' | 'xml') =>
-                          setValidationType(value)
-                        }
-                        value={validationType}>
-                        <label className="flex items-center">
-                          <Radio.Item id="no-validation" value="none">
-                            <Radio.Indicator />
-                          </Radio.Item>
-                          <span className="ml-6 cursor-pointer">
-                            No validation
-                          </span>
-                        </label>
-
-                        <label className="flex items-center">
-                          <Radio.Item id="json-validation" value="json">
-                            <Radio.Indicator />
-                          </Radio.Item>
-                          <span className="ml-6 cursor-pointer">
-                            Valid JSON
-                          </span>
-                        </label>
-
-                        <label className="flex items-center">
-                          <Radio.Item id="xml-validation" value="xml">
-                            <Radio.Indicator />
-                          </Radio.Item>
-                          <span className="ml-6 cursor-pointer">Valid XML</span>
-                        </label>
-                      </Radio.Root>
-                    </Box>
-
-                    <Box className="mt-8 flex items-center gap-8">
-                      <Switch.Root
-                        checked={llmAsJudgeEnabled}
-                        onCheckedChange={setLlmAsJudgeEnabled}
-                        size="small">
-                        <Switch.Thumb
-                          size="small"
-                          checked={llmAsJudgeEnabled}
-                        />
-                      </Switch.Root>
-                      <span className="font-semibold">
-                        Enable LLM-as-a-judge scoring
-                      </span>
+                      <FieldName name="Scorers" />
+                      <Autocomplete
+                        multiple
+                        options={Array.from(SCORER_FORMS.keys())}
+                        sx={{width: '100%'}}
+                        value={scorers.map(
+                          scorer => scorer.objectId || scorer.val['_type']
+                        )}
+                        onChange={(
+                          unused,
+                          newScorers: string | string[] | null
+                        ) => {
+                          if (newScorers === null) {
+                            clearScorers();
+                            clearScorerValids();
+                            return;
+                          }
+                          const newScorerArray = _.isArray(newScorers)
+                            ? (newScorers as string[])
+                            : [newScorers as string];
+                          setScorers(
+                            newScorerArray.map(newScorer => ({
+                              scheme: 'weave',
+                              weaveKind: 'object',
+                              entity,
+                              project,
+                              objectId: '',
+                              versionHash: '',
+                              path: '',
+                              versionIndex: 0,
+                              baseObjectClass: newScorer,
+                              createdAtMs: Date.now(),
+                              val: {_type: newScorer},
+                            }))
+                          );
+                          setScorerValids(currentValids =>
+                            currentValids.slice(0, newScorerArray.length)
+                          );
+                        }}
+                      />
                     </Box>
                   </Box>
-                </Box>
+                </Box>*/}
 
-                {scorerForms}
+                {scorerForms.map((Form: ScorerFormType, index: number) => (
+                  <Form
+                    key={index}
+                    scorer={scorers[index]}
+                    onValidationChange={(isValid: boolean) =>
+                      updateScorerValidAt(index, isValid)
+                    }
+                    ref={(el: ScorerFormRef) =>
+                      (scorerFormRefs.current[index] = el)
+                    }
+                  />
+                ))}
               </Box>
             )}
           </Box>
           <Box className="flex gap-8 border-t border-moon-250 p-20 py-16">
+            <Button
+              variant="secondary"
+              onClick={onClose}
+              twWrapperStyles={{flexGrow: 1}}
+              className="w-full">
+              Cancel
+            </Button>
             <Button
               disabled={!enableCreateButton}
               variant="primary"

@@ -86,7 +86,7 @@ def test_deeply_nested_generator(client):
 
     root_call = calls[0]
     assert "deeply_nested_generator" in root_call.op_name
-    for i, call in enumerate(root_call.children()):
+    for _i, call in enumerate(root_call.children()):
         assert "nested_generator" in call.op_name
         for j, call2 in enumerate(call.children()):
             assert "inner" in call2.op_name
@@ -143,7 +143,7 @@ async def test_deeply_nested_async_generator(client):
 
     root_call = calls[0]
     assert "deeply_nested_async_generator" in root_call.op_name
-    for i, call in enumerate(root_call.children()):
+    for _, call in enumerate(root_call.children()):
         assert "nested_async_generator" in call.op_name
         for j, call2 in enumerate(call.children()):
             assert "inner_async" in call2.op_name

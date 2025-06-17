@@ -3,10 +3,12 @@ import {Button} from '@wandb/weave/components/Button';
 import {IconPencilEdit} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
+import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
+import {MONITORED_FILTER_VALUE} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/common';
 import {ALL_TRACES_OR_CALLS_REF_KEY} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 import {EMPTY_PROPS_MONITORS} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/EmptyContent';
 import {SimplePageLayout} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/SimplePageLayout';
-import {MonitorDrawerRouter} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/CreateMonitorDrawer';
+import {MonitorDrawerRouter} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/MonitorFormDrawer';
 import {FilterableObjectVersionsTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectVersionsTable';
 import {Query} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientInterface/query';
 import {useCallsStats} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
@@ -14,19 +16,14 @@ import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/H
 import {SmallRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallRef';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import {parseRef, WeaveObjectRef} from '@wandb/weave/react';
+import {parseRefMaybe} from '@wandb/weave/react';
 import React, {useMemo, useState} from 'react';
 
-import {MONITORED_FILTER_VALUE} from '../../filters/common';
+export const MonitorsPage = () => {
+  const {entity, project} = useEntityProject();
 
-export const MonitorsPage = ({
-  entity,
-  project,
-}: {
-  entity: string;
-  project: string;
-}) => {
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
+
   const [selectedMonitor, setSelectedMonitor] = useState<
     ObjectVersionSchema | undefined
   >();
@@ -175,8 +172,6 @@ export const MonitorsPage = ({
       />
 
       <MonitorDrawerRouter
-        entity={entity}
-        project={project}
         open={isCreateDrawerOpen}
         onClose={handleCloseDrawer}
         monitor={selectedMonitor}
@@ -244,9 +239,10 @@ const MonitorsPageHeaderExtra: React.FC<{
 };
 
 export const SafeOpRef = ({opRef}: {opRef: string}) => {
-  try {
-    return <SmallRef objRef={parseRef(opRef) as WeaveObjectRef} />;
-  } catch (e) {
-    return <span>Incorrect op ref: {opRef}</span>;
-  }
+  const ref = parseRefMaybe(opRef);
+  return ref ? (
+    <SmallRef objRef={ref} />
+  ) : (
+    <span>Incorrect op ref: {opRef}</span>
+  );
 };

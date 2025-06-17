@@ -14,8 +14,8 @@ class LLMAsAJudgeScorer(Scorer):
     scoring_prompt: str
 
     @op
-    def score(self, *, output: str, input: str) -> Any:
-        scoring_prompt = self.scoring_prompt.format(output=output, input=input)
+    def score(self, *, output: str, **kwargs: Any) -> Any:
+        scoring_prompt = self.scoring_prompt.format(output=output, **kwargs)
         model_input = [
             {"role": "user", "content": scoring_prompt},
         ]

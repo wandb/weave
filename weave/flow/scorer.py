@@ -206,6 +206,11 @@ def preparer_scorer_op_args(
     score_signature = inspect.signature(score_op)
     score_arg_names = list(score_signature.parameters.keys())
 
+    has_var_keyword_arg = any(
+        param.kind == inspect.Parameter.VAR_KEYWORD
+        for param in score_signature.parameters.values()
+    )
+
     # The keys of `score_args` must match the argument names of the scorer's `score` method.
     # If scorer.column_map is set, then user is indicating that the dataset column(s)
     # being passed to the scorer have different names to the `score` functions' argument names.
@@ -287,7 +292,14 @@ def preparer_scorer_op_args(
                 raise ValueError(message)
     else:
         # Without column mapping, directly match scorer arguments to example keys
-        score_args = {k: v for k, v in example.items() if k in score_arg_names}
+        score_args = {
+            k: v
+            for k, v in example.items()
+            if k in score_arg_names or has_var_keyword_arg
+        }
+
+        if has_var_keyword_arg and "inputs" not in score_args:
+            score_args["inputs"] = example
 
     # Determine which parameter name is used for model output
     # Scorers must have either 'output' or 'model_output' (deprecated) parameter

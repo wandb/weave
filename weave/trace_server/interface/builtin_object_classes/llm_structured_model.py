@@ -137,7 +137,7 @@ class LLMStructuredCompletionModel(Model):
     @op
     def predict(
         self,
-        user_input: MessageListLike = [],
+        user_input: Optional[MessageListLike] = None,
         config: Optional[LLMStructuredModelParamsLike] = None,
         **template_vars: Any,
     ) -> Union[Message, str, dict[str, Any]]:
@@ -150,6 +150,9 @@ class LLMStructuredCompletionModel(Model):
             config: Optional configuration to override default parameters
             **template_vars: Variables to substitute in the messages template using {variable_name} syntax
         """
+        if user_input is None:
+            user_input = []
+
         current_client = get_weave_client()
         if current_client is None:
             raise WeaveInitError(
@@ -173,7 +176,12 @@ class LLMStructuredCompletionModel(Model):
         try:
             # The 'response' attribute of CompletionsCreateRes is a dict
             response_payload = api_response.response
-            return parse_response(response_payload, req.inputs.response_format)
+            response_format = (
+                req.inputs.response_format.get("type")
+                if req.inputs.response_format is not None
+                else None
+            )
+            return parse_response(response_payload, response_format)
         except (
             KeyError,
             IndexError,
@@ -238,7 +246,7 @@ class LLMStructuredCompletionModel(Model):
 
 
 def parse_response(
-    response_payload: dict, response_format: ResponseFormat
+    response_payload: dict, response_format: Optional[ResponseFormat]
 ) -> Union[Message, str, dict[str, Any]]:
     if response_payload.get("error"):
         # Or handle more gracefully depending on desired behavior

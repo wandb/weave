@@ -60,9 +60,9 @@ import {
 } from '../wfReactInterface/traceServerClientTypes';
 import {
   convertISOToDate,
+  flattenedTraceCallStatusCode,
   traceCallLatencyMs,
   traceCallLatencyS,
-  traceCallStatusCode,
 } from '../wfReactInterface/tsDataModelHooks';
 import {opVersionRefOpName} from '../wfReactInterface/utilities';
 import {FlattenedCallData} from './CallsTable';
@@ -392,10 +392,10 @@ function buildCallsTableColumns(
       width: 59,
       display: 'flex',
       valueGetter: (unused: any, row: any) => {
-        return traceCallStatusCode(row);
+        return flattenedTraceCallStatusCode(row);
       },
       renderCell: cellParams => {
-        const valueStatus = traceCallStatusCode(cellParams.row);
+        const valueStatus = flattenedTraceCallStatusCode(cellParams.row);
         const valueFilter = ComputedCallStatuses[valueStatus];
         return (
           <CellFilterWrapper
@@ -581,7 +581,11 @@ function buildCallsTableColumns(
                   field={field}
                   rowId={params.id.toString()}
                   operation={null}
-                  value={params.value}>
+                  value={params.value}
+                  style={{
+                    height: '100%',
+                    width: '100%',
+                  }}>
                   <CellValue value={params.value} />
                 </CellFilterWrapper>
               );
@@ -719,7 +723,7 @@ function buildCallsTableColumns(
     filterable: false,
     sortable: true,
     valueGetter: (unused: any, row: any) => {
-      if (traceCallStatusCode(row) === ComputedCallStatuses.running) {
+      if (flattenedTraceCallStatusCode(row) === ComputedCallStatuses.running) {
         // Call is still in progress, latency will be 0.
         // Displaying nothing seems preferable to being misleading.
         return null;
@@ -728,7 +732,8 @@ function buildCallsTableColumns(
     },
     renderCell: cellParams => {
       if (
-        traceCallStatusCode(cellParams.row) === ComputedCallStatuses.running
+        flattenedTraceCallStatusCode(cellParams.row) ===
+        ComputedCallStatuses.running
       ) {
         // Call is still in progress, latency will be 0.
         // Displaying nothing seems preferable to being misleading.
@@ -843,7 +848,7 @@ function buildCallsTableColumns(
  * in the previous data.
  */
 const useAllDynamicColumnNames = (
-  tableData: TraceCallSchema[],
+  tableData: FlattenedCallData[],
   shouldIgnoreColumn: (col: string) => boolean,
   resetDep: any
 ) => {
