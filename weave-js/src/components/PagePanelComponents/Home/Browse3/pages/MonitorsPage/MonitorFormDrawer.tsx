@@ -26,10 +26,7 @@ import {
   getFilterByRaw,
   useFilterSortby,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableQuery';
-import {
-  Autocomplete,
-  OpSelector,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/OpSelector';
+import {OpSelector} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/OpSelector';
 import {
   FieldName,
   typographyStyle,
@@ -40,18 +37,13 @@ import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {
   useObjCreate,
   useRootObjectVersions,
-  useScorerCreate,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
-import {objectVersionKeyToRefUri} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/utilities';
-import {
-  ObjectVersionKey,
-  ObjectVersionSchema,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRef} from '@wandb/weave/react';
-import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
+import {useList} from 'react-use';
 
 const PAGE_SIZE = 10;
 const PAGE_OFFSET = 0;
@@ -110,30 +102,36 @@ const StyledSliderInput = styled('div')<{progress: number}>(({progress}) => ({
   },
 }));
 
-const SCORER_FORMS: Map<
-  string,
-  React.ComponentType<{
-    scorer: ObjectVersionSchema;
-    onChange: (scorer: ObjectVersionSchema) => void;
-    onValidationChange: (isValid: boolean) => void;
-  }> | null
-> = new Map([
+export interface ScorerFormProps {
+  scorer: ObjectVersionSchema;
+  onValidationChange: (valid: boolean) => void;
+}
+
+type ScorerFormType = React.ForwardRefExoticComponent<
+  ScorerFormProps & React.RefAttributes<ScorerFormRef>
+>;
+
+export interface ScorerFormRef {
+  saveScorer: () => Promise<string | undefined>;
+}
+
+const SCORER_FORMS: Map<string, ScorerFormType | null> = new Map([
   ['ValidJSONScorer', null],
   ['ValidXMLScorer', null],
   ['LLMAsAJudgeScorer', LLMAsAJudgeScorerForm],
 ]);
 
-export const MonitorDrawerRouter = (props: CreateMonitorDrawerProps) => {
+export const MonitorDrawerRouter = (props: MonitorFormDrawerProps) => {
   if (props.monitor) {
     return (
-      <CreateMonitorDrawerWithScorers {...props} monitor={props.monitor} /> // Repeating monitor to appease type checking
+      <EditMonitorDrawerWithScorers {...props} monitor={props.monitor} /> // Repeating monitor to appease type checking
     );
   }
-  return <CreateMonitorDrawer {...props} />;
+  return <MonitorFormDrawer {...props} />;
 };
 
-const CreateMonitorDrawerWithScorers = (
-  props: CreateMonitorDrawerProps & {monitor: ObjectVersionSchema}
+const EditMonitorDrawerWithScorers = (
+  props: MonitorFormDrawerProps & {monitor: ObjectVersionSchema}
 ) => {
   const {entity, project} = useEntityProject();
   const scorerIds: string[] = useMemo(() => {
@@ -155,23 +153,23 @@ const CreateMonitorDrawerWithScorers = (
   return loading || !scorers ? (
     <WaveLoader size="huge" />
   ) : (
-    <CreateMonitorDrawer {...props} scorers={scorers} />
+    <MonitorFormDrawer {...props} scorers={scorers} />
   );
 };
 
-type CreateMonitorDrawerProps = {
+type MonitorFormDrawerProps = {
   open: boolean;
   onClose: () => void;
   monitor?: ObjectVersionSchema;
   scorers?: ObjectVersionSchema[];
 };
 
-export const CreateMonitorDrawer = ({
+export const MonitorFormDrawer = ({
   open,
   onClose,
   monitor,
   scorers: existingScorers,
-}: CreateMonitorDrawerProps) => {
+}: MonitorFormDrawerProps) => {
   const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -188,29 +186,60 @@ export const CreateMonitorDrawer = ({
     string[]
   >([]);
   const [filter, setFilter] = useState<WFHighLevelCallFilter>({
-    opVersionRefs: monitor?.val['op_names'] || [],
+    opVersionRefs: [],
   });
-  const [filterModel, setFilterModel] = useState<GridFilterModel>(
-    queryToGridFilterModel(monitor?.val['query']) || {
-      items: [],
-    }
-  );
+  const [filterModel, setFilterModel] = useState<GridFilterModel>({
+    items: [],
+  });
+
   const {useCalls} = useWFHooks();
-  const [scorers, setScorers] = useState<ObjectVersionSchema[]>(
-    existingScorers || []
+
+  const [scorers, {set: setScorers}] = useList<ObjectVersionSchema>(
+    existingScorers || [
+      {
+        scheme: 'weave',
+        weaveKind: 'object',
+        entity,
+        project,
+        objectId: '',
+        versionHash: '',
+        path: '',
+        versionIndex: 0,
+        baseObjectClass: 'LLMAsAJudgeScorer',
+        createdAtMs: Date.now(),
+        val: {_type: 'LLMAsAJudgeScorer'},
+      },
+    ]
   );
-  const [scorerValids, setScorerValids] = useState<boolean[]>([]);
-  const [active, setActive] = useState<boolean>(
-    monitor?.val['active'] || false
+
+  const [scorerValids, {updateAt: updateScorerValidAt}] = useList<boolean>(
+    existingScorers?.map(() => true) || [false]
   );
+
+  const [active, setActive] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!monitor) {
+      return;
+    }
+    setActive(monitor.val['active'] ?? false);
+    setMonitorName(monitor.val['name'] ?? '');
+    setDescription(monitor.val['description'] ?? '');
+    setSamplingRate((monitor.val['sampling_rate'] || 0.1) * 100);
+    setFilter({
+      opVersionRefs: monitor.val['op_names'] || [],
+    });
+    setFilterModel(queryToGridFilterModel(monitor.val['query']) ?? {items: []});
+    setSelectedOpVersionOption(monitor.val['op_names'] ?? []);
+    setScorers(existingScorers ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monitor]);
+
   const [isCreating, setIsCreating] = useState<boolean>(false);
+
   const {sortBy, lowLevelFilter} = useFilterSortby(filter, {items: []}, [
     {field: 'started_at', sort: 'desc'},
   ]);
-
-  useEffect(() => {
-    setScorerValids(currentValids => currentValids.slice(0, scorers.length));
-  }, [scorers.length]);
 
   const {result: callsResults, loading: callsLoading} = useCalls({
     entity,
@@ -281,9 +310,22 @@ export const CreateMonitorDrawer = ({
     allScorersValid,
   ]);
 
-  const objCreate = useObjCreate();
+  const scorerForms: ScorerFormType[] = useMemo(
+    () =>
+      scorers
+        .map(scorer => SCORER_FORMS.get(scorer.val['_type']))
+        .filter(f => !!f) as ScorerFormType[],
+    [scorers]
+  );
 
-  const scorerCreate = useScorerCreate();
+  const scorerFormRefs = useRef<ScorerFormRef[]>([]);
+
+  // Ensure refs array matches subForms length
+  useEffect(() => {
+    scorerFormRefs.current = scorerFormRefs.current.slice(0, scorers.length);
+  }, [scorerForms.length, scorers.length]);
+
+  const objCreate = useObjCreate();
 
   const createMonitor = useCallback(async () => {
     if (!enableCreateButton) {
@@ -294,29 +336,14 @@ export const CreateMonitorDrawer = ({
 
     try {
       const scorerRefs = await Promise.all(
-        scorers.map(async scorer => {
-          let scorerVersionKey: ObjectVersionKey;
-          if (scorer.versionHash) {
-            scorerVersionKey = {
-              scheme: 'weave',
-              weaveKind: 'object',
-              entity: scorer.entity,
-              project: scorer.project,
-              objectId: scorer.objectId,
-              versionHash: scorer.versionHash,
-              path: '',
-            };
-          } else {
-            scorerVersionKey = await scorerCreate({
-              entity,
-              project,
-              name: scorer.objectId,
-              val: scorer.val,
-            });
-          }
-          return objectVersionKeyToRefUri(scorerVersionKey);
-        })
+        scorerFormRefs.current.map(async ref => await ref.saveScorer())
       );
+
+      if (scorerRefs.some(ref => !ref)) {
+        setError('Failed to create scorer');
+        setIsCreating(false);
+        return;
+      }
 
       const mongoQuery = getFilterByRaw(filterModel);
 
@@ -365,7 +392,6 @@ export const CreateMonitorDrawer = ({
     selectedOpVersionOption,
     filterModel,
     samplingRate,
-    scorers,
     setIsCreating,
     monitor,
     onClose,
@@ -374,39 +400,8 @@ export const CreateMonitorDrawer = ({
     entity,
     objCreate,
     project,
-    scorerCreate,
+    scorerFormRefs,
   ]);
-
-  const scorerForms = useMemo(() => {
-    return (
-      <>
-        {scorers.map((scorer, index) => {
-          const ScorerForm = SCORER_FORMS.get(scorer.val['_type']);
-          if (!ScorerForm) {
-            return null;
-          }
-          return (
-            <ScorerForm
-              key={index}
-              scorer={scorer}
-              onChange={(newScorer: ObjectVersionSchema) =>
-                setScorers(currentScorers =>
-                  currentScorers.map((s, i) => (i === index ? newScorer : s))
-                )
-              }
-              onValidationChange={(isValid: boolean) =>
-                setScorerValids(currentValids => {
-                  const nextValids = [...currentValids];
-                  nextValids[index] = isValid;
-                  return nextValids;
-                })
-              }
-            />
-          );
-        })}
-      </>
-    );
-  }, [scorers]);
 
   return (
     <Drawer
@@ -572,55 +567,18 @@ export const CreateMonitorDrawer = ({
                   </Box>
                 </Box>
 
-                <Box className="flex flex-col gap-8 pt-16">
-                  <Typography
-                    sx={typographyStyle}
-                    className="border-t border-moon-250 px-20 pb-8 pt-16 font-semibold uppercase tracking-wide text-moon-500">
-                    Scorers
-                  </Typography>
-                  <Box className="flex flex-col gap-16 px-20">
-                    <Box>
-                      <FieldName name="Scorers" />
-                      <Autocomplete
-                        multiple
-                        options={Array.from(SCORER_FORMS.keys())}
-                        sx={{width: '100%'}}
-                        value={scorers.map(
-                          scorer => scorer.objectId || scorer.val['_type']
-                        )}
-                        onChange={(
-                          unused,
-                          newScorers: string | string[] | null
-                        ) => {
-                          if (newScorers === null) {
-                            setScorers([]);
-                            return;
-                          }
-                          const newScorerArray = _.isArray(newScorers)
-                            ? (newScorers as string[])
-                            : [newScorers as string];
-                          setScorers(
-                            newScorerArray.map(newScorer => ({
-                              scheme: 'weave',
-                              weaveKind: 'object',
-                              entity,
-                              project,
-                              objectId: '',
-                              versionHash: '',
-                              path: '',
-                              versionIndex: 0,
-                              baseObjectClass: newScorer,
-                              createdAtMs: Date.now(),
-                              val: {_type: newScorer},
-                            }))
-                          );
-                        }}
-                      />
-                    </Box>
-                  </Box>
-                </Box>
-
-                {scorerForms}
+                {scorerForms.map((Form: ScorerFormType, index: number) => (
+                  <Form
+                    key={index}
+                    scorer={scorers[index]}
+                    onValidationChange={(isValid: boolean) =>
+                      updateScorerValidAt(index, isValid)
+                    }
+                    ref={(el: ScorerFormRef) =>
+                      (scorerFormRefs.current[index] = el)
+                    }
+                  />
+                ))}
               </Box>
             )}
           </Box>

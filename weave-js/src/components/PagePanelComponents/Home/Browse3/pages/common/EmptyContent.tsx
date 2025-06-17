@@ -6,7 +6,7 @@ import {TargetBlank} from '../../../../../../common/util/links';
 import {Button} from '../../../../../Button';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
-import {MonitorDrawerRouter} from '../MonitorsPage/CreateMonitorDrawer';
+import {MonitorDrawerRouter} from '../MonitorsPage/MonitorFormDrawer';
 import {EmptyProps} from './Empty';
 import {Link} from './Links';
 
@@ -41,7 +41,6 @@ const NewDatasetButton: React.FC = () => {
 
 const NewMonitorButton: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const {entity, project} = useParams<{entity: string; project: string}>();
 
   return (
     <>
@@ -53,8 +52,6 @@ const NewMonitorButton: React.FC = () => {
         New monitor
       </Button>
       <MonitorDrawerRouter
-        entity={entity}
-        project={project}
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         monitor={undefined}

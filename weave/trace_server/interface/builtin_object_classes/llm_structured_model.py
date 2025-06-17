@@ -137,7 +137,7 @@ class LLMStructuredCompletionModel(Model):
     @op
     def predict(
         self,
-        user_input: MessageListLike = [],
+        user_input: Optional[MessageListLike] = None,
         config: Optional[LLMStructuredModelParamsLike] = None,
         **template_vars: Any,
     ) -> Union[Message, str, dict[str, Any]]:
@@ -150,6 +150,9 @@ class LLMStructuredCompletionModel(Model):
             config: Optional configuration to override default parameters
             **template_vars: Variables to substitute in the messages template using {variable_name} syntax
         """
+        if user_input is None:
+            user_input = []
+
         current_client = get_weave_client()
         if current_client is None:
             raise WeaveInitError(

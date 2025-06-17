@@ -28,7 +28,7 @@ export type Modality = 'Text' | 'Vision' | 'Embedding';
 // TODO: Fix snake case to camel case
 // TODO: Maybe use name ModelData or something so we can save Model for an object that has attached logic
 export type Model = {
-  // Model id scoped with provider
+  // Unique catalog specific identifier for this model.
   id: ModelId;
 
   // This is who is hosting the model.
@@ -41,10 +41,13 @@ export type Model = {
 
   status: ModelStatus;
 
-  // id used in Weave's playground - this is inconsistently scoped py provider currently
-  // For hosted current thinking is that it will be the same as idHuggingFace but having
-  // separate field gives us flexibility to use this for custom or non-hosted models in the future.
-  idPlayground: string;
+  // id used in Weave's playground - this is inconsistently scoped py provider currently.
+  // The inference service expects the model string to be consistent with the Hugging Face
+  // identifier. However, these values are not necessarily the same. For example, the
+  // playground doesn't support embedding models currently, so this may be undefined when
+  // idHuggingFace is not. Having a separate field also gives us the flexibility to use this
+  // for custom or non-hosted models in the future.
+  idPlayground?: string;
 
   // TODO: Decide how we want to handle this - right now we are constructing urlHuggingFace from it
   idHuggingFace?: string;
@@ -64,6 +67,10 @@ export type Model = {
   // Hugging Face data
   likesHuggingFace?: number;
   downloadsHuggingFace?: number;
+  license?: string;
+
+  parameterCountTotal?: number;
+  parameterCountActive?: number;
 
   // The maximum number of tokens the model can attend to at once
   contextWindow?: number;
@@ -79,10 +86,6 @@ export type Model = {
   supportsFunctionCalling?: boolean;
 
   urlHuggingFace?: string;
-  card: {
-    text: string;
-    data: Record<string, any>;
-  };
 };
 
 export type Models = Model[];

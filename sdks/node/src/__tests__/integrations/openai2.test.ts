@@ -37,6 +37,9 @@ describe('OpenAI Integration', () => {
           },
         },
       },
+      responses: {
+        create: jest.fn(),
+      },
     };
 
     // Setup WeaveClient
@@ -237,5 +240,204 @@ describe('makeOpenAIImagesGenerateOp', () => {
 
     // Verify the original function was called with correct args
     expect(mockGenerate).toHaveBeenCalledWith({prompt: 'draw a picture'});
+  });
+});
+
+// New tests for responses.create endpoint
+describe('OpenAI responses.create Integration', () => {
+  let mockOpenAI: any;
+  let wrappedOpenAI: any;
+
+  beforeEach(() => {
+    // Mock the responses.create endpoint
+    const mockNonStreamingResponse = {
+      id: 'resp_test_id',
+      object: 'response',
+      created_at: 1749508506,
+      status: 'completed',
+      model: 'gpt-4o-2024-08-06',
+      output: [
+        {
+          id: 'msg_test_id',
+          type: 'message',
+          status: 'completed',
+          content: [
+            {
+              type: 'output_text',
+              annotations: [],
+              text: 'Hello! How can I help you today?',
+            },
+          ],
+          role: 'assistant',
+        },
+      ],
+      usage: {
+        input_tokens: 10,
+        output_tokens: 8,
+        total_tokens: 18,
+      },
+    };
+
+    const mockStreamChunks = [
+      {
+        type: 'response.created',
+        sequence_number: 0,
+        response: {
+          id: 'resp_test_id',
+          object: 'response',
+          created_at: 1749508506,
+          status: 'in_progress',
+          model: 'gpt-4o-2024-08-06',
+          output: [],
+          usage: null,
+        },
+      },
+      {
+        type: 'response.output_text.delta',
+        sequence_number: 4,
+        item_id: 'msg_test_id',
+        output_index: 0,
+        content_index: 0,
+        delta: 'Hello!',
+      },
+      {
+        type: 'response.output_text.delta',
+        sequence_number: 5,
+        item_id: 'msg_test_id',
+        output_index: 0,
+        content_index: 0,
+        delta: ' How can I help you today?',
+      },
+      {
+        type: 'response.output_text.done',
+        sequence_number: 6,
+        item_id: 'msg_test_id',
+        output_index: 0,
+        content_index: 0,
+        text: 'Hello! How can I help you today?',
+      },
+      {
+        type: 'response.completed',
+        sequence_number: 7,
+        response: {
+          id: 'resp_test_id',
+          status: 'completed',
+          usage: {
+            input_tokens: 10,
+            output_tokens: 8,
+            total_tokens: 18,
+          },
+        },
+      },
+    ];
+
+    class MockStream {
+      private chunks: any[];
+
+      constructor(chunks: any[]) {
+        this.chunks = chunks;
+      }
+
+      async *[Symbol.asyncIterator]() {
+        for (const chunk of this.chunks) {
+          yield chunk;
+        }
+      }
+    }
+
+    // Complete mock OpenAI object with all required properties
+    mockOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(),
+        },
+      },
+      images: {
+        generate: jest.fn(),
+      },
+      beta: {
+        chat: {
+          completions: {
+            parse: jest.fn(),
+          },
+        },
+      },
+      responses: {
+        create: jest.fn().mockImplementation((options: any) => {
+          if (options.stream) {
+            return Promise.resolve(new MockStream(mockStreamChunks));
+          }
+          return Promise.resolve(mockNonStreamingResponse);
+        }),
+      },
+    };
+
+    wrappedOpenAI = wrapOpenAI(mockOpenAI);
+  });
+
+  describe('responses.create', () => {
+    it('should handle non-streaming responses', async () => {
+      const options = {
+        model: 'gpt-4o-2024-08-06',
+        instructions: 'You are a helpful assistant',
+        messages: [{role: 'user', content: 'Hello!'}],
+      };
+
+      const result = await wrappedOpenAI.responses.create(options);
+
+      expect(result).toMatchObject({
+        id: 'resp_test_id',
+        object: 'response',
+        status: 'completed',
+        model: 'gpt-4o-2024-08-06',
+        output: [
+          {
+            id: 'msg_test_id',
+            type: 'message',
+            content: [
+              {
+                type: 'output_text',
+                text: 'Hello! How can I help you today?',
+              },
+            ],
+            role: 'assistant',
+          },
+        ],
+        usage: {
+          input_tokens: 10,
+          output_tokens: 8,
+          total_tokens: 18,
+        },
+      });
+
+      expect(mockOpenAI.responses.create).toHaveBeenCalledWith(options);
+    });
+
+    it('should handle streaming responses and skip deltas', async () => {
+      const options = {
+        model: 'gpt-4o-2024-08-06',
+        instructions: 'You are a helpful assistant',
+        messages: [{role: 'user', content: 'Hello!'}],
+        stream: true,
+      };
+
+      const stream = await wrappedOpenAI.responses.create(options);
+
+      let deltaCount = 0;
+      let finalText = '';
+      for await (const chunk of stream) {
+        if (chunk.type === 'response.output_text.delta') {
+          deltaCount++;
+        }
+        if (chunk.type === 'response.output_text.done') {
+          finalText = chunk.text;
+        }
+      }
+
+      // Verify deltas were received but final text comes from done event
+      expect(deltaCount).toBe(2); // Two delta chunks
+      expect(finalText).toBe('Hello! How can I help you today?');
+      expect(mockOpenAI.responses.create).toHaveBeenCalledWith(options);
+    });
   });
 });

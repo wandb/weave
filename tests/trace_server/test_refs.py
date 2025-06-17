@@ -24,7 +24,9 @@ def test_isdescended_from():
     assert b.is_descended_from(a) == True
 
 
-def string_with_every_char(disallowed_chars=[]):
+def string_with_every_char(disallowed_chars=None):
+    if disallowed_chars is None:
+        disallowed_chars = []
     char_codes = list(range(256))
     random.shuffle(char_codes)
     return "".join(chr(i) for i in char_codes if chr(i) not in disallowed_chars)
