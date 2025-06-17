@@ -162,6 +162,78 @@ This section describes several ways to interact with the W&B Inference service:
 - [Chat completion with Llama 4 Scout](#llama-4-scout)
 - [Chat completion with Phi 4 Mini](#phi-4-mini)
 
+#### Using Weave wuth the infernce service
+
+Use Weave with the Inference service to [trace model calls](../tracking/tracing.mdx), [evaluate performance](../core-types/evaluations.md), and [publish a leaderboard](../core-types/leaderboards.md). The following Python code sample  compares two models on a simple question–answer dataset.
+
+```python
+import os
+import asyncio
+import openai
+import weave
+from weave.flow import leaderboard
+from weave.trace.ref_util import get_ref
+
+weave.init("inference-demo")
+
+dataset = [
+    {"input": "What is 2 + 2?", "target": "4"},
+    {"input": "Name a primary color.", "target": "red"},
+]
+
+@weave.op
+def exact_match(target: str, output: str) -> float:
+    return float(target.strip().lower() == output.strip().lower())
+
+class WBInferenceModel(weave.Model):
+    model: str
+
+    @weave.op
+    def predict(self, prompt: str) -> str:
+        client = openai.OpenAI(
+            base_url="https://api.inference.wandb.ai/v1",
+            api_key=os.environ["WANDB_API_KEY"],
+            project="my-team/my-project",
+        )
+        resp = client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.choices[0].message.content
+
+llama = WBInferenceModel(model="meta-llama/Llama-3.1-8B-Instruct")
+deepseek = WBInferenceModel(model="deepseek-ai/DeepSeek-V3-0324")
+
+evaluation = weave.Evaluation(
+    name="QA",
+    dataset=dataset,
+    scorers=[exact_match],
+)
+
+async def run_eval():
+    await evaluation.evaluate(llama)
+    await evaluation.evaluate(deepseek)
+
+asyncio.run(run_eval())
+
+spec = leaderboard.Leaderboard(
+    name="Inference Leaderboard",
+    description="Compare models on a QA dataset",
+    columns=[
+        leaderboard.LeaderboardColumn(
+            evaluation_object_ref=get_ref(evaluation).uri(),
+            scorer_name="exact_match",
+            summary_metric_path="mean",
+        )
+    ],
+)
+
+weave.publish(spec)
+print(leaderboard.get_leaderboard_results(spec, weave.WeaveClient()))
+```
+
+Open the **Leaders** tab in the Weave UI to [view the leaderboard](../core-types/leaderboards.md)
+
 #### List available models
 
 Use the API to query all currently available models and their IDs. This is useful for selecting models dynamically or inspecting what's available in your environment.
