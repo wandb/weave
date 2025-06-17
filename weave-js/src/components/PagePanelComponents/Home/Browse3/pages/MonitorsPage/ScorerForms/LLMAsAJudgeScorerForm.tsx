@@ -1,4 +1,5 @@
 import {Box, Typography} from '@mui/material';
+import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
@@ -63,6 +64,10 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       ResponseFormat | undefined
     >();
 
+    const [isProviderModel, setIsProviderModel] = useState<boolean>(false);
+
+    const [isModelSettingsExpanded, setIsModelSettingsExpanded] = useState<boolean>(true);
+
     const {projectId, entity, project} = useEntityProject();
 
     const {result: savedModelRes} = useLeafObjectInstances(
@@ -101,6 +106,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       );
       if (currentModel) {
         setJudgeModel(currentModel);
+        setIsProviderModel(false);
         onValidationChange(true);
         if (currentModel.default_params) {
           const systemPrompt = getSystemPrompt(currentModel.default_params);
@@ -125,26 +131,10 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       if (!judgeModel) {
         setJudgeModelError('A judge model is required.');
         return false;
-      } else {
-        if (!judgeModelName) {
-          setJudgeModelError('A judge model name is required.');
-          return false;
-        }
-        // Allow empty system prompts?
-        /*if (
-          !judgeModel.default_params ||
-          !getSystemPrompt(judgeModel.default_params)
-        ) {
-          setJudgeModelError('A judge model system prompt is required');
-          return false;
-        }*/
-        if (!responseFormat) {
-          setJudgeModelError('A judge model response format is required.');
-          return false;
-        }
       }
+      setJudgeModelError(null);
       return true;
-    }, [judgeModel, judgeModelName, responseFormat]);
+    }, [judgeModel]);
 
     const validateScorer = useCallback(() => {
       if (!scorerName) {
@@ -174,6 +164,16 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const saveModel = useCallback(async (): Promise<string | undefined> => {
       if (!judgeModel) {
         return undefined;
+      }
+
+      // Check if this model already exists in saved models
+      const existingModel = savedModels.find(
+        model => model.name === judgeModelName
+      );
+      
+      if (existingModel) {
+        // Model already exists, return its reference
+        return `weave:///${projectId}/object/${existingModel.name}:${existingModel.ref?._digest}`;
       }
 
       const model: LlmStructuredCompletionModel = {
@@ -209,6 +209,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       systemPrompt,
       responseFormat,
       createLLMStructuredCompletionModel,
+      savedModels,
     ]);
 
     const scorerCreate = useScorerCreate();
@@ -224,14 +225,23 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         responseFormat !== judgeModel.default_params?.response_format;
 
       let judgeModelRef: string | undefined;
-      if (modelHasChanged) {
+      if (modelHasChanged && !judgeModel.ref) {
+        // Only save the model if it's changed and it's not already a saved model
         judgeModelRef = await saveModel();
         if (!judgeModelRef) {
           setJudgeModelError('Failed to save judge model.');
           return undefined;
         }
-      } else {
+      } else if (judgeModel.ref) {
+        // This is already a saved model, use its reference
         judgeModelRef = `weave:///${projectId}/object/${judgeModel.name}:${judgeModel.ref?._digest}`;
+      } else {
+        // Model hasn't changed and it's a provider model that needs to be saved
+        judgeModelRef = await saveModel();
+        if (!judgeModelRef) {
+          setJudgeModelError('Failed to save judge model.');
+          return undefined;
+        }
       }
 
       // If the scoring prompt or judge model has changed, we need to create a new scorer version
@@ -309,27 +319,47 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         let newJudgeModel: LlmStructuredCompletionModel | undefined;
 
         if (savedModel && savedModels) {
+          // This is a saved model - use its existing configuration
           newJudgeModel = savedModels.find(
             model =>
               model.name === savedModel.objectId &&
               model.ref?._extra?.[0] === `${savedModel.versionIndex}`
           );
+          setIsProviderModel(false);
         } else {
+          // This is a provider model - create default judge model configuration
+          const modelName = `${newValue}-judge-model-default`;
+          const defaultSystemPrompt = `
+You are an impartial evaluation system designed to assess outputs according to provided criteria. You will receive specific evaluation instructions and must follow them precisely.
+
+CRITICAL: You must ALWAYS respond in valid JSON format using the exact structure specified in the evaluation instructions. Never deviate from the required JSON format under any circumstances.
+
+Your role:
+1. Carefully read the evaluation criteria provided
+2. Analyze the given output objectively against those criteria
+3. Focus solely on the specified evaluation dimensions
+4. Provide your assessment in the exact JSON format requested
+
+Remember: Your response must be valid JSON that can be parsed programmatically. Do not include any text outside the JSON structure.
+`.trim();
+          
           newJudgeModel = {
             llm_model_id: newValue,
-            name: judgeModelName || `${scorerName}-judge-model`,
+            name: modelName,
             default_params: {
               max_tokens: maxTokens,
+              messages_template: [{role: 'system', content: defaultSystemPrompt}],
+              response_format: 'json_object',
             },
             description: '',
             ref: undefined,
           };
+          setIsProviderModel(true);
         }
         setJudgeModel(newJudgeModel);
         onValidationChange(!!scorerName && !!scoringPrompt);
       },
       [
-        judgeModelName,
         scoringPrompt,
         savedModels,
         scorerName,
@@ -338,50 +368,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       ]
     );
 
-    const onJudgeModelNameChange = useCallback(
-      value => {
-        setJudgeModelName(value);
-        const validationResult = validateDatasetName(value);
-        setJudgeModelError(validationResult.error);
-        onValidationChange(
-          !validationResult.error &&
-            !!value &&
-            !!systemPrompt &&
-            !!responseFormat &&
-            !!scorerName &&
-            !!scoringPrompt
-        );
-      },
-      [
-        systemPrompt,
-        responseFormat,
-        scorerName,
-        scoringPrompt,
-        setJudgeModelName,
-        setJudgeModelError,
-        onValidationChange,
-      ]
-    );
-
-    const onSystemPromptChange = useCallback(
-      value => {
-        setSystemPrompt(value);
-        onValidationChange(
-          !!value &&
-            !!judgeModelName &&
-            !!scorerName &&
-            !!scoringPrompt &&
-            !!responseFormat
-        );
-      },
-      [
-        judgeModelName,
-        scorerName,
-        scoringPrompt,
-        responseFormat,
-        onValidationChange,
-      ]
-    );
 
     return (
       <Box className="flex flex-col gap-8 pt-16">
@@ -416,65 +402,92 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             </Typography>
           </Box>
 
-          <Box>
-            <FieldName name="Judge model" />
-            <LLMDropdownLoaded
-              className="w-full"
-              value={selectedJudgeModel || ''}
-              isTeamAdmin={false}
-              direction={{horizontal: 'left', vertical: 'up'}}
-              onChange={onJudgeModelChange}
-            />
-            {judgeModelError && (
-              <Typography
-                className="mt-1 text-sm"
-                sx={{
-                  ...typographyStyle,
-                  color: 'error.main',
-                }}
+          <div className="flex flex-col gap-8">
+            <Box>
+              <FieldName name="Judge model" />
+              <LLMDropdownLoaded
+                className="w-full"
+                value={selectedJudgeModel || ''}
+                isTeamAdmin={false}
+                direction={{horizontal: 'left', vertical: 'up'}}
+                onChange={onJudgeModelChange}
               />
-            )}
-          </Box>
-          {judgeModel && (
-            <Box className="flex flex-col gap-16 rounded-md bg-moon-100 p-16">
-              <Typography
-                sx={typographyStyle}
-                className="text-sm font-semibold uppercase tracking-wide text-moon-500">
-                Model settings
-              </Typography>
-
-              <Box>
-                <FieldName name="LLM ID" />
-                <Typography sx={{...typographyStyle, color: 'text.secondary'}}>
-                  {judgeModel.llm_model_id}
-                </Typography>
-              </Box>
-              <Box>
-                <FieldName name="Configuration name" />
-                <TextField
-                  value={judgeModelName}
-                  onChange={onJudgeModelNameChange}
+              {judgeModelError && (
+                <Typography
+                  className="mt-1 text-sm"
+                  sx={{
+                    ...typographyStyle,
+                    color: 'error.main',
+                  }}
                 />
-              </Box>
-              <Box>
-                <FieldName name="System prompt" />
-                <TextArea
-                  value={systemPrompt}
-                  onChange={e => onSystemPromptChange(e.target.value)}
-                />
-              </Box>
-              <Box>
-                <FieldName name="Response format" />
-                <ResponseFormatSelect
-                  responseFormat={
-                    (responseFormat ||
-                      'json_object') as PlaygroundResponseFormats
-                  }
-                  setResponseFormat={setResponseFormat}
-                />
-              </Box>
+              )}
             </Box>
-          )}
+            {judgeModel && (
+              <Box className="flex flex-col gap-8 rounded-md bg-moon-100 py-8 pl-16 pr-8">
+                <Box 
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => setIsModelSettingsExpanded(!isModelSettingsExpanded)}
+                >
+                  <Typography
+                    sx={typographyStyle}
+                    className="text-sm font-semibold uppercase tracking-wide text-moon-500">
+                    Model settings
+                  </Typography>
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    icon={isModelSettingsExpanded ? 'chevron-up' : 'chevron-down'}
+                  />
+                </Box>
+
+                {isModelSettingsExpanded && (
+                  <>
+                    <Box>
+                      <Typography 
+                        sx={{...typographyStyle, fontWeight: 600, marginBottom: '4px'}}
+                      >
+                        LLM
+                      </Typography>
+                      <Typography sx={{...typographyStyle, color: 'text.secondary'}}>
+                        {judgeModel.llm_model_id}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography 
+                        sx={{...typographyStyle, fontWeight: 600, marginBottom: '4px'}}
+                      >
+                        Configuration name
+                      </Typography>
+                      <Typography sx={{...typographyStyle, color: 'text.secondary'}}>
+                        {judgeModelName}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography 
+                        sx={{...typographyStyle, fontWeight: 600, marginBottom: '4px'}}
+                      >
+                        System prompt
+                      </Typography>
+                      <Typography sx={{...typographyStyle, color: 'text.secondary', whiteSpace: 'pre-wrap'}}>
+                        {systemPrompt}
+                      </Typography>
+                    </Box>
+                    <Box className="mb-8">
+                      <Typography 
+                        sx={{...typographyStyle, fontWeight: 600, marginBottom: '4px'}}
+                      >
+                        Response format
+                      </Typography>
+                      <Typography sx={{...typographyStyle, color: 'text.secondary'}}>
+                        {responseFormat}
+                      </Typography>
+                    </Box>
+                  </>
+                )}
+              </Box>
+            )}
+          </div>
+
           <Box>
             <FieldName name="Scoring prompt" />
             <TextArea
