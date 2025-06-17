@@ -422,7 +422,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               className="w-full"
               value={selectedJudgeModel || ''}
               isTeamAdmin={false}
-              direction={{horizontal: 'left', vertical: 'up'}}
+              direction={{horizontal: 'left'}}
               onChange={onJudgeModelChange}
             />
             {judgeModelError && (

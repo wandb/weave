@@ -185,7 +185,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
               isAdmin={isTeamAdmin}
               onConfigureProvider={handleConfigureProvider}
               onViewCatalog={handleViewCatalog}
-              direction={{horizontal: 'right', vertical: 'down'}}
+              direction={{horizontal: 'right'}}
             />
           ),
         }}

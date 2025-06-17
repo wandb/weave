@@ -61,7 +61,6 @@ export interface ProviderOption {
 
 export type OpenDirection = {
   horizontal: 'left' | 'right';
-  vertical: 'up' | 'down';
 };
 
 export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
@@ -120,29 +119,35 @@ const SubMenu = ({
   }, []);
 
   const subMenuPosition = useMemo(() => {
-    if (direction.horizontal === 'right' && direction.vertical === 'down') {
-      return {
-        left: position.right + 1,
-        top: position.top,
-      };
-    }
-    if (direction.horizontal === 'right' && direction.vertical === 'up') {
-      return {
-        left: position.right + 1,
-        bottom: viewportHeight - position.bottom + 4,
-      };
-    }
-    if (direction.horizontal === 'left' && direction.vertical === 'down') {
-      return {
-        right: viewportWidth - position.right + 1,
-        top: position.top,
-      };
-    }
-    if (direction.horizontal === 'left' && direction.vertical === 'up') {
-      return {
-        right: viewportWidth - position.left + 1,
-        bottom: viewportHeight - position.bottom - 4,
-      };
+    // Calculate if dropdown is above or below 50% of the viewport
+    const dropdownMidpoint = (position.top + position.bottom) / 2;
+    const viewportMidpoint = viewportHeight / 2;
+    const shouldOpenDown = dropdownMidpoint < viewportMidpoint;
+
+    if (direction.horizontal === 'right') {
+      if (shouldOpenDown) {
+        return {
+          left: position.right + 1,
+          top: position.top,
+        };
+      } else {
+        return {
+          left: position.right + 1,
+          bottom: viewportHeight - position.bottom + 4,
+        };
+      }
+    } else if (direction.horizontal === 'left') {
+      if (shouldOpenDown) {
+        return {
+          right: viewportWidth - position.left + 1,
+          top: position.top,
+        };
+      } else {
+        return {
+          right: viewportWidth - position.left + 1,
+          bottom: viewportHeight - position.bottom - 4,
+        };
+      }
     }
     return {};
   }, [direction, position, viewportWidth, viewportHeight]);
@@ -401,7 +406,13 @@ const SubMenuOption = ({
               alignItems: 'center',
             }}>
             {direction.horizontal === 'left' && (
-              <Box sx={{display: 'flex', gap: 1, marginRight: '8px', alignItems: 'center'}}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1,
+                  marginRight: '8px',
+                  alignItems: 'center',
+                }}>
                 {hasOptions && <Icon name="chevron-back" color="moon_500" />}
               </Box>
             )}
@@ -418,7 +429,13 @@ const SubMenuOption = ({
               </div>
             </Box>
             {direction.horizontal === 'right' && (
-              <Box sx={{display: 'flex', gap: 1, marginLeft: 'auto', alignItems: 'center'}}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1,
+                  marginLeft: 'auto',
+                  alignItems: 'center',
+                }}>
                 {hasOptions && <Icon name="chevron-next" color="moon_500" />}
               </Box>
             )}
