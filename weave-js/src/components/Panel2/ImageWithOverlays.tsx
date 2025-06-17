@@ -1,3 +1,4 @@
+import * as RadixTooltip from '@radix-ui/react-tooltip';
 import {LineStyle, Style} from '@wandb/weave/common/components/MediaCard';
 import {BoundingBox2D, LayoutType} from '@wandb/weave/common/types/media';
 import {colorFromString} from '@wandb/weave/common/util/colors';
@@ -19,7 +20,6 @@ import {compare} from '../../compare';
 import * as Controls from './controlsImage';
 import {ClassSetControls, ClassSetState, ClassState} from './controlsImage';
 import {useSignedUrlWithExpiration} from './useAssetFromArtifact';
-import * as RadixTooltip from '@radix-ui/react-tooltip';
 
 // Copied from media.tsx, for some reason importing media.tsx
 // doesn't work with storybook, at least at the moment I'm doing
@@ -486,6 +486,7 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
     bboxControls,
     mediaSize,
     sliderControls,
+    cardSize,
   ]);
 
   const collisionBoundary = useRef<HTMLDivElement>(null);
