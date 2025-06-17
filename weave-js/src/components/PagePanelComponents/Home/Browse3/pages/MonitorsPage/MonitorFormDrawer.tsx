@@ -454,6 +454,9 @@ export const MonitorFormDrawer = ({
                         frozenFilter={undefined}
                         width="100%"
                       />
+                    </Box>
+                    <Box>
+                      <FieldName name="Additional filters" />
                       {selectedOpVersionOption.length > 0 ? (
                         <FilterPanel
                           entity={entity}
@@ -483,7 +486,7 @@ export const MonitorFormDrawer = ({
                           onChange={setSamplingRate}
                           min={0}
                           max={100}
-                          step={10}
+                          step={1}
                           hasInput
                           className="w-full"
                         />
