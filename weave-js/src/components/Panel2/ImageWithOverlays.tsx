@@ -10,7 +10,6 @@ import {
   opAssetFile,
   VoidNode,
 } from '@wandb/weave/core';
-import Color from 'color';
 import * as _ from 'lodash';
 import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import styled from 'styled-components';
