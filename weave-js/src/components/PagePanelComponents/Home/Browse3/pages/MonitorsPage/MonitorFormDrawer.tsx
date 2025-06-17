@@ -202,15 +202,9 @@ export const MonitorFormDrawer = ({
   const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [description, setDescription] = useState<string>(
-    monitor?.val['description'] || ''
-  );
-  const [monitorName, setMonitorName] = useState<string>(
-    monitor?.val['name'] || ''
-  );
-  const [samplingRate, setSamplingRate] = useState<number>(
-    (monitor?.val['sampling_rate'] || 0.1) * 100
-  );
+  const [description, setDescription] = useState<string>('');
+  const [monitorName, setMonitorName] = useState<string>('');
+  const [samplingRate, setSamplingRate] = useState<number>(10);
   const [selectedOpVersionOption, setSelectedOpVersionOption] = useState<
     string[]
   >([]);
@@ -242,7 +236,7 @@ export const MonitorFormDrawer = ({
   );
 
   const [scorerValids, {updateAt: updateScorerValidAt}] = useList<boolean>(
-    existingScorers?.map(() => true) || [false]
+    existingScorers?.map(s => true) || [false]
   );
 
   const [active, setActive] = useState<boolean>(false);
@@ -595,6 +589,58 @@ export const MonitorFormDrawer = ({
                     </Box>
                   </Box>
                 </Box>
+
+                {/*<Box className="flex flex-col gap-8 pt-16">
+                  <Typography
+                    sx={typographyStyle}
+                    className="border-t border-moon-250 px-20 pb-8 pt-16 font-semibold uppercase tracking-wide text-moon-500">
+                    Scorers
+                  </Typography>
+                  <Box className="flex flex-col gap-16 px-20">
+                    <Box>
+                      <FieldName name="Scorers" />
+                      <Autocomplete
+                        multiple
+                        options={Array.from(SCORER_FORMS.keys())}
+                        sx={{width: '100%'}}
+                        value={scorers.map(
+                          scorer => scorer.objectId || scorer.val['_type']
+                        )}
+                        onChange={(
+                          unused,
+                          newScorers: string | string[] | null
+                        ) => {
+                          if (newScorers === null) {
+                            clearScorers();
+                            clearScorerValids();
+                            return;
+                          }
+                          const newScorerArray = _.isArray(newScorers)
+                            ? (newScorers as string[])
+                            : [newScorers as string];
+                          setScorers(
+                            newScorerArray.map(newScorer => ({
+                              scheme: 'weave',
+                              weaveKind: 'object',
+                              entity,
+                              project,
+                              objectId: '',
+                              versionHash: '',
+                              path: '',
+                              versionIndex: 0,
+                              baseObjectClass: newScorer,
+                              createdAtMs: Date.now(),
+                              val: {_type: newScorer},
+                            }))
+                          );
+                          setScorerValids(currentValids =>
+                            currentValids.slice(0, newScorerArray.length)
+                          );
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                </Box>*/}
 
                 {scorerForms.map((Form: ScorerFormType, index: number) => (
                   <Form
