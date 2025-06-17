@@ -456,23 +456,23 @@ export const MonitorFormDrawer = ({
                       />
                       {selectedOpVersionOption.length > 0 ? (
                         <FilterPanel
-                        entity={entity}
-                        project={project}
-                        filterModel={filterModel}
-                        setFilterModel={setFilterModel}
-                        columnInfo={columns}
-                        selectedCalls={[]}
-                        clearSelectedCalls={() => {}}
-                      />
-                    ) : (
+                          entity={entity}
+                          project={project}
+                          filterModel={filterModel}
+                          setFilterModel={setFilterModel}
+                          columnInfo={columns}
+                          selectedCalls={[]}
+                          clearSelectedCalls={() => {}}
+                        />
+                      ) : (
                         <Typography
-                        className="mt-1 text-sm font-normal"
-                        sx={{
+                          className="mt-1 text-sm font-normal"
+                          sx={{
                             ...typographyStyle,
                             color: 'text.secondary',
                           }}>
                           Select an op to add filters.
-                          </Typography>
+                        </Typography>
                       )}
                     </Box>
                     <Box>
