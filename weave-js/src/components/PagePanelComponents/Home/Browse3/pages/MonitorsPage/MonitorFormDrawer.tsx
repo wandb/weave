@@ -54,7 +54,7 @@ const StyledSliderInput: React.FC<{
 }> = ({progress, className, children}) => {
   // Create a unique ID for this instance to scope the styles
   const uniqueId = useRef(`slider-${Math.random().toString(36).substr(2, 9)}`);
-  
+
   return (
     <>
       <style>
@@ -124,9 +124,7 @@ const StyledSliderInput: React.FC<{
           }
         `}
       </style>
-      <div className={`${uniqueId.current} ${className || ''}`}>
-        {children}
-      </div>
+      <div className={`${uniqueId.current} ${className || ''}`}>{children}</div>
     </>
   );
 };
