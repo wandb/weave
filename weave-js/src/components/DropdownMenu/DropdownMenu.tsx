@@ -53,12 +53,13 @@ const contentClassName = classNames(
 export const Content = React.forwardRef<
   HTMLDivElement,
   RadixDropdownMenu.DropdownMenuContentProps
->(({className, children, ...props}, ref) => (
+>(({className, children, style, ...props}, ref) => (
   <Tailwind>
     <RadixDropdownMenu.Content
       ref={ref}
       className={twMerge(contentClassName, className)}
       sideOffset={5}
+      style={{...style, zIndex: 10001}}
       {...props}>
       {children}
     </RadixDropdownMenu.Content>
