@@ -1015,12 +1015,3 @@ const PlaygroundPageBinding = () => {
     />
   );
 };
-
-export const useEntityProject = (): {
-  entity: string;
-  project: string;
-  projectId: string;
-} => {
-  const {entity, project} = useParamsDecoded<Browse3ProjectParams>();
-  return {entity, project, projectId: `${entity}/${project}`};
-};

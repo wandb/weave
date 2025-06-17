@@ -1,14 +1,6 @@
 import {Box, Drawer, Typography} from '@mui/material';
-import {styled} from '@mui/material/styles';
 import {GridFilterModel} from '@mui/x-data-grid-pro';
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
-import {
-  MOON_250,
-  MOON_350,
-  TEAL_500,
-} from '@wandb/weave/common/css/color.styles';
-import {Radio} from '@wandb/weave/components';
-import {Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
@@ -41,6 +33,7 @@ import {
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
@@ -120,15 +113,9 @@ export const MonitorFormDrawer = ({
   const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [description, setDescription] = useState<string>(
-    monitor?.val['description'] || ''
-  );
-  const [monitorName, setMonitorName] = useState<string>(
-    monitor?.val['name'] || ''
-  );
-  const [samplingRate, setSamplingRate] = useState<number>(
-    (monitor?.val['sampling_rate'] || 0.1) * 100
-  );
+  const [description, setDescription] = useState<string>('');
+  const [monitorName, setMonitorName] = useState<string>('');
+  const [samplingRate, setSamplingRate] = useState<number>(10);
   const [selectedOpVersionOption, setSelectedOpVersionOption] = useState<
     string[]
   >([]);
@@ -350,37 +337,6 @@ export const MonitorFormDrawer = ({
     scorerFormRefs,
   ]);
 
-  const scorerForms = useMemo(() => {
-    return (
-      <>
-        {scorers.map((scorer, index) => {
-          const ScorerForm = SCORER_FORMS.get(scorer.val['_type']);
-          if (!ScorerForm) {
-            return null;
-          }
-          return (
-            <ScorerForm
-              key={index}
-              scorer={scorer}
-              onChange={(newScorer: ObjectVersionSchema) =>
-                setScorers(currentScorers =>
-                  currentScorers.map((s, i) => (i === index ? newScorer : s))
-                )
-              }
-              onValidationChange={(isValid: boolean) =>
-                setScorerValids(currentValids => {
-                  const nextValids = [...currentValids];
-                  nextValids[index] = isValid;
-                  return nextValids;
-                })
-              }
-            />
-          );
-        })}
-      </>
-    );
-  }, [scorers]);
-
   return (
     <Drawer
       open={open}
@@ -499,44 +455,38 @@ export const MonitorFormDrawer = ({
                         width="100%"
                       />
                       {selectedOpVersionOption.length > 0 ? (
-                        <Box className="mt-4">
-                          <FilterPanel
-                            entity={entity}
-                            project={project}
-                            filterModel={filterModel}
-                            setFilterModel={setFilterModel}
-                            columnInfo={columns}
-                            selectedCalls={[]}
-                            clearSelectedCalls={() => {}}
-                          />
-                        </Box>
-                      ) : (
+                        <FilterPanel
+                        entity={entity}
+                        project={project}
+                        filterModel={filterModel}
+                        setFilterModel={setFilterModel}
+                        columnInfo={columns}
+                        selectedCalls={[]}
+                        clearSelectedCalls={() => {}}
+                      />
+                    ) : (
                         <Typography
-                          className="mt-4 text-sm font-normal"
-                          sx={{
+                        className="mt-1 text-sm font-normal"
+                        sx={{
                             ...typographyStyle,
                             color: 'text.secondary',
                           }}>
-                          Select an op to add additional filters.
-                        </Typography>
+                          Select an op to add filters.
+                          </Typography>
                       )}
                     </Box>
                     <Box>
                       <FieldName name="Sampling rate" />
                       <Box className="flex items-center gap-12">
-                        <StyledSliderInput
+                        <SliderInput
+                          value={samplingRate}
+                          onChange={setSamplingRate}
+                          min={0}
+                          max={100}
+                          step={10}
+                          hasInput
                           className="w-full"
-                          progress={samplingRate}>
-                          <SliderInput
-                            value={samplingRate}
-                            onChange={setSamplingRate}
-                            min={0}
-                            max={100}
-                            step={10}
-                            hasInput
-                            className="w-full"
-                          />
-                        </StyledSliderInput>
+                        />
                         <span style={typographyStyle}>%</span>
                       </Box>
                     </Box>

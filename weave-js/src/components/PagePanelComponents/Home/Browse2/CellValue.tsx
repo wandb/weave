@@ -41,7 +41,7 @@ export const CellValue = ({value, noLink, stringStyle}: CellValueProps) => {
           width: '100%',
           height: '100%',
         }}>
-        <CellValueBoolean height="38px" value={value} />
+        <CellValueBoolean value={value} />
       </Box>
     );
   }
