@@ -430,7 +430,7 @@ Organization admins can track current Inference credit balance, usage history, a
 1. In the W&B UI, navigate to the W&B **Billing** page.
 2. In the bottom righthand corner, the Inference billing information card is displayed. From here, you can:
 - Click the **View usage** button in the Inference billing information card to view your usage over time.
-- If you're on a paid plan, view your projected inference charges.
+- If you're on a paid plan, view your upcoming inference charges.
 
 :::tip
 Visit the [Inference pricing page for a breakdown of per-model pricing](https://wandb.ai/site/pricing/inference)
