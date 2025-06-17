@@ -36,30 +36,14 @@ This guide provides the following information:
   - [Available methods](#available-methods)
       - [Chat completions](#chat-completions)
       - [List supported models](#list-supported-models)
-  - [Usage examples](#usage-examples)
-      - [Use Weave with the inference service](#use-weave-with-the-inference-service) 
-      - [List available models](#list-available-models)
-      - [Llama 3.1 8B](#llama-31-8b)
-      - [DeepSeek V3-0324](#deepseek-v3-0324)
-      - [Llama 3.3 70B](#llama-33-70b)
-      - [DeepSeek R1-0528](#deepseek-r1-0528)
-      - [Llama 4 Scout](#llama-4-scout)
-      - [Phi 4 Mini](#phi-4-mini)
+- [Usage examples](#usage-examples)
 - [UI](#ui)
   - [Access the Inference service](#access-the-inference-service)
-      - [From the Inference tab](#from-the-inference-tab)
-      - [From the Playground tab](#from-the-playground-tab)
   - [Try a model in the Playground](#try-a-model-in-the-playground)
   - [Compare multiple models](#compare-multiple-models)
-      - [Access the Compare view from the Inference tab ](#access-the-compare-view-from-the-inference-tab)
-      - [Access the Compare view from the Playground tab](#access-the-compare-view-from-the-playground-tab)
-  - [View billing information](#view-billing-and-usage-information)
+  - [View billing and usage information](#view-billing-and-usage-information)
 - [Usage information and limits ](#usage-information-and-limits)
-  - [Geographic restrictions](#geographic-restrictions)
-  - [Concurrency limits](#concurrency-limits)
-  - [Pricing](#pricing)
 - [API errors](#api-errors)
-- [FAQ](#faq)
 
 ## Prerequisites
 
@@ -104,9 +88,14 @@ To access this endpoint, you must have a valid W&B account with Inference servic
 
 ### Available methods
 
+The Inference service provides two primary methods:
+
+- [Chat completions](#chat-completions)
+- [List supported models](#list-supported-models)
+
 #### Chat completions
 
-The primary API method available is `/chat/completions`, which supports OpenAI-compatible request formats for sending messages to a supported model and receiving a completion. For usage examples involving specific models, see the [API usage examples](#usage-examples).
+The primary API method available is `/chat/completions`, which supports OpenAI-compatible request formats for sending messages to a supported model and receiving a completion. For usage examples demonstrating how to use the W&B Inference service with Weave, see the [API usage examples](#usage-examples).
 
 To create a chat completion, you will need:
 
@@ -122,6 +111,21 @@ To create a chat completion, you will need:
   - `microsoft/Phi-4-mini-instruct`
 
 <Tabs groupId="programming-language" queryString>
+  <TabItem value="bash" label="Bash" default>
+    ```bash
+    curl https://api.inference.wandb.ai/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer <your-api-key>" \
+      -H "OpenAI-Project: <your-entity>/<your-project>" \
+      -d '{
+        "model": "<model-id>",
+        "messages": [
+          { "role": "system", "content": "You are a helpful assistant." },
+          { "role": "user", "content": "Tell me a joke." }
+        ]
+      }'
+    ```
+  </TabItem>
   <TabItem value="python" label="Python">
     ```python
     import openai
@@ -155,21 +159,6 @@ To create a chat completion, you will need:
     )
 
     print(response.choices[0].message.content)
-    ```
-  </TabItem>
-  <TabItem value="bash" label="Bash" default>
-    ```bash
-    curl https://api.inference.wandb.ai/v1/chat/completions \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer <your-api-key>" \
-      -H "OpenAI-Project: <your-entity>/<your-project>" \
-      -d '{
-        "model": "<model-id>",
-        "messages": [
-          { "role": "system", "content": "You are a helpful assistant." },
-          { "role": "user", "content": "Tell me a joke." }
-        ]
-      }'
     ```
   </TabItem>
 </Tabs>
@@ -214,35 +203,68 @@ This section provides several examples demonstrating how to use W&B Inference wi
 
 #### Basic example: Trace Llama 3.1 8B with Weave
 
+The following Python code sample shows how to send a prompt to the **Llama 3.1 8B** model using the W&B Inference API and trace the call in Weave. Tracing lets you capture the full input/output of the LLM call, monitor performance, and analyze results in the Weave UI.
+
+:::tip
+Learn more about [tracing in Weave](../tracking/tracing.mdx).
+:::
+
+In this example:
+
+- You define a `@weave.op()`-decorated function, `run_chat`, which makes a chat completion request using the OpenAI-compatible client.
+- Your traces are recorded and associated with your W&B entity and project `project="<your-entity>/<your-project>`
+- The function is automatically traced by Weave, so its inputs, outputs, latency, and metadata (like model ID) are logged.
+- The result is printed in the terminal, and the trace appears in your **Traces** tab at [https://wandb.ai](https://wandb.ai) under the specified project.
+
+To use this example, you must complete the [general prerequisites](#prerequisites) and [Additional prerequisites for using the API via Python](#additional-prerequisites-for-using-the-api-via-python).
+
 ```python
+import weave
 import openai
 
+# Set the Weave team and project for tracing
+weave.init("<your-team>/<your-project>")
+
 client = openai.OpenAI(
-    # The custom base URL points to W&B Inference
     base_url='https://api.inference.wandb.ai/v1',
 
     # Get your API key from https://wandb.ai/authorize
-    # Consider setting it in the environment as OPENAI_API_KEY instead for safety
-    api_key="<your-apikey>",
+    api_key="<your-api-key>",
 
-    # Team and project are required for usage tracking
-    project="<team>/<project>",
+    # Required for W&B inference usage tracking
+    project="wandb/inference-demo",
 )
 
-response = client.chat.completions.create(
-    model="meta-llama/Llama-3.1-8B-Instruct",
-    messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Tell me a joke."}
-    ],
-)
+# Trace the model call in Weave
+@weave.op()
+def run_chat():
+    response = client.chat.completions.create(
+        model="meta-llama/Llama-3.1-8B-Instruct",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Tell me a joke."}
+        ],
+    )
+    return response.choices[0].message.content
 
-print(response.choices[0].message.content)
+# Run and log the traced call
+output = run_chat()
+print(output)
 ```
+
+Once you run the code sample:
+1. Navigate to [https://wandb.ai](https://wandb.ai).
+2. Select the **Traces** tab to view your Weave traces.
+
+Next, try the [advanced example](#advanced-example-use-weave-evaluations-and-leaderboards-with-the-inference-service).
+
+![Traces display](imgs/image.png)
 
 #### Advanced example: Use Weave Evaluations and Leaderboards with the inference service
 
-Use Weave with the Inference service to [trace model calls](../tracking/tracing.mdx), [evaluate performance](../core-types/evaluations.md), and [publish a leaderboard](../core-types/leaderboards.md). The following Python code sample compares two models on a simple question–answer dataset.
+In addition to using Weave with the Inference service to [trace model calls](../tracking/tracing.mdx), you can also [evaluate performance](../core-types/evaluations.md), and [publish a leaderboard](../core-types/leaderboards.md). The following Python code sample compares two models on a simple question–answer dataset.
+
+To use this example, you must complete the [general prerequisites](#prerequisites) and [Additional prerequisites for using the API via Python](#additional-prerequisites-for-using-the-api-via-python).
 
 ```python
 import os
@@ -252,7 +274,8 @@ import weave
 from weave.flow import leaderboard
 from weave.trace.ref_util import get_ref
 
-weave.init("inference-demo")
+# Set the Weave team and project for tracing
+weave.init("<your-team>/<your-project>")
 
 dataset = [
     {"input": "What is 2 + 2?", "target": "4"},
@@ -270,8 +293,10 @@ class WBInferenceModel(weave.Model):
     def predict(self, prompt: str) -> str:
         client = openai.OpenAI(
             base_url="https://api.inference.wandb.ai/v1",
-            api_key=os.environ["WANDB_API_KEY"],
-            project="<team>/<project>",
+            # Get your API key from https://wandb.ai/authorize
+            api_key="<your-api-key>",
+            # Required for W&B inference usage tracking
+            project="<your-team>/<your-project>",
         )
         resp = client.chat.completions.create(
             model=self.model,
@@ -282,10 +307,14 @@ class WBInferenceModel(weave.Model):
 llama = WBInferenceModel(model="meta-llama/Llama-3.1-8B-Instruct")
 deepseek = WBInferenceModel(model="deepseek-ai/DeepSeek-V3-0324")
 
+def preprocess_model_input(example):
+    return {"prompt": example["input"]}
+
 evaluation = weave.Evaluation(
     name="QA",
     dataset=dataset,
     scorers=[exact_match],
+    preprocess_model_input=preprocess_model_input,
 )
 
 async def run_eval():
@@ -307,11 +336,17 @@ spec = leaderboard.Leaderboard(
 )
 
 weave.publish(spec)
-print(leaderboard.get_leaderboard_results(spec, weave.WeaveClient()))
 ```
 
-Open the **Leaders** tab in the Weave UI to [view the leaderboard](../core-types/leaderboards.md)
+After you run the following code sample, navigate to your W&B account at [https://wandb.ai/](https://wandb.ai/) and:
 
+- Navigate to the **Traces** tab to [view your traces](../tracking/tracing.mdx)
+- Navigate to the **Evals** tab to [view your model evaluations](../core-types/evaluations.md)
+- Navigate to the **Leaders** tab to [view the generated leaderboard](../core-types/leaderboards.md)
+
+![View your model evaluations](imgs/inference-advanced-evals.png)
+
+![View your traces](imgs/inference-advanced-leaderboard.png)
 
 ## UI
 
@@ -329,14 +364,17 @@ You can access the Inference service via the Weave UI from two different locatio
 1. Navigate to your W&B account at [https://wandb.ai/](https://wandb.ai/).
 2. From the left sidebar, select **Inference**. A page with available models and model information displays.
 
+![The Inference tab](imgs/inference-ui.png)
+
 #### From the Playground tab
 
 1. From the left sidebar, select **Playground**. The Playground chat UI displays.
 2. From the LLM dropdown list, mouseover **W&B Inference**. A dropdown with available W&B Inference models displays to the right.
 3. From the W&B Inference models dropdown, you can:
    - Click the name of any available model to [try it in the Playground](#try-a-model-in-the-playground).
-   - Mouseover the information icon to the right of the model name for model information. You can also click the link to [view detailed model information](#view-model-information).
-   - Compare one or models in the Playground
+   - [Compare one or models in the Playground](#compare-multiple-models)
+
+![The Inference models dropdown in Playground](imgs/inference-playground.png)
 
 ### Try a model in the Playground
 
@@ -346,6 +384,8 @@ Once you've [selected a model using one of the access options](#access-the-infer
 - [Add, retry, edit, and delete messages](../tools/playground.md#message-controls) 
 - [Save and reuse a model with custom settings](../tools/playground.md#saved-models)
 - [Compare multiple models](#compare-multiple-models)
+
+![Using an Inference model in the Playground](imgs/inference-playground-single.png)
 
 ### Compare multiple models
 
@@ -362,6 +402,8 @@ You can compare multiple Inference models in the Playground. The Compare view ca
 4. In any of the selected cards, click the **Compare N models in the Playground** button (`N` is the number of models you are comparing. For example, when 3 models are selected, the button displays as **Compare 3 models in the Playground**). The comparison view opens. 
 
 Now, you can compare models in the Playground, and use any of the features described in [Try a model in the Playground](#try-a-model-in-the-playground).
+
+![Select multiple models to compare in Playground](imgs/inference-playground-compare.png)
 
 #### Access the Compare view from the Playground tab
 
