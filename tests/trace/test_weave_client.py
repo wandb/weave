@@ -587,7 +587,7 @@ def test_calls_delete(client):
 
     assert len(list(client.get_calls())) == 4
 
-    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call0.op_name])))
+    result = list(client.get_calls(filter={"op_names": [call0.op_name]}))
     assert len(result) == 3
 
     # should deleted call0_child1, _call0_child2, call1, but not call0
@@ -2063,7 +2063,7 @@ def test_calls_query_filter_by_strings(client):
     test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
     test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
 
-    for i in range(5):
+    for _i in range(5):
         dummy_op()
 
     # Flush to ensure all calls are persisted

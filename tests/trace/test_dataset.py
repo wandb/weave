@@ -6,7 +6,7 @@ from weave.trace.context.tests_context import raise_on_captured_errors
 
 
 def test_basic_dataset_lifecycle(client):
-    for i in range(2):
+    for _i in range(2):
         dataset = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
         ref = weave.publish(dataset)
         dataset2 = weave.ref(ref.uri()).get()
@@ -66,7 +66,7 @@ def test_dataset_laziness(client):
 
     assert length == length2
 
-    for row in dataset:
+    for _row in dataset:
         log = client.server.attribute_access_log
         assert _top_level_logs(log) == []
 
@@ -108,7 +108,7 @@ def test_published_dataset_laziness(client):
 
     assert length == length2
 
-    for i, row in enumerate(dataset):
+    for i, _row in enumerate(dataset):
         log = client.server.attribute_access_log
         # This is the critical part of the test - ensuring that
         # the rows are only fetched when they are actually needed.
