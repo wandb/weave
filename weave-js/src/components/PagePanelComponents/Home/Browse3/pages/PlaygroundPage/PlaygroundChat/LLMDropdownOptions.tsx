@@ -398,11 +398,10 @@ const SubMenuOption = ({
           <Box
             sx={{
               display: 'flex',
-              justifyContent: 'space-between',
               alignItems: 'center',
             }}>
             {direction.horizontal === 'left' && (
-              <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+              <Box sx={{display: 'flex', gap: 1, marginRight: '8px', alignItems: 'center'}}>
                 {hasOptions && <Icon name="chevron-back" color="moon_500" />}
               </Box>
             )}
@@ -419,7 +418,7 @@ const SubMenuOption = ({
               </div>
             </Box>
             {direction.horizontal === 'right' && (
-              <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+              <Box sx={{display: 'flex', gap: 1, marginLeft: 'auto', alignItems: 'center'}}>
                 {hasOptions && <Icon name="chevron-next" color="moon_500" />}
               </Box>
             )}
