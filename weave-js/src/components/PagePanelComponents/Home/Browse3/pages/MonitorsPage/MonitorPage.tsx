@@ -187,9 +187,14 @@ const MonitorPageInner = ({
                     ),
                     'Monitored Ops': (
                       <Box className="flex gap-2">
-                        {monitorVersions[0].val['op_names'].map(
-                          (opRefUri: string) => (
-                            <SafeOpRef key={opRefUri} opRef={opRefUri} />
+                        {!monitorVersions[0].val['op_names'] ||
+                        monitorVersions[0].val['op_names'].length === 0 ? (
+                          <span>All ops</span>
+                        ) : (
+                          monitorVersions[0].val['op_names'].map(
+                            (opRefUri: string) => (
+                              <SafeOpRef key={opRefUri} opRef={opRefUri} />
+                            )
                           )
                         )}
                       </Box>
