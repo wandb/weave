@@ -122,6 +122,7 @@ class CallSchema(BaseModel):
     # WB Metadata
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
     deleted_at: Optional[datetime.datetime] = None
 
@@ -164,6 +165,7 @@ class StartedCallSchemaForInsert(BaseModel):
     # WB Metadata
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
 
 class EndedCallSchemaForInsert(BaseModel):
@@ -197,6 +199,7 @@ class ObjSchema(BaseModel):
     is_latest: int
     kind: str
     base_object_class: Optional[str]
+    leaf_object_class: Optional[str] = None
     val: Any
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -506,6 +509,11 @@ class ObjectVersionFilter(BaseModel):
         default=None,
         description="Filter objects by their base classes",
         examples=[["Model"], ["Dataset"]],
+    )
+    leaf_object_classes: Optional[list[str]] = Field(
+        default=None,
+        description="Filter objects by their leaf classes",
+        examples=[["Model"], ["Dataset"], ["LLMStructuredCompletionModel"]],
     )
     object_ids: Optional[list[str]] = Field(
         default=None,
@@ -1091,6 +1099,14 @@ class TraceServerInterface(Protocol):
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
+
+    # Execute LLM API (Streaming)
+    # Returns an iterator of JSON-serializable chunks that together form the streamed
+    # response from the model provider. Each element must be a dictionary that can
+    # be serialized with ``json.dumps``.
+    def completions_create_stream(
+        self, req: CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]: ...
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...

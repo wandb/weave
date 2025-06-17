@@ -225,6 +225,9 @@ describe('op streaming', () => {
         sum: state.sum + chunk.value,
         id: chunk.id,
       }),
+      finalizeFn: () => {
+        // no-op
+      },
     };
     const streamOp = op(numberStream, {streamReducer});
 
