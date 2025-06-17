@@ -135,6 +135,7 @@ export type TraceCallsQueryStatsReq = {
   filter?: TraceCallsFilter;
   query?: Query;
   limit?: number;
+  expand_columns?: string[];
 };
 
 export type TraceCallsQueryStatsRes = {

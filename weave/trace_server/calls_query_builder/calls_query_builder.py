@@ -562,6 +562,7 @@ class Condition(BaseModel):
         self, expand_columns: Optional[list[str]] = None
     ) -> list[ObjectRefCondition]:
         """Get any object ref conditions for CTE building"""
+        print(f"get_object_ref_conditions {self.operand=} {expand_columns=}")
         expand_cols = expand_columns or []
         if not expand_cols or not is_object_ref_operand(self.operand, expand_cols):
             return []
@@ -844,16 +845,12 @@ class CallsQuery(BaseModel):
                 )
                 all_object_ref_conditions.extend(object_ref_conditions)
 
-        print(f"{all_object_ref_conditions=}")
-
         # Build CTEs for object reference filtering
         cte_result = build_object_ref_ctes(
             pb, self.project_id, all_object_ref_conditions
         )
         object_join_cte = cte_result[0]
         field_to_object_join_alias_map = cte_result[1]
-
-        print(f"{object_join_cte=} {field_to_object_join_alias_map=}")
 
         # Query Conditions
         for condition in self.query_conditions:
@@ -1592,6 +1589,8 @@ def build_calls_query_stats_query(
         cq.add_condition(req.query.expr_)
     if req.limit is not None:
         cq.set_limit(req.limit)
+    if req.expand_columns is not None:
+        cq.set_expand_columns(req.expand_columns)
 
     aggregated_columns = {"count": "count()"}
     if req.include_total_storage_size:

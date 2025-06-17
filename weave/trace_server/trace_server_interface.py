@@ -425,6 +425,7 @@ class CallsQueryStatsReq(BaseModel):
     query: Optional[Query] = None
     limit: Optional[int] = None
     include_total_storage_size: Optional[bool] = False
+    expand_columns: Optional[list[str]] = None
 
 
 class CallsQueryStatsRes(BaseModel):

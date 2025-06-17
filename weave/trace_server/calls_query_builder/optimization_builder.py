@@ -988,6 +988,8 @@ def process_query_for_object_refs(
     processor = ObjectRefFilterToCTEProcessor(pb, table_alias, expand_columns)
     transformed_sql = apply_processor(processor, query.expr_)
 
+    print(f"process_query_for_object_refs {transformed_sql=}")
+
     return transformed_sql, processor.object_ref_conditions
 
 

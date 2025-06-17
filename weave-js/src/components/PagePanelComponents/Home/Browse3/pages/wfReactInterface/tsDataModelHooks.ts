@@ -516,6 +516,9 @@ export const useCallsStats = (
         : undefined,
       query: params.query,
       limit: params.limit,
+      expand_columns: params.expandColumns
+        ? Array.from(params.expandColumns)
+        : undefined,
       ...(!!params.includeTotalStorageSize
         ? {include_total_storage_size: true}
         : null),
@@ -539,6 +542,7 @@ export const useCallsStats = (
     deepFilter,
     params.query,
     params.limit,
+    params.expandColumns,
     getTsClient,
   ]);
 
