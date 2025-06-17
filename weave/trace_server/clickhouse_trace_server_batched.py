@@ -336,7 +336,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._insert_call(ch_call)
 
         if wf_env.wf_enable_online_eval() and publish:
-            self.kafka_producer.produce_call_end(req.end)
+            # Strip large and optional fields, dont modify param
+            end_copy = req.end.model_copy()
+            end_copy.output = None
+            end_copy.summary = {}
+            end_copy.exception = None
+            self.kafka_producer.produce_call_end(end_copy)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
