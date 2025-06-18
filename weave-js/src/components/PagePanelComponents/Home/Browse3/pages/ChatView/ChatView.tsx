@@ -55,7 +55,7 @@ export const ChatView = ({chat}: ChatViewProps) => {
 
     if (hasNewMessage) {
       prevMessageCountRef.current = currentMessageCount;
-      
+
       if (
         outputRef.current &&
         chatResult &&
