@@ -48,7 +48,7 @@ export function transformToValidName(input: string): NameTransformResult {
     transformedName: transformed,
     hasChanged,
     message: hasChanged
-      ? `Your name "${trimmedInput}" will be saved as "${transformed}".`
+      ? transformed
       : null,
   };
 }

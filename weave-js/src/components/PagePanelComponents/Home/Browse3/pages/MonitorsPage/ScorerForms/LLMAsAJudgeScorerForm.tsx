@@ -40,7 +40,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       scorer.objectId
     );
 
-    const [nameTransformMessage, setNameTransformMessage] = useState<React.ReactNode | null>(null);
+    const [hasNameTransform, setHasNameTransform] = useState<boolean>(false);
     const [transformedScorerName, setTransformedScorerName] = useState<string>('');
 
     const [scoringPrompt, setScoringPrompt] = useState<string | undefined>(
@@ -59,7 +59,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
 
     const [judgeModelName, setJudgeModelName] = useState<string | undefined>();
     const [transformedJudgeModelName, setTransformedJudgeModelName] = useState<string>('');
-    const [judgeModelNameTransformMessage, setJudgeModelNameTransformMessage] = useState<string | null>(null);
+    const [hasJudgeModelNameTransform, setHasJudgeModelNameTransform] = useState<boolean>(false);
 
     const [systemPrompt, setSystemPrompt] = useState<string | undefined>();
 
@@ -284,7 +284,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         setScorerName(value);
         const transformResult = transformToValidName(value);
         setTransformedScorerName(transformResult.transformedName);
-        setNameTransformMessage(transformResult.message);
+        setHasNameTransform(transformResult.hasChanged);
         onValidationChange(
           !!transformResult.transformedName && validateJudgeModel() && !!scoringPrompt
         );
@@ -341,7 +341,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         setJudgeModelName(value);
         const transformResult = transformToValidName(value);
         setTransformedJudgeModelName(transformResult.transformedName);
-        setJudgeModelNameTransformMessage(transformResult.message);
+        setHasJudgeModelNameTransform(transformResult.hasChanged);
         setJudgeModelError(null);
         onValidationChange(
           !!transformResult.transformedName &&
@@ -395,14 +395,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           <Box>
             <FieldName name="Scorer Name" />
             <TextField value={scorerName} onChange={onScorerNameChange} />
-            {nameTransformMessage && (
+            {hasNameTransform && (
               <Typography
                 className="mt-4 text-sm"
                 sx={{
                   ...typographyStyle,
-                  color: 'text.secondary',
+                  color: 'sienna',
                 }}>
-                {nameTransformMessage}
+                Your scorer name will be saved as <span style={{ fontWeight: 600 }}>{transformedScorerName}</span>
               </Typography>
             )}
             <Typography
@@ -449,14 +449,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                   value={judgeModelName}
                   onChange={onJudgeModelNameChange}
                 />
-                {judgeModelNameTransformMessage && (
+                {hasJudgeModelNameTransform && (
                   <Typography
                     className="mt-4 text-sm"
                     sx={{
                       ...typographyStyle,
-                      color: 'text.secondary',
+                      color: 'sienna',
                     }}>
-                    {judgeModelNameTransformMessage}
+                    Your model name will be saved as <span style={{ fontWeight: 600 }}>{transformedJudgeModelName}</span>
                   </Typography>
                 )}
               </Box>

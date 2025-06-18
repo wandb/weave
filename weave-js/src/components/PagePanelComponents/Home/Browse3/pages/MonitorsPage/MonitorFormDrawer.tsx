@@ -112,8 +112,7 @@ export const MonitorFormDrawer = ({
 }: MonitorFormDrawerProps) => {
   const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
-  const [nameTransformMessage, setNameTransformMessage] =
-    useState<React.ReactNode | null>(null);
+  const [hasNameTransform, setHasNameTransform] = useState<boolean>(false);
   const [description, setDescription] = useState<string>('');
   const [monitorName, setMonitorName] = useState<string>('');
   const [transformedMonitorName, setTransformedMonitorName] =
@@ -210,7 +209,7 @@ export const MonitorFormDrawer = ({
     setMonitorName(value);
     const transformResult = transformToValidName(value);
     setTransformedMonitorName(transformResult.transformedName);
-    setNameTransformMessage(transformResult.message);
+    setHasNameTransform(transformResult.hasChanged);
   }, []);
 
   const opVersionOptions = useOpVersionOptions(entity, project, {});
@@ -391,14 +390,14 @@ export const MonitorFormDrawer = ({
                       placeholder="Enter a name for your monitor"
                       onChange={handleNameChange}
                     />
-                    {nameTransformMessage && (
+                    {hasNameTransform && (
                       <Typography
                         className="mt-4 text-sm"
                         sx={{
                           ...typographyStyle,
-                          color: 'text.secondary',
+                          color: 'sienna',
                         }}>
-                        {nameTransformMessage}
+                        Your monitor name will be saved as <span style={{ fontWeight: 600 }}>{transformedMonitorName}</span>
                       </Typography>
                     )}
                     <Typography
