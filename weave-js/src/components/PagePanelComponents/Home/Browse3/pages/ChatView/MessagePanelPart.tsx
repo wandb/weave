@@ -15,7 +15,7 @@ type MessagePanelPartProps = {
   showCursor?: boolean;
 };
 
-const parseThinkingBlocks = (text: string) => {
+function parseThinkingBlocks(text: string) {
   const parts: Array<{type: 'thinking' | 'text'; content: string}> = [];
   const thinkingRegex =
     /<(think|thinking)>([\s\S]*?)(<\/(think|thinking)>|$)/gi;
@@ -50,7 +50,7 @@ const parseThinkingBlocks = (text: string) => {
   }
 
   return parts.length > 0 ? parts : [{type: 'text' as const, content: text}];
-};
+}
 
 export const MessagePanelPart = ({
   value,
