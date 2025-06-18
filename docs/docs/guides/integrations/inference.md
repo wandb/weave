@@ -19,7 +19,7 @@ To learn more, see the [pricing page](https://wandb.ai/site/pricing/) and [W&B I
 
 Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference-powered applications.
 
-| Model            | Model ID                                      | Type(s)       | Context Window | Parameters                  | Description                                                                 |
+| Model            | Model ID (for API usage)                                     | Type(s)       | Context Window | Parameters                  | Description                                                                 |
 |------------------|-----------------------------------------------|---------------|----------------|-----------------------------|-----------------------------------------------------------------------------|
 | DeepSeek R1-0528 | deepseek-ai/DeepSeek-R1-0528                  | Text          | 161K           | 37B - 680B (Active - Total) | Optimized for precise reasoning tasks including complex coding, math, and structured document analysis. |
 | DeepSeek V3-0324 | deepseek-ai/DeepSeek-V3-0324                  | Text          | 161K           | 37B - 680B (Active - Total) | Robust Mixture-of-Experts model tailored for high-complexity language processing and comprehensive document analysis. |
