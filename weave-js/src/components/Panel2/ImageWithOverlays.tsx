@@ -491,93 +491,112 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
 
   const collisionBoundary = useRef<HTMLDivElement>(null);
 
+  // Scale the image to fit the card size
+  const scale = Math.min(
+    (cardSize?.width ?? 0) / mediaSize.width,
+    (cardSize?.height ?? 0) / mediaSize.height
+  );
+  const imageWidth = mediaSize.width * scale;
+  const imageHeight = mediaSize.height * scale;
+
   return (
-    <div className="relative" ref={collisionBoundary}>
-      {cardSize &&
-        boxData.map(box => {
-          const isHidden = isBoundingBoxHidden(
-            box,
-            bboxControls,
-            sliderControls
-          );
-          if (isHidden) {
-            return null;
-          }
+    <div
+      className="relative flex h-full w-full items-center"
+      ref={collisionBoundary}>
+      {cardSize && (
+        <div
+          className="relative overflow-hidden"
+          style={{
+            width: imageWidth,
+            height: imageHeight,
+            minWidth: imageWidth,
+          }}>
+          {boxData.map(box => {
+            const isHidden = isBoundingBoxHidden(
+              box,
+              bboxControls,
+              sliderControls
+            );
+            if (isHidden) {
+              return null;
+            }
 
-          const {class_id: classId} = box;
-          const name = classStates?.[classId]?.name ?? `ID: ${box.class_id}`;
+            const {class_id: classId} = box;
+            const name = classStates?.[classId]?.name ?? `ID: ${box.class_id}`;
 
-          let color = boxColor(classId);
-          if (classStates?.[classId]?.color) {
-            color = classStates?.[classId]?.color;
-          }
-          const position = box.position;
-          const widthMultiplier =
-            box.domain === 'pixel'
-              ? cardSize.width / mediaSize.width
-              : cardSize.width;
-          const heightMultiplier =
-            box.domain === 'pixel'
-              ? cardSize.height / mediaSize.height
-              : cardSize.height;
+            let color = boxColor(classId);
+            if (classStates?.[classId]?.color) {
+              color = classStates?.[classId]?.color;
+            }
+            const position = box.position;
+            const widthMultiplier = box.domain === 'pixel' ? scale : imageWidth;
+            const heightMultiplier =
+              box.domain === 'pixel' ? scale : imageHeight;
 
-          let left, top, width, height;
-          if ('minX' in position) {
-            left = position.minX * widthMultiplier;
-            top = position.minY * heightMultiplier;
-            width = (position.maxX - position.minX) * widthMultiplier;
-            height = (position.maxY - position.minY) * heightMultiplier;
-          } else {
-            left = (position.middle[0] - position.width / 2) * widthMultiplier;
-            top = (position.middle[1] - position.height / 2) * heightMultiplier;
-            width = position.width * widthMultiplier;
-            height = position.height * heightMultiplier;
-          }
+            let left, top, width, height;
+            if ('minX' in position) {
+              left = position.minX * widthMultiplier;
+              top = position.minY * heightMultiplier;
+              width = (position.maxX - position.minX) * widthMultiplier;
+              height = (position.maxY - position.minY) * heightMultiplier;
+            } else {
+              left =
+                (position.middle[0] - position.width / 2) * widthMultiplier;
+              top =
+                (position.middle[1] - position.height / 2) * heightMultiplier;
+              width = position.width * widthMultiplier;
+              height = position.height * heightMultiplier;
+            }
+            // Scale the outline width based on the card size. If it's a small card, we probably want a thinner outline so
+            // the image isn't obstructed too much. But if it's a large card, we want a thicker outline so it's more visible.
+            const outlineWidth = Math.min(6, Math.max(2, cardSize.width / 100));
 
-          return (
-            <div
-              key={classId}
-              className="absolute"
-              style={{
-                left,
-                top: top,
-              }}>
-              <div className="relative">
-                <Tooltip.Provider delayDuration={0}>
-                  <RadixTooltip.Root>
-                    <Tooltip.Trigger>
-                      <div
-                        style={{
-                          outline: 3,
-                          outlineColor: color,
-                          outlineStyle:
-                            lineStyle === 'line'
-                              ? 'solid'
-                              : lineStyle ?? 'solid',
-                          width,
-                          height,
-                        }}
-                      />
-                    </Tooltip.Trigger>
-                    <Tooltip.Content
-                      hideWhenDetached={true}
-                      style={{backgroundColor: color}}
-                      avoidCollisions
-                      side="top"
-                      align="start"
-                      collisionBoundary={collisionBoundary.current}>
-                      <div
+            return (
+              <div
+                key={classId}
+                className="absolute"
+                style={{
+                  left,
+                  top: top,
+                }}>
+                <div className="relative">
+                  <Tooltip.Provider delayDuration={0}>
+                    <RadixTooltip.Root>
+                      <Tooltip.Trigger>
+                        <div
+                          style={{
+                            outline: outlineWidth,
+                            outlineColor: color,
+                            outlineStyle:
+                              lineStyle === 'line'
+                                ? 'solid'
+                                : lineStyle ?? 'solid',
+                            width,
+                            height,
+                          }}
+                        />
+                      </Tooltip.Trigger>
+                      <Tooltip.Content
+                        hideWhenDetached={true}
                         style={{backgroundColor: color}}
-                        className="text-white">
-                        {name}
-                      </div>
-                    </Tooltip.Content>
-                  </RadixTooltip.Root>
-                </Tooltip.Provider>
+                        avoidCollisions
+                        side="top"
+                        align="start"
+                        collisionBoundary={collisionBoundary.current}>
+                        <div
+                          style={{backgroundColor: color}}
+                          className="text-white">
+                          {name}
+                        </div>
+                      </Tooltip.Content>
+                    </RadixTooltip.Root>
+                  </Tooltip.Provider>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+      )}
       <OverlayCanvas {...mediaSize} ref={canvasRef} />
     </div>
   );
