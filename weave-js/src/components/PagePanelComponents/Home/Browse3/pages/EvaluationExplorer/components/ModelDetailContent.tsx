@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   TextField,
   Select,
@@ -39,32 +39,56 @@ export const ModelDetailContent: React.FC<ModelDetailContentProps> = ({ modelId 
   const { models: weavePlaygroundModels } = useWeavePlaygroundModels();
   const { models: foundationModels } = useFoundationModels();
   
-  const model = models.find(m => m.id === modelId);
+  // Find the model if it exists (it might not for new models)
+  const model = modelId ? models.find(m => m.id === modelId) : null;
+  const isNewModel = modelId?.startsWith('new-model-');
+  
+  // Memoize the lists to prevent unnecessary re-renders
+  const memoizedWeaveModels = useMemo(() => weavePlaygroundModels || [], [weavePlaygroundModels]);
+  const memoizedFoundationModels = useMemo(() => foundationModels || [], [foundationModels]);
   
   // Initialize configuration state
-  const [config, setConfig] = useState<ModelConfiguration>({
-    type: MODEL_TYPES.WEAVE_PLAYGROUND,
-    weavePlaygroundId: '',
-    name: model?.name || '',
-    description: model?.description || '',
-    foundationModel: '',
-    systemTemplate: '',
-    userTemplate: ''
+  const [config, setConfig] = useState<ModelConfiguration>(() => {
+    // For new models, start with create-new selected
+    if (isNewModel) {
+      return {
+        type: MODEL_TYPES.WEAVE_PLAYGROUND,
+        weavePlaygroundId: 'create-new',
+        name: '',
+        description: '',
+        foundationModel: '',
+        systemTemplate: '',
+        userTemplate: ''
+      };
+    }
+    
+    // For existing models
+    return {
+      type: MODEL_TYPES.WEAVE_PLAYGROUND,
+      weavePlaygroundId: '',
+      name: model?.name || '',
+      description: model?.description || '',
+      foundationModel: '',
+      systemTemplate: '',
+      userTemplate: ''
+    };
   });
 
-  // Update config when model changes
+  // Update config when model changes (but not for new models)
   useEffect(() => {
-    if (model) {
+    if (model && !isNewModel) {
       setConfig(prev => ({
         ...prev,
         name: model.name,
         description: model.description
       }));
     }
-  }, [model]);
+  }, [model, isNewModel]);
 
   // Handle Weave Playground model selection
   const handleWeavePlaygroundSelect = (playgroundId: string) => {
+    if (!playgroundId) return; // Ignore empty selections
+    
     if (playgroundId === 'create-new') {
       setConfig(prev => ({
         ...prev,
@@ -74,7 +98,7 @@ export const ModelDetailContent: React.FC<ModelDetailContentProps> = ({ modelId 
         userTemplate: ''
       }));
     } else {
-      const playgroundModel = weavePlaygroundModels.find(m => m.id === playgroundId);
+      const playgroundModel = memoizedWeaveModels.find(m => m.id === playgroundId);
       if (playgroundModel) {
         setConfig(prev => ({
           ...prev,
@@ -97,7 +121,7 @@ export const ModelDetailContent: React.FC<ModelDetailContentProps> = ({ modelId 
   if (!modelId) return null;
 
   return (
-    <>
+    <Box sx={{ width: '100%', height: '100%' }}>
       {/* Model Type Selection */}
       <DrawerSection>
         <DrawerFormField 
@@ -149,8 +173,15 @@ export const ModelDetailContent: React.FC<ModelDetailContentProps> = ({ modelId 
             >
               <FormControl fullWidth size="small">
                 <Select
-                  value={config.weavePlaygroundId || ''}
+                  value={config.weavePlaygroundId}
                   onChange={(e) => handleWeavePlaygroundSelect(e.target.value)}
+                  MenuProps={{
+                    PaperProps: {
+                      style: {
+                        maxHeight: 300,
+                      },
+                    },
+                  }}
                 >
                   <MenuItem value="">
                     <em>Select a model</em>
@@ -159,7 +190,7 @@ export const ModelDetailContent: React.FC<ModelDetailContentProps> = ({ modelId 
                     <em>Create New Model</em>
                   </MenuItem>
                   <Divider />
-                  {weavePlaygroundModels.map((pm) => (
+                  {memoizedWeaveModels.map((pm) => (
                     <MenuItem key={pm.id} value={pm.id}>
                       <Box>
                         <Typography variant="body2">{pm.name}</Typography>
@@ -174,8 +205,8 @@ export const ModelDetailContent: React.FC<ModelDetailContentProps> = ({ modelId 
             </DrawerFormField>
           </DrawerSection>
 
-          {/* Model Configuration Fields */}
-          {(config.weavePlaygroundId === 'create-new' || config.weavePlaygroundId) && (
+          {/* Model Configuration Fields - Show for new models or when a playground model is selected */}
+          {(config.weavePlaygroundId === 'create-new' || config.weavePlaygroundId || isNewModel) && (
             <DrawerSection>
               <DrawerFormField 
                 label="Name" 
@@ -215,11 +246,18 @@ export const ModelDetailContent: React.FC<ModelDetailContentProps> = ({ modelId 
                   <Select
                     value={config.foundationModel || ''}
                     onChange={(e) => updateConfig({ foundationModel: e.target.value })}
+                    MenuProps={{
+                      PaperProps: {
+                        style: {
+                          maxHeight: 300,
+                        },
+                      },
+                    }}
                   >
                     <MenuItem value="">
                       <em>Select foundation model</em>
                     </MenuItem>
-                    {foundationModels.map((fm) => (
+                    {memoizedFoundationModels.map((fm) => (
                       <MenuItem key={fm.id} value={fm.id}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                           <Typography variant="body2">{fm.name}</Typography>
@@ -294,6 +332,6 @@ export const ModelDetailContent: React.FC<ModelDetailContentProps> = ({ modelId 
           </DrawerFormField>
         </DrawerSection>
       )}
-    </>
+    </Box>
   );
 }; 

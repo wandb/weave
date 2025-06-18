@@ -51,7 +51,7 @@ export const ConfigurationBar: React.FC<ConfigurationBarProps> = ({
   // Create panels array for expanded drawer
   const panels = selectedModelForDetail ? [{
     id: 'model-detail',
-    title: 'Model Configuration',
+    title: selectedModelForDetail.startsWith('new-model-') ? 'Configure New Model' : 'Model Configuration',
     content: <ModelDetailContent modelId={selectedModelForDetail} />,
     width: 400,
     onClose: handleModelDetailClose
