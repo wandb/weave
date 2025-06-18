@@ -57,8 +57,10 @@ export const MessagePanelPart = ({
   isStructuredOutput,
   showCursor = false,
 }: MessagePanelPartProps) => {
-  const [expandedThinking, setExpandedThinking] = useState<{[key: number]: boolean}>({});
-  
+  const [expandedThinking, setExpandedThinking] = useState<{
+    [key: number]: boolean;
+  }>({});
+
   if (typeof value === 'string') {
     if (isStructuredOutput) {
       const reformat = JSON.stringify(JSON.parse(value), null, 2);
@@ -93,16 +95,21 @@ export const MessagePanelPart = ({
               const isExpanded = expandedThinking[index] ?? showCursor;
               return (
                 <div key={index}>
-                  <Button 
-                    variant="ghost" 
-                    size="small" 
+                  <Button
+                    variant="ghost"
+                    size="small"
                     className="mb-8"
-                    endIcon={isExpanded ? "chevron-up" : "chevron-down"}
-                    onClick={() => setExpandedThinking(prev => ({...prev, [index]: !isExpanded}))}>
+                    endIcon={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    onClick={() =>
+                      setExpandedThinking(prev => ({
+                        ...prev,
+                        [index]: !isExpanded,
+                      }))
+                    }>
                     Thinking
                   </Button>
                   {isExpanded && (
-                    <div className="rounded bg-moon-100 p-16 mb-8">
+                    <div className="mb-8 rounded bg-moon-100 p-16">
                       <span className="whitespace-break-spaces italic text-moon-600">
                         {part.content.trim()}
                       </span>
