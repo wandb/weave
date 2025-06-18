@@ -330,7 +330,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self,
         req: tsi.CallEndReq,
         publish: bool = True,
-        flush_immediately: bool = True,
+        flush_immediately: bool = False,
     ) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
@@ -347,6 +347,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             end_copy.output = None
             end_copy.summary = {}
             end_copy.exception = None
+            # Don't flush immediately by default, rely on explicit flush
             self.kafka_producer.produce_call_end(end_copy, flush_immediately)
 
         # Returns the id of the newly created call
