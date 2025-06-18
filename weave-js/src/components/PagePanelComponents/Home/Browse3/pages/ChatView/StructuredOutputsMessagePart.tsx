@@ -113,7 +113,7 @@ export const StructuredOutputsMessagePart: FC<{
         />
       </div>
       {tab === 'table' ? (
-        <div className="min-h-[60px] w-full overflow-hidden rounded-md border border-moon-200 bg-white">
+        <div className="w-full overflow-hidden rounded-md border border-moon-200 bg-white">
           <StyledDataGrid
             autoHeight
             rows={pathValueRows}
