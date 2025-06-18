@@ -501,7 +501,7 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
 
   return (
     <div className="relative flex h-full w-full items-center">
-      {cardSize && (
+      {cardSize && Number.isFinite(scale) && (
         <div
           className="relative overflow-hidden"
           ref={collisionBoundary}
