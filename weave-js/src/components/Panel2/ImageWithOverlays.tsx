@@ -500,12 +500,11 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
   const imageHeight = mediaSize.height * scale;
 
   return (
-    <div
-      className="relative flex h-full w-full items-center"
-      ref={collisionBoundary}>
+    <div className="relative flex h-full w-full items-center">
       {cardSize && (
         <div
           className="relative overflow-hidden"
+          ref={collisionBoundary}
           style={{
             width: imageWidth,
             height: imageHeight,
@@ -577,8 +576,8 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
                         />
                       </Tooltip.Trigger>
                       <Tooltip.Content
-                        hideWhenDetached={true}
-                        style={{backgroundColor: color}}
+                        hideWhenDetached
+                        style={{backgroundColor: color, padding: 4}}
                         avoidCollisions
                         side="top"
                         align="start"
