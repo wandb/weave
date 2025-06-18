@@ -397,7 +397,10 @@ export const MonitorFormDrawer = ({
                           ...typographyStyle,
                           color: 'sienna',
                         }}>
-                        Your monitor name will be saved as <span style={{ fontWeight: 600 }}>{transformedMonitorName}</span>
+                        Your monitor name will be saved as{' '}
+                        <span style={{fontWeight: 600}}>
+                          {transformedMonitorName}
+                        </span>
                       </Typography>
                     )}
                     <Typography

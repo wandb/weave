@@ -41,7 +41,8 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     );
 
     const [hasNameTransform, setHasNameTransform] = useState<boolean>(false);
-    const [transformedScorerName, setTransformedScorerName] = useState<string>('');
+    const [transformedScorerName, setTransformedScorerName] =
+      useState<string>('');
 
     const [scoringPrompt, setScoringPrompt] = useState<string | undefined>(
       scorer.val['scoring_prompt']
@@ -58,8 +59,10 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const [judgeModelError, setJudgeModelError] = useState<string | null>(null);
 
     const [judgeModelName, setJudgeModelName] = useState<string | undefined>();
-    const [transformedJudgeModelName, setTransformedJudgeModelName] = useState<string>('');
-    const [hasJudgeModelNameTransform, setHasJudgeModelNameTransform] = useState<boolean>(false);
+    const [transformedJudgeModelName, setTransformedJudgeModelName] =
+      useState<string>('');
+    const [hasJudgeModelNameTransform, setHasJudgeModelNameTransform] =
+      useState<boolean>(false);
 
     const [systemPrompt, setSystemPrompt] = useState<string | undefined>();
 
@@ -286,7 +289,9 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         setTransformedScorerName(transformResult.transformedName);
         setHasNameTransform(transformResult.hasChanged);
         onValidationChange(
-          !!transformResult.transformedName && validateJudgeModel() && !!scoringPrompt
+          !!transformResult.transformedName &&
+            validateJudgeModel() &&
+            !!scoringPrompt
         );
       },
       [scoringPrompt, validateJudgeModel, onValidationChange]
@@ -392,133 +397,140 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           </Typography>
 
           <Box className="flex flex-col gap-16 px-20">
-          <Box>
-            <FieldName name="Scorer Name" />
-            <TextField value={scorerName} onChange={onScorerNameChange} />
-            {hasNameTransform && (
+            <Box>
+              <FieldName name="Scorer Name" />
+              <TextField value={scorerName} onChange={onScorerNameChange} />
+              {hasNameTransform && (
+                <Typography
+                  className="mt-4 text-sm"
+                  sx={{
+                    ...typographyStyle,
+                    color: 'sienna',
+                  }}>
+                  Your scorer name will be saved as{' '}
+                  <span style={{fontWeight: 600}}>{transformedScorerName}</span>
+                </Typography>
+              )}
               <Typography
-                className="mt-4 text-sm"
+                className="mt-4 text-sm font-normal"
                 sx={{
                   ...typographyStyle,
-                  color: 'sienna',
+                  color: 'text.secondary',
                 }}>
-                Your scorer name will be saved as <span style={{ fontWeight: 600 }}>{transformedScorerName}</span>
+                Valid names must start with a letter or number and can only
+                contain letters, numbers, hyphens, and underscores.
               </Typography>
-            )}
-            <Typography
-              className="mt-4 text-sm font-normal"
-              sx={{
-                ...typographyStyle,
-                color: 'text.secondary',
-              }}>
-              Valid names must start with a letter or number and can only
-              contain letters, numbers, hyphens, and underscores.
-            </Typography>
-          </Box>
+            </Box>
 
-          <Box>
-            <FieldName name="Judge Model" />
-            <LLMDropdownLoaded
-              className="w-full"
-              value={selectedJudgeModel || ''}
-              isTeamAdmin={false}
-              direction={{horizontal: 'left', vertical: 'up'}}
-              onChange={onJudgeModelChange}
-            />
-            {judgeModelError && (
-              <Typography
-                className="mt-4 text-sm"
-                sx={{
-                  ...typographyStyle,
-                  color: 'info.warning',
+            <Box>
+              <FieldName name="Judge Model" />
+              <LLMDropdownLoaded
+                className="w-full"
+                value={selectedJudgeModel || ''}
+                isTeamAdmin={false}
+                direction={{horizontal: 'left', vertical: 'up'}}
+                onChange={onJudgeModelChange}
+              />
+              {judgeModelError && (
+                <Typography
+                  className="mt-4 text-sm"
+                  sx={{
+                    ...typographyStyle,
+                    color: 'info.warning',
+                  }}
+                />
+              )}
+            </Box>
+            {judgeModel && (
+              <Box className="flex flex-col gap-8 rounded-md border border-moon-250 p-12">
+                <Box>
+                  <FieldName name="LLM ID" />
+                  <Typography
+                    sx={{...typographyStyle, color: 'text.secondary'}}>
+                    {judgeModel.llm_model_id}
+                  </Typography>
+                </Box>
+                <Box>
+                  <FieldName name="Judge Model Configuration Name" />
+                  <TextField
+                    value={judgeModelName}
+                    onChange={onJudgeModelNameChange}
+                  />
+                  {hasJudgeModelNameTransform && (
+                    <Typography
+                      className="mt-4 text-sm"
+                      sx={{
+                        ...typographyStyle,
+                        color: 'sienna',
+                      }}>
+                      Your model name will be saved as{' '}
+                      <span style={{fontWeight: 600}}>
+                        {transformedJudgeModelName}
+                      </span>
+                    </Typography>
+                  )}
+                </Box>
+                <Box>
+                  <FieldName name="Judge Model System Prompt" />
+                  <TextArea
+                    value={systemPrompt}
+                    onChange={e => onSystemPromptChange(e.target.value)}
+                  />
+                </Box>
+                <Box>
+                  <FieldName name="Judge Model Response Format" />
+                  <ResponseFormatSelect
+                    responseFormat={
+                      (responseFormat ||
+                        'json_object') as PlaygroundResponseFormats
+                    }
+                    setResponseFormat={setResponseFormat}
+                  />
+                </Box>
+              </Box>
+            )}
+            <Box>
+              <FieldName name="Scoring Prompt" />
+              <TextArea
+                value={scoringPrompt}
+                placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
+                onChange={e => {
+                  setScoringPrompt(e.target.value);
+                  onValidationChange(
+                    !!e.target.value &&
+                      !!transformedScorerName &&
+                      validateJudgeModel()
+                  );
                 }}
               />
-            )}
-          </Box>
-          {judgeModel && (
-            <Box className="flex flex-col gap-8 rounded-md border border-moon-250 p-12">
-              <Box>
-                <FieldName name="LLM ID" />
-                <Typography sx={{...typographyStyle, color: 'text.secondary'}}>
-                  {judgeModel.llm_model_id}
+              {scoringPromptError && (
+                <Typography
+                  className="mt-1 text-sm"
+                  sx={{
+                    ...typographyStyle,
+                    color: 'error.main',
+                  }}>
+                  {scoringPromptError}
                 </Typography>
-              </Box>
-              <Box>
-                <FieldName name="Judge Model Configuration Name" />
-                <TextField
-                  value={judgeModelName}
-                  onChange={onJudgeModelNameChange}
-                />
-                {hasJudgeModelNameTransform && (
-                  <Typography
-                    className="mt-4 text-sm"
-                    sx={{
-                      ...typographyStyle,
-                      color: 'sienna',
-                    }}>
-                    Your model name will be saved as <span style={{ fontWeight: 600 }}>{transformedJudgeModelName}</span>
-                  </Typography>
-                )}
-              </Box>
-              <Box>
-                <FieldName name="Judge Model System Prompt" />
-                <TextArea
-                  value={systemPrompt}
-                  onChange={e => onSystemPromptChange(e.target.value)}
-                />
-              </Box>
-              <Box>
-                <FieldName name="Judge Model Response Format" />
-                <ResponseFormatSelect
-                  responseFormat={
-                    (responseFormat ||
-                      'json_object') as PlaygroundResponseFormats
-                  }
-                  setResponseFormat={setResponseFormat}
-                />
-              </Box>
-            </Box>
-          )}
-          <Box>
-            <FieldName name="Scoring Prompt" />
-            <TextArea
-              value={scoringPrompt}
-              placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
-              onChange={e => {
-                setScoringPrompt(e.target.value);
-                onValidationChange(
-                  !!e.target.value && !!transformedScorerName && validateJudgeModel()
-                );
-              }}
-            />
-            {scoringPromptError && (
+              )}
               <Typography
-                className="mt-1 text-sm"
+                className="mt-1 text-sm font-normal"
                 sx={{
                   ...typographyStyle,
-                  color: 'error.main',
+                  color: 'text.secondary',
                 }}>
-                {scoringPromptError}
+                The scoring prompt will be used to score the output of your ops.
+                You can use the following variables: {'{output}'} and{' '}
+                {'{input}'}. See{' '}
+                <Link
+                  to="https://docs.wandb.ai/guides/monitors/scorers#llm-as-a-judge-scorer"
+                  target="_blank"
+                  className="text-blue-500">
+                  docs
+                </Link>{' '}
+                for more details.
               </Typography>
-            )}
-            <Typography
-              className="mt-1 text-sm font-normal"
-              sx={{
-                ...typographyStyle,
-                color: 'text.secondary',
-              }}>
-              The scoring prompt will be used to score the output of your ops.
-              You can use the following variables: {'{output}'} and {'{input}'}.
-              See{' '}
-              <Link
-                to="https://docs.wandb.ai/guides/monitors/scorers#llm-as-a-judge-scorer"
-                target="_blank"
-                className="text-blue-500">
-                docs
-              </Link>{' '}
-              for more details.
-            </Typography>
-          </Box>
+            </Box>
           </Box>
         </Box>
       </Tailwind>

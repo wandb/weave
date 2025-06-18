@@ -47,8 +47,6 @@ export function transformToValidName(input: string): NameTransformResult {
   return {
     transformedName: transformed,
     hasChanged,
-    message: hasChanged
-      ? transformed
-      : null,
+    message: hasChanged ? transformed : null,
   };
 }
