@@ -57,7 +57,7 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
       </Button>
       
       {showThinking && (
-        <div className="mb-4 rounded-lg bg-moon-100 p-4">
+        <div className="mb-4 rounded-lg bg-moon-100 p-16">
           <div className="mb-2 text-xs font-semibold text-moon-600">Model thinking</div>
           <MessagePanelPart 
             value={thinkingContent} 
