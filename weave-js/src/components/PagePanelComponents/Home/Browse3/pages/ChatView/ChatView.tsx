@@ -48,16 +48,12 @@ export const ChatView = ({chat}: ChatViewProps) => {
     [chatResult]
   );
 
+  // Only scroll when a new message is sent (messages array changes), not during streaming
   useEffect(() => {
-    if (
-      outputRef.current &&
-      chatResult &&
-      'choices' in chatResult &&
-      chatResult.choices
-    ) {
+    if (outputRef.current) {
       outputRef.current.scrollIntoView();
     }
-  }, [chatResult]);
+  }, [chat.request?.messages?.length]);
 
   return (
     <div className="flex flex-col pb-32">
