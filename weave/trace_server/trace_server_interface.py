@@ -1042,6 +1042,45 @@ class ProjectStatsRes(BaseModel):
     files_storage_size_bytes: int
 
 
+# Thread API
+
+
+class ThreadSchema(BaseModel):
+    thread_id: str
+    trace_count: int
+    start_time: datetime.datetime
+    last_updated: datetime.datetime
+
+
+class ThreadsQueryReq(BaseModel):
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of threads to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of threads to skip")
+    sort_by: Optional[list[SortBy]] = Field(
+        default=None,
+        description="Sorting criteria for the threads. Supported fields: 'last_updated', 'trace_count', 'thread_id'.",
+        examples=[[SortBy(field="last_updated", direction="desc")]],
+    )
+    sortable_datetime_after: Optional[datetime.datetime] = Field(
+        default=None,
+        description="Only include calls with sortable_datetime after this timestamp. Used for ClickHouse granule optimization to limit memory usage by filtering out old data granules efficiently. For SQLite, filters on started_at.",
+        examples=["2024-01-01T00:00:00Z"],
+    )
+    sortable_datetime_before: Optional[datetime.datetime] = Field(
+        default=None,
+        description="Only include calls with sortable_datetime before this timestamp. Used for ClickHouse granule optimization to limit memory usage by filtering out recent data granules efficiently. For SQLite, filters on started_at.",
+        examples=["2024-12-31T23:59:59Z"],
+    )
+
+
+class ThreadsQueryRes(BaseModel):
+    threads: list[ThreadSchema]
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1120,3 +1159,6 @@ class TraceServerInterface(Protocol):
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
+
+    # Thread API
+    def threads_query(self, req: ThreadsQueryReq) -> ThreadsQueryRes: ...
