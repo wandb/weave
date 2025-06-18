@@ -64,7 +64,9 @@ pip install openai weave
 ```
 
 :::note
-The `weave` library is only required if you'll be using Weave to trace your LLM applications. For information on getting started with Weave, see the [Weave Quickstart](../../quickstart.md).
+The `weave` library is only required if you'll be using Weave to trace your LLM applications. For information on getting started with Weave, see the [Weave Quickstart](../../quickstart.md). 
+
+For usage examples demonstrating how to use the W&B Inference service with Weave, see the [API usage examples](#usage-examples).
 :::
 
 ## API specification
@@ -195,14 +197,14 @@ Use the API to query all currently available models and their IDs. This is usefu
   </TabItem>
 </Tabs>
 
-### Usage examples
+## Usage examples
 
 This section provides several examples demonstrating how to use W&B Inference with Weave:
 
 - [Basic example: Trace Llama 3.1 8B with Weave](#basic-example-trace-llama-31-8b-with-weave)
 - [Advanced example: Use Weave Evaluations and Leaderboards with the inference service](#advanced-example-use-weave-evaluations-and-leaderboards-with-the-inference-service) 
 
-#### Basic example: Trace Llama 3.1 8B with Weave
+### Basic example: Trace Llama 3.1 8B with Weave
 
 The following Python code sample shows how to send a prompt to the **Llama 3.1 8B** model using the W&B Inference API and trace the call in Weave. Tracing lets you capture the full input/output of the LLM call, monitor performance, and analyze results in the Weave UI.
 
@@ -262,7 +264,7 @@ Next, try the [advanced example](#advanced-example-use-weave-evaluations-and-lea
 
 ![Traces display](imgs/image.png)
 
-#### Advanced example: Use Weave Evaluations and Leaderboards with the inference service
+### Advanced example: Use Weave Evaluations and Leaderboards with the inference service
 
 In addition to using Weave with the Inference service to [trace model calls](../tracking/tracing.mdx), you can also [evaluate performance](../core-types/evaluations.md), and [publish a leaderboard](../core-types/leaderboards.md). The following Python code sample compares two models on a simple question–answer dataset.
 
