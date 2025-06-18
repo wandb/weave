@@ -89,11 +89,11 @@ import {
 } from './callsTableFilter';
 import {CallsTableNoRowsOverlay} from './CallsTableNoRowsOverlay';
 import {DEFAULT_FILTER_CALLS, useCallsForQuery} from './callsTableQuery';
+import {collapseGroupingModel} from './collapseGroupingModel/collapseGroupingModel';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 import {OpSelector} from './OpSelector';
 import {ParentFilterTag} from './ParentFilterTag';
-import { collapseGroupingModel } from './collapseGroupingModel/collapseGroupingModel';
 
 const MAX_SELECT = 100;
 
@@ -887,8 +887,8 @@ export const CallsTable: FC<{
     if (shouldCollapseGroups) {
       return collapseGroupingModel(groupingModel);
     }
-    return groupingModel
-  }, [columns.colGroupingModel, shouldCollapseGroups])
+    return groupingModel;
+  }, [columns.colGroupingModel, shouldCollapseGroups]);
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
