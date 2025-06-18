@@ -1,9 +1,10 @@
 import 'prismjs/components/prism-markup-templating';
 
 import _ from 'lodash';
-import React from 'react';
+import React, {useState} from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
+import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
 import {ToolCalls} from './ToolCalls';
 import {MessagePart, ToolCall} from './types';
@@ -14,11 +15,50 @@ type MessagePanelPartProps = {
   showCursor?: boolean;
 };
 
+const parseThinkingBlocks = (text: string) => {
+  const parts: Array<{type: 'thinking' | 'text'; content: string}> = [];
+  const thinkingRegex =
+    /<(think|thinking)>([\s\S]*?)(<\/(think|thinking)>|$)/gi;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = thinkingRegex.exec(text)) !== null) {
+    // Add text before thinking block
+    if (match.index > lastIndex) {
+      parts.push({
+        type: 'text',
+        content: text.slice(lastIndex, match.index),
+      });
+    }
+
+    // Add thinking block content
+    const hasClosingTag = match[3] !== undefined;
+    parts.push({
+      type: 'thinking',
+      content: match[2],
+    });
+
+    lastIndex = hasClosingTag ? match.index + match[0].length : text.length; // If no closing tag, treat rest as thinking
+  }
+
+  // Add remaining text after last thinking block
+  if (lastIndex < text.length) {
+    parts.push({
+      type: 'text',
+      content: text.slice(lastIndex),
+    });
+  }
+
+  return parts.length > 0 ? parts : [{type: 'text' as const, content: text}];
+};
+
 export const MessagePanelPart = ({
   value,
   isStructuredOutput,
   showCursor = false,
 }: MessagePanelPartProps) => {
+  const [expandedThinking, setExpandedThinking] = useState<{[key: number]: boolean}>({});
+  
   if (typeof value === 'string') {
     if (isStructuredOutput) {
       const reformat = JSON.stringify(JSON.parse(value), null, 2);
@@ -29,6 +69,10 @@ export const MessagePanelPart = ({
     // if (isLikelyMarkdown(value)) {
     //   return <Markdown content={value} />;
     // }
+
+    const parts = parseThinkingBlocks(value);
+    const lastPartIndex = parts.length - 1;
+
     return (
       <>
         <style>
@@ -43,10 +87,41 @@ export const MessagePanelPart = ({
           `}
         </style>
         <div>
-          <span className="whitespace-break-spaces">{value}</span>
-          {showCursor && (
-            <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[12px] w-[12px] rounded-full bg-gold-500" />
-          )}
+          {parts.map((part, index) => {
+            const isLastPart = index === lastPartIndex;
+            if (part.type === 'thinking') {
+              const isExpanded = expandedThinking[index] ?? false;
+              return (
+                <div key={index}>
+                  <Button 
+                    variant="ghost" 
+                    size="small" 
+                    endIcon={isExpanded ? "chevron-up" : "chevron-down"}
+                    onClick={() => setExpandedThinking(prev => ({...prev, [index]: !isExpanded}))}>
+                    Thinking
+                  </Button>
+                  {isExpanded && (
+                    <div className="mt-8 rounded bg-moon-100 p-16">
+                      <span className="whitespace-break-spaces italic text-moon-600">
+                        {part.content.trim()}
+                      </span>
+                      {showCursor && isLastPart && (
+                        <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[12px] w-[12px] rounded-full bg-gold-500" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <span key={index} className="whitespace-break-spaces">
+                {part.content}
+                {showCursor && isLastPart && (
+                  <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[12px] w-[12px] rounded-full bg-gold-500" />
+                )}
+              </span>
+            );
+          })}
         </div>
       </>
     );
