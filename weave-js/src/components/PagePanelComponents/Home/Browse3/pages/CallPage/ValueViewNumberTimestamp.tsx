@@ -7,30 +7,12 @@ const JAN_1_2100_S = 4_102_444_800;
 const JAN_1_2000_MS = 1000 * JAN_1_2000_S;
 const JAN_1_2100_MS = 1000 * JAN_1_2100_S;
 
-// Likely timestamp field names
-const LIKELY_TIMESTAMP_NAMES = [
-  'created',
-  'started',
-  'ended',
-  'updated',
-  'finished',
-  'duration',
-  'created_at',
-  'started_at',
-  'updated_at',
-  'finished_at',
-  'ended_at',
-  'duration_ms',
-  'time',
-  'timestamp',
-  'time_ms',
-  'timestamp_ms',
-];
+// Regex pattern to match likely timestamp field names
+const TIMESTAMP_PATTERN =
+  /^(?:.*_)?(created|started|ended|updated|finished|duration|time|timestamp)(?:_(?:at|ms))?$/i;
 
 export const likelyTimestampName = (field?: string) => {
-  return LIKELY_TIMESTAMP_NAMES.some(name =>
-    field?.toLowerCase().includes(name)
-  );
+  return field ? TIMESTAMP_PATTERN.test(field) : false;
 };
 
 export const isProbablyTimestampMs = (value: number, field?: string) => {
