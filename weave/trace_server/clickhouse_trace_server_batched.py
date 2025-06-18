@@ -2270,6 +2270,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             logger.info("Retrying with large objects stripped.")
             batch = self._strip_large_values(self._call_batch)
             self._insert_call_batch(batch)
+
         self._call_batch = []
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
