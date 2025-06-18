@@ -480,28 +480,23 @@ Consider both explicit sentiment indicators and implicit emotional undertones.
               )}
             </Box>
             {judgeModel && (
-              <Box className="flex flex-col gap-8 rounded-md bg-moon-100 py-8 pl-16 pr-8">
-                <Box
-                  className="flex cursor-pointer items-center justify-between"
-                  onClick={() =>
-                    setIsModelSettingsExpanded(!isModelSettingsExpanded)
-                  }>
-                  <Typography
-                    sx={typographyStyle}
-                    className="text-sm font-semibold uppercase tracking-wide text-moon-500">
-                    Model settings
-                  </Typography>
+              <div className="flex flex-col gap-8">
+                <div className="flex justify-start">
                   <Button
                     variant="ghost"
                     size="small"
-                    icon={
+                    active={isModelSettingsExpanded}
+                    endIcon={
                       isModelSettingsExpanded ? 'chevron-up' : 'chevron-down'
                     }
-                  />
-                </Box>
-
+                    onClick={() =>
+                      setIsModelSettingsExpanded(!isModelSettingsExpanded)
+                    }>
+                    Model settings
+                  </Button>
+                </div>
                 {isModelSettingsExpanded && (
-                  <>
+                  <Box className="flex flex-col gap-8 rounded-md bg-moon-100 py-8 pl-16 pr-8">
                     <Box>
                       <Typography
                         sx={{
@@ -562,9 +557,9 @@ Consider both explicit sentiment indicators and implicit emotional undertones.
                         {responseFormat}
                       </Typography>
                     </Box>
-                  </>
+                  </Box>
                 )}
-              </Box>
+              </div>
             )}
           </div>
 
@@ -582,7 +577,7 @@ Consider both explicit sentiment indicators and implicit emotional undertones.
                     variant="ghost"
                     size="small"
                     active={isInsertSamplesOpen}
-                    endIcon="chevron-down">
+                    startIcon="add-new">
                     Insert samples
                   </Button>
                 </DropdownMenu.Trigger>
@@ -591,7 +586,7 @@ Consider both explicit sentiment indicators and implicit emotional undertones.
                     {Object.keys(samplePrompts).map(sampleType => (
                       <DropdownMenu.Item
                         key={sampleType}
-                        onClick={() => handleInsertSample(sampleType)}>
+                        onClick={() => handleInsertSample(sampleType as keyof typeof samplePrompts)}>
                         {sampleType}
                       </DropdownMenu.Item>
                     ))}
