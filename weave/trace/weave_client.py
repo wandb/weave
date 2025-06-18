@@ -507,6 +507,7 @@ class CallDict(TypedDict):
     started_at: datetime.datetime | None
     ended_at: datetime.datetime | None
     deleted_at: datetime.datetime | None
+    thread_id: str | None
 
 
 @dataclasses.dataclass
@@ -535,6 +536,7 @@ class Call:
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
     deleted_at: datetime.datetime | None = None
+    thread_id: str | None = None
 
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
@@ -743,6 +745,7 @@ class Call:
             started_at=self.started_at,
             ended_at=self.ended_at,
             deleted_at=self.deleted_at,
+            thread_id=self.thread_id,
         )
 
 
@@ -774,6 +777,7 @@ def make_client_call(
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
+        thread_id=server_call.thread_id,
     )
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()
@@ -1261,6 +1265,9 @@ class WeaveClient:
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
+        # Get thread_id from context
+        thread_id = call_context.get_thread_id()
+
         call_id = generate_id()
         call = Call(
             _op_name=op_name_future,
@@ -1271,6 +1278,7 @@ class WeaveClient:
             # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
             attributes=attributes_dict,
+            thread_id=thread_id,
         )
         # Disallow further modification of attributes after the call is created
         attributes_dict.freeze()
@@ -1317,6 +1325,7 @@ class WeaveClient:
                         attributes=attributes_dict,
                         wb_run_id=current_wb_run_id,
                         wb_run_step=current_wb_run_step,
+                        thread_id=thread_id,
                     )
                 )
             )
