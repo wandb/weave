@@ -196,7 +196,7 @@ export const MessagePanel = ({
                         {isInThinkingMode && isStreaming && (
                           <div className="mb-2 flex items-center text-moon-600">
                             <span className="mr-2">Thinking...</span>
-                            <span className="cursor-blink -mb-[1px] inline-block h-[8px] w-[8px] rounded-full bg-moon-600" />
+                            <span className="cursor-blink -mb-[1px] inline-block h-[8px] w-[8px] rounded-full bg-gold-500" />
                           </div>
                         )}
 
@@ -207,8 +207,7 @@ export const MessagePanel = ({
                           isStreaming && (
                             <div className="mb-2 text-moon-600">
                               <span>
-                                Thought for {thinkingDuration} second
-                                {thinkingDuration !== 1 ? 's' : ''}
+                                Thought for {thinkingDuration} seconds.
                               </span>
                             </div>
                           )}
