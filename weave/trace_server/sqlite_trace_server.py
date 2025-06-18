@@ -33,6 +33,7 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import Row, quote_json_path
+from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
     digest_is_version_like,
@@ -1460,6 +1461,55 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError(
             "project_stats is not implemented for SQLite trace server"
         )
+
+    def threads_query(self, req: tsi.ThreadsQueryReq) -> tsi.ThreadsQueryRes:
+        """Query threads with aggregated statistics sorted by last activity."""
+        conn, cursor = get_conn_cursor(self.db_path)
+
+        # Use the dedicated query builder
+        query, parameters = make_threads_query_sqlite(
+            project_id=req.project_id,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
+            sortable_datetime_after=req.sortable_datetime_after,
+            sortable_datetime_before=req.sortable_datetime_before,
+        )
+
+        cursor.execute(query, parameters)
+        query_result = cursor.fetchall()
+
+        threads = []
+        for row in query_result:
+            thread_id, trace_count, start_time_str, last_updated_str = row
+
+            # Parse the datetime strings if present
+            if start_time_str and last_updated_str:
+                try:
+                    # SQLite stores datetime as string, parse it
+                    start_time = datetime.datetime.fromisoformat(
+                        start_time_str.replace("Z", "+00:00")
+                    )
+                    last_updated = datetime.datetime.fromisoformat(
+                        last_updated_str.replace("Z", "+00:00")
+                    )
+                except (ValueError, AttributeError):
+                    # Skip threads without valid timestamps
+                    continue
+            else:
+                # Skip threads without valid timestamps
+                continue
+
+            threads.append(
+                tsi.ThreadSchema(
+                    thread_id=thread_id,
+                    trace_count=trace_count,
+                    start_time=start_time,
+                    last_updated=last_updated,
+                )
+            )
+
+        return tsi.ThreadsQueryRes(threads=threads)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
