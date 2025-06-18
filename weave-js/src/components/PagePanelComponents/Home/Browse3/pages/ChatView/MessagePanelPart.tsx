@@ -102,7 +102,7 @@ export const MessagePanelPart = ({
                     Thinking
                   </Button>
                   {isExpanded && (
-                    <div className="rounded bg-moon-100 p-16">
+                    <div className="rounded bg-moon-100 p-16 mb-8">
                       <span className="whitespace-break-spaces italic text-moon-600">
                         {part.content.trim()}
                       </span>
@@ -116,7 +116,7 @@ export const MessagePanelPart = ({
             }
             return (
               <span key={index} className="whitespace-break-spaces">
-                {part.content}
+                {!showCursor && isLastPart ? part.content.trim() : part.content}
                 {showCursor && isLastPart && (
                   <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[12px] w-[12px] rounded-full bg-gold-500" />
                 )}
