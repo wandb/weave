@@ -353,11 +353,15 @@ export const useAnimatedText = (
 export const useThinkingState = (content: string, isStreaming: boolean) => {
   const [isInThinkingMode, setIsInThinkingMode] = useState(false);
   const [hasSeenClosingTag, setHasSeenClosingTag] = useState(false);
+  const [thinkingDuration, setThinkingDuration] = useState<number | null>(null);
+  const thinkingStartTimeRef = useRef<number | null>(null);
   
   useEffect(() => {
     if (!content) {
       setIsInThinkingMode(false);
       setHasSeenClosingTag(false);
+      setThinkingDuration(null);
+      thinkingStartTimeRef.current = null;
       return;
     }
     
@@ -366,13 +370,22 @@ export const useThinkingState = (content: string, isStreaming: boolean) => {
     const hasClosingTag = /<\/think(?:ing)?>/.test(content);
     
     if (startsWithThinking && !hasClosingTag && isStreaming) {
+      // Just entered thinking mode
+      if (!isInThinkingMode) {
+        thinkingStartTimeRef.current = Date.now();
+      }
       setIsInThinkingMode(true);
       setHasSeenClosingTag(false);
     } else if (hasClosingTag) {
+      // Just exited thinking mode
+      if (isInThinkingMode && thinkingStartTimeRef.current) {
+        const duration = Math.round((Date.now() - thinkingStartTimeRef.current) / 1000);
+        setThinkingDuration(duration);
+      }
       setIsInThinkingMode(false);
       setHasSeenClosingTag(true);
     }
-  }, [content, isStreaming]);
+  }, [content, isStreaming, isInThinkingMode]);
   
-  return {isInThinkingMode, hasSeenClosingTag};
+  return {isInThinkingMode, hasSeenClosingTag, thinkingDuration};
 };

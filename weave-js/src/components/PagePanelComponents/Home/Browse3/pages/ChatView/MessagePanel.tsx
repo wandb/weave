@@ -65,7 +65,7 @@ export const MessagePanel = ({
   );
   
   // Detect thinking state
-  const {isInThinkingMode} = useThinkingState(
+  const {isInThinkingMode, hasSeenClosingTag, thinkingDuration} = useThinkingState(
     displayedText,
     isStreaming
   );
@@ -198,6 +198,13 @@ export const MessagePanel = ({
                         <div className="mb-2 flex items-center text-moon-600">
                           <span className="mr-2">Thinking...</span>
                           <span className="cursor-blink -mb-[1px] inline-block h-[8px] w-[8px] rounded-full bg-moon-600" />
+                        </div>
+                      )}
+                      
+                      {/* Show thinking duration after thinking completes */}
+                      {!isInThinkingMode && hasSeenClosingTag && thinkingDuration && isStreaming && (
+                        <div className="mb-2 text-moon-600">
+                          <span>Thought for {thinkingDuration} second{thinkingDuration !== 1 ? 's' : ''}</span>
                         </div>
                       )}
                       
