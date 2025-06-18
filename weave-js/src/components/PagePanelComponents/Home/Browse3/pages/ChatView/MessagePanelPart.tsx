@@ -90,18 +90,19 @@ export const MessagePanelPart = ({
           {parts.map((part, index) => {
             const isLastPart = index === lastPartIndex;
             if (part.type === 'thinking') {
-              const isExpanded = expandedThinking[index] ?? false;
+              const isExpanded = expandedThinking[index] ?? showCursor;
               return (
                 <div key={index}>
                   <Button 
                     variant="ghost" 
                     size="small" 
+                    className="mb-8"
                     endIcon={isExpanded ? "chevron-up" : "chevron-down"}
                     onClick={() => setExpandedThinking(prev => ({...prev, [index]: !isExpanded}))}>
                     Thinking
                   </Button>
                   {isExpanded && (
-                    <div className="mt-8 rounded bg-moon-100 p-16">
+                    <div className="rounded bg-moon-100 p-16">
                       <span className="whitespace-break-spaces italic text-moon-600">
                         {part.content.trim()}
                       </span>
