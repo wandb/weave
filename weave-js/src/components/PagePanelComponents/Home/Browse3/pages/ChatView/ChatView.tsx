@@ -64,7 +64,7 @@ export const ChatView = ({chat}: ChatViewProps) => {
     }
     
     prevMessageCountRef.current = currentMessageCount;
-  }, [chatResult, chat.request?.messages]);
+  }, [chat.request?.messages]);
 
   return (
     <div className="flex flex-col pb-32">
