@@ -552,6 +552,7 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
 
             return (
               <div
+                data-test="single-bounding-box"
                 key={classId}
                 className="absolute"
                 style={{
