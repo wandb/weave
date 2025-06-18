@@ -93,6 +93,7 @@ import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 import {OpSelector} from './OpSelector';
 import {ParentFilterTag} from './ParentFilterTag';
+import { collapseGroupingModel } from './collapseGroupingModel/collapseGroupingModel';
 
 const MAX_SELECT = 100;
 
@@ -879,6 +880,16 @@ export const CallsTable: FC<{
     project,
   ]);
 
+  const shouldCollapseGroups = true;
+
+  const columnGroupingModel = useMemo(() => {
+    const groupingModel = columns.colGroupingModel;
+    if (shouldCollapseGroups) {
+      return collapseGroupingModel(groupingModel);
+    }
+    return groupingModel
+  }, [columns.colGroupingModel, shouldCollapseGroups])
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -1135,7 +1146,7 @@ export const CallsTable: FC<{
         disableRowSelectionOnClick
         rowSelectionModel={rowSelectionModel}
         // columnGroupingModel={groupingModel}
-        columnGroupingModel={columns.colGroupingModel}
+        columnGroupingModel={columnGroupingModel}
         hideFooter={!callsLoading && callsTotal === 0}
         hideFooterSelectedRowCount
         onColumnWidthChange={newCol => {
