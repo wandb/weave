@@ -292,6 +292,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         try:
             yield
             self._flush_calls()
+            self.kafka_producer.flush()
         finally:
             self._call_batch = []
             self._flush_immediately = True
@@ -303,7 +304,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if item.mode == "start":
                     res.append(self.call_start(item.req))
                 elif item.mode == "end":
-                    res.append(self.call_end(item.req))
+                    res.append(self.call_end(item.req, flush_immediately=False))
                 else:
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
@@ -325,7 +326,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
-    def call_end(self, req: tsi.CallEndReq, publish: bool = True) -> tsi.CallEndRes:
+    def call_end(
+        self,
+        req: tsi.CallEndReq,
+        publish: bool = True,
+        flush_immediately: bool = False,
+    ) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
@@ -336,7 +342,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._insert_call(ch_call)
 
         if wf_env.wf_enable_online_eval() and publish:
-            self.kafka_producer.produce_call_end(req.end)
+            # Strip large and optional fields, dont modify param
+            end_copy = req.end.model_copy()
+            end_copy.output = None
+            end_copy.summary = {}
+            end_copy.exception = None
+            # Don't flush immediately by default, rely on explicit flush
+            self.kafka_producer.produce_call_end(end_copy, flush_immediately)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
