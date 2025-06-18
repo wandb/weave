@@ -537,3 +537,7 @@ def test_evaluate_get_ref(client):
     assert retrieved_eval2 is not None
     assert len(retrieved_eval1.scorers) == 1
     assert len(retrieved_eval2.scorers) == 1
+
+    # Type assertions
+    assert isinstance(retrieved_eval1.scorers[0], TestScorer)
+    retrieved_eval1 = weave.ref(ref1.uri()).get()
