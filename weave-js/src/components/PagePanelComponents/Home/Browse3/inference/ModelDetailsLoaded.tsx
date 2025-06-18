@@ -46,12 +46,16 @@ const CODE_EXAMPLES_CHAT: Record<string, string> = {
   Python: `
 import openai
 
-# The custom base URL points to W&B Inference
 client = openai.OpenAI(
+    # The custom base URL points to W&B Inference
     base_url='${BASE_URL}',
+
     # Get your API key from ${window.location.origin}/authorize
     # Consider setting it in the environment as OPENAI_API_KEY instead for safety
-    api_key="<your-apikey>"
+    api_key="<your-apikey>",
+
+    # Team and project are required for usage tracking
+    project="<team>/<project>",
 )
 
 response = client.chat.completions.create(
@@ -60,10 +64,6 @@ response = client.chat.completions.create(
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "Tell me a joke."}
     ],
-    extra_headers={
-        # Team and project are required for usage tracking
-        "OpenAI-Project": "<team>/<project>"
-    },
 )
 
 print(response.choices[0].message.content)`,

@@ -105,9 +105,7 @@ export const ModelTile = ({
   return (
     <div
       className={`group w-[500px] cursor-pointer rounded-lg border border-moon-250 bg-white px-16 pb-6 pt-12  ${
-        isSelected
-          ? 'border-teal-500 shadow-[0_0_10px_rgb(169,237,242)]'
-          : 'hover:border-moon-350'
+        isSelected ? 'border-teal-500' : 'hover:border-moon-350'
       }`}
       onClick={onClickTile}>
       <div className="mb-8 flex items-center gap-8">
@@ -159,7 +157,7 @@ export const ModelTile = ({
       <div className="text-sm text-moon-650">{model.descriptionShort}</div>
       {onClickPlayground && (
         <div
-          className={`flex gap-8 py-6 transition-opacity duration-200 ${
+          className={`inline-flex gap-8 py-6 pr-6 transition-opacity duration-200 ${
             isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
           onClick={onClickButtonRow}>
