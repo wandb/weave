@@ -4578,3 +4578,139 @@ def test_calls_query_with_descendant_error(client):
         )
 
         assert len(calls) == count
+
+
+def test_thread_context_with_weave_api(client):
+    """Test thread context using the weave.thread() API."""
+    import weave
+    from weave.trace.context import call_context
+
+    # Test default thread_id is None
+    assert call_context.get_thread_id() is None
+
+    # Test using weave.thread context manager
+    with weave.thread("api_thread_1"):
+        assert call_context.get_thread_id() == "api_thread_1"
+
+        # Test nested context
+        with weave.thread("api_thread_2"):
+            assert call_context.get_thread_id() == "api_thread_2"
+
+        # Should revert to parent context
+        assert call_context.get_thread_id() == "api_thread_1"
+
+    # Should revert to None
+    assert call_context.get_thread_id() is None
+
+
+def test_thread_id_in_calls(client):
+    """Test that thread_id is properly captured in call records."""
+    import weave
+
+    @weave.op
+    def test_op_with_thread(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def test_op_without_thread(x: int) -> int:
+        return x * 3
+
+    # Call without thread context
+    result1 = test_op_without_thread(5)
+    assert result1 == 15
+
+    # Call with thread context
+    with weave.thread("test_thread_id"):
+        result2 = test_op_with_thread(5)
+        assert result2 == 10
+
+    # Get the calls to verify thread_id
+    calls = client.get_calls()
+
+    # Find our calls (most recent first)
+    thread_call = None
+    no_thread_call = None
+
+    for call in calls:
+        if "test_op_with_thread" in call.op_name:
+            thread_call = call
+        elif "test_op_without_thread" in call.op_name:
+            no_thread_call = call
+
+    assert thread_call is not None
+    assert no_thread_call is not None
+
+    # Verify thread_id values
+    assert thread_call.thread_id == "test_thread_id"
+    assert no_thread_call.thread_id is None
+
+
+def test_thread_id_inheritance(client):
+    """Test that thread_id is inherited by child calls."""
+    import weave
+
+    @weave.op
+    def child_op(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def parent_op(x: int) -> int:
+        return child_op(x) * 2
+
+    # Call with thread context
+    with weave.thread("inherited_thread"):
+        result = parent_op(10)
+        assert result == 22  # (10 + 1) * 2
+
+    # Get the calls to verify thread_id inheritance
+    calls = client.get_calls()
+
+    # Find our calls
+    parent_call = None
+    child_call = None
+
+    for call in calls:
+        if "parent_op" in call.op_name:
+            parent_call = call
+        elif "child_op" in call.op_name:
+            child_call = call
+
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Both should have the same thread_id
+    assert parent_call.thread_id == "inherited_thread"
+    assert child_call.thread_id == "inherited_thread"
+
+
+def test_thread_context_error_handling(client):
+    """Test that thread context is properly managed even when exceptions occur."""
+    import weave
+    from weave.trace.context import call_context
+
+    @weave.op
+    def failing_op(should_fail: bool) -> str:
+        if should_fail:
+            raise ValueError("Test exception")
+        return "success"
+
+    # Test that thread context is properly restored after exception
+    assert call_context.get_thread_id() is None
+
+    try:
+        with weave.thread("exception_thread"):
+            assert call_context.get_thread_id() == "exception_thread"
+            failing_op(True)  # This will raise an exception
+    except ValueError:
+        pass  # Expected
+
+    # Thread context should be restored to None
+    assert call_context.get_thread_id() is None
+
+    # Test successful call after exception
+    with weave.thread("recovery_thread"):
+        result = failing_op(False)
+        assert result == "success"
+        assert call_context.get_thread_id() == "recovery_thread"
+
+    assert call_context.get_thread_id() is None

@@ -25,6 +25,7 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.term import configure_logger
+from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
 logger = logging.getLogger(__name__)
@@ -265,6 +266,28 @@ def attributes(attributes: dict[str, Any]) -> Iterator:
         call_context.call_attributes.reset(token)
 
 
+@contextlib.contextmanager
+def thread(thread_id: str) -> Iterator:
+    """
+    Context manager for setting thread_id on calls within the context.
+
+    Example:
+
+    ```python
+    with weave.thread(thread_id="thread_1"):
+        result = my_function("input")  # This call will have thread_id="thread_1"
+    ```
+
+    Args:
+        thread_id: The thread identifier to associate with calls in this context.
+
+    Yields:
+        None
+    """
+    with call_context.set_thread_id(thread_id):
+        yield
+
+
 def finish() -> None:
     """Stops logging to weave.
 
@@ -294,6 +317,8 @@ __all__ = [
     "obj_ref",
     "output_of",
     "attributes",
+    "thread",
+    "generate_id",
     "finish",
     "op",
     "Table",
