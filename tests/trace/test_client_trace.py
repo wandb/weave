@@ -4683,6 +4683,71 @@ def test_thread_id_inheritance(client):
     assert child_call.thread_id == "inherited_thread"
 
 
+def test_thread_id_query_filtering(client):
+    """Test that calls can be filtered by thread_id."""
+    import weave
+
+    @weave.op
+    def query_test_op(value: str) -> str:
+        return f"processed_{value}"
+
+    # Create calls with different thread_ids
+    with weave.thread("filter_thread_1"):
+        query_test_op("value1")
+
+    with weave.thread("filter_thread_2"):
+        query_test_op("value2")
+
+    query_test_op("value3")  # No thread context
+
+    # Query calls by thread_id using the server interface
+    if hasattr(client.server, "calls_query"):
+        # Test filtering by thread_id
+        res1 = client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "thread_id"},
+                            {"$literal": "filter_thread_1"},
+                        ]
+                    }
+                },
+            )
+        )
+
+        # Should find the call with filter_thread_1
+        thread1_calls = [
+            call for call in res1.calls if call.thread_id == "filter_thread_1"
+        ]
+        assert len(thread1_calls) >= 1
+
+        # Query all calls and verify thread_id values
+        all_calls_res = client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+            )
+        )
+
+        # Find our test calls by op_name pattern
+        our_test_calls = [
+            call for call in all_calls_res.calls if "query_test_op" in call.op_name
+        ]
+
+        # Verify we have calls with both thread_ids and None
+        thread_ids_found = {call.thread_id for call in our_test_calls}
+        assert (
+            "filter_thread_1" in thread_ids_found
+        ), f"Should find filter_thread_1, got: {thread_ids_found}"
+        assert (
+            "filter_thread_2" in thread_ids_found
+        ), f"Should find filter_thread_2, got: {thread_ids_found}"
+        assert (
+            None in thread_ids_found
+        ), f"Should find None thread_id, got: {thread_ids_found}"
+
+
 def test_thread_context_error_handling(client):
     """Test that thread context is properly managed even when exceptions occur."""
     import weave
@@ -4714,3 +4779,166 @@ def test_thread_context_error_handling(client):
         assert call_context.get_thread_id() == "recovery_thread"
 
     assert call_context.get_thread_id() is None
+
+
+def test_threads_query_endpoint(client):
+    """Test the threads_query endpoint (/threads/query) functionality."""
+    import datetime
+
+    import weave
+    from weave.trace_server import trace_server_interface as tsi
+
+    # Create some test operations
+    @weave.op
+    def thread_test_op(value: str) -> str:
+        return f"processed_{value}"
+
+    @weave.op
+    def multi_call_op(thread_name: str) -> list[str]:
+        results = []
+        for i in range(3):
+            results.append(thread_test_op(f"{thread_name}_call_{i}"))
+        return results
+
+    # Test that we start with no threads (if this is a fresh client)
+    initial_threads = client.server.threads_query(
+        tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+    )
+    initial_count = len(initial_threads.threads)
+
+    # Create calls with different thread_ids
+    thread_ids = ["analytics_thread", "processing_thread", "validation_thread"]
+
+    for i, thread_id in enumerate(thread_ids):
+        with weave.thread(thread_id):
+            # Create multiple calls per thread to test trace_count
+            multi_call_op(f"thread_{i}")
+            thread_test_op(f"single_call_{i}")
+
+    # Create some calls without thread_ids
+    thread_test_op("no_thread_1")
+    thread_test_op("no_thread_2")
+
+    # Test basic threads query
+    threads_res = client.server.threads_query(
+        tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+    )
+
+    # Should have found our new threads
+    assert len(threads_res.threads) >= 3  # At least our 3 threads
+
+    # Find our specific threads
+    our_threads = {
+        thread.thread_id: thread
+        for thread in threads_res.threads
+        if thread.thread_id in thread_ids
+    }
+    assert len(our_threads) == 3, f"Expected 3 threads, got {len(our_threads)}"
+
+    # Test that each thread has the correct trace_count
+    # Each thread should have 2 distinct traces:
+    # 1) multi_call_op() trace (with 3 nested calls)
+    # 2) thread_test_op("single_call_i") trace
+    for thread_id, thread in our_threads.items():
+        assert thread.thread_id == thread_id
+        assert (
+            thread.trace_count >= 2
+        ), f"Thread {thread_id} should have at least 2 traces, got {thread.trace_count}"
+        assert thread.start_time is not None
+        assert thread.last_updated is not None
+        assert isinstance(thread.start_time, datetime.datetime)
+        assert isinstance(thread.last_updated, datetime.datetime)
+
+    # Test limit parameter
+    limited_res = client.server.threads_query(
+        tsi.ThreadsQueryReq(project_id=get_client_project_id(client), limit=2)
+    )
+    assert len(limited_res.threads) == 2
+
+    # Test offset parameter
+    offset_res = client.server.threads_query(
+        tsi.ThreadsQueryReq(project_id=get_client_project_id(client), limit=1, offset=1)
+    )
+    assert len(offset_res.threads) == 1
+
+    # Test sorting by thread_id
+    sorted_res = client.server.threads_query(
+        tsi.ThreadsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="thread_id", direction="asc")],
+        )
+    )
+    thread_ids_sorted = [t.thread_id for t in sorted_res.threads]
+    assert thread_ids_sorted == sorted(thread_ids_sorted)
+
+    # Test sorting by trace_count descending
+    count_sorted_res = client.server.threads_query(
+        tsi.ThreadsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="trace_count", direction="desc")],
+        )
+    )
+    trace_counts = [t.trace_count for t in count_sorted_res.threads]
+    assert trace_counts == sorted(trace_counts, reverse=True)
+
+    # Test sorting by last_updated descending (most recent first)
+    time_sorted_res = client.server.threads_query(
+        tsi.ThreadsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="last_updated", direction="desc")],
+        )
+    )
+    last_updated_times = [t.last_updated for t in time_sorted_res.threads]
+    # Verify times are in descending order
+    for i in range(len(last_updated_times) - 1):
+        assert last_updated_times[i] >= last_updated_times[i + 1]
+
+    # Test datetime filtering
+    # Get a timestamp from the middle of our test
+    middle_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+        seconds=5
+    )
+
+    after_filter_res = client.server.threads_query(
+        tsi.ThreadsQueryReq(
+            project_id=get_client_project_id(client),
+            sortable_datetime_after=middle_time,
+        )
+    )
+    # Should still include our recent threads
+    recent_thread_ids = {t.thread_id for t in after_filter_res.threads}
+    assert any(tid in recent_thread_ids for tid in thread_ids)
+
+    # Test filtering for very recent data (should include our threads)
+    very_recent_time = datetime.datetime.now(
+        datetime.timezone.utc
+    ) + datetime.timedelta(minutes=1)
+    before_filter_res = client.server.threads_query(
+        tsi.ThreadsQueryReq(
+            project_id=get_client_project_id(client),
+            sortable_datetime_before=very_recent_time,
+        )
+    )
+    # Should include our threads since they're before this future time
+    assert len(before_filter_res.threads) >= 3
+
+    # Test combination of parameters
+    combo_res = client.server.threads_query(
+        tsi.ThreadsQueryReq(
+            project_id=get_client_project_id(client),
+            limit=5,
+            offset=0,
+            sort_by=[tsi.SortBy(field="trace_count", direction="desc")],
+            sortable_datetime_after=middle_time,
+        )
+    )
+    assert len(combo_res.threads) <= 5
+
+    # Verify that the ThreadSchema fields are properly populated
+    for thread in combo_res.threads:
+        assert isinstance(thread.thread_id, str)
+        assert isinstance(thread.trace_count, int)
+        assert thread.trace_count > 0
+        assert isinstance(thread.start_time, datetime.datetime)
+        assert isinstance(thread.last_updated, datetime.datetime)
+        assert thread.start_time <= thread.last_updated
