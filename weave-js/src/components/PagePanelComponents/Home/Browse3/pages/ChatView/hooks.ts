@@ -265,17 +265,20 @@ export const useAnimatedText = (
   // Animation function
   const animateText = useCallback(() => {
     const targetText = targetTextRef.current;
-    
+
     // Check if we're in thinking mode
-    const thinkMatch = targetText.match(/^<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/);
+    const thinkMatch = targetText.match(
+      /^<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/
+    );
     const hasOpenThinking = thinkMatch !== null;
-    const hasClosedThinking = thinkMatch && thinkMatch[0].length < targetText.length;
+    const hasClosedThinking =
+      thinkMatch && thinkMatch[0].length < targetText.length;
     const thinkingEndIndex = thinkMatch ? thinkMatch[0].length : 0;
-    
+
     if (hasOpenThinking && !hasClosedThinking) {
       // Still in thinking mode, only show up to the current point (no content inside thinking tags)
       // This ensures we don't show any thinking content prematurely
-      setDisplayedText(targetText);  // Keep full text for thinking detection
+      setDisplayedText(targetText); // Keep full text for thinking detection
       charIndexRef.current = 0;
       postThinkingIndexRef.current = 0;
       setIsAnimating(false);
@@ -285,7 +288,7 @@ export const useAnimatedText = (
     // Calculate the actual index in the post-thinking content
     let actualContentStart = hasClosedThinking ? thinkingEndIndex : 0;
     let postThinkingContent = targetText.substring(actualContentStart);
-    
+
     if (postThinkingContent.length === 0) {
       // No content after thinking yet
       setDisplayedText(targetText);
@@ -296,13 +299,13 @@ export const useAnimatedText = (
     if (charIndexRef.current < postThinkingContent.length) {
       // Animate character by character
       const nextIndex = charIndexRef.current + 1;
-      
+
       // Build the displayed text: full thinking tags + animated post-thinking content
       const animatedPostContent = postThinkingContent.substring(0, nextIndex);
-      const fullDisplay = hasClosedThinking 
+      const fullDisplay = hasClosedThinking
         ? targetText.substring(0, actualContentStart) + animatedPostContent
         : animatedPostContent;
-      
+
       setDisplayedText(fullDisplay);
       charIndexRef.current = nextIndex;
       setIsAnimating(true);
@@ -332,7 +335,9 @@ export const useAnimatedText = (
     }
 
     // Check current state
-    const thinkMatch = text.match(/^<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/);
+    const thinkMatch = text.match(
+      /^<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/
+    );
     const hasClosedThinking = thinkMatch && thinkMatch[0].length < text.length;
     const thinkingEndIndex = thinkMatch ? thinkMatch[0].length : 0;
 
@@ -355,7 +360,7 @@ export const useThinkingState = (content: string, isStreaming: boolean) => {
   const [hasSeenClosingTag, setHasSeenClosingTag] = useState(false);
   const [thinkingDuration, setThinkingDuration] = useState<number | null>(null);
   const thinkingStartTimeRef = useRef<number | null>(null);
-  
+
   useEffect(() => {
     if (!content) {
       setIsInThinkingMode(false);
@@ -364,11 +369,11 @@ export const useThinkingState = (content: string, isStreaming: boolean) => {
       thinkingStartTimeRef.current = null;
       return;
     }
-    
+
     // Check if content starts with thinking tag
     const startsWithThinking = /^<think(?:ing)?>/.test(content);
     const hasClosingTag = /<\/think(?:ing)?>/.test(content);
-    
+
     if (startsWithThinking && !hasClosingTag && isStreaming) {
       // Just entered thinking mode
       if (!isInThinkingMode) {
@@ -379,13 +384,15 @@ export const useThinkingState = (content: string, isStreaming: boolean) => {
     } else if (hasClosingTag) {
       // Just exited thinking mode
       if (isInThinkingMode && thinkingStartTimeRef.current) {
-        const duration = Math.round((Date.now() - thinkingStartTimeRef.current) / 1000);
+        const duration = Math.round(
+          (Date.now() - thinkingStartTimeRef.current) / 1000
+        );
         setThinkingDuration(duration);
       }
       setIsInThinkingMode(false);
       setHasSeenClosingTag(true);
     }
   }, [content, isStreaming, isInThinkingMode]);
-  
+
   return {isInThinkingMode, hasSeenClosingTag, thinkingDuration};
 };

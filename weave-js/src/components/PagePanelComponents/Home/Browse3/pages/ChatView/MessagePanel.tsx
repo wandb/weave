@@ -61,14 +61,12 @@ export const MessagePanel = ({
   const {displayedText, isAnimating} = useAnimatedText(
     messageText,
     shouldAnimateText,
-    10  // Faster for character-by-character animation
+    10 // Faster for character-by-character animation
   );
-  
+
   // Detect thinking state
-  const {isInThinkingMode, hasSeenClosingTag, thinkingDuration} = useThinkingState(
-    displayedText,
-    isStreaming
-  );
+  const {isInThinkingMode, hasSeenClosingTag, thinkingDuration} =
+    useThinkingState(displayedText, isStreaming);
 
   useEffect(() => {
     if (contentRef.current) {
@@ -122,174 +120,193 @@ export const MessagePanel = ({
           'mb-[16px]': !isNested,
           'mb-[0]': isNested,
         })}>
-      <div className="flex gap-[16px]">
-        {!isNested && !isSystemPrompt && (
-          <div className="w-32 flex-shrink-0">
-            {!isUser && !isTool && (
-              <Callout
-                size="x-small"
-                icon="robot-service-member"
-                color="moon"
-                className="mt-[4px] h-32 w-32 bg-moon-100"
-              />
-            )}
-          </div>
-        )}
-
-        <div
-          className={classNames('relative w-full overflow-visible', {
-            'rounded-lg': !isNested,
-            'border-t border-moon-250': isTool,
-            'bg-moon-100': isSystemPrompt || isTool,
-            'bg-cactus-300/[0.24]': isUser,
-            'max-w-full': !isUser,
-            'max-w-[768px]': isUser,
-            'ml-auto': isUser,
-            'mr-auto': !isUser,
-            'py-[16px]': hasContent,
-            'pb-[4px] pt-[8px]': !isUser && !isTool && !isSystemPrompt,
-          })}>
-          <div
-            className={classNames({
-              'pb-[16px]': hasToolCalls && hasContent,
-            })}>
-            {isSystemPrompt && (
-              <div className="flex justify-between px-[16px]">
-                <div className="text-sm text-moon-500">
-                  {message.role.charAt(0).toUpperCase() + message.role.slice(1)}
-                </div>
-              </div>
-            )}
-
-            {isTool && (
-              <div className={classNames('pb-8')}>
-                <div className="text-[14px] font-semibold text-moon-500">
-                  Response
-                </div>
-              </div>
-            )}
-
-            <div
-              ref={contentRef}
-              className={classNames('w-full overflow-y-hidden', {
-                'max-h-[400px]': !isShowingMore && !editorHeight,
-                'max-h-full': isShowingMore || editorHeight,
-              })}>
-              {messageHeader}
-              {isPlayground && editorHeight ? (
-                <PlaygroundMessagePanelEditor
-                  message={message}
-                  index={index}
-                  choiceIndex={choiceIndex}
-                  editorHeight={editorHeight}
-                  isNested={isNested ?? false}
-                  pendingToolResponseId={pendingToolResponseId}
-                  setEditorHeight={setEditorHeight}
+        <div className="flex gap-[16px]">
+          {!isNested && !isSystemPrompt && (
+            <div className="w-32 flex-shrink-0">
+              {!isUser && !isTool && (
+                <Callout
+                  size="x-small"
+                  icon="robot-service-member"
+                  color="moon"
+                  className="mt-[4px] h-32 w-32 bg-moon-100"
                 />
-              ) : (
-                <>
-                  {hasContent && (
-                    <div
-                      className={classNames(hasToolCalls ? 'pb-8' : '', {
-                        'px-16': isSystemPrompt || isUser,
-                      })}>
-                      {/* Show thinking indicator during streaming */}
-                      {isInThinkingMode && isStreaming && (
-                        <div className="mb-2 flex items-center text-moon-600">
-                          <span className="mr-2">Thinking...</span>
-                          <span className="cursor-blink -mb-[1px] inline-block h-[8px] w-[8px] rounded-full bg-moon-600" />
-                        </div>
-                      )}
-                      
-                      {/* Show thinking duration after thinking completes */}
-                      {!isInThinkingMode && hasSeenClosingTag && thinkingDuration && isStreaming && (
-                        <div className="mb-2 text-moon-600">
-                          <span>Thought for {thinkingDuration} second{thinkingDuration !== 1 ? 's' : ''}</span>
-                        </div>
-                      )}
-                      
-                      {/* Show actual content - but not during thinking mode while streaming */}
-                      {!(isInThinkingMode && isStreaming) && _.isString(message.content) ? (
-                        // Use ThinkingMessage component when not streaming and message contains thinking tags
-                        !isStreaming && /^<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/.test(message.content) ? (
-                          <ThinkingMessage
-                            content={message.content}
-                            isStructuredOutput={isStructuredOutput}
-                            showCursor={false}
-                          />
-                        ) : (
-                          (() => {
-                            // Extract content after thinking tags if present
-                            let displayValue = shouldAnimateText ? displayedText : message.content;
-                            
-                            // If we have thinking tags, extract the content after them
-                            const thinkMatch = displayValue.match(/^<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/);
-                            if (thinkMatch) {
-                              // Get everything after the closing think tag
-                              displayValue = displayValue.substring(thinkMatch[0].length);
-                            }
-                            
-                            // Don't show anything if there's no content to display
-                            if (!displayValue) {
-                              return null;
-                            }
-                            
-                            return (
-                              <MessagePanelPart
-                                value={displayValue}
-                                isStructuredOutput={isStructuredOutput}
-                                showCursor={shouldAnimateText && isAnimating}
-                              />
-                            );
-                          })()
-                        )
-                      ) : (
-                        !_.isString(message.content) && !(isInThinkingMode && isStreaming) && message.content!.map((p, i) => (
-                          <MessagePanelPart key={i} value={p} />
-                        ))
-                      )}
-                    </div>
-                  )}
-                </>
               )}
             </div>
+          )}
 
-            {isOverflowing && !editorHeight && (
-              <ShowMoreButton
-                isUser={isUser}
-                isSystemPrompt={isSystemPrompt}
-                isNested={isNested}
-                isShowingMore={isShowingMore}
-                setIsShowingMore={setIsShowingMore}
-              />
-            )}
-          </div>
-          {hasToolCalls && (
+          <div
+            className={classNames('relative w-full overflow-visible', {
+              'rounded-lg': !isNested,
+              'border-t border-moon-250': isTool,
+              'bg-moon-100': isSystemPrompt || isTool,
+              'bg-cactus-300/[0.24]': isUser,
+              'max-w-full': !isUser,
+              'max-w-[768px]': isUser,
+              'ml-auto': isUser,
+              'mr-auto': !isUser,
+              'py-[16px]': hasContent,
+              'pb-[4px] pt-[8px]': !isUser && !isTool && !isSystemPrompt,
+            })}>
             <div
               className={classNames({
-                'border-t border-moon-250 pt-8': hasContent,
+                'pb-[16px]': hasToolCalls && hasContent,
               })}>
-              <ToolCalls toolCalls={message.tool_calls!} />
-            </div>
-          )}
-        </div>
-      </div>
+              {isSystemPrompt && (
+                <div className="flex justify-between px-[16px]">
+                  <div className="text-sm text-moon-500">
+                    {message.role.charAt(0).toUpperCase() +
+                      message.role.slice(1)}
+                  </div>
+                </div>
+              )}
 
-      {/* Playground buttons (retry, edit, delete) - using group and group-hover to control opacity. */}
-      {isPlayground && !editorHeight ? (
-        <div className="flex w-full items-center justify-start opacity-0 group-hover:opacity-100">
-          <PlaygroundMessagePanelButtons
-            index={message.original_index ?? index}
-            choiceIndex={choiceIndex}
-            isTool={isTool}
-            hasContent={hasContent}
-            contentRef={contentRef}
-            setEditorHeight={setEditorHeight}
-            responseIndexes={responseIndexes}
-          />
+              {isTool && (
+                <div className={classNames('pb-8')}>
+                  <div className="text-[14px] font-semibold text-moon-500">
+                    Response
+                  </div>
+                </div>
+              )}
+
+              <div
+                ref={contentRef}
+                className={classNames('w-full overflow-y-hidden', {
+                  'max-h-[400px]': !isShowingMore && !editorHeight,
+                  'max-h-full': isShowingMore || editorHeight,
+                })}>
+                {messageHeader}
+                {isPlayground && editorHeight ? (
+                  <PlaygroundMessagePanelEditor
+                    message={message}
+                    index={index}
+                    choiceIndex={choiceIndex}
+                    editorHeight={editorHeight}
+                    isNested={isNested ?? false}
+                    pendingToolResponseId={pendingToolResponseId}
+                    setEditorHeight={setEditorHeight}
+                  />
+                ) : (
+                  <>
+                    {hasContent && (
+                      <div
+                        className={classNames(hasToolCalls ? 'pb-8' : '', {
+                          'px-16': isSystemPrompt || isUser,
+                        })}>
+                        {/* Show thinking indicator during streaming */}
+                        {isInThinkingMode && isStreaming && (
+                          <div className="mb-2 flex items-center text-moon-600">
+                            <span className="mr-2">Thinking...</span>
+                            <span className="cursor-blink -mb-[1px] inline-block h-[8px] w-[8px] rounded-full bg-moon-600" />
+                          </div>
+                        )}
+
+                        {/* Show thinking duration after thinking completes */}
+                        {!isInThinkingMode &&
+                          hasSeenClosingTag &&
+                          thinkingDuration &&
+                          isStreaming && (
+                            <div className="mb-2 text-moon-600">
+                              <span>
+                                Thought for {thinkingDuration} second
+                                {thinkingDuration !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )}
+
+                        {/* Show actual content - but not during thinking mode while streaming */}
+                        {!(isInThinkingMode && isStreaming) &&
+                        _.isString(message.content) ? (
+                          // Use ThinkingMessage component when not streaming and message contains thinking tags
+                          !isStreaming &&
+                          /^<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/.test(
+                            message.content
+                          ) ? (
+                            <ThinkingMessage
+                              content={message.content}
+                              isStructuredOutput={isStructuredOutput}
+                              showCursor={false}
+                            />
+                          ) : (
+                            (() => {
+                              // Extract content after thinking tags if present
+                              let displayValue = shouldAnimateText
+                                ? displayedText
+                                : message.content;
+
+                              // If we have thinking tags, extract the content after them
+                              const thinkMatch = displayValue.match(
+                                /^<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/
+                              );
+                              if (thinkMatch) {
+                                // Get everything after the closing think tag
+                                displayValue = displayValue.substring(
+                                  thinkMatch[0].length
+                                );
+                              }
+
+                              // Don't show anything if there's no content to display
+                              if (!displayValue) {
+                                return null;
+                              }
+
+                              return (
+                                <MessagePanelPart
+                                  value={displayValue}
+                                  isStructuredOutput={isStructuredOutput}
+                                  showCursor={shouldAnimateText && isAnimating}
+                                />
+                              );
+                            })()
+                          )
+                        ) : (
+                          !_.isString(message.content) &&
+                          !(isInThinkingMode && isStreaming) &&
+                          message.content!.map((p, i) => (
+                            <MessagePanelPart key={i} value={p} />
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {isOverflowing && !editorHeight && (
+                <ShowMoreButton
+                  isUser={isUser}
+                  isSystemPrompt={isSystemPrompt}
+                  isNested={isNested}
+                  isShowingMore={isShowingMore}
+                  setIsShowingMore={setIsShowingMore}
+                />
+              )}
+            </div>
+            {hasToolCalls && (
+              <div
+                className={classNames({
+                  'border-t border-moon-250 pt-8': hasContent,
+                })}>
+                <ToolCalls toolCalls={message.tool_calls!} />
+              </div>
+            )}
+          </div>
         </div>
-      ) : null}
-    </div>
+
+        {/* Playground buttons (retry, edit, delete) - using group and group-hover to control opacity. */}
+        {isPlayground && !editorHeight ? (
+          <div className="flex w-full items-center justify-start opacity-0 group-hover:opacity-100">
+            <PlaygroundMessagePanelButtons
+              index={message.original_index ?? index}
+              choiceIndex={choiceIndex}
+              isTool={isTool}
+              hasContent={hasContent}
+              contentRef={contentRef}
+              setEditorHeight={setEditorHeight}
+              responseIndexes={responseIndexes}
+            />
+          </div>
+        ) : null}
+      </div>
     </>
   );
 };

@@ -1,5 +1,6 @@
-import React, {useState, useMemo} from 'react';
 import {Button} from '@wandb/weave/components/Button';
+import React, {useMemo,useState} from 'react';
+
 import {MessagePanelPart} from './MessagePanelPart';
 
 interface ThinkingMessageProps {
