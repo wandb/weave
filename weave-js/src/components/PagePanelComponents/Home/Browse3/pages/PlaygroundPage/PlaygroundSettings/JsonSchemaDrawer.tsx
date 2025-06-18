@@ -1,19 +1,16 @@
-import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {CodeEditor} from '@wandb/weave/components/CodeEditor';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useEffect, useState} from 'react';
 
 import {ResizableDrawer} from '../../common/ResizableDrawer';
 import {TabUseBannerError} from '../../common/TabUseBanner';
-import {PlaygroundResponseFormats} from '../types';
 
 export type JsonSchemaDrawerProps = {
   open: boolean;
   onClose: () => void;
   jsonSchema: string;
-  setJsonSchema: (val: string) => void;
-  responseFormat: PlaygroundResponseFormats;
-  setResponseFormat: (val: PlaygroundResponseFormats) => void;
+  onSave: (jsonSchema: string) => void;
 };
 
 export const EMPTY_SCHEMA = `{
@@ -42,9 +39,7 @@ export const JsonSchemaDrawer: React.FC<JsonSchemaDrawerProps> = ({
   open,
   onClose,
   jsonSchema,
-  setJsonSchema,
-  responseFormat,
-  setResponseFormat,
+  onSave,
 }) => {
   const [localSchema, setLocalSchema] = useState(jsonSchema || DEFAULT_SCHEMA);
   const [error, setError] = useState<string | null>(null);
@@ -57,10 +52,7 @@ export const JsonSchemaDrawer: React.FC<JsonSchemaDrawerProps> = ({
   const handleSave = () => {
     try {
       JSON.parse(localSchema);
-      setJsonSchema(localSchema);
-      if (responseFormat !== PlaygroundResponseFormats.JsonSchema) {
-        setResponseFormat(PlaygroundResponseFormats.JsonSchema);
-      }
+      onSave(localSchema);
       onClose();
     } catch (e: any) {
       setError(e.message);
@@ -74,105 +66,72 @@ export const JsonSchemaDrawer: React.FC<JsonSchemaDrawerProps> = ({
       defaultWidth={500}
       marginTop={60}
       headerContent={
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            px: 3,
-            py: 2,
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            backgroundColor: 'background.paper',
-          }}>
-          <span style={{fontSize: 20, fontWeight: 600}}>Edit JSON Schema</span>
-          <Button icon="close" variant="ghost" onClick={onClose} />
-        </Box>
+        <Tailwind>
+          <div className="flex h-64 items-center justify-between border-b border-moon-200 px-16 py-8">
+            <span className="text-2xl font-semibold">Edit JSON Schema</span>
+            <Button icon="close" variant="ghost" onClick={onClose} />
+          </div>
+        </Tailwind>
       }>
-      <Box
-        sx={{
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}>
-        {/* Content */}
-        <Box
-          sx={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            px: 3,
-            py: 2,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            gap: 2,
-          }}>
-          {error && (
-            <TabUseBannerError>
-              Invalid JSON:
-              {error.split('\n').map((line, index) => (
-                <span key={index}>{line}</span>
-              ))}
-            </TabUseBannerError>
-          )}
+      <Tailwind style={{height: '100%'}}>
+        <div className="flex h-full flex-col justify-between overflow-hidden">
+          {/* Content */}
+          <div className="flex flex-1 flex-col gap-8 overflow-hidden px-16 py-16">
+            {error && (
+              <TabUseBannerError>
+                Invalid JSON:
+                {error.split('\n').map((line, index) => (
+                  <span key={index}>{line}</span>
+                ))}
+              </TabUseBannerError>
+            )}
 
-          <Box sx={{display: 'flex', justifyContent: 'flex-end', gap: 1}}>
-            <Button
-              variant="secondary"
-              size="small"
-              onClick={() => setLocalSchema(DEFAULT_SCHEMA)}>
-              Load placeholder schema
-            </Button>
-            <Button
-              variant="secondary"
-              size="small"
-              onClick={() => setLocalSchema(EMPTY_SCHEMA)}>
-              Clear schema
-            </Button>
-          </Box>
+            <div className="flex justify-end gap-1">
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() => setLocalSchema(DEFAULT_SCHEMA)}>
+                Load placeholder schema
+              </Button>
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() => setLocalSchema(EMPTY_SCHEMA)}>
+                Clear schema
+              </Button>
+            </div>
 
-          <CodeEditor
-            value={localSchema}
-            language="json"
-            minHeight={200}
-            maxHeight={500}
-            onChange={(val: string) => setLocalSchema(val)}
-            wrapLines
-          />
-        </Box>
-        {/* Footer */}
-        <Box
-          sx={{
-            py: 2,
-            px: 0,
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            backgroundColor: 'background.paper',
-            width: '100%',
-            display: 'flex',
-            flexShrink: 0,
-            position: 'sticky',
-            bottom: 0,
-          }}>
-          <Box sx={{display: 'flex', gap: 2, width: '100%', mx: 2}}>
-            <Button
-              onClick={onClose}
-              variant="secondary"
-              style={{flex: 1}}
-              twWrapperStyles={{flex: 1}}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              variant="primary"
-              style={{flex: 1}}
-              twWrapperStyles={{flex: 1}}>
-              Save
-            </Button>
-          </Box>
-        </Box>
-      </Box>
+            <CodeEditor
+              value={localSchema}
+              language="json"
+              minHeight={200}
+              maxHeight={500}
+              onChange={(val: string) => setLocalSchema(val)}
+              wrapLines
+            />
+          </div>
+
+          {/* Footer */}
+          <div className="flex gap-2 border-t border-moon-200 px-0 py-16">
+            <div className="flex w-full gap-8 px-16">
+              <Button
+                onClick={onClose}
+                variant="secondary"
+                className="flex-1"
+                twWrapperStyles={{flex: 1}}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                variant="primary"
+                className="flex-1"
+                twWrapperStyles={{flex: 1}}>
+                Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Tailwind>
     </ResizableDrawer>
   );
 };

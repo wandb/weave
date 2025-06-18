@@ -75,8 +75,11 @@ export const ResponseFormatEditor: React.FC<
         <JsonSchemaDrawer
           open={jsonSchemaDrawerOpen}
           onClose={() => setJsonSchemaDrawerOpen(false)}
-          {...props}
           jsonSchema={props.jsonSchema ?? EMPTY_SCHEMA}
+          onSave={jsonSchema => {
+            props.setJsonSchema(jsonSchema);
+            props.setResponseFormat(PlaygroundResponseFormats.JsonSchema);
+          }}
         />
       </Box>
     </Tailwind>
