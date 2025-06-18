@@ -71,12 +71,12 @@ export const CompareGridCellValue = ({
       </div>
     );
   }
-
+  const leafPath = path.toString().split('.').slice(-1)[0] ?? '';
   if (valueType === 'number') {
-    if (isProbablyTimestampSec(value)) {
+    if (isProbablyTimestampSec(value, leafPath)) {
       return <CompareGridCellValueTimestamp value={value} unit="s" />;
     }
-    if (isProbablyTimestampMs(value)) {
+    if (isProbablyTimestampMs(value, leafPath)) {
       return <CompareGridCellValueTimestamp value={value} unit="ms" />;
     }
     return <ValueViewNumber value={value} />;

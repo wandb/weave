@@ -7,18 +7,50 @@ const JAN_1_2100_S = 4_102_444_800;
 const JAN_1_2000_MS = 1000 * JAN_1_2000_S;
 const JAN_1_2100_MS = 1000 * JAN_1_2100_S;
 
-// TODO: This is only looking at value, but we could also consider the value name, e.g. "created".
+// Likely timestamp field names
+const LIKELY_TIMESTAMP_NAMES = [
+  'created',
+  'started',
+  'ended',
+  'updated',
+  'finished',
+  'duration',
+  'created_at',
+  'started_at',
+  'updated_at',
+  'finished_at',
+  'ended_at',
+  'duration_ms',
+  'time',
+  'timestamp',
+  'time_ms',
+  'timestamp_ms',
+];
 
-export const isProbablyTimestampMs = (value: number) => {
-  return JAN_1_2000_MS <= value && value <= JAN_1_2100_MS;
+export const likelyTimestampName = (field?: string) => {
+  return LIKELY_TIMESTAMP_NAMES.some(name =>
+    field?.toLowerCase().includes(name)
+  );
 };
 
-export const isProbablyTimestampSec = (value: number) => {
-  return JAN_1_2000_S <= value && value <= JAN_1_2100_S;
+export const isProbablyTimestampMs = (value: number, field?: string) => {
+  return (
+    likelyTimestampName(field) &&
+    JAN_1_2000_MS <= value &&
+    value <= JAN_1_2100_MS
+  );
 };
 
-export const isProbablyTimestamp = (value: number) => {
-  return isProbablyTimestampMs(value) || isProbablyTimestampSec(value);
+export const isProbablyTimestampSec = (value: number, field?: string) => {
+  return (
+    likelyTimestampName(field) && JAN_1_2000_S <= value && value <= JAN_1_2100_S
+  );
+};
+
+export const isProbablyTimestamp = (value: number, field?: string) => {
+  return (
+    isProbablyTimestampMs(value, field) || isProbablyTimestampSec(value, field)
+  );
 };
 
 type ValueViewNumberTimestampProps = {
