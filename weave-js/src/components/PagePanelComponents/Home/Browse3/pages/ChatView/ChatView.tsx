@@ -52,19 +52,20 @@ export const ChatView = ({chat}: ChatViewProps) => {
   useEffect(() => {
     const currentMessageCount = chat.request?.messages?.length || 0;
     const hasNewMessage = currentMessageCount > prevMessageCountRef.current;
-    
-    if (
-      hasNewMessage &&
-      outputRef.current &&
-      chatResult &&
-      'choices' in chatResult &&
-      chatResult.choices
-    ) {
-      outputRef.current.scrollIntoView();
+
+    if (hasNewMessage) {
+      prevMessageCountRef.current = currentMessageCount;
+      
+      if (
+        outputRef.current &&
+        chatResult &&
+        'choices' in chatResult &&
+        chatResult.choices
+      ) {
+        outputRef.current.scrollIntoView();
+      }
     }
-    
-    prevMessageCountRef.current = currentMessageCount;
-  }, [chat.request?.messages]);
+  }, [chat.request?.messages, chatResult]);
 
   return (
     <div className="flex flex-col pb-32">
