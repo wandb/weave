@@ -57,7 +57,7 @@ export const ChatView = ({chat}: ChatViewProps) => {
     ) {
       outputRef.current.scrollIntoView();
     }
-  }, [chatResult]);
+  }, [chat.request?.messages?.length]);
 
   return (
     <div className="flex flex-col pb-32">
