@@ -11,9 +11,7 @@ from weave.trace_server.trace_server_interface import (
     CompletionsCreateRequestInputs,
 )
 
-# TODO: Fast follow up
-# JSON_SCHEMA = "json_schema"
-ResponseFormat = Literal["json_object", "text"]
+ResponseFormat = Literal["json_object", "json_schema", "text"]
 
 
 def is_response_format(value: Any) -> bool:

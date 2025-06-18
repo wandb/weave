@@ -1141,6 +1141,7 @@
             {
               "enum": [
                 "json_object",
+                "json_schema",
                 "text"
               ],
               "type": "string"
