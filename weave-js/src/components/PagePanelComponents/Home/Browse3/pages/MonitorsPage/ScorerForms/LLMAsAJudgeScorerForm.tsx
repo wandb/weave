@@ -1,7 +1,6 @@
 import {Box, Typography} from '@mui/material';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
 import {
   FieldName,
@@ -12,6 +11,7 @@ import {
   useCreateBuiltinObjectInstance,
   useLeafObjectInstances,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/objectClassQuery';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {
   forwardRef,
   useCallback,

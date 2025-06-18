@@ -112,10 +112,12 @@ export const MonitorFormDrawer = ({
 }: MonitorFormDrawerProps) => {
   const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
-  const [nameTransformMessage, setNameTransformMessage] = useState<React.ReactNode | null>(null);
+  const [nameTransformMessage, setNameTransformMessage] =
+    useState<React.ReactNode | null>(null);
   const [description, setDescription] = useState<string>('');
   const [monitorName, setMonitorName] = useState<string>('');
-  const [transformedMonitorName, setTransformedMonitorName] = useState<string>('');
+  const [transformedMonitorName, setTransformedMonitorName] =
+    useState<string>('');
   const [samplingRate, setSamplingRate] = useState<number>(10);
   const [selectedOpVersionOption, setSelectedOpVersionOption] = useState<
     string[]
@@ -204,15 +206,12 @@ export const MonitorFormDrawer = ({
     () => false
   );
 
-  const handleNameChange = useCallback(
-    (value: string) => {
-      setMonitorName(value);
-      const transformResult = transformToValidName(value);
-      setTransformedMonitorName(transformResult.transformedName);
-      setNameTransformMessage(transformResult.message);
-    },
-    []
-  );
+  const handleNameChange = useCallback((value: string) => {
+    setMonitorName(value);
+    const transformResult = transformToValidName(value);
+    setTransformedMonitorName(transformResult.transformedName);
+    setNameTransformMessage(transformResult.message);
+  }, []);
 
   const opVersionOptions = useOpVersionOptions(entity, project, {});
 
