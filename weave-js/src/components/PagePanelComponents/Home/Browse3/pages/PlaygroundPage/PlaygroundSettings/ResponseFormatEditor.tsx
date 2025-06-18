@@ -1,4 +1,3 @@
-import {Box} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {Select} from '@wandb/weave/components/Form/Select';
 import {Icon} from '@wandb/weave/components/Icon';
@@ -23,52 +22,33 @@ export const ResponseFormatEditor: React.FC<
 
   return (
     <Tailwind>
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '4px',
-        }}>
-        <span style={{fontSize: '14px'}}>Response format</span>
+      <div className="flex flex-col gap-4">
+        <span className="text-sm">Response format</span>
         <ResponseFormatSelect {...props} />
         {props.responseFormat !== PlaygroundResponseFormats.Text &&
           (props.jsonSchema &&
           props.jsonSchema.trim() &&
           isValidJson(props.jsonSchema) ? (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                justifyContent: 'space-between',
-              }}>
-              <span
-                style={{
-                  fontSize: 16,
-                  display: 'flex',
-                  alignItems: 'center',
-                }}>
-                <Icon
-                  name="checkmark"
-                  style={{marginRight: 6, fontSize: 20}}
-                  className="text-green-500"
-                />
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <span className="flex items-center gap-2">
+                <Icon name="checkmark" className="mr-2 text-green-500" />
                 JSON schema defined
               </span>
               <Button
                 variant="ghost"
-                style={{marginLeft: 'auto'}}
+                size="small"
+                className="ml-auto"
                 onClick={() => setJsonSchemaDrawerOpen(true)}
                 icon="pencil-edit">
                 Edit
               </Button>
-            </Box>
+            </div>
           ) : (
             <Button
               variant="secondary"
               onClick={() => setJsonSchemaDrawerOpen(true)}
               icon="add-new"
-              className="w-full">
+              className="mt-4 w-full">
               Add JSON schema
             </Button>
           ))}
@@ -81,7 +61,7 @@ export const ResponseFormatEditor: React.FC<
             props.setResponseFormat(PlaygroundResponseFormats.JsonSchema);
           }}
         />
-      </Box>
+      </div>
     </Tailwind>
   );
 };
