@@ -58,7 +58,7 @@ export const CellValue = ({
     return <CellValueString value={value} style={stringStyle} />;
   }
   if (typeof value === 'number') {
-    if (isProbablyTimestamp(value, field)) {
+    if (field && isProbablyTimestamp(value, field)) {
       return <ValueViewNumberTimestamp value={value} />;
     }
     return (

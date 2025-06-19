@@ -71,8 +71,8 @@ export const CompareGridCellValue = ({
       </div>
     );
   }
-  const leafPath = path.toString().split('.').slice(-1)[0] ?? '';
   if (valueType === 'number') {
+    const leafPath = path.tail()?.toString() ?? '';
     if (isProbablyTimestampSec(value, leafPath)) {
       return <CompareGridCellValueTimestamp value={value} unit="s" />;
     }

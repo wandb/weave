@@ -2,7 +2,7 @@ import {likelyTimestampName} from './ValueViewNumberTimestamp';
 
 describe('likelyTimestampName', () => {
   it('returns false for undefined', () => {
-    expect(likelyTimestampName(undefined)).toEqual(false);
+    expect(likelyTimestampName('')).toEqual(false);
   });
 
   it('returns false for empty string', () => {
