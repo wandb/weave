@@ -601,7 +601,9 @@ def get_openai_patcher(
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.images"),
                 "AsyncImages.create_variation",
-                openai_image_wrapper_async(settings=async_images_create_variation_settings),
+                openai_image_wrapper_async(
+                    settings=async_images_create_variation_settings
+                ),
             ),
         ]
     )

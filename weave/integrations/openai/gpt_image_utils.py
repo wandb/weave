@@ -1,4 +1,5 @@
 from typing import Any, Callable, Optional
+
 from weave.integrations.openai.openai_utils import (
     create_basic_wrapper_async,
     create_basic_wrapper_sync,
@@ -22,19 +23,20 @@ def openai_image_postprocess_outputs(outputs: dict[str, Any]) -> Any:
     Returns a tuple of (original_response, PIL_Image) for b64_json format,
     or just the original response for url format.
     """
-    from PIL import Image
-    from io import BytesIO
     import base64
+    from io import BytesIO
+
+    from PIL import Image
 
     # Unwrap API response if needed
     outputs = maybe_unwrap_api_response(outputs)
 
     # Check if we have image data in base64 format
-    if hasattr(outputs, 'data') and len(outputs.data) > 0:
+    if hasattr(outputs, "data") and len(outputs.data) > 0:
         first_image = outputs.data[0]
-        
+
         # Handle base64 response format
-        if hasattr(first_image, 'b64_json') and first_image.b64_json:
+        if hasattr(first_image, "b64_json") and first_image.b64_json:
             image_data = first_image.b64_json
             image_bytes = base64.b64decode(image_data)
             image = Image.open(BytesIO(image_bytes))

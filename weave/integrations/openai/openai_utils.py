@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-import importlib
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable
 
 import weave
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.integrations.patcher import MultiPatcher
+from weave.trace.autopatch import OpSettings
 from weave.trace.op import Op, ProcessedInputs, _add_accumulator
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
-    from openai.types.responses import Response, ResponseStreamEvent
+    from openai.types.chat.chat_completion_chunk import (
+        ChoiceDeltaFunctionCall,
+        ChoiceDeltaToolCall,
+    )
+    from openai.types.chat.chat_completion_message import FunctionCall
+    from openai.types.chat.chat_completion_message_tool_call import (
+        ChatCompletionMessageToolCall,
+    )
 
 _openai_patcher: MultiPatcher | None = None
 
@@ -49,7 +55,7 @@ def maybe_unwrap_api_response(value: Any) -> Any:
 
 
 def openai_on_finish_post_processor(
-    value: "ChatCompletionChunk | None",
+    value: ChatCompletionChunk | None,
 ) -> dict | None:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
@@ -65,7 +71,7 @@ def openai_on_finish_post_processor(
     value = maybe_unwrap_api_response(value)
 
     def _get_function_call(
-        function_call: "ChoiceDeltaFunctionCall | None",
+        function_call: ChoiceDeltaFunctionCall | None,
     ) -> FunctionCall | None:
         if function_call is None:
             return function_call
@@ -78,7 +84,7 @@ def openai_on_finish_post_processor(
             return None
 
     def _get_tool_calls(
-        tool_calls: list["ChoiceDeltaToolCall"] | None,
+        tool_calls: list[ChoiceDeltaToolCall] | None,
     ) -> list[ChatCompletionMessageToolCall] | None:
         if tool_calls is None:
             return tool_calls
@@ -133,10 +139,10 @@ def openai_on_finish_post_processor(
 
 
 def openai_accumulator(
-    acc: "ChatCompletionChunk | None",
-    value: "ChatCompletionChunk",
+    acc: ChatCompletionChunk | None,
+    value: ChatCompletionChunk,
     skip_last: bool = False,
-) -> "ChatCompletionChunk":
+) -> ChatCompletionChunk:
     from openai.types.chat import ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -145,7 +151,7 @@ def openai_accumulator(
     )
 
     def _process_chunk(
-        chunk: ChatCompletionChunk, acc_choices: Optional[list[dict]] = None
+        chunk: ChatCompletionChunk, acc_choices: list[dict] | None = None
     ) -> list[dict]:
         """Once the first_chunk is set (acc), take the next chunk and append the message content
         to the message content of acc or first_chunk.
@@ -341,6 +347,7 @@ def create_basic_wrapper_sync(
     Returns:
         A wrapper function that takes a function and returns a wrapped function
     """
+
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
 
@@ -379,6 +386,7 @@ def create_basic_wrapper_async(
     Returns:
         A wrapper function that takes a function and returns a wrapped async function
     """
+
     def wrapper(fn: Callable) -> Callable:
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
@@ -430,6 +438,7 @@ def create_streaming_wrapper_sync(
     Returns:
         A wrapper function that takes a function and returns a wrapped function
     """
+
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
 

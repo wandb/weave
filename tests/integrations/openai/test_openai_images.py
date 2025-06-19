@@ -7,10 +7,8 @@ from openai import AsyncOpenAI, OpenAI
 from PIL import Image
 
 from weave.integrations.integration_utilities import op_name_from_ref
-from weave.trace.weave_client import WeaveClient
 from weave.integrations.openai import openai_sdk
-from weave.trace.autopatch import AutopatchSettings, IntegrationSettings, OpSettings
-
+from weave.trace.autopatch import AutopatchSettings, IntegrationSettings
 
 
 @pytest.mark.skip_clickhouse_client
@@ -39,7 +37,7 @@ def test_openai_image_generate_sync(client_creator) -> None:
             size="1024x1024",
             quality="low",
             output_format="jpeg",
-            output_compression=50
+            output_compression=50,
         )
 
         calls = list(client.calls())
@@ -64,13 +62,13 @@ def test_openai_image_generate_sync(client_creator) -> None:
         # Verify output structure
         output = call.output
         assert len(output) == 2
-        
+
         # First element should be the original response
         original_response, pil_image = output
         assert original_response.created == response.created
         assert len(original_response.data) == 1
         assert original_response.data[0].b64_json is not None
-        
+
         # Second element should be PIL Image
         assert isinstance(pil_image, Image.Image)
         assert pil_image.size == (1024, 1024)
@@ -106,7 +104,7 @@ async def test_openai_image_generate_async(client_creator) -> None:
             size="1024x1024",
             quality="low",
             output_format="jpeg",
-            output_compression=50
+            output_compression=50,
         )
 
         calls = list(client.calls())
@@ -130,11 +128,11 @@ async def test_openai_image_generate_async(client_creator) -> None:
         # Verify output structure
         output = call.output
         assert len(output) == 2
-        
+
         # First element should be the original response
         original_response, pil_image = output
         assert original_response.created == response.created
-        
+
         # Second element should be PIL Image
         assert isinstance(pil_image, Image.Image)
         assert pil_image.size == (1024, 1024)
@@ -146,49 +144,51 @@ async def test_openai_image_generate_async(client_creator) -> None:
 
 def test_openai_image_postprocess_inputs():
     """Test input postprocessing function."""
-    from weave.integrations.openai.gpt_image_utils import openai_image_postprocess_inputs
-    
+    from weave.integrations.openai.gpt_image_utils import (
+        openai_image_postprocess_inputs,
+    )
+
     test_inputs = {
         "model": "gpt-image-1",
         "prompt": "A test prompt",
     }
-    
+
     result = openai_image_postprocess_inputs(test_inputs)
-    
+
     # Should return inputs unchanged
     assert result == test_inputs
 
 
 def test_openai_image_postprocess_outputs():
     """Test output postprocessing function."""
-    from weave.integrations.openai.gpt_image_utils import openai_image_postprocess_outputs
-    
+    from weave.integrations.openai.gpt_image_utils import (
+        openai_image_postprocess_outputs,
+    )
+
     # Create a simple test image and convert to base64
-    test_image = Image.new('RGB', (100, 100), color=(255, 0, 0))
+    test_image = Image.new("RGB", (100, 100), color=(255, 0, 0))
     image_buffer = BytesIO()
-    test_image.save(image_buffer, format='PNG')
-    image_data = base64.b64encode(image_buffer.getvalue()).decode('utf-8')
-    
+    test_image.save(image_buffer, format="PNG")
+    image_data = base64.b64encode(image_buffer.getvalue()).decode("utf-8")
+
     # Mock response structure
     class MockData:
         def __init__(self, b64_json):
             self.b64_json = b64_json
-    
+
     class MockResponse:
         def __init__(self, b64_json):
             self.data = [MockData(b64_json)]
-    
+
     mock_response = MockResponse(image_data)
-    
+
     result = openai_image_postprocess_outputs(mock_response)
-    
+
     # Should return tuple of (original_response, PIL_image)
     assert isinstance(result, tuple)
     assert len(result) == 2
-    
+
     original_response, pil_image = result
     assert original_response == mock_response
     assert isinstance(pil_image, Image.Image)
     assert pil_image.size == (100, 100)
-
-
