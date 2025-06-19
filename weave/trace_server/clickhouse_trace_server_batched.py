@@ -95,6 +95,7 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
+from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
@@ -193,10 +194,15 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT = 1 * 1024 * 1024  # 1 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
+# https://clickhouse.com/docs/operations/settings/settings#max_memory_usage
 DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
+# https://clickhouse.com/docs/operations/settings/settings#max_execution_time
+DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
-    or DEFAULT_MAX_MEMORY_USAGE
+    or DEFAULT_MAX_MEMORY_USAGE,
+    "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
+    or DEFAULT_MAX_EXECUTION_TIME,
 }
 
 
@@ -223,6 +229,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
+        self._kafka_producer: Optional[KafkaProducer] = None
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -243,6 +250,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return self._file_storage_client
         self._file_storage_client = maybe_get_storage_client_from_env()
         return self._file_storage_client
+
+    @property
+    def kafka_producer(self) -> KafkaProducer:
+        if self._kafka_producer is not None:
+            return self._kafka_producer
+        self._kafka_producer = KafkaProducer.from_env()
+        return self._kafka_producer
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -278,6 +292,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         try:
             yield
             self._flush_calls()
+            self.kafka_producer.flush()
         finally:
             self._call_batch = []
             self._flush_immediately = True
@@ -289,7 +304,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if item.mode == "start":
                     res.append(self.call_start(item.req))
                 elif item.mode == "end":
-                    res.append(self.call_end(item.req))
+                    res.append(self.call_end(item.req, flush_immediately=False))
                 else:
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
@@ -311,7 +326,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+    def call_end(
+        self,
+        req: tsi.CallEndReq,
+        publish: bool = True,
+        flush_immediately: bool = False,
+    ) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
@@ -320,6 +340,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
+
+        if wf_env.wf_enable_online_eval() and publish:
+            # Strip large and optional fields, dont modify param
+            end_copy = req.end.model_copy()
+            end_copy.output = None
+            end_copy.summary = {}
+            end_copy.exception = None
+            # Don't flush immediately by default, rely on explicit flush
+            self.kafka_producer.produce_call_end(end_copy, flush_immediately)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
@@ -1351,7 +1380,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             if len(needed_extra_results) > 0:
                 refs: list[ri.InternalObjectRef] = []
-                for i, extra_result in needed_extra_results:
+                for _, extra_result in needed_extra_results:
                     if extra_result.unresolved_obj_ref is None:
                         raise ValueError("Expected unresolved obj ref")
                     refs.append(extra_result.unresolved_obj_ref)
@@ -2418,9 +2447,10 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
 def _ch_table_stats_to_table_stats_schema(
     ch_table_stats_row: Sequence[Any],
 ) -> tsi.TableStatsRow:
-    digest, count, storage_size_bytes = (lambda a, b, c=cast(Any, None): (a, b, c))(
-        *ch_table_stats_row
-    )
+    # Unpack the row with a default for the third value if it doesn't exist
+    row_tuple = tuple(ch_table_stats_row)
+    digest, count = row_tuple[:2]
+    storage_size_bytes = row_tuple[2] if len(row_tuple) > 2 else cast(Any, None)
 
     return tsi.TableStatsRow(
         count=count,
@@ -2822,11 +2852,14 @@ def _setup_completion_model_info(
     elif model_name.startswith("coreweave/"):
         # See https://docs.litellm.ai/docs/providers/openai_compatible
         # but ignore the bit about omitting the /v1 because it is actually necessary
-        req.inputs.model = "openai/" + model_name.split("/")[1]
+        req.inputs.model = "openai/" + model_name.replace("coreweave/", "", 1)
         provider = "custom"
-        base_url = "https://infr.cw4637-staging.coreweave.app/v1"
+        base_url = "https://api.inference.wandb.ai/v1"
         # The API key should have been passed in as an extra header.
         if req.inputs.extra_headers:
+            hostname = req.inputs.extra_headers.get("trace_server_hostname", None)
+            if hostname == "weave-trace.qa.wandb.ai":
+                base_url = "https://api.qa.inference.coreweave.com/v1"
             api_key = req.inputs.extra_headers.pop("api_key", None)
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None

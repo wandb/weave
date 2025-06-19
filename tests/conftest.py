@@ -4,6 +4,7 @@ import logging
 import os
 import typing
 from collections.abc import Iterator
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -28,6 +29,21 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
+
+
+@pytest.fixture(autouse=True)
+def patch_kafka_producer():
+    """
+    Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
+    This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
+
+    If a test needs to test the Kafka producer, they should orride this patch explicitly.
+    """
+    with patch(
+        "weave.trace_server.clickhouse_trace_server_batched.KafkaProducer.from_env",
+        return_value=MagicMock(),
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -626,3 +642,16 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+@pytest.fixture(autouse=True)
+def caching_client_isolation(monkeypatch, tmp_path):
+    """Isolate cache directories for each test to prevent cross-test contamination."""
+    test_specific_cache_dir = (
+        tmp_path / f"weave_cache_{get_test_name().replace('/', '_').replace('::', '_')}"
+    )
+    test_specific_cache_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
+    yield test_specific_cache_dir
+    # tmp_path and monkeypatch automatically handle cleanup

@@ -62,7 +62,8 @@ def check_cuda(device: str) -> None:
 
     if torch.cuda.is_available() and device == "cpu":
         warnings.warn(
-            "You have a GPU available, you can pass `device='cuda'` to the scorer init, this will speed up model loading and inference"
+            "You have a GPU available, you can pass `device='cuda'` to the scorer init, this will speed up model loading and inference",
+            stacklevel=2,
         )
 
 

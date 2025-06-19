@@ -40,7 +40,6 @@ dependencies = [
   "packaging>=21.0",         # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "emoji>=2.12.1",           # For emoji shortcode support in Feedback
-  "uuid-utils>=0.9.0",       # Used for ID generation - remove once python's built-in uuid supports UUIDv7
   "numpy>1.21.0",            # Used in box.py and scorer.py (should be made optional)
   "rich",                    # Used for special formatting of tables (should be made optional)
   "click",                   # Used for terminal/stdio printing
@@ -165,6 +164,8 @@ test = [
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
+  "freezegun",
+  "eval_type_backport",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
@@ -177,6 +178,8 @@ test = [
   "moviepy<=1.0.3",
   "filelock",
   "httpx",
+
+  "confluent-kafka",
 
   "weave[trace_server]",
   "weave[trace_server_tests]",
@@ -256,6 +259,11 @@ select = [
   "TRY400", # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
   "C",      # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",   # https://docs.astral.sh/ruff/rules/print-statement/
+  "B006",   # https://docs.astral.sh/ruff/rules/mutable-argument-default/
+  "B007",   # https://docs.astral.sh/ruff/rules/unused-loop-control-variable/
+  "B008",   # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
+  "B009",   # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
+  "B028",   # https://docs.astral.sh/ruff/rules/no-explicit-stacklevel/
 ]
 ignore = [
   # we use Google style
@@ -308,7 +316,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.51-dev0"
+current_version = "0.51.55-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

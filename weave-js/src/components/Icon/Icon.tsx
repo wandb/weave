@@ -45,8 +45,10 @@ import {ReactComponent as ImportColumn} from '../../assets/icons/icon-column.svg
 import {ReactComponent as ImportContentFullWidth} from '../../assets/icons/icon-content-full-width.svg';
 import {ReactComponent as ImportContentNarrow} from '../../assets/icons/icon-content-narrow.svg';
 import {ReactComponent as ImportContentWide} from '../../assets/icons/icon-content-wide.svg';
+import {ReactComponent as ImportContextWindow} from '../../assets/icons/icon-context-window.svg';
 import {ReactComponent as ImportContractLeft} from '../../assets/icons/icon-contract-left.svg';
 import {ReactComponent as ImportCopy} from '../../assets/icons/icon-copy.svg';
+import {ReactComponent as ImportCourthouseLicense} from '../../assets/icons/icon-courthouse-license.svg';
 import {ReactComponent as ImportCreditCardPayment} from '../../assets/icons/icon-credit-card-payment.svg';
 import {ReactComponent as ImportCropBeginning} from '../../assets/icons/icon-crop-beginning.svg';
 import {ReactComponent as ImportCropEnd} from '../../assets/icons/icon-crop-end.svg';
@@ -90,6 +92,7 @@ import {ReactComponent as ImportFullScreenModeExpand} from '../../assets/icons/i
 import {ReactComponent as ImportGhostAgent} from '../../assets/icons/icon-ghost-agent.svg';
 import {ReactComponent as ImportGit} from '../../assets/icons/icon-git.svg';
 import {ReactComponent as ImportGithub} from '../../assets/icons/icon-github.svg';
+import {ReactComponent as ImportGrafana} from '../../assets/icons/icon-grafana.svg';
 import {ReactComponent as ImportGroup} from '../../assets/icons/icon-group.svg';
 import {ReactComponent as ImportH1} from '../../assets/icons/icon-h1.svg';
 import {ReactComponent as ImportH2} from '../../assets/icons/icon-h2.svg';
@@ -105,6 +108,7 @@ import {ReactComponent as ImportIdle} from '../../assets/icons/icon-idle.svg';
 import {ReactComponent as ImportIgnoreOutliers} from '../../assets/icons/icon-ignore-outliers.svg';
 import {ReactComponent as ImportImpersonateMaskAlt} from '../../assets/icons/icon-impersonate-mask-alt.svg';
 import {ReactComponent as ImportImportInsert} from '../../assets/icons/icon-import-insert.svg';
+import {ReactComponent as ImportInference} from '../../assets/icons/icon-inference.svg';
 import {ReactComponent as ImportInfo} from '../../assets/icons/icon-info.svg';
 import {ReactComponent as ImportItalic} from '../../assets/icons/icon-italic.svg';
 import {ReactComponent as ImportJobAutomation} from '../../assets/icons/icon-job-automation.svg';
@@ -436,11 +440,17 @@ export const IconContentNarrow = (props: SVGIconProps) => (
 export const IconContentWide = (props: SVGIconProps) => (
   <ImportContentWide {...updateIconProps(props)} />
 );
+export const IconContextWindow = (props: SVGIconProps) => (
+  <ImportContextWindow {...updateIconProps(props)} />
+);
 export const IconContractLeft = (props: SVGIconProps) => (
   <ImportContractLeft {...updateIconProps(props)} />
 );
 export const IconCopy = (props: SVGIconProps) => (
   <ImportCopy {...updateIconProps(props)} />
+);
+export const IconCourthouseLicense = (props: SVGIconProps) => (
+  <ImportCourthouseLicense {...updateIconProps(props)} />
 );
 export const IconCreditCardPayment = (props: SVGIconProps) => (
   <ImportCreditCardPayment {...updateIconProps(props)} />
@@ -571,6 +581,9 @@ export const IconGit = (props: SVGIconProps) => (
 export const IconGithub = (props: SVGIconProps) => (
   <ImportGithub {...updateIconProps(props)} />
 );
+export const IconGrafana = (props: SVGIconProps) => (
+  <ImportGrafana {...updateIconProps(props)} />
+);
 export const IconGroup = (props: SVGIconProps) => (
   <ImportGroup {...updateIconProps(props)} />
 );
@@ -615,6 +628,9 @@ export const IconImpersonateMaskAlt = (props: SVGIconProps) => (
 );
 export const IconImportInsert = (props: SVGIconProps) => (
   <ImportImportInsert {...updateIconProps(props)} />
+);
+export const IconInference = (props: SVGIconProps) => (
+  <ImportInference {...updateIconProps(props)} />
 );
 export const IconInfo = (props: SVGIconProps) => (
   <ImportInfo {...updateIconProps(props)} />
@@ -1197,8 +1213,10 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'content-full-width': IconContentFullWidth,
   'content-narrow': IconContentNarrow,
   'content-wide': IconContentWide,
+  'context-window': IconContextWindow,
   'contract-left': IconContractLeft,
   copy: IconCopy,
+  'courthouse-license': IconCourthouseLicense,
   'credit-card-payment': IconCreditCardPayment,
   'crop-beginning': IconCropBeginning,
   'crop-end': IconCropEnd,
@@ -1242,6 +1260,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'ghost-agent': IconGhostAgent,
   git: IconGit,
   github: IconGithub,
+  grafana: IconGrafana,
   group: IconGroup,
   h1: IconH1,
   h2: IconH2,
@@ -1257,6 +1276,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'ignore-outliers': IconIgnoreOutliers,
   'impersonate-mask-alt': IconImpersonateMaskAlt,
   'import-insert': IconImportInsert,
+  inference: IconInference,
   info: IconInfo,
   italic: IconItalic,
   'job-automation': IconJobAutomation,
