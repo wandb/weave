@@ -775,3 +775,54 @@ def test_llamaindex_tool_calling_sync(client: WeaveClient) -> None:
     assert tools[0]["function"]["name"] == "generate_song"
     assert "name" in tools[0]["function"]["parameters"]["properties"]
     assert "artist" in tools[0]["function"]["parameters"]["properties"]
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+@pytest.mark.asyncio
+async def test_llamaindex_workflow(client: WeaveClient) -> None:
+    """Test LlamaIndex workflow execution."""
+    from llama_index.core.workflow import (
+        StartEvent,
+        StopEvent,
+        Workflow,
+        step,
+        Event,
+    )
+
+    class FirstEvent(Event):
+        first_output: str
+
+    class SecondEvent(Event):
+        second_output: str
+
+    class TestWorkflow(Workflow):
+        @step
+        async def step_one(self, ev: StartEvent) -> FirstEvent:
+            return FirstEvent(first_output="First step complete.")
+
+        @step
+        async def step_two(self, ev: FirstEvent) -> SecondEvent:
+            return SecondEvent(second_output="Second step complete.")
+
+        @step
+        async def step_three(self, ev: SecondEvent) -> StopEvent:
+            return StopEvent(result="Workflow complete.")
+
+    # Execute the workflow
+    workflow = TestWorkflow(timeout=10, verbose=False)
+    result = await workflow.run(first_input="Start the workflow.")
+
+    # Verify the workflow result
+    assert result == "Workflow complete."
+
+    # Check the captured calls
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+    print(len(flattened_calls))
+
+    assert len(flattened_calls) == 6
