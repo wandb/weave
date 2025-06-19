@@ -53,6 +53,71 @@ function parseThinkingBlocks(text: string) {
   return parts.length > 0 ? parts : [{type: 'text' as const, content: text}];
 }
 
+type CursorAnimatedProps = {
+  show: boolean;
+};
+
+const CursorAnimated = ({ show }: CursorAnimatedProps) => {
+  if (!show) return null;
+  return (
+    <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[12px] w-[12px] rounded-full bg-gold-500" />
+  );
+};
+
+type ThinkingPartProps = {
+  content: string;
+  index: number;
+  isExpanded: boolean;
+  showCursor: boolean;
+  isLastPart: boolean;
+  onToggleExpanded: (index: number) => void;
+};
+
+const ThinkingPart = ({
+  content,
+  index,
+  isExpanded,
+  showCursor,
+  isLastPart,
+  onToggleExpanded,
+}: ThinkingPartProps) => {
+  return (
+    <div>
+      <Button
+        variant="ghost"
+        size="small"
+        className="mb-8"
+        endIcon={isExpanded ? 'chevron-up' : 'chevron-down'}
+        onClick={() => onToggleExpanded(index)}>
+        Thinking
+      </Button>
+      {isExpanded && (
+        <div className="mb-8 rounded bg-moon-100 p-16">
+          <span className="whitespace-break-spaces italic text-moon-600">
+            {content.trim()}
+          </span>
+          <CursorAnimated show={showCursor && isLastPart} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+type TextPartProps = {
+  content: string;
+  showCursor: boolean;
+  isLastPart: boolean;
+};
+
+const TextPart = ({ content, showCursor, isLastPart }: TextPartProps) => {
+  return (
+    <span className="whitespace-break-spaces">
+      {!showCursor && isLastPart ? content.trim() : content}
+      <CursorAnimated show={showCursor && isLastPart} />
+    </span>
+  );
+};
+
 export const MessagePanelPart = ({
   value,
   isStructuredOutput,
@@ -100,40 +165,29 @@ export const MessagePanelPart = ({
             if (part.type === 'thinking') {
               const isExpanded = expandedThinking[index] ?? showCursor;
               return (
-                <div key={index}>
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    className="mb-8"
-                    endIcon={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    onClick={() =>
-                      setExpandedThinking(prev => ({
-                        ...prev,
-                        [index]: !isExpanded,
-                      }))
-                    }>
-                    Thinking
-                  </Button>
-                  {isExpanded && (
-                    <div className="mb-8 rounded bg-moon-100 p-16">
-                      <span className="whitespace-break-spaces italic text-moon-600">
-                        {part.content.trim()}
-                      </span>
-                      {showCursor && isLastPart && (
-                        <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[12px] w-[12px] rounded-full bg-gold-500" />
-                      )}
-                    </div>
-                  )}
-                </div>
+                <ThinkingPart
+                  key={index}
+                  content={part.content}
+                  index={index}
+                  isExpanded={isExpanded}
+                  showCursor={showCursor}
+                  isLastPart={isLastPart}
+                  onToggleExpanded={(idx) =>
+                    setExpandedThinking(prev => ({
+                      ...prev,
+                      [idx]: !isExpanded,
+                    }))
+                  }
+                />
               );
             }
             return (
-              <span key={index} className="whitespace-break-spaces">
-                {!showCursor && isLastPart ? part.content.trim() : part.content}
-                {showCursor && isLastPart && (
-                  <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[12px] w-[12px] rounded-full bg-gold-500" />
-                )}
-              </span>
+              <TextPart
+                key={index}
+                content={part.content}
+                showCursor={showCursor}
+                isLastPart={isLastPart}
+              />
             );
           })}
         </div>
