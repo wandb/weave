@@ -55,9 +55,7 @@ client = openai.OpenAI(
     api_key="<your-apikey>",
 
     # Team and project are required for usage tracking
-    default_headers={
-      "OpenAI-Project": "<team>/<project>"
-    },
+    project="<team>/<project>",
 )
 
 response = client.chat.completions.create(
