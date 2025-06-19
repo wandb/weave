@@ -703,3 +703,75 @@ async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
     assert call_3.output["usage"]["prompt_tokens"] == 22
     assert call_3.output["usage"]["completion_tokens"] == 17
     assert call_3.output["usage"]["total_tokens"] == 39
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_llamaindex_tool_calling_sync(client: WeaveClient) -> None:
+    """Test synchronous LLM tool calling operation."""
+    import os
+    from pydantic import BaseModel
+    from llama_index.core.tools import FunctionTool
+    from llama_index.llms.openai import OpenAI
+
+    class Song(BaseModel):
+        name: str
+        artist: str
+
+    def generate_song(name: str, artist: str) -> Song:
+        """Generates a song with provided name and artist."""
+        return Song(name=name, artist=artist)
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+    llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
+    tool = FunctionTool.from_defaults(fn=generate_song)
+    
+    response = llm.predict_and_call([tool], "Pick a random song for me")
+
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+
+    # Verify we have the expected call structure
+    assert len(flattened_calls) == 7
+    
+    # Find the main predict_and_call operation
+    main_call = None
+    for call, _ in flattened_calls:
+        if "predict_and_call" in op_name_from_ref(call.op_name):
+            main_call = call
+            break
+    
+    assert main_call is not None, "Could not find predict_and_call operation"
+    assert main_call.started_at < main_call.ended_at
+    assert main_call.parent_id is None
+    assert main_call.inputs["model"] == "gpt-4o-mini"
+    assert main_call.inputs["temperature"] == 0.1
+    
+    # Verify the tool was provided in inputs
+    assert "tools" in main_call.inputs or "_self" in main_call.inputs
+    
+    # Verify output contains song information
+    assert main_call.output is not None
+    
+    # Check that we have OpenAI completion calls
+    openai_calls = [call for call, _ in flattened_calls if "openai.chat.completions.create" in op_name_from_ref(call.op_name)]
+    assert len(openai_calls) >= 1, "Should have at least one OpenAI completion call"
+    
+    # Verify the OpenAI call has the correct structure
+    openai_call = openai_calls[0]
+    assert openai_call.inputs["model"] == "gpt-4o-mini"
+    assert openai_call.inputs["temperature"] == 0.1
+    assert "tools" in openai_call.inputs  # Tool calling should include tools parameter
+    assert openai_call.inputs["stream"] == False
+    
+    # Verify the tool was defined correctly in the OpenAI call
+    tools = openai_call.inputs["tools"]
+    assert len(tools) == 1
+    assert tools[0]["type"] == "function"
+    assert tools[0]["function"]["name"] == "generate_song"
+    assert "name" in tools[0]["function"]["parameters"]["properties"]
+    assert "artist" in tools[0]["function"]["parameters"]["properties"]
