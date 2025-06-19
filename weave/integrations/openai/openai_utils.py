@@ -26,7 +26,7 @@ def maybe_unwrap_api_response(value: Any) -> Any:
 
         if isinstance(value, LegacyAPIResponse):
             maybe_value = value.parse()
-    except:
+    except Exception:
         pass
 
     try:
@@ -34,7 +34,7 @@ def maybe_unwrap_api_response(value: Any) -> Any:
 
         if isinstance(value, APIResponse):
             maybe_value = value.parse()
-    except:
+    except Exception:
         pass
 
     try:
@@ -42,13 +42,15 @@ def maybe_unwrap_api_response(value: Any) -> Any:
 
         if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
             return maybe_value
-    except:
+    except Exception:
         pass
 
     return value
 
 
-def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict | None:
+def openai_on_finish_post_processor(
+    value: "ChatCompletionChunk | None",
+) -> dict | None:
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -63,7 +65,7 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
     value = maybe_unwrap_api_response(value)
 
     def _get_function_call(
-        function_call: ChoiceDeltaFunctionCall | None,
+        function_call: "ChoiceDeltaFunctionCall | None",
     ) -> FunctionCall | None:
         if function_call is None:
             return function_call
@@ -76,7 +78,7 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
             return None
 
     def _get_tool_calls(
-        tool_calls: list[ChoiceDeltaToolCall] | None,
+        tool_calls: list["ChoiceDeltaToolCall"] | None,
     ) -> list[ChatCompletionMessageToolCall] | None:
         if tool_calls is None:
             return tool_calls
@@ -131,10 +133,10 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
 
 
 def openai_accumulator(
-    acc: ChatCompletionChunk | None,
-    value: ChatCompletionChunk,
+    acc: "ChatCompletionChunk | None",
+    value: "ChatCompletionChunk",
     skip_last: bool = False,
-) -> ChatCompletionChunk:
+) -> "ChatCompletionChunk":
     from openai.types.chat import ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
         ChoiceDeltaFunctionCall,
@@ -143,13 +145,15 @@ def openai_accumulator(
     )
 
     def _process_chunk(
-        chunk: ChatCompletionChunk, acc_choices: list[dict] = []
+        chunk: ChatCompletionChunk, acc_choices: Optional[list[dict]] = None
     ) -> list[dict]:
         """Once the first_chunk is set (acc), take the next chunk and append the message content
         to the message content of acc or first_chunk.
         """
+        if acc_choices is None:
+            acc_choices = []
         for chunk_choice in chunk.choices:
-            for i in range(chunk_choice.index + 1 - len(acc_choices)):
+            for _ in range(chunk_choice.index + 1 - len(acc_choices)):
                 acc_choices.append(
                     {
                         "index": len(acc_choices),
@@ -320,58 +324,58 @@ def openai_on_input_handler(
 
 def create_basic_wrapper_sync(
     settings: OpSettings,
-    postprocess_inputs: Optional[Callable] = None, 
-    postprocess_output: Optional[Callable] = None,
-    on_finish_handler: Optional[Callable] = None
+    postprocess_inputs: Callable | None = None,
+    postprocess_output: Callable | None = None,
+    on_finish_handler: Callable | None = None,
 ) -> Callable[[Callable], Callable]:
     """
     Creates a basic synchronous wrapper function for any API integration.
     This reduces duplication across different integration modules.
-    
+
     Args:
         settings: OpSettings for the wrapped operation
         postprocess_inputs: Function to preprocess inputs before the call
         postprocess_output: Function to process outputs after the call
         on_finish_handler: Function to handle the finishing of an operation
-        
+
     Returns:
         A wrapper function that takes a function and returns a wrapped function
     """
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
-        
+
         if postprocess_inputs and not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = postprocess_inputs
-            
+
         if postprocess_output and not op_kwargs.get("postprocess_output"):
             op_kwargs["postprocess_output"] = postprocess_output
-            
+
         op = weave.op(fn, **op_kwargs)
-        
+
         if on_finish_handler:
             op._set_on_finish_handler(on_finish_handler)
-            
+
         return op
-    
+
     return wrapper
 
 
 def create_basic_wrapper_async(
     settings: OpSettings,
-    postprocess_inputs: Optional[Callable] = None, 
-    postprocess_output: Optional[Callable] = None,
-    on_finish_handler: Optional[Callable] = None
+    postprocess_inputs: Callable | None = None,
+    postprocess_output: Callable | None = None,
+    on_finish_handler: Callable | None = None,
 ) -> Callable[[Callable], Callable]:
     """
     Creates a basic asynchronous wrapper function for any API integration.
     This reduces duplication across different integration modules.
-    
+
     Args:
         settings: OpSettings for the wrapped operation
         postprocess_inputs: Function to preprocess inputs before the call
         postprocess_output: Function to process outputs after the call
         on_finish_handler: Function to handle the finishing of an operation
-        
+
     Returns:
         A wrapper function that takes a function and returns a wrapped async function
     """
@@ -380,40 +384,40 @@ def create_basic_wrapper_async(
             @wraps(fn)
             async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 return await fn(*args, **kwargs)
-            
+
             return _async_wrapper
-        
+
         op_kwargs = settings.model_dump()
-        
+
         if postprocess_inputs and not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = postprocess_inputs
-            
+
         if postprocess_output and not op_kwargs.get("postprocess_output"):
             op_kwargs["postprocess_output"] = postprocess_output
-            
+
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
-        
+
         if on_finish_handler:
             op._set_on_finish_handler(on_finish_handler)
-            
+
         return op
-    
+
     return wrapper
 
 
 def create_streaming_wrapper_sync(
     settings: OpSettings,
-    postprocess_inputs: Optional[Callable] = None,
-    postprocess_output: Optional[Callable] = None,
-    on_finish_handler: Optional[Callable] = None,
-    accumulator: Optional[Callable] = None,
-    should_accumulate: Optional[Callable] = None,
-    on_finish_post_processor: Optional[Callable] = None
+    postprocess_inputs: Callable | None = None,
+    postprocess_output: Callable | None = None,
+    on_finish_handler: Callable | None = None,
+    accumulator: Callable | None = None,
+    should_accumulate: Callable | None = None,
+    on_finish_post_processor: Callable | None = None,
 ) -> Callable[[Callable], Callable]:
     """
     Creates a streaming synchronous wrapper function for any API integration.
     This is useful for APIs that support streaming responses.
-    
+
     Args:
         settings: OpSettings for the wrapped operation
         postprocess_inputs: Function to preprocess inputs before the call
@@ -422,24 +426,24 @@ def create_streaming_wrapper_sync(
         accumulator: Function to accumulate streaming responses
         should_accumulate: Function to determine if responses should be accumulated
         on_finish_post_processor: Function to post-process accumulated output
-        
+
     Returns:
         A wrapper function that takes a function and returns a wrapped function
     """
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
-        
+
         if postprocess_inputs and not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = postprocess_inputs
-            
+
         if postprocess_output and not op_kwargs.get("postprocess_output"):
             op_kwargs["postprocess_output"] = postprocess_output
-            
+
         op = weave.op(fn, **op_kwargs)
-        
+
         if on_finish_handler:
             op._set_on_finish_handler(on_finish_handler)
-            
+
         if accumulator and should_accumulate:
             return _add_accumulator(
                 op,
@@ -447,7 +451,7 @@ def create_streaming_wrapper_sync(
                 should_accumulate=should_accumulate,
                 on_finish_post_processor=on_finish_post_processor,
             )
-        
+
         return op
-    
-    return wrapper 
+
+    return wrapper
