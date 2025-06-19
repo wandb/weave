@@ -14,6 +14,7 @@ try:
     from llama_index.core.instrumentation.events.base import BaseEvent
     from llama_index.core.instrumentation.span_handlers.base import BaseSpanHandler
     from llama_index.core.workflow.errors import WorkflowDone
+    from llama_index.core.workflow.events import StopEvent
 except ImportError:
     _import_failed = True
 except Exception:
@@ -245,7 +246,10 @@ if not _import_failed:
                 # WorkflowDone is not an error, it's the normal way workflows signal completion
                 if err is not None and not _import_failed and isinstance(err, WorkflowDone):
                     exception_to_log = None
-                
+
+                if result is not None and isinstance(result, StopEvent):
+                    result = result.result
+
                 if result is not None:
                     try:
                         if hasattr(result, "model_dump"):
