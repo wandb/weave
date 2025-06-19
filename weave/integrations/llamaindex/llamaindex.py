@@ -242,9 +242,13 @@ if not _import_failed:
                 call_to_finish = _weave_calls_map.pop(id_)
                 outputs = None
                 exception_to_log = err
-                
+
                 # WorkflowDone is not an error, it's the normal way workflows signal completion
-                if err is not None and not _import_failed and isinstance(err, WorkflowDone):
+                if (
+                    err is not None
+                    and not _import_failed
+                    and isinstance(err, WorkflowDone)
+                ):
                     exception_to_log = None
 
                 if result is not None and isinstance(result, StopEvent):
