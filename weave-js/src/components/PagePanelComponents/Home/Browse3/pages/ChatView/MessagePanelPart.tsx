@@ -1,7 +1,7 @@
 import 'prismjs/components/prism-markup-templating';
 
 import _ from 'lodash';
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {Button} from '../../../../../Button';
@@ -13,6 +13,7 @@ type MessagePanelPartProps = {
   value: MessagePart;
   isStructuredOutput?: boolean;
   showCursor?: boolean;
+  role?: string;
 };
 
 function parseThinkingBlocks(text: string) {
@@ -56,6 +57,7 @@ export const MessagePanelPart = ({
   value,
   isStructuredOutput,
   showCursor = false,
+  role,
 }: MessagePanelPartProps) => {
   const [expandedThinking, setExpandedThinking] = useState<{
     [key: number]: boolean;
@@ -72,7 +74,11 @@ export const MessagePanelPart = ({
     //   return <Markdown content={value} />;
     // }
 
-    const parts = parseThinkingBlocks(value);
+    // Only parse thinking blocks for assistant messages, not user messages
+    const shouldParseThinking = role !== 'user';
+    const parts = useMemo(() => shouldParseThinking 
+      ? parseThinkingBlocks(value)
+      : [{type: 'text' as const, content: value}], [shouldParseThinking, value]);
     const lastPartIndex = parts.length - 1;
 
     return (

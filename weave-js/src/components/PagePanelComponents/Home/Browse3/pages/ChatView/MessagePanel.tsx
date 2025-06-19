@@ -181,10 +181,11 @@ export const MessagePanel = ({
                           }
                           isStructuredOutput={isStructuredOutput}
                           showCursor={shouldAnimateText && isAnimating}
+                          role={message.role}
                         />
                       ) : (
                         message.content!.map((p, i) => (
-                          <MessagePanelPart key={i} value={p} />
+                          <MessagePanelPart key={i} value={p} role={message.role} />
                         ))
                       )}
                     </div>
