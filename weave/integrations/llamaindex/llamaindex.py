@@ -50,9 +50,10 @@ def _get_class_name(obj: Any) -> str:
     """Get a meaningful class name from an object."""
     # Try class_name() method first (common in LlamaIndex)
     if hasattr(obj, "class_name") and callable(obj.class_name):
-        return obj.class_name()
+        result = obj.class_name()
+        return str(result) if result is not None else obj.__class__.__name__
     # Try class name from the class itself
-    return obj.__class__.__name__
+    return str(obj.__class__.__name__)
 
 
 def _process_inputs(raw_inputs: dict[str, Any]) -> dict[str, Any]:
@@ -99,7 +100,7 @@ def _get_op_name_from_span(span_id: str) -> str:
 
 if not _import_failed:
 
-    class WeaveSpanHandler(BaseSpanHandler[Any]):
+    class WeaveSpanHandler(BaseSpanHandler[Any]):  # pyright: ignore[reportRedeclaration]
         """Handles LlamaIndex span start, end, and drop events to trace operations."""
 
         @classmethod
@@ -242,17 +243,21 @@ if not _import_failed:
                 if result is not None:
                     try:
                         if hasattr(result, "model_dump"):
-                            outputs = _process_inputs(result.model_dump(exclude_none=True))
+                            outputs = _process_inputs(
+                                result.model_dump(exclude_none=True)
+                            )
                         else:
                             outputs = _process_inputs({"result": result})
                     except Exception:
                         outputs = _process_inputs({"result": str(result)})
 
-            try:
-                gc.finish_call(call_to_finish, outputs, exception=exception_to_log)
-            except Exception as e:
-                error_type = "dropping" if err else "finishing"
-                print(f"Weave(SpanHandler): Error {error_type} call for ID {id_}: {e}")
+                try:
+                    gc.finish_call(call_to_finish, outputs, exception=exception_to_log)
+                except Exception as e:
+                    error_type = "dropping" if err else "finishing"
+                    print(
+                        f"Weave(SpanHandler): Error {error_type} call for ID {id_}: {e}"
+                    )
 
         def prepare_to_exit_span(
             self,
@@ -278,8 +283,7 @@ if not _import_failed:
             self._prepare_to_exit_or_drop(id_, err=err)
             return None
 
-
-    class WeaveEventHandler(BaseEventHandler):
+    class WeaveEventHandler(BaseEventHandler):  # pyright: ignore[reportRedeclaration]
         """Handles LlamaIndex events to create fine-grained Weave calls within spans."""
 
         @classmethod
@@ -376,7 +380,9 @@ if not _import_failed:
                     gc.finish_call(call_to_finish, raw_event_payload)
                 else:
                     # No matching start event found, create a standalone call
-                    call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
+                    call = gc.create_call(
+                        op_name, raw_event_payload, parent_call_for_event
+                    )
                     gc.finish_call(call, raw_event_payload)
 
                 # Only finish spans that were deferred due to streaming (indicated by deferred_result or deferred_err being set)
@@ -409,77 +415,6 @@ if not _import_failed:
             # except Exception as e:
             #     print(f"Weave(EventHandler): Error processing event {op_name} (Key: {event_pairing_key}): {e}")
 
-
-    class LLamaIndexPatcher(Patcher):
-        """Manages patching of LlamaIndex instrumentation to integrate with Weave."""
-
-        def __init__(self) -> None:
-            super().__init__()
-            self.dispatcher: Optional[Any] = None
-            self._original_event_handlers: Optional[list[BaseEventHandler]] = None
-            self._original_span_handlers: Optional[list[BaseSpanHandler[Any]]] = None
-            self.weave_event_handler: Optional[WeaveEventHandler] = None
-            self.weave_span_handler: Optional[WeaveSpanHandler] = None
-            self._atexit_registered: bool = False
-
-        def _get_script_name(self) -> str:
-            """Tries to determine the name of the executing script."""
-            try:
-                import __main__
-
-                if hasattr(__main__, "__file__") and __main__.__file__:
-                    return __main__.__file__
-            except (ImportError, AttributeError):
-                pass
-            return "unknown_script"
-
-        def attempt_patch(self) -> bool:
-            """Attempts to patch LlamaIndex instrumentation and set up Weave handlers."""
-            global _global_root_call, _import_failed
-            if _import_failed:
-                return False
-
-            try:
-                import llama_index.core.instrumentation as instrument
-
-                self.dispatcher = instrument.get_dispatcher()
-                self._original_event_handlers = list(self.dispatcher.event_handlers)
-                self._original_span_handlers = list(self.dispatcher.span_handlers)
-
-                self.weave_event_handler = WeaveEventHandler()
-                self.weave_span_handler = WeaveSpanHandler()
-
-                self.dispatcher.add_event_handler(self.weave_event_handler)
-                self.dispatcher.add_span_handler(self.weave_span_handler)
-
-            except Exception as e:
-                print(f"Weave: Failed to patch LlamaIndex dispatcher: {e}")
-                return False
-            return True
-
-        def undo_patch(self) -> bool:
-            """Reverts LlamaIndex instrumentation to its original state."""
-            if (
-                not self.dispatcher
-                or self._original_event_handlers is None
-                or self._original_span_handlers is None
-            ):
-                return False
-
-            try:
-                self.dispatcher.event_handlers = self._original_event_handlers
-                self.dispatcher.span_handlers = self._original_span_handlers
-
-                self._original_event_handlers = None
-                self._original_span_handlers = None
-                self.weave_event_handler = None
-                self.weave_span_handler = None
-                self.dispatcher = None
-            except Exception as e:
-                print(f"Weave: Failed to undo LlamaIndex dispatcher patch: {e}")
-                return False
-            return True
-
 else:
 
     class WeaveSpanHandler:  # type: ignore
@@ -488,15 +423,64 @@ else:
     class WeaveEventHandler:  # type: ignore
         pass
 
-    class LLamaIndexPatcher(Patcher):  # type: ignore
-        def __init__(self) -> None:
-            pass
 
-        def attempt_patch(self) -> bool:
+class LLamaIndexPatcher(Patcher):  # pyright: ignore[reportRedeclaration]
+    """Manages patching of LlamaIndex instrumentation to integrate with Weave."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.dispatcher: Optional[Any] = None
+        self._original_event_handlers: Optional[list[BaseEventHandler]] = None
+        self._original_span_handlers: Optional[list[BaseSpanHandler[Any]]] = None
+        self.weave_event_handler: Optional[WeaveEventHandler] = None
+        self.weave_span_handler: Optional[WeaveSpanHandler] = None
+
+    def attempt_patch(self) -> bool:
+        """Attempts to patch LlamaIndex instrumentation and set up Weave handlers."""
+        global _global_root_call, _import_failed
+        if _import_failed:
             return False
 
-        def undo_patch(self) -> bool:
+        try:
+            import llama_index.core.instrumentation as instrument
+
+            self.dispatcher = instrument.get_dispatcher()
+            self._original_event_handlers = list(self.dispatcher.event_handlers)
+            self._original_span_handlers = list(self.dispatcher.span_handlers)
+
+            self.weave_event_handler = WeaveEventHandler()
+            self.weave_span_handler = WeaveSpanHandler()
+
+            self.dispatcher.add_event_handler(self.weave_event_handler)
+            self.dispatcher.add_span_handler(self.weave_span_handler)
+
+        except Exception as e:
+            print(f"Weave: Failed to patch LlamaIndex dispatcher: {e}")
             return False
+        return True
+
+    def undo_patch(self) -> bool:
+        """Reverts LlamaIndex instrumentation to its original state."""
+        if (
+            not self.dispatcher
+            or self._original_event_handlers is None
+            or self._original_span_handlers is None
+        ):
+            return False
+
+        try:
+            self.dispatcher.event_handlers = self._original_event_handlers
+            self.dispatcher.span_handlers = self._original_span_handlers
+
+            self._original_event_handlers = None
+            self._original_span_handlers = None
+            self.weave_event_handler = None
+            self.weave_span_handler = None
+            self.dispatcher = None
+        except Exception as e:
+            print(f"Weave: Failed to undo LlamaIndex dispatcher patch: {e}")
+            return False
+        return True
 
 
 llamaindex_patcher = LLamaIndexPatcher()
