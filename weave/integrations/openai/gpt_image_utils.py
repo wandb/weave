@@ -61,9 +61,7 @@ def openai_image_on_finish(
 
 
 def openai_image_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
-    """
-    Creates a wrapper for synchronous OpenAI image API operations using common utilities.
-    """
+    "Creates a wrapper for synchronous OpenAI image API operations using common utilities."
     return create_basic_wrapper_sync(
         settings,
         postprocess_inputs=openai_image_postprocess_inputs,
@@ -73,9 +71,7 @@ def openai_image_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Call
 
 
 def openai_image_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
-    """
-    Creates a wrapper for asynchronous OpenAI image API operations using common utilities.
-    """
+    "Creates a wrapper for asynchronous OpenAI image API operations using common utilities."
     return create_basic_wrapper_async(
         settings,
         postprocess_inputs=openai_image_postprocess_inputs,
