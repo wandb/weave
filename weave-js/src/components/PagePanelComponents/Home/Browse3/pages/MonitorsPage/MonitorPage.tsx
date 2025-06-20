@@ -125,6 +125,14 @@ const MonitorPageInner = ({
     query: callCountQuery,
   });
 
+  const monitorVersionForDelete = useMemo(() => {
+    return {
+      ...monitorVersions[0],
+      // We want to delete all versions of the monitor
+      versionHash: '*',
+    };
+  }, [monitorVersions]);
+
   return (
     <SimplePageLayoutWithHeader
       title={
@@ -159,7 +167,8 @@ const MonitorPageInner = ({
             )}
             <div className="ml-auto">
               <DeleteObjectButtonWithModal
-                objVersionSchema={monitorVersions[0]}
+                overrideDisplayStr={monitorVersions[0].val['name']}
+                objVersionSchema={monitorVersionForDelete}
               />
             </div>
           </div>
