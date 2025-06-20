@@ -33,7 +33,7 @@ import {useScorerCreate} from '../../wfReactInterface/tsDataModelHooks';
 import {ScorerFormProps, ScorerFormRef} from '../MonitorFormDrawer';
 
 export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
-  ({scorer, onValidationChange}, ref) => {
+  ({scorer, onValidationChange, validationErrors}, ref) => {
     //const [isValid, setIsValid] = useState(false);
     const [scorerName, setScorerName] = useState<string | undefined>(
       scorer.objectId
@@ -395,14 +395,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           <Box>
             <FieldName name="Scorer Name" />
             <TextField value={scorerName} onChange={onScorerNameChange} />
-            {nameError && (
+            {(validationErrors?.scorerName || nameError) && (
               <Typography
                 className="mt-1 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
                 }}>
-                {nameError}
+                {validationErrors?.scorerName || nameError}
               </Typography>
             )}
             <Typography
@@ -425,14 +425,15 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               direction={{horizontal: 'left', vertical: 'up'}}
               onChange={onJudgeModelChange}
             />
-            {judgeModelError && (
+            {(validationErrors?.judgeModel || judgeModelError) && (
               <Typography
                 className="mt-1 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
-                }}
-              />
+                }}>
+                {validationErrors?.judgeModel || judgeModelError}
+              </Typography>
             )}
           </Box>
           {judgeModel && (
@@ -481,14 +482,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                 );
               }}
             />
-            {scoringPromptError && (
+            {(validationErrors?.scoringPrompt || scoringPromptError) && (
               <Typography
                 className="mt-1 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
                 }}>
-                {scoringPromptError}
+                {validationErrors?.scoringPrompt || scoringPromptError}
               </Typography>
             )}
             <Typography
