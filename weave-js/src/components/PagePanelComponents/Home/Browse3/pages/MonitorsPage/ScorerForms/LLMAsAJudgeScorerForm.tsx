@@ -167,6 +167,12 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       return true;
     }, [transformedScorerName, scoringPrompt, validateJudgeModel]);
 
+    // Centralized validation effect to trigger when key dependencies change
+    useEffect(() => {
+      const isValid = validateScorer();
+      onValidationChange(isValid);
+    }, [validateScorer, onValidationChange]);
+
     const createLLMStructuredCompletionModel = useCreateBuiltinObjectInstance(
       'LLMStructuredCompletionModel'
     );
@@ -288,13 +294,8 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         const transformResult = transformToValidName(value);
         setTransformedScorerName(transformResult.transformedName);
         setHasNameTransform(transformResult.hasChanged);
-        onValidationChange(
-          !!transformResult.transformedName &&
-            validateJudgeModel() &&
-            !!scoringPrompt
-        );
       },
-      [scoringPrompt, validateJudgeModel, onValidationChange]
+      []
     );
 
     useMemo(() => {
@@ -329,15 +330,12 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           };
         }
         setJudgeModel(newJudgeModel);
-        onValidationChange(!!transformedScorerName && !!scoringPrompt);
       },
       [
         judgeModelName,
-        scoringPrompt,
         savedModels,
         transformedScorerName,
         setJudgeModel,
-        onValidationChange,
       ]
     );
 
@@ -348,43 +346,15 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         setTransformedJudgeModelName(transformResult.transformedName);
         setHasJudgeModelNameTransform(transformResult.hasChanged);
         setJudgeModelError(null);
-        onValidationChange(
-          !!transformResult.transformedName &&
-            !!systemPrompt &&
-            !!responseFormat &&
-            !!transformedScorerName &&
-            !!scoringPrompt
-        );
       },
-      [
-        systemPrompt,
-        responseFormat,
-        transformedScorerName,
-        scoringPrompt,
-        setJudgeModelName,
-        setJudgeModelError,
-        onValidationChange,
-      ]
+      []
     );
 
     const onSystemPromptChange = useCallback(
       value => {
         setSystemPrompt(value);
-        onValidationChange(
-          !!value &&
-            !!judgeModelName &&
-            !!transformedScorerName &&
-            !!scoringPrompt &&
-            !!responseFormat
-        );
       },
-      [
-        judgeModelName,
-        transformedScorerName,
-        scoringPrompt,
-        responseFormat,
-        onValidationChange,
-      ]
+      []
     );
 
     return (
@@ -496,11 +466,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                 placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
                 onChange={e => {
                   setScoringPrompt(e.target.value);
-                  onValidationChange(
-                    !!e.target.value &&
-                      !!transformedScorerName &&
-                      validateJudgeModel()
-                  );
                 }}
               />
               {scoringPromptError && (
