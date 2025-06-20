@@ -1,9 +1,9 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Weights & Biases (W&B) Inference Service
+# W&B Inference
 
-_Weights & Biases (W&B) Inference_ provides access to leading open-source foundation models via the W&B Weave UI and an OpenAI-compliant API. With W&B Inference, you can:
+_W&B Inference_ provides access to leading open-source foundation models via W&B Weave and an OpenAI-compliant API. With W&B Inference, you can:
 
 - Develop AI applications and agents without signing up for a hosting provider or self-hosting a model.
 - Try the supported models in the W&B Weave Playground.
