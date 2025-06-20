@@ -2,8 +2,6 @@ import {Box, Typography} from '@mui/material';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
-import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/datasets/datasetNameValidation';
-import {transformNameToValid} from '../nameTransform';
 import {
   FieldName,
   typographyStyle,
@@ -32,6 +30,7 @@ import {
 } from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {useScorerCreate} from '../../wfReactInterface/tsDataModelHooks';
 import {ScorerFormProps, ScorerFormRef} from '../MonitorFormDrawer';
+import {transformNameToValid} from '../nameTransform';
 
 export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
   ({scorer, onValidationChange, validationErrors}, ref) => {
@@ -75,7 +74,8 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const [scorerName, setScorerName] = useState<string | undefined>(
       scorer.objectId || ''
     );
-    const [transformedScorerName, setTransformedScorerName] = useState<string>('');
+    const [transformedScorerName, setTransformedScorerName] =
+      useState<string>('');
 
     const [nameError, setNameError] = useState<string | null>(null);
 
@@ -94,7 +94,8 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const [judgeModelError, setJudgeModelError] = useState<string | null>(null);
 
     const [judgeModelName, setJudgeModelName] = useState<string | undefined>();
-    const [transformedJudgeModelName, setTransformedJudgeModelName] = useState<string>('');
+    const [transformedJudgeModelName, setTransformedJudgeModelName] =
+      useState<string>('');
     const [judgeModelNameError, setJudgeModelNameError] = useState<
       string | null
     >(null);
@@ -293,7 +294,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     }, [
       projectId,
       judgeModel,
-      judgeModelName,
       transformedJudgeModelName,
       systemPrompt,
       responseFormat,
@@ -363,7 +363,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       entity,
       project,
       saveModel,
-      judgeModelName,
+      transformedJudgeModelName,
       systemPrompt,
       responseFormat,
     ]);
@@ -413,9 +413,15 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     );
 
     useEffect(() => {
-      const modelName = judgeModel?.name || (scorerName ? transformNameToValid(`${scorerName}-judge-model`) : undefined);
+      const modelName =
+        judgeModel?.name ||
+        (scorerName
+          ? transformNameToValid(`${scorerName}-judge-model`)
+          : undefined);
       setJudgeModelName(modelName);
-      setTransformedJudgeModelName(modelName ? transformNameToValid(modelName) : '');
+      setTransformedJudgeModelName(
+        modelName ? transformNameToValid(modelName) : ''
+      );
       setSystemPrompt(
         judgeModel?.default_params && getSystemPrompt(judgeModel.default_params)
       );
@@ -437,7 +443,9 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         } else {
           newJudgeModel = {
             llm_model_id: newValue,
-            name: judgeModelName || transformNameToValid(`${scorerName}-judge-model`),
+            name:
+              judgeModelName ||
+              transformNameToValid(`${scorerName}-judge-model`),
             default_params: {
               max_tokens: maxTokens,
             },
@@ -565,7 +573,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               <Typography
                 className="mt-1 text-sm text-gold-600"
                 sx={{
-                  ...typographyStyle
+                  ...typographyStyle,
                 }}>
                 The name of your scorer is{' '}
                 <span className="font-semibold">{transformedScorerName}</span>
@@ -629,16 +637,19 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                       {judgeModelNameError}
                     </Typography>
                   )}
-                {judgeModelName && transformedJudgeModelName !== judgeModelName && (
-                  <Typography
-                    className="mt-1 text-sm text-gold-600"
-                    sx={{
-                      ...typographyStyle
-                    }}>
-                    The name of your judge model configuration is{' '}
-                    <span className="font-semibold">{transformedJudgeModelName}</span>
-                  </Typography>
-                )}
+                {judgeModelName &&
+                  transformedJudgeModelName !== judgeModelName && (
+                    <Typography
+                      className="mt-1 text-sm text-gold-600"
+                      sx={{
+                        ...typographyStyle,
+                      }}>
+                      The name of your judge model configuration is{' '}
+                      <span className="font-semibold">
+                        {transformedJudgeModelName}
+                      </span>
+                    </Typography>
+                  )}
               </Box>
               <Box>
                 <FieldName name="Judge Model System Prompt" />
