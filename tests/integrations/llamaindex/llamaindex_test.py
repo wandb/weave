@@ -113,7 +113,7 @@ async def test_llamaindex_llm_complete_async(client: WeaveClient) -> None:
     assert call_0.parent_id is None
     assert call_0.inputs["model"] == "gpt-4o-mini"
     assert call_0.inputs["temperature"] == 0.1
-    assert call_0.inputs["_self"] == "William Shakespeare is "
+    assert call_0.inputs["self"] == "William Shakespeare is "
     assert len(call_0.output["text"]) > 0
     assert call_0.output["additional_kwargs"]["prompt_tokens"] == 11
     assert call_0.output["additional_kwargs"]["completion_tokens"] == 211
@@ -185,7 +185,7 @@ def test_llamaindex_llm_stream_complete_sync(client: WeaveClient) -> None:
     assert call_0.parent_id is None
     assert call_0.inputs["model"] == "gpt-4o-mini"
     assert call_0.inputs["temperature"] == 0.1
-    assert call_0.inputs["_self"] == "William Shakespeare is "
+    assert call_0.inputs["self"] == "William Shakespeare is "
     assert "result" in call_0.output
     assert call_0.output["result"].startswith("<generator object")
 
@@ -263,7 +263,7 @@ async def test_llamaindex_llm_stream_complete_async(client: WeaveClient) -> None
     assert flattened_calls_to_names(flattened_calls) == exp
 
     call_0, _ = flattened_calls[0]
-    assert call_0.inputs["_self"] == "William Shakespeare is "
+    assert call_0.inputs["self"] == "William Shakespeare is "
     assert call_0.inputs["model"] == "gpt-4o-mini"
     assert call_0.inputs["temperature"] == 0.1
     assert call_0.inputs["api_key"] == "REDACTED"
@@ -831,3 +831,103 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
     print(len(flattened_calls))
 
     assert len(flattened_calls) == 6
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+@pytest.mark.asyncio
+async def test_llamaindex_quick_start(client: WeaveClient) -> None:
+    from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
+    from llama_index.core.agent.workflow import FunctionAgent
+    from llama_index.llms.openai import OpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
+
+    documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
+    index = VectorStoreIndex.from_documents(documents)
+    query_engine = index.as_query_engine()
+
+    def multiply(a: float, b: float) -> float:
+        """Useful for multiplying two numbers."""
+        return a * b
+
+    async def search_documents(query: str) -> str:
+        """Useful for answering natural language questions about an personal essay written by Paul Graham."""
+        response = await query_engine.aquery(query)
+        return str(response)
+
+    # Create an enhanced workflow with both tools
+    agent = FunctionAgent(
+        tools=[multiply, search_documents],
+        llm=OpenAI(model="gpt-4o-mini", api_key=api_key),
+        system_prompt="""You are a helpful assistant that can perform calculations
+        and search through documents to answer questions.""",
+    )
+
+    # Now we can ask questions about the documents or do calculations
+    response = await agent.run("What did the author do in college? Also, what's 7 * 8?")
+
+    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    flattened_calls = flatten_calls(calls)
+
+    assert len(flattened_calls) == 54
+    assert flattened_calls_to_names(flattened_calls) == [
+        ("llama_index.span.NodeParser-call", 0),
+        ("llama_index.span.MetadataAwareTextSplitter-parse_nodes", 1),
+        ("llama_index.span.SentenceSplitter.split_text_metadata_aware", 2),
+        ("llama_index.span.BaseEmbedding.get_text_embedding_batch", 0),
+        ("llama_index.event.Embedding", 1),
+        ("openai.embeddings.create", 2),
+        ("llama_index.span.Workflow.run", 0),
+        ("llama_index.span.AgentWorkflow.init_run", 1),
+        ("llama_index.span.AgentWorkflow.setup_agent", 1),
+        ("llama_index.span.AgentWorkflow.run_agent_step", 1),
+        ("llama_index.span.OpenAI-prepare_chat_with_tools", 2),
+        ("llama_index.span.OpenAI.astream_chat", 2),
+        ("llama_index.event.LLMChat", 3),
+        ("llama_index.event.LLMChatInProgress", 4),
+        ("openai.chat.completions.create", 5),
+        ("llama_index.span.AgentWorkflow.parse_agent_output", 1),
+        ("llama_index.span.AgentWorkflow.call_tool", 1),
+        ("llama_index.span.FunctionTool.acall", 2),
+        ("llama_index.span.BaseQueryEngine.aquery", 3),
+        ("llama_index.event.Query", 4),
+        ("llama_index.span.RetrieverQueryEngine-aquery", 4),
+        ("llama_index.span.BaseRetriever.aretrieve", 5),
+        ("llama_index.event.Retrieval", 6),
+        ("llama_index.span.VectorIndexRetriever-aretrieve", 6),
+        ("llama_index.span.BaseEmbedding.aget_query_embedding", 7),
+        ("llama_index.event.Embedding", 8),
+        ("llama_index.span.OpenAIEmbedding-aget_query_embedding", 8),
+        ("openai.embeddings.create", 9),
+        ("llama_index.span.BaseSynthesizer.asynthesize", 5),
+        ("llama_index.event.Synthesize", 6),
+        ("llama_index.span.CompactAndRefine.aget_response", 6),
+        ("llama_index.span.TokenTextSplitter.split_text", 7),
+        ("llama_index.span.Refine.aget_response", 7),
+        ("llama_index.event.GetResponse", 8),
+        ("llama_index.span.TokenTextSplitter.split_text", 8),
+        ("llama_index.span.LLM.apredict", 8),
+        ("llama_index.event.LLMPredict", 9),
+        ("llama_index.span.OpenAI.achat", 9),
+        ("llama_index.event.LLMChat", 10),
+        ("openai.chat.completions.create", 11),
+        ("llama_index.span.AgentWorkflow.call_tool", 1),
+        ("llama_index.span.FunctionTool.acall", 2),
+        ("llama_index.span.AgentWorkflow.aggregate_tool_results", 1),
+        ("llama_index.span.AgentWorkflow.aggregate_tool_results", 1),
+        ("llama_index.span.AgentWorkflow.setup_agent", 1),
+        ("llama_index.span.AgentWorkflow.run_agent_step", 1),
+        ("llama_index.span.OpenAI-prepare_chat_with_tools", 2),
+        ("llama_index.span.OpenAI.astream_chat", 2),
+        ("llama_index.event.LLMChat", 3),
+        ("llama_index.event.LLMChatInProgress", 4),
+        ("openai.chat.completions.create", 5),
+        ("llama_index.span.AgentWorkflow.parse_agent_output", 1),
+        ("llama_index.span.Workflow-done", 1),
+        ("llama_index.event.SpanDrop", 2),
+    ]
