@@ -56,12 +56,7 @@ export const ChatView = ({chat}: ChatViewProps) => {
     if (hasNewMessage) {
       prevMessageCountRef.current = currentMessageCount;
 
-      if (
-        outputRef.current &&
-        chatResult &&
-        'choices' in chatResult &&
-        chatResult.choices
-      ) {
+      if (outputRef.current) {
         outputRef.current.scrollIntoView();
       }
     }
