@@ -91,6 +91,10 @@ def _process_inputs(raw_inputs: dict[str, Any]) -> dict[str, Any]:
         except (TypeError, OverflowError):
             processed[k] = str(v)
 
+        if k == "_self":
+            processed["self"] = v
+            processed.pop(k)
+
     return processed
 
 
