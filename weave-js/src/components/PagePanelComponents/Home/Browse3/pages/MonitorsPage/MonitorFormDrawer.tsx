@@ -33,7 +33,7 @@ import {
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
+import {Root as SwitchRoot, Thumb as SwitchThumb} from '@wandb/weave/components/Switch';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
@@ -150,7 +150,7 @@ export const MonitorFormDrawer = ({
     existingScorers?.map(s => true) || [false]
   );
 
-  const [active, setActive] = useState<boolean>(false);
+  const [active, setActive] = useState<boolean>(true);
 
   useEffect(() => {
     if (!monitor) {
@@ -423,15 +423,17 @@ export const MonitorFormDrawer = ({
                       onChange={e => setDescription(e.target.value)}
                     />
                   </Box>
-                  <Box>
-                    <FieldName name="Active" />
-                    <ToggleButtonGroup
-                      value={active ? 'active' : 'inactive'}
-                      options={[{value: 'active'}, {value: 'inactive'}]}
-                      onValueChange={value => setActive(value === 'active')}
-                      size="medium"
-                    />
-                  </Box>
+                  {monitor && (
+                    <Box className="flex items-center gap-8">
+                      <SwitchRoot
+                        size="small"
+                        checked={active}
+                        onCheckedChange={setActive}>
+                        <SwitchThumb size="small" checked={active} />
+                      </SwitchRoot>
+                      <p className="font-semibold">Active monitor</p>
+                    </Box>
+                  )}
                 </Box>
 
                 <Box className="flex flex-col gap-8 pt-16">
