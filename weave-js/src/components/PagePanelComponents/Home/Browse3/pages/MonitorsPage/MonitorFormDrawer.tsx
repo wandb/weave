@@ -228,21 +228,6 @@ export const MonitorFormDrawer = ({
     });
   }, [scorers, scorerValids]);
 
-  const enableCreateButton = useMemo(() => {
-    return (
-      monitorName.length > 0 &&
-      selectedOpVersionOption.length > 0 &&
-      scorers.length > 0 &&
-      nameError === null &&
-      allScorersValid
-    );
-  }, [
-    monitorName,
-    selectedOpVersionOption,
-    scorers,
-    nameError,
-    allScorersValid,
-  ]);
 
   const scorerForms: ScorerFormType[] = useMemo(
     () =>
@@ -262,10 +247,6 @@ export const MonitorFormDrawer = ({
   const objCreate = useObjCreate();
 
   const createMonitor = useCallback(async () => {
-    if (!enableCreateButton) {
-      return;
-    }
-
     setIsCreating(true);
 
     try {
@@ -330,7 +311,6 @@ export const MonitorFormDrawer = ({
     monitor,
     onClose,
     active,
-    enableCreateButton,
     entity,
     objCreate,
     project,
@@ -565,14 +545,6 @@ export const MonitorFormDrawer = ({
           </Box>
           <Box className="flex gap-8 border-t border-moon-250 p-20 py-16">
             <Button
-              variant="secondary"
-              onClick={onClose}
-              twWrapperStyles={{flexGrow: 1}}
-              className="w-full">
-              Cancel
-            </Button>
-            <Button
-              disabled={!enableCreateButton}
               variant="primary"
               onClick={createMonitor}
               twWrapperStyles={{flexGrow: 1}}
