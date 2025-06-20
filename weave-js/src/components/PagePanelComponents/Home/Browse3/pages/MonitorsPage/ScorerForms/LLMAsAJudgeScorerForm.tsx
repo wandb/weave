@@ -550,10 +550,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             <TextField
               value={scorerName}
               onChange={onScorerNameChange}
-              errorState={
-                (touchedFields.scorerName || validationErrors?.scorerName) &&
-                !!nameError
-              }
             />
             {(touchedFields.scorerName || validationErrors?.scorerName) &&
               nameError && (
@@ -611,11 +607,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                 <TextField
                   value={judgeModelName}
                   onChange={onJudgeModelNameChange}
-                  errorState={
-                    (touchedFields.judgeModelName ||
-                      validationErrors?.judgeModelName) &&
-                    !!judgeModelNameError
-                  }
                 />
                 {(touchedFields.judgeModelName ||
                   validationErrors?.judgeModelName) &&
@@ -635,11 +626,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                 <TextArea
                   value={systemPrompt}
                   onChange={e => onSystemPromptChange(e.target.value)}
-                  errorState={
-                    (touchedFields.systemPrompt ||
-                      validationErrors?.systemPrompt) &&
-                    !!systemPromptError
-                  }
                 />
                 {(touchedFields.systemPrompt ||
                   validationErrors?.systemPrompt) &&
@@ -682,11 +668,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             <TextArea
               value={scoringPrompt}
               placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
-              errorState={
-                (touchedFields.scoringPrompt ||
-                  validationErrors?.scoringPrompt) &&
-                !!scoringPromptError
-              }
               onChange={e => {
                 setScoringPrompt(e.target.value);
                 setTouchedFields(prev => ({...prev, scoringPrompt: true}));
