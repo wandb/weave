@@ -549,10 +549,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         <Box className="flex flex-col gap-16 px-20">
           <Box>
             <FieldName name="Scorer Name" />
-            <TextField
-              value={scorerName}
-              onChange={onScorerNameChange}
-            />
+            <TextField value={scorerName} onChange={onScorerNameChange} />
             {(touchedFields.scorerName || validationErrors?.scorerName) &&
               nameError && (
                 <Typography
