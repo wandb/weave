@@ -170,7 +170,7 @@ export const MonitorFormDrawer = ({
 
   const [active, setActive] = useState<boolean>(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  
+
   // Reset submission state when drawer closes
   useEffect(() => {
     if (!open) {
@@ -283,16 +283,19 @@ export const MonitorFormDrawer = ({
   const createMonitor = useCallback(async () => {
     console.log('=== CREATE MONITOR DEBUG ===');
     console.log('scorerValids:', scorerValids);
-    console.log('scorers:', scorers.map((s, i) => ({
-      index: i,
-      type: s.val['_type'],
-      objectId: s.objectId,
-      hasForm: SCORER_FORMS.get(s.val['_type']) !== null
-    })));
-    
+    console.log(
+      'scorers:',
+      scorers.map((s, i) => ({
+        index: i,
+        type: s.val['_type'],
+        objectId: s.objectId,
+        hasForm: SCORER_FORMS.get(s.val['_type']) !== null,
+      }))
+    );
+
     // Mark that we've submitted
     setHasSubmitted(true);
-    
+
     // Clear previous errors
     setError(null);
     setNameError(null);
@@ -336,16 +339,16 @@ export const MonitorFormDrawer = ({
       scorers.forEach((scorer, index) => {
         const hasForm = SCORER_FORMS.get(scorer.val['_type']) !== null;
         const isValid = scorerValids[index];
-        
+
         console.log(`Scorer ${index} validation:`, {
           type: scorer.val['_type'],
           hasForm,
           isValid,
           objectId: scorer.objectId,
           scoring_prompt: scorer.val['scoring_prompt'],
-          model: scorer.val['model']
+          model: scorer.val['model'],
         });
-        
+
         const errors: {
           scorerName?: string;
           scoringPrompt?: string;
@@ -358,7 +361,7 @@ export const MonitorFormDrawer = ({
           // The scorer form handles its own validation
           // We just mark that there are validation errors
           hasValidationErrors = true;
-          
+
           // Set a flag to indicate validation errors exist
           errors.scorerName = 'validation_error';
         }
@@ -375,11 +378,11 @@ export const MonitorFormDrawer = ({
         const hasForm = SCORER_FORMS.get(scorer.val['_type']) !== null;
         return hasForm && !scorerValids[index];
       });
-      
+
       if (invalidScorers.length > 0) {
         setError('There was a problem with the scorer configuration.');
       }
-      
+
       toast('Please check your configuration and fix the validation errors.', {
         type: 'error',
         autoClose: 4000,
@@ -431,20 +434,20 @@ export const MonitorFormDrawer = ({
 
       setIsCreating(false);
 
-      toast(
-        `Monitor ${monitorName} ${monitor ? 'updated' : 'created'}`,
-        {
-          type: 'success',
-          autoClose: 2500,
-        }
-      );
+      toast(`Monitor ${monitorName} ${monitor ? 'updated' : 'created'}`, {
+        type: 'success',
+        autoClose: 2500,
+      });
       onClose();
     } catch (objCreateError) {
       setError('Failed to create monitor.');
-      toast('Error creating monitor. Please check your configuration and try again.', {
-        type: 'error',
-        autoClose: 5000,
-      });
+      toast(
+        'Error creating monitor. Please check your configuration and try again.',
+        {
+          type: 'error',
+          autoClose: 5000,
+        }
+      );
       setIsCreating(false);
     }
   }, [
@@ -506,11 +509,7 @@ export const MonitorFormDrawer = ({
             ) : (
               <Box className="flex flex-grow flex-col gap-16">
                 <Box className="flex flex-col gap-16 px-20">
-                  {error && (
-                    <Alert severity="error">
-                      {error}
-                    </Alert>
-                  )}
+                  {error && <Alert severity="error">{error}</Alert>}
                   <Box>
                     <FieldName name="Name" />
                     <TextField
@@ -578,7 +577,23 @@ export const MonitorFormDrawer = ({
                           setFilter({...f, traceRootsOnly: false})
                         }
                         frozenFilter={undefined}
-                        sx={{width: '100%', height: undefined}}
+                        sx={{
+                          width: '100%',
+                          height: undefined,
+                          '& .MuiOutlinedInput-root': operationError
+                            ? {
+                                '& fieldset': {
+                                  borderColor: 'error.main',
+                                },
+                                '&:hover fieldset': {
+                                  borderColor: 'error.main',
+                                },
+                                '&.Mui-focused fieldset': {
+                                  borderColor: 'error.main',
+                                },
+                              }
+                            : {},
+                        }}
                       />
                       {operationError && (
                         <Typography
@@ -695,7 +710,9 @@ export const MonitorFormDrawer = ({
                           clearScorerValidationError(index);
                         }
                       }}
-                      validationErrors={hasSubmitted ? scorerValidationErrors[index] : undefined}
+                      validationErrors={
+                        hasSubmitted ? scorerValidationErrors[index] : undefined
+                      }
                       ref={(el: ScorerFormRef) =>
                         (scorerFormRefs.current[index] = el)
                       }
