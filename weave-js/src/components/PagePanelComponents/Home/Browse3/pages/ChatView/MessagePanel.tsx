@@ -185,7 +185,11 @@ export const MessagePanel = ({
                         />
                       ) : (
                         message.content!.map((p, i) => (
-                          <MessagePanelPart key={i} value={p} role={message.role} />
+                          <MessagePanelPart
+                            key={i}
+                            value={p}
+                            role={message.role}
+                          />
                         ))
                       )}
                     </div>

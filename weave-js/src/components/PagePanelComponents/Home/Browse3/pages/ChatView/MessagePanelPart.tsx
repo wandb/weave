@@ -57,7 +57,7 @@ type CursorAnimatedProps = {
   show: boolean;
 };
 
-const CursorAnimated = ({ show }: CursorAnimatedProps) => {
+const CursorAnimated = ({show}: CursorAnimatedProps) => {
   if (!show) return null;
   return (
     <span className="cursor-blink -mb-[2px] ml-[4px] inline-block h-[12px] w-[12px] rounded-full bg-gold-500" />
@@ -109,7 +109,7 @@ type TextPartProps = {
   isLastPart: boolean;
 };
 
-const TextPart = ({ content, showCursor, isLastPart }: TextPartProps) => {
+const TextPart = ({content, showCursor, isLastPart}: TextPartProps) => {
   return (
     <span className="whitespace-break-spaces">
       {!showCursor && isLastPart ? content.trim() : content}
@@ -128,6 +128,18 @@ export const MessagePanelPart = ({
     [key: number]: boolean;
   }>({});
 
+  // Only parse thinking blocks for assistant messages, not user messages
+  const shouldParseThinking = role !== 'user' && typeof value === 'string';
+  const parts = useMemo(
+    () =>
+      shouldParseThinking
+        ? parseThinkingBlocks(value as string)
+        : typeof value === 'string'
+        ? [{type: 'text' as const, content: value}]
+        : [],
+    [shouldParseThinking, value]
+  );
+
   if (typeof value === 'string') {
     if (isStructuredOutput) {
       const reformat = JSON.stringify(JSON.parse(value), null, 2);
@@ -138,12 +150,6 @@ export const MessagePanelPart = ({
     // if (isLikelyMarkdown(value)) {
     //   return <Markdown content={value} />;
     // }
-
-    // Only parse thinking blocks for assistant messages, not user messages
-    const shouldParseThinking = role !== 'user';
-    const parts = useMemo(() => shouldParseThinking 
-      ? parseThinkingBlocks(value)
-      : [{type: 'text' as const, content: value}], [shouldParseThinking, value]);
     const lastPartIndex = parts.length - 1;
 
     return (
@@ -172,7 +178,7 @@ export const MessagePanelPart = ({
                   isExpanded={isExpanded}
                   showCursor={showCursor}
                   isLastPart={isLastPart}
-                  onToggleExpanded={(idx) =>
+                  onToggleExpanded={idx =>
                     setExpandedThinking(prev => ({
                       ...prev,
                       [idx]: !isExpanded,
