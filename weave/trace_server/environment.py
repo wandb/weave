@@ -200,7 +200,7 @@ def wf_file_storage_project_ramp_pct() -> Optional[int]:
 # Inference Service Settings
 
 
-def inference_service_base_url() -> Optional[str]:
+def inference_service_base_url() -> str:
     """The base URL for the inference service."""
     return os.environ.get(
         "INFERENCE_SERVICE_BASE_URL", "https://api.inference.wandb.ai/v1"
