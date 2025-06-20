@@ -168,6 +168,23 @@ export const MonitorFormDrawer = ({
   );
 
   const [active, setActive] = useState<boolean>(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  
+  // Reset submission state when drawer closes
+  useEffect(() => {
+    if (!open) {
+      setHasSubmitted(false);
+    }
+  }, [open]);
+
+  // Callback to clear validation errors for a specific scorer
+  const clearScorerValidationError = useCallback((index: number) => {
+    setScorerValidationErrors(prev => {
+      const newErrors = [...prev];
+      newErrors[index] = {};
+      return newErrors;
+    });
+  }, []);
 
   useEffect(() => {
     if (!monitor) {
@@ -231,7 +248,7 @@ export const MonitorFormDrawer = ({
 
   const opVersionOptions = useOpVersionOptions(entity, project, {}, false);
 
-  useMemo(() => {
+  useEffect(() => {
     setSelectedOpVersionOption(filter.opVersionRefs ?? []);
   }, [filter]);
 
@@ -263,6 +280,18 @@ export const MonitorFormDrawer = ({
   const objCreate = useObjCreate();
 
   const createMonitor = useCallback(async () => {
+    console.log('=== CREATE MONITOR DEBUG ===');
+    console.log('scorerValids:', scorerValids);
+    console.log('scorers:', scorers.map((s, i) => ({
+      index: i,
+      type: s.val['_type'],
+      objectId: s.objectId,
+      hasForm: SCORER_FORMS.get(s.val['_type']) !== null
+    })));
+    
+    // Mark that we've submitted
+    setHasSubmitted(true);
+    
     // Clear previous errors
     setError(null);
     setNameError(null);
@@ -299,12 +328,23 @@ export const MonitorFormDrawer = ({
     }> = [];
 
     if (scorers.length === 0) {
-      setError('At least one scorer is required');
+      setError('At least one scorer is required.');
       hasValidationErrors = true;
     } else {
       // Check each scorer's validation state and create specific field errors
       scorers.forEach((scorer, index) => {
         const hasForm = SCORER_FORMS.get(scorer.val['_type']) !== null;
+        const isValid = scorerValids[index];
+        
+        console.log(`Scorer ${index} validation:`, {
+          type: scorer.val['_type'],
+          hasForm,
+          isValid,
+          objectId: scorer.objectId,
+          scoring_prompt: scorer.val['scoring_prompt'],
+          model: scorer.val['model']
+        });
+        
         const errors: {
           scorerName?: string;
           scoringPrompt?: string;
@@ -313,30 +353,13 @@ export const MonitorFormDrawer = ({
           systemPrompt?: string;
         } = {};
 
-        if (hasForm && !scorerValids[index]) {
-          // For LLMAsAJudgeScorer, validate specific fields
-          if (scorer.val['_type'] === 'LLMAsAJudgeScorer') {
-            if (!scorer.objectId && !scorer.val['name']) {
-              errors.scorerName = 'Scorer name is required';
-            }
-            if (!scorer.val['scoring_prompt']) {
-              errors.scoringPrompt = 'Scoring prompt is required';
-            }
-            if (!scorer.val['model']) {
-              errors.judgeModel = 'Judge model is required';
-              // If no model is set, also show that model name would be required
-              errors.judgeModelName =
-                'Judge model configuration name is required';
-              errors.systemPrompt = 'Judge model system prompt is required';
-            } else {
-              // If model exists but scorer is still invalid, likely due to missing configuration
-              // This handles the case where a model is selected but not properly configured
-              errors.judgeModelName =
-                'Judge model configuration name is required';
-              errors.systemPrompt = 'Judge model system prompt is required';
-            }
-          }
+        if (hasForm && !isValid) {
+          // The scorer form handles its own validation
+          // We just mark that there are validation errors
           hasValidationErrors = true;
+          
+          // Set a flag to indicate validation errors exist
+          errors.scorerName = 'validation_error';
         }
 
         newScorerValidationErrors[index] = errors;
@@ -346,6 +369,15 @@ export const MonitorFormDrawer = ({
 
     // If there are validation errors, don't proceed
     if (hasValidationErrors) {
+      // Check if there are scorer validation errors and set a helpful message
+      const invalidScorers = scorers.filter((scorer, index) => {
+        const hasForm = SCORER_FORMS.get(scorer.val['_type']) !== null;
+        return hasForm && !scorerValids[index];
+      });
+      
+      if (invalidScorers.length > 0) {
+        setError('There was a problem with the scorer configuration.');
+      }
       return;
     }
 
@@ -357,7 +389,7 @@ export const MonitorFormDrawer = ({
       );
 
       if (scorerRefs.some(ref => !ref)) {
-        setError('Failed to create scorer');
+        setError('Failed to create scorer.');
         setIsCreating(false);
         return;
       }
@@ -401,7 +433,7 @@ export const MonitorFormDrawer = ({
       );
       onClose();
     } catch (objCreateError) {
-      setError('Failed to create monitor');
+      setError('Failed to create monitor.');
       setIsCreating(false);
     }
   }, [
@@ -647,10 +679,14 @@ export const MonitorFormDrawer = ({
                   <Box key={index}>
                     <Form
                       scorer={scorers[index]}
-                      onValidationChange={(isValid: boolean) =>
-                        updateScorerValidAt(index, isValid)
-                      }
-                      validationErrors={scorerValidationErrors[index]}
+                      onValidationChange={(isValid: boolean) => {
+                        updateScorerValidAt(index, isValid);
+                        // Clear validation errors when the form becomes valid
+                        if (isValid) {
+                          clearScorerValidationError(index);
+                        }
+                      }}
+                      validationErrors={hasSubmitted ? scorerValidationErrors[index] : undefined}
                       ref={(el: ScorerFormRef) =>
                         (scorerFormRefs.current[index] = el)
                       }

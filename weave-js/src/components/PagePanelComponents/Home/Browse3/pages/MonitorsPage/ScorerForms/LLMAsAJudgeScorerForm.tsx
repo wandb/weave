@@ -34,9 +34,44 @@ import {ScorerFormProps, ScorerFormRef} from '../MonitorFormDrawer';
 
 export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
   ({scorer, onValidationChange, validationErrors}, ref) => {
+    console.log('LLMAsAJudgeScorerForm rendered with:', {
+      scorer,
+      validationErrors
+    });
+    
+    // Track which fields have been touched
+    const [touchedFields, setTouchedFields] = useState<{
+      scorerName?: boolean;
+      scoringPrompt?: boolean;
+      judgeModel?: boolean;
+      judgeModelName?: boolean;
+      systemPrompt?: boolean;
+    }>({});
+    
+    // When validationErrors are provided, it means the form was submitted
+    // So we should show all validation errors
+    useEffect(() => {
+      if (validationErrors && validationErrors.scorerName) {
+        setTouchedFields({
+          scorerName: true,
+          scoringPrompt: true,
+          judgeModel: true,
+          judgeModelName: true,
+          systemPrompt: true
+        });
+        
+        // Trigger validation for all fields
+        if (!scorerName) setNameError('Scorer name is required');
+        if (!scoringPrompt) setScoringPromptError('Scoring prompt is required');
+        if (!judgeModel) setJudgeModelError('Judge model is required');
+        if (!judgeModelName) setJudgeModelNameError('Judge model configuration name is required');
+        if (!systemPrompt) setSystemPromptError('System prompt is required');
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [validationErrors]);
     //const [isValid, setIsValid] = useState(false);
     const [scorerName, setScorerName] = useState<string | undefined>(
-      scorer.objectId
+      scorer.objectId || ''
     );
 
     const [nameError, setNameError] = useState<string | null>(null);
@@ -56,8 +91,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const [judgeModelError, setJudgeModelError] = useState<string | null>(null);
 
     const [judgeModelName, setJudgeModelName] = useState<string | undefined>();
+    const [judgeModelNameError, setJudgeModelNameError] = useState<
+      string | null
+    >(null);
 
     const [systemPrompt, setSystemPrompt] = useState<string | undefined>();
+    const [systemPromptError, setSystemPromptError] = useState<string | null>(
+      null
+    );
 
     const [responseFormat, setResponseFormat] = useState<
       ResponseFormat | undefined
@@ -90,6 +131,25 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       [savedModelRes, entity, project]
     );
 
+    // Properly validate on mount and when dependencies change
+    useEffect(() => {
+      console.log('LLMAsAJudgeScorerForm validation check:', {
+        scorerName,
+        scoringPrompt,
+        judgeModel,
+        judgeModelName,
+        systemPrompt,
+        responseFormat
+      });
+      
+      // Call validation with current state
+      const isValid = !!scorerName && !!scoringPrompt && !!judgeModel && 
+                      !!judgeModelName && !!systemPrompt && !!responseFormat;
+      console.log('Validation result:', isValid);
+      onValidationChange(isValid);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scorerName, scoringPrompt, judgeModel, judgeModelName, systemPrompt, responseFormat]);
+    
     useEffect(() => {
       if (!savedModels || !scorer.val['model']) {
         return;
@@ -101,7 +161,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       );
       if (currentModel) {
         setJudgeModel(currentModel);
-        onValidationChange(true);
         if (currentModel.default_params) {
           const systemPrompt = getSystemPrompt(currentModel.default_params);
           setSystemPrompt(systemPrompt);
@@ -122,29 +181,45 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     }, [judgeModel]);
 
     const validateJudgeModel = useCallback(() => {
+      let isValid = true;
+
       if (!judgeModel) {
-        setJudgeModelError('A judge model is required.');
-        return false;
+        setJudgeModelError('Judge model is required');
+        isValid = false;
       } else {
-        if (!judgeModelName) {
-          setJudgeModelError('A judge model name is required.');
-          return false;
-        }
-        // Allow empty system prompts?
-        /*if (
-          !judgeModel.default_params ||
-          !getSystemPrompt(judgeModel.default_params)
-        ) {
-          setJudgeModelError('A judge model system prompt is required');
-          return false;
-        }*/
-        if (!responseFormat) {
-          setJudgeModelError('A judge model response format is required.');
-          return false;
-        }
+        setJudgeModelError(null);
       }
-      return true;
-    }, [judgeModel, judgeModelName, responseFormat]);
+
+      if (!judgeModelName) {
+        setJudgeModelNameError('Judge model configuration name is required');
+        isValid = false;
+      } else {
+        setJudgeModelNameError(null);
+      }
+
+      if (!systemPrompt) {
+        setSystemPromptError('Judge model system prompt is required');
+        isValid = false;
+      } else {
+        setSystemPromptError(null);
+      }
+
+      if (!responseFormat) {
+        // This error shows on the judge model field since response format is part of the model config
+        if (judgeModel && !judgeModelError) {
+          setJudgeModelError('Judge model response format is required');
+        }
+        isValid = false;
+      }
+
+      return isValid;
+    }, [
+      judgeModel,
+      judgeModelName,
+      responseFormat,
+      systemPrompt,
+      judgeModelError,
+    ]);
 
     const validateScorer = useCallback(() => {
       if (!scorerName) {
@@ -156,11 +231,13 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           setNameError(validationResult.error);
           return false;
         }
+        setNameError(null); // Clear error when name is valid
       }
       if (!scoringPrompt) {
         setScoringPromptError('A scoring prompt is required.');
         return false;
       }
+      setScoringPromptError(null); // Clear error when prompt is valid
       if (!validateJudgeModel()) {
         return false;
       }
@@ -285,19 +362,44 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const onScorerNameChange = useCallback(
       (value: string) => {
         setScorerName(value);
+        setTouchedFields(prev => ({ ...prev, scorerName: true }));
         setNameError(null);
         const validationResult = validateDatasetName(value);
         if (validationResult.error) {
           setNameError(validationResult.error);
+        } else if (!value) {
+          setNameError('Scorer name is required');
         }
-        onValidationChange(
-          !validationResult.error && validateJudgeModel() && !!scoringPrompt
-        );
+        const isValid =
+          !validationResult.error &&
+          !!value &&
+          !!scoringPrompt &&
+          !!judgeModel &&
+          !!judgeModelName &&
+          !!responseFormat &&
+          !!systemPrompt;
+        console.log('onScorerNameChange validation:', {
+          value,
+          scoringPrompt: !!scoringPrompt,
+          judgeModel: !!judgeModel,
+          judgeModelName: !!judgeModelName,
+          responseFormat: !!responseFormat,
+          systemPrompt: !!systemPrompt,
+          isValid
+        });
+        onValidationChange(isValid);
       },
-      [scoringPrompt, validateJudgeModel, onValidationChange]
+      [
+        scoringPrompt,
+        judgeModel,
+        judgeModelName,
+        responseFormat,
+        systemPrompt,
+        onValidationChange,
+      ]
     );
 
-    useMemo(() => {
+    useEffect(() => {
       setJudgeModelName(judgeModel?.name || undefined);
       setSystemPrompt(
         judgeModel?.default_params && getSystemPrompt(judgeModel.default_params)
@@ -306,6 +408,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         judgeModel?.default_params?.response_format || 'json_object'
       );
     }, [judgeModel]);
+
 
     const onJudgeModelChange = useCallback(
       (newValue, maxTokens, savedModel) => {
@@ -329,8 +432,26 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           };
         }
         setJudgeModel(newJudgeModel);
+        setTouchedFields(prev => ({ ...prev, judgeModel: true }));
         setJudgeModelError(null);
-        onValidationChange(!!scorerName && !!scoringPrompt);
+        // Validate all fields when judge model changes
+        const isValid =
+          !!scorerName &&
+          !!scoringPrompt &&
+          !!newJudgeModel &&
+          !!judgeModelName &&
+          !!responseFormat &&
+          !!systemPrompt;
+        console.log('onJudgeModelChange validation:', {
+          scorerName: !!scorerName,
+          scoringPrompt: !!scoringPrompt,
+          newJudgeModel: !!newJudgeModel,
+          judgeModelName: !!judgeModelName,
+          responseFormat: !!responseFormat,
+          systemPrompt: !!systemPrompt,
+          isValid
+        });
+        onValidationChange(isValid);
       },
       [
         judgeModelName,
@@ -339,33 +460,38 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         scorerName,
         setJudgeModel,
         onValidationChange,
+        responseFormat,
+        systemPrompt,
       ]
     );
 
     const onJudgeModelNameChange = useCallback(
       value => {
         setJudgeModelName(value);
-        setJudgeModelError(null);
+        setTouchedFields(prev => ({ ...prev, judgeModelName: true }));
+        setJudgeModelNameError(null);
         const validationResult = validateDatasetName(value);
         if (validationResult.error) {
-          setJudgeModelError(validationResult.error);
+          setJudgeModelNameError(validationResult.error);
+        } else if (!value) {
+          setJudgeModelNameError('Judge model configuration name is required');
         }
         onValidationChange(
           !validationResult.error &&
             !!value &&
-            !!systemPrompt &&
             !!responseFormat &&
             !!scorerName &&
-            !!scoringPrompt
+            !!scoringPrompt &&
+            !!judgeModel &&
+            !!systemPrompt
         );
       },
       [
-        systemPrompt,
         responseFormat,
         scorerName,
         scoringPrompt,
-        setJudgeModelName,
-        setJudgeModelError,
+        judgeModel,
+        systemPrompt,
         onValidationChange,
       ]
     );
@@ -373,12 +499,19 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const onSystemPromptChange = useCallback(
       value => {
         setSystemPrompt(value);
+        setTouchedFields(prev => ({ ...prev, systemPrompt: true }));
+        setSystemPromptError(null);
+        if (!value) {
+          setSystemPromptError('System prompt is required');
+        }
+        // System prompt is now required
         onValidationChange(
           !!value &&
             !!judgeModelName &&
             !!scorerName &&
             !!scoringPrompt &&
-            !!responseFormat
+            !!responseFormat &&
+            !!judgeModel
         );
       },
       [
@@ -386,6 +519,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         scorerName,
         scoringPrompt,
         responseFormat,
+        judgeModel,
         onValidationChange,
       ]
     );
@@ -402,14 +536,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           <Box>
             <FieldName name="Scorer Name" />
             <TextField value={scorerName} onChange={onScorerNameChange} />
-            {(nameError || validationErrors?.scorerName) && (
+            {(touchedFields.scorerName || validationErrors?.scorerName) && nameError && (
               <Typography
                 className="mt-1 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
                 }}>
-                {nameError || validationErrors?.scorerName}
+                {nameError}
               </Typography>
             )}
             <Typography
@@ -432,14 +566,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               direction={{horizontal: 'left', vertical: 'up'}}
               onChange={onJudgeModelChange}
             />
-            {(judgeModelError || validationErrors?.judgeModel) && (
+            {(touchedFields.judgeModel || validationErrors?.judgeModel) && judgeModelError && (
               <Typography
                 className="mt-1 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
                 }}>
-                {judgeModelError || validationErrors?.judgeModel}
+                {judgeModelError}
               </Typography>
             )}
           </Box>
@@ -457,14 +591,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                   value={judgeModelName}
                   onChange={onJudgeModelNameChange}
                 />
-                {(judgeModelError || validationErrors?.judgeModelName) && (
+                {(touchedFields.judgeModelName || validationErrors?.judgeModelName) && judgeModelNameError && (
                   <Typography
                     className="mt-1 text-sm"
                     sx={{
                       ...typographyStyle,
                       color: 'error.main',
                     }}>
-                    {judgeModelError || validationErrors?.judgeModelName}
+                    {judgeModelNameError}
                   </Typography>
                 )}
               </Box>
@@ -474,14 +608,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                   value={systemPrompt}
                   onChange={e => onSystemPromptChange(e.target.value)}
                 />
-                {validationErrors?.systemPrompt && (
+                {(touchedFields.systemPrompt || validationErrors?.systemPrompt) && systemPromptError && (
                   <Typography
                     className="mt-1 text-sm"
                     sx={{
                       ...typographyStyle,
                       color: 'error.main',
                     }}>
-                    {validationErrors?.systemPrompt}
+                    {systemPromptError}
                   </Typography>
                 )}
               </Box>
@@ -492,7 +626,18 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                     (responseFormat ||
                       'json_object') as PlaygroundResponseFormats
                   }
-                  setResponseFormat={setResponseFormat}
+                  setResponseFormat={value => {
+                    setResponseFormat(value);
+                    // Trigger validation when response format changes
+                    const isValid =
+                      !!scorerName &&
+                      !!scoringPrompt &&
+                      !!judgeModel &&
+                      !!judgeModelName &&
+                      !!value &&
+                      !!systemPrompt;
+                    onValidationChange(isValid);
+                  }}
                 />
               </Box>
             </Box>
@@ -504,20 +649,24 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
               onChange={e => {
                 setScoringPrompt(e.target.value);
+                setTouchedFields(prev => ({ ...prev, scoringPrompt: true }));
                 setScoringPromptError(null);
+                if (!e.target.value) {
+                  setScoringPromptError('Scoring prompt is required');
+                }
                 onValidationChange(
                   !!e.target.value && !!scorerName && validateJudgeModel()
                 );
               }}
             />
-            {(scoringPromptError || validationErrors?.scoringPrompt) && (
+            {(touchedFields.scoringPrompt || validationErrors?.scoringPrompt) && scoringPromptError && (
               <Typography
                 className="mt-1 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
                 }}>
-                {scoringPromptError || validationErrors?.scoringPrompt}
+                {scoringPromptError}
               </Typography>
             )}
             <Typography
