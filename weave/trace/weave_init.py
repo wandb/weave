@@ -65,6 +65,8 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
         )
     if not entity_name:
         raise ValueError("entity_name must be non-empty")
+    if not project_name:
+        raise ValueError("project_name must be non-empty")
 
     return entity_name, project_name
 

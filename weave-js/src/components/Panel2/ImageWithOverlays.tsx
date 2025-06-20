@@ -466,7 +466,10 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
       const isHidden = isBoundingBoxHidden(box, bboxControls, sliderControls);
 
       if (!isHidden) {
-        const color = boxColor(classId);
+        let color = boxColor(classId);
+        if (classStates?.[classId]?.color) {
+          color = classStates?.[classId]?.color;
+        }
         const name = classStates?.[classId]?.name ?? `ID: ${box.class_id}`;
         drawBox(canvas, box, name, mediaSize, color, opts);
       }

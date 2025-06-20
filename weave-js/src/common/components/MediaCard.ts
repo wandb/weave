@@ -1,3 +1,4 @@
+import {RGB} from '../util/colors';
 import {CompareOp} from '../util/ops';
 
 export interface Style {
@@ -14,6 +15,7 @@ export interface BoundingBoxSliderControl {
 
 export interface BoundingBoxClassControl {
   disabled: boolean;
+  color?: RGB;
 }
 
 export interface AllBoundingBoxControls {
