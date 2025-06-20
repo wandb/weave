@@ -32,8 +32,8 @@ import {
   useRootObjectVersions,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
-import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Root as SwitchRoot, Thumb as SwitchThumb} from '@wandb/weave/components/Switch';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
