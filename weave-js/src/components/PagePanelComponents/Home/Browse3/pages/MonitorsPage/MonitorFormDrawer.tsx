@@ -1,6 +1,8 @@
 import {Box, Drawer, Typography} from '@mui/material';
 import {GridFilterModel} from '@mui/x-data-grid-pro';
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {Alert} from '@wandb/weave/components/Alert';
 import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
@@ -36,7 +38,6 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {toast} from 'react-toastify';
 import {useList} from 'react-use';
 
 const PAGE_SIZE = 10;
@@ -378,6 +379,11 @@ export const MonitorFormDrawer = ({
       if (invalidScorers.length > 0) {
         setError('There was a problem with the scorer configuration.');
       }
+      
+      toast('Please check your configuration and fix the validation errors.', {
+        type: 'error',
+        autoClose: 4000,
+      });
       return;
     }
 
@@ -425,15 +431,20 @@ export const MonitorFormDrawer = ({
 
       setIsCreating(false);
 
-      toast.success(
+      toast(
         `Monitor ${monitorName} ${monitor ? 'updated' : 'created'}`,
         {
+          type: 'success',
           autoClose: 2500,
         }
       );
       onClose();
     } catch (objCreateError) {
       setError('Failed to create monitor.');
+      toast('Error creating monitor. Please check your configuration and try again.', {
+        type: 'error',
+        autoClose: 5000,
+      });
       setIsCreating(false);
     }
   }, [
@@ -496,11 +507,9 @@ export const MonitorFormDrawer = ({
               <Box className="flex flex-grow flex-col gap-16">
                 <Box className="flex flex-col gap-16 px-20">
                   {error && (
-                    <Box
-                      className="rounded-sm bg-red-300 text-red-600"
-                      sx={typographyStyle}>
+                    <Alert severity="error">
                       {error}
-                    </Box>
+                    </Alert>
                   )}
                   <Box>
                     <FieldName name="Name" />
