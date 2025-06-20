@@ -9,6 +9,7 @@ import {TextField} from '@wandb/weave/components/Form/TextField';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
 import {validateDatasetName} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/datasets/datasetNameValidation';
+import {transformNameToValid} from './nameTransform';
 import {FilterPanel} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/FilterPanel';
 import {prepareFlattenedCallDataForTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTable';
 import {useCallsTableColumns} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableColumns';
@@ -133,6 +134,7 @@ export const MonitorFormDrawer = ({
   >([]);
   const [description, setDescription] = useState<string>('');
   const [monitorName, setMonitorName] = useState<string>('');
+  const [transformedMonitorName, setTransformedMonitorName] = useState<string>('');
   const [samplingRate, setSamplingRate] = useState<number>(10);
   const [selectedOpVersionOption, setSelectedOpVersionOption] = useState<
     string[]
@@ -241,8 +243,14 @@ export const MonitorFormDrawer = ({
   const handleNameChange = useCallback(
     (value: string) => {
       setMonitorName(value);
-      const validationResult = validateDatasetName(value);
-      setNameError(validationResult.error);
+      const transformed = transformNameToValid(value);
+      setTransformedMonitorName(transformed);
+      // Only show error if the field is empty, not for invalid characters since we transform them
+      if (!value.trim()) {
+        setNameError('Monitor name is required');
+      } else {
+        setNameError(null);
+      }
     },
     [setNameError]
   );
@@ -413,7 +421,7 @@ export const MonitorFormDrawer = ({
 
       const monitorObj = {
         _type: 'Monitor',
-        name: monitorName,
+        name: transformedMonitorName,
         description,
         ref: null,
         _class_name: 'Monitor',
@@ -427,14 +435,14 @@ export const MonitorFormDrawer = ({
 
       await objCreate({
         projectId: `${entity}/${project}`,
-        objectId: monitorName,
+        objectId: transformedMonitorName,
         val: monitorObj,
         baseObjectClass: 'Monitor',
       });
 
       setIsCreating(false);
 
-      toast(`Monitor ${monitorName} ${monitor ? 'updated' : 'created'}`, {
+      toast(`Monitor ${transformedMonitorName} ${monitor ? 'updated' : 'created'}`, {
         type: 'success',
         autoClose: 2500,
       });
@@ -526,6 +534,16 @@ export const MonitorFormDrawer = ({
                           color: 'error.main',
                         }}>
                         {nameError}
+                      </Typography>
+                    )}
+                    {monitorName && transformedMonitorName !== monitorName && (
+                      <Typography
+                        className="mt-1 text-sm text-gold-600"
+                        sx={{
+                          ...typographyStyle
+                        }}>
+                        The name of your monitor is{' '}
+                        <span className="font-semibold">{transformedMonitorName}</span>
                       </Typography>
                     )}
                     <Typography
