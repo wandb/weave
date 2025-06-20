@@ -167,12 +167,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       return true;
     }, [transformedScorerName, scoringPrompt, validateJudgeModel]);
 
-    // Centralized validation effect to trigger when key dependencies change
-    useEffect(() => {
-      const isValid = validateScorer();
-      onValidationChange(isValid);
-    }, [validateScorer, onValidationChange]);
-
     const createLLMStructuredCompletionModel = useCreateBuiltinObjectInstance(
       'LLMStructuredCompletionModel'
     );
@@ -297,6 +291,12 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       },
       []
     );
+
+    // Effect to trigger validation when key fields change
+    useEffect(() => {
+      const isValid = validateScorer();
+      onValidationChange(isValid);
+    }, [transformedScorerName, scoringPrompt, judgeModel, transformedJudgeModelName, systemPrompt, responseFormat]);
 
     useMemo(() => {
       setJudgeModelName(judgeModel?.name || undefined);
