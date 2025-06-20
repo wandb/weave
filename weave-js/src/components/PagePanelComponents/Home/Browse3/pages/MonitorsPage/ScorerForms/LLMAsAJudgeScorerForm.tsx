@@ -285,8 +285,11 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const onScorerNameChange = useCallback(
       (value: string) => {
         setScorerName(value);
+        setNameError(null);
         const validationResult = validateDatasetName(value);
-        setNameError(validationResult.error);
+        if (validationResult.error) {
+          setNameError(validationResult.error);
+        }
         onValidationChange(
           !validationResult.error && validateJudgeModel() && !!scoringPrompt
         );
@@ -326,6 +329,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           };
         }
         setJudgeModel(newJudgeModel);
+        setJudgeModelError(null);
         onValidationChange(!!scorerName && !!scoringPrompt);
       },
       [
@@ -341,8 +345,11 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     const onJudgeModelNameChange = useCallback(
       value => {
         setJudgeModelName(value);
+        setJudgeModelError(null);
         const validationResult = validateDatasetName(value);
-        setJudgeModelError(validationResult.error);
+        if (validationResult.error) {
+          setJudgeModelError(validationResult.error);
+        }
         onValidationChange(
           !validationResult.error &&
             !!value &&
@@ -395,14 +402,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           <Box>
             <FieldName name="Scorer Name" />
             <TextField value={scorerName} onChange={onScorerNameChange} />
-            {(validationErrors?.scorerName || nameError) && (
+            {(nameError || validationErrors?.scorerName) && (
               <Typography
                 className="mt-1 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
                 }}>
-                {validationErrors?.scorerName || nameError}
+                {nameError || validationErrors?.scorerName}
               </Typography>
             )}
             <Typography
@@ -425,14 +432,14 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               direction={{horizontal: 'left', vertical: 'up'}}
               onChange={onJudgeModelChange}
             />
-            {(validationErrors?.judgeModel || judgeModelError) && (
+            {(judgeModelError || validationErrors?.judgeModel) && (
               <Typography
                 className="mt-1 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
                 }}>
-                {validationErrors?.judgeModel || judgeModelError}
+                {judgeModelError || validationErrors?.judgeModel}
               </Typography>
             )}
           </Box>
@@ -450,6 +457,16 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                   value={judgeModelName}
                   onChange={onJudgeModelNameChange}
                 />
+                {(judgeModelError || validationErrors?.judgeModelName) && (
+                  <Typography
+                    className="mt-1 text-sm"
+                    sx={{
+                      ...typographyStyle,
+                      color: 'error.main',
+                    }}>
+                    {judgeModelError || validationErrors?.judgeModelName}
+                  </Typography>
+                )}
               </Box>
               <Box>
                 <FieldName name="Judge Model System Prompt" />
@@ -457,6 +474,16 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                   value={systemPrompt}
                   onChange={e => onSystemPromptChange(e.target.value)}
                 />
+                {validationErrors?.systemPrompt && (
+                  <Typography
+                    className="mt-1 text-sm"
+                    sx={{
+                      ...typographyStyle,
+                      color: 'error.main',
+                    }}>
+                    {validationErrors?.systemPrompt}
+                  </Typography>
+                )}
               </Box>
               <Box>
                 <FieldName name="Judge Model Response Format" />
@@ -477,19 +504,20 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
               onChange={e => {
                 setScoringPrompt(e.target.value);
+                setScoringPromptError(null);
                 onValidationChange(
                   !!e.target.value && !!scorerName && validateJudgeModel()
                 );
               }}
             />
-            {(validationErrors?.scoringPrompt || scoringPromptError) && (
+            {(scoringPromptError || validationErrors?.scoringPrompt) && (
               <Typography
                 className="mt-1 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
                 }}>
-                {validationErrors?.scoringPrompt || scoringPromptError}
+                {scoringPromptError || validationErrors?.scoringPrompt}
               </Typography>
             )}
             <Typography

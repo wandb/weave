@@ -49,6 +49,8 @@ export interface ScorerFormProps {
     scorerName?: string;
     scoringPrompt?: string;
     judgeModel?: string;
+    judgeModelName?: string;
+    systemPrompt?: string;
   };
 }
 
@@ -124,6 +126,8 @@ export const MonitorFormDrawer = ({
       scorerName?: string;
       scoringPrompt?: string;
       judgeModel?: string;
+      judgeModelName?: string;
+      systemPrompt?: string;
     }>
   >([]);
   const [description, setDescription] = useState<string>('');
@@ -238,12 +242,8 @@ export const MonitorFormDrawer = ({
     }
   }, [selectedOpVersionOption, operationError]);
 
-  // Clear scorer errors when scorers become valid
-  useEffect(() => {
-    setScorerValidationErrors(prev =>
-      prev.map((errors, index) => (scorerValids[index] ? {} : errors))
-    );
-  }, [scorerValids]);
+  // Only clear scorer errors on form submission, not during live validation
+  // Individual field errors are managed by the scorer forms themselves
 
   const scorerForms: ScorerFormType[] = useMemo(
     () =>
@@ -294,6 +294,8 @@ export const MonitorFormDrawer = ({
       scorerName?: string;
       scoringPrompt?: string;
       judgeModel?: string;
+      judgeModelName?: string;
+      systemPrompt?: string;
     }> = [];
 
     if (scorers.length === 0) {
@@ -307,6 +309,8 @@ export const MonitorFormDrawer = ({
           scorerName?: string;
           scoringPrompt?: string;
           judgeModel?: string;
+          judgeModelName?: string;
+          systemPrompt?: string;
         } = {};
 
         if (hasForm && !scorerValids[index]) {
@@ -320,6 +324,16 @@ export const MonitorFormDrawer = ({
             }
             if (!scorer.val['model']) {
               errors.judgeModel = 'Judge model is required';
+              // If no model is set, also show that model name would be required
+              errors.judgeModelName =
+                'Judge model configuration name is required';
+              errors.systemPrompt = 'Judge model system prompt is required';
+            } else {
+              // If model exists but scorer is still invalid, likely due to missing configuration
+              // This handles the case where a model is selected but not properly configured
+              errors.judgeModelName =
+                'Judge model configuration name is required';
+              errors.systemPrompt = 'Judge model system prompt is required';
             }
           }
           hasValidationErrors = true;
