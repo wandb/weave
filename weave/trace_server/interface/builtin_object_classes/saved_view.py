@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -36,6 +36,7 @@ class SavedViewDefinition(BaseModel):
     pin: Optional[Pin] = Field(default=None)
     sort_by: Optional[list[tsi.SortBy]] = Field(default=None)
     page_size: Optional[int] = Field(default=None)
+    charts_config: Optional[dict[str, Any]] = Field(default=None)
 
 
 class SavedView(base_object_def.BaseObject):
