@@ -1,7 +1,6 @@
 import {Box, Typography} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
-import {TextField} from '@wandb/weave/components/Form/TextField';
 import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
 import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
 import {
@@ -137,7 +136,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
 
     // Track which fields have been touched
     const [touchedFields, setTouchedFields] = useState<{
-      scorerName?: boolean;
       scoringPrompt?: boolean;
       judgeModel?: boolean;
     }>({});
@@ -145,37 +143,33 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     // When validationErrors are provided, it means the form was submitted
     // So we should show all validation errors
     useEffect(() => {
-      if (validationErrors && validationErrors.scorerName) {
+      if (validationErrors) {
         setTouchedFields({
-          scorerName: true,
           scoringPrompt: true,
           judgeModel: true,
         });
 
         // Trigger validation for required fields only
-        if (!scorerName) setNameError('Scorer name is required');
         if (!scoringPrompt) setScoringPromptError('Scoring prompt is required');
         if (!judgeModel) setJudgeModelError('Judge model is required');
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [validationErrors]);
-    //const [isValid, setIsValid] = useState(false);
-    const [scorerName, setScorerName] = useState<string | undefined>(
-      scorer.objectId || ''
-    );
-    const [transformedScorerName, setTransformedScorerName] =
-      useState<string>('');
-
-    const [nameError, setNameError] = useState<string | null>(null);
-
-    // Update scorer name when monitor name changes
-    useEffect(() => {
-      if (monitorName && !scorer.objectId) {
-        const newScorerName = `${monitorName}-scorer`;
-        setScorerName(newScorerName);
-        setTransformedScorerName(transformNameToValid(newScorerName));
+    // Auto-generate scorer name based on monitor name
+    const scorerName = useMemo(() => {
+      if (scorer.objectId) {
+        return scorer.objectId; // Use existing name for existing scorers
       }
+      if (!monitorName) {
+        return '';
+      }
+      
+      return `${monitorName}-scorer`;
     }, [monitorName, scorer.objectId]);
+
+    const transformedScorerName = useMemo(() => {
+      return transformNameToValid(scorerName);
+    }, [scorerName]);
 
     const [scoringPrompt, setScoringPrompt] = useState<string | undefined>(
       scorer.val['scoring_prompt']
@@ -234,7 +228,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     // Properly validate on mount and when dependencies change
     useEffect(() => {
       console.log('LLMAsAJudgeScorerForm validation check:', {
-        scorerName,
         scoringPrompt,
         judgeModel,
         judgeModelName,
@@ -243,11 +236,11 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       });
 
       // Call validation with current state
-      const isValid = !!scorerName && !!scoringPrompt && !!judgeModel;
+      const isValid = !!scoringPrompt && !!judgeModel;
       console.log('Validation result:', isValid);
       onValidationChange(isValid);
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [scorerName, scoringPrompt, judgeModel]);
+    }, [scoringPrompt, judgeModel]);
 
     useEffect(() => {
       if (!savedModels || !scorer.val['model']) {
@@ -290,12 +283,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     }, [judgeModel]);
 
     const validateScorer = useCallback(() => {
-      if (!scorerName) {
-        setNameError('A scorer name is required.');
-        return false;
-      } else {
-        setNameError(null); // Clear error when name is valid
-      }
       if (!scoringPrompt) {
         setScoringPromptError('A scoring prompt is required.');
         return false;
@@ -305,7 +292,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         return false;
       }
       return true;
-    }, [scorerName, scoringPrompt, validateJudgeModel]);
+    }, [scoringPrompt, validateJudgeModel]);
 
     const createLLMStructuredCompletionModel = useCreateBuiltinObjectInstance(
       'LLMStructuredCompletionModel'
@@ -438,29 +425,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       saveScorer,
     }));
 
-    const onScorerNameChange = useCallback(
-      (value: string) => {
-        setScorerName(value);
-        const transformed = transformNameToValid(value);
-        setTransformedScorerName(transformed);
-        setTouchedFields(prev => ({...prev, scorerName: true}));
-        // Only show error if the field is empty, not for invalid characters since we transform them
-        if (!value.trim()) {
-          setNameError('Scorer name is required');
-        } else {
-          setNameError(null);
-        }
-        const isValid = !!value && !!scoringPrompt && !!judgeModel;
-        console.log('onScorerNameChange validation:', {
-          value,
-          scoringPrompt: !!scoringPrompt,
-          judgeModel: !!judgeModel,
-          isValid,
-        });
-        onValidationChange(isValid);
-      },
-      [scoringPrompt, judgeModel, onValidationChange]
-    );
 
     useEffect(() => {
       const modelName =
@@ -563,40 +527,6 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
         </Typography>
 
         <Box className="flex flex-col gap-16 px-20">
-          <Box>
-            <FieldName name="Scorer name" />
-            <TextField value={scorerName} onChange={onScorerNameChange} />
-            {(touchedFields.scorerName || validationErrors?.scorerName) &&
-              nameError && (
-                <Typography
-                  className="mt-1 text-sm"
-                  sx={{
-                    ...typographyStyle,
-                    color: 'error.main',
-                  }}>
-                  {nameError}
-                </Typography>
-              )}
-            {scorerName && transformedScorerName !== scorerName && (
-              <Typography
-                className="mt-1 text-sm text-gold-600"
-                sx={{
-                  ...typographyStyle,
-                }}>
-                The name of your scorer is{' '}
-                <span className="font-semibold">{transformedScorerName}</span>
-              </Typography>
-            )}
-            <Typography
-              className="mt-4 text-sm font-normal"
-              sx={{
-                ...typographyStyle,
-                color: 'text.secondary',
-              }}>
-              Valid names must start with a letter or number and can only
-              contain letters, numbers, hyphens, and underscores.
-            </Typography>
-          </Box>
           <Box className="flex flex-col gap-8">
             <Box>
               <FieldName name="Judge model" />
@@ -712,7 +642,7 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                         setTouchedFields(prev => ({...prev, scoringPrompt: true}));
                         setScoringPromptError(null);
                         onValidationChange(
-                          !!samplePrompts.bias_detection && !!scorerName && validateJudgeModel()
+                          !!samplePrompts.bias_detection && validateJudgeModel()
                         );
                       }}>
                       Bias detection
@@ -724,7 +654,7 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                         setTouchedFields(prev => ({...prev, scoringPrompt: true}));
                         setScoringPromptError(null);
                         onValidationChange(
-                          !!samplePrompts.sentiment_analysis && !!scorerName && validateJudgeModel()
+                          !!samplePrompts.sentiment_analysis && validateJudgeModel()
                         );
                       }}>
                       Sentiment analysis
@@ -736,7 +666,7 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                         setTouchedFields(prev => ({...prev, scoringPrompt: true}));
                         setScoringPromptError(null);
                         onValidationChange(
-                          !!samplePrompts.toxicity_detection && !!scorerName && validateJudgeModel()
+                          !!samplePrompts.toxicity_detection && validateJudgeModel()
                         );
                       }}>
                       Toxicity detection
@@ -748,7 +678,7 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                         setTouchedFields(prev => ({...prev, scoringPrompt: true}));
                         setScoringPromptError(null);
                         onValidationChange(
-                          !!samplePrompts.prompt_injection && !!scorerName && validateJudgeModel()
+                          !!samplePrompts.prompt_injection && validateJudgeModel()
                         );
                       }}>
                       Prompt injection
@@ -760,7 +690,7 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                         setTouchedFields(prev => ({...prev, scoringPrompt: true}));
                         setScoringPromptError(null);
                         onValidationChange(
-                          !!samplePrompts.helpfulness_metric && !!scorerName && validateJudgeModel()
+                          !!samplePrompts.helpfulness_metric && validateJudgeModel()
                         );
                       }}>
                       Helpfulness metric
@@ -781,7 +711,7 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                   setScoringPromptError('Scoring prompt is required');
                 }
                 onValidationChange(
-                  !!e.target.value && !!scorerName && validateJudgeModel()
+                  !!e.target.value && validateJudgeModel()
                 );
               }}
             />
