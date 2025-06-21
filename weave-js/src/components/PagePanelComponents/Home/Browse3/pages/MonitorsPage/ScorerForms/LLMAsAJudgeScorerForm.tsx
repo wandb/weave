@@ -709,6 +709,11 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                       onClick={() => {
                         setScoringPrompt(samplePrompts.bias_detection);
                         setShowSamplePrompts(false);
+                        setTouchedFields(prev => ({...prev, scoringPrompt: true}));
+                        setScoringPromptError(null);
+                        onValidationChange(
+                          !!samplePrompts.bias_detection && !!scorerName && validateJudgeModel()
+                        );
                       }}>
                       Bias detection
                     </DropdownMenu.Item>
@@ -716,6 +721,11 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                       onClick={() => {
                         setScoringPrompt(samplePrompts.sentiment_analysis);
                         setShowSamplePrompts(false);
+                        setTouchedFields(prev => ({...prev, scoringPrompt: true}));
+                        setScoringPromptError(null);
+                        onValidationChange(
+                          !!samplePrompts.sentiment_analysis && !!scorerName && validateJudgeModel()
+                        );
                       }}>
                       Sentiment analysis
                     </DropdownMenu.Item>
@@ -723,6 +733,11 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                       onClick={() => {
                         setScoringPrompt(samplePrompts.toxicity_detection);
                         setShowSamplePrompts(false);
+                        setTouchedFields(prev => ({...prev, scoringPrompt: true}));
+                        setScoringPromptError(null);
+                        onValidationChange(
+                          !!samplePrompts.toxicity_detection && !!scorerName && validateJudgeModel()
+                        );
                       }}>
                       Toxicity detection
                     </DropdownMenu.Item>
@@ -730,6 +745,11 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                       onClick={() => {
                         setScoringPrompt(samplePrompts.prompt_injection);
                         setShowSamplePrompts(false);
+                        setTouchedFields(prev => ({...prev, scoringPrompt: true}));
+                        setScoringPromptError(null);
+                        onValidationChange(
+                          !!samplePrompts.prompt_injection && !!scorerName && validateJudgeModel()
+                        );
                       }}>
                       Prompt injection
                     </DropdownMenu.Item>
@@ -737,6 +757,11 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                       onClick={() => {
                         setScoringPrompt(samplePrompts.helpfulness_metric);
                         setShowSamplePrompts(false);
+                        setTouchedFields(prev => ({...prev, scoringPrompt: true}));
+                        setScoringPromptError(null);
+                        onValidationChange(
+                          !!samplePrompts.helpfulness_metric && !!scorerName && validateJudgeModel()
+                        );
                       }}>
                       Helpfulness metric
                     </DropdownMenu.Item>
