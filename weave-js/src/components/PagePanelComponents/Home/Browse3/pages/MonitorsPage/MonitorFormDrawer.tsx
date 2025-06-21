@@ -291,18 +291,6 @@ export const MonitorFormDrawer = ({
   const objCreate = useObjCreate();
 
   const createMonitor = useCallback(async () => {
-    console.log('=== CREATE MONITOR DEBUG ===');
-    console.log('scorerValids:', scorerValids);
-    console.log(
-      'scorers:',
-      scorers.map((s, i) => ({
-        index: i,
-        type: s.val['_type'],
-        objectId: s.objectId,
-        hasForm: SCORER_FORMS.get(s.val['_type']) !== null,
-      }))
-    );
-
     // Mark that we've submitted
     setHasSubmitted(true);
 
@@ -349,16 +337,6 @@ export const MonitorFormDrawer = ({
       scorers.forEach((scorer, index) => {
         const hasForm = SCORER_FORMS.get(scorer.val['_type']) !== null;
         const isValid = scorerValids[index];
-
-        console.log(`Scorer ${index} validation:`, {
-          type: scorer.val['_type'],
-          hasForm,
-          isValid,
-          objectId: scorer.objectId,
-          scoring_prompt: scorer.val['scoring_prompt'],
-          model: scorer.val['model'],
-        });
-
         const errors: {
           scorerName?: string;
           scoringPrompt?: string;

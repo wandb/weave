@@ -34,11 +34,6 @@ import {transformNameToValid} from '../nameTransform';
 
 export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
   ({scorer, onValidationChange, validationErrors}, ref) => {
-    console.log('LLMAsAJudgeScorerForm rendered with:', {
-      scorer,
-      validationErrors,
-    });
-
     // Track which fields have been touched
     const [touchedFields, setTouchedFields] = useState<{
       scorerName?: boolean;
@@ -138,15 +133,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
 
     // Properly validate on mount and when dependencies change
     useEffect(() => {
-      console.log('LLMAsAJudgeScorerForm validation check:', {
-        scorerName,
-        scoringPrompt,
-        judgeModel,
-        judgeModelName,
-        systemPrompt,
-        responseFormat,
-      });
-
       // Call validation with current state
       const isValid =
         !!scorerName &&
@@ -155,7 +141,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         !!judgeModelName &&
         !!systemPrompt &&
         !!responseFormat;
-      console.log('Validation result:', isValid);
       onValidationChange(isValid);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
@@ -285,7 +270,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             val: model,
           },
         });
-        console.log('saveModel', 'post response', response);
         return `weave:///${projectId}/object/${model.name}:${response.digest}`;
       } catch (error) {
         console.error('Failed to save model:', error);
@@ -391,15 +375,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           !!judgeModelName &&
           !!responseFormat &&
           !!systemPrompt;
-        console.log('onScorerNameChange validation:', {
-          value,
-          scoringPrompt: !!scoringPrompt,
-          judgeModel: !!judgeModel,
-          judgeModelName: !!judgeModelName,
-          responseFormat: !!responseFormat,
-          systemPrompt: !!systemPrompt,
-          isValid,
-        });
         onValidationChange(isValid);
       },
       [
@@ -464,15 +439,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           !!judgeModelName &&
           !!responseFormat &&
           !!systemPrompt;
-        console.log('onJudgeModelChange validation:', {
-          scorerName: !!scorerName,
-          scoringPrompt: !!scoringPrompt,
-          newJudgeModel: !!newJudgeModel,
-          judgeModelName: !!judgeModelName,
-          responseFormat: !!responseFormat,
-          systemPrompt: !!systemPrompt,
-          isValid,
-        });
         onValidationChange(isValid);
       },
       [
