@@ -15,6 +15,7 @@ type ChatViewProps = {
 
 export const ChatView = ({chat}: ChatViewProps) => {
   const outputRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
   const playgroundContext = usePlaygroundContext();
 
   const chatResult = useDeepMemo(chat.result);
@@ -49,15 +50,17 @@ export const ChatView = ({chat}: ChatViewProps) => {
   );
 
   useEffect(() => {
-    if (
-      outputRef.current &&
-      chatResult &&
-      'choices' in chatResult &&
-      chatResult.choices
-    ) {
-      outputRef.current.scrollIntoView();
+    const currentMessageCount = chat.request?.messages?.length || 0;
+    const hasNewMessage = currentMessageCount > prevMessageCountRef.current;
+
+    if (hasNewMessage) {
+      prevMessageCountRef.current = currentMessageCount;
+
+      if (outputRef.current) {
+        outputRef.current.scrollIntoView();
+      }
     }
-  }, [chatResult]);
+  }, [chat.request?.messages]);
 
   return (
     <div className="flex flex-col pb-32">
