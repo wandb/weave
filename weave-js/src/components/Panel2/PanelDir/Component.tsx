@@ -16,6 +16,8 @@ import React, {useState} from 'react';
 import {Icon, Pagination, Table} from 'semantic-ui-react';
 
 import * as LLReact from '../../../react';
+import {Tag} from '../../Tag';
+import {Tooltip} from '../../Tooltip';
 import * as Panel2 from '../panel';
 import {Panel2Loader} from '../PanelComp';
 import {inputType} from './common';
@@ -193,14 +195,27 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
         {numeral(file.size).format('0.0b')}
       </Table.Cell>
       <Table.Cell className="file-download-cell">
-        {isDownloadable && (
-          <a
-            href={file.url}
-            download={fileName}
-            onClick={e => e.stopPropagation()}>
-            <LegacyWBIcon name="download" />
-          </a>
-        )}
+        {isDownloadable &&
+          (file.ref ? (
+            <Tooltip
+              content={
+                <>
+                  This artifact exists externally and is <br />
+                  only referenced in the code. It cannot
+                  <br />
+                  be downloaded via the UI.
+                </>
+              }
+              trigger={<Tag label="Referenced" color={'moon'} />}
+            />
+          ) : (
+            <a
+              href={file.url}
+              download={fileName}
+              onClick={e => e.stopPropagation()}>
+              <LegacyWBIcon name="download" />
+            </a>
+          ))}
       </Table.Cell>
     </Table.Row>
   );
