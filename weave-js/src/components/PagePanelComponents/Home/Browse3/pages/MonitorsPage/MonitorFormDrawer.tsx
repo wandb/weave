@@ -48,6 +48,7 @@ const PAGE_OFFSET = 0;
 export interface ScorerFormProps {
   scorer: ObjectVersionSchema;
   onValidationChange: (valid: boolean) => void;
+  monitorName?: string;
   validationErrors?: {
     scorerName?: string;
     scoringPrompt?: string;
@@ -729,6 +730,7 @@ export const MonitorFormDrawer = ({
                   <Box key={index}>
                     <Form
                       scorer={scorers[index]}
+                      monitorName={transformedMonitorName}
                       onValidationChange={(isValid: boolean) => {
                         updateScorerValidAt(index, isValid);
                         // Clear validation errors when the form becomes valid
