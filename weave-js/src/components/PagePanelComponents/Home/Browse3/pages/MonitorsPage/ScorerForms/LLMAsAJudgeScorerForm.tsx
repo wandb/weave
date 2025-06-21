@@ -1,7 +1,7 @@
 import {Box, Typography} from '@mui/material';
 import {Button} from '@wandb/weave/components/Button';
-import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
+import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
 import {
   FieldName,
@@ -124,7 +124,7 @@ Consider both explicit sentiment indicators and implicit emotional undertones.
 }
 
 ## Output to score: 
-{output}`
+{output}`,
 };
 
 export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
@@ -158,7 +158,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       if (!monitorName) {
         return '';
       }
-      
+
       return `${monitorName}-scorer`;
     }, [monitorName, scorer.objectId]);
 
@@ -410,7 +410,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       saveScorer,
     }));
 
-
     useEffect(() => {
       const modelName =
         judgeModel?.name ||
@@ -440,7 +439,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               model.name === savedModel.objectId &&
               model.ref?._extra?.[0] === `${savedModel.versionIndex}`
           );
-          
+
           // Load the system prompt from the saved model
           if (newJudgeModel?.default_params) {
             setSystemPrompt(getSystemPrompt(newJudgeModel.default_params));
@@ -460,8 +459,7 @@ Your role:
 4. Provide your assessment in the exact JSON format requested
 
 Remember: Your response must be valid JSON that can be parsed programmatically. Do not include any text outside the JSON structure.
-          `.trim();          
-
+          `.trim();
 
           newJudgeModel = {
             llm_model_id: newValue,
@@ -470,27 +468,36 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
               transformNameToValid(`${scorerName}-judge-model`),
             default_params: {
               max_tokens: maxTokens,
-              messages_template: [{role: 'system', content: defaultSystemPrompt}],
+              messages_template: [
+                {role: 'system', content: defaultSystemPrompt},
+              ],
               response_format: 'json_object',
             },
             description: '',
             ref: undefined,
           };
-          
+
           // Set the default system prompt
           setSystemPrompt(defaultSystemPrompt);
           setResponseFormat('json_object');
         }
-        
+
         setJudgeModel(newJudgeModel);
         setTouchedFields(prev => ({...prev, judgeModel: true}));
         setJudgeModelError(null);
-        
+
         // Validate all fields when judge model changes
         const isValid = !!scorerName && !!scoringPrompt && !!newJudgeModel;
         onValidationChange(isValid);
       },
-      [scoringPrompt, savedModels, scorerName, setJudgeModel, onValidationChange]
+      [
+        scoringPrompt,
+        savedModels,
+        scorerName,
+        setJudgeModel,
+        onValidationChange,
+        judgeModelName,
+      ]
     );
 
     // These callbacks are no longer needed since fields are read-only
@@ -538,63 +545,63 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                   Model settings
                 </Button>
                 {showModelSettings && (
-                  <Box className="bg-moon-100 rounded-md p-12 mt-4">
-                  <Box className="mt-12 flex flex-col gap-16">
-                    <Box>
-                      <Typography
-                        sx={{
-                          ...typographyStyle,
-                          fontWeight: 600,
-                          color: 'text.secondary',
-                        }}>
-                        LLM ID
-                      </Typography>
-                      <Typography sx={{...typographyStyle}}>
-                        {judgeModel.llm_model_id}
-                      </Typography>
+                  <Box className="mt-4 rounded-md bg-moon-100 p-12">
+                    <Box className="mt-12 flex flex-col gap-16">
+                      <Box>
+                        <Typography
+                          sx={{
+                            ...typographyStyle,
+                            fontWeight: 600,
+                            color: 'text.secondary',
+                          }}>
+                          LLM ID
+                        </Typography>
+                        <Typography sx={{...typographyStyle}}>
+                          {judgeModel.llm_model_id}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography
+                          sx={{
+                            ...typographyStyle,
+                            fontWeight: 600,
+                            color: 'text.secondary',
+                          }}>
+                          Configuration name
+                        </Typography>
+                        <Typography sx={{...typographyStyle}}>
+                          {judgeModel.name || judgeModelName || 'Not set'}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography
+                          sx={{
+                            ...typographyStyle,
+                            fontWeight: 600,
+                            color: 'text.secondary',
+                          }}>
+                          System prompt
+                        </Typography>
+                        <Typography
+                          sx={{...typographyStyle}}
+                          className="whitespace-pre-wrap">
+                          {systemPrompt || 'Not set'}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography
+                          sx={{
+                            ...typographyStyle,
+                            fontWeight: 600,
+                            color: 'text.secondary',
+                          }}>
+                          Response format
+                        </Typography>
+                        <Typography sx={{...typographyStyle}}>
+                          {responseFormat || 'json_object'}
+                        </Typography>
+                      </Box>
                     </Box>
-                    <Box>
-                      <Typography
-                        sx={{
-                          ...typographyStyle,
-                          fontWeight: 600,
-                          color: 'text.secondary',
-                        }}>
-                        Configuration name
-                      </Typography>
-                      <Typography sx={{...typographyStyle}}>
-                        {judgeModel.name || judgeModelName || 'Not set'}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography
-                        sx={{
-                          ...typographyStyle,
-                          fontWeight: 600,
-                          color: 'text.secondary',
-                        }}>
-                        System prompt
-                      </Typography>
-                      <Typography
-                        sx={{...typographyStyle}}
-                        className="whitespace-pre-wrap">
-                        {systemPrompt || 'Not set'}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography
-                        sx={{
-                          ...typographyStyle,
-                          fontWeight: 600,
-                          color: 'text.secondary',
-                        }}>
-                        Response format
-                      </Typography>
-                      <Typography sx={{...typographyStyle}}>
-                        {responseFormat || 'json_object'}
-                      </Typography>
-                    </Box>
-                  </Box>
                   </Box>
                 )}
               </Box>
@@ -603,7 +610,9 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
           <Box>
             <Box className="flex items-center justify-between">
               <FieldName name="Scoring prompt" />
-              <DropdownMenu.Root open={showSamplePrompts} onOpenChange={setShowSamplePrompts}>
+              <DropdownMenu.Root
+                open={showSamplePrompts}
+                onOpenChange={setShowSamplePrompts}>
                 <DropdownMenu.Trigger>
                   <Button
                     variant="ghost"
@@ -618,7 +627,10 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                       onClick={() => {
                         setScoringPrompt(samplePrompts.bias_detection);
                         setShowSamplePrompts(false);
-                        setTouchedFields(prev => ({...prev, scoringPrompt: true}));
+                        setTouchedFields(prev => ({
+                          ...prev,
+                          scoringPrompt: true,
+                        }));
                         setScoringPromptError(null);
                         onValidationChange(
                           !!samplePrompts.bias_detection && validateJudgeModel()
@@ -630,10 +642,14 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                       onClick={() => {
                         setScoringPrompt(samplePrompts.sentiment_analysis);
                         setShowSamplePrompts(false);
-                        setTouchedFields(prev => ({...prev, scoringPrompt: true}));
+                        setTouchedFields(prev => ({
+                          ...prev,
+                          scoringPrompt: true,
+                        }));
                         setScoringPromptError(null);
                         onValidationChange(
-                          !!samplePrompts.sentiment_analysis && validateJudgeModel()
+                          !!samplePrompts.sentiment_analysis &&
+                            validateJudgeModel()
                         );
                       }}>
                       Sentiment analysis
@@ -642,10 +658,14 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                       onClick={() => {
                         setScoringPrompt(samplePrompts.toxicity_detection);
                         setShowSamplePrompts(false);
-                        setTouchedFields(prev => ({...prev, scoringPrompt: true}));
+                        setTouchedFields(prev => ({
+                          ...prev,
+                          scoringPrompt: true,
+                        }));
                         setScoringPromptError(null);
                         onValidationChange(
-                          !!samplePrompts.toxicity_detection && validateJudgeModel()
+                          !!samplePrompts.toxicity_detection &&
+                            validateJudgeModel()
                         );
                       }}>
                       Toxicity detection
@@ -654,10 +674,14 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                       onClick={() => {
                         setScoringPrompt(samplePrompts.prompt_injection);
                         setShowSamplePrompts(false);
-                        setTouchedFields(prev => ({...prev, scoringPrompt: true}));
+                        setTouchedFields(prev => ({
+                          ...prev,
+                          scoringPrompt: true,
+                        }));
                         setScoringPromptError(null);
                         onValidationChange(
-                          !!samplePrompts.prompt_injection && validateJudgeModel()
+                          !!samplePrompts.prompt_injection &&
+                            validateJudgeModel()
                         );
                       }}>
                       Prompt injection
@@ -666,10 +690,14 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                       onClick={() => {
                         setScoringPrompt(samplePrompts.helpfulness_metric);
                         setShowSamplePrompts(false);
-                        setTouchedFields(prev => ({...prev, scoringPrompt: true}));
+                        setTouchedFields(prev => ({
+                          ...prev,
+                          scoringPrompt: true,
+                        }));
                         setScoringPromptError(null);
                         onValidationChange(
-                          !!samplePrompts.helpfulness_metric && validateJudgeModel()
+                          !!samplePrompts.helpfulness_metric &&
+                            validateJudgeModel()
                         );
                       }}>
                       Helpfulness metric
@@ -689,9 +717,7 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
                 if (!e.target.value) {
                   setScoringPromptError('Scoring prompt is required');
                 }
-                onValidationChange(
-                  !!e.target.value && validateJudgeModel()
-                );
+                onValidationChange(!!e.target.value && validateJudgeModel());
               }}
             />
             {(touchedFields.scoringPrompt || validationErrors?.scoringPrompt) &&
