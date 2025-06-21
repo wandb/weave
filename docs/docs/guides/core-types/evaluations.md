@@ -4,7 +4,7 @@ _Evaluation-driven LLM application development_ helps you systematically improve
 
 In Weave, the core of the workflow is the _`Evaluation` object_, which defines:
 
-- A [`Dataset`](../core-types/datasets) or list of dictionaries for test examples.
+- A [`Dataset`](datasets.md) or list of dictionaries for test examples.
 - One or more [scoring functions](../evaluation/scorers.md).
 - Optional configuration like [input preprocessing](#format-dataset-rows-before-evaluating).
 
