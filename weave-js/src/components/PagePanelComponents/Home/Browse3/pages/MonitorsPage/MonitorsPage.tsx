@@ -105,8 +105,8 @@ export const MonitorsPage = () => {
                     valueGetter: (_, row) => row.obj.val['op_names'],
                     renderCell: params => {
                       const opRefs: string[] = params.value;
-                      if (opRefs.length === 0) {
-                        return null;
+                      if (!opRefs || opRefs.length === 0) {
+                        return <span>All ops</span>;
                       }
                       return (
                         <div className="flex items-center gap-2">
