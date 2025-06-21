@@ -12,7 +12,6 @@ from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.utils.retry import _is_retryable_exception, with_retry
-from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
 
@@ -94,11 +93,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes:
-        # TODO: This should happen in the wandb backend, not here, and it's slow
-        # (hundreds of ms)
-        return tsi.EnsureProjectExistsRes.model_validate(
-            project_creator.ensure_project_exists(entity, project)
-        )
+        # Rely on the backend to create the project if needed. Avoid wandb dependency.
+        return tsi.EnsureProjectExistsRes(project_name=project)
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
