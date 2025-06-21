@@ -1,5 +1,5 @@
 import {Select} from '@wandb/weave/components/Form/Select';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {useEntityProject} from '../../../context';
@@ -56,6 +56,10 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
   const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [menuPlacement, setMenuPlacement] = useState<'top' | 'bottom' | 'auto'>(
+    'auto'
+  );
+  const selectRef = useRef<HTMLDivElement>(null);
 
   // TOOD: Avoid direct url manipulation
   const history = useHistory();
@@ -138,8 +142,19 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     areProvidersLoading,
   ]);
 
+  const handleMenuOpen = () => {
+    if (selectRef.current) {
+      const rect = selectRef.current.getBoundingClientRect();
+      const dropdownMidpoint = (rect.top + rect.bottom) / 2;
+      const viewportMidpoint = window.innerHeight / 2;
+
+      // If dropdown is above 50% of viewport, open down; if below, open up
+      setMenuPlacement(dropdownMidpoint < viewportMidpoint ? 'bottom' : 'top');
+    }
+  };
+
   return (
-    <div className="w-[300px]">
+    <div className="w-[300px]" ref={selectRef}>
       <Select
         isDisabled={areProvidersLoading}
         placeholder={
@@ -175,6 +190,8 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
         }}
         options={llmDropdownOptions}
         maxMenuHeight={500}
+        menuPlacement={menuPlacement}
+        onMenuOpen={handleMenuOpen}
         components={{
           Option: props => (
             <CustomOption
@@ -185,7 +202,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
               isAdmin={isTeamAdmin}
               onConfigureProvider={handleConfigureProvider}
               onViewCatalog={handleViewCatalog}
-              direction={{horizontal: 'right', vertical: 'down'}}
+              direction={{horizontal: 'right'}}
             />
           ),
         }}
@@ -251,6 +268,10 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
   const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [menuPlacement, setMenuPlacement] = useState<'top' | 'bottom' | 'auto'>(
+    'auto'
+  );
+  const selectRef = useRef<HTMLDivElement>(null);
 
   // TOOD: Avoid direct url manipulation
   const history = useHistory();
@@ -386,8 +407,19 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
     selectFirstAvailable,
   ]);
 
+  const handleMenuOpen = () => {
+    if (selectRef.current) {
+      const rect = selectRef.current.getBoundingClientRect();
+      const dropdownMidpoint = (rect.top + rect.bottom) / 2;
+      const viewportMidpoint = window.innerHeight / 2;
+
+      // If dropdown is above 50% of viewport, open down; if below, open up
+      setMenuPlacement(dropdownMidpoint < viewportMidpoint ? 'bottom' : 'top');
+    }
+  };
+
   return (
-    <div className={className}>
+    <div className={className} ref={selectRef}>
       <Select
         isDisabled={areProvidersLoading}
         placeholder={
@@ -423,6 +455,8 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
         }}
         options={llmDropdownOptions}
         maxMenuHeight={500}
+        menuPlacement={menuPlacement}
+        onMenuOpen={handleMenuOpen}
         components={{
           Option: props => (
             <CustomOption
