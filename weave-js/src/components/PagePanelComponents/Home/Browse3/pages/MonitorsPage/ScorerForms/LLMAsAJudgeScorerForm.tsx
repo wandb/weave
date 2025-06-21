@@ -129,11 +129,6 @@ Consider both explicit sentiment indicators and implicit emotional undertones.
 
 export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
   ({scorer, onValidationChange, validationErrors, monitorName}, ref) => {
-    console.log('LLMAsAJudgeScorerForm rendered with:', {
-      scorer,
-      validationErrors,
-    });
-
     // Track which fields have been touched
     const [touchedFields, setTouchedFields] = useState<{
       scoringPrompt?: boolean;
@@ -227,17 +222,8 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
 
     // Properly validate on mount and when dependencies change
     useEffect(() => {
-      console.log('LLMAsAJudgeScorerForm validation check:', {
-        scoringPrompt,
-        judgeModel,
-        judgeModelName,
-        systemPrompt,
-        responseFormat,
-      });
-
       // Call validation with current state
       const isValid = !!scoringPrompt && !!judgeModel;
-      console.log('Validation result:', isValid);
       onValidationChange(isValid);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scoringPrompt, judgeModel]);
@@ -337,7 +323,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             val: model,
           },
         });
-        console.log('saveModel', 'post response', response);
         return `weave:///${projectId}/object/${model.name}:${response.digest}`;
       } catch (error) {
         console.error('Failed to save model:', error);
@@ -503,12 +488,6 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
         
         // Validate all fields when judge model changes
         const isValid = !!scorerName && !!scoringPrompt && !!newJudgeModel;
-        console.log('onJudgeModelChange validation:', {
-          scorerName: !!scorerName,
-          scoringPrompt: !!scoringPrompt,
-          newJudgeModel: !!newJudgeModel,
-          isValid,
-        });
         onValidationChange(isValid);
       },
       [scoringPrompt, savedModels, scorerName, setJudgeModel, onValidationChange]
