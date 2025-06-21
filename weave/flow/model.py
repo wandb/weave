@@ -164,7 +164,7 @@ async def apply_model_async(
             c. construct Evaluation with a preprocess_model_input function that accepts a dataset example and returns a dict with keys expected by {model_predict_fn_name}
             """
         )
-        raise OpCallError(message)
+        raise OpCallError(message) from e
     except Exception:
         logger.info("model_output failed")
         logger.info(traceback.format_exc())

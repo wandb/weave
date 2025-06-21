@@ -73,7 +73,7 @@ class MemTraceFilesArtifact:
                 val = self.path_contents[path]
                 f = StringIO(val.decode("utf-8"))
         except KeyError:
-            raise FileNotFoundError(path)
+            raise FileNotFoundError(path) from None
         yield f
         f.close()
 

@@ -183,8 +183,8 @@ class EasyPrompt(UserList, Prompt):
             # TODO: Override role and do dedent?
             self.data.append(item)
         elif isinstance(item, list):
-            for item in item:
-                self.append(item)
+            for sub_item in item:
+                self.append(sub_item)
         else:
             raise TypeError(f"Cannot append {item} of type {type(item)} to Prompt")
 

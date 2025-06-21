@@ -51,7 +51,7 @@ def validate_feedback_create_req(
         except ValidationError as e:
             raise InvalidRequest(
                 f"Invalid payload for feedback_type {req.feedback_type}: {e}"
-            )
+            ) from e
 
     # Validate the required fields for the feedback type.
     if feedback_type_is_annotation(req.feedback_type):
@@ -74,7 +74,7 @@ def validate_feedback_create_req(
         except ValidationError as e:
             raise InvalidRequest(
                 f"Invalid payload for feedback_type {req.feedback_type}: {e}"
-            )
+            ) from e
     elif req.annotation_ref:
         raise InvalidRequest(
             "annotation_ref is not allowed for non-annotation feedback"
@@ -99,7 +99,7 @@ def validate_feedback_create_req(
         except ValidationError as e:
             raise InvalidRequest(
                 f"Invalid payload for feedback_type {req.feedback_type}: {e}"
-            )
+            ) from e
     elif req.runnable_ref:
         raise InvalidRequest("runnable_ref is not allowed for non-runnable feedback")
     elif req.call_ref:

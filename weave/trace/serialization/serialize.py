@@ -220,7 +220,7 @@ def dictify(
                         to_dict_result[k] = stringify(v)
                 return to_dict_result
         except Exception:
-            raise ValueError("to_dict failed")
+            raise ValueError("to_dict failed") from None
 
     result: dict[Any, Any] = {}
     result["__class__"] = {

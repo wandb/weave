@@ -71,7 +71,7 @@ def test_basic_evaluation(
         "greater_than_4_scorer": {"true_count": 3, "true_fraction": 1.0},
     }
 
-    for i, (inputs, outputs, score1, score2) in enumerate(
+    for i, (inputs, output_val, score1, score2) in enumerate(
         zip(user_dataset, outputs, score1_results, score2_results)
     ):
         predict_index = 1 + i * 4
@@ -86,14 +86,14 @@ def test_basic_evaluation(
         assert predict_and_score_call.inputs["self"]._class_name == "Evaluation"
         assert predict_and_score_call.inputs["model"]._class_name == "Model"
         assert predict_and_score_call.inputs["example"] == inputs
-        assert predict_and_score_call.output["output"] == outputs
+        assert predict_and_score_call.output["output"] == output_val
 
         predict_call = calls[predict_index + 1]
         assert op_name_from_call(predict_call) == "Model.predict"
         assert predict_call.attributes["_weave_eval_meta"]["imperative"] is True
         assert predict_call.inputs["self"]._class_name == "Model"
         assert predict_call.inputs["inputs"] == inputs
-        assert predict_call.output == outputs
+        assert predict_call.output == output_val
 
         feedbacks = list(predict_call.feedback)
         assert len(feedbacks) == 2
@@ -103,14 +103,14 @@ def test_basic_evaluation(
         scorer1_call = calls[predict_index + 2]
         assert op_name_from_call(scorer1_call) == "greater_than_2_scorer"
         assert scorer1_call.attributes["_weave_eval_meta"]["imperative"] is True
-        assert scorer1_call.inputs["output"] == outputs
+        assert scorer1_call.inputs["output"] == output_val
         assert scorer1_call.inputs["inputs"] == inputs
         assert scorer1_call.output == score1
 
         scorer2_call = calls[predict_index + 3]
         assert op_name_from_call(scorer2_call) == "greater_than_4_scorer"
         assert scorer2_call.attributes["_weave_eval_meta"]["imperative"] is True
-        assert scorer2_call.inputs["output"] == outputs
+        assert scorer2_call.inputs["output"] == output_val
         assert scorer2_call.inputs["inputs"] == inputs
         assert scorer2_call.output == score2
 
