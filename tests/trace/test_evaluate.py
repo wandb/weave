@@ -489,3 +489,55 @@ def test_evaluate_table_order(client):
     scores = [c.output["scores"]["score_simple"] for c in predict_and_score_calls]
     assert all(scores)
     assert len(scores) == 5
+
+
+def test_evaluate_get_ref(client):
+    """Test that we can get refs for evaluations with both class and function scorers."""
+    # Simple dataset
+    rows = [
+        {"prompt": "1 + 1", "answer": "2"},
+        {"prompt": "2 + 2", "answer": "4"},
+    ]
+    dataset = weave.Dataset(rows=rows)
+
+    # Class-based scorer
+    class TestScorer(weave.Scorer):
+        @weave.op()
+        def score(self, output, answer):
+            return {"correct": output == answer}
+
+    # Function-based scorer
+    @weave.op()
+    def test_scorer_func(output, answer):
+        return {"correct": output == answer}
+
+    # Create evaluations
+    eval_with_class = Evaluation(dataset=rows, scorers=[TestScorer()])
+    eval_with_func = Evaluation(dataset=rows, scorers=[test_scorer_func])
+
+    # Publish evaluations
+    ref1 = weave.publish(eval_with_class, "eval_class")
+    ref2 = weave.publish(eval_with_func, "eval_func")
+
+    # Simple model
+    @weave.op()
+    def simple_model(prompt):
+        return "2" if "1 + 1" in prompt else "4"
+
+    # Run evaluations to ensure they work
+    result1 = asyncio.run(eval_with_class.evaluate(simple_model))
+    result2 = asyncio.run(eval_with_func.evaluate(simple_model))
+
+    # Verify we can get refs for both evaluations
+    retrieved_eval1 = weave.ref(ref1.uri()).get()
+    retrieved_eval2 = weave.ref(ref2.uri()).get()
+
+    # Basic assertions to ensure they work
+    assert retrieved_eval1 is not None
+    assert retrieved_eval2 is not None
+    assert len(retrieved_eval1.scorers) == 1
+    assert len(retrieved_eval2.scorers) == 1
+
+    # Type assertions
+    assert isinstance(retrieved_eval1.scorers[0], TestScorer)
+    retrieved_eval1 = weave.ref(ref1.uri()).get()
