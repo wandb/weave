@@ -1,6 +1,12 @@
 import {Box, Drawer, Typography} from '@mui/material';
 import {GridFilterModel} from '@mui/x-data-grid-pro';
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
+import {
+  MOON_250,
+  MOON_350,
+  TEAL_500,
+} from '@wandb/weave/common/css/color.styles';
+import {Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
@@ -33,7 +39,6 @@ import {
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
@@ -41,6 +46,88 @@ import {useList} from 'react-use';
 
 const PAGE_SIZE = 10;
 const PAGE_OFFSET = 0;
+
+const StyledSliderInput: React.FC<{
+  progress: number;
+  className?: string;
+  children: React.ReactNode;
+}> = ({progress, className, children}) => {
+  // Create a unique ID for this instance to scope the styles
+  const uniqueId = useRef(`slider-${Math.random().toString(36).substr(2, 9)}`);
+
+  return (
+    <>
+      <style>
+        {`
+          .${uniqueId.current} .slider-input input[type='range'] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(
+              to right,
+              ${TEAL_500} 0%,
+              ${TEAL_500} ${progress}%,
+              ${MOON_250} ${progress}%,
+              ${MOON_250} 100%
+            );
+            outline: none;
+            padding: 0;
+            margin: 8px 0;
+          }
+
+          .${uniqueId.current} .slider-input input[type='range']::-webkit-slider-track {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: transparent;
+          }
+
+          .${uniqueId.current} .slider-input input[type='range']::-moz-range-track {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: transparent;
+          }
+
+          .${uniqueId.current} .slider-input input[type='range']::-webkit-slider-thumb {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            border: 1px solid ${MOON_350};
+            box-shadow: 0 0 2px 0px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s;
+          }
+
+          .${uniqueId.current} .slider-input input[type='range']::-webkit-slider-thumb:hover {
+            box-shadow: 0 0 8px 0px rgba(0, 0, 0, 0.2);
+          }
+
+          .${uniqueId.current} .slider-input input[type='range']::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            border: 1px solid ${MOON_350};
+            box-shadow: 0 0 2px 0px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s;
+          }
+
+          .${uniqueId.current} .slider-input input[type='range']::-moz-range-thumb:hover {
+            box-shadow: 0 0 8px 0px rgba(0, 0, 0, 0.2);
+          }
+        `}
+      </style>
+      <div className={`${uniqueId.current} ${className || ''}`}>{children}</div>
+    </>
+  );
+};
 
 export interface ScorerFormProps {
   scorer: ObjectVersionSchema;
@@ -424,13 +511,15 @@ export const MonitorFormDrawer = ({
                     />
                   </Box>
                   <Box>
-                    <FieldName name="Active" />
-                    <ToggleButtonGroup
-                      value={active ? 'active' : 'inactive'}
-                      options={[{value: 'active'}, {value: 'inactive'}]}
-                      onValueChange={value => setActive(value === 'active')}
-                      size="medium"
-                    />
+                    <Box className="flex items-center gap-8">
+                      <Switch.Root
+                        checked={active}
+                        onCheckedChange={setActive}
+                        size="small">
+                        <Switch.Thumb size="small" checked={active} />
+                      </Switch.Root>
+                      <span className="font-semibold">Active monitor</span>
+                    </Box>
                   </Box>
                 </Box>
 
@@ -454,42 +543,45 @@ export const MonitorFormDrawer = ({
                         frozenFilter={undefined}
                         sx={{width: '100%', height: undefined}}
                       />
-                    </Box>
-                    <Box>
-                      <FieldName name="Additional filters" />
                       {selectedOpVersionOption.length > 0 ? (
-                        <FilterPanel
-                          entity={entity}
-                          project={project}
-                          filterModel={filterModel}
-                          setFilterModel={setFilterModel}
-                          columnInfo={columns}
-                          selectedCalls={[]}
-                          clearSelectedCalls={() => {}}
-                        />
+                        <Box className="mt-4">
+                          <FilterPanel
+                            entity={entity}
+                            project={project}
+                            filterModel={filterModel}
+                            setFilterModel={setFilterModel}
+                            columnInfo={columns}
+                            selectedCalls={[]}
+                            clearSelectedCalls={() => {}}
+                          />
+                        </Box>
                       ) : (
                         <Typography
-                          className="mt-1 text-sm font-normal"
+                          className="mt-4 text-sm font-normal"
                           sx={{
                             ...typographyStyle,
                             color: 'text.secondary',
                           }}>
-                          Select an op to add filters.
+                          Select an op to add additional filters.
                         </Typography>
                       )}
                     </Box>
                     <Box>
                       <FieldName name="Sampling rate" />
                       <Box className="flex items-center gap-12">
-                        <SliderInput
-                          value={samplingRate}
-                          onChange={setSamplingRate}
-                          min={0}
-                          max={100}
-                          step={1}
-                          hasInput
+                        <StyledSliderInput
                           className="w-full"
-                        />
+                          progress={samplingRate}>
+                          <SliderInput
+                            value={samplingRate}
+                            onChange={setSamplingRate}
+                            min={0}
+                            max={100}
+                            step={10}
+                            hasInput
+                            className="w-full"
+                          />
+                        </StyledSliderInput>
                         <span style={typographyStyle}>%</span>
                       </Box>
                     </Box>
