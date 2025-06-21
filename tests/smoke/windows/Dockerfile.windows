@@ -1,0 +1,35 @@
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Install Python
+RUN Invoke-WebRequest -Uri https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe -OutFile python-installer.exe; \
+    Start-Process python-installer.exe -ArgumentList '/quiet', 'InstallAllUsers=1', 'PrependPath=1' -Wait; \
+    Remove-Item -Force python-installer.exe; \
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User'); \
+    python --version
+
+# Install pip
+RUN python -m ensurepip --upgrade; \
+    python -m pip install --upgrade pip
+
+# Install pytest and build tools
+RUN python -m pip install pytest build setuptools wheel hatchling
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY pyproject.toml .
+COPY README.md .
+COPY LICENSE .
+COPY weave/ ./weave/
+
+# Install weave in development mode
+RUN python -m pip install -e .
+
+# Copy test files
+COPY tests/smoke/windows/test_windows_smoke.py .
+
+# Run tests
+CMD ["python", "-m", "pytest", "test_windows_smoke.py", "-v"] 
