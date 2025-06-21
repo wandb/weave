@@ -10,7 +10,7 @@ import {
 import {Checkbox} from '@wandb/weave/components/Checkbox';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRefMaybe} from '../../../../../../react';
@@ -540,6 +540,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     });
   }, [columns, columnOrder]);
 
+  const sortModelInitialized = useRef(false);
+
   const defaultSortModel: GridSortItem[] = useMemo(() => {
     if (!columnOrder) {
       return columns.map(c => ({field: c.field, sort: 'desc'}));
@@ -552,10 +554,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   }, [columnOrder, columns]);
 
   useEffect(() => {
-    if (columns.length > 1 && !loading) {
+    if (columns.length > 1 && !loading && !sortModelInitialized.current) {
       setSortModel(defaultSortModel);
+      sortModelInitialized.current = true;
     }
-  }, [columns, defaultSortModel, loading]);
+  }, [columns.length, defaultSortModel, loading]);
 
   if (loading) {
     return <Loading centered />;
