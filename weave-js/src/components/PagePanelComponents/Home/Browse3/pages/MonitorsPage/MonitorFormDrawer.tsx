@@ -452,7 +452,7 @@ export const MonitorFormDrawer = ({
                           setFilter({...f, traceRootsOnly: false})
                         }
                         frozenFilter={undefined}
-                        sx={{width: '100%', height: undefined}}
+                        width="100%"
                       />
                     </Box>
                     <Box>
