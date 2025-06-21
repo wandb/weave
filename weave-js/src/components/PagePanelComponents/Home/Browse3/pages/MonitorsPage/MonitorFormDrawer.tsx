@@ -320,7 +320,7 @@ export const MonitorFormDrawer = ({
       setNameError('Monitor name is required');
       hasValidationErrors = true;
     } else {
-      const nameValidation = validateDatasetName(monitorName);
+      const nameValidation = validateDatasetName(transformedMonitorName);
       if (nameValidation.error) {
         setNameError(nameValidation.error);
         hasValidationErrors = true;
