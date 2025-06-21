@@ -33,4 +33,6 @@ def set_ref(obj: Any, ref: Ref | None) -> None:
             try:
                 obj.__dict__["ref"] = ref
             except:
-                raise ValueError(f"Failed to set ref on object of type {type(obj)}")
+                raise ValueError(
+                    f"Failed to set ref on object of type {type(obj)}"
+                ) from None

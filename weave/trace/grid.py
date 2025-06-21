@@ -136,7 +136,7 @@ class Row:
         try:
             return self[name]
         except KeyError:
-            raise AttributeError(f"Row has no attribute or column '{name}'")
+            raise AttributeError(f"Row has no attribute or column '{name}'") from None
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Allow setting column values as attributes.
@@ -356,7 +356,7 @@ class Grid:
             except (ValueError, TypeError):
                 raise ValueError(
                     f"Cannot coerce value '{value}' to type '{col.type}' for column '{col.id}'"
-                )
+                ) from None
 
         self.rows[row_index][column_index] = value
         return self
@@ -423,7 +423,7 @@ class Grid:
                 except (ValueError, TypeError):
                     raise ValueError(
                         f"Cannot coerce value '{value}' to type '{column.type}' for column '{column.id}'"
-                    )
+                    ) from None
             else:
                 processed_values.append(value)
 
@@ -593,7 +593,7 @@ class Grid:
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         # Create a DataFrame directly from the grid data
         data: dict[str, list[Any]] = {col.id: [] for col in self.columns}

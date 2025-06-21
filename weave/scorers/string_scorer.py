@@ -28,7 +28,7 @@ class LevenshteinScorer(weave.Scorer):
         except ImportError:
             raise ValueError(
                 "Levenshtein package not found. Please install it with `pip install Levenshtein`"
-            )
+            ) from None
         else:
             return self
 

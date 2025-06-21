@@ -2238,7 +2238,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "Database insertion failed. Record too large. "
                     "A likely cause is that a single row or cell exceeded "
                     "the limit. If logging images, save them as `Image.PIL`."
-                )
+                ) from e
             raise
         except Exception as e:
             # Do potentially expensive data length calculation, only on

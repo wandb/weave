@@ -164,7 +164,7 @@ def save(
         else:
             save_non_file_clip(obj, artifact, name)
     except Exception as e:
-        raise ValueError(f"Failed to write video file with error: {e}")
+        raise ValueError(f"Failed to write video file with error: {e}") from e
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
