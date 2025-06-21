@@ -606,7 +606,7 @@ export const typeToDataGridColumnSpec = (
             headerName: innerKey,
             renderCell: params => {
               const data = params.row.data[innerKey];
-              return <CellValue value={data ?? ''} />;
+              return <CellValue value={data ?? ''} field={innerKey} />;
             },
           },
         ];
