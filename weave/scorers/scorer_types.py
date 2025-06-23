@@ -43,7 +43,7 @@ class LLMScorer(weave.Scorer):
         except ImportError:
             raise ImportError(
                 "litellm is required to use the LLM-powered scorers, please install it with `pip install litellm`"
-            )
+            ) from None
         self._acompletion = acompletion
         self._aembedding = aembedding
         self._amoderation = amoderation
