@@ -1,7 +1,7 @@
 import copy
 import datetime
 from collections import OrderedDict, defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterator, AsyncIterator
 from typing import Any, Optional, cast
 
 from weave.trace_server import refs_internal as ri
@@ -19,14 +19,25 @@ def make_feedback_query_req(
         call_refs.append(ref.uri())
 
     # construct mogo style query
+    from weave.trace_server.interface.query import (
+        InOperation,
+        GetFieldOperator,
+        LiteralOperation,
+    )
+
     query = tsi.Query(
         **{
-            "$expr": {
-                "$in": [
-                    {"$getField": "weave_ref"},
-                    [{"$literal": call_ref} for call_ref in call_refs],
-                ]
-            }
+            "$expr": InOperation(
+                **{
+                    "$in": (
+                        GetFieldOperator(**{"$getField": "weave_ref"}),
+                        [
+                            LiteralOperation(**{"$literal": call_ref})
+                            for call_ref in call_refs
+                        ],
+                    )
+                }
+            )
         }
     )
     feedback_query_req = tsi.FeedbackQueryReq(
@@ -185,6 +196,21 @@ class DynamicBatchProcessor:
         batch = []
 
         for item in iterator:
+            batch.append(item)
+
+            if len(batch) >= self.batch_size:
+                yield batch
+
+                batch = []
+                self.batch_size = self._compute_batch_size()
+
+        if batch:
+            yield batch
+
+    async def make_batches_async(self, async_iterator: AsyncIterator[Any]) -> Any:
+        batch = []
+
+        async for item in async_iterator:
             batch.append(item)
 
             if len(batch) >= self.batch_size:

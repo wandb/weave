@@ -19,15 +19,15 @@ class KafkaProducer(ConfluentKafkaProducer):
         }
         return cls(conf)
 
-    def produce_call_end(
+    async def produce_call_end(
         self, call_end: tsi.EndedCallSchemaForInsert, flush_immediately: bool = False
     ) -> None:
-        self.produce(
+        await self.produce(
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
         )
         if flush_immediately:
-            self.flush()
+            await self.flush()
 
 
 class KafkaConsumer(ConfluentKafkaConsumer):
