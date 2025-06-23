@@ -768,6 +768,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+        import time
+
+        time.sleep(10)
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         if req.filter:
             if req.filter.is_op is not None:
