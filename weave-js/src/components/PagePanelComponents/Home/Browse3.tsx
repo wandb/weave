@@ -67,6 +67,7 @@ import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/t
 import {getParamArray, queryGetDict} from './Browse3/urlQueryUtil';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
+import getConfig from '@wandb/weave/config';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
@@ -419,9 +420,11 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
         </Route>
-        <Route path={`${projectRoot}/monitors`}>
-          <MonitorsPageBinding />
-        </Route>
+        {!getConfig().IS_DEDICATED && (
+          <Route path={`${projectRoot}/monitors`}>
+            <MonitorsPageBinding />
+          </Route>
+        )}
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
         </Route>
