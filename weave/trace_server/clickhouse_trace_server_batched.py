@@ -1452,23 +1452,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return [r.val for r in extra_results]
 
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.file_create")
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 
         if client is not None and use_file_storage:
             try:
-                self._file_create_bucket(req, digest, client)
+                await self._file_create_bucket(req, digest, client)
             except FileStorageWriteError as e:
-                self._file_create_clickhouse(req, digest)
+                await self._file_create_clickhouse(req, digest)
         else:
-            self._file_create_clickhouse(req, digest)
+            await self._file_create_clickhouse(req, digest)
         set_root_span_dd_tags({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
-    def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
+    async def _file_create_clickhouse(
+        self, req: tsi.FileCreateReq, digest: str
+    ) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
         chunks = [
             req.content[i : i + FILE_CHUNK_SIZE]
@@ -1499,10 +1502,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "bytes_stored",
                 "file_storage_uri",
             ],
+            settings={"async_insert": 1},
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
-    def _file_create_bucket(
+    async def _file_create_bucket(
         self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
         set_root_span_dd_tags({"storage_provider": "bucket"})
@@ -1533,6 +1537,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "bytes_stored",
                 "file_storage_uri",
             ],
+            settings={"async_insert": 1},
         )
 
     def _should_use_file_storage_for_writes(self, project_id: str) -> bool:

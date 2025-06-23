@@ -4,6 +4,7 @@ import logging
 from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
 
+import httpx
 from pydantic import BaseModel
 
 from weave.trace.env import weave_trace_server_url
@@ -510,16 +511,18 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     @with_retry
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        r = requests.post(
-            self.trace_server_url + "/files/create",
-            auth=self._auth,
-            data={"project_id": req.project_id},
-            files={"file": (req.name, req.content)},
-            # timeout=DEFAULT_TIMEOUT,
-        )
-        r.raise_for_status()
-        return tsi.FileCreateRes.model_validate(r.json())
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        async with httpx.AsyncClient() as client:
+            print("hitting files/create/")
+            response = await client.post(
+                self.trace_server_url + "/files/create",
+                auth=self._auth,
+                data={"project_id": req.project_id},
+                files={"file": (req.name, req.content)},
+                # timeout=DEFAULT_TIMEOUT,
+            )
+            response.raise_for_status()
+            return tsi.FileCreateRes.model_validate(response.json())
 
     @with_retry
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:

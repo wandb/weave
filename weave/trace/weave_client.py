@@ -2194,6 +2194,8 @@ class WeaveClient:
         if cached_res:
             return cached_res
 
+        print(">>>>> doing _send_file_create")
+
         if self.future_executor_fastlane:
             # If we have a separate upload worker pool, use it
             res = self.future_executor_fastlane.defer(self.server.file_create, req)

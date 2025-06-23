@@ -312,7 +312,7 @@ def generate_routes(
             name=file.filename or "<unnamed_file>",
             content=await file.read(),
         )
-        return service.trace_server_interface.file_create(req)
+        return await service.trace_server_interface.file_create(req)
 
     @router.post(
         "/file/content",
