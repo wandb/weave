@@ -3,7 +3,6 @@ import _ from 'lodash';
 import {useMemo} from 'react';
 import {useLocation} from 'react-router-dom';
 
-import getConfig from '../../config';
 import {FancyPageSidebarItem} from './FancyPageSidebar';
 
 export const useProjectSidebar = (
@@ -47,8 +46,6 @@ export const useProjectSidebar = (
   const isNoSidebarItems = !showModelsSidebarItems && !showWeaveSidebarItems;
   const isBothSidebarItems = showModelsSidebarItems && showWeaveSidebarItems;
   const isShowAll = isNoSidebarItems || isBothSidebarItems;
-
-  const isDedicated = getConfig().IS_DEDICATED;
 
   return useMemo(() => {
     const weaveOnlyMenu = [
@@ -180,10 +177,7 @@ export const useProjectSidebar = (
             name: 'Monitors',
             slug: 'weave/monitors',
             // feature-gating for admins
-            isShown:
-              (showWeaveSidebarItems || isShowAll) &&
-              isWandbAdmin &&
-              !isDedicated,
+            isShown: (showWeaveSidebarItems || isShowAll) && isWandbAdmin,
             iconName: IconNames.JobAutomation,
           },
           {
@@ -292,7 +286,6 @@ export const useProjectSidebar = (
     isShowAll,
     isWandbAdmin,
     isWeaveOnly,
-    isDedicated,
     nwSearchStr,
     showWeaveSidebarItems,
     viewingRestricted,
