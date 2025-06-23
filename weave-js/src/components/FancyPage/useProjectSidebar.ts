@@ -251,6 +251,7 @@ export const useProjectSidebar = (
             isShown: isShowAll,
             menu: [
               'weave/prompts',
+              ...(isWandbAdmin ? ['weave/monitors'] : []),
               'weave/models',
               'weave/datasets',
               'weave/scorers',
