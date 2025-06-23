@@ -15,6 +15,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
     cast_to_message_list,
     parse_params_to_litellm_params,
 )
+from weave.trace_server.validation_util import CHValidationError
 
 
 def test_llm_structured_completion_model_creation_and_class_assignment(
@@ -633,7 +634,7 @@ def test_cast_to_message():
 def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
     """Test schema validation for LLMStructuredCompletionModel."""
     # Test missing required field
-    with pytest.raises(Exception):  # ValidationError or similar
+    with pytest.raises(CHValidationError):  # ValidationError or similar
         client.server.obj_create(
             tsi.ObjCreateReq.model_validate(
                 {
