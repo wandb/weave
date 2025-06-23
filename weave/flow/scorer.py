@@ -158,7 +158,7 @@ def get_scorer_attributes(
         except AttributeError:
             raise ValueError(
                 f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
-            )
+            ) from None
     elif is_op(scorer):
         scorer = as_op(scorer)
         scorer_name = cast(str, scorer.name)
@@ -399,7 +399,7 @@ async def apply_scorer_async(
             c. change dataset column names to match expected {scorer_name} argument names: {required_arg_names}
             """
         )
-        raise OpCallError(message)
+        raise OpCallError(message) from e
 
     return ApplyScorerSuccess(result=result, score_call=score_call)
 

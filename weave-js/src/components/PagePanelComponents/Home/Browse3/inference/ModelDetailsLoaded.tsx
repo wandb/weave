@@ -45,6 +45,10 @@ const BASE_URL =
 const CODE_EXAMPLES_CHAT: Record<string, string> = {
   Python: `
 import openai
+import weave
+
+# Weave autopatches OpenAI to log LLM calls to W&B
+weave.init("<team>/<project>")
 
 client = openai.OpenAI(
     # The custom base URL points to W&B Inference
