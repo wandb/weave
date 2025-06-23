@@ -1047,12 +1047,36 @@ class ProjectStatsRes(BaseModel):
 
 class ThreadSchema(BaseModel):
     thread_id: str
-    trace_count: int
-    start_time: datetime.datetime
-    last_updated: datetime.datetime
+    turn_count: int = Field(description="Number of turn calls in this thread")
+    start_time: datetime.datetime = Field(
+        description="Earliest start time of turn calls in this thread"
+    )
+    last_updated: datetime.datetime = Field(
+        description="Latest end time of turn calls in this thread"
+    )
+    first_call_id: Optional[str] = Field(
+        description="Call ID of the first call in this thread (earliest start_time)"
+    )
+    latest_call_id: Optional[str] = Field(
+        description="Call ID of the latest call in this thread (latest end_time)"
+    )
+    p50_call_duration_ms: Optional[float] = Field(
+        description="50th percentile (median) of call durations in milliseconds within this thread"
+    )
+    p99_call_duration_ms: Optional[float] = Field(
+        description="99th percentile of call durations in milliseconds within this thread"
+    )
 
 
 class ThreadsQueryReq(BaseModel):
+    """
+    Query threads with aggregated statistics based on turn calls only.
+
+    Turn calls are the immediate children of thread contexts (where call.id == turn_id).
+    This provides meaningful conversation-level statistics rather than including all
+    nested implementation details.
+    """
+
     project_id: str = Field(
         description="The ID of the project", examples=["my_entity/my_project"]
     )
@@ -1062,7 +1086,7 @@ class ThreadsQueryReq(BaseModel):
     offset: Optional[int] = Field(default=None, description="Number of threads to skip")
     sort_by: Optional[list[SortBy]] = Field(
         default=None,
-        description="Sorting criteria for the threads. Supported fields: 'last_updated', 'trace_count', 'thread_id'.",
+        description="Sorting criteria for the threads. Supported fields: 'thread_id', 'turn_count', 'start_time', 'last_updated', 'p50_call_duration_ms', 'p99_call_duration_ms'.",
         examples=[[SortBy(field="last_updated", direction="desc")]],
     )
     sortable_datetime_after: Optional[datetime.datetime] = Field(

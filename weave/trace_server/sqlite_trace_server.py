@@ -1481,7 +1481,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         threads = []
         for row in query_result:
-            thread_id, trace_count, start_time_str, last_updated_str = row
+            (
+                thread_id,
+                turn_count,
+                start_time_str,
+                last_updated_str,
+                first_call_id,
+                latest_call_id,
+                p50_call_duration_ms,
+                p99_call_duration_ms,
+            ) = row
 
             # Parse the datetime strings if present
             if start_time_str and last_updated_str:
@@ -1503,9 +1512,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             threads.append(
                 tsi.ThreadSchema(
                     thread_id=thread_id,
-                    trace_count=trace_count,
+                    turn_count=turn_count,
                     start_time=start_time,
                     last_updated=last_updated,
+                    first_call_id=first_call_id,
+                    latest_call_id=latest_call_id,
+                    p50_call_duration_ms=p50_call_duration_ms,
+                    p99_call_duration_ms=p99_call_duration_ms,
                 )
             )
 
