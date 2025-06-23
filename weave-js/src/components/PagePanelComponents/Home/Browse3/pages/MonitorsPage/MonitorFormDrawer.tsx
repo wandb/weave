@@ -213,7 +213,7 @@ export const MonitorFormDrawer = ({
     [setNameError]
   );
 
-  const opVersionOptions = useOpVersionOptions(entity, project, {});
+  const opVersionOptions = useOpVersionOptions(entity, project, {}, false);
 
   useMemo(() => {
     setSelectedOpVersionOption(filter.opVersionRefs ?? []);
