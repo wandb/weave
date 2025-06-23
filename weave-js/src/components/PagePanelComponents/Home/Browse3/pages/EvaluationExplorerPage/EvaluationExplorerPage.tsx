@@ -68,6 +68,14 @@ const ConfigPanel: React.FC = () => {
       </Header>
       <Column style={{flex: 1, overflowY: 'auto'}}>
         <ConfigSection title="Evaluation" icon="baseline-alt">
+          <Select
+            options={[]}
+            value={''}
+            onChange={option => {
+              console.log(option);
+              console.error('Not yet implemented');
+            }}
+          />
           <Column
             style={{
               flex: 0,
@@ -153,6 +161,7 @@ const ConfigSection: React.FC<{
           alignItems: 'center',
           flex: 0,
           fontWeight: 600,
+          paddingBottom: '8px',
         }}>
         <Icon name={icon} />
         <span style={{marginLeft: '4px'}}>{title}</span>
