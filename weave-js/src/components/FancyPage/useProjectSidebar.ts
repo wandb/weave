@@ -174,6 +174,13 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Explorer',
+            slug: 'weave/evaluation-explorer',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.RocketLaunch,
+          },
+          {
+            type: 'button' as const,
             name: 'Monitors',
             slug: 'weave/monitors',
             // feature-gating for admins
