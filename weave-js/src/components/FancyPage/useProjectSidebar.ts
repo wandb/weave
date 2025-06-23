@@ -3,8 +3,8 @@ import _ from 'lodash';
 import {useMemo} from 'react';
 import {useLocation} from 'react-router-dom';
 
-import {FancyPageSidebarItem} from './FancyPageSidebar';
 import getConfig from '../../config';
+import {FancyPageSidebarItem} from './FancyPageSidebar';
 
 export const useProjectSidebar = (
   isLoading: boolean,
@@ -292,6 +292,7 @@ export const useProjectSidebar = (
     isShowAll,
     isWandbAdmin,
     isWeaveOnly,
+    isDedicated,
     nwSearchStr,
     showWeaveSidebarItems,
     viewingRestricted,

@@ -2,6 +2,7 @@ import {ApolloProvider} from '@apollo/client';
 import {Box, Drawer} from '@mui/material';
 import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
+import getConfig from '@wandb/weave/config';
 import {debounce} from 'lodash';
 import React, {
   FC,
@@ -67,7 +68,6 @@ import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/t
 import {getParamArray, queryGetDict} from './Browse3/urlQueryUtil';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
-import getConfig from '@wandb/weave/config';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
