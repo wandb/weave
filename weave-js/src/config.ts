@@ -9,7 +9,6 @@ declare global {
       WANDB_BASE_URL: string;
       DD_ENV: string;
       ENV_IS_CI: boolean;
-      IS_DEDICATED: boolean;
     };
   }
 }
@@ -26,7 +25,6 @@ if (!window.WEAVE_CONFIG) {
     WANDB_BASE_URL: window.CONFIG?.BACKEND_HOST ?? 'https://api.wandb.ai',
     DD_ENV: '',
     ENV_IS_CI: false,
-    IS_DEDICATED: false,
   };
 }
 
@@ -38,7 +36,6 @@ interface Config {
   WANDB_BASE_URL: string;
   TRACE_BACKEND_BASE_URL: string;
   ENV_IS_CI: boolean;
-  IS_DEDICATED: boolean;
   urlPrefixed(path: string): string;
   backendWeaveExecutionUrl(shadow?: boolean): string;
   backendWeaveViewerUrl(): string;
@@ -94,7 +91,6 @@ const DEFAULT_CONFIG: Config = {
   WANDB_BASE_URL: window.WEAVE_CONFIG.WANDB_BASE_URL,
   ENV_IS_CI: window.WEAVE_CONFIG.ENV_IS_CI,
   TRACE_BACKEND_BASE_URL: window.WEAVE_CONFIG.TRACE_BACKEND_BASE_URL,
-  IS_DEDICATED: window.WEAVE_CONFIG.IS_DEDICATED,
 } as const;
 
 let config = {...DEFAULT_CONFIG};
