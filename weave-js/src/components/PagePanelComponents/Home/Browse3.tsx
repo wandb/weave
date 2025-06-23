@@ -2,6 +2,7 @@ import {ApolloProvider} from '@apollo/client';
 import {Box, Drawer} from '@mui/material';
 import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
+import getConfig from '@wandb/weave/config';
 import {debounce} from 'lodash';
 import React, {
   FC,
@@ -419,9 +420,11 @@ const Browse3ProjectRoot: FC<{
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
         </Route>
-        <Route path={`${projectRoot}/monitors`}>
-          <MonitorsPageBinding />
-        </Route>
+        {!getConfig().IS_DEDICATED && (
+          <Route path={`${projectRoot}/monitors`}>
+            <MonitorsPageBinding />
+          </Route>
+        )}
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
         </Route>
