@@ -118,7 +118,7 @@ def wf_file_storage_project_allow_list() -> Optional[list[str]]:
     except Exception as e:
         raise ValueError(
             f"WF_FILE_STORAGE_PROJECT_ALLOW_LIST is not a valid comma-separated list: {allow_list}. Error: {str(e)}"
-        )
+        ) from e
 
     return project_ids
 
@@ -187,7 +187,7 @@ def wf_file_storage_project_ramp_pct() -> Optional[int]:
     except ValueError as e:
         raise ValueError(
             f"WF_FILE_STORAGE_PROJECT_RAMP_PCT is not a valid integer: {pct_str}. Error: {str(e)}"
-        )
+        ) from e
 
     if pct < 0 or pct > 100:
         raise ValueError(
@@ -195,3 +195,13 @@ def wf_file_storage_project_ramp_pct() -> Optional[int]:
         )
 
     return pct
+
+
+# Inference Service Settings
+
+
+def inference_service_base_url() -> str:
+    """The base URL for the inference service."""
+    return os.environ.get(
+        "INFERENCE_SERVICE_BASE_URL", "https://api.inference.wandb.ai/v1"
+    )
