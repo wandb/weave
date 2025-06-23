@@ -128,17 +128,15 @@ export const MessagePanelPart = ({
     [key: number]: boolean;
   }>({});
 
-  // Only parse thinking blocks for assistant messages, not user messages
-  const shouldParseThinking = role !== 'user' && typeof value === 'string';
-  const parts = useMemo(
-    () =>
-      shouldParseThinking
-        ? parseThinkingBlocks(value as string)
-        : typeof value === 'string'
-        ? [{type: 'text' as const, content: value}]
-        : [],
-    [shouldParseThinking, value]
-  );
+  const parts = useMemo(() => {
+    // Only parse thinking blocks for assistant messages, not user messages
+    const shouldParseThinking = role !== 'user' && typeof value === 'string';
+    return shouldParseThinking
+      ? parseThinkingBlocks(value as string)
+      : typeof value === 'string'
+      ? [{type: 'text' as const, content: value}]
+      : [];
+  }, [role, value]);
 
   if (typeof value === 'string') {
     if (isStructuredOutput) {
