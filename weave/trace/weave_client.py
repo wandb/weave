@@ -232,9 +232,8 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative step not supported")
 
         # Apply limit if provided
-        if self.limit is not None:
-            if stop is None or stop > self.limit:
-                stop = self.limit
+        if self.limit is not None and (stop is None or stop > self.limit):
+            stop = self.limit
 
         # Apply offset if provided
         if self.offset is not None:

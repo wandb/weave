@@ -909,9 +909,8 @@ def get_field_by_name(name: str) -> CallsMergedField:
             dumped_start_part = start_part + "_dump"
             if dumped_start_part in ALLOWED_CALL_FIELDS:
                 field = ALLOWED_CALL_FIELDS[dumped_start_part]
-                if isinstance(field, CallsMergedDynamicField):
-                    if len(field_parts) > 1:
-                        return field.with_path(field_parts[1:])
+                if isinstance(field, CallsMergedDynamicField) and len(field_parts) > 1:
+                    return field.with_path(field_parts[1:])
                 return field
             raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
