@@ -537,13 +537,24 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
             </Box>
             {judgeModel && (
               <Box>
-                <Button
-                  variant="ghost"
-                  size="small"
-                  icon={showModelSettings ? 'chevron-up' : 'chevron-down'}
-                  onClick={() => setShowModelSettings(!showModelSettings)}>
-                  Model settings
-                </Button>
+                <Box className="flex items-center justify-between gap-2">
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    icon={showModelSettings ? 'chevron-up' : 'chevron-down'}
+                    onClick={() => setShowModelSettings(!showModelSettings)}>
+                    Model settings
+                  </Button>
+                  <Typography className="text-sm text-moon-500" sx={{...typographyStyle}}>
+                    Learn more about{' '}
+                    <Link
+                      to="https://docs.wandb.ai/guides/models"
+                      target="_blank"
+                      className="text-blue-500">
+                      creating models
+                    </Link>
+                  </Typography>
+                </Box>
                 {showModelSettings && (
                   <Box className="mt-4 rounded-md bg-moon-100 p-12">
                     <Box className="mt-12 flex flex-col gap-16">
@@ -709,7 +720,7 @@ Remember: Your response must be valid JSON that can be parsed programmatically. 
             <TextArea
               value={scoringPrompt}
               placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
-              className="min-h-[400px]"
+              className="min-h-[320px]"
               onChange={e => {
                 setScoringPrompt(e.target.value);
                 setTouchedFields(prev => ({...prev, scoringPrompt: true}));
