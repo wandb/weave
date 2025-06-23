@@ -1208,7 +1208,11 @@ def process_thread_id_filter_to_sql(
     table_alias: str,
 ) -> str:
     """Pulls out the thread_id and returns a sql string if there are any thread_ids."""
-    if hardcoded_filter is None or not hardcoded_filter.filter.thread_ids:
+    if (
+        hardcoded_filter is None
+        or hardcoded_filter.filter.thread_ids is None
+        or len(hardcoded_filter.filter.thread_ids) == 0
+    ):
         return ""
 
     thread_ids = hardcoded_filter.filter.thread_ids
@@ -1356,7 +1360,7 @@ def process_calls_filter_to_conditions(
             f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
 
-    if filter.thread_ids:
+    if filter.thread_ids is not None:
         assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
         conditions.append(
             f"{get_field_by_name('thread_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
