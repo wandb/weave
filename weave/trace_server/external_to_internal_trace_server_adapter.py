@@ -1,6 +1,6 @@
 import abc
 import typing
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from typing import Callable, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
@@ -63,19 +63,19 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def __getattr__(self, name: str) -> typing.Any:
         return getattr(self._internal_trace_server, name)
 
-    def _ref_apply(self, method: Callable[[A], B], req: A) -> B:
+    async def _ref_apply(self, method: Callable[[A], typing.Awaitable[B]], req: A) -> B:
         req_conv = universal_ext_to_int_ref_converter(
             req, self._idc.ext_to_int_project_id
         )
-        res = method(req_conv)
+        res = await method(req_conv)
         res_conv = universal_int_to_ext_ref_converter(
             res, self._idc.int_to_ext_project_id
         )
         return res_conv
 
-    def _stream_ref_apply(
-        self, method: Callable[[A], Iterator[B]], req: A
-    ) -> Iterator[B]:
+    async def _stream_ref_apply(
+        self, method: Callable[[A], AsyncIterator[B]], req: A
+    ) -> AsyncIterator[B]:
         req_conv = universal_ext_to_int_ref_converter(
             req, self._idc.ext_to_int_project_id
         )
@@ -90,37 +90,37 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 )
             return int_to_ext_project_cache[project_id]
 
-        for item in res:
+        async for item in res:
             yield universal_int_to_ext_ref_converter(item, cached_int_to_ext_project_id)
 
     # Standard API Below:
-    def ensure_project_exists(
+    async def ensure_project_exists(
         self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes:
-        return self._internal_trace_server.ensure_project_exists(entity, project)
+        return await self._internal_trace_server.ensure_project_exists(entity, project)
 
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    async def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.otel_export, req)
+        return await self._ref_apply(self._internal_trace_server.otel_export, req)
 
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+    async def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
         if req.start.wb_run_id is not None:
             req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
         if req.start.wb_user_id is not None:
             req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.call_start, req)
+        return await self._ref_apply(self._internal_trace_server.call_start, req)
 
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+    async def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
-        return self._ref_apply(self._internal_trace_server.call_end, req)
+        return await self._ref_apply(self._internal_trace_server.call_end, req)
 
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+    async def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.call_read, req)
+        res = await self._ref_apply(self._internal_trace_server.call_read, req)
         if res.call is None:
             return res
         if res.call.project_id != req.project_id:
@@ -132,7 +132,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             res.call.wb_user_id = self._idc.int_to_ext_user_id(res.call.wb_user_id)
         return res
 
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+    async def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
@@ -141,14 +141,12 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                     self._idc.ext_to_int_run_id(run_id)
                     for run_id in req.filter.wb_run_ids
                 ]
-            # TODO: How do we correctly process run_id for the query filters?
             if req.filter.wb_user_ids is not None:
                 req.filter.wb_user_ids = [
                     self._idc.ext_to_int_user_id(user_id)
                     for user_id in req.filter.wb_user_ids
                 ]
-            # TODO: How do we correctly process user_id for the query filters?
-        res = self._ref_apply(self._internal_trace_server.calls_query, req)
+        res = await self._ref_apply(self._internal_trace_server.calls_query, req)
         for call in res.calls:
             if call.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
@@ -159,7 +157,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
         return res
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    async def calls_query_stream(
+        self, req: tsi.CallsQueryReq
+    ) -> AsyncIterator[tsi.CallSchema]:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
@@ -168,17 +168,15 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                     self._idc.ext_to_int_run_id(run_id)
                     for run_id in req.filter.wb_run_ids
                 ]
-            # TODO: How do we correctly process the query filters?
             if req.filter.wb_user_ids is not None:
                 req.filter.wb_user_ids = [
                     self._idc.ext_to_int_user_id(user_id)
                     for user_id in req.filter.wb_user_ids
                 ]
-            # TODO: How do we correctly process user_id for the query filters?
-        res = self._stream_ref_apply(
+        res = await self._stream_ref_apply(
             self._internal_trace_server.calls_query_stream, req
         )
-        for call in res:
+        async for call in res:
             if call.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
             call.project_id = original_project_id
@@ -188,13 +186,15 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
             yield call
 
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+    async def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.calls_delete, req)
+        return await self._ref_apply(self._internal_trace_server.calls_delete, req)
 
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+    async def calls_query_stats(
+        self, req: tsi.CallsQueryStatsReq
+    ) -> tsi.CallsQueryStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.filter is not None:
             if req.filter.wb_run_ids is not None:
@@ -202,138 +202,141 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                     self._idc.ext_to_int_run_id(run_id)
                     for run_id in req.filter.wb_run_ids
                 ]
-            # TODO: How do we correctly process the query filters?
             if req.filter.wb_user_ids is not None:
                 req.filter.wb_user_ids = [
                     self._idc.ext_to_int_user_id(user_id)
                     for user_id in req.filter.wb_user_ids
                 ]
-            # TODO: How do we correctly process user_id for the query filters?
-        return self._ref_apply(self._internal_trace_server.calls_query_stats, req)
+        return await self._ref_apply(self._internal_trace_server.calls_query_stats, req)
 
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+    async def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.call_update, req)
+        return await self._ref_apply(self._internal_trace_server.call_update, req)
 
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
+    async def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         req.op_obj.project_id = self._idc.ext_to_int_project_id(req.op_obj.project_id)
-        return self._ref_apply(self._internal_trace_server.op_create, req)
+        return await self._ref_apply(self._internal_trace_server.op_create, req)
 
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
+    async def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.op_read, req)
+        res = await self._ref_apply(self._internal_trace_server.op_read, req)
         if res.op_obj.project_id != req.project_id:
             raise ValueError("Internal Error - Project Mismatch")
         res.op_obj.project_id = original_project_id
         return res
 
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
+    async def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.ops_query, req)
+        res = await self._ref_apply(self._internal_trace_server.ops_query, req)
         for op in res.op_objs:
             if op.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
             op.project_id = original_project_id
         return res
 
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+    async def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         req.obj.project_id = self._idc.ext_to_int_project_id(req.obj.project_id)
         if req.obj.wb_user_id is not None:
             req.obj.wb_user_id = self._idc.ext_to_int_user_id(req.obj.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.obj_create, req)
+        return await self._ref_apply(self._internal_trace_server.obj_create, req)
 
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+    async def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.obj_read, req)
+        res = await self._ref_apply(self._internal_trace_server.obj_read, req)
         if res.obj.project_id != req.project_id:
             raise ValueError("Internal Error - Project Mismatch")
         res.obj.project_id = original_project_id
         return res
 
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+    async def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.objs_query, req)
+        res = await self._ref_apply(self._internal_trace_server.objs_query, req)
         for obj in res.objs:
             if obj.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
             obj.project_id = original_project_id
         return res
 
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+    async def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.obj_delete, req)
+        return await self._ref_apply(self._internal_trace_server.obj_delete, req)
 
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+    async def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
-        return self._ref_apply(self._internal_trace_server.table_create, req)
+        return await self._ref_apply(self._internal_trace_server.table_create, req)
 
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+    async def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.table_update, req)
+        return await self._ref_apply(self._internal_trace_server.table_update, req)
 
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+    async def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.table_query, req)
+        return await self._ref_apply(self._internal_trace_server.table_query, req)
 
-    def table_query_stream(
+    async def table_query_stream(
         self, req: tsi.TableQueryReq
-    ) -> Iterator[tsi.TableRowSchema]:
+    ) -> AsyncIterator[tsi.TableRowSchema]:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        async for row in await self._stream_ref_apply(
             self._internal_trace_server.table_query_stream, req
-        )
+        ):
+            yield row
 
-    # This is a legacy endpoint, it should be removed once the client is mostly updated
-    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+    async def table_query_stats(
+        self, req: tsi.TableQueryStatsReq
+    ) -> tsi.TableQueryStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.table_query_stats, req)
+        return await self._ref_apply(self._internal_trace_server.table_query_stats, req)
 
-    def table_query_stats_batch(
+    async def table_query_stats_batch(
         self, req: tsi.TableQueryStatsBatchReq
     ) -> tsi.TableQueryStatsBatchRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.table_query_stats_batch, req)
+        return await self._ref_apply(
+            self._internal_trace_server.table_query_stats_batch, req
+        )
 
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        return self._ref_apply(self._internal_trace_server.refs_read_batch, req)
+    async def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+        return await self._ref_apply(self._internal_trace_server.refs_read_batch, req)
 
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        # Special case where refs can never be part of the request
-        return self._internal_trace_server.file_create(req)
+        return await self._internal_trace_server.file_create(req)
 
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+    async def file_content_read(
+        self, req: tsi.FileContentReadReq
+    ) -> tsi.FileContentReadRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        # Special case where refs can never be part of the request
-        return self._internal_trace_server.file_content_read(req)
+        return await self._internal_trace_server.file_content_read(req)
 
-    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+    async def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.files_stats, req)
+        return await self._ref_apply(self._internal_trace_server.files_stats, req)
 
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+    async def feedback_create(
+        self, req: tsi.FeedbackCreateReq
+    ) -> tsi.FeedbackCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         original_user_id = req.wb_user_id
         if original_user_id is None:
             raise ValueError("wb_user_id cannot be None")
         req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
-        res = self._ref_apply(self._internal_trace_server.feedback_create, req)
+        res = await self._ref_apply(self._internal_trace_server.feedback_create, req)
         if res.wb_user_id != req.wb_user_id:
             raise ValueError("Internal Error - User Mismatch")
         res.wb_user_id = original_user_id
         return res
 
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+    async def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        # TODO: How to handle wb_user_id and wb_run_id in the query filters?
-        res = self._ref_apply(self._internal_trace_server.feedback_query, req)
+        res = await self._ref_apply(self._internal_trace_server.feedback_query, req)
         for feedback in res.result:
             if "project_id" in feedback:
                 if feedback["project_id"] != req.project_id:
@@ -346,35 +349,36 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                     )
         return res
 
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+    async def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.feedback_purge, req)
+        return await self._ref_apply(self._internal_trace_server.feedback_purge, req)
 
-    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+    async def feedback_replace(
+        self, req: tsi.FeedbackReplaceReq
+    ) -> tsi.FeedbackReplaceRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         original_user_id = req.wb_user_id
         if original_user_id is None:
             raise ValueError("wb_user_id cannot be None")
         req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
-        res = self._ref_apply(self._internal_trace_server.feedback_replace, req)
+        res = await self._ref_apply(self._internal_trace_server.feedback_replace, req)
         if res.wb_user_id != req.wb_user_id:
             raise ValueError("Internal Error - User Mismatch")
         res.wb_user_id = original_user_id
         return res
 
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+    async def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.cost_create, req)
+        return await self._ref_apply(self._internal_trace_server.cost_create, req)
 
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+    async def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.cost_purge, req)
+        return await self._ref_apply(self._internal_trace_server.cost_purge, req)
 
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+    async def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.cost_query, req)
-        # Extend this to account for ORG ID when org level costs are implemented
+        res = await self._ref_apply(self._internal_trace_server.cost_query, req)
         for cost in res.results:
             if "pricing_level_id" in cost:
                 if cost["pricing_level_id"] != req.project_id:
@@ -382,7 +386,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 cost["pricing_level_id"] = original_project_id
         return res
 
-    def actions_execute_batch(
+    async def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
@@ -390,25 +394,27 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         if original_user_id is None:
             raise ValueError("wb_user_id cannot be None")
         req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
-        res = self._ref_apply(self._internal_trace_server.actions_execute_batch, req)
+        res = await self._ref_apply(
+            self._internal_trace_server.actions_execute_batch, req
+        )
         return res
 
-    def completions_create(
+    async def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        res = self._ref_apply(self._internal_trace_server.completions_create, req)
+        res = await self._ref_apply(self._internal_trace_server.completions_create, req)
         return res
 
-    # Streaming completions – simply proxy through after converting project ID.
-    def completions_create_stream(
+    async def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
-    ) -> typing.Iterator[dict[str, typing.Any]]:
+    ) -> AsyncIterator[dict[str, typing.Any]]:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         # The streamed chunks contain no project-scoped references, so we can
         # forward directly without additional ref conversion.
-        return self._internal_trace_server.completions_create_stream(req)
+        async for chunk in self._internal_trace_server.completions_create_stream(req):
+            yield chunk
 
-    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+    async def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.project_stats, req)
+        return await self._ref_apply(self._internal_trace_server.project_stats, req)

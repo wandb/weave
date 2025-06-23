@@ -1,7 +1,7 @@
 import copy
 import datetime
 from collections import OrderedDict, defaultdict
-from collections.abc import Iterator, AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, Optional, cast
 
 from weave.trace_server import refs_internal as ri
@@ -20,8 +20,8 @@ def make_feedback_query_req(
 
     # construct mogo style query
     from weave.trace_server.interface.query import (
-        InOperation,
         GetFieldOperator,
+        InOperation,
         LiteralOperation,
     )
 

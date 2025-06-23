@@ -1,5 +1,5 @@
 import datetime
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
 

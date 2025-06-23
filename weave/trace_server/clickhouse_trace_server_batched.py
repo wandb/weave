@@ -22,6 +22,7 @@
 # the problem.
 
 
+import asyncio
 import dataclasses
 import datetime
 import hashlib
@@ -29,16 +30,15 @@ import json
 import logging
 import threading
 from collections import defaultdict
-from collections.abc import Iterator, Sequence, AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Iterator, Sequence
 from contextlib import contextmanager
-from typing import Any, Callable, Optional, Union, cast, Awaitable
+from typing import Any, Callable, Optional, Union, cast
 from zoneinfo import ZoneInfo
-from clickhouse_connect.driver import httputil
-import asyncio
 
 import clickhouse_connect
 import ddtrace
 import emoji
+from clickhouse_connect.driver import httputil
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -511,8 +511,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
 
         if not expand_columns and not include_feedback:
-            for row in raw_res:
-                yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+            yield from (
+                tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+                for row in raw_res
+            )
             return
 
         ref_cache = LRUCache(max_size=1000)
@@ -2045,7 +2047,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # If tracking not requested just return chunks directly
         if not req.track_llm_call or start_call is None:
             # Convert regular iterator to async iterator
-            async def _async_chunk_wrapper():
+            async def _async_chunk_wrapper() -> AsyncIterator[dict[str, Any]]:
                 for chunk in chunk_iter:
                     yield chunk
 
@@ -2196,7 +2198,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         summary = None
         parameters = _process_parameters(parameters)
         try:
-            async with self.ch_client.query_rows_stream(
+            with self.ch_client.query_rows_stream(
                 query,
                 parameters=parameters,
                 column_formats=column_formats,
@@ -2213,7 +2215,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         "summary": summary,
                     },
                 )
-                async for row in stream:
+                for row in stream:
                     yield row
         except Exception as e:
             logger.exception(
