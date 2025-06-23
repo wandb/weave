@@ -177,7 +177,7 @@ export const useProjectSidebar = (
             name: 'Monitors',
             slug: 'weave/monitors',
             // feature-gating for admins
-            isShown: isWandbAdmin, //showWeaveSidebarItems || isShowAll,
+            isShown: (showWeaveSidebarItems || isShowAll) && isWandbAdmin,
             iconName: IconNames.JobAutomation,
           },
           {

@@ -228,9 +228,9 @@ def get_ranked_prices(
             END,
             CASE
                 -- Order by pricing level then by effective_date
-                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['ORG']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['PROJECT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['DEFAULT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
+                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["ORG"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["PROJECT"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["DEFAULT"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
                 ELSE 4
             END,
             {LLM_TOKEN_PRICES_TABLE_NAME}.effective_date DESC
@@ -477,7 +477,7 @@ def cost_query(
         ranked_prices AS ({get_ranked_prices(pb, "llm_usage", project_id).sql})
 
         -- Final Select, which just selects the correct fields, and adds a costs object
-        {final_call_select_with_cost(pb, 'ranked_prices', select_fields, order_fields).sql}
+        {final_call_select_with_cost(pb, "ranked_prices", select_fields, order_fields).sql}
     """
     return raw_sql
 
@@ -501,7 +501,7 @@ def is_project_id_sql_injection_safe(project_id: str) -> None:
 
         raise ValueError("Invalid project_id", project_id)
     except Exception:
-        raise ValueError("Invalid project_id", project_id)
+        raise ValueError("Invalid project_id", project_id) from None
 
 
 MESSAGE_INVALID_COST_PURGE = "Can only purge costs by specifying one or more cost ids"
