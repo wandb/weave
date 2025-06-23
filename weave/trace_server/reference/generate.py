@@ -212,11 +212,11 @@ def generate_routes(
         return service.trace_server_interface.calls_query(req)
 
     @router.post("/obj/create", tags=[OBJECTS_TAG_NAME])
-    def obj_create(
+    async def obj_create(
         req: tsi.ObjCreateReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.ObjCreateRes:
-        return service.trace_server_interface.obj_create(req)
+        return await service.trace_server_interface.obj_create(req)
 
     @router.post("/obj/read", tags=[OBJECTS_TAG_NAME])
     def obj_read(
@@ -240,11 +240,11 @@ def generate_routes(
         return service.trace_server_interface.obj_delete(req)
 
     @router.post("/table/create", tags=[TABLES_TAG_NAME])
-    def table_create(
+    async def table_create(
         req: tsi.TableCreateReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.TableCreateRes:
-        return service.trace_server_interface.table_create(req)
+        return await service.trace_server_interface.table_create(req)
 
     @router.post("/table/update", tags=[TABLES_TAG_NAME])
     def table_update(
@@ -312,7 +312,7 @@ def generate_routes(
             name=file.filename or "<unnamed_file>",
             content=await file.read(),
         )
-        return service.trace_server_interface.file_create(req)
+        return await service.trace_server_interface.file_create(req)
 
     @router.post(
         "/file/content",

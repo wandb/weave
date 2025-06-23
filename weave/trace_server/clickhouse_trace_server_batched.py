@@ -88,7 +88,6 @@ from weave.trace_server.feedback import (
 from weave.trace_server.file_storage import (
     FileStorageClient,
     FileStorageReadError,
-    FileStorageWriteError,
     key_for_project_digest,
     maybe_get_storage_client_from_env,
     read_from_bucket,
@@ -938,7 +937,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.ObjDeleteRes(num_deleted=num_deleted)
 
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+    async def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
@@ -956,7 +955,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             )
 
-        self._insert(
+        await self._async_insert(
             "table_rows",
             data=insert_rows,
             column_names=["project_id", "digest", "refs", "val_dump"],
@@ -969,7 +968,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             table_hasher.update(row_digest.encode())
         digest = table_hasher.hexdigest()
 
-        self._insert(
+        await self._async_insert(
             "tables",
             data=[(req.table.project_id, digest, row_digests)],
             column_names=["project_id", "digest", "row_digests"],

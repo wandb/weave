@@ -5,7 +5,7 @@ import json
 import logging
 import os
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Awaitable, Iterator
 from typing import Any, Callable, TypedDict, TypeVar
 
 from pydantic import BaseModel
@@ -229,6 +229,59 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
         return res
 
+    async def _with_cache_async(
+        self,
+        func: Callable[[TReq], Awaitable[TRes]],
+        req: TReq,
+        namespace: str,
+        make_cache_key: Callable[[TReq], str],
+        serialize: Callable[[TRes], str | bytes],
+        deserialize: Callable[[str | bytes], TRes],
+    ) -> TRes:
+        """Cache the result of a function call using the provided serialization methods.
+
+        This is the core caching implementation that handles serialization/deserialization
+        of cached values.
+
+        Args:
+            namespace: Namespace to prefix the cache key with
+            make_cache_key: Function to generate a cache key from the request
+            func: The function to cache results for
+            req: The request object
+            serialize: Function to serialize the response to a string/bytes
+            deserialize: Function to deserialize the cached value back to a response
+
+        Returns:
+            The function result, either from cache or from calling func
+        """
+        try:
+            cache_key = self._make_cache_key(namespace, make_cache_key(req))
+        except Exception as e:
+            logger.exception(f"Error creating cache key: {e}")
+            return await func(req)
+
+        # Try to get from cache
+        cached_json_value = self._safe_cache_get(cache_key)
+        if cached_json_value is not None:
+            try:
+                return deserialize(cached_json_value)
+            except Exception as e:
+                logger.exception(f"Error deserializing cached value: {e}")
+                # Remove corrupted cache entry
+                self._safe_cache_delete(cache_key)
+
+        # Cache miss or deserialization error - get fresh result
+        res = await func(req)
+
+        # Cache the result
+        try:
+            json_value_to_cache = serialize(res)
+            self._safe_cache_set(cache_key, json_value_to_cache)
+        except Exception as e:
+            logger.exception(f"Error serializing value for cache: {e}")
+
+        return res
+
     def _with_cache_pydantic(
         self,
         func: Callable[[TReq], TRes],
@@ -257,6 +310,21 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             lambda json_value: res_type.model_validate_json(json_value),
         )
 
+    async def _with_cache_pydantic_async(
+        self,
+        func: Callable[[TReq], Awaitable[TRes]],
+        req: TReq,
+        res_type: type[TRes],
+    ) -> TRes:
+        return await self._with_cache_async(
+            func,
+            req,
+            func.__name__,
+            lambda req: pydantic_bytes_safe_dump(req),
+            lambda res: res.model_dump_json(),
+            lambda json_value: res_type.model_validate_json(json_value),
+        )
+
     def reset_cache_recorder(self) -> None:
         self._cache_recorder = {
             "hits": 0,
@@ -276,9 +344,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         )
 
     # Obj API
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+    async def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         # All obj_create requests are cacheable!
-        return self._with_cache_pydantic(
+        return await self._with_cache_pydantic_async(
             self._next_trace_server.obj_create, req, tsi.ObjCreateRes
         )
 
@@ -386,9 +454,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return tsi.RefsReadBatchRes(vals=final_results)
 
     # File API
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         # All file_create requests are cacheable!
-        return self._with_cache_pydantic(
+        return await self._with_cache_pydantic_async(
             self._next_trace_server.file_create, req, tsi.FileCreateRes
         )
 
@@ -399,7 +467,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             "file_content_read",
             lambda req: req.model_dump_json(),
             lambda res: res.content,
-            lambda content: tsi.FileContentReadRes(content=content),
+            lambda content: tsi.FileContentReadRes(
+                content=(
+                    content if isinstance(content, bytes) else content.encode("utf-8")
+                )
+            ),
         )
 
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
@@ -417,6 +489,12 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         return self._next_trace_server.call_end(req)
+
+    async def call_start_async(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        return await self._next_trace_server.call_start_async(req)
+
+    async def call_end_async(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+        return await self._next_trace_server.call_end_async(req)
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         return self._next_trace_server.call_read(req)
@@ -464,8 +542,8 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return self._next_trace_server.objs_query(req)
 
     # Table API
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        return self._next_trace_server.table_create(req)
+    async def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        return await self._next_trace_server.table_create(req)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         return self._next_trace_server.table_update(req)

@@ -301,9 +301,11 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.obj_delete, req)
 
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+    async def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
-        return self._ref_apply(self._internal_trace_server.table_create, req)
+        return await self._async_ref_apply(
+            self._internal_trace_server.table_create, req
+        )
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)

@@ -1,5 +1,6 @@
 # Sqlite Trace Server
 
+import asyncio
 import contextvars
 import datetime
 import hashlib
@@ -252,6 +253,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             conn.commit()
         return tsi.CallEndRes()
+
+    async def call_start_async(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        return await asyncio.to_thread(self.call_start, req)
+
+    async def call_end_async(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+        return await asyncio.to_thread(self.call_end, req)
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         calls = self.calls_query(
@@ -738,7 +745,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         raise NotImplementedError()
 
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+    async def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        return await asyncio.to_thread(self._obj_create, req)
+
+    def _obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
 
         processed_result = process_incoming_object_val(
@@ -965,7 +975,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
 
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+    async def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        return await asyncio.to_thread(self._table_create, req)
+
+    def _table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         insert_rows = []
         for r in req.table.rows:
@@ -1365,7 +1378,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             "actions_execute_batch is not implemented for SQLite trace server"
         )
 
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        return await asyncio.to_thread(self._file_create, req)
+
+    def _file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         digest = bytes_digest(req.content)
         with self.lock:

@@ -264,6 +264,54 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             if line:
                 yield res_model.model_validate_json(line)
 
+    def _generic_request_async(
+        self,
+        url: str,
+        req: BaseModel,
+        req_model: type[BaseModel],
+        res_model: type[BaseModel],
+    ) -> BaseModel:
+        if isinstance(req, dict):
+            req = req_model.model_validate(req)
+        r = await self._generic_request_executor_async(url, req, stream=False)
+        return res_model.model_validate(r)
+
+    async def _generic_request_executor_async(
+        self,
+        url: str,
+        req: BaseModel,
+        stream: bool = False,
+    ) -> Any:
+        """Async version of _generic_request_executor using aiohttp."""
+        import aiohttp
+
+        headers = {}
+        # aiohttp requires data to be str or bytes for POST
+        data = req.model_dump_json(by_alias=True).encode("utf-8")
+        auth = aiohttp.BasicAuth(*self._auth) if self._auth else None
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                self.trace_server_url + url,
+                data=data,
+                auth=auth,
+                headers=headers,
+            ) as r:
+                if r.status == 500:
+                    reason_val = await r.text()
+                    try:
+                        import json as _json
+
+                        reason_val = _json.dumps(_json.loads(reason_val), indent=2)
+                    except Exception:
+                        reason_val = f"Reason: {reason_val}"
+                    raise Exception(
+                        f"500 Server Error: Internal Server Error for url: {url}. {reason_val}"
+                    )
+                r.raise_for_status()
+                if stream:
+                    return r
+                return await r.json()
+
     @with_retry
     def server_info(self) -> ServerInfoRes:
         r = requests.get(
@@ -319,6 +367,20 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             return tsi.CallEndRes()
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
+    async def call_end_async(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+        if self.should_batch:
+            assert self.call_processor is not None
+            self.call_processor.enqueue([EndBatchItem(req=req)])
+            return tsi.CallEndRes()
+        return await self._generic_request_async("/call/end", req, stream=False)
+
+    async def call_start_async(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        if self.should_batch:
+            assert self.call_processor is not None
+            self.call_processor.enqueue([StartBatchItem(req=req)])
+            return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
+        return await self._generic_request_async("/call/start", req, stream=False)
+
     def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
         return self._generic_request(
             "/call/read", req, tsi.CallReadReq, tsi.CallReadRes
@@ -373,7 +435,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     # Obj API
 
-    def obj_create(
+    async def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        return await self._generic_request_async("/obj/create", req, stream=False)
+
+    def _obj_create(
         self, req: Union[tsi.ObjCreateReq, dict[str, Any]]
     ) -> tsi.ObjCreateRes:
         return self._generic_request(
@@ -395,7 +460,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
         )
 
-    def table_create(
+    async def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        return await self._generic_request_async("/table/create", req, stream=False)
+
+    async def _table_create(
         self, req: Union[tsi.TableCreateReq, dict[str, Any]]
     ) -> tsi.TableCreateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
@@ -416,7 +484,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                     rows=[],
                 )
             )
-            initialization_res = self.table_create(initialization_req)
+            initialization_res = await self.table_create(initialization_req)
 
             update_req = tsi.TableUpdateReq(
                 project_id=req.table.project_id,
@@ -432,8 +500,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 digest=update_res.digest, row_digests=update_res.updated_row_digests
             )
         else:
-            return self._generic_request(
-                "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
+            return await self._generic_request_executor_async(
+                "/table/create", req, stream=False
             )
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
@@ -467,16 +535,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 digest=second_half_res.digest, updated_row_digests=all_digests
             )
         else:
-            return self._generic_request(
-                "/table/update", req, tsi.TableUpdateReq, tsi.TableUpdateRes
+            return self._generic_request_executor_async(
+                "/table/update", req, stream=False
             )
 
     def table_query(
         self, req: Union[tsi.TableQueryReq, dict[str, Any]]
     ) -> tsi.TableQueryRes:
-        return self._generic_request(
-            "/table/query", req, tsi.TableQueryReq, tsi.TableQueryRes
-        )
+        return self._generic_request_executor_async("/table/query", req, stream=False)
 
     def table_query_stream(
         self, req: tsi.TableQueryReq
@@ -488,29 +554,54 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def table_query_stats(
         self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
     ) -> tsi.TableQueryStatsRes:
-        return self._generic_request(
-            "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
+        return self._generic_request_executor_async(
+            "/table/query_stats", req, stream=False
         )
 
     def table_query_stats_batch(
         self, req: Union[tsi.TableQueryStatsReq, dict[str, Any]]
     ) -> tsi.TableQueryStatsRes:
-        return self._generic_request(
-            "/table/query_stats_batch",
-            req,
-            tsi.TableQueryStatsBatchReq,
-            tsi.TableQueryStatsBatchRes,
+        return self._generic_request_executor_async(
+            "/table/query_stats_batch", req, stream=False
         )
 
     def refs_read_batch(
         self, req: Union[tsi.RefsReadBatchReq, dict[str, Any]]
     ) -> tsi.RefsReadBatchRes:
-        return self._generic_request(
-            "/refs/read_batch", req, tsi.RefsReadBatchReq, tsi.RefsReadBatchRes
+        return self._generic_request_executor_async(
+            "/refs/read_batch", req, stream=False
         )
 
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        """Create a file on the trace server asynchronously.
+
+        Args:
+            req (tsi.FileCreateReq): The file creation request containing project_id, name, and content.
+
+        Returns:
+            tsi.FileCreateRes: The response containing the created file information.
+
+        Examples:
+            >>> req = tsi.FileCreateReq(project_id="proj123", name="test.txt", content=b"hello")
+            >>> res = await file_create(req)
+        """
+        import aiohttp
+
+        async with aiohttp.ClientSession() as session:
+            data = aiohttp.FormData()
+            data.add_field("project_id", req.project_id)
+            data.add_field("file", req.content, filename=req.name)
+
+            async with session.post(
+                self.trace_server_url + "/files/create",
+                data=data,
+                auth=aiohttp.BasicAuth(*self._auth) if self._auth else None,
+            ) as r:
+                r.raise_for_status()
+                return tsi.FileCreateRes.model_validate(await r.json())
+
     @with_retry
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    def _file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         r = requests.post(
             self.trace_server_url + "/files/create",
             auth=self._auth,
@@ -537,78 +628,64 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return tsi.FileContentReadRes(content=bytes.read())
 
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
-        return self._generic_request(
-            "/files/stats", req, tsi.FilesStatsReq, tsi.FilesStatsRes
-        )
+        return self._generic_request_executor_async("/files/stats", req, stream=False)
 
     def feedback_create(
         self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
     ) -> tsi.FeedbackCreateRes:
-        return self._generic_request(
-            "/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes
+        return self._generic_request_executor_async(
+            "/feedback/create", req, stream=False
         )
 
     def feedback_query(
         self, req: Union[tsi.FeedbackQueryReq, dict[str, Any]]
     ) -> tsi.FeedbackQueryRes:
-        return self._generic_request(
-            "/feedback/query", req, tsi.FeedbackQueryReq, tsi.FeedbackQueryRes
+        return self._generic_request_executor_async(
+            "/feedback/query", req, stream=False
         )
 
     def feedback_purge(
         self, req: Union[tsi.FeedbackPurgeReq, dict[str, Any]]
     ) -> tsi.FeedbackPurgeRes:
-        return self._generic_request(
-            "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes
+        return self._generic_request_executor_async(
+            "/feedback/purge", req, stream=False
         )
 
     def feedback_replace(
         self, req: Union[tsi.FeedbackReplaceReq, dict[str, Any]]
     ) -> tsi.FeedbackReplaceRes:
-        return self._generic_request(
-            "/feedback/replace", req, tsi.FeedbackReplaceReq, tsi.FeedbackReplaceRes
+        return self._generic_request_executor_async(
+            "/feedback/replace", req, stream=False
         )
 
     def actions_execute_batch(
         self, req: Union[tsi.ActionsExecuteBatchReq, dict[str, Any]]
     ) -> tsi.ActionsExecuteBatchRes:
-        return self._generic_request(
-            "/actions/execute_batch",
-            req,
-            tsi.ActionsExecuteBatchReq,
-            tsi.ActionsExecuteBatchRes,
+        return self._generic_request_executor_async(
+            "/actions/execute_batch", req, stream=False
         )
 
     # Cost API
     def cost_query(
         self, req: Union[tsi.CostQueryReq, dict[str, Any]]
     ) -> tsi.CostQueryRes:
-        return self._generic_request(
-            "/cost/query", req, tsi.CostQueryReq, tsi.CostQueryRes
-        )
+        return self._generic_request_executor_async("/cost/query", req, stream=False)
 
     def cost_create(
         self, req: Union[tsi.CostCreateReq, dict[str, Any]]
     ) -> tsi.CostCreateRes:
-        return self._generic_request(
-            "/cost/create", req, tsi.CostCreateReq, tsi.CostCreateRes
-        )
+        return self._generic_request_executor_async("/cost/create", req, stream=False)
 
     def cost_purge(
         self, req: Union[tsi.CostPurgeReq, dict[str, Any]]
     ) -> tsi.CostPurgeRes:
-        return self._generic_request(
-            "/cost/purge", req, tsi.CostPurgeReq, tsi.CostPurgeRes
-        )
+        return self._generic_request_executor_async("/cost/purge", req, stream=False)
 
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        return self._generic_request(
-            "/completions/create",
-            req,
-            tsi.CompletionsCreateReq,
-            tsi.CompletionsCreateRes,
+        return self._generic_request_executor_async(
+            "/completions/create", req, stream=False
         )
 
     def completions_create_stream(
@@ -620,9 +697,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        return self._generic_request(
-            "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
-        )
+        return self._generic_request_executor_async("/project/stats", req, stream=False)
 
 
 __docspec__ = [

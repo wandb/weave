@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import copy
 import dataclasses
 import datetime
@@ -1293,7 +1294,7 @@ class WeaveClient:
         _should_print_call_link = should_print_call_link()
         _current_call = call_context.get_current_call()
 
-        def send_start_call() -> bool:
+        async def _send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
                 from weave.trace.pii_redaction import redact_pii
@@ -1303,7 +1304,7 @@ class WeaveClient:
             inputs_json = to_json(
                 maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
             )
-            self.server.call_start(
+            await self.server.call_start_async(
                 CallStartReq(
                     start=StartedCallSchemaForInsert(
                         project_id=project_id,
@@ -1321,6 +1322,9 @@ class WeaveClient:
                 )
             )
             return True
+
+        def send_start_call() -> bool:
+            return asyncio.run(_send_start_call())
 
         def on_complete(f: Future) -> None:
             try:
@@ -1446,7 +1450,7 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_end_call() -> None:
+        async def _send_end_call() -> None:
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.trace.pii_redaction import redact_pii
@@ -1456,7 +1460,7 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
-            self.server.call_end(
+            await self.server.call_end_async(
                 CallEndReq(
                     end=EndedCallSchemaForInsert(
                         project_id=project_id,
@@ -1468,6 +1472,9 @@ class WeaveClient:
                     )
                 )
             )
+
+        def send_end_call() -> None:
+            return asyncio.run(_send_end_call())
 
         self.future_executor.defer(send_end_call)
 
@@ -2026,7 +2033,7 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
-        def send_obj_create() -> ObjCreateRes:
+        async def _send_obj_create() -> ObjCreateRes:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
@@ -2037,7 +2044,11 @@ class WeaveClient:
                     val=json_val,
                 )
             )
-            return self.server.obj_create(req)
+            return await self.server.obj_create(req)
+
+        # TODO: Remove this once we have a way to run async code in the future executor
+        def send_obj_create() -> ObjCreateRes:
+            return asyncio.run(_send_obj_create())
 
         res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
         digest_future: Future[str] = self.future_executor.then(
@@ -2080,12 +2091,15 @@ class WeaveClient:
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
-        def send_table_create() -> TableCreateRes:
+        async def _send_table_create() -> TableCreateRes:
             rows = to_json(table.rows, self._project_id(), self)
             req = TableCreateReq(
                 table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
             )
-            return self.server.table_create(req)
+            return await self.server.table_create(req)
+
+        def send_table_create() -> TableCreateRes:
+            return asyncio.run(_send_table_create())
 
         res_future: Future[TableCreateRes] = self.future_executor.defer(
             send_table_create
@@ -2190,11 +2204,18 @@ class WeaveClient:
         if cached_res:
             return cached_res
 
+        async def _send_file_create() -> FileCreateRes:
+            return await self.server.file_create(req)
+
+        # TODO: Remove this once we have a way to run async code in the future executor
+        def send_file_create() -> FileCreateRes:
+            return asyncio.run(_send_file_create())
+
         if self.future_executor_fastlane:
             # If we have a separate upload worker pool, use it
-            res = self.future_executor_fastlane.defer(self.server.file_create, req)
+            res = self.future_executor_fastlane.defer(send_file_create)
         else:
-            res = self.future_executor.defer(self.server.file_create, req)
+            res = self.future_executor.defer(send_file_create)
 
         self.send_file_cache.put(req, res)
         return res
