@@ -13,7 +13,6 @@ from weave.trace_server.llm_completion import get_custom_provider_info
 from weave.trace_server.secret_fetcher_context import (
     _secret_fetcher_context,
 )
-from weave.trace_server.validation_util import CHValidationError
 
 
 class MockObjectReadError(Exception):
@@ -378,11 +377,14 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
     def test_streaming_error_handling(self):
         """Test error handling in streaming completion."""
+
+        class StreamingException(Exception): ...
+
         with patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock litellm to raise an exception
-            mock_litellm.side_effect = Exception("Test error")
+            mock_litellm.side_effect = StreamingException("Test error")
 
             # Create test request
             req = tsi.CompletionsCreateReq(
@@ -395,7 +397,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             )
 
             # Get the stream and expect an exception
-            with self.assertRaises(CHValidationError):
+            with self.assertRaises(StreamingException):
                 list(self.server.completions_create_stream(req))
 
     def test_streaming_with_call_tracking(self):
