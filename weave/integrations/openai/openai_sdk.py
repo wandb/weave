@@ -10,6 +10,10 @@ import weave
 from weave.integrations.openai.gpt_image_utils import (
     openai_image_wrapper_async,
     openai_image_wrapper_sync,
+    openai_image_edit_wrapper_sync,
+    openai_image_edit_wrapper_async,
+    openai_image_variation_wrapper_sync,
+    openai_image_variation_wrapper_async,
 )
 from weave.integrations.openai.openai_utils import (
     openai_accumulator,
@@ -586,22 +590,22 @@ def get_openai_patcher(
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.images"),
                 "Images.edit",
-                openai_image_wrapper_sync(settings=images_edit_settings),
+                openai_image_edit_wrapper_sync(settings=images_edit_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.images"),
                 "AsyncImages.edit",
-                openai_image_wrapper_async(settings=async_images_edit_settings),
+                openai_image_edit_wrapper_async(settings=async_images_edit_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.images"),
                 "Images.create_variation",
-                openai_image_wrapper_sync(settings=images_create_variation_settings),
+                openai_image_variation_wrapper_sync(settings=images_create_variation_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.images"),
                 "AsyncImages.create_variation",
-                openai_image_wrapper_async(
+                openai_image_variation_wrapper_async(
                     settings=async_images_create_variation_settings
                 ),
             ),

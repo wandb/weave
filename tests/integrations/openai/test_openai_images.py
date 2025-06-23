@@ -20,10 +20,10 @@ def test_openai_image_generate_sync(client_creator) -> None:
     """Test synchronous image generation using OpenAI GPT-Image"""
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
-    openai_sdk._openai_patcher = None
-
     # Autopatch testing is disabled for this test, so we need to manually patch the OpenAI client
     # This is a workaround to allow us to test the OpenAI client without the autopatching tests interfering
+    openai_sdk._openai_patcher = None
+
     autopatch_settings = AutopatchSettings(
         openai=IntegrationSettings(enabled=True),
     )
@@ -136,6 +136,300 @@ async def test_openai_image_generate_async(client_creator) -> None:
         # Second element should be PIL Image
         assert isinstance(pil_image, Image.Image)
         assert pil_image.size == (1024, 1024)
+
+        # Verify usage tracking
+        usage = call.summary["usage"]["gpt-image-1"]
+        assert usage["requests"] == 1
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+def test_openai_image_edit_sync(client_creator) -> None:
+    """Test synchronous image editing using OpenAI GPT-Image Edit API"""
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+
+    # Autopatch testing is disabled for this test, so we need to manually patch the OpenAI client
+    # This is a workaround to allow us to test the OpenAI client without the autopatching tests interfering
+    openai_sdk._openai_patcher = None
+
+    autopatch_settings = AutopatchSettings(
+        openai=IntegrationSettings(enabled=True),
+    )
+
+    # Create a simple test image and save to BytesIO
+    test_image = Image.new("RGB", (256, 256), color=(0, 255, 0))
+    image_buffer = BytesIO()
+    test_image.save(image_buffer, format="PNG")
+    image_buffer.seek(0)
+
+    with client_creator(autopatch_settings=autopatch_settings) as client:
+        openai_client = OpenAI(api_key=api_key)
+
+        response = openai_client.images.edit(
+            model="gpt-image-1",
+            image=image_buffer,
+            prompt="Add a red circle",
+            size="256x256",
+            quality="low",
+            output_format="jpeg",
+            output_compression=50,
+        )
+
+        calls = list(client.calls())
+        assert len(calls) == 1
+        call = calls[0]
+
+        # Verify the response structure
+        assert len(response.data) == 1
+        assert response.data[0].b64_json is not None
+        assert response.created is not None
+
+        # Verify weave call tracking
+        assert op_name_from_ref(call.op_name) == "openai.images.edit"
+        assert call.started_at is not None
+        assert call.started_at < call.ended_at
+
+        # Verify inputs
+        inputs = call.inputs
+        assert inputs["model"] == "gpt-image-1"
+        assert inputs["prompt"] == "Add a red circle"
+
+        # Verify output structure
+        output = call.output
+        assert len(output) == 2
+
+        # First element should be the original response
+        original_response, pil_image = output
+        assert original_response.created == response.created
+        assert len(original_response.data) == 1
+        assert original_response.data[0].b64_json is not None
+
+        # Second element should be PIL Image
+        assert isinstance(pil_image, Image.Image)
+        assert pil_image.size == (256, 256)
+
+        # Verify usage tracking
+        usage = call.summary["usage"]["gpt-image-1"]
+        assert usage["requests"] == 1
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+@pytest.mark.asyncio
+async def test_openai_image_edit_async(client_creator) -> None:
+    """Test asynchronous image editing using OpenAI GPT-Image Edit API"""
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+
+    # Autopatch testing is disabled for this test, so we need to manually patch the OpenAI client
+    # This is a workaround to allow us to test the OpenAI client without the autopatching tests interfering
+    openai_sdk._openai_patcher = None
+
+    autopatch_settings = AutopatchSettings(
+        openai=IntegrationSettings(enabled=True),
+    )
+
+    # Create a simple test image and save to BytesIO
+    test_image = Image.new("RGB", (256, 256), color=(0, 0, 255))
+    image_buffer = BytesIO()
+    test_image.save(image_buffer, format="PNG")
+    image_buffer.seek(0)
+
+    with client_creator(autopatch_settings=autopatch_settings) as client:
+        openai_client = AsyncOpenAI(api_key=api_key)
+
+        response = await openai_client.images.edit(
+            model="gpt-image-1",
+            image=image_buffer,
+            prompt="Add a yellow triangle",
+            size="256x256",
+            quality="low",
+            output_format="jpeg",
+            output_compression=50,
+        )
+
+        calls = list(client.calls())
+        assert len(calls) == 1
+        call = calls[0]
+
+        # Verify the response structure
+        assert len(response.data) == 1
+        assert response.data[0].b64_json is not None
+        assert response.created is not None
+
+        # Verify weave call tracking
+        assert op_name_from_ref(call.op_name) == "openai.images.edit"
+        assert call.started_at is not None
+        assert call.started_at < call.ended_at
+
+        # Verify inputs
+        inputs = call.inputs
+        assert inputs["model"] == "gpt-image-1"
+        assert inputs["prompt"] == "Add a yellow triangle"
+
+        # Verify output structure
+        output = call.output
+        assert len(output) == 2
+
+        # First element should be the original response
+        original_response, pil_image = output
+        assert original_response.created == response.created
+        assert len(original_response.data) == 1
+        assert original_response.data[0].b64_json is not None
+
+        # Second element should be PIL Image
+        assert isinstance(pil_image, Image.Image)
+        assert pil_image.size == (256, 256)
+
+        # Verify usage tracking
+        usage = call.summary["usage"]["gpt-image-1"]
+        assert usage["requests"] == 1
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+def test_openai_image_create_variation_sync(client_creator) -> None:
+    """Test synchronous image variation generation using OpenAI GPT-Image Variation API"""
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+
+    # Autopatch testing is disabled for this test, so we need to manually patch the OpenAI client
+    # This is a workaround to allow us to test the OpenAI client without the autopatching tests interfering
+    openai_sdk._openai_patcher = None
+
+    autopatch_settings = AutopatchSettings(
+        openai=IntegrationSettings(enabled=True),
+    )
+
+    # Create a simple test image and save to BytesIO
+    test_image = Image.new("RGB", (128, 128), color=(255, 255, 0))
+    image_buffer = BytesIO()
+    test_image.save(image_buffer, format="PNG")
+    image_buffer.seek(0)
+
+    with client_creator(autopatch_settings=autopatch_settings) as client:
+        openai_client = OpenAI(api_key=api_key)
+
+        response = openai_client.images.create_variation(
+            model="gpt-image-1",
+            image=image_buffer,
+            size="128x128",
+            quality="low",
+            output_format="jpeg",
+            output_compression=50,
+        )
+
+        calls = list(client.calls())
+        assert len(calls) == 1
+        call = calls[0]
+
+        # Verify the response structure
+        assert len(response.data) == 1
+        assert response.data[0].b64_json is not None
+        assert response.created is not None
+
+        # Verify weave call tracking
+        assert op_name_from_ref(call.op_name) == "openai.images.create_variation"
+        assert call.started_at is not None
+        assert call.started_at < call.ended_at
+
+        # Verify inputs
+        inputs = call.inputs
+        assert inputs["model"] == "gpt-image-1"
+
+        # Verify output structure
+        output = call.output
+        assert len(output) == 2
+
+        # First element should be the original response
+        original_response, pil_image = output
+        assert original_response.created == response.created
+        assert len(original_response.data) == 1
+        assert original_response.data[0].b64_json is not None
+
+        # Second element should be PIL Image
+        assert isinstance(pil_image, Image.Image)
+        assert pil_image.size == (128, 128)
+
+        # Verify usage tracking
+        usage = call.summary["usage"]["gpt-image-1"]
+        assert usage["requests"] == 1
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+@pytest.mark.asyncio
+async def test_openai_image_create_variation_async(client_creator) -> None:
+    """Test asynchronous image variation generation using OpenAI GPT-Image Variation API"""
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+
+    # Autopatch testing is disabled for this test, so we need to manually patch the OpenAI client
+    # This is a workaround to allow us to test the OpenAI client without the autopatching tests interfering
+    openai_sdk._openai_patcher = None
+
+    autopatch_settings = AutopatchSettings(
+        openai=IntegrationSettings(enabled=True),
+    )
+
+    # Create a simple test image and save to BytesIO
+    test_image = Image.new("RGB", (128, 128), color=(0, 255, 255))
+    image_buffer = BytesIO()
+    test_image.save(image_buffer, format="PNG")
+    image_buffer.seek(0)
+
+    with client_creator(autopatch_settings=autopatch_settings) as client:
+        openai_client = AsyncOpenAI(api_key=api_key)
+
+        response = await openai_client.images.create_variation(
+            model="gpt-image-1",
+            image=image_buffer,
+            size="128x128",
+            quality="low",
+            output_format="jpeg",
+            output_compression=50,
+        )
+
+        calls = list(client.calls())
+        assert len(calls) == 1
+        call = calls[0]
+
+        # Verify the response structure
+        assert len(response.data) == 1
+        assert response.data[0].b64_json is not None
+        assert response.created is not None
+
+        # Verify weave call tracking
+        assert op_name_from_ref(call.op_name) == "openai.images.create_variation"
+        assert call.started_at is not None
+        assert call.started_at < call.ended_at
+
+        # Verify inputs
+        inputs = call.inputs
+        assert inputs["model"] == "gpt-image-1"
+
+        # Verify output structure
+        output = call.output
+        assert len(output) == 2
+
+        # First element should be the original response
+        original_response, pil_image = output
+        assert original_response.created == response.created
+        assert len(original_response.data) == 1
+        assert original_response.data[0].b64_json is not None
+
+        # Second element should be PIL Image
+        assert isinstance(pil_image, Image.Image)
+        assert pil_image.size == (128, 128)
 
         # Verify usage tracking
         usage = call.summary["usage"]["gpt-image-1"]
