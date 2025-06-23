@@ -1,6 +1,8 @@
 import {Box, Drawer, Typography} from '@mui/material';
 import {GridFilterModel} from '@mui/x-data-grid-pro';
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
+import {toast} from '@wandb/weave/common/components/elements/Toast';
+import {Alert} from '@wandb/weave/components/Alert';
 import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
@@ -36,8 +38,9 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {toast} from 'react-toastify';
 import {useList} from 'react-use';
+
+import {transformNameToValid} from './nameTransform';
 
 const PAGE_SIZE = 10;
 const PAGE_OFFSET = 0;
@@ -45,6 +48,14 @@ const PAGE_OFFSET = 0;
 export interface ScorerFormProps {
   scorer: ObjectVersionSchema;
   onValidationChange: (valid: boolean) => void;
+  monitorName?: string;
+  validationErrors?: {
+    scorerName?: string;
+    scoringPrompt?: string;
+    judgeModel?: string;
+    judgeModelName?: string;
+    systemPrompt?: string;
+  };
 }
 
 type ScorerFormType = React.ForwardRefExoticComponent<
@@ -113,8 +124,20 @@ export const MonitorFormDrawer = ({
   const {entity, project} = useEntityProject();
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
+  const [scorerValidationErrors, setScorerValidationErrors] = useState<
+    Array<{
+      scorerName?: string;
+      scoringPrompt?: string;
+      judgeModel?: string;
+      judgeModelName?: string;
+      systemPrompt?: string;
+    }>
+  >([]);
   const [description, setDescription] = useState<string>('');
   const [monitorName, setMonitorName] = useState<string>('');
+  const [transformedMonitorName, setTransformedMonitorName] =
+    useState<string>('');
   const [samplingRate, setSamplingRate] = useState<number>(10);
   const [selectedOpVersionOption, setSelectedOpVersionOption] = useState<
     string[]
@@ -147,10 +170,27 @@ export const MonitorFormDrawer = ({
   );
 
   const [scorerValids, {updateAt: updateScorerValidAt}] = useList<boolean>(
-    existingScorers?.map(s => true) || [false]
+    existingScorers?.map(_ => true) || [false]
   );
 
   const [active, setActive] = useState<boolean>(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+
+  // Reset submission state when drawer closes
+  useEffect(() => {
+    if (!open) {
+      setHasSubmitted(false);
+    }
+  }, [open]);
+
+  // Callback to clear validation errors for a specific scorer
+  const clearScorerValidationError = useCallback((index: number) => {
+    setScorerValidationErrors(prev => {
+      const newErrors = [...prev];
+      newErrors[index] = {};
+      return newErrors;
+    });
+  }, []);
 
   useEffect(() => {
     if (!monitor) {
@@ -206,43 +246,33 @@ export const MonitorFormDrawer = ({
   const handleNameChange = useCallback(
     (value: string) => {
       setMonitorName(value);
-      const validationResult = validateDatasetName(value);
-      setNameError(validationResult.error);
+      const transformed = transformNameToValid(value);
+      setTransformedMonitorName(transformed);
+      // Only show error if the field is empty, not for invalid characters since we transform them
+      if (!value.trim()) {
+        setNameError('Monitor name is required');
+      } else {
+        setNameError(null);
+      }
     },
     [setNameError]
   );
 
   const opVersionOptions = useOpVersionOptions(entity, project, {}, false);
 
-  useMemo(() => {
+  useEffect(() => {
     setSelectedOpVersionOption(filter.opVersionRefs ?? []);
   }, [filter]);
 
-  const allScorersValid = useMemo(() => {
-    return scorers.every((scorer, index) => {
-      const hasForm = SCORER_FORMS.get(scorer.val['_type']) !== null;
-      if (hasForm) {
-        return scorerValids[index] === true;
-      }
-      return true; // No form, so it's valid
-    });
-  }, [scorers, scorerValids]);
+  // Clear operation error when operations are selected
+  useEffect(() => {
+    if (selectedOpVersionOption.length > 0 && operationError) {
+      setOperationError(null);
+    }
+  }, [selectedOpVersionOption, operationError]);
 
-  const enableCreateButton = useMemo(() => {
-    return (
-      monitorName.length > 0 &&
-      selectedOpVersionOption.length > 0 &&
-      scorers.length > 0 &&
-      nameError === null &&
-      allScorersValid
-    );
-  }, [
-    monitorName,
-    selectedOpVersionOption,
-    scorers,
-    nameError,
-    allScorersValid,
-  ]);
+  // Only clear scorer errors on form submission, not during live validation
+  // Individual field errors are managed by the scorer forms themselves
 
   const scorerForms: ScorerFormType[] = useMemo(
     () =>
@@ -262,7 +292,90 @@ export const MonitorFormDrawer = ({
   const objCreate = useObjCreate();
 
   const createMonitor = useCallback(async () => {
-    if (!enableCreateButton) {
+    // Mark that we've submitted
+    setHasSubmitted(true);
+
+    // Clear previous errors
+    setError(null);
+    setNameError(null);
+    setOperationError(null);
+    setScorerValidationErrors([]);
+
+    let hasValidationErrors = false;
+
+    // Monitor name validation
+    if (!monitorName.trim()) {
+      setNameError('Monitor name is required');
+      hasValidationErrors = true;
+    } else {
+      const nameValidation = validateDatasetName(transformedMonitorName);
+      if (nameValidation.error) {
+        setNameError(nameValidation.error);
+        hasValidationErrors = true;
+      }
+    }
+
+    // Operation validation
+    if (selectedOpVersionOption.length === 0) {
+      setOperationError('At least one operation must be selected');
+      hasValidationErrors = true;
+    }
+
+    // Scorer validation
+    const newScorerValidationErrors: Array<{
+      scorerName?: string;
+      scoringPrompt?: string;
+      judgeModel?: string;
+      judgeModelName?: string;
+      systemPrompt?: string;
+    }> = [];
+
+    if (scorers.length === 0) {
+      setError('At least one scorer is required.');
+      hasValidationErrors = true;
+    } else {
+      // Check each scorer's validation state and create specific field errors
+      scorers.forEach((scorer, index) => {
+        const hasForm = SCORER_FORMS.get(scorer.val['_type']) !== null;
+        const isValid = scorerValids[index];
+        const errors: {
+          scorerName?: string;
+          scoringPrompt?: string;
+          judgeModel?: string;
+          judgeModelName?: string;
+          systemPrompt?: string;
+        } = {};
+
+        if (hasForm && !isValid) {
+          // The scorer form handles its own validation
+          // We just mark that there are validation errors
+          hasValidationErrors = true;
+
+          // Set a flag to indicate validation errors exist
+          errors.scorerName = 'validation_error';
+        }
+
+        newScorerValidationErrors[index] = errors;
+      });
+      setScorerValidationErrors(newScorerValidationErrors);
+    }
+
+    // If there are validation errors, don't proceed
+    if (hasValidationErrors) {
+      // Check if there are scorer validation errors and set a helpful message
+      const invalidScorers = scorers.filter((scorer, index) => {
+        const hasForm = SCORER_FORMS.get(scorer.val['_type']) !== null;
+        return hasForm && !scorerValids[index];
+      });
+
+      if (invalidScorers.length > 0) {
+        setError('There was a problem with the scorer configuration.');
+      }
+
+      toast('Please check your configuration and fix the validation errors.', {
+        type: 'error',
+        autoClose: 4000,
+      });
       return;
     }
 
@@ -274,7 +387,7 @@ export const MonitorFormDrawer = ({
       );
 
       if (scorerRefs.some(ref => !ref)) {
-        setError('Failed to create scorer');
+        setError('Failed to create scorer.');
         setIsCreating(false);
         return;
       }
@@ -289,7 +402,7 @@ export const MonitorFormDrawer = ({
 
       const monitorObj = {
         _type: 'Monitor',
-        name: monitorName,
+        name: transformedMonitorName,
         description,
         ref: null,
         _class_name: 'Monitor',
@@ -303,22 +416,31 @@ export const MonitorFormDrawer = ({
 
       await objCreate({
         projectId: `${entity}/${project}`,
-        objectId: monitorName,
+        objectId: transformedMonitorName,
         val: monitorObj,
         baseObjectClass: 'Monitor',
       });
 
       setIsCreating(false);
 
-      toast.success(
-        `Monitor ${monitorName} ${monitor ? 'updated' : 'created'}`,
+      toast(
+        `Monitor ${transformedMonitorName} ${monitor ? 'updated' : 'created'}`,
         {
+          type: 'success',
           autoClose: 2500,
         }
       );
       onClose();
     } catch (objCreateError) {
-      setError('Failed to create monitor');
+      setError('Failed to create monitor.');
+      toast(
+        'Error creating monitor. Please check your configuration and try again.',
+        {
+          type: 'error',
+          autoClose: 5000,
+        }
+      );
+      setIsCreating(false);
     }
   }, [
     monitorName,
@@ -330,11 +452,13 @@ export const MonitorFormDrawer = ({
     monitor,
     onClose,
     active,
-    enableCreateButton,
     entity,
     objCreate,
     project,
     scorerFormRefs,
+    scorerValids,
+    scorers,
+    transformedMonitorName,
   ]);
 
   return (
@@ -378,13 +502,7 @@ export const MonitorFormDrawer = ({
             ) : (
               <Box className="flex flex-grow flex-col gap-16">
                 <Box className="flex flex-col gap-16 px-20">
-                  {error && (
-                    <Box
-                      className="rounded-sm bg-red-300 text-red-600"
-                      sx={typographyStyle}>
-                      {error}
-                    </Box>
-                  )}
+                  {error && <Alert severity="error">{error}</Alert>}
                   <Box>
                     <FieldName name="Name" />
                     <TextField
@@ -401,6 +519,18 @@ export const MonitorFormDrawer = ({
                           color: 'error.main',
                         }}>
                         {nameError}
+                      </Typography>
+                    )}
+                    {monitorName && transformedMonitorName !== monitorName && (
+                      <Typography
+                        className="mt-1 text-sm text-gold-600"
+                        sx={{
+                          ...typographyStyle,
+                        }}>
+                        The name of your monitor is{' '}
+                        <span className="font-semibold">
+                          {transformedMonitorName}
+                        </span>
                       </Typography>
                     )}
                     <Typography
@@ -452,8 +582,34 @@ export const MonitorFormDrawer = ({
                           setFilter({...f, traceRootsOnly: false})
                         }
                         frozenFilter={undefined}
-                        sx={{width: '100%', height: undefined}}
+                        sx={{
+                          width: '100%',
+                          height: undefined,
+                          '& .MuiOutlinedInput-root': operationError
+                            ? {
+                                '& fieldset': {
+                                  borderColor: 'error.main',
+                                },
+                                '&:hover fieldset': {
+                                  borderColor: 'error.main',
+                                },
+                                '&.Mui-focused fieldset': {
+                                  borderColor: 'error.main',
+                                },
+                              }
+                            : {},
+                        }}
                       />
+                      {operationError && (
+                        <Typography
+                          className="mt-1 text-sm"
+                          sx={{
+                            ...typographyStyle,
+                            color: 'error.main',
+                          }}>
+                          {operationError}
+                        </Typography>
+                      )}
                     </Box>
                     <Box>
                       <FieldName name="Additional filters" />
@@ -549,30 +705,31 @@ export const MonitorFormDrawer = ({
                 </Box>*/}
 
                 {scorerForms.map((Form: ScorerFormType, index: number) => (
-                  <Form
-                    key={index}
-                    scorer={scorers[index]}
-                    onValidationChange={(isValid: boolean) =>
-                      updateScorerValidAt(index, isValid)
-                    }
-                    ref={(el: ScorerFormRef) =>
-                      (scorerFormRefs.current[index] = el)
-                    }
-                  />
+                  <Box key={index}>
+                    <Form
+                      scorer={scorers[index]}
+                      monitorName={transformedMonitorName}
+                      onValidationChange={(isValid: boolean) => {
+                        updateScorerValidAt(index, isValid);
+                        // Clear validation errors when the form becomes valid
+                        if (isValid) {
+                          clearScorerValidationError(index);
+                        }
+                      }}
+                      validationErrors={
+                        hasSubmitted ? scorerValidationErrors[index] : undefined
+                      }
+                      ref={(el: ScorerFormRef) =>
+                        (scorerFormRefs.current[index] = el)
+                      }
+                    />
+                  </Box>
                 ))}
               </Box>
             )}
           </Box>
           <Box className="flex gap-8 border-t border-moon-250 p-20 py-16">
             <Button
-              variant="secondary"
-              onClick={onClose}
-              twWrapperStyles={{flexGrow: 1}}
-              className="w-full">
-              Cancel
-            </Button>
-            <Button
-              disabled={!enableCreateButton}
               variant="primary"
               onClick={createMonitor}
               twWrapperStyles={{flexGrow: 1}}
