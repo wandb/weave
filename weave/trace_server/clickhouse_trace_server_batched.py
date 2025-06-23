@@ -1179,9 +1179,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.ProjectStatsRes(**dict(zip(columns, query_result.result_rows[0])))
 
-    def threads_query(self, req: tsi.ThreadsQueryReq) -> tsi.ThreadsQueryRes:
-        """Query threads with aggregated statistics sorted by last activity."""
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        """Stream threads with aggregated statistics sorted by last activity."""
         pb = ParamBuilder()
+
+        # Extract filter values
+        after_datetime = None
+        before_datetime = None
+        if req.filter is not None:
+            after_datetime = req.filter.after_datetime
+            before_datetime = req.filter.before_datetime
 
         # Use the dedicated query builder
         query = make_threads_query(
@@ -1190,15 +1199,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             limit=req.limit,
             offset=req.offset,
             sort_by=req.sort_by,
-            sortable_datetime_after=req.sortable_datetime_after,
-            sortable_datetime_before=req.sortable_datetime_before,
+            sortable_datetime_after=after_datetime,
+            sortable_datetime_before=before_datetime,
         )
 
-        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        # Stream the results using _query_stream
+        raw_res = self._query_stream(query, pb.get_params())
 
-        threads = []
-        for row in query_result.result_rows:
-            thread_id, trace_count, start_time, last_updated = row
+        for row in raw_res:
+            (
+                thread_id,
+                turn_count,
+                start_time,
+                last_updated,
+                first_turn_id,
+                last_turn_id,
+                p50_turn_duration_ms,
+                p99_turn_duration_ms,
+            ) = row
 
             # Ensure datetimes have timezone info
             start_time_with_tz = _ensure_datetimes_have_tz(start_time)
@@ -1208,16 +1226,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # Skip threads without valid timestamps
                 continue
 
-            threads.append(
-                tsi.ThreadSchema(
-                    thread_id=thread_id,
-                    trace_count=trace_count,
-                    start_time=start_time_with_tz,
-                    last_updated=last_updated_with_tz,
-                )
+            yield tsi.ThreadSchema(
+                thread_id=thread_id,
+                turn_count=turn_count,
+                start_time=start_time_with_tz,
+                last_updated=last_updated_with_tz,
+                first_turn_id=first_turn_id,
+                last_turn_id=last_turn_id,
+                p50_turn_duration_ms=p50_turn_duration_ms,
+                p99_turn_duration_ms=p99_turn_duration_ms,
             )
-
-        return tsi.ThreadsQueryRes(threads=threads)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
     def _parsed_refs_read_batch(

@@ -16,9 +16,12 @@ def make_threads_query(
     sortable_datetime_before: Optional[datetime.datetime] = None,
 ) -> str:
     """
-    Generate a query to fetch threads with aggregated statistics.
+    Generate a query to fetch threads with aggregated statistics from turn calls only.
 
-    IMPORTANT: This uses two-level aggregation to handle ClickHouse materialized view behavior.
+    IMPORTANT: This filters to only include turn calls (where id = turn_id) to provide
+    meaningful thread statistics based on conversation turns rather than all nested calls.
+
+    This uses two-level aggregation to handle ClickHouse materialized view behavior.
 
     ClickHouse Background:
     - calls_merged is populated by a materialized view from call_parts
@@ -78,25 +81,34 @@ def make_threads_query(
     query = f"""
     SELECT
         thread_id,
-        COUNT(DISTINCT trace_id) as trace_count,
-        min(start_time) as start_time,
-        max(last_updated) as last_updated
+        COUNT(*) as turn_count,
+        min(call_start_time) as start_time,          -- Earliest start time across all calls in thread
+        max(call_end_time) as last_updated,          -- Latest end time across all calls in thread
+        argMin(id, call_start_time) as first_turn_id,     -- Turn ID with earliest start_time
+        argMax(id, call_end_time) as last_turn_id,   -- Turn ID with latest last_updated
+        quantile(0.5)(call_duration) as p50_turn_duration_ms,  -- P50 of turn durations in milliseconds
+        quantile(0.99)(call_duration) as p99_turn_duration_ms  -- P99 of turn durations in milliseconds
     FROM (
         -- INNER QUERY: Consolidate each individual call before thread-level aggregation
         -- This handles cases where calls_merged has multiple partial rows per call_id
         -- due to ClickHouse materialized view background merge behavior
         SELECT
             id,                              -- Call identifier
-            trace_id,                        -- Trace identifier
             any(thread_id) as thread_id,     -- Get any non-null thread_id for this call
                                             -- (all non-null values should be identical)
-            min(started_at) as start_time,   -- Earliest start time for this call
-            max(ended_at) as last_updated    -- Latest end time for this call
+            min(started_at) as call_start_time,   -- Earliest start time for this call
+            max(ended_at) as call_end_time,   -- Latest end time for this call
+            -- Calculate call duration in milliseconds
+            CASE
+                WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                THEN dateDiff('millisecond', call_start_time, call_end_time)
+                ELSE NULL
+            END as call_duration
         FROM calls_merged
         WHERE project_id = {{{project_id_param}: String}}
             {sortable_datetime_filter_clause}
-        GROUP BY id, trace_id               -- Group by call to merge partial rows
-        HAVING thread_id IS NOT NULL AND thread_id != ''  -- Filter after aggregation
+        GROUP BY id                         -- Group by call id to merge partial rows
+        HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)  -- Filter to turn calls only
     ) as properly_merged_calls
     -- OUTER QUERY: Now aggregate at thread level with properly consolidated calls
     GROUP BY thread_id
@@ -136,7 +148,10 @@ def make_threads_query_sqlite(
     sortable_datetime_before: Optional[datetime.datetime] = None,
 ) -> tuple[str, list]:
     """
-    Generate a SQLite query to fetch threads with aggregated statistics.
+    Generate a SQLite query to fetch threads with aggregated statistics from turn calls only.
+
+    This filters to only include turn calls (where id = turn_id) to provide meaningful
+    thread statistics based on conversation turns rather than all nested calls.
 
     Args:
         project_id: The project ID to filter by
@@ -166,17 +181,36 @@ def make_threads_query_sqlite(
 
     timestamp_filter_clause = " ".join(timestamp_filter_clauses)
 
-    # Base query - group by thread_id and collect statistics
+    # Base query - group by thread_id and collect statistics from turn calls only
     query = f"""
     SELECT
         thread_id,
-        COUNT(DISTINCT trace_id) as trace_count,
+        COUNT(*) as turn_count,
         MIN(started_at) as start_time,
-        MAX(ended_at) as last_updated
-    FROM calls
+        MAX(ended_at) as last_updated,
+        -- Get turn ID with earliest start time for this thread
+        (SELECT id FROM calls c2
+         WHERE c2.thread_id = c1.thread_id
+         AND c2.project_id = c1.project_id
+         AND c2.id = c2.turn_id
+         ORDER BY c2.started_at ASC
+         LIMIT 1) as first_turn_id,
+        -- Get turn ID with latest end time for this thread
+        (SELECT id FROM calls c2
+         WHERE c2.thread_id = c1.thread_id
+         AND c2.project_id = c1.project_id
+         AND c2.id = c2.turn_id
+         ORDER BY c2.ended_at DESC
+         LIMIT 1) as last_turn_id,
+        -- P50 calculation placeholder - might be implemented properly later
+        -1 as p50_turn_duration_ms,
+        -- P99 calculation placeholder - might be implemented properly later
+        -1 as p99_turn_duration_ms
+    FROM calls c1
     WHERE project_id = ?
         AND thread_id IS NOT NULL
         AND thread_id != ''
+        AND id = turn_id                 -- Only include turn calls for meaningful thread stats
         {timestamp_filter_clause}
     GROUP BY thread_id
     """
@@ -221,9 +255,11 @@ def _validate_and_map_sort_field(field: str) -> str:
     # Map of API field names to SQL column names
     valid_fields = {
         "thread_id": "thread_id",
-        "trace_count": "trace_count",
+        "turn_count": "turn_count",
         "start_time": "start_time",
         "last_updated": "last_updated",
+        "p50_turn_duration_ms": "p50_turn_duration_ms",
+        "p99_turn_duration_ms": "p99_turn_duration_ms",
     }
 
     if field not in valid_fields:

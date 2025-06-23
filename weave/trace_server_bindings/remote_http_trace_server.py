@@ -625,9 +625,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
         )
 
-    def threads_query(self, req: tsi.ThreadsQueryReq) -> tsi.ThreadsQueryRes:
-        return self._generic_request(
-            "/threads/query", req, tsi.ThreadsQueryReq, tsi.ThreadsQueryRes
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        return self._generic_stream_request(
+            "/threads/stream_query", req, tsi.ThreadsQueryReq, tsi.ThreadSchema
         )
 
 

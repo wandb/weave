@@ -1462,9 +1462,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             "project_stats is not implemented for SQLite trace server"
         )
 
-    def threads_query(self, req: tsi.ThreadsQueryReq) -> tsi.ThreadsQueryRes:
-        """Query threads with aggregated statistics sorted by last activity."""
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        """Stream threads with aggregated statistics sorted by last activity."""
         conn, cursor = get_conn_cursor(self.db_path)
+
+        # Extract filter values
+        after_datetime = None
+        before_datetime = None
+        if req.filter is not None:
+            after_datetime = req.filter.after_datetime
+            before_datetime = req.filter.before_datetime
 
         # Use the dedicated query builder
         query, parameters = make_threads_query_sqlite(
@@ -1472,16 +1481,25 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             limit=req.limit,
             offset=req.offset,
             sort_by=req.sort_by,
-            sortable_datetime_after=req.sortable_datetime_after,
-            sortable_datetime_before=req.sortable_datetime_before,
+            sortable_datetime_after=after_datetime,
+            sortable_datetime_before=before_datetime,
         )
 
         cursor.execute(query, parameters)
         query_result = cursor.fetchall()
 
-        threads = []
-        for row in query_result:
-            thread_id, trace_count, start_time_str, last_updated_str = row
+        # Use iter() as requested for SQLite implementation
+        for row in iter(query_result):
+            (
+                thread_id,
+                turn_count,
+                start_time_str,
+                last_updated_str,
+                first_turn_id,
+                last_turn_id,
+                p50_turn_duration_ms,
+                p99_turn_duration_ms,
+            ) = row
 
             # Parse the datetime strings if present
             if start_time_str and last_updated_str:
@@ -1500,16 +1518,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 # Skip threads without valid timestamps
                 continue
 
-            threads.append(
-                tsi.ThreadSchema(
-                    thread_id=thread_id,
-                    trace_count=trace_count,
-                    start_time=start_time,
-                    last_updated=last_updated,
-                )
+            yield tsi.ThreadSchema(
+                thread_id=thread_id,
+                turn_count=turn_count,
+                start_time=start_time,
+                last_updated=last_updated,
+                first_turn_id=first_turn_id,
+                last_turn_id=last_turn_id,
+                p50_turn_duration_ms=p50_turn_duration_ms,
+                p99_turn_duration_ms=p99_turn_duration_ms,
             )
-
-        return tsi.ThreadsQueryRes(threads=threads)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
