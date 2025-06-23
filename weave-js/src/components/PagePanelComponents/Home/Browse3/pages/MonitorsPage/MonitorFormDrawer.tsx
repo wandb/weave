@@ -1,7 +1,9 @@
 import {Box, Drawer, Typography} from '@mui/material';
 import {GridFilterModel} from '@mui/x-data-grid-pro';
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
+import {Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
+import {StyledSliderInput} from '@wandb/weave/components/Form/StyledSliderInput';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
@@ -33,7 +35,6 @@ import {
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
@@ -212,7 +213,7 @@ export const MonitorFormDrawer = ({
     [setNameError]
   );
 
-  const opVersionOptions = useOpVersionOptions(entity, project, {});
+  const opVersionOptions = useOpVersionOptions(entity, project, {}, false);
 
   useMemo(() => {
     setSelectedOpVersionOption(filter.opVersionRefs ?? []);
@@ -424,13 +425,15 @@ export const MonitorFormDrawer = ({
                     />
                   </Box>
                   <Box>
-                    <FieldName name="Active" />
-                    <ToggleButtonGroup
-                      value={active ? 'active' : 'inactive'}
-                      options={[{value: 'active'}, {value: 'inactive'}]}
-                      onValueChange={value => setActive(value === 'active')}
-                      size="medium"
-                    />
+                    <Box className="flex items-center gap-8">
+                      <Switch.Root
+                        checked={active}
+                        onCheckedChange={setActive}
+                        size="small">
+                        <Switch.Thumb size="small" checked={active} />
+                      </Switch.Root>
+                      <span className="font-semibold">Active monitor</span>
+                    </Box>
                   </Box>
                 </Box>
 
@@ -454,42 +457,45 @@ export const MonitorFormDrawer = ({
                         frozenFilter={undefined}
                         sx={{width: '100%', height: undefined}}
                       />
-                    </Box>
-                    <Box>
-                      <FieldName name="Additional filters" />
                       {selectedOpVersionOption.length > 0 ? (
-                        <FilterPanel
-                          entity={entity}
-                          project={project}
-                          filterModel={filterModel}
-                          setFilterModel={setFilterModel}
-                          columnInfo={columns}
-                          selectedCalls={[]}
-                          clearSelectedCalls={() => {}}
-                        />
+                        <Box className="mt-4">
+                          <FilterPanel
+                            entity={entity}
+                            project={project}
+                            filterModel={filterModel}
+                            setFilterModel={setFilterModel}
+                            columnInfo={columns}
+                            selectedCalls={[]}
+                            clearSelectedCalls={() => {}}
+                          />
+                        </Box>
                       ) : (
                         <Typography
-                          className="mt-1 text-sm font-normal"
+                          className="mt-4 text-sm font-normal"
                           sx={{
                             ...typographyStyle,
                             color: 'text.secondary',
                           }}>
-                          Select an op to add filters.
+                          Select an op to add additional filters.
                         </Typography>
                       )}
                     </Box>
                     <Box>
                       <FieldName name="Sampling rate" />
                       <Box className="flex items-center gap-12">
-                        <SliderInput
-                          value={samplingRate}
-                          onChange={setSamplingRate}
-                          min={0}
-                          max={100}
-                          step={1}
-                          hasInput
+                        <StyledSliderInput
                           className="w-full"
-                        />
+                          progress={samplingRate}>
+                          <SliderInput
+                            value={samplingRate}
+                            onChange={setSamplingRate}
+                            min={0}
+                            max={100}
+                            step={10}
+                            hasInput
+                            className="w-full"
+                          />
+                        </StyledSliderInput>
                         <span style={typographyStyle}>%</span>
                       </Box>
                     </Box>

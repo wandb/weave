@@ -495,6 +495,11 @@ export const useChatCompletionFunctions = (
     updateCallback: () => void,
     throttleTimeout: number
   ) => {
+    // Handle error chunk
+    if ((chunk as any).error) {
+      toast((chunk as any).error, {type: 'error'});
+    }
+
     // Create a throttled version of the update callback to prevent React render queue saturation.
     // Frequent per-token setState calls from multiple parallel streams can saturate React's
     // render queue, making later streams appear to start only after earlier ones finish.

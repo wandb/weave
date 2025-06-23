@@ -417,7 +417,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           </Box>
 
           <Box>
-            <FieldName name="Judge Model" />
+            <FieldName name="Judge model" />
             <LLMDropdownLoaded
               className="w-full"
               value={selectedJudgeModel || ''}
@@ -436,7 +436,13 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             )}
           </Box>
           {judgeModel && (
-            <Box className="flex flex-col gap-8 rounded-md border border-moon-250 p-12">
+            <Box className="flex flex-col gap-16 rounded-md bg-moon-100 p-16">
+              <Typography
+                sx={typographyStyle}
+                className="text-sm font-semibold uppercase tracking-wide text-moon-500">
+                Model settings
+              </Typography>
+
               <Box>
                 <FieldName name="LLM ID" />
                 <Typography sx={{...typographyStyle, color: 'text.secondary'}}>
@@ -444,21 +450,21 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                 </Typography>
               </Box>
               <Box>
-                <FieldName name="Judge Model Configuration Name" />
+                <FieldName name="Configuration name" />
                 <TextField
                   value={judgeModelName}
                   onChange={onJudgeModelNameChange}
                 />
               </Box>
               <Box>
-                <FieldName name="Judge Model System Prompt" />
+                <FieldName name="System prompt" />
                 <TextArea
                   value={systemPrompt}
                   onChange={e => onSystemPromptChange(e.target.value)}
                 />
               </Box>
               <Box>
-                <FieldName name="Judge Model Response Format" />
+                <FieldName name="Response format" />
                 <ResponseFormatSelect
                   responseFormat={
                     (responseFormat ||
@@ -470,7 +476,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             </Box>
           )}
           <Box>
-            <FieldName name="Scoring Prompt" />
+            <FieldName name="Scoring prompt" />
             <TextArea
               value={scoringPrompt}
               placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
@@ -483,7 +489,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             />
             {scoringPromptError && (
               <Typography
-                className="mt-1 text-sm"
+                className="mt-4 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
@@ -492,7 +498,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               </Typography>
             )}
             <Typography
-              className="mt-1 text-sm font-normal"
+              className="mt-4 text-sm font-normal"
               sx={{
                 ...typographyStyle,
                 color: 'text.secondary',

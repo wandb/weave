@@ -39,7 +39,7 @@ def ensure_ref_is_valid(
     try:
         parsed_ref = ri.parse_internal_uri(ref)
     except ValueError as e:
-        raise InvalidRequest(f"Invalid ref: {ref}, {e}")
+        raise InvalidRequest(f"Invalid ref: {ref}, {e}") from e
     if expected_type and not isinstance(parsed_ref, expected_type):
         raise InvalidRequest(
             f"Invalid ref: {ref}, expected {(t.__name__ for t in expected_type)}"
