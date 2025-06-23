@@ -43,10 +43,12 @@ import {RemovableTag} from '../../../../../Tag';
 import {RemoveAction} from '../../../../../Tag/RemoveAction';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
+import {CallsCharts} from '../../charts/CallsCharts';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {usePeekLocation} from '../../context';
 import {AddToDatasetDrawer} from '../../datasets/AddToDatasetDrawer';
 import {
   convertFeedbackFieldToBackendFilter,
@@ -67,7 +69,6 @@ import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkAddToDatasetButton,
@@ -631,6 +632,7 @@ export const CallsTable: FC<{
   );
 
   const columnVisibilityModel = useMemo(() => {
+    // Always use the default column visibility behavior, regardless of metrics state
     if (!columnVisibilityModelProp) {
       return undefined;
     }
@@ -661,6 +663,74 @@ export const CallsTable: FC<{
   const clearSelectedCalls = useCallback(() => {
     setSelectedCalls([]);
   }, [setSelectedCalls]);
+
+  // Detect peek drawer state to flip proportions
+  const peekLocation = usePeekLocation();
+  const isPeekOpen = peekLocation != null;
+
+  // Default proportions: 60% table, 40% charts
+  // When peek drawer opens: 40% table, 60% charts
+  const baseTableWidthFraction = isPeekOpen ? 0.4 : 0.6;
+
+  // Track previous peek state to detect actual changes
+  const previousPeekStateRef = useRef(isPeekOpen);
+
+  const [tableWidthFraction, setTableWidthFraction] = useState(
+    baseTableWidthFraction
+  );
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Only update table width when peek drawer state actually changes
+  useEffect(() => {
+    const peekStateChanged = previousPeekStateRef.current !== isPeekOpen;
+    if (peekStateChanged && !isDragging) {
+      setTableWidthFraction(baseTableWidthFraction);
+      previousPeekStateRef.current = isPeekOpen;
+    }
+  }, [isPeekOpen, baseTableWidthFraction, isDragging]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    setIsDragging(true);
+    e.preventDefault();
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const container = document.querySelector('.calls-table-layout');
+      if (!container) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const newWidth = e.clientX - containerRect.left;
+
+      // Set min and max width constraints
+      const minWidth = 300;
+      const maxWidth = containerRect.width - 200; // Leave space for charts
+      const constrainedWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
+
+      // Convert to fraction of available width
+      const newFraction = constrainedWidth / containerRect.width;
+      setTableWidthFraction(newFraction);
+    },
+    [isDragging]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+    return () => {};
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Clear selections when switching table types
   useEffect(() => {
@@ -1082,99 +1152,263 @@ export const CallsTable: FC<{
           </div>
         </TailwindContents>
       }>
-      {isMetricsChecked && (
-        <CallsCharts
-          entity={entity}
-          project={project}
-          filter={filter}
-          filterModelProp={filterModelResolved}
+      <style>
+        {`
+          .calls-table-layout * {
+            box-sizing: border-box;
+          }
+          .calls-table-layout .MuiDataGrid-root {
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 300px !important;
+          }
+          .calls-table-left-panel {
+            flex-shrink: 0 !important;
+            flex-grow: 0 !important;
+            overflow: hidden !important;
+          }
+          .resize-handle {
+            width: 2px;
+            background: #e5e7eb;
+            cursor: col-resize;
+            position: relative;
+            transition: background 0.2s;
+          }
+          .resize-handle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 20px;
+            background: currentColor;
+            transform: translate(-50%, -50%);
+            opacity: 0.5;
+          }
+        `}
+      </style>
+      {isMetricsChecked ? (
+        <div
+          className="calls-table-layout"
+          style={{
+            display: 'flex',
+            height: 'calc(100vh - 160px)',
+            minHeight: '400px',
+            width: '100%',
+            gap: '0px',
+            position: 'relative',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+          }}>
+          <div
+            className="calls-table-left-panel"
+            style={{
+              width: `${tableWidthFraction * 100}%`,
+              minWidth: '300px',
+              height: '100%',
+              overflow: 'hidden',
+              flexShrink: 0,
+              flexGrow: 0,
+              boxSizing: 'border-box',
+            }}>
+            <StyledDataGrid
+              // Start Column Menu
+              // ColumnMenu is needed to support pinning and column visibility
+              disableColumnMenu={false}
+              // ColumnFilter is definitely useful
+              disableColumnFilter={true}
+              disableMultipleColumnsFiltering={false}
+              // ColumnPinning seems to be required in DataGridPro, else it crashes.
+              // However, in this case it is also useful.
+              disableColumnPinning={false}
+              // ColumnReorder is definitely useful
+              // TODO (Tim): This needs to be managed externally (making column
+              // ordering a controlled property) This is a "regression" from the calls
+              // table refactor
+              disableColumnReorder={true}
+              // ColumnResize is definitely useful
+              disableColumnResize={false}
+              // ColumnSelector is definitely useful
+              disableColumnSelector={false}
+              disableMultipleColumnsSorting={true}
+              // End Column Menu
+              columnHeaderHeight={40}
+              apiRef={apiRef}
+              loading={callsLoading}
+              rows={tableData}
+              // initialState={initialState}
+              onColumnVisibilityModelChange={onColumnVisibilityModelChange}
+              columnVisibilityModel={columnVisibilityModel}
+              // SORT SECTION START
+              sortingMode="server"
+              sortModel={sortModelFiltered}
+              onSortModelChange={onSortModelChange}
+              // SORT SECTION END
+              // PAGINATION SECTION START
+              pagination
+              rowCount={calls.primaryError ? 0 : callsTotal}
+              paginationMode="server"
+              paginationModel={paginationModel}
+              onPaginationModelChange={onPaginationModelChange}
+              // PAGINATION SECTION END
+              rowHeight={38}
+              columns={muiColumns}
+              disableRowSelectionOnClick
+              rowSelectionModel={rowSelectionModel}
+              // columnGroupingModel={groupingModel}
+              columnGroupingModel={columns.colGroupingModel}
+              hideFooter={!callsLoading && callsTotal === 0}
+              hideFooterSelectedRowCount
+              onColumnWidthChange={newCol => {
+                setUserDefinedColumnWidths(curr => {
+                  return {
+                    ...curr,
+                    [newCol.colDef.field]: newCol.colDef.computedWidth,
+                  };
+                });
+              }}
+              pinnedColumns={pinModelResolved}
+              onPinnedColumnsChange={onPinnedColumnsChange}
+              sx={{
+                borderRadius: 0,
+                height: '100%',
+                width: '100%',
+                overflow: 'hidden',
+                '& .MuiDataGrid-virtualScroller': {
+                  overflowX: 'auto',
+                },
+                // This moves the pagination controls to the left
+                '& .MuiDataGrid-footerContainer': {
+                  justifyContent: 'flex-start',
+                },
+                '& .MuiDataGrid-main:focus-visible': {
+                  outline: 'none',
+                },
+              }}
+              slots={{
+                noRowsOverlay,
+                columnMenu: CallsCustomColumnMenu,
+                pagination: () => (
+                  <PaginationButtons hideControls={hideControls} />
+                ),
+                columnMenuSortDescendingIcon: IconSortDescending,
+                columnMenuSortAscendingIcon: IconSortAscending,
+                columnMenuHideIcon: IconNotVisible,
+                columnMenuPinLeftIcon: () => (
+                  <IconPinToRight style={{transform: 'scaleX(-1)'}} />
+                ),
+                columnMenuPinRightIcon: IconPinToRight,
+                loadingOverlay: CustomLoadingOverlay,
+              }}
+              className="tw-style"
+            />
+          </div>
+          <div
+            className={`resize-handle ${isDragging ? 'dragging' : ''}`}
+            onMouseDown={handleMouseDown}
+          />
+          <div
+            style={{
+              flex: '1',
+              minWidth: '200px',
+              height: '100%',
+              overflowX: 'hidden',
+              overflowY: 'auto',
+              borderTop: '1px solid rgba(224, 224, 224, 1)',
+            }}>
+            <CallsCharts
+              entity={entity}
+              project={project}
+              filter={filter}
+              filterModelProp={filterModelResolved}
+            />
+          </div>
+        </div>
+      ) : (
+        <StyledDataGrid
+          // Start Column Menu
+          // ColumnMenu is needed to support pinning and column visibility
+          disableColumnMenu={false}
+          // ColumnFilter is definitely useful
+          disableColumnFilter={true}
+          disableMultipleColumnsFiltering={false}
+          // ColumnPinning seems to be required in DataGridPro, else it crashes.
+          // However, in this case it is also useful.
+          disableColumnPinning={false}
+          // ColumnReorder is definitely useful
+          // TODO (Tim): This needs to be managed externally (making column
+          // ordering a controlled property) This is a "regression" from the calls
+          // table refactor
+          disableColumnReorder={true}
+          // ColumnResize is definitely useful
+          disableColumnResize={false}
+          // ColumnSelector is definitely useful
+          disableColumnSelector={false}
+          disableMultipleColumnsSorting={true}
+          // End Column Menu
+          columnHeaderHeight={40}
+          apiRef={apiRef}
+          loading={callsLoading}
+          rows={tableData}
+          // initialState={initialState}
+          onColumnVisibilityModelChange={onColumnVisibilityModelChange}
+          columnVisibilityModel={columnVisibilityModel}
+          // SORT SECTION START
+          sortingMode="server"
+          sortModel={sortModelFiltered}
+          onSortModelChange={onSortModelChange}
+          // SORT SECTION END
+          // PAGINATION SECTION START
+          pagination
+          rowCount={calls.primaryError ? 0 : callsTotal}
+          paginationMode="server"
+          paginationModel={paginationModel}
+          onPaginationModelChange={onPaginationModelChange}
+          // PAGINATION SECTION END
+          rowHeight={38}
+          columns={muiColumns}
+          disableRowSelectionOnClick
+          rowSelectionModel={rowSelectionModel}
+          // columnGroupingModel={groupingModel}
+          columnGroupingModel={columns.colGroupingModel}
+          hideFooter={!callsLoading && callsTotal === 0}
+          hideFooterSelectedRowCount
+          onColumnWidthChange={newCol => {
+            setUserDefinedColumnWidths(curr => {
+              return {
+                ...curr,
+                [newCol.colDef.field]: newCol.colDef.computedWidth,
+              };
+            });
+          }}
+          pinnedColumns={pinModelResolved}
+          onPinnedColumnsChange={onPinnedColumnsChange}
+          sx={{
+            borderRadius: 0,
+            // This moves the pagination controls to the left
+            '& .MuiDataGrid-footerContainer': {
+              justifyContent: 'flex-start',
+            },
+            '& .MuiDataGrid-main:focus-visible': {
+              outline: 'none',
+            },
+          }}
+          slots={{
+            noRowsOverlay,
+            columnMenu: CallsCustomColumnMenu,
+            pagination: () => <PaginationButtons hideControls={hideControls} />,
+            columnMenuSortDescendingIcon: IconSortDescending,
+            columnMenuSortAscendingIcon: IconSortAscending,
+            columnMenuHideIcon: IconNotVisible,
+            columnMenuPinLeftIcon: () => (
+              <IconPinToRight style={{transform: 'scaleX(-1)'}} />
+            ),
+            columnMenuPinRightIcon: IconPinToRight,
+            loadingOverlay: CustomLoadingOverlay,
+          }}
+          className="tw-style"
         />
       )}
-      <StyledDataGrid
-        // Start Column Menu
-        // ColumnMenu is needed to support pinning and column visibility
-        disableColumnMenu={false}
-        // ColumnFilter is definitely useful
-        disableColumnFilter={true}
-        disableMultipleColumnsFiltering={false}
-        // ColumnPinning seems to be required in DataGridPro, else it crashes.
-        // However, in this case it is also useful.
-        disableColumnPinning={false}
-        // ColumnReorder is definitely useful
-        // TODO (Tim): This needs to be managed externally (making column
-        // ordering a controlled property) This is a "regression" from the calls
-        // table refactor
-        disableColumnReorder={true}
-        // ColumnResize is definitely useful
-        disableColumnResize={false}
-        // ColumnSelector is definitely useful
-        disableColumnSelector={false}
-        disableMultipleColumnsSorting={true}
-        // End Column Menu
-        columnHeaderHeight={40}
-        apiRef={apiRef}
-        loading={callsLoading}
-        rows={tableData}
-        // initialState={initialState}
-        onColumnVisibilityModelChange={onColumnVisibilityModelChange}
-        columnVisibilityModel={columnVisibilityModel}
-        // SORT SECTION START
-        sortingMode="server"
-        sortModel={sortModelFiltered}
-        onSortModelChange={onSortModelChange}
-        // SORT SECTION END
-        // PAGINATION SECTION START
-        pagination
-        rowCount={calls.primaryError ? 0 : callsTotal}
-        paginationMode="server"
-        paginationModel={paginationModel}
-        onPaginationModelChange={onPaginationModelChange}
-        // PAGINATION SECTION END
-        rowHeight={38}
-        columns={muiColumns}
-        disableRowSelectionOnClick
-        rowSelectionModel={rowSelectionModel}
-        // columnGroupingModel={groupingModel}
-        columnGroupingModel={columns.colGroupingModel}
-        hideFooter={!callsLoading && callsTotal === 0}
-        hideFooterSelectedRowCount
-        onColumnWidthChange={newCol => {
-          setUserDefinedColumnWidths(curr => {
-            return {
-              ...curr,
-              [newCol.colDef.field]: newCol.colDef.computedWidth,
-            };
-          });
-        }}
-        pinnedColumns={pinModelResolved}
-        onPinnedColumnsChange={onPinnedColumnsChange}
-        sx={{
-          borderRadius: 0,
-          // This moves the pagination controls to the left
-          '& .MuiDataGrid-footerContainer': {
-            justifyContent: 'flex-start',
-          },
-          '& .MuiDataGrid-main:focus-visible': {
-            outline: 'none',
-          },
-        }}
-        slots={{
-          noRowsOverlay,
-          columnMenu: CallsCustomColumnMenu,
-          pagination: () => <PaginationButtons hideControls={hideControls} />,
-          columnMenuSortDescendingIcon: IconSortDescending,
-          columnMenuSortAscendingIcon: IconSortAscending,
-          columnMenuHideIcon: IconNotVisible,
-          columnMenuPinLeftIcon: () => (
-            <IconPinToRight style={{transform: 'scaleX(-1)'}} />
-          ),
-          columnMenuPinRightIcon: IconPinToRight,
-          loadingOverlay: () => (
-            <CustomLoadingOverlay hideControls={hideControls} />
-          ),
-        }}
-        className="tw-style"
-      />
     </FilterLayoutTemplate>
   );
 };
