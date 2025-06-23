@@ -87,13 +87,6 @@ const OUTWARD_MARGINS: Record<SelectSize, string> = {
   variable: '-8px',
 } as const;
 
-const CLEAR_INDICATOR_PADDING: Record<SelectSize, number> = {
-  small: 2,
-  medium: 6,
-  large: 8,
-  variable: 2,
-} as const;
-
 export type AdditionalProps = {
   size?: SelectSize;
   errorState?: boolean;
