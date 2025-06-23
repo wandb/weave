@@ -62,7 +62,7 @@ const ConfigPanel: React.FC = () => {
           size="small"
           variant="secondary"
           onClick={() => {
-            console.error('Not yet implemented');
+            console.error('TODO: Implement me');
           }}
         />
       </Header>
@@ -73,7 +73,7 @@ const ConfigPanel: React.FC = () => {
             value={''}
             onChange={option => {
               console.log(option);
-              console.error('Not yet implemented');
+              console.error('TODO: Implement me');
             }}
           />
           <Column
@@ -94,7 +94,7 @@ const ConfigPanel: React.FC = () => {
                 value={''}
                 onChange={option => {
                   console.log(option);
-                  console.error('Not yet implemented');
+                  console.error('TODO: Implement me');
                 }}
               />
             </ConfigSection>
@@ -110,7 +110,7 @@ const ConfigPanel: React.FC = () => {
                 value={''}
                 onChange={option => {
                   console.log(option);
-                  console.error('Not yet implemented');
+                  console.error('TODO: Implement me');
                 }}
               />
             </ConfigSection>
@@ -122,7 +122,7 @@ const ConfigPanel: React.FC = () => {
             value={''}
             onChange={option => {
               console.log(option);
-              console.error('Not yet implemented');
+              console.error('TODO: Implement me');
             }}
           />
         </ConfigSection>
@@ -131,7 +131,7 @@ const ConfigPanel: React.FC = () => {
         <Button
           variant="secondary"
           onClick={() => {
-            console.error('Not yet implemented');
+            console.error('TODO: Implement me');
           }}>
           Clear
         </Button>
@@ -139,7 +139,7 @@ const ConfigPanel: React.FC = () => {
           icon="play"
           variant="primary"
           onClick={() => {
-            console.error('Not yet implemented');
+            console.error('TODO: Implement me');
           }}>
           Run eval
         </Button>
