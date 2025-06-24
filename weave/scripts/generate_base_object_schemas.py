@@ -24,7 +24,7 @@ def generate_schemas() -> None:
     to 'generated_builtin_object_class_schemas.json'.
     """
     # Dynamically create a parent model with all registered objects as properties
-    CompositeModel = create_model(
+    CompositeModel = create_model(  # noqa: N806
         "CompositeBaseObject",
         **{name: (cls, ...) for name, cls in BUILTIN_OBJECT_REGISTRY.items()},
     )

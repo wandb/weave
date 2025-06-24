@@ -813,10 +813,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         If no digests are provided all versions will have their data overwritten with
         an empty val_dump.
         """
-        MAX_OBJECTS_TO_DELETE = 100
-        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+        max_objects_to_delete = 100
+        if req.digests and len(req.digests) > max_objects_to_delete:
             raise ValueError(
-                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+                f"Object delete request contains {len(req.digests)} objects. Please delete {max_objects_to_delete} or fewer objects at a time."
             )
 
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -1783,8 +1783,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
         payload = _dict_value_to_dump(req.payload)
-        MAX_PAYLOAD = 1 << 20  # 1 MiB
-        if len(payload) > MAX_PAYLOAD:
+        max_payload = 1 << 20  # 1 MiB
+        if len(payload) > max_payload:
             raise InvalidRequest("Feedback payload too large")
         row: Row = {
             "id": feedback_id,

@@ -3171,8 +3171,8 @@ def test_objects_and_keys_with_special_characters(client):
 
 
 def test_calls_stream_feedback(client):
-    BATCH_SIZE = 10
-    num_calls = BATCH_SIZE + 1
+    batch_size = 10
+    num_calls = batch_size + 1
 
     @weave.op
     def test_call(x):

@@ -161,8 +161,8 @@ def make_random_image(image_size: tuple[int, int] = (64, 64)):
 @pytest.fixture
 def dataset_ref(client):
     # This fixture represents a saved dataset containing images
-    N_ROWS = 5
-    rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
+    n_rows = 5
+    rows = [{"img": make_random_image()} for _ in range(n_rows)]
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 
@@ -205,8 +205,8 @@ async def test_many_images_will_consistently_log():
 
 
 def test_images_in_load_of_dataset(client):
-    N_ROWS = 5
-    rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
+    n_rows = 5
+    rows = [{"img": make_random_image()} for _ in range(n_rows)]
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 
