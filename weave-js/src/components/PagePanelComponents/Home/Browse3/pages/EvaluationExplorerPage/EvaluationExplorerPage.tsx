@@ -12,6 +12,7 @@ import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
 } from './context';
+import {NewDatasetEditor} from './DatasetEditor';
 import {clientBound, hookify} from './hooks';
 import {getLatestDatasetRefs, getLatestEvaluationRefs} from './query';
 
@@ -54,8 +55,9 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
   return (
     <Row>
       <ConfigPanel entity={entity} project={project} />
-      <Column style={{flex: 1}}>
-        <Header>Results</Header>
+      <Column style={{flex: '1 1 600px', overflow: 'hidden'}}>
+        <Header>Dataset</Header>
+        <NewDatasetEditor entity={entity} project={project} />
       </Column>
     </Row>
   );
@@ -70,6 +72,7 @@ const ConfigPanel: React.FC<{entity: string; project: string}> = ({
       style={{
         maxWidth: '500px',
         minWidth: '300px',
+        flex: '1 1 400px',
         borderRight: `1px solid ${BORDER_COLOR}`,
         backgroundColor: SECONDARY_BACKGROUND_COLOR,
       }}>
@@ -147,6 +150,7 @@ const Header: React.FC<{children?: React.ReactNode}> = ({children}) => {
         fontWeight: 600,
         fontSize: '18px',
         justifyContent: 'space-between',
+        flex: `0 0 ${HEADER_HEIGHT_PX}px`,
       }}>
       {children}
     </div>
@@ -316,22 +320,36 @@ const DatasetPicker: React.FC<{entity: string; project: string}> = ({
   project,
 }) => {
   const refsQuery = useLatestDatasetRefs(entity, project);
-  const newDatasetOption = useMemo(() => {
-    return {
-      label: 'New Dataset',
-      value: 'new-Dataset',
-    };
+  const newDatasetOptions = useMemo(() => {
+    return [
+      {
+        label: 'Start from scratch',
+        value: 'new-dataset',
+      },
+      {
+        label: 'Upload a file',
+        value: 'upload-file',
+      },
+    ];
   }, []);
   const selectOptions = useMemo(() => {
     return [
-      newDatasetOption,
-      ...(refsQuery.data?.map(ref => ({
-        label: ref,
-      })) ?? []),
+      {
+        label: 'Create new dataset',
+        options: newDatasetOptions,
+      },
+      {
+        label: 'Load existing dataset',
+        options:
+          refsQuery.data?.map(ref => ({
+            label: ref,
+            value: ref,
+          })) ?? [],
+      },
     ];
-  }, [refsQuery.data, newDatasetOption]);
+  }, [refsQuery.data, newDatasetOptions]);
   const selectedValue = useMemo(() => {
-    return selectOptions[0];
+    return selectOptions[0].options[0];
   }, [selectOptions]);
 
   if (refsQuery.loading) {
