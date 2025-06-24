@@ -2541,9 +2541,9 @@ def test_read_call_start_with_cost(client):
         pass
     elif isinstance(summary, dict):
         # Check that the costs object was NOT added
-        assert COST_OBJECT_NAME not in summary.get("weave", {}), (
-            f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
-        )
+        assert (
+            COST_OBJECT_NAME not in summary.get("weave", {})
+        ), f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
     else:
         pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
 
@@ -4458,37 +4458,37 @@ def test_project_stats_clickhouse(client, clickhouse_client):
 
 
 def test_calls_query_with_descendant_error(client):
-    class TestException(Exception):
+    class TestError(Exception):
         pass
 
     @weave.op
     def child_op(val: int):
         if val == 0:
-            raise TestException("Error")
+            raise TestError("Error")
         return val
 
     @weave.op
     def parent_op(val: int):
         if val == 1:
-            raise TestException("Error")
+            raise TestError("Error")
         try:
             return child_op(val)
-        except TestException as e:
+        except TestError as e:
             return val
 
     try:
         parent_op(0)
-    except TestException as e:
+    except TestError as e:
         pass
 
     try:
         parent_op(1)
-    except TestException as e:
+    except TestError as e:
         pass
 
     try:
         parent_op(2)
-    except TestException as e:
+    except TestError as e:
         pass
 
     calls = list(
