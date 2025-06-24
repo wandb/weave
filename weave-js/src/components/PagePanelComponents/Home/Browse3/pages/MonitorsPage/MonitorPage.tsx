@@ -2,6 +2,7 @@ import {Box, Typography} from '@mui/material';
 import {GridFilterItem} from '@mui/x-data-grid-pro';
 import {Button, ButtonVariants} from '@wandb/weave/components/Button';
 import {IconNames} from '@wandb/weave/components/Icon';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {BooleanIcon} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValueBoolean';
 import {
   useEntityProject,
@@ -61,6 +62,16 @@ export const MonitorPage = (props: {objectName: string; version: string}) => {
   });
 
   const monitorVersions = objectVersionResults.result || [];
+  const isLoading = objectVersionResults.loading;
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <LoadingDots />
+      </div>
+    );
+  }
+  
   return monitorVersions === null || monitorVersions.length === 0 ? (
     <NotFoundPanel title="Monitor not found" />
   ) : (
