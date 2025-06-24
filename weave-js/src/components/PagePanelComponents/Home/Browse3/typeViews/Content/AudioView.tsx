@@ -9,6 +9,7 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {ContentViewMetadataLoadedProps} from './types';
+import {downloadFromUrl} from './Shared';
 
 export const AudioContent = (props: ContentViewMetadataLoadedProps) => {
   const {entity, project, content, metadata} = props;
@@ -49,12 +50,7 @@ export const AudioContent = (props: ContentViewMetadataLoadedProps) => {
       console.error('Audio URL is not available');
       return;
     }
-    const a = document.createElement('a');
-    a.href = audioUrl;
-    a.download = `${audioFileName}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    downloadFromUrl(audioUrl, audioFileName);
   };
 
   return (
@@ -111,17 +107,11 @@ export const AudioPlayer: FC<{
   }
 
   const downloadFile = () => {
-    if (!audioUrl) {
-      console.error('Audio URL is not available');
+    if (!audioUrl || !audioFileName) {
+      console.error('Audio URL or filename is not available');
       return;
     }
-    const a = document.createElement('a');
-    a.href = audioUrl;
-    const date = new Date().toISOString().split('T')[0];
-    a.download = `${project}_${date}_${entity}_${audioFileName}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    downloadFromUrl(audioUrl, audioFileName);
   };
 
   return (

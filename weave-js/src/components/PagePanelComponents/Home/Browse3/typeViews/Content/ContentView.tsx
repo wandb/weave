@@ -8,22 +8,7 @@ import {AudioContent} from './AudioView';
 import { PDFContent } from './PDFView';
 import { VideoContent } from './VideoView';
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
-import {ContentMetadataTooltip, ContentTooltipWrapper, DownloadButton, getIconName, IconWithText} from './Shared';
-
-// Save a Blob as a content in the user's downloads folder in a
-// cross-browser compatible way.
-const saveBlob = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-  });
-};
+import {ContentMetadataTooltip, ContentTooltipWrapper, DownloadButton, getIconName, IconWithText, saveBlob} from './Shared';
 
 const FallbackContent = (props: ContentViewMetadataLoadedProps) => {
   const [contentResult, setContentResult] = useState<Blob | null>(null);

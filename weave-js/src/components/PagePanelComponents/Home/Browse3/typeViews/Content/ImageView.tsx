@@ -4,11 +4,12 @@ import Lightbox from 'yet-another-react-lightbox';
 import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 
-import {StyledTooltip, TooltipHint} from '@wandb/weave/components/DraggablePopups';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {Tooltip} from '@wandb/weave/components/Tooltip';
 import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotApplicable';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {ContentViewMetadataLoadedProps} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/types';
+import { StyledTooltip } from '@wandb/weave/components/DraggablePopups';
 
 export const ImageContent = (props: ContentViewMetadataLoadedProps) => (
   <AutoSizer style={{height: '100%', width: '100%'}}>
@@ -187,16 +188,16 @@ const ImageContentLoaded = ({
             onClick={onClick}
           />
         </div>
-        <TooltipHint>
+        <div style={{color: '#666', textAlign: 'center', fontSize: '0.8em'}}>
           {imageWidth}x{imageHeight} - Click for more details
-        </TooltipHint>
+        </div>
       </div>
     );
     image = (
       <StyledTooltip enterDelay={500} title={preview}>
         {image}
       </StyledTooltip>
-    );
+    )
   }
 
   return (

@@ -14,7 +14,7 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind, TailwindContents} from '@wandb/weave/components/Tailwind';
 import {ContentViewMetadataLoadedProps} from './types';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
-import {ContentMetadataTooltip, ContentTooltipWrapper, DownloadButton, getIconName, IconWithText} from './Shared';
+import {ContentMetadataTooltip, ContentTooltipWrapper, DownloadButton, getIconName, IconWithText, saveBlob} from './Shared';
 
 type PDFViewProps = {
   blob: Blob;
@@ -31,22 +31,6 @@ const makePlaceholder = (page: number): Slide => ({
   width: -1,
   height: page, // PDF pages are 1-indexed
 });
-
-
-// Save a Blob as a content in the user's downloads folder in a
-// cross-browser compatible way.
-const saveBlob = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-  });
-};
 
 export const PDFContent = (props: ContentViewMetadataLoadedProps) => {
   const [contentResult, setContentResult] = useState<Blob | null>(null);
