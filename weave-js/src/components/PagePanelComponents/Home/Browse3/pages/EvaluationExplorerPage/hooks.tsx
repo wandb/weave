@@ -19,7 +19,7 @@ type HookResult<T> =
       data: T;
     };
 
-export const promiseToHook = <TArgs extends any[], TReturn>(
+export const hookify = <TArgs extends any[], TReturn>(
   promiseFn: (...inputs: TArgs) => Promise<TReturn>
 ): ((...inputs: TArgs) => HookResult<TReturn>) => {
   const useFn = (...inputs: TArgs) => {
@@ -87,7 +87,7 @@ export const promiseToHook = <TArgs extends any[], TReturn>(
   return useFn;
 };
 
-export const bindClientHook = <TArgs extends any[], TReturn>(
+export const clientBound = <TArgs extends any[], TReturn>(
   useHook: (client: TraceServerClient, ...inputs: TArgs) => HookResult<TReturn>
 ) => {
   const useFn = (...inputs: TArgs) => {

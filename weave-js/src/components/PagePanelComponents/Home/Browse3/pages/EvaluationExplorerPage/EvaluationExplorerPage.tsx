@@ -10,7 +10,7 @@ import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
 } from './context';
-import {bindClientHook, promiseToHook} from './hooks';
+import {clientBound, hookify} from './hooks';
 import {getLatestEvaluationRefs} from './query';
 
 const HEADER_HEIGHT_PX = 44;
@@ -278,6 +278,4 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
   );
 };
 
-const useLatestEvaluationRefs = bindClientHook(
-  promiseToHook(getLatestEvaluationRefs)
-);
+const useLatestEvaluationRefs = clientBound(hookify(getLatestEvaluationRefs));
