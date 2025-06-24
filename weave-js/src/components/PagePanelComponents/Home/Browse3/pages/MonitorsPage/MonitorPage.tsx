@@ -63,15 +63,17 @@ export const MonitorPage = (props: {objectName: string; version: string}) => {
 
   const monitorVersions = objectVersionResults.result || [];
   const isLoading = objectVersionResults.loading;
-  
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <LoadingDots />
-      </div>
+      <Tailwind>
+        <div className="flex min-h-[100vh] items-center justify-center">
+          <LoadingDots />
+        </div>
+      </Tailwind>
     );
   }
-  
+
   return monitorVersions === null || monitorVersions.length === 0 ? (
     <NotFoundPanel title="Monitor not found" />
   ) : (
