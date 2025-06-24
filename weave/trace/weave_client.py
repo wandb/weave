@@ -232,9 +232,8 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative step not supported")
 
         # Apply limit if provided
-        if self.limit is not None:
-            if stop is None or stop > self.limit:
-                stop = self.limit
+        if self.limit is not None and (stop is None or stop > self.limit):
+            stop = self.limit
 
         # Apply offset if provided
         if self.offset is not None:
@@ -297,7 +296,7 @@ class PaginatedIterator(Generic[T, R]):
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         records = []
         for item in self:
@@ -584,7 +583,7 @@ class Call:
             try:
                 entity, project = self.project_id.split("/")
             except ValueError:
-                raise ValueError(f"Invalid project_id: {self.project_id}")
+                raise ValueError(f"Invalid project_id: {self.project_id}") from None
             weave_ref = CallRef(entity, project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
@@ -599,7 +598,7 @@ class Call:
         try:
             entity, project = self.project_id.split("/")
         except ValueError:
-            raise ValueError(f"Invalid project_id: {self.project_id}")
+            raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
 
     @property
@@ -1014,11 +1013,13 @@ class WeaveClient:
                 if e.response.content:
                     try:
                         reason = json.loads(e.response.content).get("reason")
-                        raise ValueError(reason)
+                        raise ValueError(reason) from None
                     except json.JSONDecodeError:
-                        raise ValueError(e.response.content)
+                        raise ValueError(e.response.content) from None
                 if e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from e
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -1040,7 +1041,9 @@ class WeaveClient:
                 )
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from None
                 raise
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")

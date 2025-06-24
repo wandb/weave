@@ -285,7 +285,7 @@ class WeaveTrustScorerV1(weave.Scorer):
                     except Exception as e:
                         raise WeaveTrustScorerError(
                             f"Error calling {scorer_name}: {e}", errors=e
-                        )
+                        ) from e
         else:
             # Run scorers sequentially
             for scorer_name, scorer in self._loaded_scorers.items():
@@ -296,7 +296,7 @@ class WeaveTrustScorerV1(weave.Scorer):
                 except Exception as e:
                     raise WeaveTrustScorerError(
                         f"Error calling {scorer_name}: {e}", errors=e
-                    )
+                    ) from e
 
         return results
 

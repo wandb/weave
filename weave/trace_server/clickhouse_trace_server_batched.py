@@ -1004,11 +1004,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> Iterator[tsi.TableRowSchema]:
         conds = []
         pb = ParamBuilder()
-        if req.filter:
-            if req.filter.row_digests:
-                conds.append(
-                    f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
-                )
+        if req.filter and req.filter.row_digests:
+            conds.append(
+                f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
+            )
 
         sort_fields = []
         if req.sort_by:
@@ -2238,7 +2237,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "Database insertion failed. Record too large. "
                     "A likely cause is that a single row or cell exceeded "
                     "the limit. If logging images, save them as `Image.PIL`."
-                )
+                ) from e
             raise
         except Exception as e:
             # Do potentially expensive data length calculation, only on
@@ -2251,9 +2250,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "table": table,
                     "data_len": len(data),
                     "data_bytes": data_bytes,
-                    "example_data": None if len(data) == 0 else data[0],
-                    "column_names": column_names,
-                    "settings": settings,
                 },
             )
             raise
@@ -2403,6 +2399,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "id": ch_call_dict.get("id"),
         "trace_id": ch_call_dict.get("trace_id"),
         "parent_id": ch_call_dict.get("parent_id"),
+        "thread_id": ch_call_dict.get("thread_id"),
         "op_name": ch_call_dict.get("op_name"),
         "started_at": started_at,
         "ended_at": ended_at,
@@ -2471,6 +2468,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         id=call_id,
         trace_id=trace_id,
         parent_id=start_call.parent_id,
+        thread_id=start_call.thread_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
@@ -2852,18 +2850,20 @@ def _setup_completion_model_info(
     elif model_name.startswith("coreweave/"):
         # See https://docs.litellm.ai/docs/providers/openai_compatible
         # but ignore the bit about omitting the /v1 because it is actually necessary
-        req.inputs.model = "openai/" + model_name.replace("coreweave/", "", 1)
+        req.inputs.model = model_name.replace("coreweave/", "openai/", 1)
+
         provider = "custom"
-        base_url = "https://api.inference.wandb.ai/v1"
+
+        base_url = wf_env.inference_service_base_url()
+
         # The API key should have been passed in as an extra header.
         if req.inputs.extra_headers:
-            hostname = req.inputs.extra_headers.get("trace_server_hostname", None)
-            if hostname == "weave-trace.qa.wandb.ai":
-                base_url = "https://api.qa.inference.coreweave.com/v1"
             api_key = req.inputs.extra_headers.pop("api_key", None)
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None
+
         return_type = "openai"
+
     else:
         # Custom provider path
         custom_provider_info = get_custom_provider_info(
