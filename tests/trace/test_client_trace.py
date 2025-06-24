@@ -50,6 +50,7 @@ from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
 )
+from weave.trace_server.validation_util import CHValidationError
 
 ## Hacky interface compatibility helpers
 
@@ -200,6 +201,7 @@ def test_trace_server_call_start_and_end(client):
         "display_name": None,
         "storage_size_bytes": None,
         "total_storage_size_bytes": None,
+        "thread_id": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -249,6 +251,7 @@ def test_trace_server_call_start_and_end(client):
         "display_name": None,
         "storage_size_bytes": None,
         "total_storage_size_bytes": None,
+        "thread_id": None,
     }
 
 
@@ -3109,7 +3112,7 @@ def test_object_with_char_over_limit(client):
             }
         }
     )
-    with pytest.raises(Exception):
+    with pytest.raises(CHValidationError):
         client.server.obj_create(create_req)
 
 
