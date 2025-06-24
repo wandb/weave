@@ -394,7 +394,11 @@ const DatasetPicker: React.FC<{
   project: string;
   setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
 }> = ({entity, project, setNewDatasetEditorMode}) => {
+  const {config, editConfig} = useEvaluationExplorerPageContext();
   const refsQuery = useLatestDatasetRefs(entity, project);
+  const [newDatasetEditorMode, setNewDatasetEditorModeInternal] = useState<
+    'new-empty' | 'new-file'
+  >('new-empty');
 
   const newDatasetOptions = useMemo(() => {
     return [
@@ -426,8 +430,36 @@ const DatasetPicker: React.FC<{
     ];
   }, [refsQuery.data, newDatasetOptions]);
 
-  const [selectedValue, setSelectedValue] = useState(
-    selectOptions[0].options[0]
+  const selectedOption = useMemo(() => {
+    if (config.evaluationDefinition.properties.dataset.originalSourceRef) {
+      return {
+        label: refStringToName(
+          config.evaluationDefinition.properties.dataset.originalSourceRef
+        ),
+        value: config.evaluationDefinition.properties.dataset.originalSourceRef,
+      };
+    }
+    if (newDatasetEditorMode === 'new-empty') {
+      return selectOptions[0].options[0];
+    }
+    if (newDatasetEditorMode === 'new-file') {
+      return selectOptions[0].options[1];
+    }
+    return null;
+  }, [
+    config.evaluationDefinition.properties.dataset.originalSourceRef,
+    newDatasetEditorMode,
+    selectOptions,
+  ]);
+
+  const setDatasetRef = useCallback(
+    (datasetRef: string | null) => {
+      editConfig(draft => {
+        draft.evaluationDefinition.properties.dataset.originalSourceRef =
+          datasetRef;
+      });
+    },
+    [editConfig]
   );
 
   if (refsQuery.loading) {
@@ -438,17 +470,23 @@ const DatasetPicker: React.FC<{
     <Select
       blurInputOnSelect
       options={selectOptions}
-      value={selectedValue}
+      value={selectedOption}
       onChange={option => {
+        // TODO: clean this up - this is super messy and needs to be refactored
         if (option?.value === 'new-empty') {
           setNewDatasetEditorMode('new-empty');
+          setNewDatasetEditorModeInternal('new-empty');
+
+          setDatasetRef(null);
         } else if (option?.value === 'new-file') {
           setNewDatasetEditorMode('new-file');
+          setNewDatasetEditorModeInternal('new-file');
+
+          setDatasetRef(null);
+        } else if (option) {
+          setDatasetRef(option.value);
         } else {
-          console.error('TODO: Implement me');
-        }
-        if (option) {
-          setSelectedValue(option);
+          setDatasetRef(null);
         }
       }}
     />
