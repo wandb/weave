@@ -14,7 +14,8 @@ import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tailwind, TailwindContents} from '@wandb/weave/components/Tailwind';
 import {ContentViewMetadataLoadedProps} from './types';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
-import {ContentMetadataTooltip, ContentTooltipWrapper, DownloadButton, getIconName, IconWithText, saveBlob} from './Shared';
+import {ContentMetadataTooltip, DownloadButton, getIconName, IconWithText, saveBlob} from './Shared';
+import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
 
 type PDFViewProps = {
   blob: Blob;
@@ -121,17 +122,23 @@ export const PDFContent = (props: ContentViewMetadataLoadedProps) => {
   }
 
   const tooltipTrigger = (
-    <ContentTooltipWrapper
-      showPreview={false}
-      tooltipHint="Click icon or filename to preview, button to download"
-      body={iconWithText}
+    <StyledTooltip
+      enterDelay={500}
+      title={
+        <TailwindContents>
+          <ContentMetadataTooltip
+            filename={filename}
+            mimetype={mimetype}
+            size={size}
+          />
+          <div className="text-sm">
+            <div className="mt-8 text-center text-xs">Click icon or filename to preview, button to download</div>
+          </div>
+        </TailwindContents>
+      }
     >
-      <ContentMetadataTooltip
-        filename={filename}
-        mimetype={mimetype}
-        size={size}
-      />
-    </ContentTooltipWrapper>
+      {iconWithText}
+    </StyledTooltip>
   );
 
   return (

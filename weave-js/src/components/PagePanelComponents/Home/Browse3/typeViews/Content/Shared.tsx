@@ -67,48 +67,6 @@ export const IconWithText = ({iconName, filename, onClick}: {
   );
 }
 
-type ContentTooltipWrapperProps = {
-  showPreview: boolean;
-  tooltipHint?: string;
-  tooltipPreview?: React.ReactNode;
-  body: React.ReactNode;
-  children: React.ReactNode;
-  noTriggerWrap?: boolean;
-};
-
-export const ContentTooltipWrapper = ({
-  showPreview,
-  tooltipHint,
-  tooltipPreview,
-  body,
-  children,
-}: ContentTooltipWrapperProps) => {
-  const tooltip = (
-    <TailwindContents>
-      {tooltipPreview && (
-        <div className="flex justify-center">{tooltipPreview}</div>
-      )}
-      {!tooltipPreview && children}
-      {tooltipHint && (
-        <div className="text-sm">
-          <div className="mt-8 text-center text-xs">{tooltipHint}</div>
-        </div>
-      )}
-    </TailwindContents>
-  );
-
-  // Always render the body, but only wrap with tooltip when showPreview is false
-  if (showPreview) {
-    return <>{body}</>;
-  }
-
-  return (
-    <StyledTooltip enterDelay={500} title={tooltip}>
-      {body}
-    </StyledTooltip>
-  );
-};
-
 type ContentMetadataTooltipProps = {
   filename: string;
   mimetype: string;
@@ -184,17 +142,23 @@ export const IconWithTextAndDownloadHover = ({
   return (
     <TailwindContents>
       <div className="group flex items-center gap-4">
-        <ContentTooltipWrapper
-          showPreview={false}
-          tooltipHint="Click icon or filename to preview, button to download"
-          body={clickableIconAndText}
+        <StyledTooltip
+          enterDelay={500}
+          title={
+            <TailwindContents>
+              <ContentMetadataTooltip
+                filename={filename}
+                mimetype={mimetype}
+                size={size}
+              />
+              <div className="text-sm">
+                <div className="mt-8 text-center text-xs">Click icon or filename to preview, button to download</div>
+              </div>
+            </TailwindContents>
+          }
         >
-          <ContentMetadataTooltip
-            filename={filename}
-            mimetype={mimetype}
-            size={size}
-          />
-        </ContentTooltipWrapper>
+          {clickableIconAndText}
+        </StyledTooltip>
         <div className="opacity-0 group-hover:opacity-100">
           <DownloadButton isDownloading={isDownloading} doSave={doSave} />
         </div>

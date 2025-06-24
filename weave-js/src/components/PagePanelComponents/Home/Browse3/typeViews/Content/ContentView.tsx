@@ -8,7 +8,8 @@ import {AudioContent} from './AudioView';
 import { PDFContent } from './PDFView';
 import { VideoContent } from './VideoView';
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
-import {ContentMetadataTooltip, ContentTooltipWrapper, DownloadButton, getIconName, IconWithText, saveBlob} from './Shared';
+import {ContentMetadataTooltip, DownloadButton, getIconName, IconWithText, saveBlob} from './Shared';
+import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
 
 const FallbackContent = (props: ContentViewMetadataLoadedProps) => {
   const [contentResult, setContentResult] = useState<Blob | null>(null);
@@ -58,17 +59,23 @@ const FallbackContent = (props: ContentViewMetadataLoadedProps) => {
   );
 
   const tooltipTrigger = (
-    <ContentTooltipWrapper
-      showPreview={false}
-      tooltipHint="Click button to download"
-      body={iconWithText}
+    <StyledTooltip
+      enterDelay={500}
+      title={
+        <TailwindContents>
+          <ContentMetadataTooltip
+            filename={filename}
+            mimetype={mimetype}
+            size={size}
+          />
+          <div className="text-sm">
+            <div className="mt-8 text-center text-xs">Click button to download</div>
+          </div>
+        </TailwindContents>
+      }
     >
-      <ContentMetadataTooltip
-        filename={filename}
-        mimetype={mimetype}
-        size={size}
-      />
-    </ContentTooltipWrapper>
+      {iconWithText}
+    </StyledTooltip>
   );
 
   return (
