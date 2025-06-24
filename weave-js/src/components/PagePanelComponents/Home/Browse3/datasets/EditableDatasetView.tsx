@@ -1,3 +1,4 @@
+import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import {Box, Typography} from '@mui/material';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -144,8 +145,6 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     [history, router, sharedRef]
   );
 
-  const [initialFields, setInitialFields] = useState<string[]>([]);
-
   const parsedRef = useMemo(
     () => parseRefMaybe(datasetObject.rows),
     [datasetObject.rows]
@@ -262,32 +261,6 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     [setAddedRows]
   );
 
-  const handleAddRowsClick = useCallback(() => {
-    setPaginationModel(prev => ({...prev, page: 0}));
-    setAddedRows(prev => {
-      const updatedMap = new Map(prev);
-      const newId = `${ADDED_ROW_ID_PREFIX}${uuidv4()}`;
-      const newRow = {
-        ___weave: {
-          id: newId,
-          isNew: true,
-        },
-        ...Object.fromEntries(initialFields.map(field => [field, ''])),
-      };
-      updatedMap.set(newId, newRow);
-
-      // Wait for the next tick to ensure the row is added and grid is updated
-      setTimeout(() => {
-        const firstField = initialFields[0];
-        if (firstField) {
-          apiRef.current.scrollToIndexes({rowIndex: numAddedRows});
-        }
-      }, 0);
-
-      return updatedMap;
-    });
-  }, [setAddedRows, initialFields, apiRef, numAddedRows]);
-
   const rows = useMemo(() => {
     if (fetchQueryLoaded) {
       return loadedRows.map(row => {
@@ -324,6 +297,47 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     return [...displayedAddedRows, ...rows];
   }, [rows, addedRows, numAddedRows, paginationModel, isEditing]);
 
+  const allFields = useMemo(() => {
+    return combinedRows.reduce((acc, row) => {
+      Object.keys(row)
+        .filter(key => key !== '___weave')
+        .forEach(key => {
+          if (!acc.includes(key)) {
+            acc.push(key);
+          }
+        });
+      return acc;
+    }, new Array<string>());
+  }, [combinedRows]);
+
+  const [initialFields, setInitialFields] = useState<string[]>([]);
+  useEffect(() => {
+    if (initialFields.length === 0 && allFields.length > 0) {
+      setInitialFields(allFields);
+    }
+  }, [initialFields, allFields]);
+
+  const handleAddColumnClick = useCallback(() => {
+    let targetNumber = allFields.length + 1;
+    let newFieldName = 'column_' + targetNumber;
+    while (allFields.includes(newFieldName)) {
+      targetNumber++;
+      newFieldName = 'column_' + targetNumber;
+    }
+    setAddedRows(prev => {
+      const addedRowEntries = Array.from(prev.entries());
+      const newEntries = addedRowEntries.map(([key, row]) => {
+        const newRow = {
+          ...row,
+          [newFieldName]: '',
+        };
+        return [key, newRow];
+      });
+
+      return new Map(newEntries);
+    });
+  }, [allFields, setAddedRows]);
+
   const initialFieldsSet = useMemo(
     () => new Set(initialFields),
     [initialFields]
@@ -350,17 +364,6 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   );
 
   const columns = useMemo(() => {
-    const allFields = combinedRows.reduce((acc, row) => {
-      Object.keys(row)
-        .filter(key => key !== '___weave')
-        .forEach(key => acc.add(key));
-      return acc;
-    }, new Set<string>());
-
-    if (initialFields.length === 0 && allFields.size > 0) {
-      setInitialFields(Array.from(allFields));
-    }
-
     // Create an array to hold all base columns
     const baseColumns: GridColDef[] = [];
 
@@ -447,6 +450,8 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
       sortable: true,
       filterable: false,
       pinnable: false,
+      reorderable: false,
+      disableReorder: true,
       renderCell: (params: GridRenderCellParams) => {
         if (!isEditing) {
           return (
@@ -485,22 +490,21 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
 
     return [...baseColumns, ...fieldColumns];
   }, [
-    combinedRows,
-    deleteRow,
-    restoreRow,
-    deletedRows,
-    deleteAddedRow,
-    initialFields,
+    allFields,
+    hideIdColumn,
     isEditing,
-    onClick,
-    offset,
-    loadedRows,
     columnWidths,
-    preserveFieldOrder,
+    deletedRows,
+    disableNewRowHighlight,
+    onClick,
+    deleteRow,
+    deleteAddedRow,
+    restoreRow,
     hideRemoveForAddedRows,
     isFieldEdited,
-    hideIdColumn,
-    disableNewRowHighlight,
+    loadedRows,
+    offset,
+    preserveFieldOrder,
   ]);
 
   const handleColumnWidthChange = useCallback((params: any) => {
@@ -509,6 +513,32 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
       [params.colDef.field]: params.width,
     }));
   }, []);
+
+  const handleAddRowsClick = useCallback(() => {
+    setPaginationModel(prev => ({...prev, page: 0}));
+    setAddedRows(prev => {
+      const updatedMap = new Map(prev);
+      const newId = `${ADDED_ROW_ID_PREFIX}${uuidv4()}`;
+      const newRow = {
+        ___weave: {
+          id: newId,
+          isNew: true,
+        },
+        ...Object.fromEntries(allFields.map(field => [field, ''])),
+      };
+      updatedMap.set(newId, newRow);
+
+      // Wait for the next tick to ensure the row is added and grid is updated
+      setTimeout(() => {
+        const firstField = allFields[0];
+        if (firstField) {
+          apiRef.current.scrollToIndexes({rowIndex: numAddedRows});
+        }
+      }, 0);
+
+      return updatedMap;
+    });
+  }, [setAddedRows, allFields, apiRef, numAddedRows]);
 
   const CustomFooter = useCallback(() => {
     return (
@@ -521,6 +551,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               justifyContent: 'flex-start',
               alignItems: 'center',
               flex: 1,
+              gap: 1,
             }}>
             <Button
               icon="add-new"
@@ -529,6 +560,15 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               tooltip="Add row">
               Add row
             </Button>
+            {isNewDataset && (
+              <Button
+                icon="add-new"
+                onClick={handleAddColumnClick}
+                variant="secondary"
+                tooltip="Add column">
+                Add column
+              </Button>
+            )}
           </Box>
         )}
         <Box
@@ -539,7 +579,13 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         </Box>
       </GridFooterContainer>
     );
-  }, [isEditing, handleAddRowsClick, showAddRowButton]);
+  }, [
+    isEditing,
+    showAddRowButton,
+    handleAddRowsClick,
+    isNewDataset,
+    handleAddColumnClick,
+  ]);
 
   const knownFieldNames = useMemo(() => {
     return new Set(combinedRows.flatMap(row => Object.keys(row)));
@@ -603,7 +649,23 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     setNewFieldName(null);
   }, [edittingFieldName, newFieldName, setAddedRows]);
 
-  function CustomUserItem(props: GridColumnMenuItemProps) {
+  const handleDeleteColumn = useCallback(
+    (fieldName: string) => {
+      setAddedRows(prev => {
+        const newEntries = Array.from(prev.entries()).map(([key, row]) => {
+          const newRow = _.omit(row, fieldName);
+          return [key, newRow];
+        });
+        console.log(newEntries);
+        return new Map(newEntries);
+      });
+      setEdittingFieldName(null);
+      setNewFieldName(null);
+    },
+    [setAddedRows]
+  );
+
+  function CustomEditItem(props: GridColumnMenuItemProps) {
     return (
       <MenuItem onClick={() => handleStartFieldName(props.colDef.field)}>
         <ListItemIcon>
@@ -614,14 +676,25 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     );
   }
 
+  function CustomDeleteItem(props: GridColumnMenuItemProps) {
+    return (
+      <MenuItem onClick={() => handleDeleteColumn(props.colDef.field)}>
+        <ListItemIcon>
+          <DeleteIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText>Delete</ListItemText>
+      </MenuItem>
+    );
+  }
+
   function CustomColumnMenu(props: GridColumnMenuProps) {
     return (
       <GridColumnMenu
         {...props}
         slots={{
-          // Hide `columnMenuColumnsItem`
           columnMenuColumnsItem: null,
-          columnMenuUserItem: CustomUserItem,
+          columnMenuEditItem: CustomEditItem,
+          columnMenuDeleteItem: CustomDeleteItem,
         }}
       />
     );

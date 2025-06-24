@@ -1,5 +1,5 @@
 import {Box} from '@mui/material';
-import React, {useCallback, useEffect, useRef} from 'react';
+import React, {useEffect} from 'react';
 
 import {DatasetFilePicker} from '../../datasets/CreateDatasetDrawer';
 import {
@@ -7,7 +7,6 @@ import {
   useCreateDatasetContext,
 } from '../../datasets/CreateDatasetDrawerContext';
 import {EditableDatasetView} from '../../datasets/EditableDatasetView';
-import {SUPPORTED_FILE_EXTENSIONS} from '../../datasets/fileFormats';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
 
 const dummyRow = {
