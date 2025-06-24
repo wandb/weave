@@ -9,7 +9,6 @@ import {ImageContent} from './ImageView';
 import {AudioContent} from './AudioView';
 import { getIconName } from './Shared';
 import { PDFContent } from './PDFView';
-import { VideoContent } from './VideoView';
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
