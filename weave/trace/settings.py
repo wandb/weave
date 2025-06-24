@@ -105,11 +105,11 @@ class UserSettings(BaseModel):
     This cannot be changed after the client has been initialized.
     """
 
-    use_server_cache: bool = False
+    use_server_cache: bool = True
     """
-    Toggles caching of server responses, defaults to False
+    Toggles caching of server responses, defaults to True
 
-    If True, caches server responses to disk.
+    If True, caches server responses to disk at `WEAVE_SERVER_CACHE_DIR`.
     Can be overridden with the environment variable `WEAVE_USE_SERVER_CACHE`
     """
 
@@ -157,6 +157,15 @@ class UserSettings(BaseModel):
     Sets the maximum number of retries.  Defaults to 3.
 
     Can be overridden with the environment variable `WEAVE_RETRY_MAX_ATTEMPTS`
+    """
+
+    enable_disk_fallback: bool = True
+    """
+    Toggles disk fallback for dropped items.
+
+    If True, items that fail to be processed or are dropped due to queue limits
+    will be written to disk as a fallback instead of being lost.
+    Can be overridden with the environment variable `WEAVE_ENABLE_DISK_FALLBACK`
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -250,6 +259,11 @@ def retry_max_interval() -> float:
     if max_interval is None:
         return 60 * 5  # 5 minutes
     return max_interval
+
+
+def should_enable_disk_fallback() -> bool:
+    """Returns whether disk fallback should be enabled for dropped items."""
+    return _should("enable_disk_fallback")
 
 
 def parse_and_apply_settings(

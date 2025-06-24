@@ -69,13 +69,13 @@ There are three main ways to create Calls in Weave:
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
-    Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`. Simply call [`await weave.init('project_name')`](../../reference/typescript-sdk/weave/functions/init.md) and wrap your OpenAI client with [`weave.wrapOpenAI`](../../reference/typescript-sdk/weave/functions/wrapOpenAI.md) at the start of your program:
+    Weave automatically tracks [calls to common LLM libraries](../integrations/index.md), such as `openai`.
 
     ```typescript showLineNumbers
     import OpenAI from 'openai'
     import * as weave from 'weave'
 
-    const client = weave.wrapOpenAI(new OpenAI())
+    const client = new OpenAI()
 
     // Initialize Weave Tracing
     await weave.init('intro-example')
@@ -94,8 +94,17 @@ There are three main ways to create Calls in Weave:
     });
     ```
 
+    For a complete setup guide for JS / TS projects, see the [TypeScript SDK: Third-Party Integration Guide](../integrations/js.md).
+
   </TabItem>
 </Tabs>
+
+#### Summary
+
+You can store metrics or other post-call values in the `summary`
+dictionary of a Call. Modify `call.summary` during execution and any
+values you add will be merged with Weave's computed summary data when
+the call finishes.
 
 ### 2. Decorating and wrapping functions
 
@@ -381,11 +390,49 @@ However, often LLM applications have additional logic (such as pre/post processi
         print(my_function.call("World"))
     ```
 
+    :::tip
+    `call.attributes` cannot be modified once the call starts. Use this
+    context manager to set any metadata before invoking the op.
+    :::
+
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     ```plaintext
     This feature is not available in TypeScript yet.  Stay tuned!
     ```
+  </TabItem>
+</Tabs>
+
+#### Trace parallel (multi-threaded) function calls
+
+<Tabs groupId="programming-language">
+  <TabItem value="python" label="Python" default>
+    By default, parallel calls all show up in Weave as separate root calls. To get correct nesting under the same parent `op`, use [`ThreadPoolExecutor`](../../reference/python-sdk/weave/trace/weave.trace.util/#class-contextawarethreadpoolexecutor).
+
+    The following code sample demonstrates the use of `ThreadPoolExecutor`. 
+    The first function, `func`, is a simple `op` that takes `x` and returns `x+1`. The second function, `outer`, is another `op` that accepts a list of inputs.
+    Inside `outer`, the use of `ThreadPoolExecutor` and `exc.map(func, inputs)` means that each call to `func` still carries the same parent trace context. 
+
+    ```python
+    import weave
+
+    @weave.op
+    def func(x):
+        return x+1
+
+    @weave.op
+    def outer(inputs):
+        with weave.ThreadPoolExecutor() as exc:
+            exc.map(func, inputs)
+
+    # Update your Weave project name  
+    client = weave.init('my-weave-project')
+    outer([1,2,3,4,5])
+    ```
+
+    In the Weave UI, this produces a single parent call with five nested child calls, so that you get a fully hierarchical trace even though the increments run in parallel.
+
+    ![The Trace UI, showing a single parent call for `outer`, with five nested child calls.](imgs/threadpoolexecutor.png)
   </TabItem>
 </Tabs>
 
@@ -906,12 +953,12 @@ Please see the [schema](../../reference/python-sdk/weave/trace_server/weave.trac
 | trace_id | string (uuid) | Identifier for the trace this call belongs to |
 | parent_id | string (uuid) | Identifier of the parent call |
 | started_at | datetime | Timestamp when the call started |
-| attributes | Dict[str, Any] | User-defined metadata about the call |
+| attributes | Dict[str, Any] | User-defined metadata about the call *(read-only during execution)* |
 | inputs | Dict[str, Any] | Input parameters for the call |
 | ended_at | datetime (optional) | Timestamp when the call ended |
 | exception | string (optional) | Error message if the call failed |
 | output | Any (optional) | Result of the call |
-| summary | Optional[SummaryMap] | Post-execution summary information |
+| summary | Optional[SummaryMap] | Post-execution summary information. You can modify this during execution to record custom metrics. |
 | wb_user_id | Optional[str] | Associated Weights & Biases user ID |
 | wb_run_id | Optional[str] | Associated Weights & Biases run ID |
 | deleted_at | datetime (optional) | Timestamp of call deletion, if applicable |
@@ -920,7 +967,7 @@ The table above outlines the key properties of a Call in Weave. Each property pl
 
 - The `id`, `trace_id`, and `parent_id` fields help in organizing and relating calls within the system.
 - Timing information (`started_at`, `ended_at`) allows for performance analysis.
-- The `attributes` and `inputs` fields provide context for the call, while `output` and `summary` capture the results.
+- The `attributes` and `inputs` fields provide context for the call. Attributes are frozen once the call starts, so set them before invocation with `weave.attributes`. `output` and `summary` capture the results, and you can update `summary` during execution to log additional metrics.
 - Integration with Weights & Biases is facilitated through `wb_user_id` and `wb_run_id`.
 
 This comprehensive set of properties enables detailed tracking and analysis of function calls throughout your project.

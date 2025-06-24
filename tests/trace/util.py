@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import io
 import logging
@@ -5,7 +7,6 @@ import re
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Optional
 
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -76,7 +77,7 @@ class DummyTestException(Exception):
 
 
 def get_info_loglines(
-    caplog, match_string: Optional[str] = None, getattrs: list[str] = ["msg"]
+    caplog, match_string: str | None = None, getattrs: list[str] | None = None
 ):
     """
     Get all log lines from caplog that match the given string.
@@ -91,6 +92,9 @@ def get_info_loglines(
     >>> get_info_loglines(caplog, "my query", ["msg", "query"])
     >>> [{"msg": "my query", "query": "SELECT * FROM my_table"}]
     """
+    if getattrs is None:
+        getattrs = ["msg"]
+
     lines = []
     for record in caplog.records:
         if match_string and record.msg != match_string:

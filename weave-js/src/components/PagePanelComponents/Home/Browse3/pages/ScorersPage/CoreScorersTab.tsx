@@ -1,5 +1,6 @@
 import React from 'react';
 
+import {EMPTY_PROPS_PROGRAMMATIC_SCORERS} from '../common/EmptyContent';
 import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
 
 export const ProgrammaticScorersTab: React.FC<{
@@ -15,6 +16,7 @@ export const ProgrammaticScorersTab: React.FC<{
       initialFilter={{
         baseObjectClass: 'Scorer',
       }}
+      propsEmpty={EMPTY_PROPS_PROGRAMMATIC_SCORERS}
     />
   );
 };
