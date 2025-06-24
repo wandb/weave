@@ -261,7 +261,7 @@ In the following example, you'll create:
             - is_true: a boolean stating whether the output statement is true or false based on the input statement.
             - reasoning: your reasoning as to why the statement is true or false.
             ```
-        ![Creating a monitor part 3](img/monitors-ui-3.png)
+            ![Creating a monitor part 3](img/monitors-ui-3.png)
 5. Click **Create Monitor**. The `truthfulness-monitor` is ready to start monitoring.
 6. Generate statements for evaluation by the monitor with true and easily verifiable `ground_truth` statements such as `"Water freezes at 0 degrees Celsius."`.
     ```python
