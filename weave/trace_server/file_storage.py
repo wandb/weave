@@ -159,7 +159,7 @@ def key_for_project_digest(project_id: str, digest: str) -> str:
     return f"weave/projects/{project_id}/files/{digest}"
 
 
-def _is_rate_limit_error(exception: BaseException | None) -> bool:
+def _is_rate_limit_error(exception: Union[BaseException, None]) -> bool:
     """Check if the exception is a rate limiting error (429) from any cloud provider.
 
     Based on official cloud provider documentation:
