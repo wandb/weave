@@ -427,17 +427,15 @@ export const MonitorFormDrawer = ({
                       onChange={e => setDescription(e.target.value)}
                     />
                   </Box>
-                  {monitor && (
-                    <Box className="flex items-center gap-8">
-                      <SwitchRoot
-                        size="small"
-                        checked={active}
-                        onCheckedChange={setActive}>
-                        <SwitchThumb size="small" checked={active} />
-                      </SwitchRoot>
-                      <p className="font-semibold">Active monitor</p>
-                    </Box>
-                  )}
+                  <Box className="flex items-center gap-8">
+                    <SwitchRoot
+                      size="small"
+                      checked={active}
+                      onCheckedChange={setActive}>
+                      <SwitchThumb size="small" checked={active} />
+                    </SwitchRoot>
+                    <p className="font-semibold">Active monitor</p>
+                  </Box>
                 </Box>
 
                 <Box className="flex flex-col gap-8 pt-16">
