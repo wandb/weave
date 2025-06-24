@@ -181,12 +181,12 @@ class TestGCSStorage:
         # In-memory storage for all blobs
         blob_data = {}
 
-        def mock_upload_from_string(data, timeout=None):
+        def mock_upload_from_string(data, timeout=None, **kwargs):
             # Get the blob name from the mock's name attribute
             blob_name = mock_blob.name
             blob_data[blob_name] = data
 
-        def mock_download_as_bytes(timeout=None):
+        def mock_download_as_bytes(timeout=None, **kwargs):
             # Get the blob name from the mock's name attribute
             blob_name = mock_blob.name
             return blob_data.get(blob_name, b"")
