@@ -116,13 +116,6 @@ const ConfigPanel: React.FC<{entity: string; project: string}> = ({
               }}>
               <Column style={{gap: '8px'}}>
                 <Row style={{alignItems: 'center', gap: '8px'}}>
-                  <Button
-                    icon="copy"
-                    variant="ghost"
-                    onClick={() => {
-                      console.error('TODO: Implement me');
-                    }}
-                  />
                   <div style={{flex: 1}}>
                     <Select
                       options={[]}
@@ -135,6 +128,13 @@ const ConfigPanel: React.FC<{entity: string; project: string}> = ({
                   </div>
                   <Button
                     icon="settings"
+                    variant="ghost"
+                    onClick={() => {
+                      console.error('TODO: Implement me');
+                    }}
+                  />
+                  <Button
+                    icon="copy"
                     variant="ghost"
                     onClick={() => {
                       console.error('TODO: Implement me');
@@ -164,13 +164,6 @@ const ConfigPanel: React.FC<{entity: string; project: string}> = ({
         <ConfigSection title="Models" icon="model">
           <Column style={{gap: '8px'}}>
             <Row style={{alignItems: 'center', gap: '8px'}}>
-              <Button
-                icon="copy"
-                variant="ghost"
-                onClick={() => {
-                  console.error('TODO: Implement me');
-                }}
-              />
               <div style={{flex: 1}}>
                 <Select
                   options={[]}
@@ -183,6 +176,13 @@ const ConfigPanel: React.FC<{entity: string; project: string}> = ({
               </div>
               <Button
                 icon="settings"
+                variant="ghost"
+                onClick={() => {
+                  console.error('TODO: Implement me');
+                }}
+              />
+              <Button
+                icon="copy"
                 variant="ghost"
                 onClick={() => {
                   console.error('TODO: Implement me');
