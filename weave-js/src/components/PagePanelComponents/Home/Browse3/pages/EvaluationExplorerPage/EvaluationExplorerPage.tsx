@@ -12,7 +12,7 @@ import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
 } from './context';
-import {NewDatasetEditor} from './DatasetEditor';
+import {NewEmptyDatasetEditor} from './DatasetEditor';
 import {clientBound, hookify} from './hooks';
 import {getLatestDatasetRefs, getLatestEvaluationRefs} from './query';
 
@@ -50,14 +50,14 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
   entity,
   project,
 }) => {
-  const {config, editConfig} = useEvaluationExplorerPageContext();
+  const {config} = useEvaluationExplorerPageContext();
   console.log(config);
   return (
     <Row>
       <ConfigPanel entity={entity} project={project} />
       <Column style={{flex: '1 1 600px', overflow: 'hidden'}}>
         <Header>Dataset</Header>
-        <NewDatasetEditor entity={entity} project={project} />
+        <NewEmptyDatasetEditor entity={entity} project={project} />
       </Column>
     </Row>
   );
@@ -225,6 +225,7 @@ const EvaluationConfigSection: React.FC<{entity: string; project: string}> = ({
   entity,
   project,
 }) => {
+  const {config, editConfig} = useEvaluationExplorerPageContext();
   return (
     <ConfigSection title="Evaluation" icon="baseline-alt">
       <EvaluationPicker entity={entity} project={project} />
@@ -236,17 +237,24 @@ const EvaluationConfigSection: React.FC<{entity: string; project: string}> = ({
         }}>
         <Row style={{padding: '8px 0px 8px 16px'}}>
           <TextField
+            value={config.evaluationDefinition.properties.name}
             placeholder="Evaluation Name"
             onChange={value => {
-              console.error('TODO: Implement me');
+              editConfig(draft => {
+                draft.evaluationDefinition.properties.name = value;
+              });
             }}
           />
         </Row>
         <Row style={{padding: '8px 0px 16px 16px'}}>
           <TextArea
+            value={config.evaluationDefinition.properties.description}
             placeholder="Evaluation Description"
-            onChange={value => {
-              console.error('TODO: Implement me');
+            onChange={e => {
+              editConfig(draft => {
+                draft.evaluationDefinition.properties.description =
+                  e.target.value;
+              });
             }}
           />
         </Row>

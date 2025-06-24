@@ -1,6 +1,13 @@
-import {Box} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import {Box, Typography} from '@mui/material';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import MenuItem from '@mui/material/MenuItem';
 import {
   GridColDef,
+  GridColumnMenu,
+  GridColumnMenuItemProps,
+  GridColumnMenuProps,
   GridFooterContainer,
   GridPagination,
   GridPaginationModel,
@@ -11,8 +18,10 @@ import {
 } from '@mui/x-data-grid-pro';
 import {A} from '@wandb/weave/common/util/links';
 import {Button} from '@wandb/weave/components/Button';
+import {TextField} from '@wandb/weave/components/Form/TextField';
 import {RowId} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallPage/DataTableView';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
+import _ from 'lodash';
 import get from 'lodash/get';
 import React, {
   useCallback,
@@ -32,6 +41,7 @@ import {WeaveCHTableSourceRefContext} from '../pages/CallPage/DataTableView';
 import {TABLE_ID_EDGE_NAME} from '../pages/wfReactInterface/constants';
 import {useWFHooks} from '../pages/wfReactInterface/context';
 import {SortBy} from '../pages/wfReactInterface/traceServerClientTypes';
+import {ReusableDrawer} from '../ReusableDrawer';
 import {StyledDataGrid} from '../StyledDataGrid';
 import {
   CELL_COLORS,
@@ -60,6 +70,9 @@ export interface EditableDatasetViewProps {
   showAddRowButton?: boolean;
   hideIdColumn?: boolean;
   disableNewRowHighlight?: boolean;
+  // If true, then we assume that all the data is client-side
+  // and we can make changes to columns
+  isNewDataset?: boolean;
 }
 
 interface OrderedRow {
@@ -74,6 +87,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   showAddRowButton = true,
   hideIdColumn = false,
   disableNewRowHighlight = false,
+  isNewDataset = false,
 }) => {
   const {useTableRowsQuery, useTableQueryStats} = useWFHooks();
   const [sortBy, setSortBy] = useState<SortBy[]>([]);
@@ -407,6 +421,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         sortable: false,
         filterable: false,
         editable: false,
+        disableColumnMenu: true,
         renderCell: (params: GridRenderCellParams) => (
           <ControlCell
             params={params}
@@ -431,6 +446,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
       editable: false,
       sortable: true,
       filterable: false,
+      pinnable: false,
       renderCell: (params: GridRenderCellParams) => {
         if (!isEditing) {
           return (
@@ -525,8 +541,110 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     );
   }, [isEditing, handleAddRowsClick, showAddRowButton]);
 
+  const knownFieldNames = useMemo(() => {
+    return new Set(combinedRows.flatMap(row => Object.keys(row)));
+  }, [combinedRows]);
+
+  const [edittingFieldName, setEdittingFieldName] = useState<string | null>(
+    null
+  );
+  const [newFieldName, setNewFieldName] = useState<string | null>(null);
+
+  const inputError = useMemo(() => {
+    if (!newFieldName) {
+      return 'Column name is required';
+    }
+    if (newFieldName.length > 255) {
+      return 'Column name must be less than 255 characters';
+    }
+    if (newFieldName.length < 4) {
+      return 'Column name must be at least 4 characters';
+    }
+
+    // valid characters: alphabetic + underscore
+    if (!/^[a-zA-Z0-9_]+$/.test(newFieldName)) {
+      return 'Column name must contain only alphabetic characters and underscores';
+    }
+
+    //cannot start with a number
+    if (/^\d/.test(newFieldName)) {
+      return 'Column name cannot start with a number';
+    }
+
+    if (
+      knownFieldNames.has(newFieldName) &&
+      newFieldName !== edittingFieldName
+    ) {
+      return 'Column name must be unique';
+    }
+    return null;
+  }, [newFieldName, knownFieldNames, edittingFieldName]);
+
+  const handleStartFieldName = useCallback((fieldName: string) => {
+    setEdittingFieldName(fieldName);
+    setNewFieldName(fieldName);
+  }, []);
+
+  const handleSaveNewFieldName = useCallback(() => {
+    setAddedRows(prev => {
+      const addedRowEntries = Array.from(prev.entries());
+      const newEntries = addedRowEntries.map(([key, row]) => {
+        const val = row[edittingFieldName ?? ''];
+        const newRow = {
+          ..._.omit(row, edittingFieldName ?? ''),
+          [newFieldName ?? '']: val,
+        };
+        return [key, newRow];
+      });
+
+      return new Map(newEntries);
+    });
+    setEdittingFieldName(null);
+    setNewFieldName(null);
+  }, [edittingFieldName, newFieldName, setAddedRows]);
+
+  function CustomUserItem(props: GridColumnMenuItemProps) {
+    return (
+      <MenuItem onClick={() => handleStartFieldName(props.colDef.field)}>
+        <ListItemIcon>
+          <EditIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText>Edit</ListItemText>
+      </MenuItem>
+    );
+  }
+
+  function CustomColumnMenu(props: GridColumnMenuProps) {
+    return (
+      <GridColumnMenu
+        {...props}
+        slots={{
+          // Hide `columnMenuColumnsItem`
+          columnMenuColumnsItem: null,
+          columnMenuUserItem: CustomUserItem,
+        }}
+      />
+    );
+  }
+
   return (
     <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+      <ReusableDrawer
+        open={!!edittingFieldName}
+        title="Edit Column Name"
+        onClose={() => setEdittingFieldName(null)}
+        onSave={() => {
+          handleSaveNewFieldName();
+        }}
+        saveDisabled={!!inputError || newFieldName === edittingFieldName}>
+        <TextField
+          value={newFieldName ?? ''}
+          onChange={value => setNewFieldName(value)}
+          placeholder="Column Name"
+          errorState={!!inputError}
+        />
+        {inputError && <Typography color="error">{inputError}</Typography>}
+      </ReusableDrawer>
       <StyledDataGrid
         data-testid="dataset-table"
         apiRef={apiRef}
@@ -542,7 +660,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         onColumnWidthChange={handleColumnWidthChange}
         columnBufferPx={50}
         autoHeight={false}
-        disableColumnMenu={true}
+        disableColumnMenu={!isNewDataset}
         density="compact"
         rows={combinedRows}
         columns={columns}
@@ -561,6 +679,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         pageSizeOptions={[50]}
         slots={{
           footer: isEditing ? CustomFooter : undefined,
+          columnMenu: CustomColumnMenu,
         }}
         sx={{
           border: 'none',

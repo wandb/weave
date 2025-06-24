@@ -1,40 +1,61 @@
-import React, {useMemo} from 'react';
+import React, {useEffect} from 'react';
 
-import {CreateDatasetProvider} from '../../datasets/CreateDatasetDrawerContext';
 import {
-  DatasetObjectVal,
-  EditableDatasetView,
-} from '../../datasets/EditableDatasetView';
+  CreateDatasetProvider,
+  useCreateDatasetContext,
+} from '../../datasets/CreateDatasetDrawerContext';
+import {EditableDatasetView} from '../../datasets/EditableDatasetView';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
 
-export const NewDatasetEditor = ({
+const dummyRow = {
+  user_input: 'Hello, how are you?',
+  expected_output: "I'm good, thank you!",
+};
+
+export const NewEmptyDatasetEditor = ({
   entity,
   project,
 }: {
   entity: string;
   project: string;
 }) => {
-  const {isCreatingDataset, handleSaveDataset} = useDatasetSaving({
+  const {handleSaveDataset} = useDatasetSaving({
     entity,
     project,
     onSaveComplete: () => {
       console.error('TODO: Implement me');
     },
   });
-  const emptyDataset: DatasetObjectVal = useMemo(() => {
-    return {
-      _type: 'Dataset',
-      name: null,
-      description: null,
-      rows: JSON.stringify([]),
-      _class_name: 'Dataset',
-      _bases: ['Object', 'BaseModel'],
-    };
-  }, []);
-
   return (
     <CreateDatasetProvider onPublishDataset={handleSaveDataset}>
-      <EditableDatasetView isEditing datasetObject={emptyDataset} />
+      <NewEmptyDatasetEditorInner />
     </CreateDatasetProvider>
+  );
+};
+
+const NewEmptyDatasetEditorInner = () => {
+  const {state, initializeDataset} = useCreateDatasetContext();
+  const {parsedData} = state;
+
+  useEffect(() => {
+    if (!parsedData) {
+      initializeDataset([dummyRow]);
+    }
+  }, [initializeDataset, parsedData]);
+
+  if (!parsedData) {
+    return null;
+  }
+
+  return (
+    <EditableDatasetView
+      datasetObject={parsedData}
+      isEditing={true}
+      hideRemoveForAddedRows={false}
+      showAddRowButton={true}
+      hideIdColumn={true}
+      disableNewRowHighlight={true}
+      isNewDataset={true}
+    />
   );
 };

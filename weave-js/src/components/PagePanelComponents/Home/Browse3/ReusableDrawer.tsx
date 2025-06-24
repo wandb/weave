@@ -72,7 +72,7 @@ export const ReusableDrawer: FC<ReusableDrawerProps> = ({
             color="primary"
             disabled={saveDisabled}
             className="w-full">
-            Create scorer
+            Save
           </Button>
         </Box>
       </Box>
