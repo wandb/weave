@@ -267,6 +267,7 @@ select = [
   "B020",   # https://docs.astral.sh/ruff/rules/loop-variable-overrides-iterator/
   "B028",   # https://docs.astral.sh/ruff/rules/no-explicit-stacklevel/
   "B904",   # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
+  "SIM102", # https://docs.astral.sh/ruff/rules/collapsible-if/,
 ]
 ignore = [
   # we use Google style
