@@ -2,21 +2,6 @@ import {makeRefObject} from '@wandb/weave/util/refs';
 
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 
-const makeSafe = <T>(
-  fn: (...args: any[]) => Promise<T>,
-  defaultValue: T,
-  errorMessage?: (e: any) => string
-) => {
-  return async (...args: any[]) => {
-    try {
-      return await fn(...args);
-    } catch (e: any) {
-      console.error(errorMessage ? errorMessage(e) : e);
-      return defaultValue;
-    }
-  };
-};
-
 export const getLatestEvaluationRefs = async (
   client: TraceServerClient,
   entity: string,
@@ -36,8 +21,3 @@ export const getLatestEvaluationRefs = async (
     makeRefObject(entity, project, 'object', o.object_id, o.digest, undefined)
   );
 };
-
-// export const getLatestEvaluationRefsSafe = makeSafe(
-//   getLatestEvaluationRefs,
-//   []
-// );
