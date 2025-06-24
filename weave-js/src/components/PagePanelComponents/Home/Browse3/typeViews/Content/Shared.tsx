@@ -6,17 +6,17 @@ import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {convertBytes} from '@wandb/weave/util';
 import React from 'react';
 
-import { ContentMetadata } from './types';
+import {ContentMetadata} from './types';
 
 const ICON_MAP: Record<string, IconName> = {
   'application/json': IconNames.JobProgramCode,
   'text/csv': IconNames.Table,
   'text/html': IconNames.JobProgramCode,
   'text/xml': IconNames.JobProgramCode,
-  'audio': IconNames.MusicAudio,
-  'image': IconNames.Photo,
-  'video': IconNames.VideoPlay,
-  'text': IconNames.Document,
+  audio: IconNames.MusicAudio,
+  image: IconNames.Photo,
+  video: IconNames.VideoPlay,
+  text: IconNames.Document,
 };
 
 export const getIconName = (mimetype: string): IconName => {
@@ -43,7 +43,11 @@ export const DownloadButton = ({
 };
 
 // Memoized component that doesn't re-render on size changes
-export const IconWithText = ({iconName, filename, onClick}: {
+export const IconWithText = ({
+  iconName,
+  filename,
+  onClick,
+}: {
   iconName: IconName;
   filename: string;
   onClick?: () => void;
@@ -66,7 +70,7 @@ export const IconWithText = ({iconName, filename, onClick}: {
       <span>{filename}</span>
     </div>
   );
-}
+};
 
 type ContentMetadataTooltipProps = {
   filename: string;
@@ -90,7 +94,6 @@ export const ContentMetadataTooltip = ({
     </div>
   );
 };
-
 
 // Save a Blob as a content in the user's downloads folder in a
 // cross-browser compatible way.
@@ -133,13 +136,9 @@ export const IconWithTextAndDownloadHover = ({
   const {filename, size, mimetype} = metadata;
   const clickableIconAndText = (
     <div>
-      <IconWithText
-        iconName={iconName}
-        filename={filename}
-        onClick={onClick}
-      />
+      <IconWithText iconName={iconName} filename={filename} onClick={onClick} />
     </div>
-  )
+  );
   return (
     <TailwindContents>
       <div className="group flex items-center gap-4">
@@ -153,11 +152,12 @@ export const IconWithTextAndDownloadHover = ({
                 size={size}
               />
               <div className="text-sm">
-                <div className="mt-8 text-center text-xs">Click icon or filename to preview, button to download</div>
+                <div className="mt-8 text-center text-xs">
+                  Click icon or filename to preview, button to download
+                </div>
               </div>
             </TailwindContents>
-          }
-        >
+          }>
           {clickableIconAndText}
         </StyledTooltip>
         <div className="opacity-0 group-hover:opacity-100">
@@ -166,4 +166,4 @@ export const IconWithTextAndDownloadHover = ({
       </div>
     </TailwindContents>
   );
-}
+};

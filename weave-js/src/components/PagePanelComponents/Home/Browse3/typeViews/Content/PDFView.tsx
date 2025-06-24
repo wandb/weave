@@ -14,7 +14,13 @@ import Download from 'yet-another-react-lightbox/plugins/download';
 import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
 
 import {useWFHooks} from '../../pages/wfReactInterface/context';
-import {ContentMetadataTooltip, DownloadButton, getIconName, IconWithText, saveBlob} from './Shared';
+import {
+  ContentMetadataTooltip,
+  DownloadButton,
+  getIconName,
+  IconWithText,
+  saveBlob,
+} from './Shared';
 import {ContentViewMetadataLoadedProps} from './types';
 
 type PDFViewProps = {
@@ -40,7 +46,6 @@ export const PDFContent = (props: ContentViewMetadataLoadedProps) => {
   const {useFileContent} = useWFHooks();
   const {metadata, project, entity, content} = props;
   const {filename, size, mimetype} = metadata;
-
 
   const contentContent = useFileContent({
     entity,
@@ -91,7 +96,7 @@ export const PDFContent = (props: ContentViewMetadataLoadedProps) => {
   const closePreview = () => {
     setShowPreview(false);
   };
-  const iconName = getIconName(mimetype)
+  const iconName = getIconName(mimetype);
 
   const iconWithText = (
     <div>
@@ -101,7 +106,7 @@ export const PDFContent = (props: ContentViewMetadataLoadedProps) => {
         onClick={openPreview}
       />
     </div>
-  )
+  );
 
   const preview = showPreview && contentResult && (
     <PDFView
@@ -132,11 +137,12 @@ export const PDFContent = (props: ContentViewMetadataLoadedProps) => {
             size={size}
           />
           <div className="text-sm">
-            <div className="mt-8 text-center text-xs">Click icon or filename to preview, button to download</div>
+            <div className="mt-8 text-center text-xs">
+              Click icon or filename to preview, button to download
+            </div>
           </div>
         </TailwindContents>
-      }
-    >
+      }>
       {iconWithText}
     </StyledTooltip>
   );
@@ -151,7 +157,7 @@ export const PDFContent = (props: ContentViewMetadataLoadedProps) => {
       </div>
     </TailwindContents>
   );
-}
+};
 
 export const PDFView = ({blob, open, onClose, onDownload}: PDFViewProps) => {
   // We need to maintain the page index ourselves because we are changing the

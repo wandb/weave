@@ -15,7 +15,6 @@ export const AudioContent = (props: ContentViewMetadataLoadedProps) => {
   const {entity, project, content, metadata} = props;
   const {useFileContent} = useWFHooks();
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [audioFileName, setAudioFileName] = useState<string>(metadata.filename);
 
   // Memoize the params to prevent unnecessary re-queries
   const fileContentParams = useMemo(
@@ -28,10 +27,6 @@ export const AudioContent = (props: ContentViewMetadataLoadedProps) => {
   );
 
   const audioBinary = useFileContent(fileContentParams);
-
-  useMemo(() => {
-    setAudioFileName(metadata.filename);
-  }, [audioFileName]);
 
   useMemo(() => {
     if (audioBinary.result) {
@@ -50,7 +45,7 @@ export const AudioContent = (props: ContentViewMetadataLoadedProps) => {
       console.error('Audio URL is not available');
       return;
     }
-    downloadFromUrl(audioUrl, audioFileName);
+    downloadFromUrl(audioUrl, metadata.filename);
   };
 
   return (

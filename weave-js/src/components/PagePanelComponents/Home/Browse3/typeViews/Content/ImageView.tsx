@@ -1,9 +1,8 @@
-import { StyledTooltip } from '@wandb/weave/components/DraggablePopups';
+import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotApplicable';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {ContentViewMetadataLoadedProps} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/Content/types';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useMemo, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
 import Lightbox from 'yet-another-react-lightbox';
@@ -57,7 +56,7 @@ const ImageContentWithSize = ({
 
   return (
     <ImageContentWithData
-      mimetype= {metadata.mimetype}
+      mimetype={metadata.mimetype}
       buffer={imageBinary.result}
       containerWidth={containerWidth}
       containerHeight={containerHeight}
@@ -196,7 +195,7 @@ const ImageContentLoaded = ({
       <StyledTooltip enterDelay={500} title={preview}>
         {image}
       </StyledTooltip>
-    )
+    );
   }
 
   return (

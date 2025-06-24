@@ -6,10 +6,20 @@ import React, {useCallback, useEffect, useState} from 'react';
 
 import {AudioContent} from './AudioView';
 import {ImageContent} from './ImageView';
-import { PDFContent } from './PDFView';
-import {ContentMetadataTooltip, DownloadButton, getIconName, IconWithText, saveBlob} from './Shared';
-import {ContentMetadata, ContentViewMetadataLoadedProps,ContentViewProps} from './types';
-import { VideoContent } from './VideoView';
+import {PDFContent} from './PDFView';
+import {
+  ContentMetadataTooltip,
+  DownloadButton,
+  getIconName,
+  IconWithText,
+  saveBlob,
+} from './Shared';
+import {
+  ContentMetadata,
+  ContentViewMetadataLoadedProps,
+  ContentViewProps,
+} from './types';
+import {VideoContent} from './VideoView';
 
 const FallbackContent = (props: ContentViewMetadataLoadedProps) => {
   const [contentResult, setContentResult] = useState<Blob | null>(null);
@@ -51,10 +61,7 @@ const FallbackContent = (props: ContentViewMetadataLoadedProps) => {
 
   const iconWithText = (
     <div>
-      <IconWithText
-        iconName={iconName}
-        filename={filename}
-      />
+      <IconWithText iconName={iconName} filename={filename} />
     </div>
   );
 
@@ -69,11 +76,12 @@ const FallbackContent = (props: ContentViewMetadataLoadedProps) => {
             size={size}
           />
           <div className="text-sm">
-            <div className="mt-8 text-center text-xs">Click button to download</div>
+            <div className="mt-8 text-center text-xs">
+              Click button to download
+            </div>
           </div>
         </TailwindContents>
-      }
-    >
+      }>
       {iconWithText}
     </StyledTooltip>
   );
@@ -128,9 +136,8 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
         metadata={metadataJson}
         content={content}
       />
-    )
-  }
-  else if (metadataJson.mimetype.startsWith('audio')) {
+    );
+  } else if (metadataJson.mimetype.startsWith('audio')) {
     contentView = (
       <AudioContent
         entity={entity}
@@ -138,9 +145,8 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
         metadata={metadataJson}
         content={content}
       />
-    )
-  }
-  else if (metadataJson.mimetype.startsWith('video')) {
+    );
+  } else if (metadataJson.mimetype.startsWith('video')) {
     contentView = (
       <VideoContent
         entity={entity}
@@ -149,8 +155,7 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
         content={content}
       />
     );
-  }
-  else if (metadataJson.mimetype === ('application/pdf')) {
+  } else if (metadataJson.mimetype === 'application/pdf') {
     contentView = (
       <PDFContent
         entity={entity}
@@ -159,8 +164,7 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
         content={content}
       />
     );
-  }
-  else {
+  } else {
     contentView = (
       <FallbackContent
         entity={entity}
@@ -168,7 +172,7 @@ export const ContentView = ({entity, project, data}: ContentViewProps) => {
         metadata={metadataJson}
         content={content}
       />
-    )
+    );
   }
   return contentView;
 };
