@@ -1,6 +1,6 @@
 ---
-description: Python Documentation
-globs: *.py
+description: 
+globs: 
 alwaysApply: true
 ---
 
