@@ -160,7 +160,13 @@ def key_for_project_digest(project_id: str, digest: str) -> str:
 
 
 def _is_rate_limit_error(exception: BaseException | None) -> bool:
-    """Check if the exception is a rate limiting error (429) from any cloud provider."""
+    """Check if the exception is a rate limiting error (429) from any cloud provider.
+
+    Based on official cloud provider documentation:
+    - AWS: https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html
+    - GCS: https://cloud.google.com/storage/docs/retry-strategy
+    - Azure: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-retry-policy-python
+    """
     if exception is None:
         return False
 
