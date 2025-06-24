@@ -534,8 +534,6 @@ const ScorersConfigSection: React.FC<{entity: string; project: string}> = ({
     [editConfig]
   );
 
-  console.log('currentlyEditingScorerNdx', currentlyEditingScorerNdx);
-
   return (
     <ConfigSection
       title="Scorers"
@@ -653,12 +651,10 @@ const ScorerDrawer: React.FC<{
   const scorerFormRef = useRef<ScorerFormRef | null>(null);
   const onSave = useCallback(async () => {
     const newScorerRef = await scorerFormRef.current?.saveScorer();
-    console.log('newScorerRef', newScorerRef);
     onClose(newScorerRef);
   }, [onClose]);
 
   const scorerQuery = useScorer(initialScorerRef);
-  console.log('scorerQuery', scorerQuery);
 
   const scorerObj = useMemo(() => {
     if (initialScorerRef) {

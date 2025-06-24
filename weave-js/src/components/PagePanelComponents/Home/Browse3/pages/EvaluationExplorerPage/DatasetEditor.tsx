@@ -127,7 +127,6 @@ export const ExistingDatasetEditor: React.FC<{datasetRef: string}> = ({
   datasetRef,
 }) => {
   const datasetObject = useObjByRef(datasetRef);
-  console.log(datasetObject);
   if (datasetObject.loading || datasetObject.error || !datasetObject.data) {
     // TODO
     return null;
