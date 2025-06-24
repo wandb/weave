@@ -105,7 +105,7 @@ from typing import Any
 from PIL import Image
 import weave
 
-weave.init('my-weave-project')
+weave.init('image-resize-example')
 
 # Custom output type
 @dataclass
@@ -126,7 +126,7 @@ def postprocess_output(output: ImageResult) -> ImageResult:
 
 @weave.op(postprocess_output=postprocess_output)
 def generate_large_image() -> ImageResult:
-    # Create a dummy large image (e.g., 2000x2000 red square)
+    # Create an example image to process (e.g., 2000x2000 red square)
     img = Image.new("RGB", (2000, 2000), color="red")
     return ImageResult(label="big red square", image=img)
 
