@@ -1,12 +1,10 @@
 import {Box} from '@mui/material';
-import {MOON_50, MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Select} from '@wandb/weave/components/Form/Select';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {parseWeaveRef} from '@wandb/weave/react';
 import React, {useCallback, useMemo, useRef, useState} from 'react';
 
 import {ReusableDrawer} from '../../ReusableDrawer';
@@ -15,6 +13,11 @@ import {ScorerFormRef} from '../MonitorsPage/MonitorFormDrawer';
 import {LLMAsAJudgeScorerForm} from '../MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {refStringToName} from './common';
+import {
+  BORDER_COLOR,
+  HEADER_HEIGHT_PX,
+  SECONDARY_BACKGROUND_COLOR,
+} from './constants';
 import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
@@ -26,10 +29,6 @@ import {
   getLatestEvaluationRefs,
   getScorerByRef,
 } from './query';
-
-const HEADER_HEIGHT_PX = 44;
-const BORDER_COLOR = MOON_200;
-const SECONDARY_BACKGROUND_COLOR = MOON_50;
 
 type EvaluationExplorerPageProps = {
   entity: string;
@@ -148,14 +147,14 @@ const ConfigPanel: React.FC<{
         <ModelsConfigSection entity={entity} project={project} />
       </Column>
       <Footer>
-        <Button
+        {/* <Button
           icon="save"
           variant="secondary"
           onClick={() => {
             console.error('TODO: Implement me');
           }}>
           Save all
-        </Button>
+        </Button> */}
         <Button
           icon="play"
           variant="primary"
@@ -224,7 +223,7 @@ const Footer: React.FC<{children?: React.ReactNode}> = ({children}) => {
         padding: '0 16px',
         fontWeight: 600,
         fontSize: '18px',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
       }}>
       {children}
     </div>

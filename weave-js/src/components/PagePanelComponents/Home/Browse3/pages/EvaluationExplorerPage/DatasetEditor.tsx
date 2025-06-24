@@ -13,6 +13,7 @@ import {
   EditableDatasetViewProps,
 } from '../../datasets/EditableDatasetView';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
+import {HEADER_HEIGHT_PX} from './constants';
 
 const dummyRow = {
   user_input: 'Hello, how are you?',
@@ -62,17 +63,7 @@ const NewEmptyDatasetEditorInner = () => {
     return null;
   }
 
-  return (
-    <EditableDatasetViewInner
-      datasetObject={parsedData}
-      isEditing={true}
-      hideRemoveForAddedRows={false}
-      showAddRowButton={true}
-      hideIdColumn={true}
-      disableNewRowHighlight={true}
-      isNewDataset={true}
-    />
-  );
+  return <EditableDatasetViewInner datasetObject={parsedData} />;
 };
 
 const NewFileDatasetEditorInner = () => {
@@ -87,20 +78,12 @@ const NewFileDatasetEditorInner = () => {
     );
   }
 
-  return (
-    <EditableDatasetViewInner
-      datasetObject={parsedData}
-      isEditing={true}
-      hideRemoveForAddedRows={false}
-      showAddRowButton={true}
-      hideIdColumn={true}
-      disableNewRowHighlight={true}
-      isNewDataset={true}
-    />
-  );
+  return <EditableDatasetViewInner datasetObject={parsedData} />;
 };
 
-const EditableDatasetViewInner: React.FC<EditableDatasetViewProps> = props => {
+const EditableDatasetViewInner: React.FC<
+  Pick<EditableDatasetViewProps, 'datasetObject'>
+> = props => {
   const {handlePublishDataset, dispatch} = useCreateDatasetContext();
   useEffect(() => {
     // TODO: Get the name from the user
@@ -116,20 +99,20 @@ const EditableDatasetViewInner: React.FC<EditableDatasetViewProps> = props => {
     handlePublishDataset();
   }, [handlePublishDataset]);
   return (
-    <Box
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 2,
-        overflow: 'hidden',
-      }}>
-      <Button variant="primary" onClick={onSave}>
-        Save
-      </Button>
-      <Box sx={{flex: 1, overflow: 'hidden'}}>
-        <EditableDatasetView {...props} />
-      </Box>
-    </Box>
+    <EditableDatasetView
+      {...props}
+      isEditing={true}
+      hideRemoveForAddedRows={false}
+      showAddRowButton={true}
+      hideIdColumn={true}
+      disableNewRowHighlight={true}
+      isNewDataset={true}
+      footerHeight={HEADER_HEIGHT_PX}
+      extraFooterContent={
+        <Button variant="primary" onClick={onSave}>
+          Save
+        </Button>
+      }
+    />
   );
 };

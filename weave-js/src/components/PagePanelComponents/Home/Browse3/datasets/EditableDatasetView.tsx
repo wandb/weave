@@ -74,6 +74,8 @@ export interface EditableDatasetViewProps {
   // If true, then we assume that all the data is client-side
   // and we can make changes to columns
   isNewDataset?: boolean;
+  extraFooterContent?: React.ReactNode;
+  footerHeight?: number;
 }
 
 interface OrderedRow {
@@ -89,6 +91,8 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   hideIdColumn = false,
   disableNewRowHighlight = false,
   isNewDataset = false,
+  extraFooterContent = null,
+  footerHeight = undefined,
 }) => {
   const {useTableRowsQuery, useTableQueryStats} = useWFHooks();
   const [sortBy, setSortBy] = useState<SortBy[]>([]);
@@ -541,8 +545,13 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   }, [setAddedRows, allFields, apiRef, numAddedRows]);
 
   const CustomFooter = useCallback(() => {
+    const footHeightOverride: React.CSSProperties = {};
+    if (footerHeight) {
+      footHeightOverride.height = footerHeight;
+      footHeightOverride.minHeight = footerHeight;
+    }
     return (
-      <GridFooterContainer>
+      <GridFooterContainer sx={footHeightOverride}>
         {isEditing && showAddRowButton && (
           <Box
             sx={{
@@ -569,6 +578,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
                 Add column
               </Button>
             )}
+            {extraFooterContent}
           </Box>
         )}
         <Box
@@ -580,11 +590,13 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
       </GridFooterContainer>
     );
   }, [
+    footerHeight,
     isEditing,
     showAddRowButton,
     handleAddRowsClick,
     isNewDataset,
     handleAddColumnClick,
+    extraFooterContent,
   ]);
 
   const knownFieldNames = useMemo(() => {
