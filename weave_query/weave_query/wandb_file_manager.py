@@ -114,8 +114,8 @@ class WandbFileManagerAsync:
 
         if isinstance(uri, artifact_wandb.WeaveWBArtifactByIDURI):
             return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
-        elif len(uri.extra) > 0:
-            return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/{uri.extra[0]}/manifest-{uri.version}.json"
+        elif uri.extra:
+            return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}-{uri.extra[0]}.json"
         return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
 
@@ -310,8 +310,8 @@ class WandbFileManager:
         assert uri.version is not None
         if isinstance(uri, artifact_wandb.WeaveWBArtifactByIDURI):
             return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
-        elif len(uri.extra) > 0:
-            return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/{uri.extra[0]}/manifest-{uri.version}.json"
+        elif uri.extra:
+            return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}-{uri.extra[0]}.json"
         return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     def _manifest(
