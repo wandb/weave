@@ -1,4 +1,5 @@
 import * as Dialog from '@wandb/weave/components/Dialog/Dialog';
+import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
 import {IconPlay} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {WeaveflowPeekContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
@@ -6,9 +7,9 @@ import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {CustomWeaveTypeProjectContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/CustomWeaveTypeDispatcher';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
 import React, {useContext, useEffect, useRef, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
+
 import {ContentViewMetadataLoadedProps} from './types';
 
 type VideoFormat = 'gif' | 'mp4' | 'webm';

@@ -1,8 +1,9 @@
 import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotApplicable';
 import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import React from 'react';
-import {VideoContent} from '../Content/VideoView';
+
 import {ContentMetadata} from '../Content/types';
+import {VideoContent} from '../Content/VideoView';
 
 type VideoFormat = 'gif' | 'mp4' | 'webm';
 type VideoFileKeys = `video.${VideoFormat}`;

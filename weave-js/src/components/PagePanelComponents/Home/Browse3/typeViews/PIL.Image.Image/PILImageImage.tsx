@@ -1,10 +1,11 @@
 import React from 'react';
 import {AutoSizer} from 'react-virtualized';
+
 import {LoadingDots} from '../../../../../LoadingDots';
 import {NotApplicable} from '../../NotApplicable';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
-import {CustomWeaveTypePayload} from '../customWeaveType.types';
 import {ImageContentWithData} from '../Content/ImageView';
+import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
 type PILImageImageTypePayload = CustomWeaveTypePayload<
   'PIL.Image.Image',

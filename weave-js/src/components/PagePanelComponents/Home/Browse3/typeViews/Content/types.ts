@@ -26,7 +26,8 @@ export type ContentViewMetadataLoadedProps = Omit<ContentViewProps, 'data'> & {
   content: string;
 };
 
-export type SizedContentViewMetadataLoadedProps = ContentViewMetadataLoadedProps & {
-  width: number
-  height: number
-};
+export type SizedContentViewMetadataLoadedProps =
+  ContentViewMetadataLoadedProps & {
+    width: number;
+    height: number;
+  };

@@ -1,11 +1,12 @@
-import React from 'react';
 import {Button} from '@wandb/weave/components/Button';
-import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
-import { ContentMetadata } from './types';
-import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
 import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
+import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
+import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {convertBytes} from '@wandb/weave/util';
+import React from 'react';
+
+import { ContentMetadata } from './types';
 
 const ICON_MAP: Record<string, IconName> = {
   'application/json': IconNames.JobProgramCode,

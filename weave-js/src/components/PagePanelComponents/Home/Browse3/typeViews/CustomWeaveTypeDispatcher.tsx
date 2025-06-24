@@ -1,7 +1,7 @@
 import React from 'react';
 
 import {AudioPlayer} from './Audio/AudioPlayer';
-import { ContentView } from './Content/ContentView';
+import {ContentView} from './Content/ContentView';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {DateTimeView} from './datetime.datetime/DateTimeView';
 import {MarkdownView} from './Markdown/MarkdownView';

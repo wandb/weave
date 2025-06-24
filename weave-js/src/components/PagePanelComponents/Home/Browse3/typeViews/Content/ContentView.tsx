@@ -1,15 +1,15 @@
-import React, {useCallback, useEffect, useState} from 'react';
-
+import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
-import {ContentMetadata, ContentViewProps, ContentViewMetadataLoadedProps} from './types';
-import {ImageContent} from './ImageView';
-import {AudioContent} from './AudioView';
-import { PDFContent } from './PDFView';
-import { VideoContent } from './VideoView';
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
+import React, {useCallback, useEffect, useState} from 'react';
+
+import {AudioContent} from './AudioView';
+import {ImageContent} from './ImageView';
+import { PDFContent } from './PDFView';
 import {ContentMetadataTooltip, DownloadButton, getIconName, IconWithText, saveBlob} from './Shared';
-import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
+import {ContentMetadata, ContentViewMetadataLoadedProps,ContentViewProps} from './types';
+import { VideoContent } from './VideoView';
 
 const FallbackContent = (props: ContentViewMetadataLoadedProps) => {
   const [contentResult, setContentResult] = useState<Blob | null>(null);

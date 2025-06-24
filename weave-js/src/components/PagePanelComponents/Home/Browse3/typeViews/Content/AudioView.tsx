@@ -1,15 +1,15 @@
 import {MOON_350, TEAL_500} from '@wandb/weave/common/css/color.styles';
 import {formatDurationWithColons} from '@wandb/weave/common/util/time';
 import {Button} from '@wandb/weave/components/Button';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
+import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {FC, useEffect, useMemo, useRef, useState} from 'react';
 import WaveSurfer from 'wavesurfer.js';
 
-import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
-import {CustomWeaveTypePayload} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/customWeaveType.types';
-import {ContentViewMetadataLoadedProps} from './types';
 import {downloadFromUrl} from './Shared';
+import {ContentViewMetadataLoadedProps} from './types';
 
 export const AudioContent = (props: ContentViewMetadataLoadedProps) => {
   const {entity, project, content, metadata} = props;

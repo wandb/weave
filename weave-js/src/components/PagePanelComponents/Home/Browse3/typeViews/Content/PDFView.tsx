@@ -2,6 +2,10 @@ import 'yet-another-react-lightbox/plugins/thumbnails.css';
 import 'yet-another-react-lightbox/styles.css';
 import 'yet-another-react-lightbox/plugins/counter.css';
 
+import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {Tailwind, TailwindContents} from '@wandb/weave/components/Tailwind';
 import type {PDFDocumentProxy} from 'pdfjs-dist';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import Lightbox, {Slide} from 'yet-another-react-lightbox';
@@ -9,13 +13,9 @@ import Counter from 'yet-another-react-lightbox/plugins/counter';
 import Download from 'yet-another-react-lightbox/plugins/download';
 import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
 
-import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import {Tailwind, TailwindContents} from '@wandb/weave/components/Tailwind';
-import {ContentViewMetadataLoadedProps} from './types';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
 import {ContentMetadataTooltip, DownloadButton, getIconName, IconWithText, saveBlob} from './Shared';
-import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
+import {ContentViewMetadataLoadedProps} from './types';
 
 type PDFViewProps = {
   blob: Blob;
