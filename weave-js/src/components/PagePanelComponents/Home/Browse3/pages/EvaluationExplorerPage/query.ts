@@ -45,6 +45,46 @@ export const getLatestDatasetRefs = async (
   );
 };
 
+export const getLatestScorerRefs = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string
+): Promise<string[]> => {
+  const res = await client.objsQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      leaf_object_classes: ['LLMAsAJudgeScorer'],
+      latest_only: true,
+    },
+    // TODO: Add pagination or smarter filtering.
+    limit: 1000,
+    metadata_only: true,
+  });
+  return res.objs.map(o =>
+    makeRefObject(entity, project, 'object', o.object_id, o.digest, undefined)
+  );
+};
+
+export const getLatestModelRefs = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string
+): Promise<string[]> => {
+  const res = await client.objsQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      leaf_object_classes: ['PlaygroundModel'],
+      latest_only: true,
+    },
+    // TODO: Add pagination or smarter filtering.
+    limit: 1000,
+    metadata_only: true,
+  });
+  return res.objs.map(o =>
+    makeRefObject(entity, project, 'object', o.object_id, o.digest, undefined)
+  );
+};
+
 export const getObjByRef = async (
   client: TraceServerClient,
   ref?: string | null

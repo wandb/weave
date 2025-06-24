@@ -8,21 +8,27 @@ import {ScorerFormRef} from '../MonitorsPage/MonitorFormDrawer';
 import {LLMAsAJudgeScorerForm} from '../MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {refStringToName} from './common';
+import {LoadingSelect} from './components';
 import {useEvaluationExplorerPageContext} from './context';
 import {clientBound, hookify} from './hooks';
 import {Column, ConfigSection, Row} from './layout';
-import {getObjByRef} from './query';
+import {getObjByRef, getLatestScorerRefs} from './query';
 
 const newScorerOption = {
   label: 'New Scorer',
   value: 'new-scorer',
 };
 
+// Create the hook for fetching scorer refs
+// This wraps the async query function in a React hook that manages loading/error states
+const useLatestScorerRefs = clientBound(hookify(getLatestScorerRefs));
+
 export const ScorersConfigSection: React.FC<{
   entity: string;
   project: string;
 }> = ({entity, project}) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
+  const scorerRefsQuery = useLatestScorerRefs(entity, project);
 
   const [currentlyEditingScorerNdx, setCurrentlyEditingScorerNdx] = useState<
     number | null
@@ -41,13 +47,45 @@ export const ScorersConfigSection: React.FC<{
   }, [editConfig]);
 
   const scorerOptions = useMemo(() => {
-    return [newScorerOption];
-  }, []);
+    return [
+      {
+        label: 'Create new scorer',
+        options: [newScorerOption],
+      },
+      {
+        label: 'Load existing scorer',
+        options:
+          scorerRefsQuery.data?.map(ref => ({
+            label: refStringToName(ref),
+            value: ref,
+          })) ?? [],
+      },
+    ];
+  }, [scorerRefsQuery.data]);
 
   const deleteScorer = useCallback(
     (scorerNdx: number) => {
       editConfig(draft => {
         draft.evaluationDefinition.properties.scorers.splice(scorerNdx, 1);
+      });
+    },
+    [editConfig]
+  );
+
+  const updateScorerRef = useCallback(
+    (scorerNdx: number, ref: string | null) => {
+      editConfig(draft => {
+        if (ref === 'new-scorer' || ref === null) {
+          // Reset to empty scorer
+          draft.evaluationDefinition.properties.scorers[
+            scorerNdx
+          ].originalSourceRef = null;
+        } else {
+          // Set the selected scorer ref
+          draft.evaluationDefinition.properties.scorers[
+            scorerNdx
+          ].originalSourceRef = ref;
+        }
       });
     },
     [editConfig]
@@ -71,8 +109,27 @@ export const ScorersConfigSection: React.FC<{
               label: name,
               value: scorer.originalSourceRef,
             };
-            options.unshift(selectedOption);
+            // Add current selection if it's not in the list (e.g., from another project)
+            const allOptions = options.flatMap(group => group.options);
+            if (!allOptions.find(opt => opt.value === scorer.originalSourceRef)) {
+              // Add to the existing scorers group
+              options[1].options.unshift(selectedOption);
+            }
           }
+          
+          // Show loading state for individual dropdowns if query is loading
+          if (scorerRefsQuery.loading) {
+            return (
+              <Row key={scorerNdx} style={{alignItems: 'center', gap: '8px'}}>
+                <div style={{flex: 1}}>
+                  <LoadingSelect />
+                </div>
+                <Button icon="settings" variant="ghost" disabled />
+                <Button icon="delete" variant="ghost" disabled />
+              </Row>
+            );
+          }
+          
           return (
             <Row key={scorerNdx} style={{alignItems: 'center', gap: '8px'}}>
               <div style={{flex: 1}}>
@@ -80,8 +137,7 @@ export const ScorersConfigSection: React.FC<{
                   options={options}
                   value={selectedOption}
                   onChange={option => {
-                    console.log(option);
-                    console.error('TODO: Implement me');
+                    updateScorerRef(scorerNdx, option?.value ?? null);
                   }}
                 />
               </div>
