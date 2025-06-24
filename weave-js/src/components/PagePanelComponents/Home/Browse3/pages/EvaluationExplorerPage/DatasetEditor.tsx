@@ -8,12 +8,16 @@ import {
   CreateDatasetProvider,
   useCreateDatasetContext,
 } from '../../datasets/CreateDatasetDrawerContext';
+import {DatasetEditProvider} from '../../datasets/DatasetEditorContext';
 import {
+  DatasetObjectVal,
   EditableDatasetView,
   EditableDatasetViewProps,
 } from '../../datasets/EditableDatasetView';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
 import {HEADER_HEIGHT_PX} from './constants';
+import {clientBound, hookify} from './hooks';
+import {getObjByRef} from './query';
 
 const dummyRow = {
   user_input: 'Hello, how are you?',
@@ -109,10 +113,41 @@ const EditableDatasetViewInner: React.FC<
       isNewDataset={true}
       footerHeight={HEADER_HEIGHT_PX}
       extraFooterContent={
-        <Button variant="primary" onClick={onSave}>
-          Save
+        <Button icon="save" variant="primary" onClick={onSave}>
+          Save Changes
         </Button>
       }
     />
+  );
+};
+
+const useObjByRef = clientBound(hookify(getObjByRef));
+
+export const ExistingDatasetEditor: React.FC<{datasetRef: string}> = ({
+  datasetRef,
+}) => {
+  const datasetObject = useObjByRef(datasetRef);
+  console.log(datasetObject);
+  if (datasetObject.loading || datasetObject.error || !datasetObject.data) {
+    // TODO
+    return null;
+  }
+  return (
+    <DatasetEditProvider>
+      <EditableDatasetView
+        // TODO: unsafe cast
+        datasetObject={datasetObject.data.val as DatasetObjectVal}
+        isEditing={true}
+        hideRemoveForAddedRows={false}
+        showAddRowButton={true}
+        hideIdColumn={true}
+        footerHeight={HEADER_HEIGHT_PX}
+        extraFooterContent={
+          <Button icon="save" variant="primary" onClick={() => {}}>
+            Save Changes
+          </Button>
+        }
+      />
+    </DatasetEditProvider>
   );
 };

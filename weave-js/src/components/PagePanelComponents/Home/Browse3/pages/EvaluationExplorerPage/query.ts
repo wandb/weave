@@ -45,7 +45,7 @@ export const getLatestDatasetRefs = async (
   );
 };
 
-export const getScorerByRef = async (
+export const getObjByRef = async (
   client: TraceServerClient,
   ref?: string | null
 ): Promise<ObjectVersionSchema | null> => {

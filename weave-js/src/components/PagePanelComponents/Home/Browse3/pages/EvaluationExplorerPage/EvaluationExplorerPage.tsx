@@ -22,12 +22,12 @@ import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
 } from './context';
-import {NewDatasetEditor} from './DatasetEditor';
+import {ExistingDatasetEditor, NewDatasetEditor} from './DatasetEditor';
 import {clientBound, hookify} from './hooks';
 import {
   getLatestDatasetRefs,
   getLatestEvaluationRefs,
-  getScorerByRef,
+  getObjByRef,
 } from './query';
 
 type EvaluationExplorerPageProps = {
@@ -64,14 +64,14 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
   const [newDatasetEditorMode, setNewDatasetEditorMode] = useState<
     'new-empty' | 'new-file'
   >('new-empty');
+  const sourceRef =
+    config.evaluationDefinition.properties.dataset.originalSourceRef;
   const datasetEditorMode = useMemo(() => {
-    if (
-      config.evaluationDefinition.properties.dataset.originalSourceRef == null
-    ) {
+    if (sourceRef == null) {
       return newDatasetEditorMode;
     }
     return 'existing';
-  }, [config, newDatasetEditorMode]);
+  }, [newDatasetEditorMode, sourceRef]);
 
   const onNewDatasetSaveComplete = useCallback(
     (datasetRef?: string) => {
@@ -107,7 +107,9 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
             onSaveComplete={onNewDatasetSaveComplete}
           />
         )}
-        {datasetEditorMode === 'existing' && <div>Not implemented</div>}
+        {datasetEditorMode === 'existing' && sourceRef && (
+          <ExistingDatasetEditor datasetRef={sourceRef} />
+        )}
       </Column>
     </Row>
   );
@@ -639,7 +641,7 @@ const emptyScorer = (entity: string, project: string): ObjectVersionSchema => ({
   val: {_type: 'LLMAsAJudgeScorer'},
 });
 
-const useScorer = clientBound(hookify(getScorerByRef));
+const useScorer = clientBound(hookify(getObjByRef));
 
 const ScorerDrawer: React.FC<{
   entity: string;

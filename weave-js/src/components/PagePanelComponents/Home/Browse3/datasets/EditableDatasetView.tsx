@@ -562,6 +562,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               flex: 1,
               gap: 1,
             }}>
+            {extraFooterContent}
             <Button
               icon="add-new"
               onClick={handleAddRowsClick}
@@ -578,7 +579,6 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
                 Add column
               </Button>
             )}
-            {extraFooterContent}
           </Box>
         )}
         <Box
