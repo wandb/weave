@@ -269,6 +269,7 @@ select = [
   "B904",    # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
   "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
   "PERF102", # https://docs.astral.sh/ruff/rules/incorrect-dict-iterator/
+  "PERF203", # https://docs.astral.sh/ruff/rules/try-except-in-loop/
 ]
 ignore = [
   # we use Google style
