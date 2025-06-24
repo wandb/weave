@@ -46,8 +46,11 @@ from abc import abstractmethod
 from typing import Any, Callable, Optional, Union, cast
 
 import boto3
+from azure.core.exceptions import HttpResponseError
 from azure.storage.blob import BlobServiceClient
 from botocore.config import Config
+from botocore.exceptions import ClientError
+from google.api_core import exceptions as gcp_exceptions
 from google.cloud import storage
 from google.oauth2.credentials import Credentials as GCPCredentials
 from tenacity import (
@@ -56,6 +59,7 @@ from tenacity import (
     retry,
     stop_after_attempt,
     wait_exponential,
+    wait_random_exponential,
 )
 
 from weave.trace_server.environment import wf_file_storage_uri
@@ -89,7 +93,8 @@ RETRY_MAX_WAIT = 10  # seconds
 
 class FileStorageClient:
     """Abstract base class defining the interface for cloud storage operations.
-    Implementations are provided for AWS S3, Google Cloud Storage, and Azure Blob Storage."""
+    Implementations are provided for AWS S3, Google Cloud Storage, and Azure Blob Storage.
+    """
 
     base_uri: FileStorageURI
 
@@ -155,8 +160,34 @@ def key_for_project_digest(project_id: str, digest: str) -> str:
     return f"weave/projects/{project_id}/files/{digest}"
 
 
+def _is_rate_limit_error(exception: BaseException | None) -> bool:
+    """Check if the exception is a rate limiting error (429) from any cloud provider."""
+    if exception is None:
+        return False
+
+    # Google Cloud Storage - TooManyRequests exception
+    if isinstance(exception, gcp_exceptions.TooManyRequests):
+        return True
+
+    # AWS S3 - ClientError with 429 status code or Throttling error
+    if isinstance(exception, ClientError):
+        error_code = exception.response.get("Error", {}).get("Code", "")
+        if error_code in ["Throttling", "ThrottlingException", "RequestLimitExceeded"]:
+            return True
+        # Check HTTP status code
+        if exception.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 429:
+            return True
+
+    # Azure - HttpResponseError with 429 status code
+    if isinstance(exception, HttpResponseError):
+        if exception.status_code == 429:
+            return True
+
+    return False
+
+
 def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
-    """Creates a retry decorator with consistent retry policy."""
+    """Creates a retry decorator with consistent retry policy and special 429 handling."""
 
     def after_retry(retry_state: RetryCallState) -> None:
         if retry_state.attempt_number > 1:
@@ -168,9 +199,23 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
                 retry_state.seconds_since_start,
             )
 
+    def create_wait_strategy(retry_state: RetryCallState) -> float:
+        """Create wait strategy that uses jitter for rate limit errors."""
+        if retry_state.outcome and retry_state.outcome.failed:
+            exception = retry_state.outcome.exception()
+            if exception and _is_rate_limit_error(exception):
+                # Use random exponential backoff with jitter for rate limiting
+                return wait_random_exponential(
+                    multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT
+                )(retry_state)
+        # Use regular exponential backoff for other errors
+        return wait_exponential(multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT)(
+            retry_state
+        )
+
     return retry(
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-        wait=wait_exponential(multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT),
+        wait=create_wait_strategy,
         reraise=True,
         before_sleep=before_sleep_log(logger, logging.DEBUG),
         after=after_retry,
@@ -251,7 +296,9 @@ class GCSStorageClient(FileStorageClient):
         )
         bucket = self.client.bucket(uri.bucket)
         blob = bucket.blob(uri.path)
-        blob.upload_from_string(data, timeout=DEFAULT_READ_TIMEOUT)
+        # Explicitly disable retries at the operation level
+        # https://cloud.google.com/python/docs/reference/storage/latest/retry_timeout
+        blob.upload_from_string(data, timeout=DEFAULT_READ_TIMEOUT, retry=None)
 
     @create_retry_decorator("gcs_read")
     def read(self, uri: GCSFileStorageURI) -> bytes:
@@ -261,7 +308,7 @@ class GCSStorageClient(FileStorageClient):
         )
         bucket = self.client.bucket(uri.bucket)
         blob = bucket.blob(uri.path)
-        return blob.download_as_bytes(timeout=DEFAULT_READ_TIMEOUT)
+        return blob.download_as_bytes(timeout=DEFAULT_READ_TIMEOUT, retry=None)
 
 
 class AzureStorageClient(FileStorageClient):
