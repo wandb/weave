@@ -7,11 +7,11 @@ from typing import Any, Optional, Union, cast
 from pydantic import BaseModel
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import max_calls_queue_size
+from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.utils.retry import with_retry
+from weave.utils.retry import _is_retryable_exception, with_retry
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,29 @@ REMOTE_REQUEST_BYTES_LIMIT = (
 )  # 32 MiB (real limit) - 1 MiB (buffer)
 
 
+def _log_dropped_call_batch(
+    batch: list[Union[StartBatchItem, EndBatchItem]], e: Exception
+) -> None:
+    logger.error(f"Error sending batch of {len(batch)} call events to server")
+    dropped_start_ids = []
+    dropped_end_ids = []
+    for item in batch:
+        if isinstance(item, StartBatchItem):
+            dropped_start_ids.append(item.req.start.id)
+        elif isinstance(item, EndBatchItem):
+            dropped_end_ids.append(item.req.end.id)
+    if dropped_start_ids:
+        logger.error(f"dropped call start ids: {dropped_start_ids}")
+    if dropped_end_ids:
+        logger.error(f"dropped call end ids: {dropped_end_ids}")
+    if isinstance(e, requests.HTTPError) and e.response is not None:
+        logger.error(f"status code: {e.response.status_code}")
+        logger.error(f"reason: {e.response.reason}")
+        logger.error(f"text: {e.response.text}")
+    else:
+        logger.error(f"error: {e}")
+
+
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     trace_server_url: str
 
@@ -64,6 +87,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor = AsyncBatchProcessor(
                 self._flush_calls,
                 max_queue_size=max_calls_queue_size(),
+                enable_disk_fallback=should_enable_disk_fallback(),
             )
         self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
@@ -139,31 +163,49 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        # If a single item is too large, we can't send it -- log an error and drop it
+        # If a single item is over the configured limit we should log a warning
+        # Bytes limit can change based on env so we don't want to actually error here
         if encoded_bytes > self.remote_request_bytes_limit and len(batch) == 1:
-            logger.error(
-                f"Single call size ({encoded_bytes} bytes) is too large to send. "
-                f"The maximum size is {self.remote_request_bytes_limit} bytes."
+            logger.warning(
+                f"Single call size ({encoded_bytes} bytes) may be too large to send."
+                f"The configured maximum size is {self.remote_request_bytes_limit} bytes."
             )
 
         try:
             self._send_batch_to_server(encoded_data)
-        except Exception:
-            # Add items back to the queue for later processing
-            logger.warning(
-                f"Batch failed after max retries, requeueing batch with {len(batch)=} for later processing",
-            )
+        except Exception as e:
+            if not _is_retryable_exception(e):
+                _log_dropped_call_batch(batch, e)
+            else:
+                # Add items back to the queue for later processing, but only if the processor is still accepting work
+                logger.warning(
+                    f"Batch failed after max retries, requeueing batch with {len(batch)=} for later processing",
+                )
 
-            # only if debug mode
-            if logger.isEnabledFor(logging.DEBUG):
-                ids = []
-                for item in batch:
-                    if isinstance(item, StartBatchItem):
-                        ids.append(f"{item.req.start.id}-start")
-                    elif isinstance(item, EndBatchItem):
-                        ids.append(f"{item.req.end.id}-end")
-                logger.debug(f"Requeueing batch with {ids=}")
-            self.call_processor.enqueue(batch)
+                # only if debug mode
+                if logger.isEnabledFor(logging.DEBUG):
+                    ids = []
+                    for item in batch:
+                        if isinstance(item, StartBatchItem):
+                            ids.append(f"{item.req.start.id}-start")
+                        elif isinstance(item, EndBatchItem):
+                            ids.append(f"{item.req.end.id}-end")
+                    logger.debug(f"Requeueing batch with {ids=}")
+
+                # Only requeue if the processor is still accepting work
+                if self.call_processor and self.call_processor.is_accepting_new_work():
+                    self.call_processor.enqueue(batch)
+                else:
+                    logger.exception(
+                        f"Failed to enqueue batch of size {len(batch)} - Processor is shutting down"
+                    )
+
+    def get_call_processor(self) -> Union[AsyncBatchProcessor, None]:
+        """
+        Custom method not defined on the formal TraceServerInterface to expose
+        the underlying call processor. Should be formalized in a client-side interface.
+        """
+        return self.call_processor
 
     @with_retry
     def _generic_request_executor(
@@ -495,6 +537,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        return self._generic_request(
+            "/files/stats", req, tsi.FilesStatsReq, tsi.FilesStatsRes
+        )
+
     def feedback_create(
         self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
     ) -> tsi.FeedbackCreateRes:
@@ -563,6 +610,19 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             req,
             tsi.CompletionsCreateReq,
             tsi.CompletionsCreateRes,
+        )
+
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        # For remote servers, streaming is not implemented
+        # Fall back to non-streaming completion
+        response = self.completions_create(req)
+        yield {"response": response.response, "weave_call_id": response.weave_call_id}
+
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        return self._generic_request(
+            "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
         )
 
 

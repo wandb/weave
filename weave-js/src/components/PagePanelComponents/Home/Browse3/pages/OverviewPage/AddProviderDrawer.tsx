@@ -137,13 +137,15 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
       await Promise.all([
         ...deletedModels.map(model =>
           objectDeleteAllVersions({
-            entity: entityName,
-            project: projectName,
-            objectId: `${editingProvider?.name || ''}-${model || ''}`,
-            weaveKind: 'object',
-            scheme: 'weave',
-            versionHash: '',
-            path: '',
+            key: {
+              entity: entityName,
+              project: projectName,
+              objectId: `${editingProvider?.name || ''}-${model || ''}`,
+              weaveKind: 'object',
+              scheme: 'weave',
+              versionHash: '',
+              path: '',
+            },
           })
         ),
       ]);
@@ -210,7 +212,7 @@ export const AddProviderDrawer: React.FC<AddProviderDrawerProps> = ({
       open={isOpen}
       onClose={handleClose}
       // if the navbar is visible, we need to offset the drawer by the height of the navbar
-      marginTop={Math.min(60 - scrollWidth, 60)}
+      marginTop={Math.max(60 - scrollWidth, 0)}
       defaultWidth={isFullscreen ? window.innerWidth - 73 : drawerWidth}
       setWidth={width => !isFullscreen && setDrawerWidth(width)}
       headerContent={

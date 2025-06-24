@@ -34,6 +34,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
 from weave.trace_server.opentelemetry.attributes import (
     SpanEvent,
+    get_span_overrides,
     get_wandb_attributes,
     get_weave_attributes,
     get_weave_inputs,
@@ -286,10 +287,32 @@ class Span:
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
         events = [SpanEvent(e.as_dict()) for e in self.events]
         usage = get_weave_usage(self.attributes) or {}
+
         inputs = get_weave_inputs(events, self.attributes) or {}
+        # Only de-nest if we have one key
+        if len(inputs) == 1:
+            nested_top_level_input = inputs.get("inputs") or inputs.get("input")
+            # If it isn't a dict we just have to nest it under the key
+            if (
+                nested_top_level_input is not None
+                and isinstance(nested_top_level_input, (dict))
+                and all(type(key) == str for key in nested_top_level_input.keys())
+            ):
+                inputs = to_json_serializable(nested_top_level_input)
+
         outputs = get_weave_outputs(events, self.attributes) or {}
+        # Only de-nest if we have one key
+        if len(outputs) == 1:
+            nested_top_level_output = outputs.get("outputs") or outputs.get("output")
+            if nested_top_level_output is not None:
+                outputs = to_json_serializable(nested_top_level_output)
+
         attributes = get_weave_attributes(self.attributes) or {}
         wandb_attributes = get_wandb_attributes(self.attributes) or {}
+        overrides = get_span_overrides(self.attributes) or {}
+
+        start_time = overrides.get("start_time") or self.start_time
+        end_time = overrides.get("end_time") or self.end_time
 
         llm_usage = tsi.LLMUsageSchema(
             input_tokens=usage.get("input_tokens"),
@@ -312,7 +335,8 @@ class Span:
 
         has_attributes = len(attributes) > 0
         has_inputs = len(inputs) > 0
-        has_outputs = len(outputs) > 0
+        # Ouputs might be str, int, bytes
+        has_outputs = isinstance(outputs, int) or len(outputs) > 0
         has_usage = len(usage) > 0
 
         # We failed to load any of the Weave attributes, dump all attributes
@@ -343,7 +367,7 @@ class Span:
             op_name=op_name,
             trace_id=self.trace_id,
             parent_id=self.parent_id,
-            started_at=self.start_time,
+            started_at=start_time,
             attributes=attributes,
             inputs=inputs,
             display_name=display_name,
@@ -357,7 +381,7 @@ class Span:
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
-            ended_at=self.end_time,
+            ended_at=end_time,
             exception=exception_msg,
             output=outputs,
             summary=summary_insert_map,

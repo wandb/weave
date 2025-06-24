@@ -25,6 +25,7 @@ from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace import refs, weave_client
 from weave.trace.context import call_context
+from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -47,6 +48,7 @@ from weave.trace_server.sqlite_trace_server import (
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
+    FilesStatsReq,
     RefsReadBatchReq,
     TableCreateReq,
     TableQueryReq,
@@ -277,11 +279,15 @@ def test_call_create(client):
         output="hello",
         exception=None,
         summary={
+            "status_counts": {
+                "success": 1,
+                "error": 0,
+            },
             "weave": {
                 "status": "success",
                 "trace_name": "x",
                 "latency_ms": AnyIntMatcher(),
-            }
+            },
         },
         _children=[],
         attributes={
@@ -328,7 +334,7 @@ def test_calls_query(client):
             "weave": {
                 "status": "running",
                 "trace_name": "x",
-            }
+            },
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
@@ -354,7 +360,7 @@ def test_calls_query(client):
             "weave": {
                 "status": "running",
                 "trace_name": "x",
-            }
+            },
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
@@ -581,7 +587,7 @@ def test_calls_delete(client):
 
     assert len(list(client.get_calls())) == 4
 
-    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call0.op_name])))
+    result = list(client.get_calls(filter={"op_names": [call0.op_name]}))
     assert len(result) == 3
 
     # should deleted call0_child1, _call0_child2, call1, but not call0
@@ -2057,7 +2063,7 @@ def test_calls_query_filter_by_strings(client):
     test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
     test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
 
-    for i in range(5):
+    for _i in range(5):
         dummy_op()
 
     # Flush to ensure all calls are persisted
@@ -2515,17 +2521,18 @@ def test_calls_filter_by_latency(client):
 
     # Create calls with different latencies
     # Fast call - minimal latency
-    fast_call = client.create_call("x", {"a": 1, "b": 1, "test_id": test_id})
+    fast_call = client.create_call("x-fast", {"a": 1, "b": 1, "test_id": test_id})
+    time.sleep(0.001)
     client.finish_call(fast_call, "fast result")  # Minimal latency
 
     # Medium latency
-    medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
-    time.sleep(0.01)  # Add delay to increase latency
+    medium_call = client.create_call("x-medium", {"a": 2, "b": 2, "test_id": test_id})
+    time.sleep(0.1)  # Add delay to increase latency
     client.finish_call(medium_call, "medium result")
 
     # Slow call - higher latency
-    slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
-    time.sleep(0.02)  # Add more delay to further increase latency
+    slow_call = client.create_call("x-slow", {"a": 3, "b": 3, "test_id": test_id})
+    time.sleep(0.2)  # Add more delay to further increase latency
     client.finish_call(slow_call, "slow result")
 
     # Flush to make sure all calls are committed
@@ -2545,33 +2552,53 @@ def test_calls_filter_by_latency(client):
             f"Call {call.id} latency: {call.summary.get('weave', {}).get('latency_ms')}"
         )
 
-    # Instead of filtering by latency in the database query, let's do it in memory
-    # since we're having issues with the nested JSON query
-    # Sort the calls by latency to identify fast, medium and slow calls
-    sorted_calls = sorted(
-        all_calls, key=lambda call: call.summary.get("weave", {}).get("latency_ms", 0)
+    # Verify asc order
+    sorted_calls = client.get_calls(
+        query=tsi.Query(**base_query),
+        sort_by=[tsi.SortBy(field="summary.weave.latency_ms", direction="asc")],
     )
-
-    # Verify the order matches our expectation
     assert sorted_calls[0].id == fast_call.id  # Fast call
     assert sorted_calls[1].id == medium_call.id  # Medium call
     assert sorted_calls[2].id == slow_call.id  # Slow call
 
-    # For completeness, let's verify the specific call IDs
-    fast_latency_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[fast_call.id]))
+    # Verify desc order
+    sorted_calls = client.get_calls(
+        query=tsi.Query(**base_query),
+        sort_by=[tsi.SortBy(field="summary.weave.latency_ms", direction="desc")],
     )
-    assert len(fast_latency_calls) == 1
+    assert sorted_calls[0].id == slow_call.id  # Slow call
+    assert sorted_calls[1].id == medium_call.id  # Medium call
+    assert sorted_calls[2].id == fast_call.id  # Fast call
 
-    medium_latency_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[medium_call.id]))
+    # Filter by latency, Float
+    latency_calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$gte": [
+                        {"$getField": "summary.weave.latency_ms"},
+                        {"$literal": 0.001},
+                    ]
+                }
+            }
+        )
     )
-    assert len(medium_latency_calls) == 1
+    assert len(latency_calls) == 3
 
-    slow_latency_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[slow_call.id]))
+    # Filter by latency, Int
+    latency_calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "summary.weave.latency_ms"},
+                        {"$literal": 10},
+                    ]
+                }
+            }
+        )
     )
-    assert len(slow_latency_calls) == 1
+    assert len(latency_calls) == 0
 
 
 def test_calls_query_sort_by_trace_name(client):
@@ -2721,7 +2748,7 @@ def test_calls_query_sort_by_display_name_prioritized(client):
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
 
 
-async def test_tracing_enabled_context(client):
+def test_tracing_enabled_context(client):
     """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
     from weave.trace.weave_client import Call
 
@@ -2730,9 +2757,9 @@ async def test_tracing_enabled_context(client):
         return "test"
 
     # Test create_call with tracing enabled
-    call = await client.create_call(test_op, {})
+    call = client.create_call(test_op, {})
     assert isinstance(call, Call)
-    assert call._op_name == "test_op"  # Use string literal instead of __name__
+    assert call.op_name.endswith("/test_op:epbtXLYvbWDYBxWnDKcKBp506QCJhrjEXswOgNShkQc")
     assert len(list(client.get_calls())) == 1  # Verify only one call was created
 
     # Test create_call with tracing disabled
@@ -3416,3 +3443,128 @@ def test_filter_calls_by_ref(client):
     # this as "no filter"
     calls = client.get_calls(filter={"input_refs": [], "output_refs": []})
     assert len(calls) == 1
+
+
+def test_files_stats(client):
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    f_bytes = b"0" * 10000005
+    client.server.file_create(
+        FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes)
+    )
+    read_res = client.server.files_stats(FilesStatsReq(project_id="shawn/test-project"))
+
+    assert read_res.total_size_bytes == 10000005
+
+
+def test_no_400_on_invalid_artifact_url(client):
+    @weave.op()
+    def test() -> str:
+        # This url is too long, should be wandb-artifact:///entity/project/name:version
+        return "wandb-artifact:///entity/project/toxic-extra-path/artifact:latest"
+
+    _, call = test.call()
+    id = call.id
+    server_call = client.get_call(id)
+    assert server_call.id == id
+
+
+def test_no_400_on_invalid_refs(client):
+    @weave.op()
+    def test() -> str:
+        # This ref is too long, should be weave:///entity/project/object/name:version
+        return "weave:///entity/project/object/toxic-extra-path/object:latest"
+
+    _, call = test.call()
+    id = call.id
+    server_call = client.get_call(id)
+    assert server_call.id == id
+
+
+def test_sum_dict_leaves_list_of_dicts(client):
+    """Test that sum_dict_leaves correctly handles lists of dictionaries."""
+    dicts = [
+        {"a": 1, "b": "hello", "c": 2},
+        {"a": 3, "b": "world", "c": 4},
+        {"a": 5, "b": "!", "c": 6},
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {"a": 9, "b": ["hello", "world", "!"], "c": 12}
+
+    # Test with nested dictionaries in the list
+    dicts = [
+        {"a": {"x": 1, "y": 2}, "b": 3},
+        {"a": {"x": 4, "y": 5}, "b": 6},
+        {"a": {"x": 7, "y": 8}, "b": 9},
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {"a": {"x": 12, "y": 15}, "b": 18}
+
+    # Test with empty list
+    assert weave_client.sum_dict_leaves([]) == {}
+
+    # Test with list containing empty dictionaries
+    assert weave_client.sum_dict_leaves([{}]) == {}
+
+    # Test with None values
+    dicts = [
+        {"a": 1, "b": None, "c": 2},
+        {"a": 3, "b": None, "c": 4},
+        {"a": 5, "b": None, "c": 6},
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {"a": 9, "c": 12}
+
+
+def test_sum_dict_leaves_mixed_types(client):
+    """Test that sum_dict_leaves correctly handles dictionaries where the same key has different types."""
+    dicts = [
+        {"a": 1, "b": "hello", "c": 2},
+        {"a": "world", "b": 3, "c": 4},
+        {"a": 5, "b": "!", "c": "test"},
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    # When a key has mixed types, all values should be collected in a list
+    assert result == {"a": [1, "world", 5], "b": ["hello", 3, "!"], "c": [2, 4, "test"]}
+
+    # Test with nested dictionaries having mixed types
+    dicts = [
+        {"a": {"x": 1, "y": "hello"}, "b": 3},
+        {"a": {"x": "world", "y": 2}, "b": "test"},
+        {"a": {"x": 5, "y": 3}, "b": 6},
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {
+        "a": {"x": [1, "world", 5], "y": ["hello", 2, 3]},
+        "b": [3, "test", 6],
+    }
+
+
+def test_sum_dict_leaves_deep_nested(client):
+    """Test that sum_dict_leaves correctly handles deeply nested dictionaries (2 levels) with mixed types."""
+    dicts = [
+        {
+            "level1": {"level2": {"a": 1, "b": "hello", "c": {"x": 2, "y": "world"}}},
+            "top": 10,
+        },
+        {
+            "level1": {"level2": {"a": "test", "b": 3, "c": {"x": "deep", "y": 4}}},
+            "top": "mixed",
+        },
+        {
+            "level1": {"level2": {"a": 5, "b": "!", "c": {"x": 6, "y": "nested"}}},
+            "top": 20,
+        },
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {
+        "level1": {
+            "level2": {
+                "a": [1, "test", 5],
+                "b": ["hello", 3, "!"],
+                "c": {"x": [2, "deep", 6], "y": ["world", 4, "nested"]},
+            }
+        },
+        "top": [10, "mixed", 20],
+    }

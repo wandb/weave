@@ -6,7 +6,7 @@ from weave.trace.context.tests_context import raise_on_captured_errors
 
 
 def test_basic_dataset_lifecycle(client):
-    for i in range(2):
+    for _i in range(2):
         dataset = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
         ref = weave.publish(dataset)
         dataset2 = weave.ref(ref.uri()).get()
@@ -49,7 +49,11 @@ def test_dataset_laziness(client):
     """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
-    assert _top_level_logs(log) == ["ensure_project_exists"]
+    assert _top_level_logs(log) == [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+    ]
     client.server.attribute_access_log = []
 
     length = len(dataset)
@@ -62,7 +66,7 @@ def test_dataset_laziness(client):
 
     assert length == length2
 
-    for row in dataset:
+    for _row in dataset:
         log = client.server.attribute_access_log
         assert _top_level_logs(log) == []
 
@@ -76,7 +80,11 @@ def test_published_dataset_laziness(client):
     """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
-    assert _top_level_logs(log) == ["ensure_project_exists"]
+    assert _top_level_logs(log) == [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+    ]
     client.server.attribute_access_log = []
 
     ref = weave.publish(dataset)
@@ -100,7 +108,7 @@ def test_published_dataset_laziness(client):
 
     assert length == length2
 
-    for i, row in enumerate(dataset):
+    for i, _row in enumerate(dataset):
         log = client.server.attribute_access_log
         # This is the critical part of the test - ensuring that
         # the rows are only fetched when they are actually needed.
@@ -141,6 +149,59 @@ def test_dataset_caching(client):
 
     with raise_on_captured_errors():
         assert len(ds2) == 200
+
+
+def test_dataset_select(client):
+    original_rows = [{"id": i, "val": i * 2} for i in range(10)]
+    ds = weave.Dataset(rows=original_rows)
+
+    # Select first 3 using range
+    selected_ds_range = ds.select(range(3))
+    assert len(selected_ds_range) == 3
+    assert list(selected_ds_range) == [
+        {"id": 0, "val": 0},
+        {"id": 1, "val": 2},
+        {"id": 2, "val": 4},
+    ]
+
+    # Select specific indices using a list
+    indices = [5, 2, 8]
+    selected_ds_list = ds.select(indices)
+    assert len(selected_ds_list) == 3
+    assert list(selected_ds_list) == [
+        {"id": 5, "val": 10},
+        {"id": 2, "val": 4},
+        {"id": 8, "val": 16},
+    ]
+
+    # Select with an empty list - should raise ValueError
+    with pytest.raises(
+        ValueError, match="Cannot select rows with an empty set of indices."
+    ):
+        ds.select([])
+
+    # Select with indices that are out of order
+    indices_unordered = [7, 1, 4, 1]
+    selected_ds_unordered = ds.select(indices_unordered)
+    assert len(selected_ds_unordered) == 4
+    assert list(selected_ds_unordered) == [
+        {"id": 7, "val": 14},
+        {"id": 1, "val": 2},
+        {"id": 4, "val": 8},
+        {"id": 1, "val": 2},  # Duplicate index is allowed
+    ]
+
+    # Ensure original dataset is unchanged
+    assert len(ds) == 10
+    assert list(ds) == original_rows
+
+    # Test index out of bounds
+    with pytest.raises(IndexError):
+        ds.select([0, 10])  # 10 is out of bounds
+
+    # Test negative index (should fail in __getitem__)
+    with pytest.raises(IndexError):
+        ds.select([-1])
 
 
 def test_add_rows(client):

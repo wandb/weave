@@ -1,99 +1,158 @@
-import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {Button} from '@wandb/weave/components/Button';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
+import React, {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
+import {getModelsByIds} from '../../inference/modelInfo';
+import {getPlaygroundModelString} from '../../inference/util';
+import {normalizeChatTraceCall} from '../ChatView/hooks';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
-import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
+import {
+  useBaseObjectInstances,
+  useLeafObjectInstances,
+} from '../wfReactInterface/objectClassQuery';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {LLM_MAX_TOKENS, LLMMaxTokensKey} from './llmMaxTokens';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {useConfiguredProviders} from './useConfiguredProviders';
-import {
-  DEFAULT_SYSTEM_MESSAGE,
-  parseTraceCall,
-  usePlaygroundState,
-} from './usePlaygroundState';
+import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
   entity: string;
   project: string;
   callId: string;
+  // IDs of models from the inference catalog
+  modelIds: string[];
+};
+
+type PlaygroundPageInnerProps = PlaygroundPageProps &
+  ReturnType<typeof usePlaygroundState> & {
+    settingsTab: number | null;
+    setSettingsTab: Dispatch<SetStateAction<number | null>>;
+  };
+
+const isLLMMaxTokensKey = (key: string): key is LLMMaxTokensKey => {
+  return key in LLM_MAX_TOKENS;
 };
 
 export const PlaygroundPage = (props: PlaygroundPageProps) => {
-  return (
-    <SimplePageLayoutWithHeader
-      title={
-        <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-          Playground
-        </Box>
-      }
-      hideTabsIfSingle
-      headerContent={null}
-      tabs={[
-        {
-          label: 'main',
-          content: <PlaygroundPageInner {...props} />,
-        },
-      ]}
-    />
-  );
-};
+  const [settingsTab, setSettingsTab] = useState<number | null>(null);
 
-export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
+  // We expect the passed in models to all be in LLM_MAX_TOKENS,
+  // but ignore them if they are not.
+  const initialModelStrings = getModelsByIds(
+    props.modelIds.filter(isLLMMaxTokensKey)
+  ).map(getPlaygroundModelString);
+
   const {
     setPlaygroundStates,
     playgroundStates,
     setPlaygroundStateField,
     setPlaygroundStateFromTraceCall,
-  } = usePlaygroundState();
+  } = usePlaygroundState(initialModelStrings);
 
+  return (
+    <SimplePageLayoutWithHeader
+      title="Playground"
+      hideTabsIfSingle
+      headerContent={null}
+      tabs={[
+        {
+          label: 'main',
+          content: (
+            <Tailwind style={{width: '100%', height: '100%'}}>
+              <PlaygroundPageInner
+                setPlaygroundStates={setPlaygroundStates}
+                playgroundStates={playgroundStates}
+                setPlaygroundStateField={setPlaygroundStateField}
+                setPlaygroundStateFromTraceCall={
+                  setPlaygroundStateFromTraceCall
+                }
+                settingsTab={settingsTab}
+                setSettingsTab={setSettingsTab}
+                {...props}
+              />
+            </Tailwind>
+          ),
+        },
+      ]}
+      headerExtra={
+        <Button
+          variant="ghost"
+          size="medium"
+          icon="add-new"
+          onClick={() => {
+            setPlaygroundStates([
+              ...playgroundStates,
+              JSON.parse(JSON.stringify(playgroundStates[settingsTab ?? 0])),
+            ]);
+          }}>
+          Add model
+        </Button>
+      }
+    />
+  );
+};
+
+export const PlaygroundPageInner = ({
+  playgroundStates,
+  setPlaygroundStateField,
+  setPlaygroundStateFromTraceCall,
+  settingsTab,
+  setSettingsTab,
+  setPlaygroundStates,
+  entity,
+  project,
+  callId,
+}: PlaygroundPageInnerProps) => {
   const {useCall, useCalls} = useWFHooks();
-  const [settingsTab, setSettingsTab] = useState<number | null>(0);
+  const projectId = useMemo(
+    () => projectIdFromParts({entity, project}),
+    [entity, project]
+  );
   const callKey = useMemo(() => {
-    return props.callId
+    return callId
       ? {
-          entity: props.entity,
-          project: props.project,
-          callId: props.callId,
+          entity,
+          project,
+          callId,
         }
       : null;
-  }, [props.entity, props.project, props.callId]);
+  }, [entity, project, callId]);
 
-  const call = useCall(callKey);
-  const callWithCosts = useCall(callKey, {
-    includeCosts: true,
-  });
+  const call = useCall({key: callKey});
+  const callWithCosts = useCall({key: callKey, includeCosts: true});
 
-  const {result: calls} = useCalls(
-    props.entity,
-    props.project,
-    {
+  const {result: calls} = useCalls({
+    entity,
+    project,
+    filter: {
       callIds: playgroundStates.map(state => state.traceCall.id || ''),
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    {
-      includeCosts: true,
-    }
-  );
+    includeCosts: true,
+  });
 
   const {
     result: configuredProviders,
     loading: configuredProvidersLoading,
     refetch: refetchConfiguredProviders,
-  } = useConfiguredProviders(props.entity);
+  } = useConfiguredProviders(entity);
 
   const {
     result: customProvidersResult,
     loading: customProvidersLoading,
     refetch: refetchCustomProviders,
   } = useBaseObjectInstances('Provider', {
-    project_id: `${props.entity}/${props.project}`,
+    project_id: projectId,
     filter: {
       latest_only: true,
     },
@@ -104,10 +163,18 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
     loading: customProviderModelsLoading,
     refetch: refetchCustomProviderModels,
   } = useBaseObjectInstances('ProviderModel', {
-    project_id: `${props.entity}/${props.project}`,
+    project_id: projectId,
     filter: {
       latest_only: true,
     },
+  });
+
+  const {
+    result: savedModelsResult,
+    loading: savedModelsLoading,
+    refetch: refetchSavedModels,
+  } = useLeafObjectInstances('LLMStructuredCompletionModel', {
+    project_id: projectId,
   });
 
   const refetchCustomLLMs = useCallback(() => {
@@ -131,7 +198,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
         inputs: {
           messages: [DEFAULT_SYSTEM_MESSAGE],
         },
-        project_id: `${props.entity}/${props.project}`,
+        project_id: projectId,
       });
     }
     // Only set the call the first time the page loads, and we get the call
@@ -156,7 +223,7 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           if (state.traceCall.id === c.callId) {
             newStates[idx] = {
               ...state,
-              traceCall: parseTraceCall(c.traceCall || {}),
+              traceCall: normalizeChatTraceCall(c.traceCall || {}),
             };
             break;
           }
@@ -167,28 +234,18 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
   }, [calls, setPlaygroundStates]);
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        height: '100%',
-        width: '100%',
-      }}>
+    <div className="flex h-full w-full">
       {call.loading ? (
-        <Box
-          sx={{
-            display: 'flex',
-            height: '100%',
-            width: '100%',
-          }}>
+        <div className="flex h-full w-full">
           <WeaveLoader />
-        </Box>
+        </div>
       ) : (
         <PlaygroundChat
           playgroundStates={playgroundStates}
           setPlaygroundStates={setPlaygroundStates}
           setPlaygroundStateField={setPlaygroundStateField}
-          entity={props.entity}
-          project={props.project}
+          entity={entity}
+          project={project}
           setSettingsTab={setSettingsTab}
           settingsTab={settingsTab}
           isOpenInPlayground={!!call.result}
@@ -199,6 +256,8 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           customProvidersResult={customProvidersResult || []}
           customProviderModelsResult={customProviderModelsResult || []}
           configuredProviders={configuredProviders}
+          savedModelsResult={savedModelsResult || []}
+          savedModelsLoading={savedModelsLoading}
         />
       )}
       {settingsTab !== null && (
@@ -207,8 +266,10 @@ export const PlaygroundPageInner = (props: PlaygroundPageProps) => {
           setPlaygroundStateField={setPlaygroundStateField}
           settingsTab={settingsTab}
           setSettingsTab={setSettingsTab}
+          projectId={projectId}
+          refetchSavedModels={refetchSavedModels}
         />
       )}
-    </Box>
+    </div>
   );
 };

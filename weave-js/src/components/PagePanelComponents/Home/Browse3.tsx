@@ -23,6 +23,7 @@ import {
   browse2Context,
   Browse3WeaveflowRouteContextProvider,
   DESCENDENT_CALL_ID_PARAM,
+  EntityProjectProvider,
   HIDE_TRACETREE_PARAM,
   PEEK_PARAM,
   SHOW_FEEDBACK_PARAM,
@@ -44,6 +45,7 @@ import {DatasetsPage} from './Browse3/pages/DatasetsPage/DatasetsPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
+import {MonitorsPage} from './Browse3/pages/MonitorsPage/MonitorsPage';
 import {ObjectPage} from './Browse3/pages/ObjectsPage/ObjectPage';
 import {WFHighLevelObjectVersionFilter} from './Browse3/pages/ObjectsPage/objectsPageTypes';
 import {ObjectVersionPage} from './Browse3/pages/ObjectsPage/ObjectVersionPage';
@@ -62,6 +64,7 @@ import {
   WFDataModelAutoProvider,
 } from './Browse3/pages/wfReactInterface/context';
 import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/traceServerClientContext';
+import {getParamArray, queryGetDict} from './Browse3/urlQueryUtil';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
 
@@ -255,96 +258,98 @@ const MainPeekingLayout: FC = () => {
   useMousetrap('esc', closePeek);
 
   return (
-    <WFDataModelAutoProvider
-      entityName={params.entity!}
-      projectName={params.project!}>
-      <TableRowSelectionProvider>
-        <Box
-          sx={{
-            flex: '1 1 auto',
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            overflow: 'hidden',
-            flexDirection: 'row',
-            alignContent: 'stretch',
-          }}>
+    <EntityProjectProvider entity={params.entity!} project={params.project!}>
+      <WFDataModelAutoProvider
+        entityName={params.entity!}
+        projectName={params.project!}>
+        <TableRowSelectionProvider>
           <Box
             sx={{
-              flex: '1 1 40%',
-              overflow: 'hidden',
+              flex: '1 1 auto',
+              width: '100%',
+              height: '100%',
               display: 'flex',
-              marginRight: !isDrawerOpen ? 0 : `${drawerWidthPx}px`,
+              overflow: 'hidden',
+              flexDirection: 'row',
+              alignContent: 'stretch',
             }}>
-            <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
-          </Box>
-
-          <Drawer
-            variant="persistent"
-            anchor="right"
-            open={isDrawerOpen}
-            onClose={closePeek}
-            PaperProps={{
-              ref: drawerRef,
-              style: {
+            <Box
+              sx={{
+                flex: '1 1 40%',
                 overflow: 'hidden',
-                display: isDrawerOpen ? 'flex' : 'none',
-                zIndex: 1,
-                width: isDrawerOpen ? `${drawerWidthPx}px` : 0,
-                height: '100%',
-                borderLeft: '1px solid #e0e0e0',
-                position: 'absolute',
-                pointerEvents: isDragging ? 'none' : 'auto',
-              },
-            }}
-            ModalProps={{
-              keepMounted: true,
-            }}>
-            <div
-              id="dragger"
-              onMouseDown={handleDragStart}
-              style={{
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                left: 0,
-                width: '5px',
-                cursor: 'col-resize',
-                zIndex: 2,
+                display: 'flex',
+                marginRight: !isDrawerOpen ? 0 : `${drawerWidthPx}px`,
+              }}>
+              <Browse3ProjectRoot projectRoot={baseRouterProjectRoot} />
+            </Box>
+
+            <Drawer
+              variant="persistent"
+              anchor="right"
+              open={isDrawerOpen}
+              onClose={closePeek}
+              PaperProps={{
+                ref: drawerRef,
+                style: {
+                  overflow: 'hidden',
+                  display: isDrawerOpen ? 'flex' : 'none',
+                  zIndex: 1,
+                  width: isDrawerOpen ? `${drawerWidthPx}px` : 0,
+                  height: '100%',
+                  borderLeft: '1px solid #e0e0e0',
+                  position: 'absolute',
+                  pointerEvents: isDragging ? 'none' : 'auto',
+                },
               }}
-            />
-            {peekLocation && (
-              <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
-                <SimplePageLayoutContext.Provider
-                  value={{
-                    headerSuffix: (
-                      <Box sx={{flex: '0 0 auto'}}>
-                        <FullPageButton
-                          query={query}
-                          generalBase={generalBase}
-                          targetBase={targetBase}
-                        />
-                        <Button
-                          tooltip="Close drawer"
-                          icon="close"
-                          variant="ghost"
-                          className="ml-4"
-                          onClick={closePeek}
-                        />
-                      </Box>
-                    ),
-                  }}>
-                  <Browse3ProjectRoot
-                    customLocation={peekLocation}
-                    projectRoot={generalProjectRoot}
-                  />
-                </SimplePageLayoutContext.Provider>
-              </WeaveflowPeekContext.Provider>
-            )}
-          </Drawer>
-        </Box>
-      </TableRowSelectionProvider>
-    </WFDataModelAutoProvider>
+              ModalProps={{
+                keepMounted: true,
+              }}>
+              <div
+                id="dragger"
+                onMouseDown={handleDragStart}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  width: '5px',
+                  cursor: 'col-resize',
+                  zIndex: 2,
+                }}
+              />
+              {peekLocation && (
+                <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
+                  <SimplePageLayoutContext.Provider
+                    value={{
+                      headerSuffix: (
+                        <Box sx={{flex: '0 0 auto'}}>
+                          <FullPageButton
+                            query={query}
+                            generalBase={generalBase}
+                            targetBase={targetBase}
+                          />
+                          <Button
+                            tooltip="Close drawer"
+                            icon="close"
+                            variant="ghost"
+                            className="ml-4"
+                            onClick={closePeek}
+                          />
+                        </Box>
+                      ),
+                    }}>
+                    <Browse3ProjectRoot
+                      customLocation={peekLocation}
+                      projectRoot={generalProjectRoot}
+                    />
+                  </SimplePageLayoutContext.Provider>
+                </WeaveflowPeekContext.Provider>
+              )}
+            </Drawer>
+          </Box>
+        </TableRowSelectionProvider>
+      </WFDataModelAutoProvider>
+    </EntityProjectProvider>
   );
 };
 
@@ -413,6 +418,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/monitors`}>
+          <MonitorsPageBinding />
         </Route>
         <Route path={`${projectRoot}/:tab(compare-evaluations)`}>
           <CompareEvaluationsBinding />
@@ -538,9 +546,11 @@ const useCallPeekRedirect = () => {
   const history = useHistory();
   const {useCall} = useWFHooks();
   const {result: call} = useCall({
-    entity: params.entity,
-    project: params.project,
-    callId: params.itemName,
+    key: {
+      entity: params.entity,
+      project: params.project,
+      callId: params.itemName,
+    },
   });
   const query = useURLSearchParamsDict();
   useEffect(() => {
@@ -724,6 +734,11 @@ const CallPageBinding = () => {
   );
 };
 
+const MonitorsPageBinding = () => {
+  return <MonitorsPage />;
+};
+
+// TODO(tim/weaveflow_improved_nav): Generalize this
 const CallsPageBinding = () => {
   const {entity, project, tab} = useParamsDecoded<Browse3TabParams>();
   const query = useURLSearchParamsDict();
@@ -987,12 +1002,16 @@ const ComparePageBinding = () => {
 };
 
 const PlaygroundPageBinding = () => {
-  const params = useParamsDecoded<Browse3TabItemParams>();
+  const {entity, project, itemName} = useParamsDecoded<Browse3TabItemParams>();
+  const history = useHistory();
+  const query = queryGetDict(history);
+  const modelIds = getParamArray(query, 'model');
   return (
     <PlaygroundPage
-      entity={params.entity}
-      project={params.project}
-      callId={params.itemName}
+      entity={entity}
+      project={project}
+      callId={itemName}
+      modelIds={modelIds}
     />
   );
 };

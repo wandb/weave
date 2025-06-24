@@ -179,7 +179,7 @@ evaluator = CorrectnessEvaluator(llm=llm_judge)
 @weave.op()
 def correctness_evaluator(query: str, ground_truth: str, output: dict):
     result = evaluator.evaluate(
-        query=query, reference=ground_truth, response=model_output["response"]
+        query=query, reference=ground_truth, response=output["response"]
     )
     return {"correctness": float(result.score)}
 
@@ -196,7 +196,7 @@ This evaluation builds on the example in the earlier section. Evaluating using `
 
 - Make sure that the keys of the evaluation sample dicts matches the arguments of the scorer function and of the `weave.Model`'s `predict` method.
 - The `weave.Model` should have a method with the name `predict` or `infer` or `forward`. Decorate this method with `weave.op()` for tracing.
-- The scorer function should be decorated with `weave.op()` and should have `model_output` as named argument.
+- The scorer function should be decorated with `weave.op()` and should have `output` as named argument.
 
 [![llamaindex_evaluation.png](imgs/llamaindex_evaluation.png)](https://wandb.ai/wandbot/llamaindex-weave/weave/calls?filter=%7B%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fwandbot%2Fllamaindex-weave%2Fop%2FEvaluation.predict_and_score%3ANmwfShfFmgAhDGLXrF6Xn02T9MIAsCXBUcifCjyKpOM%22%5D%2C%22parentId%22%3A%2233491e66-b580-47fa-9d43-0cd6f1dc572a%22%7D&peekPath=%2Fwandbot%2Fllamaindex-weave%2Fcalls%2F33491e66-b580-47fa-9d43-0cd6f1dc572a%3Ftracetree%3D1)
 

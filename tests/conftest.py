@@ -2,20 +2,19 @@ import base64
 import contextlib
 import logging
 import os
-import subprocess
-import time
 import typing
-import urllib
 from collections.abc import Iterator
+from unittest.mock import MagicMock, patch
 
 import pytest
-import requests
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import weave
-from tests.trace.util import DummyTestException, client_is_sqlite
+from tests.conftest_lib.clickhouse_server import ensure_clickhouse_db
+from tests.trace.util import DummyTestException
 from weave.trace import autopatch, weave_client, weave_init
+from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import (
     clickhouse_trace_server_batched,
     external_to_internal_trace_server_adapter,
@@ -30,6 +29,21 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
+
+
+@pytest.fixture(autouse=True)
+def patch_kafka_producer():
+    """
+    Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
+    This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
+
+    If a test needs to test the Kafka producer, they should orride this patch explicitly.
+    """
+    with patch(
+        "weave.trace_server.clickhouse_trace_server_batched.KafkaProducer.from_env",
+        return_value=MagicMock(),
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -85,6 +99,12 @@ def pytest_addoption(parser):
         action="store",
         default="sqlite",
         help="Specify the client object to use: sqlite or clickhouse",
+    )
+    parser.addoption(
+        "--clickhouse-process",
+        action="store",
+        default="false",
+        help="Use a clickhouse process instead of a container",
     )
 
 
@@ -192,87 +212,6 @@ def client_with_throwing_server(client):
         yield client
     finally:
         client.server = curr_server
-
-
-@pytest.fixture(scope="session")
-def clickhouse_server():
-    server_up = _check_server_up(
-        ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
-    )
-    if not server_up:
-        pytest.fail("clickhouse server is not running")
-
-
-@pytest.fixture(scope="session")
-def clickhouse_trace_server(clickhouse_server):
-    clickhouse_trace_server = (
-        clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
-    )
-    clickhouse_trace_server._run_migrations()
-    yield clickhouse_trace_server
-
-
-def _check_server_health(
-    base_url: str, endpoint: str, num_retries: int = 1, sleep_time: int = 1
-) -> bool:
-    for _ in range(num_retries):
-        try:
-            response = requests.get(urllib.parse.urljoin(base_url, endpoint))
-            if response.status_code == 200:
-                return True
-            time.sleep(sleep_time)
-        except requests.exceptions.ConnectionError:
-            time.sleep(sleep_time)
-
-    print(
-        f"Server not healthy @ {urllib.parse.urljoin(base_url, endpoint)}: no response"
-    )
-    return False
-
-
-def _check_server_up(host, port) -> bool:
-    base_url = f"http://{host}:{port}/"
-    endpoint = "ping"
-
-    def server_healthy(num_retries=1):
-        return _check_server_health(
-            base_url=base_url, endpoint=endpoint, num_retries=num_retries
-        )
-
-    if server_healthy():
-        return True
-
-    if os.environ.get("CI") != "true":
-        print("CI is not true, not starting clickhouse server")
-
-        subprocess.Popen(
-            [
-                "docker",
-                "run",
-                "-d",
-                "--rm",
-                "-e",
-                "CLICKHOUSE_DB=default",
-                "-e",
-                "CLICKHOUSE_USER=default",
-                "-e",
-                "CLICKHOUSE_PASSWORD=",
-                "-e",
-                "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
-                "-p",
-                f"{port}:8123",
-                "--name",
-                "weave-python-test-clickhouse-server",
-                "--ulimit",
-                "nofile=262144:262144",
-                "clickhouse/clickhouse-server",
-            ]
-        )
-
-    # wait for the server to start
-    return server_healthy(num_retries=30)
 
 
 class TwoWayMapping:
@@ -558,6 +497,7 @@ def create_client(
     server: tsi.TraceServerInterface
     entity = "shawn"
     project = "test-project"
+
     if weave_server_flag == "sqlite":
         sqlite_server = sqlite_trace_server.SqliteTraceServer(
             "file::memory:?cache=shared"
@@ -568,7 +508,13 @@ def create_client(
             sqlite_server, DummyIdConverter(), entity
         )
     elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
+        assert ensure_clickhouse_db is not None
+        host, port = request.getfixturevalue("ensure_clickhouse_db")
+
+        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
+            host=host,
+            port=port,
+        )
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
         ch_server.ch_client.command(
             f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
@@ -601,8 +547,14 @@ def create_client(
     return inited_client
 
 
+@pytest.fixture
+def zero_stack():
+    with set_call_stack([]):
+        yield
+
+
 @pytest.fixture()
-def client(request):
+def client(zero_stack, request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
     inited_client = create_client(request)
@@ -614,7 +566,7 @@ def client(request):
 
 
 @pytest.fixture()
-def client_creator(request):
+def client_creator(zero_stack, request):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
     @contextlib.contextmanager
@@ -692,10 +644,14 @@ def network_proxy_client(client):
         weave.trace_server.requests.post = orig_post
 
 
-@pytest.fixture
-def clickhouse_client(client):
-    if client_is_sqlite(client):
-        return None
+@pytest.fixture(autouse=True)
+def caching_client_isolation(monkeypatch, tmp_path):
+    """Isolate cache directories for each test to prevent cross-test contamination."""
+    test_specific_cache_dir = (
+        tmp_path / f"weave_cache_{get_test_name().replace('/', '_').replace('::', '_')}"
+    )
+    test_specific_cache_dir.mkdir(parents=True, exist_ok=True)
 
-    ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
-    return ch_server.ch_client
+    monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
+    yield test_specific_cache_dir
+    # tmp_path and monkeypatch automatically handle cleanup

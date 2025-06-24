@@ -1,4 +1,4 @@
-from weave.trace_server.opentelemetry.helpers import try_parse_int
+from weave.trace_server.opentelemetry.helpers import try_parse_int, try_parse_timestamp
 
 """
 The constants defined in this file map attribute keys from various telemetry standards
@@ -51,8 +51,11 @@ INPUT_KEYS = [
     "gen_ai.prompt",  # From OpenTelemetry AI semantic conventions
     "input.value",  # From OpenInference standard
     "mlflow.spanInputs",  # From MLFlow's tracking format
-    "traceloop.entity.input"  # From Traceloop's conventions
+    "traceloop.entity.input",  # From Traceloop's conventions
+    "gcp.vertex.agent.tool_call_args",  # From Google's Vertex AI
+    "gcp.vertex.agent.llm_request",  # From Google's Vertex AI
     "input",  # Generic fallback for Pydantic models - lowest priority
+    "inputs",
 ]
 
 # OUTPUT_KEYS: Maps attribute keys that represent model completions or outputs
@@ -65,7 +68,10 @@ OUTPUT_KEYS = [
     "mlflow.spanOutputs",  # From MLFlow's tracking format
     "gen_ai.content.completion",  # From OpenLit project's format
     "traceloop.entity.output",  # From Traceloop's conventions
+    "gcp.vertex.agent.tool_response",  # From Google's Vertex AI
+    "gcp.vertex.agent.llm_response",  # From Google's Vertex AI
     "output",  # Generic fallback for Pydantic models - lowest priority
+    "outputs",
 ]
 
 # USAGE_KEYS: Maps internal Weave usage metric names to their equivalent keys in
@@ -130,4 +136,11 @@ ATTRIBUTE_KEYS = {
 WB_KEYS = {
     # Custom display name for the call in the UI
     "display_name": ["wandb.display_name"],
+}
+
+# These represent fields that are set by a provider which override top level span information
+# Langfuse relies on these attributes to give the real start and end time for spans
+SPAN_OVERRIDES = {
+    "start_time": [("langfuse.startTime", try_parse_timestamp)],
+    "end_time": [("langfuse.endTime", try_parse_timestamp)],
 }

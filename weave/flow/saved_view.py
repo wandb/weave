@@ -146,6 +146,12 @@ OPERATOR_MAP = {
 
 VALUELESS_OPERATORS = {"(any): isEmpty", "(any): isNotEmpty"}
 
+# We return a real float from the backend! do not convert to double!
+# When option clicking latency, because we are generating this field
+# manually on the backend, it is actually a float, not a string stored
+# in json, so we need to omit the conversion params from the filter
+FIELDS_NO_FLOAT_CONVERT = {"summary.weave.latency_ms"}
+
 
 def py_to_api_filter(filter: tsi.CallsFilter | None) -> tsi.CallsFilter | None:
     """Convert Saved View Filter to API Filter"""
@@ -157,6 +163,13 @@ def py_to_api_filter(filter: tsi.CallsFilter | None) -> tsi.CallsFilter | None:
 
 
 # See operationConverter in weave-js
+def get_field_expression(field: str) -> dict[str, Any]:
+    """Helper function to get field expression based on whether it needs float conversion."""
+    if field in FIELDS_NO_FLOAT_CONVERT:
+        return {"$getField": field}
+    return {"$convert": {"input": {"$getField": field}, "to": "double"}}
+
+
 def filter_to_clause(item: Filter) -> dict[str, Any]:
     if item.operator == "(any): isEmpty":
         return {
@@ -212,79 +225,28 @@ def filter_to_clause(item: Filter) -> dict[str, Any]:
         return {"$or": clauses}
     elif item.operator == "(number): =":
         value = float(item.value)
-        return {
-            "$eq": [
-                {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
-                {"$literal": value},
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$eq": [field, {"$literal": value}]}
     elif item.operator == "(number): !=":
         value = float(item.value)
-        return {
-            "$not": [
-                {
-                    "$eq": [
-                        {
-                            "$convert": {
-                                "input": {"$getField": item.field},
-                                "to": "double",
-                            }
-                        },
-                        {"$literal": value},
-                    ],
-                },
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$not": [{"$eq": [field, {"$literal": value}]}]}
     elif item.operator == "(number): >":
         value = float(item.value)
-        return {
-            "$gt": [
-                {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
-                {"$literal": value},
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$gt": [field, {"$literal": value}]}
     elif item.operator == "(number): >=":
         value = float(item.value)
-        return {
-            "$gte": [
-                {"$convert": {"input": {"$getField": item.field}, "to": "double"}},
-                {"$literal": value},
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$gte": [field, {"$literal": value}]}
     elif item.operator == "(number): <":
         value = float(item.value)
-        return {
-            "$not": [
-                {
-                    "$gte": [
-                        {
-                            "$convert": {
-                                "input": {"$getField": item.field},
-                                "to": "double",
-                            }
-                        },
-                        {"$literal": value},
-                    ],
-                }
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$not": [{"$gte": [field, {"$literal": value}]}]}
     elif item.operator == "(number): <=":
         value = float(item.value)
-        return {
-            "$not": [
-                {
-                    "$gt": [
-                        {
-                            "$convert": {
-                                "input": {"$getField": item.field},
-                                "to": "double",
-                            }
-                        },
-                        {"$literal": value},
-                    ],
-                }
-            ],
-        }
+        field = get_field_expression(item.field)
+        return {"$not": [{"$gt": [field, {"$literal": value}]}]}
     elif item.operator == "(bool): is":
         return {
             "$eq": [{"$getField": item.field}, {"$literal": str(item.value)}],
@@ -453,16 +415,14 @@ def operand_to_filter(operand: tsi_query.Operand) -> Filter:
         else:
             raise QueryTranslationException(f"Could not parse {filter}")
         return filter
-    if isinstance(operand, tsi_query.OrOperation):
-        if len(operand.or_) > 0:
-            operands = [operand_to_filter(o) for o in operand.or_]
-            if all(o.field == operands[0].field for o in operands):
-                if all(o.operator == "(string): equals" for o in operands):
-                    operator = "(string): in"
-                    value = [o.value for o in operands]
-                    return Filter(
-                        field=operands[0].field, operator=operator, value=value
-                    )
+    if isinstance(operand, tsi_query.OrOperation) and len(operand.or_) > 0:
+        operands = [operand_to_filter(o) for o in operand.or_]
+        if all(o.field == operands[0].field for o in operands) and all(
+            o.operator == "(string): equals" for o in operands
+        ):
+            operator = "(string): in"
+            value = [o.value for o in operands]
+            return Filter(field=operands[0].field, operator=operator, value=value)
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
@@ -972,9 +932,12 @@ class SavedView:
         ]
         # Add any columns that are visible that are not in the above list
         for key, value in visibility.items():
-            if value and key not in default_column_paths:
-                if ObjectPath.parse_str(key).elements[0] in KNOWN_COLUMNS:
-                    default_column_paths.append(key)
+            if (
+                value
+                and key not in default_column_paths
+                and ObjectPath.parse_str(key).elements[0] in KNOWN_COLUMNS
+            ):
+                default_column_paths.append(key)
         pin: Pin = self.base.definition.pin or DEFAULT_PIN
         for pin_right in pin["right"]:
             # If a column is pinned to the right, move it to the end of the list

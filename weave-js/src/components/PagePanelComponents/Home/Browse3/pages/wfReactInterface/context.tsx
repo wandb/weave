@@ -12,7 +12,10 @@ import React, {createContext, FC, useContext, useMemo} from 'react';
 
 import {useHasTraceServerClientContext} from './traceServerClientContext';
 import {tsWFDataModelHooks} from './tsDataModelHooks';
-import {WFDataModelHooksInterface} from './wfDataModelHooksInterface';
+import {
+  CallFilter,
+  WFDataModelHooksInterface,
+} from './wfDataModelHooksInterface';
 
 const WFDataModelHooksContext = createContext<WFDataModelHooksInterface | null>(
   null
@@ -46,18 +49,17 @@ export const useProjectHasTraceServerData = (
   project: string
 ) => {
   const hasTraceServer = useHasTraceServerClientContext();
-  const objs = tsWFDataModelHooks.useRootObjectVersions(
+  const objs = tsWFDataModelHooks.useRootObjectVersions({
     entity,
     project,
-    {}, // filter
-    1, // limit
-    true, // metadata only
-    {
-      skip: !hasTraceServer,
-      noAutoRefresh: true,
-    }
-  );
-  const calls = tsWFDataModelHooks.useProjectHasCalls(entity, project, {
+    limit: 1,
+    metadataOnly: true,
+    skip: !hasTraceServer,
+    noAutoRefresh: true,
+  });
+  const calls = tsWFDataModelHooks.useProjectHasCalls({
+    entity,
+    project,
     skip: !hasTraceServer,
   });
   const loading = objs.loading || calls.loading;
@@ -68,4 +70,26 @@ export const useProjectHasTraceServerData = (
     }),
     [loading, objs.result, calls.result]
   );
+};
+
+/**
+ * Returns trace count for a Run if the client can connect to trace server.
+ */
+export const useRunTraceStats = (
+  entity: string,
+  project: string,
+  runName: string
+) => {
+  const filter: CallFilter = {
+    runIds: [`${entity}/${project}/${runName}`],
+    traceRootsOnly: true,
+  };
+  const hasTraceServer = useHasTraceServerClientContext();
+  const callStats = tsWFDataModelHooks.useCallsStats({
+    entity,
+    project,
+    filter,
+    skip: !hasTraceServer,
+  });
+  return callStats;
 };

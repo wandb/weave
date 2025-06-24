@@ -106,8 +106,8 @@ import weave
 os.environ["OPENAI_API_KEY"] = "<YOUR-OPENAI-API-KEY>"
 weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")
 
-def accuracy_metric(answer, model_output, trace=None):
-    predicted_answer = model_output["answer"].lower()
+def accuracy_metric(answer, output, trace=None):
+    predicted_answer = output["answer"].lower()
     return answer["answer"].lower() == predicted_answer
 
 module = dspy.ChainOfThought("question -> answer: str, explanation: str")

@@ -37,7 +37,6 @@ export const UNFILTERABLE_FIELDS = [
   'tokens',
   'cost',
   'wb_user_id', // Option+Click works
-  'wb_run_id', // Option+Click works
   'total_storage_size_bytes',
 ];
 
@@ -51,7 +50,9 @@ export const FIELD_LABELS: Record<string, string> = {
   'summary.weave.status': 'Status',
   'summary.weave.trace_name': 'Name',
   started_at: 'Called',
+  wb_run_id: 'Run',
   wb_user_id: 'User',
+  'feedback.[*].trigger_ref': 'Monitored',
 };
 
 export const getFieldLabel = (field: string): string => {
@@ -78,8 +79,10 @@ export const FIELD_TYPE: Record<string, string> = {
   id: 'id',
   'summary.weave.status': 'status',
   'summary.weave.trace_name': 'string',
+  wb_run_id: 'run',
   wb_user_id: 'user',
   started_at: 'datetime',
+  'feedback.[*].trigger_ref': 'monitor',
 };
 
 export const getFieldType = (field: string): string => {
@@ -292,11 +295,29 @@ export const getOperatorOptions = (field: string): SelectOperatorOption[] => {
       },
     ];
   }
+  if ('run' === fieldType) {
+    return [
+      {
+        value: '(string): equals',
+        label: 'equals',
+        group: 'string',
+      },
+    ];
+  }
   if ('user' === fieldType) {
     return [
       {
         value: '(string): equals',
         label: 'equals',
+        group: 'string',
+      },
+    ];
+  }
+  if ('monitor' === fieldType) {
+    return [
+      {
+        value: '(monitored): by',
+        label: 'by',
         group: 'string',
       },
     ];
@@ -324,6 +345,10 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = {
   'attributes.weave.os_release': 'Brief operating system version',
   'attributes.weave.sys_version': 'Python version used',
 };
+
+// The wildcard works because monitors are the only usage of trigger_ref at this time
+// This will need to be updated if we add more usage of trigger_ref
+export const MONITORED_FILTER_VALUE = 'feedback.[*].trigger_ref';
 
 // Create a unique symbol for RefString
 const WeaveRefStringSymbol = Symbol('WeaveRefString');

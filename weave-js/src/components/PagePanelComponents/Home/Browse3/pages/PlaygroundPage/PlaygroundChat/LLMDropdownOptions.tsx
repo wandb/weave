@@ -3,143 +3,342 @@ import {
   MOON_100,
   MOON_200,
   MOON_800,
-  MOON_900,
   OBLIVION,
-  TEAL_500,
 } from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
+import {Pill} from '@wandb/weave/components/Tag';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import ReactDOM from 'react-dom';
 import {components, OptionProps} from 'react-select';
 
-import {Link} from '../../common/Links';
+import {getHostedModels, MODEL_INDEX} from '../../../inference/modelInfo';
+import {ModelTile} from '../../../inference/ModelTile';
+import {useInferenceContext} from '../../../inference/util';
+import {LlmStructuredCompletionModel} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
 import {
+  findMaxTokensByModelName,
   LLM_MAX_TOKENS,
   LLM_PROVIDER_LABELS,
   LLMMaxTokensKey,
 } from '../llmMaxTokens';
+import {
+  OptionalSavedPlaygroundModelParams,
+  SavedPlaygroundModelState,
+} from '../types';
 import {ProviderStatus} from '../useConfiguredProviders';
+import {convertDefaultParamsToOptionalPlaygroundModelParams} from '../useSaveModelConfiguration';
+
+export const SAVED_MODEL_OPTION_VALUE = 'saved-models';
+
+export interface LLMOption {
+  catalogId?: string; // Model Catalog ID
+  label: string;
+  subLabel?: string | React.ReactNode;
+  value: LLMMaxTokensKey | string;
+  max_tokens: number;
+
+  // Saved LLM options
+  baseModelId?: LLMMaxTokensKey | null;
+  defaultParams?: OptionalSavedPlaygroundModelParams;
+  versionIndex?: number | null;
+  isLatest?: boolean;
+  objectId?: string;
+}
 
 export interface ProviderOption {
   label: string | React.ReactNode;
   value: string;
-  llms: Array<{
-    label: string;
-    value: LLMMaxTokensKey;
-    max_tokens: number;
-  }>;
+  llms: Array<LLMOption>;
   isDisabled?: boolean;
+  providers?: ProviderOption[];
+  isPreview?: boolean; // If true, show a preview pill in the dropdown
 }
 
+export type OpenDirection = {
+  horizontal: 'left' | 'right';
+};
+
 export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
-  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
+  onChange: (
+    value: LLMMaxTokensKey,
+    maxTokens: number,
+    savedModel?: SavedPlaygroundModelState
+  ) => void;
   entity: string;
   project: string;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
+  onViewCatalog?: (path?: string) => void;
+  providers?: ProviderOption[];
+  direction: OpenDirection;
 }
 
-export const DisabledProviderTooltip: React.FC<{
-  children: React.ReactNode;
-  entity: string;
-  isAdmin?: boolean;
-}> = ({children, entity, isAdmin = false}) => {
-  return (
-    <Tooltip
-      trigger={children}
-      aria-label="Provider configuration status"
-      content={
-        <Box
-          sx={{
-            backgroundColor: MOON_900,
-            color: 'white',
-            fontSize: '14px',
-            fontWeight: 400,
-            borderRadius: '4px',
-          }}>
-          <div>This provider is not configured.</div>
-          <div>
-            Check{' '}
-            {isAdmin ? (
-              <Link
-                to={`/${entity}/settings`}
-                target="_blank"
-                aria-label="Go to team settings to configure missing secrets"
-                rel="noopener noreferrer"
-                style={{
-                  color: TEAL_500,
-                  textDecoration: 'none',
-                }}
-                className="hover:opacity-80">
-                missing secrets
-              </Link>
-            ) : (
-              'missing secrets'
-            )}{' '}
-            to enable it.
-          </div>
-        </Box>
-      }
-    />
-  );
-};
-
 const SubMenu = ({
+  value,
   llms,
   onChange,
   position,
   onSelect,
+  isAdmin,
+  onConfigureProvider,
+  onViewCatalog,
+  providers,
+  direction,
 }: {
-  llms: Array<{label: string; value: LLMMaxTokensKey; max_tokens: number}>;
-  onChange: (value: LLMMaxTokensKey, maxTokens: number) => void;
-  position: {top: number; left: number};
+  value: string;
+  llms: Array<LLMOption>;
+  onChange: (
+    value: LLMMaxTokensKey,
+    maxTokens: number,
+    savedModel?: SavedPlaygroundModelState
+  ) => void;
+  position: {top: number; left: number; bottom: number; right: number};
   onSelect: () => void;
+  isAdmin?: boolean;
+  onConfigureProvider?: (provider: string) => void;
+  onViewCatalog?: (path?: string) => void;
+  providers?: ProviderOption[];
+  direction: OpenDirection;
 }) => {
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth);
+      setViewportHeight(window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const subMenuPosition = useMemo(() => {
+    // Calculate if dropdown is above or below 50% of the viewport
+    const dropdownMidpoint = (position.top + position.bottom) / 2;
+    const viewportMidpoint = viewportHeight / 2;
+    const shouldOpenDown = dropdownMidpoint < viewportMidpoint;
+
+    if (direction.horizontal === 'right') {
+      if (shouldOpenDown) {
+        return {
+          left: position.right + 1,
+          top: position.top,
+        };
+      } else {
+        return {
+          left: position.right + 1,
+          bottom: viewportHeight - position.bottom + 4,
+        };
+      }
+    } else if (direction.horizontal === 'left') {
+      if (shouldOpenDown) {
+        return {
+          right: viewportWidth - position.left + 1,
+          top: position.top,
+        };
+      } else {
+        return {
+          right: viewportWidth - position.left + 1,
+          bottom: viewportHeight - position.bottom - 4,
+        };
+      }
+    }
+    return {};
+  }, [direction, position, viewportWidth, viewportHeight]);
+
   return ReactDOM.createPortal(
-    <Box
-      sx={{
-        position: 'fixed',
-        left: position.left - 4,
-        top: position.top - 6,
-        backgroundColor: 'white',
-        boxShadow: '0 2px 8px ' + hexToRGB(OBLIVION, 0.15),
-        borderRadius: '4px',
-        width: '300px',
-        maxHeight: '400px',
-        overflowY: 'auto',
-        border: '1px solid ' + hexToRGB(OBLIVION, 0.1),
-        p: '6px',
-        zIndex: 1,
-      }}>
-      {llms.map((llm, index) => (
-        <Box
-          key={llm.value}
-          onClick={e => {
-            e.preventDefault();
-            e.stopPropagation();
-            onChange(llm.value, llm.max_tokens);
-            onSelect();
-          }}
-          sx={{
-            width: '100%',
-            wordBreak: 'break-all',
-            wordWrap: 'break-word',
-            whiteSpace: 'normal',
-            p: '6px',
-            cursor: 'pointer',
-            borderRadius: '4px',
-            '&:hover': {
-              backgroundColor: hexToRGB(OBLIVION, 0.04),
-            },
-          }}>
-          {llm.label}
-        </Box>
-      ))}
-    </Box>,
+    <Tailwind>
+      <Box
+        sx={{
+          position: 'fixed',
+          ...subMenuPosition,
+          backgroundColor: 'white',
+          boxShadow: '0 2px 8px ' + hexToRGB(OBLIVION, 0.15),
+          borderRadius: '4px',
+          width: '300px',
+          maxHeight: '400px',
+          overflowY: 'auto',
+          border: '1px solid ' + hexToRGB(OBLIVION, 0.1),
+          p: '6px',
+          zIndex: 10000,
+        }}>
+        {llms.map(llm => {
+          // TODO: Would be nice to have all models in the catalog so we could
+          //       display tiles, link to comparison and details, etc.
+          const isCoreWeaveModel = value === 'coreweave';
+          const catalogModel = isCoreWeaveModel
+            ? MODEL_INDEX[llm.catalogId ?? '']
+            : null;
+          const isUnspportedCoreWeaveModel =
+            isCoreWeaveModel &&
+            (!catalogModel || catalogModel.apiStyle !== 'chat');
+          if (isUnspportedCoreWeaveModel) {
+            // Playground doesn't support embedding models.
+            return null;
+          }
+          return (
+            <Box
+              key={`${llm.value}${llm.versionIndex}`}
+              onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                onChange(
+                  llm.value as LLMMaxTokensKey,
+                  llm.max_tokens,
+                  llm.defaultParams && llm.baseModelId
+                    ? LLMOptionToSavedPlaygroundModelState(llm)
+                    : undefined
+                );
+                onSelect();
+              }}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                width: '100%',
+                wordBreak: 'break-all',
+                wordWrap: 'break-word',
+                whiteSpace: 'normal',
+                p: '6px',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                '&:hover': {
+                  backgroundColor: hexToRGB(OBLIVION, 0.04),
+                  '& .info-button': {
+                    opacity: 1,
+                  },
+                },
+              }}>
+              <Box sx={{flex: 1}}>
+                {llm.label}
+                {llm.subLabel && (
+                  <div className="text-sm text-moon-500">{llm.subLabel}</div>
+                )}
+              </Box>
+              {catalogModel && onViewCatalog && (
+                <Box sx={{opacity: 0}} className="info-button">
+                  <Button
+                    icon="info"
+                    variant="ghost"
+                    size="small"
+                    tooltip={
+                      <ModelTile
+                        model={catalogModel}
+                        hint="Click info button for full model details"
+                      />
+                    }
+                    tooltipProps={{
+                      className: 'p-0 bg-transparent',
+                      side: 'bottom',
+                      sideOffset: 8,
+                    }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onViewCatalog(
+                        `${catalogModel.provider}/${catalogModel.id}`
+                      );
+                    }}
+                  />
+                </Box>
+              )}
+            </Box>
+          );
+        })}
+        {onViewCatalog && !providers && value === 'coreweave' && (
+          <Box
+            onClick={e => {
+              e.stopPropagation();
+              // TODO: Pass the value as the path if we add comparison for other providers
+              onViewCatalog();
+            }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              width: '100%',
+              wordBreak: 'break-all',
+              wordWrap: 'break-word',
+              whiteSpace: 'normal',
+              p: '6px',
+              cursor: 'pointer',
+              borderRadius: '4px',
+              fontWeight: 600,
+              '&:hover': {
+                backgroundColor: hexToRGB(OBLIVION, 0.04),
+                '& .info-button': {
+                  opacity: 1,
+                },
+              },
+            }}>
+            <Box sx={{flex: 1}}>Compare models</Box>
+            <Box sx={{opacity: 0}} className="info-button">
+              <Icon width={18} height={18} name="forward-next" />
+            </Box>
+          </Box>
+        )}
+        {providers?.map(provider => {
+          const tooltipContent =
+            provider.value !== 'custom-provider' && !isAdmin
+              ? 'You must be an admin to configure this provider'
+              : undefined;
+
+          const trigger = (
+            <Box
+              key={provider.value}
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                p: '6px',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                '&:hover': {
+                  backgroundColor: hexToRGB(OBLIVION, 0.04),
+                },
+                width: '100%',
+              }}
+              onClick={() => {
+                if (provider.value === 'custom-provider' || isAdmin) {
+                  onConfigureProvider?.(provider.value);
+                }
+              }}>
+              <Box
+                sx={{
+                  wordBreak: 'break-all',
+                  wordWrap: 'break-word',
+                  whiteSpace: 'normal',
+                }}>
+                {provider.label}
+              </Box>
+              <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onConfigureProvider?.(provider.value);
+                  }}
+                  disabled={!isAdmin && provider.value !== 'custom-provider'}>
+                  Configure
+                </Button>
+              </Box>
+            </Box>
+          );
+
+          return tooltipContent ? (
+            <Tooltip content={tooltipContent} trigger={trigger} />
+          ) : (
+            trigger
+          );
+        })}
+      </Box>
+    </Tailwind>,
     document.body
   );
 };
@@ -151,117 +350,119 @@ const SubMenuOption = ({
   project,
   isAdmin,
   onConfigureProvider,
+  onViewCatalog,
+  direction,
   ...props
 }: CustomOptionProps) => {
   const [isHovered, setIsHovered] = useState(false);
-  const [position, setPosition] = useState({top: 0, left: 0});
+  const [position, setPosition] = useState({
+    top: 0,
+    left: 0,
+    bottom: 0,
+    right: 0,
+  });
   const optionRef = useRef<HTMLDivElement>(null);
   const {llms, isDisabled} = props.data;
+  const hasOptions = llms.length > 0 || (props.data.providers?.length ?? 0) > 0;
 
   useEffect(() => {
     if (isHovered && optionRef.current) {
       const rect = optionRef.current.getBoundingClientRect();
       setPosition({
         top: rect.top,
-        left: rect.right + 4,
+        bottom: rect.bottom,
+        left: rect.left,
+        right: rect.right,
       });
     }
   }, [isHovered]);
-
-  const optionContent = React.useMemo(
-    () => (
-      <Box
-        ref={optionRef}
-        onMouseEnter={() => !isDisabled && setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        sx={{
-          position: 'relative',
-          width: '100%',
-          opacity: isDisabled ? 0.5 : 1,
-        }}>
-        <Box sx={{position: 'relative', zIndex: 1}}>
-          <components.Option {...props}>
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}>
-              <Box
-                sx={{
-                  wordBreak: 'break-all',
-                  wordWrap: 'break-word',
-                  whiteSpace: 'normal',
-                  width: '90%',
-                }}>
-                {children}
-              </Box>
-              <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
-                {isAdmin && isDisabled && (
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onConfigureProvider?.(props.data.value);
-                    }}>
-                    Configure
-                  </Button>
-                )}
-                {llms.length > 0 && (
-                  <Icon name="chevron-next" color="moon_500" />
-                )}
-              </Box>
-            </Box>
-          </components.Option>
-        </Box>
-        {isHovered && llms.length > 0 && (
-          <SubMenu
-            llms={llms}
-            onChange={onChange}
-            position={position}
-            onSelect={() => {
-              props.selectProps.onInputChange?.('', {
-                action: 'set-value',
-                prevInputValue: props.selectProps.inputValue,
-              });
-              props.selectProps.onMenuClose?.();
-            }}
-          />
-        )}
-      </Box>
-    ),
-    [
-      isAdmin,
-      children,
-      isDisabled,
-      isHovered,
-      llms,
-      onChange,
-      position,
-      props,
-      onConfigureProvider,
-    ]
-  );
 
   if (props.data.value === 'divider') {
     return (
       <Box
         sx={{
           borderBottom: `1px solid ${MOON_200}`,
-          mb: 1,
+          my: 1,
         }}
       />
     );
   }
 
-  return isDisabled && !isAdmin ? (
-    <DisabledProviderTooltip entity={entity} isAdmin={isAdmin}>
-      {optionContent}
-    </DisabledProviderTooltip>
-  ) : (
-    optionContent
+  return (
+    <Box
+      ref={optionRef}
+      onMouseEnter={() => !isDisabled && setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      sx={{
+        position: 'relative',
+        width: '100%',
+        opacity: isDisabled ? 0.5 : 1,
+      }}>
+      <Box sx={{position: 'relative', zIndex: 1}}>
+        <components.Option {...props}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+            }}>
+            {direction.horizontal === 'left' && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1,
+                  marginRight: '8px',
+                  alignItems: 'center',
+                }}>
+                {hasOptions && <Icon name="chevron-back" color="moon_500" />}
+              </Box>
+            )}
+            <Box
+              sx={{
+                wordBreak: 'break-all',
+                wordWrap: 'break-word',
+                whiteSpace: 'normal',
+                width: '90%',
+              }}>
+              <div className="flex items-center gap-8">
+                {children}
+                {props.data.isPreview && <Pill label="Preview" color="moon" />}
+              </div>
+            </Box>
+            {direction.horizontal === 'right' && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1,
+                  marginLeft: 'auto',
+                  alignItems: 'center',
+                }}>
+                {hasOptions && <Icon name="chevron-next" color="moon_500" />}
+              </Box>
+            )}
+          </Box>
+        </components.Option>
+      </Box>
+      {isHovered && hasOptions && (
+        <SubMenu
+          value={props.data.value}
+          providers={props.data.providers}
+          llms={llms}
+          onChange={onChange}
+          position={position}
+          onSelect={() => {
+            props.selectProps.onInputChange?.('', {
+              action: 'set-value',
+              prevInputValue: props.selectProps.inputValue,
+            });
+            props.selectProps.onMenuClose?.();
+          }}
+          isAdmin={isAdmin}
+          onConfigureProvider={onConfigureProvider}
+          onViewCatalog={onViewCatalog}
+          direction={direction}
+        />
+      )}
+    </Box>
   );
 };
 
@@ -272,19 +473,32 @@ export const CustomOption = ({
   project,
   isAdmin,
   onConfigureProvider,
+  onViewCatalog,
+  data,
   ...props
 }: CustomOptionProps) => {
   const {inputValue} = props.selectProps;
   // If searching, show nested structure
   if (inputValue) {
-    const {llms, isDisabled} = props.data;
+    const isDisabled = data.isDisabled;
     if (isDisabled) {
       return null;
     }
 
-    const filteredLLMs = llms.filter(llm =>
-      llm.value.toLowerCase().includes(inputValue.toLowerCase())
-    );
+    const filteredLLMs = data.llms
+      .filter(
+        llm =>
+          llm.value.toLowerCase().includes(inputValue.toLowerCase()) ||
+          llm.label.toLowerCase().includes(inputValue.toLowerCase()) ||
+          (llm.subLabel &&
+            llm.subLabel
+              .toString()
+              .toLowerCase()
+              .includes(inputValue.toLowerCase()))
+      )
+      .sort((a, b) => {
+        return a.label.localeCompare(b.label);
+      });
 
     return (
       <Box>
@@ -302,19 +516,7 @@ export const CustomOption = ({
             wordWrap: 'break-word',
             whiteSpace: 'normal',
           }}>
-          <span>{props.data.label}</span>
-          {isAdmin && isDisabled && (
-            <Button
-              variant="ghost"
-              size="small"
-              onClick={e => {
-                e.preventDefault();
-                e.stopPropagation();
-                onConfigureProvider?.(props.data.value);
-              }}>
-              Configure
-            </Button>
-          )}
+          <span>{data.label}</span>
         </Box>
         <Box
           sx={{
@@ -325,9 +527,15 @@ export const CustomOption = ({
           }}>
           {filteredLLMs.map(llm => (
             <Box
-              key={llm.value}
+              key={`${llm.value}${llm.versionIndex}`}
               onClick={() => {
-                onChange(llm.value as LLMMaxTokensKey, llm.max_tokens);
+                onChange(
+                  llm.value as LLMMaxTokensKey,
+                  llm.max_tokens,
+                  llm.defaultParams && llm.baseModelId
+                    ? LLMOptionToSavedPlaygroundModelState(llm)
+                    : undefined
+                );
                 props.selectProps.onInputChange?.('', {
                   action: 'set-value',
                   prevInputValue: props.selectProps.inputValue,
@@ -341,23 +549,39 @@ export const CustomOption = ({
                 '&:hover': {
                   backgroundColor: MOON_100,
                 },
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}>
-              {llm.label}
+              <div>
+                {llm.label}
+                {llm.subLabel && (
+                  <div className="text-sm text-moon-500">{llm.subLabel}</div>
+                )}
+              </div>
+              {llm.isLatest && <Pill label="Latest" color="moon" />}
             </Box>
           ))}
         </Box>
       </Box>
     );
   }
+
+  const filteredData = {
+    ...data,
+    llms: data.llms.filter(llm => !!llm.isLatest),
+  };
   // If not searching, use the hover submenu
   return (
     <SubMenuOption
       {...props}
+      data={data.value === SAVED_MODEL_OPTION_VALUE ? filteredData : data}
       onChange={onChange}
       entity={entity}
       project={project}
       isAdmin={isAdmin}
-      onConfigureProvider={onConfigureProvider}>
+      onConfigureProvider={onConfigureProvider}
+      onViewCatalog={onViewCatalog}>
       {children}
     </SubMenuOption>
   );
@@ -369,31 +593,35 @@ export const dividerOption: ProviderOption = {
   llms: [],
 };
 
-export const addProviderOption: ProviderOption = {
-  label: (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1,
-      }}>
-      <Icon name="add-new" />
-      Add AI provider
-    </Box>
-  ),
-  value: 'add-provider',
+export const addProviderOption = (
+  disabledOptions: ProviderOption[]
+): ProviderOption => ({
+  label: 'Add AI provider',
+  value: 'configure-provider',
   llms: [],
-};
+  providers: [
+    ...disabledOptions,
+    {
+      label: 'Custom provider',
+      value: 'custom-provider',
+      llms: [],
+    },
+  ],
+});
 
-export const getLLMDropdownOptions = (
+export const useLLMDropdownOptions = (
   configuredProviders: Record<string, ProviderStatus>,
   configuredProvidersLoading: boolean,
   customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[],
   customProviderModelsResult: TraceObjSchemaForBaseObjectClass<'ProviderModel'>[],
-  customLoading: boolean
+  customLoading: boolean,
+  savedModelsResult: TraceObjSchemaForBaseObjectClass<'LLMStructuredCompletionModel'>[],
+  savedModelsLoading: boolean
 ) => {
+  const inferenceContext = useInferenceContext();
   const options: ProviderOption[] = [];
   const disabledOptions: ProviderOption[] = [];
+  const savedModelsOptions: ProviderOption[] = [];
 
   if (configuredProvidersLoading) {
     options.push({
@@ -403,18 +631,37 @@ export const getLLMDropdownOptions = (
     });
   } else {
     Object.entries(configuredProviders).forEach(([provider, {status}]) => {
-      const providerLLMs = Object.entries(LLM_MAX_TOKENS)
-        .filter(([_, config]) => config.provider === provider)
-        .map(([llmKey]) => ({
-          label: llmKey,
-          value: llmKey as LLMMaxTokensKey,
-          max_tokens: LLM_MAX_TOKENS[llmKey as LLMMaxTokensKey].max_tokens,
-        }));
+      if (provider === 'coreweave' && !inferenceContext.isInferenceEnabled) {
+        return;
+      }
+      const providerLLMs = [];
+      if (provider === 'coreweave') {
+        // Insert hosted models
+        providerLLMs.push(
+          ...getHostedModels().map(model => ({
+            catalogId: model.id,
+            value: `coreweave/${model.idPlayground}`, // What gets sent to completion endpoint
+            label: model.label ?? model.id, // What gets shown as selected
+            max_tokens: 1000, // TODO: Get max tokens from model info
+          }))
+        );
+      } else {
+        providerLLMs.push(
+          ...Object.entries(LLM_MAX_TOKENS)
+            .filter(([_, config]) => config.provider === provider)
+            .map(([llmKey]) => ({
+              label: llmKey,
+              value: llmKey as LLMMaxTokensKey,
+              max_tokens: LLM_MAX_TOKENS[llmKey as LLMMaxTokensKey].max_tokens,
+            }))
+        );
+      }
 
       const option = {
         label:
           LLM_PROVIDER_LABELS[provider as keyof typeof LLM_PROVIDER_LABELS],
         value: provider,
+        isPreview: provider === 'coreweave',
         llms: status ? providerLLMs : [],
         isDisabled: !status,
       };
@@ -457,15 +704,91 @@ export const getLLMDropdownOptions = (
     });
   }
 
-  // Combine enabled and disabled options
+  const savedModels = useMemo(
+    () =>
+      // If savedModelsResult is undefined, return an empty array
+      // Else convert the saved models to LLMOption(s)
+      (savedModelsResult || []).map(savedModelObj => {
+        const savedModelVal = savedModelObj.val as LlmStructuredCompletionModel;
+        const baseModelId = savedModelVal.llm_model_id;
+        const savedModelName =
+          savedModelVal.name ?? savedModelObj.object_id ?? 'Unnamed Model';
+
+        let maxTokens: number | undefined;
+
+        // Try to determine max tokens from built-in model list
+        if (baseModelId in LLM_MAX_TOKENS) {
+          const baseModelConfig =
+            LLM_MAX_TOKENS[baseModelId as LLMMaxTokensKey];
+          maxTokens = baseModelConfig.max_tokens;
+        } else {
+          // Try to determine from custom provider models
+          const customModelMatch = customProviderModelsResult?.find(
+            customModel => {
+              const customProviderMatch = customProvidersResult?.find(
+                p => p.digest === customModel.val.provider
+              );
+              return (
+                `${customProviderMatch?.val.name}/${customModel.val.name}` ===
+                baseModelId
+              );
+            }
+          );
+          if (customModelMatch) {
+            maxTokens = customModelMatch.val.max_tokens;
+          }
+        }
+        // Fallback max tokens determination
+        if (maxTokens === undefined) {
+          maxTokens = findMaxTokensByModelName(baseModelId);
+        }
+
+        const savedModelLabel = `${savedModelName}:v${savedModelObj.version_index}`;
+        return {
+          label: savedModelLabel,
+          value: savedModelLabel,
+          subLabel: baseModelId,
+          baseModelId: baseModelId as LLMMaxTokensKey,
+          max_tokens: maxTokens,
+          defaultParams: convertDefaultParamsToOptionalPlaygroundModelParams(
+            savedModelVal.default_params ?? {messages_template: []}
+          ),
+          objectId: savedModelName,
+          versionIndex: savedModelObj.version_index ?? null,
+          isLatest: !!savedModelObj.is_latest,
+        };
+      }),
+    [savedModelsResult, customProviderModelsResult, customProvidersResult]
+  );
+
+  if (!savedModelsLoading && savedModels.length > 0) {
+    savedModelsOptions.push({
+      label: 'Saved Models',
+      value: SAVED_MODEL_OPTION_VALUE,
+      llms: savedModels,
+    });
+  }
+
+  // Combine options
   // Add a divider option before the add provider option
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const allOptions = [
     ...options,
-    ...disabledOptions,
+    ...savedModelsOptions,
     dividerOption,
-    addProviderOption,
+    addProviderOption(disabledOptions),
   ];
 
   return allOptions;
+};
+
+export const LLMOptionToSavedPlaygroundModelState = (
+  llmOption: LLMOption
+): SavedPlaygroundModelState => {
+  return {
+    llmModelId: llmOption.baseModelId ?? null,
+    objectId: llmOption.objectId ?? null,
+    savedModelParams: llmOption.defaultParams ?? null,
+    isLatest: llmOption.isLatest ?? false,
+    versionIndex: llmOption.versionIndex ?? null,
+  };
 };

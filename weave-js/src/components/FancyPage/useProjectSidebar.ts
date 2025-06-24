@@ -170,7 +170,15 @@ export const useProjectSidebar = (
             name: 'Playground',
             slug: 'weave/playground',
             isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.RobotServiceMember,
+            iconName: IconNames.VideoPlay,
+          },
+          {
+            type: 'button' as const,
+            name: 'Monitors',
+            slug: 'weave/monitors',
+            // feature-gating for admins
+            isShown: (showWeaveSidebarItems || isShowAll) && isWandbAdmin,
+            iconName: IconNames.JobAutomation,
           },
           {
             type: 'button' as const,

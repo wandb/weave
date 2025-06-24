@@ -1,4 +1,2 @@
-import {Op} from './opType';
-import {WeaveClient} from './weaveClient';
-
-export {Op, WeaveClient};
+export {Op, OpDecorator} from './opType';
+export {WeaveClient} from './weaveClient';

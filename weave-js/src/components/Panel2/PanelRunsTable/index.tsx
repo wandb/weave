@@ -75,7 +75,7 @@ export const Spec: Panel2.PanelSpec = {
     },
   }),
 
-  equivalentTransform: async (inputNode, config, refineType) => {
+  equivalentTransform: async (inputNode, config, refineType, client, stack) => {
     const expectedReturnType = list(list(typedDict({})));
     const defaultNode = constNodeUnsafe(expectedReturnType, []);
     const runSummaryNode = opRunSummary({run: inputNode as any});
@@ -95,7 +95,7 @@ export const Spec: Panel2.PanelSpec = {
       const normalizedNode = opDropNa({
         arr: refinedNode,
       });
-      const arrNode = normalizeTableLike(normalizedNode);
+      const arrNode = normalizeTableLike(normalizedNode, stack);
 
       const refinedNormalizedNode = await refineType(arrNode);
       // In cases where the resolved type is not assignable to our expected return

@@ -78,7 +78,7 @@ def require_current_call() -> Call:
 
     It is also possible to access a Call after the Op has returned.
 
-    If you have the Call's id, perhaps from the UI, you can use the `call` method on the
+    If you have the Call's id, perhaps from the UI, you can use the `get_call` method on the
     `WeaveClient` returned from `weave.init` to retrieve the Call object.
 
     ```python
@@ -90,11 +90,11 @@ def require_current_call() -> Call:
 
     ```python
     @weave.op
-    def hello(name: str) -> None:
-        print(f"Hello {name}!")
+    def add(a: int, b: int) -> int:
+        return a + b
 
-    mycall = hello.call("world")
-    print(mycall.id)
+    result, call = add.call(1, 2)
+    print(call.id)
     ```
 
     Returns:
@@ -118,6 +118,13 @@ def get_current_call() -> Call | None:
         The Call object for the currently executing Op, or
         None if tracking has not been initialized or this method is
         invoked outside an Op.
+
+    Note:
+        The returned Call's ``attributes`` dictionary becomes immutable
+        once the call starts. Use :func:`weave.attributes` to set
+        call metadata before invoking an Op. The ``summary`` field may
+        be updated while the Op executes and will be merged with
+        computed summary information when the call finishes.
     """
     return _call_stack.get()[-1] if _call_stack.get() else None
 

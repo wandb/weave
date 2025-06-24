@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import traceback
 from datetime import datetime
@@ -6,7 +7,6 @@ from itertools import chain, repeat
 from typing import Any, Callable, Literal, Optional, Union
 
 from pydantic import PrivateAttr
-from rich import print
 from rich.console import Console
 from typing_extensions import Self
 
@@ -195,7 +195,7 @@ class Evaluation(Object):
     async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
-        eval_rows = []
+        eval_rows: list[tuple[int, dict]] = []
 
         async def eval_example(example: dict) -> dict:
             try:
@@ -203,7 +203,7 @@ class Evaluation(Object):
             except OpCallError as e:
                 raise e
             except Exception:
-                print("Predict and score failed")
+                logger.info("Predict and score failed")
                 traceback.print_exc()
                 return {self._output_key: None, "scores": {}}
             return eval_row
@@ -214,11 +214,11 @@ class Evaluation(Object):
         num_rows = len(_rows) * self.trials
 
         trial_rows = chain.from_iterable(repeat(_rows, self.trials))
-        async for example, eval_row in util.async_foreach(
+        async for index, _example, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            print(f"Evaluated {n_complete} of {num_rows} examples")
+            logger.info(f"Evaluated {n_complete} of {num_rows} examples")
             if eval_row is None:
                 eval_row = {self._output_key: None, "scores": {}}
             else:
@@ -229,17 +229,33 @@ class Evaluation(Object):
                     scorer_name = scorer_attributes.scorer_name
                     if scorer_name not in eval_row["scores"]:
                         eval_row["scores"][scorer_name] = {}
-            eval_rows.append(eval_row)
-        return EvaluationResults(rows=weave.Table(eval_rows))
+            eval_rows.append((index, eval_row))
+        eval_rows.sort(key=lambda x: x[0])
+        table_rows = [eval_row for _, eval_row in eval_rows]
+        return EvaluationResults(rows=weave.Table(table_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
     async def evaluate(self, model: Union[Op, Model]) -> dict:
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 
-        print("Evaluation summary", summary)
+        summary_str = _safe_summarize_to_str(summary)
+        if summary_str:
+            logger.info(f"Evaluation summary {summary_str}")
 
         return summary
+
+
+def _safe_summarize_to_str(summary: dict) -> str:
+    summary_str = ""
+    try:
+        summary_str = json.dumps(summary, indent=2)
+    except Exception:
+        try:
+            summary_str = str(summary)
+        except Exception:
+            pass
+    return summary_str
 
 
 def evaluate(

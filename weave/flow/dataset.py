@@ -1,4 +1,5 @@
 from collections.abc import Iterable, Iterator
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union
 
 from pydantic import field_validator
@@ -70,7 +71,7 @@ class Dataset(Object):
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         return pd.DataFrame(self.rows)
 
@@ -151,3 +152,32 @@ class Dataset(Object):
         if key < 0:
             raise IndexError("Negative indexing is not supported")
         return self.rows[key]
+
+    def __str__(self) -> str:
+        return f"Dataset({{\n    features: {list(self.columns_names)},\n    num_rows: {self.num_rows}\n}})"
+
+    @cached_property
+    def columns_names(self) -> list[str]:
+        return list(self.rows[0].keys())
+
+    @cached_property
+    def num_rows(self) -> int:
+        return len(self.rows)
+
+    def select(self, indices: Iterable[int]) -> Self:
+        """
+        Select rows from the dataset based on the provided indices.
+
+        Args:
+            indices: An iterable of integer indices specifying which rows to select.
+
+        Returns:
+            A new Dataset object containing only the selected rows.
+        """
+        # Ensure indices is not empty before proceeding
+        indices_list = list(indices)
+        if not indices_list:
+            raise ValueError("Cannot select rows with an empty set of indices.")
+
+        selected_rows = [self[i] for i in indices_list]
+        return self.__class__(rows=selected_rows)

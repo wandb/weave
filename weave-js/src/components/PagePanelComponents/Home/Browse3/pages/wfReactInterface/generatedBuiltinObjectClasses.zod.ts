@@ -6,6 +6,9 @@ export type ActionType = z.infer<typeof ActionTypeSchema>;
 export const ModelSchema = z.enum(['gpt-4o', 'gpt-4o-mini']);
 export type Model = z.infer<typeof ModelSchema>;
 
+export const ResponseFormatSchema = z.enum(['json_object', 'text']);
+export type ResponseFormat = z.infer<typeof ResponseFormatSchema>;
+
 export const ProviderReturnTypeSchema = z.enum(['openai']);
 export type ProviderReturnType = z.infer<typeof ProviderReturnTypeSchema>;
 
@@ -37,6 +40,26 @@ export const LeaderboardColumnSchema = z.object({
   summary_metric_path: z.string(),
 });
 export type LeaderboardColumn = z.infer<typeof LeaderboardColumnSchema>;
+
+export const MessageSchema = z.object({
+  content: z
+    .union([z.array(z.record(z.string(), z.any())), z.null(), z.string()])
+    .optional(),
+  function_call: z.union([z.record(z.string(), z.any()), z.null()]).optional(),
+  name: z.union([z.null(), z.string()]).optional(),
+  role: z.string(),
+  tool_call_id: z.union([z.null(), z.string()]).optional(),
+});
+export type Message = z.infer<typeof MessageSchema>;
+
+export const ObjectRefSchema = z.object({
+  _digest: z.string(),
+  _extra: z.array(z.string()).optional(),
+  entity: z.string(),
+  name: z.string(),
+  project: z.string(),
+});
+export type ObjectRef = z.infer<typeof ObjectRefSchema>;
 
 export const ProviderSchema = z.object({
   api_key_name: z.string(),
@@ -104,6 +127,17 @@ export type TestOnlyNestedBaseModel = z.infer<
   typeof TestOnlyNestedBaseModelSchema
 >;
 
+export const TestOnlyInheritedBaseObjectSchema = z.object({
+  additional_field: z.string().optional(),
+  b: z.number(),
+  c: z.number(),
+  description: z.union([z.null(), z.string()]).optional(),
+  name: z.union([z.null(), z.string()]).optional(),
+});
+export type TestOnlyInheritedBaseObject = z.infer<
+  typeof TestOnlyInheritedBaseObjectSchema
+>;
+
 export const TestOnlyNestedBaseObjectSchema = z.object({
   b: z.number(),
   description: z.union([z.null(), z.string()]).optional(),
@@ -127,6 +161,24 @@ export const LeaderboardSchema = z.object({
 });
 export type Leaderboard = z.infer<typeof LeaderboardSchema>;
 
+export const LlmStructuredCompletionModelDefaultParamsSchema = z.object({
+  frequency_penalty: z.union([z.number(), z.null()]).optional(),
+  functions: z
+    .union([z.array(z.record(z.string(), z.any())), z.null()])
+    .optional(),
+  max_tokens: z.union([z.number(), z.null()]).optional(),
+  messages_template: z.union([z.array(MessageSchema), z.null()]).optional(),
+  n_times: z.union([z.number(), z.null()]).optional(),
+  presence_penalty: z.union([z.number(), z.null()]).optional(),
+  response_format: z.union([ResponseFormatSchema, z.null()]).optional(),
+  stop: z.union([z.array(z.string()), z.null()]).optional(),
+  temperature: z.union([z.number(), z.null()]).optional(),
+  top_p: z.union([z.number(), z.null()]).optional(),
+});
+export type LlmStructuredCompletionModelDefaultParams = z.infer<
+  typeof LlmStructuredCompletionModelDefaultParamsSchema
+>;
+
 export const ExprSchema = z.object({
   $and: z.array(z.any()).optional(),
   $or: z.array(z.any()).optional(),
@@ -147,6 +199,17 @@ export const TestOnlyExampleSchema = z.object({
   primitive: z.number(),
 });
 export type TestOnlyExample = z.infer<typeof TestOnlyExampleSchema>;
+
+export const LlmStructuredCompletionModelSchema = z.object({
+  default_params: LlmStructuredCompletionModelDefaultParamsSchema.optional(),
+  description: z.union([z.null(), z.string()]).optional(),
+  llm_model_id: z.string(),
+  name: z.union([z.null(), z.string()]).optional(),
+  ref: z.union([ObjectRefSchema, z.null()]).optional(),
+});
+export type LlmStructuredCompletionModel = z.infer<
+  typeof LlmStructuredCompletionModelSchema
+>;
 
 export const QuerySchema = z.object({
   $expr: ExprSchema,
@@ -177,10 +240,12 @@ export const builtinObjectClassRegistry = {
   ActionSpec: ActionSpecSchema,
   AnnotationSpec: AnnotationSpecSchema,
   Leaderboard: LeaderboardSchema,
+  LLMStructuredCompletionModel: LlmStructuredCompletionModelSchema,
   Provider: ProviderSchema,
   ProviderModel: ProviderModelSchema,
   SavedView: SavedViewSchema,
   TestOnlyExample: TestOnlyExampleSchema,
+  TestOnlyInheritedBaseObject: TestOnlyInheritedBaseObjectSchema,
   TestOnlyNestedBaseObject: TestOnlyNestedBaseObjectSchema,
 };
 

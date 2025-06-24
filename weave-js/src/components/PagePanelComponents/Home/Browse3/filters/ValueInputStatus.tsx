@@ -45,7 +45,9 @@ export const ValueInputStatus = ({
           variant="ghost"
           active={enabledValues.includes(status)}
           onClick={() => onClick(status)}>
-          <StatusChip value={FILTER_TO_STATUS[status]} iconOnly />
+          <div className="night-aware">
+            <StatusChip value={FILTER_TO_STATUS[status]} iconOnly />
+          </div>
         </Button>
       ))}
     </div>

@@ -386,8 +386,8 @@ def test_query_light_column_with_costs() -> None:
                     JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
                 FROM all_calls),
             -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-            ranked_prices AS (
-                SELECT
+            ranked_prices AS
+                (SELECT
                     *,
                     llm_token_prices.id,
                     llm_token_prices.pricing_level,
@@ -419,15 +419,14 @@ def test_query_light_column_with_costs() -> None:
                             llm_token_prices.effective_date DESC
                     ) AS rank
                 FROM llm_usage
-                LEFT JOIN llm_token_prices ON (llm_usage.llm_id = llm_token_prices.llm_id)
-                WHERE ((llm_token_prices.pricing_level_id = {pb_2:String})
+                LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id) AND ((llm_token_prices.pricing_level_id = {pb_2:String})
                     OR (llm_token_prices.pricing_level_id = {pb_3:String})
-                    OR (llm_token_prices.pricing_level_id = {pb_4:String})))
+                    OR (llm_token_prices.pricing_level_id = {pb_4:String}))) )
             -- Final Select, which just selects the correct fields, and adds a costs object
             SELECT
                 id,
                 started_at,
-                if( any(llm_id) = 'weave_dummy_llm_id',
+                if( any(llm_id) = 'weave_dummy_llm_id' or any(llm_token_prices.id) == '',
                 any(summary_dump),
                 concat(
                     left(any(summary_dump), length(any(summary_dump)) - 1),
@@ -490,7 +489,8 @@ def test_query_with_simple_feedback_sort() -> None:
         FROM
             calls_merged
         LEFT JOIN feedback ON
-            (feedback.weave_ref = concat('weave-trace-internal:///',
+            (feedback.project_id = {pb_4:String} AND
+            feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_4:String},
             '/call/',
             calls_merged.id))
@@ -562,7 +562,8 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
         FROM
             calls_merged
         LEFT JOIN feedback ON
-            (feedback.weave_ref = concat('weave-trace-internal:///',
+            (feedback.project_id = {pb_1:String} AND
+            feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_1:String},
             '/call/',
             calls_merged.id))
@@ -624,7 +625,8 @@ def test_query_with_simple_feedback_filter() -> None:
         FROM
             calls_merged
         LEFT JOIN feedback ON
-            (feedback.weave_ref = concat('weave-trace-internal:///',
+            (feedback.project_id = {pb_3:String} AND
+            feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_3:String},
             '/call/',
             calls_merged.id))
@@ -675,7 +677,8 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
         FROM
             calls_merged
         LEFT JOIN feedback ON
-            (feedback.weave_ref = concat('weave-trace-internal:///',
+            (feedback.project_id = {pb_6:String} AND
+            feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_6:String},
             '/call/',
             calls_merged.id))
@@ -835,7 +838,7 @@ def test_query_with_summary_weave_status_sort() -> None:
             any(calls_merged.exception) AS exception,
             any(calls_merged.ended_at) AS ended_at
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_3:String}
+        WHERE calls_merged.project_id = {pb_5:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((
@@ -849,12 +852,25 @@ def test_query_with_summary_weave_status_sort() -> None:
             ))
         )
         ORDER BY CASE
-            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_0:String}
-            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_1:String}
-            ELSE {pb_2:String}
-        END ASC
+            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
+            WHEN IFNULL(
+                toInt64OrNull(
+                    JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String})
+                ),
+                0
+            ) > 0 THEN {pb_4:String}
+            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
+            ELSE {pb_3:String}
+            END ASC
         """,
-        {"pb_0": "error", "pb_1": "running", "pb_2": "success", "pb_3": "project"},
+        {
+            "pb_0": '$."status_counts"."error"',
+            "pb_1": "error",
+            "pb_2": "running",
+            "pb_3": "success",
+            "pb_4": "descendant_error",
+            "pb_5": "project",
+        },
     )
 
 
@@ -884,26 +900,30 @@ def test_query_with_summary_weave_status_sort_and_filter() -> None:
             any(calls_merged.exception) AS exception,
             any(calls_merged.ended_at) AS ended_at
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_3:String}
+        WHERE calls_merged.project_id = {pb_5:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((CASE
-                WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_0:String}
-                WHEN any(calls_merged.ended_at) IS NULL THEN {pb_1:String}
-                ELSE {pb_2:String}
-            END = {pb_2:String}))
+                WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
+                WHEN IFNULL(toInt64OrNull(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String})), 0) > 0 THEN {pb_4:String}
+                WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
+                ELSE {pb_3:String}
+            END = {pb_3:String}))
         AND ((any(calls_merged.deleted_at) IS NULL))
         AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         ORDER BY CASE
-            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_0:String}
-            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_1:String}
-            ELSE {pb_2:String}
+            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
+            WHEN IFNULL(toInt64OrNull(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String})), 0) > 0 THEN {pb_4:String}
+            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
+            ELSE {pb_3:String}
         END DESC
         """,
         {
-            "pb_0": "error",
-            "pb_1": "running",
-            "pb_2": "success",
-            "pb_3": "project",
+            "pb_0": '$."status_counts"."error"',
+            "pb_1": "error",
+            "pb_2": "running",
+            "pb_3": "success",
+            "pb_4": "descendant_error",
+            "pb_5": "project",
         },
     )
 
@@ -1952,7 +1972,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
                     AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
         SELECT calls_merged.id AS id
         FROM calls_merged
-        LEFT JOIN feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_2:String}, '/call/', calls_merged.id))
+        LEFT JOIN feedback ON (feedback.project_id = {pb_2:String} AND feedback.weave_ref = concat('weave-trace-internal:///', {pb_2:String}, '/call/', calls_merged.id))
         WHERE calls_merged.project_id = {pb_2:String}
             AND (calls_merged.id IN filtered_calls)
             AND ((calls_merged.inputs_dump LIKE {pb_8:String}
@@ -2062,6 +2082,34 @@ def test_trace_roots_only_filter_with_condition():
     )
 
 
+def test_parent_id_filter():
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"parent_ids": ["111111111111", "222222222222"]}
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.parent_id IN {pb_1:Array(String)}
+                OR calls_merged.parent_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (any(calls_merged.parent_id) IN {pb_0:Array(String)}))
+        """,
+        {
+            "pb_0": ["111111111111", "222222222222"],
+            "pb_1": ["111111111111", "222222222222"],
+            "pb_2": "project",
+        },
+    )
+
+
 def test_input_output_refs_filter():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -2094,6 +2142,62 @@ def test_input_output_refs_filter():
             "pb_1": ["weave-trace-internal:///111111111111%"],
             "pb_2": ["weave-trace-internal:///222222222222%"],
             "pb_3": ["weave-trace-internal:///111111111111%"],
+        },
+    )
+
+
+def test_all_optimization_filters():
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={
+            "input_refs": ["weave-trace-internal:///222222222222%"],
+            "output_refs": ["weave-trace-internal:///111111111111%"],
+            "trace_ids": ["111111111111", "222222222222"],
+            "op_names": [
+                "weave-trace-internal:///222222222222",
+                "weave-trace-internal:///111111111111",
+            ],
+            "parent_ids": ["111111111111", "222222222222"],
+        }
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_8:String}
+            AND (calls_merged.parent_id IN {pb_7:Array(String)}
+                OR calls_merged.parent_id IS NULL)
+            AND ((calls_merged.op_name IN {pb_3:Array(String)})
+                OR (calls_merged.op_name IS NULL))
+            AND (calls_merged.trace_id IN {pb_4:Array(String)}
+                OR calls_merged.trace_id IS NULL)
+            AND (((hasAny(calls_merged.input_refs, {pb_5:Array(String)})
+                OR length(calls_merged.input_refs) = 0)
+                AND (hasAny(calls_merged.output_refs, {pb_6:Array(String)})
+                    OR length(calls_merged.output_refs) = 0)))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)}))
+                AND (hasAny(array_concat_agg(calls_merged.output_refs), {pb_1:Array(String)}))
+            AND (any(calls_merged.parent_id) IN {pb_2:Array(String)}))))
+        """,
+        {
+            "pb_0": ["weave-trace-internal:///222222222222%"],
+            "pb_1": ["weave-trace-internal:///111111111111%"],
+            "pb_2": ["111111111111", "222222222222"],
+            "pb_3": [
+                "weave-trace-internal:///222222222222",
+                "weave-trace-internal:///111111111111",
+            ],
+            "pb_4": ["111111111111", "222222222222"],
+            "pb_5": ["weave-trace-internal:///222222222222%"],
+            "pb_6": ["weave-trace-internal:///111111111111%"],
+            "pb_7": ["111111111111", "222222222222"],
+            "pb_8": "project",
         },
     )
 

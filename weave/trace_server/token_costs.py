@@ -228,9 +228,9 @@ def get_ranked_prices(
             END,
             CASE
                 -- Order by pricing level then by effective_date
-                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['ORG']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['PROJECT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['DEFAULT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
+                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["ORG"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["PROJECT"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["DEFAULT"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
                 ELSE 4
             END,
             {LLM_TOKEN_PRICES_TABLE_NAME}.effective_date DESC
@@ -240,48 +240,48 @@ def get_ranked_prices(
     select_query = (
         llm_usage_table.select()
         .fields(["*", *ltp_fields, row_number_clause])
-        .where(
-            tsi.Query(
-                **{
-                    "$expr": {
-                        "$or": [
-                            {
-                                "$eq": [
-                                    {
-                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                    },
-                                    {"$literal": project_id},
-                                ]
-                            },
-                            {
-                                "$eq": [
-                                    {
-                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                    },
-                                    {"$literal": DEFAULT_PRICING_LEVEL_ID},
-                                ]
-                            },
-                            {
-                                "$eq": [
-                                    {
-                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                    },
-                                    {"$literal": ""},
-                                ]
-                            },
-                        ]
-                    }
-                }
-            )
-        )
         .join(
             LLM_TOKEN_PRICES_TABLE,
             tsi.Query(
                 **{
                     "$expr": {
-                        "$eq": [
-                            {"$getField": f"{llm_usage_table_alias}.llm_id"},
-                            {"$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.llm_id"},
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {"$getField": f"{llm_usage_table_alias}.llm_id"},
+                                    {
+                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.llm_id"
+                                    },
+                                ]
+                            },
+                            {
+                                "$or": [
+                                    {
+                                        "$eq": [
+                                            {
+                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                            },
+                                            {"$literal": project_id},
+                                        ]
+                                    },
+                                    {
+                                        "$eq": [
+                                            {
+                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                            },
+                                            {"$literal": DEFAULT_PRICING_LEVEL_ID},
+                                        ]
+                                    },
+                                    {
+                                        "$eq": [
+                                            {
+                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                            },
+                                            {"$literal": ""},
+                                        ]
+                                    },
+                                ]
+                            },
                         ]
                     }
                 }
@@ -391,8 +391,9 @@ def final_call_select_with_cost(
         )
     """
 
+    # If no cost was found dont add a costs object
     summary_dump_snippet = f"""
-    if( any(llm_id) = '{DUMMY_LLM_ID}',
+    if( any(llm_id) = '{DUMMY_LLM_ID}' or any(llm_token_prices.id) == '',
     any(summary_dump),
     concat(
         left(any(summary_dump), length(any(summary_dump)) - 1),
@@ -476,7 +477,7 @@ def cost_query(
         ranked_prices AS ({get_ranked_prices(pb, "llm_usage", project_id).sql})
 
         -- Final Select, which just selects the correct fields, and adds a costs object
-        {final_call_select_with_cost(pb, 'ranked_prices', select_fields, order_fields).sql}
+        {final_call_select_with_cost(pb, "ranked_prices", select_fields, order_fields).sql}
     """
     return raw_sql
 
@@ -500,7 +501,7 @@ def is_project_id_sql_injection_safe(project_id: str) -> None:
 
         raise ValueError("Invalid project_id", project_id)
     except Exception:
-        raise ValueError("Invalid project_id", project_id)
+        raise ValueError("Invalid project_id", project_id) from None
 
 
 MESSAGE_INVALID_COST_PURGE = "Can only purge costs by specifying one or more cost ids"

@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import datetime
 import io
+import logging
 import re
-import sys
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Optional
 
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -76,7 +77,7 @@ class DummyTestException(Exception):
 
 
 def get_info_loglines(
-    caplog, match_string: Optional[str] = None, getattrs: list[str] = ["msg"]
+    caplog, match_string: str | None = None, getattrs: list[str] | None = None
 ):
     """
     Get all log lines from caplog that match the given string.
@@ -91,6 +92,9 @@ def get_info_loglines(
     >>> get_info_loglines(caplog, "my query", ["msg", "query"])
     >>> [{"msg": "my query", "query": "SELECT * FROM my_table"}]
     """
+    if getattrs is None:
+        getattrs = ["msg"]
+
     lines = []
     for record in caplog.records:
         if match_string and record.msg != match_string:
@@ -104,18 +108,27 @@ def get_info_loglines(
 
 @contextmanager
 def capture_output(callbacks: list[Callable[[], None]]):
-    captured_stdout = io.StringIO()
-    old_stdout = sys.stdout
-    sys.stdout = captured_stdout
+    captured_logs = io.StringIO()
+
+    # Store original stdout and logging handlers
+    old_handlers = logging.getLogger().handlers[:]
+
+    # Create a new handler for capturing logs
+    log_handler = logging.StreamHandler(captured_logs)
+    log_handler.setFormatter(logging.Formatter("%(message)s"))
+
+    # Replace stdout and logging handlers
+    root_logger = logging.getLogger()
+    root_logger.handlers = [log_handler]
 
     try:
-        yield captured_stdout
+        yield captured_logs
     except DummyTestException:
         pass
     finally:
         for callback in callbacks:
             callback()
-        sys.stdout = old_stdout
+        root_logger.handlers = old_handlers
 
 
 def flushing_callback(client):

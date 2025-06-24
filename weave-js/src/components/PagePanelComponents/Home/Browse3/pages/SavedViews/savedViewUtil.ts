@@ -228,6 +228,7 @@ const filterToClause = (item: Filter): Record<string, any> => {
       $contains: {
         input: {$getField: item.field},
         substr: {$literal: item.value},
+        case_insensitive: false,
       },
     };
   } else if (item.operator === '(string): notContains') {
@@ -237,6 +238,7 @@ const filterToClause = (item: Filter): Record<string, any> => {
           $contains: {
             input: {$getField: item.field},
             substr: {$literal: item.value},
+            case_insensitive: false,
           },
         },
       ],
@@ -249,7 +251,10 @@ const filterToClause = (item: Filter): Record<string, any> => {
     return {
       $not: [{$eq: [{$getField: item.field}, {$literal: item.value}]}],
     };
-  } else if (item.operator === '(string): in') {
+  } else if (
+    item.operator === '(string): in' ||
+    item.operator === '(monitored): by'
+  ) {
     const values =
       typeof item.value === 'string'
         ? item.value.split(',').map((v: string) => v.trim())

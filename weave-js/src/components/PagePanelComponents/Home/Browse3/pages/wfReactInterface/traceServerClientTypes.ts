@@ -3,9 +3,18 @@ type ExtraKeysAllowed = {
   [key: string]: any;
 };
 
+export const ComputedCallStatuses = {
+  success: 'success' as const,
+  error: 'error' as const,
+  running: 'running' as const,
+  descendant_error: 'descendant_error' as const,
+} as const;
+export type ComputedCallStatusType = keyof typeof ComputedCallStatuses;
+
 type WeaveSummarySchema = {
   costs?: {[key: string]: LLMCostSchema};
   latency_ms?: number; // latency in milliseconds
+  status?: ComputedCallStatusType;
 } & ExtraKeysAllowed;
 
 export type LLMUsageSchema = {
@@ -114,6 +123,7 @@ export type TraceCallsQueryReq = {
   expand_columns?: string[];
   include_costs?: boolean;
   include_feedback?: boolean;
+  include_storage_size?: boolean;
   include_total_storage_size?: boolean;
 };
 
@@ -130,6 +140,7 @@ export type TraceCallsQueryStatsReq = {
 
 export type TraceCallsQueryStatsRes = {
   count: number;
+  total_storage_size_bytes?: number;
 };
 
 export type TraceCallsDeleteReq = {
@@ -201,6 +212,7 @@ export type FeedbackPurgeError = {
 export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
 interface TraceObjectsFilter {
   base_object_classes?: string[];
+  leaf_object_classes?: string[];
   object_ids?: string[];
   is_op?: boolean;
   latest_only?: boolean;
@@ -228,6 +240,7 @@ export interface TraceObjSchema<
   is_latest: number;
   kind: 'op' | 'object';
   base_object_class?: OBC;
+  leaf_object_class?: OBC;
   val: T;
   wb_user_id?: string;
   size_bytes?: number;
@@ -321,6 +334,14 @@ export type TraceFileContentReadRes = {
   content: ArrayBuffer;
 };
 
+export type FilesStatsReq = {
+  project_id: string;
+};
+
+export type FilesStatsRes = {
+  total_size_bytes: number;
+};
+
 export type CompletionsCreateInputs = {
   model: string;
   messages: any[];
@@ -350,6 +371,98 @@ export type CompletionsCreateReq = {
 export type CompletionsCreateRes = {
   response: any;
   weave_call_id?: string;
+};
+
+// Streaming completions returns NDJSON chunks. Consumers can turn chunks into
+// the final response they need. We expose the raw chunk list for maximum
+// flexibility.
+export type CompletionsCreateStreamReq = CompletionsCreateReq;
+
+export type CompletionChunk = MetaChunk | ContentChunk;
+
+type MetaChunk = {
+  _meta: {
+    weave_call_id: string;
+  };
+};
+
+export type ContentChunk = {
+  id: string;
+  created: number;
+  model: string;
+  object: 'chat.completion.chunk';
+  system_fingerprint: string;
+  choices: Array<{
+    finish_reason: 'stop' | 'tool_calls' | null;
+    index: number;
+    delta: {
+      refusal: null;
+      content: string | null;
+      role: string | null;
+      function_call: null;
+      tool_calls: Array<{
+        id: string | null;
+        function: {
+          arguments: string;
+          name: string | null;
+        };
+        type: 'function';
+      }> | null;
+      audio: null;
+    };
+    logprobs: null;
+  }>;
+  citations: null;
+  usage?: {
+    completion_tokens: number;
+    prompt_tokens: number;
+    total_tokens: number;
+    completion_tokens_details: {
+      accepted_prediction_tokens: number;
+      audio_tokens: number;
+      reasoning_tokens: number;
+      rejected_prediction_tokens: number;
+    };
+    prompt_tokens_details: {
+      audio_tokens: number;
+      cached_tokens: number;
+    };
+  };
+};
+
+// Add a type for the accumulated message structure
+export type AccumulatedMessage = {
+  role: string;
+  content: string | null;
+  tool_calls?: Array<{
+    id: string;
+    function: {
+      name: string;
+      arguments: string;
+    };
+    type: 'function';
+    index: number;
+  }>;
+};
+
+// Callback invoked whenever a new chunk is parsed during streaming.
+export type OnCompletionChunk = (chunk: CompletionChunk) => void;
+
+// Add a type for the streaming response
+export type CompletionsCreateStreamRes = {
+  chunks: CompletionChunk[];
+  weave_call_id?: string;
+};
+
+export type ProjectStatsReq = {
+  project_id: string;
+};
+
+export type ProjectStatsRes = {
+  trace_storage_size_bytes: number;
+  objects_storage_size_bytes: number;
+  tables_storage_size_bytes: number;
+  files_storage_size_bytes: number;
 };
 
 export enum ContentType {
