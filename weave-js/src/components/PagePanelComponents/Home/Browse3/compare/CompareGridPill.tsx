@@ -54,19 +54,13 @@ export const CompareGridPill = (props: CompareGridPillProps) => {
   if (value === compareValue) {
     return null;
   }
-  if (
-    isProbablyTimestampMs(value, 'timestamp') &&
-    isProbablyTimestampMs(compareValue, 'timestamp')
-  ) {
+  if (isProbablyTimestampMs(value) && isProbablyTimestampMs(compareValue)) {
     const difference = value - compareValue;
     const formatted = monthRoundedTime(Math.abs(difference / 1000));
     const color = difference > 0 ? 'green' : 'red';
     return <Pill color={color} label={formatted} />;
   }
-  if (
-    isProbablyTimestampSec(value, 'timestamp') &&
-    isProbablyTimestampSec(compareValue, 'timestamp')
-  ) {
+  if (isProbablyTimestampSec(value) && isProbablyTimestampSec(compareValue)) {
     const difference = value - compareValue;
     const formatted = monthRoundedTime(Math.abs(difference));
     const color = difference > 0 ? 'green' : 'red';

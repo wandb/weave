@@ -17,23 +17,22 @@ export const likelyTimestampName = (field: string) => {
   return TIMESTAMP_PATTERN.test(field);
 };
 
-export const isProbablyTimestampMs = (value: number, field: string) => {
-  return (
-    likelyTimestampName(field) &&
-    JAN_1_2000_MS <= value &&
-    value <= JAN_1_2100_MS
-  );
+export const isProbablyTimestampMs = (value: number, field?: string) => {
+  const fieldIsLikely = !field || likelyTimestampName(field);
+  return fieldIsLikely && JAN_1_2000_MS <= value && value <= JAN_1_2100_MS;
 };
 
-export const isProbablyTimestampSec = (value: number, field: string) => {
-  return (
-    likelyTimestampName(field) && JAN_1_2000_S <= value && value <= JAN_1_2100_S
-  );
+export const isProbablyTimestampSec = (value: number, field?: string) => {
+  const fieldIsLikely = !field || likelyTimestampName(field);
+  return fieldIsLikely && JAN_1_2000_S <= value && value <= JAN_1_2100_S;
 };
 
-export const isProbablyTimestamp = (value: number, field: string) => {
+export const isProbablyTimestamp = (value: number, field?: string) => {
+  const fieldIsLikely = !field || likelyTimestampName(field);
   return (
-    isProbablyTimestampMs(value, field) || isProbablyTimestampSec(value, field)
+    fieldIsLikely &&
+    (isProbablyTimestampMs(value, field) ||
+      isProbablyTimestampSec(value, field))
   );
 };
 
