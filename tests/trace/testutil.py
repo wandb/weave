@@ -24,12 +24,10 @@ class ObjectRefStrMatcher:
         other_ref = parse_uri(other)
         if not isinstance(other_ref, ObjectRef):
             return False
-        if self.entity is not None:
-            if self.entity != other_ref.entity:
-                return False
-        if self.project is not None:
-            if self.project != other_ref.project:
-                return False
+        if self.entity is not None and self.entity != other_ref.entity:
+            return False
+        if self.project is not None and self.project != other_ref.project:
+            return False
         if self.kind is not None:
             if isinstance(other_ref, ObjectRef):
                 other_kind = "object"
@@ -39,13 +37,10 @@ class ObjectRefStrMatcher:
                 raise ValueError(f"Unknown kind: {other_ref}")
             if self.kind != other_kind:
                 return False
-        if self.name is not None:
-            if self.name != other_ref.name:
-                return False
-        if self.digest is not None:
-            if self.digest != other_ref.digest:
-                return False
-        if self.extra is not None:
-            if self.extra != other_ref.extra:
-                return False
+        if self.name is not None and self.name != other_ref.name:
+            return False
+        if self.digest is not None and self.digest != other_ref.digest:
+            return False
+        if self.extra is not None and self.extra != other_ref.extra:
+            return False
         return True

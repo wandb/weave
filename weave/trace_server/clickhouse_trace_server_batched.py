@@ -1004,11 +1004,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> Iterator[tsi.TableRowSchema]:
         conds = []
         pb = ParamBuilder()
-        if req.filter:
-            if req.filter.row_digests:
-                conds.append(
-                    f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
-                )
+        if req.filter and req.filter.row_digests:
+            conds.append(
+                f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
+            )
 
         sort_fields = []
         if req.sort_by:
@@ -2251,9 +2250,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "table": table,
                     "data_len": len(data),
                     "data_bytes": data_bytes,
-                    "example_data": None if len(data) == 0 else data[0],
-                    "column_names": column_names,
-                    "settings": settings,
                 },
             )
             raise
