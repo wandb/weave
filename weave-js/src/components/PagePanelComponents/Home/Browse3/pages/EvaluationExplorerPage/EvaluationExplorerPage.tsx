@@ -5,9 +5,12 @@ import {Select} from '@wandb/weave/components/Form/Select';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useMemo, useState} from 'react';
 
+import {ReusableDrawer} from '../../ReusableDrawer';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {LLMAsAJudgeScorerForm} from '../MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
 import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
@@ -480,8 +483,39 @@ const ScorersConfigSection: React.FC<{entity: string; project: string}> = ({
             }}
           />
         </Row>
+        <ScorerDrawer entity={entity} project={project} />
       </Column>
     </ConfigSection>
+  );
+};
+
+const ScorerDrawer: React.FC<{
+  entity: string;
+  project: string;
+}> = ({entity, project}) => {
+  return (
+    <ReusableDrawer open onClose={() => {}} title="Scorer" onSave={() => {}}>
+      <Tailwind>
+        <LLMAsAJudgeScorerForm
+          scorer={{
+            scheme: 'weave',
+            weaveKind: 'object',
+            entity,
+            project,
+            objectId: '',
+            versionHash: '',
+            path: '',
+            versionIndex: 0,
+            baseObjectClass: 'LLMAsAJudgeScorer',
+            createdAtMs: Date.now(),
+            val: {_type: 'LLMAsAJudgeScorer'},
+          }}
+          onValidationChange={() => {
+            console.error('TODO: Implement me');
+          }}
+        />
+      </Tailwind>
+    </ReusableDrawer>
   );
 };
 
