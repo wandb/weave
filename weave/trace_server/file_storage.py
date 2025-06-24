@@ -93,8 +93,7 @@ RETRY_MAX_WAIT = 10  # seconds
 
 class FileStorageClient:
     """Abstract base class defining the interface for cloud storage operations.
-    Implementations are provided for AWS S3, Google Cloud Storage, and Azure Blob Storage.
-    """
+    Implementations are provided for AWS S3, Google Cloud Storage, and Azure Blob Storage."""
 
     base_uri: FileStorageURI
 
