@@ -10,12 +10,6 @@ export const initializeEmptyConfig = (): EvaluationExplorationConfig => {
         description: '',
         dataset: {
           originalSourceRef: null,
-          dirtied: false,
-          properties: {
-            name: '',
-            description: '',
-            rows: [],
-          },
         },
         scorers: [],
       },

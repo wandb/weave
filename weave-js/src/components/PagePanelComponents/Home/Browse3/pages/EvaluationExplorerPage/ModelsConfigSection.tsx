@@ -48,17 +48,6 @@ export const ModelsConfigSection: React.FC<{
     editConfig(draft => {
       draft.models.push({
         originalSourceRef: null,
-        dirtied: false,
-        properties: {
-          name: '',
-          description: '',
-          systemPromptTemplate: '',
-          modelPromptTemplate: '',
-          outputSchema: {
-            type: 'object',
-            properties: {},
-          },
-        },
       });
     });
   }, [editConfig]);
@@ -95,11 +84,9 @@ export const ModelsConfigSection: React.FC<{
         if (ref === 'new-model' || ref === null) {
           // Reset to empty model
           draft.models[modelNdx].originalSourceRef = null;
-          draft.models[modelNdx].dirtied = false;
         } else {
           // Set the selected model ref
           draft.models[modelNdx].originalSourceRef = ref;
-          draft.models[modelNdx].dirtied = false;
         }
       });
     },
@@ -202,15 +189,13 @@ export const ModelsConfigSection: React.FC<{
                 // Update the model with the new reference
                 draft.models[currentlyEditingModelNdx].originalSourceRef =
                   newModelRef;
-                // Mark as not dirtied since it's now saved
-                draft.models[currentlyEditingModelNdx].dirtied = false;
               });
             }
             setCurrentlyEditingModelNdx(null);
           }}
-          initialModel={
+          initialModelRef={
             currentlyEditingModelNdx !== null
-              ? models[currentlyEditingModelNdx]
+              ? models[currentlyEditingModelNdx].originalSourceRef ?? undefined
               : undefined
           }
         />
@@ -234,18 +219,8 @@ const ModelDrawer: React.FC<{
   project: string;
   open: boolean;
   onClose: (newModelRef?: string) => void;
-  initialModel?: {
-    originalSourceRef: string | null;
-    dirtied: boolean;
-    properties: {
-      name: string;
-      description: string;
-      systemPromptTemplate: string;
-      modelPromptTemplate: string;
-      outputSchema: any;
-    };
-  };
-}> = ({entity, project, open, onClose, initialModel}) => {
+  initialModelRef?: string;
+}> = ({entity, project, open, onClose, initialModelRef}) => {
   const modelFormRef = useRef<ModelConfigurationFormRef | null>(null);
 
   const onSave = useCallback(async () => {
@@ -261,9 +236,9 @@ const ModelDrawer: React.FC<{
       onSave={onSave}>
       <Tailwind>
         <ModelConfigurationForm
-          key={initialModel?.originalSourceRef ?? 'new-model'}
+          key={initialModelRef ?? 'new-model'}
           ref={modelFormRef}
-          initialModelRef={initialModel?.originalSourceRef ?? undefined}
+          initialModelRef={initialModelRef ?? undefined}
           onValidationChange={() => {
             // Pass - validation is handled internally by the form
           }}

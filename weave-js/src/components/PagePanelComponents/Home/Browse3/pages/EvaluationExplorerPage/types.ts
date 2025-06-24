@@ -14,23 +14,6 @@ export type EvaluationExplorationConfig = {
       dataset: {
         // The Weave Ref pointing to the dataset definition
         originalSourceRef: string | null;
-        // Whether the dataset definition is dirty
-        dirtied: boolean;
-        properties: {
-          // The name of the dataset
-          name: string;
-          // The description of the dataset
-          description: string;
-          // The rows of the dataset
-          rows: {
-            // The content digest hash for tracking changes
-            originalSourceDigest: string | null;
-            // Whether this row has been modified from its source
-            dirtied: boolean;
-            // The actual data for this row as key-value pairs
-            data: Record<string, any>;
-          }[];
-        };
       };
       // The array of scorer functions to evaluate model outputs
       scorers: Array<{
@@ -43,43 +26,5 @@ export type EvaluationExplorationConfig = {
   models: Array<{
     // The Weave Ref pointing to the model definition
     originalSourceRef: string | null;
-    // Whether the model definition is dirty
-    dirtied: boolean;
-    // The properties of the model
-    properties: {
-      // The name of the model
-      name: string;
-      // The description of the model
-      description: string;
-      // The system prompt template for the model
-      systemPromptTemplate: string;
-      // The prompt template for the model's main task
-      modelPromptTemplate: string;
-      // The expected output schema for the model
-      outputSchema: JSONSchema;
-    };
   }>;
-};
-
-// JSON Schema type for defining structured outputs
-// Used to validate and describe the expected format of model and scorer outputs
-type JSONSchema = {
-  // The JSON Schema type (e.g., "object", "string", "number", "array", "boolean")
-  type: string;
-  // Object properties definition (when type is "object")
-  properties?: Record<string, JSONSchema>;
-  // Array items definition (when type is "array")
-  items?: JSONSchema;
-  // Required properties for objects
-  required?: string[];
-  // Additional properties allowed in objects
-  additionalProperties?: boolean | JSONSchema;
-  // Description of what this schema represents
-  description?: string;
-  // Default value if not provided
-  default?: any;
-  // Enum of allowed values
-  enum?: any[];
-  // Additional schema properties as needed
-  [key: string]: any;
 };
