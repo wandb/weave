@@ -4,6 +4,7 @@
 
 import datetime
 import json
+import logging
 import typing
 import urllib
 from urllib import parse
@@ -16,7 +17,7 @@ from weave_query import environment as weave_env
 from weave_query import filesystem, artifact_wandb, cache, errors, wandb_api, engine_trace, weave_http
 
 tracer = engine_trace.tracer()  # type: ignore
-
+logger = logging.getLogger("wandb_file_manager")
 
 def _file_path(
     uri: typing.Union[
@@ -111,9 +112,15 @@ class WandbFileManagerAsync:
         ],
     ) -> str:
         assert uri.version is not None
-        if isinstance(uri, artifact_wandb.WeaveWBArtifactURI):
-            return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
-        return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
+        logger.info(f"\n\nline 115 in manifest_path() uri.extra ========>{uri.extra}\n\n")
+
+        if isinstance(uri, artifact_wandb.WeaveWBArtifactByIDURI):
+            return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
+        elif len(uri.extra) > 0:
+            logger.info(f"\n\nline 313 in manifest_path() uri.extra ========>{uri.extra}\n\n")
+            return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/{uri.extra[0]}/manifest-{uri.version}.json"
+        return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
+
 
     async def _manifest(
         self,
@@ -304,8 +311,13 @@ class WandbFileManager:
         ],
     ) -> str:
         assert uri.version is not None
+        logger.info(f"\n\nline 308 in manifest_path() uri.extra ========>{uri.extra}\n\n")
+
         if isinstance(uri, artifact_wandb.WeaveWBArtifactByIDURI):
             return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
+        elif len(uri.extra) > 0:
+            logger.info(f"\n\nline 313 in manifest_path() uri.extra ========>{uri.extra}\n\n")
+            return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/{uri.extra[0]}/manifest-{uri.version}.json"
         return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     def _manifest(

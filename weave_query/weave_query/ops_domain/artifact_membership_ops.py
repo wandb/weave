@@ -12,6 +12,8 @@ from weave_query.ops_domain.wandb_domain_gql import (
     gql_prop_op,
 )
 
+logger = logging.getLogger("artifact_membership_ops")
+
 static_art_membership_file_gql = """
             versionIndex
             artifactCollection {
@@ -29,6 +31,9 @@ static_art_membership_file_gql = """
                         }
                     }
                 }
+            }
+            artifact {
+                id
             }
             """
 
@@ -121,9 +126,12 @@ def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollecti
     version = f"v{artifactMembership['versionIndex']}"
     entity_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['entity']['name']
     project_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['name']
+    artifact_id = artifactMembership["artifact"]["id"]
+    logger.info(f"\n\nAdding extras to URI => {artifact_id}\n\n")
     uri = artifact_wandb.WeaveWBArtifactURI(
-        collection_name, version, entity_name, project_name
+        name=collection_name, version=version, entity_name=entity_name, project_name=project_name, extra=[artifact_id]
     )
+    logger.info(f"\n\nAdding extras to URI: uri.extra => {uri.extra}\n\n")
     return artifact_wandb.WandbArtifact(
         name=collection_name,
         type=type_name,
