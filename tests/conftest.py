@@ -101,6 +101,12 @@ def pytest_addoption(parser):
         help="Specify the client object to use: sqlite or clickhouse",
     )
     parser.addoption(
+        "--ch",
+        "--clickhouse",
+        action="store_true",
+        help="Use clickhouse server (shorthand for --weave-server=clickhouse)",
+    )
+    parser.addoption(
         "--clickhouse-process",
         action="store",
         default="false",
@@ -494,6 +500,11 @@ def create_client(
 ) -> weave_init.InitializedClient:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
+
+    # Check if -ch/--clickhouse flag is used
+    if request.config.getoption("--clickhouse"):
+        weave_server_flag = "clickhouse"
+
     server: tsi.TraceServerInterface
     entity = "shawn"
     project = "test-project"
