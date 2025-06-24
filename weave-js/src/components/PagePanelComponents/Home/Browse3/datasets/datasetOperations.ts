@@ -43,7 +43,11 @@ export const createNewDataset = async ({
   tableCreate,
   objCreate,
   router,
-}: CreateNewDatasetOptions) => {
+}: CreateNewDatasetOptions): Promise<{
+  url: string;
+  objectId: string;
+  objectDigest: string;
+}> => {
   const newTableResult = await tableCreate({
     table: {
       project_id: projectId,
@@ -88,6 +92,7 @@ export const createNewDataset = async ({
   return {
     url: newDatasetUrl,
     objectId: datasetName,
+    objectDigest: newDatasetResp,
   };
 };
 

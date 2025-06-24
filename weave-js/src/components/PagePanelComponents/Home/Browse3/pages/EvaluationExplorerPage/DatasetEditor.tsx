@@ -1,12 +1,17 @@
 import {Box} from '@mui/material';
-import React, {useEffect} from 'react';
+import {Button} from '@wandb/weave/components';
+import React, {useCallback, useEffect} from 'react';
 
 import {DatasetFilePicker} from '../../datasets/CreateDatasetDrawer';
 import {
+  CREATE_DATASET_ACTIONS,
   CreateDatasetProvider,
   useCreateDatasetContext,
 } from '../../datasets/CreateDatasetDrawerContext';
-import {EditableDatasetView} from '../../datasets/EditableDatasetView';
+import {
+  EditableDatasetView,
+  EditableDatasetViewProps,
+} from '../../datasets/EditableDatasetView';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
 
 const dummyRow = {
@@ -18,16 +23,18 @@ export const NewDatasetEditor = ({
   entity,
   project,
   useFilePicker = false,
+  onSaveComplete,
 }: {
   entity: string;
   project: string;
   useFilePicker?: boolean;
+  onSaveComplete?: (datasetRef?: string) => void;
 }) => {
   const {handleSaveDataset} = useDatasetSaving({
     entity,
     project,
-    onSaveComplete: () => {
-      console.error('TODO: Implement me');
+    onSaveComplete: datasetRef => {
+      onSaveComplete?.(datasetRef);
     },
   });
   return (
@@ -56,7 +63,7 @@ const NewEmptyDatasetEditorInner = () => {
   }
 
   return (
-    <EditableDatasetView
+    <EditableDatasetViewInner
       datasetObject={parsedData}
       isEditing={true}
       hideRemoveForAddedRows={false}
@@ -81,7 +88,7 @@ const NewFileDatasetEditorInner = () => {
   }
 
   return (
-    <EditableDatasetView
+    <EditableDatasetViewInner
       datasetObject={parsedData}
       isEditing={true}
       hideRemoveForAddedRows={false}
@@ -90,5 +97,39 @@ const NewFileDatasetEditorInner = () => {
       disableNewRowHighlight={true}
       isNewDataset={true}
     />
+  );
+};
+
+const EditableDatasetViewInner: React.FC<EditableDatasetViewProps> = props => {
+  const {handlePublishDataset, dispatch} = useCreateDatasetContext();
+  useEffect(() => {
+    // TODO: Get the name from the user
+    dispatch({
+      type: CREATE_DATASET_ACTIONS.SET_DATASET_NAME,
+      payload: 'eval-dataset',
+    });
+
+    // TODO: Validate the name
+    // const validationResult = validateDatasetName(value);
+  }, [dispatch]);
+  const onSave = useCallback(() => {
+    handlePublishDataset();
+  }, [handlePublishDataset]);
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+        overflow: 'hidden',
+      }}>
+      <Button variant="primary" onClick={onSave}>
+        Save
+      </Button>
+      <Box sx={{flex: 1, overflow: 'hidden'}}>
+        <EditableDatasetView {...props} />
+      </Box>
+    </Box>
   );
 };

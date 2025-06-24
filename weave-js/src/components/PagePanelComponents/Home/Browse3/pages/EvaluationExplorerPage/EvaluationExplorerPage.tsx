@@ -14,6 +14,7 @@ import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {ScorerFormRef} from '../MonitorsPage/MonitorFormDrawer';
 import {LLMAsAJudgeScorerForm} from '../MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
+import {refStringToName} from './common';
 import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
@@ -60,7 +61,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
   entity,
   project,
 }) => {
-  const {config} = useEvaluationExplorerPageContext();
+  const {config, editConfig} = useEvaluationExplorerPageContext();
   const [newDatasetEditorMode, setNewDatasetEditorMode] = useState<
     'new-empty' | 'new-file'
   >('new-empty');
@@ -72,7 +73,17 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
     }
     return 'existing';
   }, [config, newDatasetEditorMode]);
-  console.log(config);
+
+  const onNewDatasetSaveComplete = useCallback(
+    (datasetRef?: string) => {
+      editConfig(draft => {
+        draft.evaluationDefinition.properties.dataset.originalSourceRef =
+          datasetRef ?? null;
+      });
+    },
+    [editConfig]
+  );
+
   return (
     <Row>
       <ConfigPanel
@@ -83,10 +94,19 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
       <Column style={{flex: '1 1 600px', overflow: 'hidden'}}>
         <Header>Dataset</Header>
         {datasetEditorMode === 'new-empty' && (
-          <NewDatasetEditor entity={entity} project={project} />
+          <NewDatasetEditor
+            entity={entity}
+            project={project}
+            onSaveComplete={onNewDatasetSaveComplete}
+          />
         )}
         {datasetEditorMode === 'new-file' && (
-          <NewDatasetEditor entity={entity} project={project} useFilePicker />
+          <NewDatasetEditor
+            entity={entity}
+            project={project}
+            useFilePicker
+            onSaveComplete={onNewDatasetSaveComplete}
+          />
         )}
         {datasetEditorMode === 'existing' && <div>Not implemented</div>}
       </Column>
@@ -399,7 +419,7 @@ const DatasetPicker: React.FC<{
         label: 'Load existing dataset',
         options:
           refsQuery.data?.map(ref => ({
-            label: ref,
+            label: refStringToName(ref),
             value: ref,
           })) ?? [],
       },
@@ -490,11 +510,7 @@ const ScorersConfigSection: React.FC<{entity: string; project: string}> = ({
           let selectedOption = newScorerOption;
           const options = [...scorerOptions];
           if (scorer.originalSourceRef) {
-            const ref = parseWeaveRef(scorer.originalSourceRef);
-            const name = `${ref.artifactName} (${ref.artifactVersion.slice(
-              0,
-              4
-            )})`;
+            const name = refStringToName(scorer.originalSourceRef);
             selectedOption = {
               label: name,
               value: scorer.originalSourceRef,

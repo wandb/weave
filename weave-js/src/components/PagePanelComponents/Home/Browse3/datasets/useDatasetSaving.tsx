@@ -1,3 +1,4 @@
+import {makeRefObject} from '@wandb/weave/util/refs';
 import React from 'react';
 import {toast} from 'react-toastify';
 
@@ -9,7 +10,7 @@ import {DatasetPublishToast} from './DatasetPublishToast';
 interface UseDatasetSavingOptions {
   entity: string;
   project: string;
-  onSaveComplete?: () => void;
+  onSaveComplete?: (datasetRef?: string) => void;
 }
 
 interface DatasetSavingResult {
@@ -37,6 +38,7 @@ export const useDatasetSaving = ({
   const handleSaveDataset = React.useCallback(
     async (name: string, rows: any[]) => {
       setIsCreatingDataset(true);
+      let datasetRef: undefined | string = undefined;
       try {
         // Create the dataset using the actual API function
         const result = await createNewDataset({
@@ -49,6 +51,15 @@ export const useDatasetSaving = ({
           objCreate,
           router,
         });
+
+        datasetRef = makeRefObject(
+          entity,
+          project,
+          'object',
+          result.objectId,
+          result.objectDigest,
+          undefined
+        );
 
         // Show success message with link to the new dataset
         toast(
@@ -69,7 +80,7 @@ export const useDatasetSaving = ({
         toast.error(`Failed to create dataset: ${error.message}`);
       } finally {
         setIsCreatingDataset(false);
-        onSaveComplete?.();
+        onSaveComplete?.(datasetRef);
       }
     },
     [entity, project, tableCreate, objCreate, router, onSaveComplete]
