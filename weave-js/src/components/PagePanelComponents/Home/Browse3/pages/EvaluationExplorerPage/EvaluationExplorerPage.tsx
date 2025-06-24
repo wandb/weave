@@ -5,14 +5,14 @@ import {Select} from '@wandb/weave/components/Form/Select';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
 } from './context';
-import {NewEmptyDatasetEditor} from './DatasetEditor';
+import {NewDatasetEditor} from './DatasetEditor';
 import {clientBound, hookify} from './hooks';
 import {getLatestDatasetRefs, getLatestEvaluationRefs} from './query';
 
@@ -51,22 +51,44 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
   project,
 }) => {
   const {config} = useEvaluationExplorerPageContext();
+  const [newDatasetEditorMode, setNewDatasetEditorMode] = useState<
+    'new-empty' | 'new-file'
+  >('new-empty');
+  const datasetEditorMode = useMemo(() => {
+    if (
+      config.evaluationDefinition.properties.dataset.originalSourceRef == null
+    ) {
+      return newDatasetEditorMode;
+    }
+    return 'existing';
+  }, [config, newDatasetEditorMode]);
   console.log(config);
   return (
     <Row>
-      <ConfigPanel entity={entity} project={project} />
+      <ConfigPanel
+        entity={entity}
+        project={project}
+        setNewDatasetEditorMode={setNewDatasetEditorMode}
+      />
       <Column style={{flex: '1 1 600px', overflow: 'hidden'}}>
         <Header>Dataset</Header>
-        <NewEmptyDatasetEditor entity={entity} project={project} />
+        {datasetEditorMode === 'new-empty' && (
+          <NewDatasetEditor entity={entity} project={project} />
+        )}
+        {datasetEditorMode === 'new-file' && (
+          <NewDatasetEditor entity={entity} project={project} useFilePicker />
+        )}
+        {datasetEditorMode === 'existing' && <div>Not implemented</div>}
       </Column>
     </Row>
   );
 };
 
-const ConfigPanel: React.FC<{entity: string; project: string}> = ({
-  entity,
-  project,
-}) => {
+const ConfigPanel: React.FC<{
+  entity: string;
+  project: string;
+  setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
+}> = ({entity, project, setNewDatasetEditorMode}) => {
   return (
     <Column
       style={{
@@ -88,7 +110,11 @@ const ConfigPanel: React.FC<{entity: string; project: string}> = ({
         />
       </Header>
       <Column style={{flex: 1, overflowY: 'auto'}}>
-        <EvaluationConfigSection entity={entity} project={project} />
+        <EvaluationConfigSection
+          entity={entity}
+          project={project}
+          setNewDatasetEditorMode={setNewDatasetEditorMode}
+        />
         <ModelsConfigSection entity={entity} project={project} />
       </Column>
       <Footer>
@@ -221,10 +247,11 @@ const LoadingSelect: typeof Select = props => {
 
 // Specialized Components
 
-const EvaluationConfigSection: React.FC<{entity: string; project: string}> = ({
-  entity,
-  project,
-}) => {
+const EvaluationConfigSection: React.FC<{
+  entity: string;
+  project: string;
+  setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
+}> = ({entity, project, setNewDatasetEditorMode}) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   return (
     <ConfigSection title="Evaluation" icon="baseline-alt">
@@ -258,7 +285,11 @@ const EvaluationConfigSection: React.FC<{entity: string; project: string}> = ({
             }}
           />
         </Row>
-        <DatasetConfigSection entity={entity} project={project} />
+        <DatasetConfigSection
+          entity={entity}
+          project={project}
+          setNewDatasetEditorMode={setNewDatasetEditorMode}
+        />
         <ScorersConfigSection entity={entity} project={project} />
       </Column>
     </ConfigSection>
@@ -305,10 +336,11 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
   );
 };
 
-const DatasetConfigSection: React.FC<{entity: string; project: string}> = ({
-  entity,
-  project,
-}) => {
+const DatasetConfigSection: React.FC<{
+  entity: string;
+  project: string;
+  setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
+}> = ({entity, project, setNewDatasetEditorMode}) => {
   return (
     <ConfigSection
       title="Dataset"
@@ -317,29 +349,36 @@ const DatasetConfigSection: React.FC<{entity: string; project: string}> = ({
         paddingTop: '0px',
         paddingRight: '0px',
       }}>
-      <DatasetPicker entity={entity} project={project} />
+      <DatasetPicker
+        entity={entity}
+        project={project}
+        setNewDatasetEditorMode={setNewDatasetEditorMode}
+      />
     </ConfigSection>
   );
 };
 
 const useLatestDatasetRefs = clientBound(hookify(getLatestDatasetRefs));
-const DatasetPicker: React.FC<{entity: string; project: string}> = ({
-  entity,
-  project,
-}) => {
+const DatasetPicker: React.FC<{
+  entity: string;
+  project: string;
+  setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
+}> = ({entity, project, setNewDatasetEditorMode}) => {
   const refsQuery = useLatestDatasetRefs(entity, project);
+
   const newDatasetOptions = useMemo(() => {
     return [
       {
         label: 'Start from scratch',
-        value: 'new-dataset',
+        value: 'new-empty',
       },
       {
         label: 'Upload a file',
-        value: 'upload-file',
+        value: 'new-file',
       },
     ];
   }, []);
+
   const selectOptions = useMemo(() => {
     return [
       {
@@ -356,9 +395,10 @@ const DatasetPicker: React.FC<{entity: string; project: string}> = ({
       },
     ];
   }, [refsQuery.data, newDatasetOptions]);
-  const selectedValue = useMemo(() => {
-    return selectOptions[0].options[0];
-  }, [selectOptions]);
+
+  const [selectedValue, setSelectedValue] = useState(
+    selectOptions[0].options[0]
+  );
 
   if (refsQuery.loading) {
     return <LoadingSelect />;
@@ -366,11 +406,20 @@ const DatasetPicker: React.FC<{entity: string; project: string}> = ({
 
   return (
     <Select
+      blurInputOnSelect
       options={selectOptions}
       value={selectedValue}
       onChange={option => {
-        console.log(option);
-        console.error('TODO: Implement me');
+        if (option?.value === 'new-empty') {
+          setNewDatasetEditorMode('new-empty');
+        } else if (option?.value === 'new-file') {
+          setNewDatasetEditorMode('new-file');
+        } else {
+          console.error('TODO: Implement me');
+        }
+        if (option) {
+          setSelectedValue(option);
+        }
       }}
     />
   );
