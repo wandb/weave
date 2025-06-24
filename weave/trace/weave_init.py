@@ -65,6 +65,8 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
         )
     if not entity_name:
         raise ValueError("entity_name must be non-empty")
+    if not project_name:
+        raise ValueError("project_name must be non-empty")
 
     return entity_name, project_name
 
@@ -94,6 +96,8 @@ def init_weave(
         ):
             return _current_inited_client
         else:
+            # Flush any pending calls before switching to a new project
+            _current_inited_client.client.finish()
             _current_inited_client.reset()
 
     from weave.wandb_interface import wandb_api  # type: ignore

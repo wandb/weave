@@ -71,6 +71,14 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "gpt-4o-audio-preview-2025-06-03": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-4o-mini-audio-preview": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-4o-mini-audio-preview-2024-12-17": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -88,6 +96,10 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-4o-mini-2024-07-18": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "codex-mini-latest": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -110,6 +122,14 @@
   "computer-use-preview": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
+  },
+  "o3-pro": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o3-pro-2025-06-10": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
   },
   "o3": {
     "litellm_provider": "openai",
@@ -575,6 +595,10 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/codex-mini-latest": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/o1-preview": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
@@ -1007,6 +1031,10 @@
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
+  "mistral/mistral-medium-2505": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
   "mistral/mistral-medium-2312": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
@@ -1072,6 +1100,18 @@
     "api_key_name": "MISTRAL_API_KEY"
   },
   "mistral/codestral-mamba-latest": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/devstral-small-2505": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/magistral-medium-2506": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/magistral-small-2506": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
@@ -1319,6 +1359,14 @@
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
+  "claude-4-opus-20250514": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
+  "claude-4-sonnet-20250514": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
   "claude-3-7-sonnet-latest": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
@@ -1368,6 +1416,10 @@
     "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.5-pro-preview-tts": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-2.5-pro-preview-06-05": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },

@@ -144,7 +144,7 @@ openai.images.generate({
 });
 ```
 
-Please also see [TypeScript SDK: Third-Party Integration Guide](https://weave-docs.wandb.ai/guides/integrations/js) for setup guide for ESM projects.
+For a complete setup guide for ESM projects, see the [TypeScript SDK: Third-Party Integration Guide](https://weave-docs.wandb.ai/guides/integrations/js).
 
 ### Evaluations
 

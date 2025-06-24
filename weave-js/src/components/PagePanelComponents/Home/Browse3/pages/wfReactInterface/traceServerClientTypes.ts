@@ -123,6 +123,7 @@ export type TraceCallsQueryReq = {
   expand_columns?: string[];
   include_costs?: boolean;
   include_feedback?: boolean;
+  include_storage_size?: boolean;
   include_total_storage_size?: boolean;
 };
 
@@ -211,6 +212,7 @@ export type FeedbackPurgeError = {
 export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
 interface TraceObjectsFilter {
   base_object_classes?: string[];
+  leaf_object_classes?: string[];
   object_ids?: string[];
   is_op?: boolean;
   latest_only?: boolean;
@@ -238,6 +240,7 @@ export interface TraceObjSchema<
   is_latest: number;
   kind: 'op' | 'object';
   base_object_class?: OBC;
+  leaf_object_class?: OBC;
   val: T;
   wb_user_id?: string;
   size_bytes?: number;
