@@ -2,6 +2,8 @@ import {Box} from '@mui/material';
 import {MOON_50, MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Select} from '@wandb/weave/components/Form/Select';
+import {TextArea} from '@wandb/weave/components/Form/TextArea';
+import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import React, {useMemo} from 'react';
 
@@ -88,11 +90,12 @@ const ConfigPanel: React.FC<{entity: string; project: string}> = ({
       </Column>
       <Footer>
         <Button
+          icon="save"
           variant="secondary"
           onClick={() => {
             console.error('TODO: Implement me');
           }}>
-          Clear
+          Save all
         </Button>
         <Button
           icon="play"
@@ -227,6 +230,22 @@ const EvaluationConfigSection: React.FC<{entity: string; project: string}> = ({
           borderLeft: `1px solid ${BORDER_COLOR}`,
           marginTop: '16px',
         }}>
+        <Row style={{padding: '8px 0px 8px 16px'}}>
+          <TextField
+            placeholder="Evaluation Name"
+            onChange={value => {
+              console.error('TODO: Implement me');
+            }}
+          />
+        </Row>
+        <Row style={{padding: '8px 0px 16px 16px'}}>
+          <TextArea
+            placeholder="Evaluation Description"
+            onChange={value => {
+              console.error('TODO: Implement me');
+            }}
+          />
+        </Row>
         <DatasetConfigSection entity={entity} project={project} />
         <ScorersConfigSection entity={entity} project={project} />
       </Column>
