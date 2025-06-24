@@ -240,10 +240,9 @@ class StackedCache:
         for layer in self._layers:
             should_write = True
 
-            if self._existence_check_optimization:
-                # Check if key exists - if so, we know it has the same value
-                if key in layer:
-                    should_write = False
+            # Check if key exists - if so, we know it has the same value
+            if self._existence_check_optimization and key in layer:
+                should_write = False
 
             if should_write:
                 layer.put(key, value)
