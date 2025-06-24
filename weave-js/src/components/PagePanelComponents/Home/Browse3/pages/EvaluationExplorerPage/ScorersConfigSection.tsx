@@ -150,13 +150,6 @@ export const ScorersConfigSection: React.FC<{
                   setCurrentlyEditingScorerNdx(scorerNdx);
                 }}
               />
-              {/* <Button
-              icon="copy"
-              variant="ghost"
-              onClick={() => {
-                console.error('TODO: Implement me');
-              }}
-            /> */}
               <Button
                 icon="delete"
                 variant="ghost"

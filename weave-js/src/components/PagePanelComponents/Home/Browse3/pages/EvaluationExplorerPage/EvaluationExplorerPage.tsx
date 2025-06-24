@@ -103,6 +103,7 @@ const ConfigPanel: React.FC<{
   project: string;
   setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
 }> = ({entity, project, setNewDatasetEditorMode}) => {
+  const {config} = useEvaluationExplorerPageContext();
   return (
     <Column
       style={{
@@ -114,14 +115,6 @@ const ConfigPanel: React.FC<{
       }}>
       <Header>
         <span>Configuration</span>
-        <Button
-          icon="settings-parameters"
-          size="small"
-          variant="secondary"
-          onClick={() => {
-            console.error('TODO: Implement me');
-          }}
-        />
       </Header>
       <Column style={{flex: 1, overflowY: 'auto'}}>
         <EvaluationConfigSection
@@ -136,6 +129,7 @@ const ConfigPanel: React.FC<{
           icon="play"
           variant="primary"
           onClick={() => {
+            console.log(config);
             console.error('TODO: Implement me');
           }}>
           Run eval
