@@ -13,10 +13,12 @@ type HookResult<T> =
   | {
       loading: false;
       error: Error;
+      data: null;
     }
   | {
       loading: false;
       data: T;
+      error: null;
     };
 
 export const hookify = <TArgs extends any[], TReturn>(

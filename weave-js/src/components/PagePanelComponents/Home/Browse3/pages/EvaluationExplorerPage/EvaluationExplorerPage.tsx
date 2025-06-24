@@ -3,7 +3,7 @@ import {MOON_50, MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Select} from '@wandb/weave/components/Form/Select';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
-import React from 'react';
+import React, {useMemo} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {
@@ -114,14 +114,50 @@ const ConfigPanel: React.FC<{entity: string; project: string}> = ({
                 paddingBottom: '0px',
                 paddingRight: '0px',
               }}>
-              <Select
-                options={[]}
-                value={''}
-                onChange={option => {
-                  console.log(option);
-                  console.error('TODO: Implement me');
-                }}
-              />
+              <Column style={{gap: '8px'}}>
+                <Row style={{alignItems: 'center', gap: '8px'}}>
+                  <Button
+                    icon="copy"
+                    variant="ghost"
+                    onClick={() => {
+                      console.error('TODO: Implement me');
+                    }}
+                  />
+                  <div style={{flex: 1}}>
+                    <Select
+                      options={[]}
+                      value={''}
+                      onChange={option => {
+                        console.log(option);
+                        console.error('TODO: Implement me');
+                      }}
+                    />
+                  </div>
+                  <Button
+                    icon="settings"
+                    variant="ghost"
+                    onClick={() => {
+                      console.error('TODO: Implement me');
+                    }}
+                  />
+                  <Button
+                    icon="remove"
+                    variant="ghost"
+                    onClick={() => {
+                      console.error('TODO: Implement me');
+                    }}
+                  />
+                </Row>
+                <Row>
+                  <Button
+                    icon="add-new"
+                    variant="ghost"
+                    onClick={() => {
+                      console.error('TODO: Implement me');
+                    }}
+                  />
+                </Row>
+              </Column>
             </ConfigSection>
           </Column>
         </ConfigSection>
@@ -164,7 +200,7 @@ const ConfigSection: React.FC<{
   children?: React.ReactNode;
 }> = ({title, icon, style, children}) => {
   return (
-    <Column style={{padding: '16px', flex: 0, ...style}}>
+    <Column style={{padding: '8px 16px 16px 16px', flex: 0, ...style}}>
       <Row
         style={{
           alignItems: 'center',
@@ -258,6 +294,10 @@ const Column: React.FC<{
   );
 };
 
+const LoadingSelect: typeof Select = props => {
+  return <Select isDisabled placeholder="Loading..." {...props} />;
+};
+
 // Specialized Components
 
 const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
@@ -265,11 +305,32 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
   project,
 }) => {
   const refsQuery = useLatestEvaluationRefs(entity, project);
-  console.log(refsQuery);
+  const newEvaluationOption = useMemo(() => {
+    return {
+      label: 'New Evaluation',
+      value: 'new-evaluation',
+    };
+  }, []);
+  const selectOptions = useMemo(() => {
+    return [
+      newEvaluationOption,
+      ...(refsQuery.data?.map(ref => ({
+        label: ref,
+      })) ?? []),
+    ];
+  }, [refsQuery.data, newEvaluationOption]);
+  const selectedValue = useMemo(() => {
+    return selectOptions[0];
+  }, [selectOptions]);
+
+  if (refsQuery.loading) {
+    return <LoadingSelect />;
+  }
+
   return (
     <Select
-      options={[]}
-      value={''}
+      options={selectOptions}
+      value={selectedValue}
       onChange={option => {
         console.log(option);
         console.error('TODO: Implement me');
