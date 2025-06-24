@@ -6,12 +6,16 @@ import {Icon, IconName} from '@wandb/weave/components/Icon';
 import React from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {
+  EvaluationExplorerPageProvider,
+  useEvaluationExplorerPageContext,
+} from './context';
 
 const HEADER_HEIGHT_PX = 44;
 const BORDER_COLOR = MOON_200;
 const SECONDARY_BACKGROUND_COLOR = MOON_50;
 
-export type EvaluationExplorerPageProps = {
+type EvaluationExplorerPageProps = {
   entity: string;
   project: string;
 };
@@ -25,7 +29,11 @@ export const EvaluationExplorerPage = (props: EvaluationExplorerPageProps) => {
       tabs={[
         {
           label: 'main',
-          content: <EvaluationExplorerPageInner {...props} />,
+          content: (
+            <EvaluationExplorerPageProvider>
+              <EvaluationExplorerPageInner {...props} />
+            </EvaluationExplorerPageProvider>
+          ),
         },
       ]}
       headerExtra={null}
@@ -33,9 +41,12 @@ export const EvaluationExplorerPage = (props: EvaluationExplorerPageProps) => {
   );
 };
 
-export const EvaluationExplorerPageInner: React.FC<
-  EvaluationExplorerPageProps
-> = ({entity, project}) => {
+const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
+  entity,
+  project,
+}) => {
+  const {config, editConfig} = useEvaluationExplorerPageContext();
+  console.log(config);
   return (
     <Row>
       <ConfigPanel />

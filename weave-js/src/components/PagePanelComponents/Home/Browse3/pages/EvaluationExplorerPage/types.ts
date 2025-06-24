@@ -2,7 +2,7 @@ export type EvaluationExplorationConfig = {
   // The definition of the evaluation to run
   evaluationDefinition: {
     // The Weave Ref pointing to the evaluation definition
-    ref?: string;
+    originalSourceRef: string | null;
     // Whether the properties deviated from the referenced source
     dirtied: boolean;
     properties: {
@@ -13,7 +13,7 @@ export type EvaluationExplorationConfig = {
       // The definition of the dataset to use
       dataset: {
         // The Weave Ref pointing to the dataset definition
-        ref?: string;
+        originalSourceRef: string | null;
         // Whether the dataset definition is dirty
         dirtied: boolean;
         properties: {
@@ -24,7 +24,7 @@ export type EvaluationExplorationConfig = {
           // The rows of the dataset
           rows: {
             // The content digest hash for tracking changes
-            digest?: string;
+            originalSourceDigest: string | null;
             // Whether this row has been modified from its source
             dirtied: boolean;
             // The actual data for this row as key-value pairs
@@ -35,7 +35,7 @@ export type EvaluationExplorationConfig = {
       // The array of scorer functions to evaluate model outputs
       scorers: Array<{
         // The Weave Ref pointing to the scorer definition
-        ref?: string;
+        originalSourceRef: string | null;
         // Determines if the properties deviated from the referenced source
         dirtied: boolean;
         // The properties of the scorer
@@ -57,7 +57,7 @@ export type EvaluationExplorationConfig = {
   // The array of models to evaluate
   models: Array<{
     // The Weave Ref pointing to the model definition
-    ref?: string;
+    originalSourceRef: string | null;
     // Whether the model definition is dirty
     dirtied: boolean;
     // The properties of the model
