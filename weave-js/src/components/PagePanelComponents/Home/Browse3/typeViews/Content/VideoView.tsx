@@ -6,7 +6,7 @@ import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Brows
 import {CustomWeaveTypeProjectContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/typeViews/CustomWeaveTypeDispatcher';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
 import React, {useContext, useEffect, useRef, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
 import {ContentViewMetadataLoadedProps} from './types';
@@ -83,44 +83,41 @@ const VideoContentWithSize: React.FC<VideoContentWithSizeProps> = ({
       const thumbnailHeight = Math.min(containerHeight, 38); // Default height of the cell row
       const thumbnailWidth = Math.min(containerWidth, 68); // 16:9-ish ratio
 
-      const thumbnailContent = (
-        <Tailwind>
-          <div
-            className="relative flex h-full w-full items-center justify-start"
-            style={{cursor: 'pointer'}}
-            onClick={() => setShowPopup(true)}>
-            <div
-              style={{height: thumbnailHeight, width: thumbnailWidth}}
-              className="relative">
-              {videoBinary.result ? (
-                <>
-                  <VideoContentDisplay
-                    fileExt={fileExt}
-                    buffer={videoBinary.result}
-                    containerWidth={thumbnailWidth}
-                    containerHeight={thumbnailHeight}
-                    title={title}
-                    isThumbnail={true}
-                    videoRef={videoRef}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 transition-all duration-200 hover:bg-oblivion/10">
-                    <IconPlay className="text-white" />
-                  </div>
-                </>
-              ) : (
-                <LoadingDots />
-              )}
-            </div>
-          </div>
-        </Tailwind>
-      );
-
       return (
         <>
-          <Tooltip
-            trigger={thumbnailContent}
-            content={`${fileExt.toUpperCase()} Video - Click to play`}
-          />
+          <Tailwind>
+            <StyledTooltip
+              enterDelay={500}
+              title={`${fileExt.toUpperCase()} Video - Click to play`}>
+              <div
+                className="relative flex h-full w-full items-center justify-start"
+                style={{cursor: 'pointer'}}
+                onClick={() => setShowPopup(true)}>
+                <div
+                  style={{height: thumbnailHeight, width: thumbnailWidth}}
+                  className="relative">
+                  {videoBinary.result ? (
+                    <>
+                      <VideoContentDisplay
+                        fileExt={fileExt}
+                        buffer={videoBinary.result}
+                        containerWidth={thumbnailWidth}
+                        containerHeight={thumbnailHeight}
+                        title={title}
+                        isThumbnail={true}
+                        videoRef={videoRef}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-oblivion/30 transition-all duration-200 hover:bg-oblivion/10">
+                        <IconPlay className="text-white" />
+                      </div>
+                    </>
+                  ) : (
+                    <LoadingDots />
+                  )}
+                </div>
+              </div>
+            </StyledTooltip>
+          </Tailwind>
 
           {showPopup && videoBinary.result && (
             <Dialog.Root open={showPopup} onOpenChange={setShowPopup}>

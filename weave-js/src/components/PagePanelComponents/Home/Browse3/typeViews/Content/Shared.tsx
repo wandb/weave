@@ -3,7 +3,7 @@ import {Button} from '@wandb/weave/components/Button';
 import {CustomLink} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/Links';
 import { ContentMetadata } from './types';
 import {Icon, IconName, IconNames} from '@wandb/weave/components/Icon';
-import {Tooltip} from '@wandb/weave/components/Tooltip';
+import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
 import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import {convertBytes} from '@wandb/weave/util';
 
@@ -82,7 +82,6 @@ export const ContentTooltipWrapper = ({
   tooltipPreview,
   body,
   children,
-  noTriggerWrap,
 }: ContentTooltipWrapperProps) => {
   const tooltip = (
     <TailwindContents>
@@ -103,7 +102,11 @@ export const ContentTooltipWrapper = ({
     return <>{body}</>;
   }
 
-  return <Tooltip trigger={body} content={tooltip} noTriggerWrap={noTriggerWrap} />;
+  return (
+    <StyledTooltip enterDelay={500} title={tooltip}>
+      {body}
+    </StyledTooltip>
+  );
 };
 
 type ContentMetadataTooltipProps = {
