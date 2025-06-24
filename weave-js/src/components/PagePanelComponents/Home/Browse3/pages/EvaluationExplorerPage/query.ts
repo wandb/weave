@@ -73,7 +73,7 @@ export const getLatestModelRefs = async (
   const res = await client.objsQuery({
     project_id: `${entity}/${project}`,
     filter: {
-      leaf_object_classes: ['PlaygroundModel'],
+      leaf_object_classes: ['LLMStructuredCompletionModel'],
       latest_only: true,
     },
     // TODO: Add pagination or smarter filtering.
