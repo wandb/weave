@@ -1457,9 +1457,9 @@ def test_attributes_on_ops(client):
 
 def test_dataset_row_type(client):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         d = weave.Dataset(rows=[])
-    with pytest.raises(ValidationError):
+    with pytest.raises(TypeError):
         d = weave.Dataset(rows=[{"a": 1}, "a", "b"])
     with pytest.raises(ValidationError):
         d = weave.Dataset(rows=[{"a": 1}, {}])
