@@ -2127,7 +2127,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
-        migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
+        migrator = wf_migrator.ClickHouseTraceServerMigrator(
+            self._mint_client(),
+            allow_down_migrations=False,  # Always disable down migrations in production
+        )
         migrator.apply_migrations(self._database)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query_stream")

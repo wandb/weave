@@ -21,7 +21,10 @@ def mock_costs():
 @pytest.fixture
 def migrator():
     ch_client = Mock()
-    migrator = trace_server_migrator.ClickHouseTraceServerMigrator(ch_client)
+    migrator = trace_server_migrator.ClickHouseTraceServerMigrator(
+        ch_client,
+        allow_down_migrations=True,  # Allow for testing purposes
+    )
     migrator._get_migration_status = Mock()
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
@@ -228,3 +231,41 @@ def test_format_replicated_sql_non_mergetree(mock_costs, migrator):
 
     for sql in test_cases:
         assert migrator._format_replicated_sql(sql) == sql
+
+
+def test_down_migration_safety_controls(mock_costs):
+    """Test down migration safety controls and normal migration behavior"""
+    # Mock the migration map used across all tests
+    migration_map = {
+        1: {"up": "1.up.sql", "down": "1.down.sql"},
+        2: {"up": "2.up.sql", "down": "2.down.sql"},
+    }
+
+    # Test 1: Down migrations are blocked by default
+    ch_client = Mock()
+    migrator_blocked = trace_server_migrator.ClickHouseTraceServerMigrator(
+        ch_client, allow_down_migrations=False
+    )
+
+    with pytest.raises(
+        trace_server_migrator.MigrationError, match="Down migrations are not allowed"
+    ):
+        migrator_blocked._determine_migrations_to_apply(
+            current_version=2, migration_map=migration_map, target_version=1
+        )
+
+    # Test 2: Up migrations still work normally with safeguard
+    result = migrator_blocked._determine_migrations_to_apply(
+        current_version=1, migration_map=migration_map, target_version=2
+    )
+    assert result == [(2, "2.up.sql")]
+
+    # Test 3: Down migrations work when explicitly allowed
+    migrator_allowed = trace_server_migrator.ClickHouseTraceServerMigrator(
+        ch_client, allow_down_migrations=True
+    )
+
+    result = migrator_allowed._determine_migrations_to_apply(
+        current_version=2, migration_map=migration_map, target_version=1
+    )
+    assert result == [(1, "2.down.sql")]

@@ -25,6 +25,7 @@ class ClickHouseTraceServerMigrator:
     replicated: bool
     replicated_path: str
     replicated_cluster: str
+    allow_down_migrations: bool
 
     def __init__(
         self,
@@ -32,7 +33,19 @@ class ClickHouseTraceServerMigrator:
         replicated: Optional[bool] = None,
         replicated_path: Optional[str] = None,
         replicated_cluster: Optional[str] = None,
+        allow_down_migrations: bool = False,
     ):
+        """
+        Initialize the ClickHouse Trace Server Migrator.
+
+        Args:
+            ch_client (CHClient): ClickHouse client instance.
+            replicated (Optional[bool]): Whether to use replicated tables.
+            replicated_path (Optional[str]): Path for replicated tables.
+            replicated_cluster (Optional[str]): Cluster name for replicated tables.
+            allow_down_migrations (bool): Whether to allow down migrations. Defaults to False for safety.
+
+        """
         super().__init__()
         self.ch_client = ch_client
         self.replicated = False if replicated is None else replicated
@@ -44,6 +57,7 @@ class ClickHouseTraceServerMigrator:
             if replicated_cluster is None
             else replicated_cluster
         )
+        self.allow_down_migrations = allow_down_migrations
         self._initialize_migration_db()
 
     def _is_safe_identifier(self, value: str) -> bool:
@@ -96,6 +110,14 @@ class ClickHouseTraceServerMigrator:
     def apply_migrations(
         self, target_db: str, target_version: Optional[int] = None
     ) -> None:
+        """
+        Apply database migrations to the target database.
+
+        Args:
+            target_db (str): Name of the target database.
+            target_version (Optional[int]): Target migration version. If None, migrates to latest.
+
+        """
         status = self._get_migration_status(target_db)
         logger.info(f"""`{target_db}` migration status: {status}""")
         if status["partially_applied_version"]:
@@ -219,6 +241,21 @@ class ClickHouseTraceServerMigrator:
         migration_map: dict,
         target_version: Optional[int] = None,
     ) -> list[tuple[int, str]]:
+        """
+        Determine which migrations need to be applied.
+
+        Args:
+            current_version (int): Current database migration version.
+            migration_map (dict): Map of available migrations.
+            target_version (Optional[int]): Target migration version.
+
+        Returns:
+            list[tuple[int, str]]: List of (version, migration_file) tuples to apply.
+
+        Raises:
+            MigrationError: If down migrations are attempted without explicit permission.
+
+        """
         if target_version is None:
             target_version = len(migration_map)
             # Do not run down migrations if not explicitly requesting target_version
@@ -238,6 +275,16 @@ class ClickHouseTraceServerMigrator:
                 res.append((i, f"{migration_map[i]['up']}"))
             return res
         if target_version < current_version:
+            # Prevent accidental down migrations in production environments
+            if not self.allow_down_migrations:
+                raise MigrationError(
+                    f"Down migrations are not allowed (current: {current_version}, target: {target_version}). "
+                    "Down migrations must be run manually and are not supported in production environments."
+                )
+
+            logger.warning(
+                f"RUNNING DOWN MIGRATION from {current_version} to {target_version}. This may result in data loss!"
+            )
             res = []
             for i in range(current_version, target_version, -1):
                 if migration_map[i]["down"] is None:
