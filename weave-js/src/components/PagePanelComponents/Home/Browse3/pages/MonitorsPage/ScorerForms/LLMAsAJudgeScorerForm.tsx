@@ -7,34 +7,25 @@ import {
   FieldName,
   typographyStyle,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/FormComponents';
-import {
-  useCreateBuiltinObjectInstance,
-  useLeafObjectInstances,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/objectClassQuery';
 import React, {
   forwardRef,
   useCallback,
-  useEffect,
   useImperativeHandle,
-  useMemo,
+  useRef,
   useState,
 } from 'react';
 import {Link} from 'react-router-dom';
 
-import {LLMDropdownLoaded} from '../../PlaygroundPage/PlaygroundChat/LLMDropdown';
-import {ResponseFormatSelect} from '../../PlaygroundPage/PlaygroundSettings/ResponseFormatEditor';
-import {PlaygroundResponseFormats} from '../../PlaygroundPage/types';
-import {
-  LlmStructuredCompletionModel,
-  LlmStructuredCompletionModelDefaultParams,
-  ResponseFormat,
-} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
+import {LlmStructuredCompletionModel} from '../../wfReactInterface/generatedBuiltinObjectClasses.zod';
 import {useScorerCreate} from '../../wfReactInterface/tsDataModelHooks';
 import {ScorerFormProps, ScorerFormRef} from '../MonitorFormDrawer';
+import {
+  ModelConfigurationForm,
+  ModelConfigurationFormRef,
+} from './ModelConfigurationForm';
 
 export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
   ({scorer, onValidationChange}, ref) => {
-    //const [isValid, setIsValid] = useState(false);
     const [scorerName, setScorerName] = useState<string | undefined>(
       scorer.objectId
     );
@@ -53,98 +44,11 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       LlmStructuredCompletionModel | undefined
     >(undefined);
 
-    const [judgeModelError, setJudgeModelError] = useState<string | null>(null);
-
-    const [judgeModelName, setJudgeModelName] = useState<string | undefined>();
-
-    const [systemPrompt, setSystemPrompt] = useState<string | undefined>();
-
-    const [responseFormat, setResponseFormat] = useState<
-      ResponseFormat | undefined
-    >();
+    const [modelFormValid, setModelFormValid] = useState(false);
 
     const {projectId, entity, project} = useEntityProject();
 
-    const {result: savedModelRes} = useLeafObjectInstances(
-      'LLMStructuredCompletionModel',
-      {
-        project_id: projectId,
-      }
-    );
-
-    const savedModels: LlmStructuredCompletionModel[] = useMemo(
-      () =>
-        savedModelRes?.map(model => {
-          const savedModel = model.val as LlmStructuredCompletionModel;
-          // Createing a ref so we can track the version index
-          savedModel.ref = {
-            entity,
-            project,
-            name: savedModel.name || '',
-            _digest: model.digest,
-            // We presume current _extra is empty
-            _extra: [`${model.version_index}`],
-          };
-          return savedModel;
-        }) || [],
-      [savedModelRes, entity, project]
-    );
-
-    useEffect(() => {
-      if (!savedModels || !scorer.val['model']) {
-        return;
-      }
-      const currentModel = savedModels.find(
-        model =>
-          `weave:///${projectId}/object/${model.name}:${model.ref?._digest}` ===
-          scorer.val['model']
-      );
-      if (currentModel) {
-        setJudgeModel(currentModel);
-        onValidationChange(true);
-        if (currentModel.default_params) {
-          const systemPrompt = getSystemPrompt(currentModel.default_params);
-          setSystemPrompt(systemPrompt);
-        }
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [savedModels, entity, project, projectId, scorer.val]);
-
-    const selectedJudgeModel = useMemo(() => {
-      if (judgeModel) {
-        if (judgeModel.ref) {
-          // This is a saved model
-          return `${judgeModel.name}:v${judgeModel.ref?._extra?.[0]}`;
-        }
-        return judgeModel.llm_model_id;
-      }
-      return undefined;
-    }, [judgeModel]);
-
-    const validateJudgeModel = useCallback(() => {
-      if (!judgeModel) {
-        setJudgeModelError('A judge model is required.');
-        return false;
-      } else {
-        if (!judgeModelName) {
-          setJudgeModelError('A judge model name is required.');
-          return false;
-        }
-        // Allow empty system prompts?
-        /*if (
-          !judgeModel.default_params ||
-          !getSystemPrompt(judgeModel.default_params)
-        ) {
-          setJudgeModelError('A judge model system prompt is required');
-          return false;
-        }*/
-        if (!responseFormat) {
-          setJudgeModelError('A judge model response format is required.');
-          return false;
-        }
-      }
-      return true;
-    }, [judgeModel, judgeModelName, responseFormat]);
+    const modelFormRef = useRef<ModelConfigurationFormRef | null>(null);
 
     const validateScorer = useCallback(() => {
       if (!scorerName) {
@@ -161,55 +65,11 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         setScoringPromptError('A scoring prompt is required.');
         return false;
       }
-      if (!validateJudgeModel()) {
+      if (!modelFormValid) {
         return false;
       }
       return true;
-    }, [scorerName, scoringPrompt, validateJudgeModel]);
-
-    const createLLMStructuredCompletionModel = useCreateBuiltinObjectInstance(
-      'LLMStructuredCompletionModel'
-    );
-
-    const saveModel = useCallback(async (): Promise<string | undefined> => {
-      if (!judgeModel) {
-        return undefined;
-      }
-
-      const model: LlmStructuredCompletionModel = {
-        llm_model_id: judgeModel.llm_model_id,
-        name: judgeModelName,
-        default_params: {
-          ...judgeModel.default_params,
-          messages_template: systemPrompt
-            ? [{role: 'system', content: systemPrompt}]
-            : undefined,
-          response_format: responseFormat,
-        },
-      };
-
-      try {
-        const response = await createLLMStructuredCompletionModel({
-          obj: {
-            project_id: projectId,
-            object_id: model.name as string,
-            val: model,
-          },
-        });
-        console.log('saveModel', 'post response', response);
-        return `weave:///${projectId}/object/${model.name}:${response.digest}`;
-      } catch (error) {
-        console.error('Failed to save model:', error);
-      }
-      return undefined;
-    }, [
-      projectId,
-      judgeModel,
-      judgeModelName,
-      systemPrompt,
-      responseFormat,
-      createLLMStructuredCompletionModel,
-    ]);
+    }, [scorerName, scoringPrompt, modelFormValid]);
 
     const scorerCreate = useScorerCreate();
 
@@ -218,20 +78,10 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         return undefined;
       }
 
-      const modelHasChanged =
-        judgeModelName !== judgeModel.name ||
-        systemPrompt !== getSystemPrompt(judgeModel.default_params || {}) ||
-        responseFormat !== judgeModel.default_params?.response_format;
-
-      let judgeModelRef: string | undefined;
-      if (modelHasChanged) {
-        judgeModelRef = await saveModel();
-        if (!judgeModelRef) {
-          setJudgeModelError('Failed to save judge model.');
-          return undefined;
-        }
-      } else {
-        judgeModelRef = `weave:///${projectId}/object/${judgeModel.name}:${judgeModel.ref?._digest}`;
+      // Save the model first if needed
+      const judgeModelRef = await modelFormRef.current?.saveModel();
+      if (!judgeModelRef) {
+        return undefined;
       }
 
       // If the scoring prompt or judge model has changed, we need to create a new scorer version
@@ -272,10 +122,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       projectId,
       entity,
       project,
-      saveModel,
-      judgeModelName,
-      systemPrompt,
-      responseFormat,
     ]);
 
     useImperativeHandle(ref, () => ({
@@ -288,99 +134,25 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
         const validationResult = validateDatasetName(value);
         setNameError(validationResult.error);
         onValidationChange(
-          !validationResult.error && validateJudgeModel() && !!scoringPrompt
+          !validationResult.error && modelFormValid && !!scoringPrompt
         );
       },
-      [scoringPrompt, validateJudgeModel, onValidationChange]
+      [scoringPrompt, modelFormValid, onValidationChange]
     );
 
-    useMemo(() => {
-      setJudgeModelName(judgeModel?.name || undefined);
-      setSystemPrompt(
-        judgeModel?.default_params && getSystemPrompt(judgeModel.default_params)
-      );
-      setResponseFormat(
-        judgeModel?.default_params?.response_format || 'json_object'
-      );
-    }, [judgeModel]);
-
-    const onJudgeModelChange = useCallback(
-      (newValue, maxTokens, savedModel) => {
-        let newJudgeModel: LlmStructuredCompletionModel | undefined;
-
-        if (savedModel && savedModels) {
-          newJudgeModel = savedModels.find(
-            model =>
-              model.name === savedModel.objectId &&
-              model.ref?._extra?.[0] === `${savedModel.versionIndex}`
-          );
-        } else {
-          newJudgeModel = {
-            llm_model_id: newValue,
-            name: judgeModelName || `${scorerName}-judge-model`,
-            default_params: {
-              max_tokens: maxTokens,
-            },
-            description: '',
-            ref: undefined,
-          };
-        }
-        setJudgeModel(newJudgeModel);
-        onValidationChange(!!scorerName && !!scoringPrompt);
+    const onModelValidationChange = useCallback(
+      (isValid: boolean) => {
+        setModelFormValid(isValid);
+        onValidationChange(!nameError && isValid && !!scoringPrompt);
       },
-      [
-        judgeModelName,
-        scoringPrompt,
-        savedModels,
-        scorerName,
-        setJudgeModel,
-        onValidationChange,
-      ]
+      [nameError, scoringPrompt, onValidationChange]
     );
 
-    const onJudgeModelNameChange = useCallback(
-      value => {
-        setJudgeModelName(value);
-        const validationResult = validateDatasetName(value);
-        setJudgeModelError(validationResult.error);
-        onValidationChange(
-          !validationResult.error &&
-            !!value &&
-            !!systemPrompt &&
-            !!responseFormat &&
-            !!scorerName &&
-            !!scoringPrompt
-        );
+    const onModelChange = useCallback(
+      (model: LlmStructuredCompletionModel | undefined) => {
+        setJudgeModel(model);
       },
-      [
-        systemPrompt,
-        responseFormat,
-        scorerName,
-        scoringPrompt,
-        setJudgeModelName,
-        setJudgeModelError,
-        onValidationChange,
-      ]
-    );
-
-    const onSystemPromptChange = useCallback(
-      value => {
-        setSystemPrompt(value);
-        onValidationChange(
-          !!value &&
-            !!judgeModelName &&
-            !!scorerName &&
-            !!scoringPrompt &&
-            !!responseFormat
-        );
-      },
-      [
-        judgeModelName,
-        scorerName,
-        scoringPrompt,
-        responseFormat,
-        onValidationChange,
-      ]
+      []
     );
 
     return (
@@ -416,65 +188,13 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             </Typography>
           </Box>
 
-          <Box>
-            <FieldName name="Judge model" />
-            <LLMDropdownLoaded
-              className="w-full"
-              value={selectedJudgeModel || ''}
-              isTeamAdmin={false}
-              direction={{horizontal: 'left'}}
-              onChange={onJudgeModelChange}
-            />
-            {judgeModelError && (
-              <Typography
-                className="mt-1 text-sm"
-                sx={{
-                  ...typographyStyle,
-                  color: 'error.main',
-                }}
-              />
-            )}
-          </Box>
-          {judgeModel && (
-            <Box className="flex flex-col gap-16 rounded-md bg-moon-100 p-16">
-              <Typography
-                sx={typographyStyle}
-                className="text-sm font-semibold uppercase tracking-wide text-moon-500">
-                Model settings
-              </Typography>
+          <ModelConfigurationForm
+            ref={modelFormRef}
+            initialModelRef={scorer.val['model']}
+            onValidationChange={onModelValidationChange}
+            onModelChange={onModelChange}
+          />
 
-              <Box>
-                <FieldName name="LLM ID" />
-                <Typography sx={{...typographyStyle, color: 'text.secondary'}}>
-                  {judgeModel.llm_model_id}
-                </Typography>
-              </Box>
-              <Box>
-                <FieldName name="Configuration name" />
-                <TextField
-                  value={judgeModelName}
-                  onChange={onJudgeModelNameChange}
-                />
-              </Box>
-              <Box>
-                <FieldName name="System prompt" />
-                <TextArea
-                  value={systemPrompt}
-                  onChange={e => onSystemPromptChange(e.target.value)}
-                />
-              </Box>
-              <Box>
-                <FieldName name="Response format" />
-                <ResponseFormatSelect
-                  responseFormat={
-                    (responseFormat ||
-                      'json_object') as PlaygroundResponseFormats
-                  }
-                  setResponseFormat={setResponseFormat}
-                />
-              </Box>
-            </Box>
-          )}
           <Box>
             <FieldName name="Scoring prompt" />
             <TextArea
@@ -483,7 +203,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               onChange={e => {
                 setScoringPrompt(e.target.value);
                 onValidationChange(
-                  !!e.target.value && !!scorerName && validateJudgeModel()
+                  !!e.target.value && !!scorerName && modelFormValid
                 );
               }}
             />
@@ -520,15 +240,3 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
     );
   }
 );
-
-function getSystemPrompt(
-  modelDefaultParams: LlmStructuredCompletionModelDefaultParams
-): string | undefined {
-  const systemPrompt = modelDefaultParams.messages_template?.find(
-    message => message.role === 'system'
-  )?.content;
-  if (typeof systemPrompt === 'string') {
-    return systemPrompt;
-  }
-  return undefined;
-}

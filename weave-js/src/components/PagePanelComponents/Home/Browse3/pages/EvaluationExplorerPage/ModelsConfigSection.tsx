@@ -4,6 +4,10 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useCallback, useMemo, useRef, useState} from 'react';
 
 import {ReusableDrawer} from '../../ReusableDrawer';
+import {
+  ModelConfigurationForm,
+  ModelConfigurationFormRef,
+} from '../MonitorsPage/ScorerForms/ModelConfigurationForm';
 import {refStringToName} from './common';
 import {LoadingSelect} from './components';
 import {useEvaluationExplorerPageContext} from './context';
@@ -122,12 +126,14 @@ export const ModelsConfigSection: React.FC<{
             };
             // Add current selection if it's not in the list (e.g., from another project)
             const allOptions = options.flatMap(group => group.options);
-            if (!allOptions.find(opt => opt.value === model.originalSourceRef)) {
+            if (
+              !allOptions.find(opt => opt.value === model.originalSourceRef)
+            ) {
               // Add to the existing models group
               options[1].options.unshift(selectedOption);
             }
           }
-          
+
           // Show loading state for individual dropdowns if query is loading
           if (modelRefsQuery.loading) {
             return (
@@ -140,7 +146,7 @@ export const ModelsConfigSection: React.FC<{
               </Row>
             );
           }
-          
+
           return (
             <Row key={modelNdx} style={{alignItems: 'center', gap: '8px'}}>
               <div style={{flex: 1}}>
@@ -240,11 +246,11 @@ const ModelDrawer: React.FC<{
     };
   };
 }> = ({entity, project, open, onClose, initialModel}) => {
-  // TODO: Implement save functionality
+  const modelFormRef = useRef<ModelConfigurationFormRef | null>(null);
+
   const onSave = useCallback(async () => {
-    // TODO: Save model and get reference
-    console.error('TODO: Implement model save');
-    onClose();
+    const newModelRef = await modelFormRef.current?.saveModel();
+    onClose(newModelRef);
   }, [onClose]);
 
   return (
@@ -254,12 +260,14 @@ const ModelDrawer: React.FC<{
       title="Model Configuration"
       onSave={onSave}>
       <Tailwind>
-        <div className="p-4">
-          {/* TODO: Add model configuration form components */}
-          <p className="text-gray-500">
-            Model configuration form will be implemented here
-          </p>
-        </div>
+        <ModelConfigurationForm
+          key={initialModel?.originalSourceRef ?? 'new-model'}
+          ref={modelFormRef}
+          initialModelRef={initialModel?.originalSourceRef ?? undefined}
+          onValidationChange={() => {
+            // Pass - validation is handled internally by the form
+          }}
+        />
       </Tailwind>
     </ReusableDrawer>
   );

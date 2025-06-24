@@ -12,7 +12,7 @@ import {LoadingSelect} from './components';
 import {useEvaluationExplorerPageContext} from './context';
 import {clientBound, hookify} from './hooks';
 import {Column, ConfigSection, Row} from './layout';
-import {getObjByRef, getLatestScorerRefs} from './query';
+import {getLatestScorerRefs, getObjByRef} from './query';
 
 const newScorerOption = {
   label: 'New Scorer',
@@ -111,12 +111,14 @@ export const ScorersConfigSection: React.FC<{
             };
             // Add current selection if it's not in the list (e.g., from another project)
             const allOptions = options.flatMap(group => group.options);
-            if (!allOptions.find(opt => opt.value === scorer.originalSourceRef)) {
+            if (
+              !allOptions.find(opt => opt.value === scorer.originalSourceRef)
+            ) {
               // Add to the existing scorers group
               options[1].options.unshift(selectedOption);
             }
           }
-          
+
           // Show loading state for individual dropdowns if query is loading
           if (scorerRefsQuery.loading) {
             return (
@@ -129,7 +131,7 @@ export const ScorersConfigSection: React.FC<{
               </Row>
             );
           }
-          
+
           return (
             <Row key={scorerNdx} style={{alignItems: 'center', gap: '8px'}}>
               <div style={{flex: 1}}>

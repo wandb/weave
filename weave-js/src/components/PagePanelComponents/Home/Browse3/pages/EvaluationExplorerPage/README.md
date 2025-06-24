@@ -22,6 +22,12 @@ The EvaluationExplorerPage provides an interactive interface for building and ru
 - **`layout.tsx`**: Reusable layout components (Column, Row, Header, Footer, etc.)
 - **`components.tsx`**: Shared UI components
 
+### Shared Components (from MonitorsPage)
+- **`ModelConfigurationForm.tsx`**: Reusable form for configuring LLM models with structured completion capabilities
+  - Used by both LLMAsAJudgeScorerForm and ModelsConfigSection
+  - Handles model selection, configuration, and saving
+  - Provides validation and state management
+
 ### Utilities
 - **`common.ts`**: Common utility functions (e.g., `refStringToName`)
 - **`hooks.tsx`**: Custom React hooks for data fetching and state management
@@ -66,6 +72,17 @@ Drawers provide detailed editing interfaces:
 - Save functionality
 - Form validation
 - Integration with Weave object storage
+
+### Shared Model Configuration
+The `ModelConfigurationForm` component provides a reusable interface for:
+- Selecting LLM models from available options
+- Configuring model parameters (name, system prompt, response format)
+- Saving models as `LLMStructuredCompletionModel` objects
+- Validation and error handling
+
+This component is shared between:
+- **LLMAsAJudgeScorerForm**: For configuring judge models in scorers
+- **ModelsConfigSection**: For configuring models in evaluations
 
 ## Usage
 
