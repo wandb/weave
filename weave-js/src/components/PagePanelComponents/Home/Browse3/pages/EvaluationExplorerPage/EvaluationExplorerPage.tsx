@@ -162,14 +162,50 @@ const ConfigPanel: React.FC<{entity: string; project: string}> = ({
           </Column>
         </ConfigSection>
         <ConfigSection title="Models" icon="model">
-          <Select
-            options={[]}
-            value={''}
-            onChange={option => {
-              console.log(option);
-              console.error('TODO: Implement me');
-            }}
-          />
+          <Column style={{gap: '8px'}}>
+            <Row style={{alignItems: 'center', gap: '8px'}}>
+              <Button
+                icon="copy"
+                variant="ghost"
+                onClick={() => {
+                  console.error('TODO: Implement me');
+                }}
+              />
+              <div style={{flex: 1}}>
+                <Select
+                  options={[]}
+                  value={''}
+                  onChange={option => {
+                    console.log(option);
+                    console.error('TODO: Implement me');
+                  }}
+                />
+              </div>
+              <Button
+                icon="settings"
+                variant="ghost"
+                onClick={() => {
+                  console.error('TODO: Implement me');
+                }}
+              />
+              <Button
+                icon="remove"
+                variant="ghost"
+                onClick={() => {
+                  console.error('TODO: Implement me');
+                }}
+              />
+            </Row>
+            <Row>
+              <Button
+                icon="add-new"
+                variant="ghost"
+                onClick={() => {
+                  console.error('TODO: Implement me');
+                }}
+              />
+            </Row>
+          </Column>
         </ConfigSection>
       </Column>
       <Footer>
