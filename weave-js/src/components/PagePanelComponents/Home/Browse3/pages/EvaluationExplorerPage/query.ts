@@ -17,7 +17,7 @@ const makeSafe = <T>(
   };
 };
 
-const getLatestEvaluationRefs = async (
+export const getLatestEvaluationRefs = async (
   client: TraceServerClient,
   entity: string,
   project: string
@@ -37,7 +37,7 @@ const getLatestEvaluationRefs = async (
   );
 };
 
-export const getLatestEvaluationRefsSafe = makeSafe(
-  getLatestEvaluationRefs,
-  []
-);
+// export const getLatestEvaluationRefsSafe = makeSafe(
+//   getLatestEvaluationRefs,
+//   []
+// );

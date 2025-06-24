@@ -10,6 +10,8 @@ import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
 } from './context';
+import {bindClientHook, promiseToHook} from './hooks';
+import {getLatestEvaluationRefs} from './query';
 
 const HEADER_HEIGHT_PX = 44;
 const BORDER_COLOR = MOON_200;
@@ -49,7 +51,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
   console.log(config);
   return (
     <Row>
-      <ConfigPanel />
+      <ConfigPanel entity={entity} project={project} />
       <Column style={{flex: 1}}>
         <Header>Results</Header>
       </Column>
@@ -57,7 +59,10 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
   );
 };
 
-const ConfigPanel: React.FC = () => {
+const ConfigPanel: React.FC<{entity: string; project: string}> = ({
+  entity,
+  project,
+}) => {
   return (
     <Column
       style={{
@@ -79,14 +84,7 @@ const ConfigPanel: React.FC = () => {
       </Header>
       <Column style={{flex: 1, overflowY: 'auto'}}>
         <ConfigSection title="Evaluation" icon="baseline-alt">
-          <Select
-            options={[]}
-            value={''}
-            onChange={option => {
-              console.log(option);
-              console.error('TODO: Implement me');
-            }}
-          />
+          <EvaluationPicker entity={entity} project={project} />
           <Column
             style={{
               flex: 0,
@@ -259,3 +257,27 @@ const Column: React.FC<{
     </Box>
   );
 };
+
+// Specialized Components
+
+const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
+  entity,
+  project,
+}) => {
+  const refsQuery = useLatestEvaluationRefs(entity, project);
+  console.log(refsQuery);
+  return (
+    <Select
+      options={[]}
+      value={''}
+      onChange={option => {
+        console.log(option);
+        console.error('TODO: Implement me');
+      }}
+    />
+  );
+};
+
+const useLatestEvaluationRefs = bindClientHook(
+  promiseToHook(getLatestEvaluationRefs)
+);
