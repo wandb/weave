@@ -7,7 +7,7 @@ import {CustomWeaveTypeProjectContext} from '@wandb/weave/components/PagePanelCo
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import React, {useContext, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useContext, useEffect, useRef, useState} from 'react';
 import {AutoSizer} from 'react-virtualized';
 import {ContentViewMetadataLoadedProps} from './types';
 
@@ -48,7 +48,6 @@ type VideoContentWithSizeProps = ContentViewMetadataLoadedProps & {
 const VideoContentWithSize: React.FC<VideoContentWithSizeProps> = ({
   entity,
   project,
-  data,
   metadata,
   content,
   containerWidth,
@@ -212,10 +211,7 @@ type VideoContentDisplayProps = {
 const VideoContentDisplay: React.FC<VideoContentDisplayProps> = ({
   fileExt,
   buffer,
-  containerWidth,
   containerHeight,
-  title,
-  previewImageUrl,
   isThumbnail,
   videoRef,
 }) => {

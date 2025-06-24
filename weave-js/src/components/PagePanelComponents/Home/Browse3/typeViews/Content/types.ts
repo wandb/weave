@@ -21,7 +21,7 @@ export type ContentMetadata = {
   mimetype: string;
 };
 
-export type ContentViewMetadataLoadedProps = ContentViewProps & {
+export type ContentViewMetadataLoadedProps = Omit<ContentViewProps, 'data'> & {
   metadata: ContentMetadata;
   content: string;
 };

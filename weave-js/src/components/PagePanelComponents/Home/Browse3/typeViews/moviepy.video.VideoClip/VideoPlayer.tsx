@@ -57,22 +57,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     size: 0, // Size not available in video clip data
   };
 
-  // Create data structure compatible with ContentTypePayload
-  const contentData = {
-    type: 'weave.type_wrappers.Content.content.Content' as const,
-    val: {},
-    files: {
-      content: data.files[videoKey],
-      'metadata.json': '', // Not used but required by type
-    },
-  };
-
   return (
     <VideoContent
       entity={entity}
       project={project}
       mode={mode}
-      data={contentData}
       metadata={metadata}
       content={data.files[videoKey]}
     />
