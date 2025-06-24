@@ -188,7 +188,7 @@ Learn how to [create a monitor in general](#create-a-monitor) or try out the [en
             - **Configuration name**
             - **System prompt**
             - **Response format**
-        - **Scoring prompt**: The prompt used by the LLM-as-a-judge to score your ops. The prompt should specify what the `{output}` and `{input}` are. For more information, see [Scoring prompts](#scoring-prompts).
+        - **Scoring prompt**: The prompt used by the LLM-as-a-judge to score your ops. The prompt should specify what the `{output}` and `{input}` are.
 4. Click **Create Monitor**. Weave will automatically begin monitoring and scoring calls that match the specified criteria. You can view monitor details in the **Monitors** tab.
 
 ### Example: Create a truthfulness monitor
