@@ -268,7 +268,6 @@ def test_poison_pill_detection_and_immediate_drop():
                 raise RuntimeError("Batch processing error")
             processed.append(item)
 
-        print(f"Processed: {processed}")
         successful_items += processed
 
     with tempfile.TemporaryDirectory() as temp_dir:
