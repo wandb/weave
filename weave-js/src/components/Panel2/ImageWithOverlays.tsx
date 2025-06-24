@@ -557,7 +557,7 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
                 className="absolute"
                 style={{
                   left,
-                  top: top,
+                  top,
                 }}>
                 <div className="relative">
                   <Tooltip.Provider delayDuration={0}>
@@ -565,7 +565,7 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
                       <Tooltip.Trigger>
                         <div
                           style={{
-                            outline: outlineWidth,
+                            outlineWidth,
                             outlineColor: color,
                             outlineStyle:
                               lineStyle === 'line'
