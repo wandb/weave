@@ -3568,3 +3568,211 @@ def test_sum_dict_leaves_deep_nested(client):
         },
         "top": [10, "mixed", 20],
     }
+
+
+def test_filter_calls_by_ref(client):
+    """Test filtering calls by values within objects stored as refs in inputs/outputs."""
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    # Create configuration objects to be referenced
+    config1 = {"temperature": 0.5, "model": "gpt-4", "max_tokens": 100}
+    config1_ref = weave.publish(config1, "config1")
+
+    config2 = {"temperature": 0.8, "model": "gpt-3.5", "max_tokens": 200}
+    config2_ref = weave.publish(config2, "config2")
+
+    # Create nested objects with references
+    worker_info1 = {"id": 1, "status": "active", "config": config1_ref}
+    worker1_ref = weave.publish(worker_info1, "worker1")
+
+    worker_info2 = {"id": 2, "status": "inactive", "config": config2_ref}
+    worker2_ref = weave.publish(worker_info2, "worker2")
+
+    # Create a more complex nested structure
+    project_data = {
+        "name": "test_project",
+        "version": "v1.0",
+        "settings": {"debug": True, "workers": [worker1_ref, worker2_ref]},
+    }
+    project_ref = weave.publish(project_data, "project")
+
+    @weave.op()
+    def process_with_config(worker_config, project_info):
+        return {
+            "result": f"processed with {worker_config.config.model}",
+            "processed_worker": worker_config,
+            "project_context": project_info,
+        }
+
+    # Create calls that use these referenced objects
+    process_with_config(worker1_ref, project_ref)
+    process_with_config(worker2_ref, project_ref)
+
+    client.flush()
+
+    # Test filtering by simple ref value in inputs
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [{"$getField": "inputs.worker_config.id"}, {"$literal": 1}]
+                }
+            },
+            expand_columns=["inputs.worker_config"],
+        )
+    )
+    assert len(calls) == 1  # Should get call with worker1
+
+    # Test filtering by nested ref value in inputs
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "inputs.worker_config.config.model"},
+                        {"$literal": "gpt-4"},
+                    ]
+                }
+            },
+            expand_columns=["inputs.worker_config", "inputs.worker_config.config"],
+        )
+    )
+    assert len(calls) == 1  # Should get call with config1 (gpt-4)
+
+    # Test filtering by deeply nested ref value
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "inputs.project_info.settings.debug"},
+                        {"$literal": True},
+                    ]
+                }
+            },
+            expand_columns=["inputs.project_info"],
+        )
+    )
+    assert len(calls) == 2  # Should get both calls since both use same project
+
+    # Test filtering by output ref value
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "output.processed_worker.status"},
+                        {"$literal": "active"},
+                    ]
+                }
+            },
+            expand_columns=["output.processed_worker"],
+        )
+    )
+    assert len(calls) == 1  # Should get call that returned worker1
+
+    # Test complex query with multiple ref conditions
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$and": [
+                        {
+                            "$eq": [
+                                {
+                                    "$getField": "inputs.worker_config.config.temperature"
+                                },
+                                {"$literal": 0.8},
+                            ]
+                        },
+                        {
+                            "$eq": [
+                                {"$getField": "inputs.project_info.name"},
+                                {"$literal": "test_project"},
+                            ]
+                        },
+                    ]
+                }
+            },
+            expand_columns=[
+                "inputs.worker_config",
+                "inputs.worker_config.config",
+                "inputs.project_info",
+            ],
+        )
+    )
+    assert len(calls) == 1  # Should get call with worker2 (temp=0.8) and test_project
+
+    # Test filtering with string comparison on ref values
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$contains": {
+                        "input": {"$getField": "inputs.worker_config.config.model"},
+                        "substr": {"$literal": "gpt"},
+                    }
+                }
+            },
+            expand_columns=["inputs.worker_config", "inputs.worker_config.config"],
+        )
+    )
+    assert len(calls) == 2  # Should get both calls since both models contain "gpt"
+
+    # Test filtering with numeric comparison on ref values
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$gt": [
+                        {"$getField": "inputs.worker_config.config.max_tokens"},
+                        {"$literal": 150},
+                    ]
+                }
+            },
+            expand_columns=["inputs.worker_config", "inputs.worker_config.config"],
+        )
+    )
+    assert len(calls) == 1  # Should get call with config2 (max_tokens=200)
+
+    # Test OR condition with ref values
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$or": [
+                        {
+                            "$eq": [
+                                {"$getField": "inputs.worker_config.id"},
+                                {"$literal": 1},
+                            ]
+                        },
+                        {
+                            "$eq": [
+                                {"$getField": "output.processed_worker.status"},
+                                {"$literal": "inactive"},
+                            ]
+                        },
+                    ]
+                }
+            },
+            expand_columns=["inputs.worker_config", "output.processed_worker"],
+        )
+    )
+    assert (
+        len(calls) == 2
+    )  # Should get both calls (worker1 by id=1, worker2 by status=inactive)
+
+    # Test filtering without expand_columns should not work for ref values
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [{"$getField": "inputs.worker_config.id"}, {"$literal": 1}]
+                }
+            }
+            # No expand_columns provided
+        )
+    )
+    assert len(calls) == 0  # Should get no calls since refs are not expanded
