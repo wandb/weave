@@ -69,18 +69,15 @@ export const hookify = <TArgs extends any[], TReturn>(
         return {
           loading,
           error,
-        };
-      } else if (data) {
-        return {
-          loading,
-          data,
+          data: null,
         };
       } else {
-        console.error('Invalid state', {loading, data, error});
         return {
-          loading: true as const,
-          data: null,
+          loading,
           error: null,
+          // A little dangerous in the event that `data` is null but `TReturn` is not
+          // but it's fine for our use case
+          data: data as TReturn,
         };
       }
     }, [loading, data, error]);

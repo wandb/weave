@@ -6,18 +6,25 @@ import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useMemo, useState} from 'react';
+import {parseWeaveRef} from '@wandb/weave/react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 
 import {ReusableDrawer} from '../../ReusableDrawer';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {ScorerFormRef} from '../MonitorsPage/MonitorFormDrawer';
 import {LLMAsAJudgeScorerForm} from '../MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
+import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
 } from './context';
 import {NewDatasetEditor} from './DatasetEditor';
 import {clientBound, hookify} from './hooks';
-import {getLatestDatasetRefs, getLatestEvaluationRefs} from './query';
+import {
+  getLatestDatasetRefs,
+  getLatestEvaluationRefs,
+  getScorerByRef,
+} from './query';
 
 const HEADER_HEIGHT_PX = 44;
 const BORDER_COLOR = MOON_200;
@@ -428,10 +435,48 @@ const DatasetPicker: React.FC<{
   );
 };
 
+const newScorerOption = {
+  label: 'New Scorer',
+  value: 'new-scorer',
+};
+
 const ScorersConfigSection: React.FC<{entity: string; project: string}> = ({
   entity,
   project,
 }) => {
+  const {config, editConfig} = useEvaluationExplorerPageContext();
+
+  const [currentlyEditingScorerNdx, setCurrentlyEditingScorerNdx] = useState<
+    number | null
+  >(null);
+
+  const scorers = useMemo(() => {
+    return config.evaluationDefinition.properties.scorers;
+  }, [config]);
+
+  const addScorer = useCallback(() => {
+    editConfig(draft => {
+      draft.evaluationDefinition.properties.scorers.push({
+        originalSourceRef: null,
+      });
+    });
+  }, [editConfig]);
+
+  const scorerOptions = useMemo(() => {
+    return [newScorerOption];
+  }, []);
+
+  const deleteScorer = useCallback(
+    (scorerNdx: number) => {
+      editConfig(draft => {
+        draft.evaluationDefinition.properties.scorers.splice(scorerNdx, 1);
+      });
+    },
+    [editConfig]
+  );
+
+  console.log('currentlyEditingScorerNdx', currentlyEditingScorerNdx);
+
   return (
     <ConfigSection
       title="Scorers"
@@ -441,77 +486,156 @@ const ScorersConfigSection: React.FC<{entity: string; project: string}> = ({
         paddingRight: '0px',
       }}>
       <Column style={{gap: '8px'}}>
-        <Row style={{alignItems: 'center', gap: '8px'}}>
-          <div style={{flex: 1}}>
-            <Select
-              options={[]}
-              value={''}
-              onChange={option => {
-                console.log(option);
-                console.error('TODO: Implement me');
-              }}
-            />
-          </div>
-          <Button
-            icon="settings"
-            variant="ghost"
-            onClick={() => {
-              console.error('TODO: Implement me');
-            }}
-          />
-          <Button
+        {scorers.map((scorer, scorerNdx) => {
+          let selectedOption = newScorerOption;
+          const options = [...scorerOptions];
+          if (scorer.originalSourceRef) {
+            const ref = parseWeaveRef(scorer.originalSourceRef);
+            const name = `${ref.artifactName} (${ref.artifactVersion.slice(
+              0,
+              4
+            )})`;
+            selectedOption = {
+              label: name,
+              value: scorer.originalSourceRef,
+            };
+            options.unshift(selectedOption);
+          }
+          return (
+            <Row key={scorerNdx} style={{alignItems: 'center', gap: '8px'}}>
+              <div style={{flex: 1}}>
+                <Select
+                  options={options}
+                  value={selectedOption}
+                  onChange={option => {
+                    console.log(option);
+                    console.error('TODO: Implement me');
+                  }}
+                />
+              </div>
+              <Button
+                icon="settings"
+                variant="ghost"
+                onClick={() => {
+                  setCurrentlyEditingScorerNdx(scorerNdx);
+                }}
+              />
+              {/* <Button
             icon="copy"
             variant="ghost"
             onClick={() => {
               console.error('TODO: Implement me');
             }}
-          />
-          <Button
-            icon="remove"
-            variant="ghost"
-            onClick={() => {
-              console.error('TODO: Implement me');
-            }}
-          />
-        </Row>
+          /> */}
+              <Button
+                icon="delete"
+                variant="ghost"
+                onClick={() => {
+                  deleteScorer(scorerNdx);
+                }}
+              />
+            </Row>
+          );
+        })}
         <Row>
           <Button
             icon="add-new"
             variant="ghost"
             onClick={() => {
-              console.error('TODO: Implement me');
+              addScorer();
             }}
           />
         </Row>
-        <ScorerDrawer entity={entity} project={project} />
+        <ScorerDrawer
+          entity={entity}
+          project={project}
+          open={currentlyEditingScorerNdx !== null}
+          onClose={newScorerRef => {
+            if (newScorerRef && currentlyEditingScorerNdx !== null) {
+              editConfig(draft => {
+                draft.evaluationDefinition.properties.scorers[
+                  currentlyEditingScorerNdx
+                ].originalSourceRef = newScorerRef;
+              });
+            }
+            setCurrentlyEditingScorerNdx(null);
+          }}
+          initialScorerRef={
+            currentlyEditingScorerNdx !== null
+              ? scorers[currentlyEditingScorerNdx]?.originalSourceRef ??
+                undefined
+              : undefined
+          }
+        />
       </Column>
     </ConfigSection>
   );
 };
 
+const emptyScorer = (entity: string, project: string): ObjectVersionSchema => ({
+  scheme: 'weave',
+  weaveKind: 'object',
+  entity,
+  project,
+  objectId: '',
+  versionHash: '',
+  path: '',
+  versionIndex: 0,
+  baseObjectClass: 'LLMAsAJudgeScorer',
+  createdAtMs: Date.now(),
+  val: {_type: 'LLMAsAJudgeScorer'},
+});
+
+const useScorer = clientBound(hookify(getScorerByRef));
+
 const ScorerDrawer: React.FC<{
   entity: string;
   project: string;
-}> = ({entity, project}) => {
+  open: boolean;
+  onClose: (newScorerRef?: string) => void;
+  initialScorerRef?: string;
+}> = ({entity, project, open, onClose, initialScorerRef}) => {
+  const scorerFormRef = useRef<ScorerFormRef | null>(null);
+  const onSave = useCallback(async () => {
+    const newScorerRef = await scorerFormRef.current?.saveScorer();
+    console.log('newScorerRef', newScorerRef);
+    onClose(newScorerRef);
+  }, [onClose]);
+
+  const scorerQuery = useScorer(initialScorerRef);
+  console.log('scorerQuery', scorerQuery);
+
+  const scorerObj = useMemo(() => {
+    if (initialScorerRef) {
+      return scorerQuery.data ?? emptyScorer(entity, project);
+    } else {
+      return emptyScorer(entity, project);
+    }
+  }, [entity, initialScorerRef, project, scorerQuery.data]);
+
+  if (scorerQuery.loading) {
+    // TODO: Show a loading indicator
+    return null;
+  }
+
+  if (scorerQuery.error) {
+    // TODO: Show a loading indicator
+    return null;
+  }
+
   return (
-    <ReusableDrawer open onClose={() => {}} title="Scorer" onSave={() => {}}>
+    <ReusableDrawer
+      open={open}
+      onClose={() => onClose()}
+      title="Scorer Configuration"
+      onSave={onSave}>
       <Tailwind>
         <LLMAsAJudgeScorerForm
-          scorer={{
-            scheme: 'weave',
-            weaveKind: 'object',
-            entity,
-            project,
-            objectId: '',
-            versionHash: '',
-            path: '',
-            versionIndex: 0,
-            baseObjectClass: 'LLMAsAJudgeScorer',
-            createdAtMs: Date.now(),
-            val: {_type: 'LLMAsAJudgeScorer'},
-          }}
+          key={initialScorerRef}
+          ref={scorerFormRef}
+          scorer={scorerObj}
           onValidationChange={() => {
-            console.error('TODO: Implement me');
+            // Pass
           }}
         />
       </Tailwind>

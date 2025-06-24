@@ -36,21 +36,6 @@ export type EvaluationExplorationConfig = {
       scorers: Array<{
         // The Weave Ref pointing to the scorer definition
         originalSourceRef: string | null;
-        // Determines if the properties deviated from the referenced source
-        dirtied: boolean;
-        // The properties of the scorer
-        properties: {
-          // The name of the scorer function
-          name: string;
-          // The description of what this scorer evaluates
-          description: string;
-          // The system prompt template for the scorer LLM
-          systemPromptTemplate: string;
-          // The prompt template for scoring model outputs
-          scorerPromptTemplate: string;
-          // The expected output schema for the scorer results
-          outputSchema: JSONSchema;
-        };
       }>;
     };
   };

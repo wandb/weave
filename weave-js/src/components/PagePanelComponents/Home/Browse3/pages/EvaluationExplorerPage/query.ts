@@ -1,6 +1,9 @@
+import {parseWeaveRef} from '@wandb/weave/react';
 import {makeRefObject} from '@wandb/weave/util/refs';
 
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
+import {convertTraceServerObjectVersionToSchema} from '../wfReactInterface/tsDataModelHooks';
+import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
 export const getLatestEvaluationRefs = async (
   client: TraceServerClient,
@@ -40,4 +43,27 @@ export const getLatestDatasetRefs = async (
   return res.objs.map(o =>
     makeRefObject(entity, project, 'object', o.object_id, o.digest, undefined)
   );
+};
+
+export const getScorerByRef = async (
+  client: TraceServerClient,
+  ref?: string | null
+): Promise<ObjectVersionSchema | null> => {
+  if (!ref) {
+    return null;
+  }
+
+  const parsedRef = parseWeaveRef(ref);
+
+  if (parsedRef.weaveKind !== 'object') {
+    return null;
+  }
+
+  const res = await client.objRead({
+    project_id: `${parsedRef.entityName}/${parsedRef.projectName}`,
+    object_id: parsedRef.artifactName,
+    digest: parsedRef.artifactVersion,
+  });
+
+  return convertTraceServerObjectVersionToSchema(res.obj);
 };
