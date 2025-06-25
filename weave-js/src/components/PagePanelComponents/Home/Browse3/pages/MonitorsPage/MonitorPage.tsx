@@ -2,6 +2,7 @@ import {Box, Typography} from '@mui/material';
 import {GridFilterItem} from '@mui/x-data-grid-pro';
 import {Button, ButtonVariants} from '@wandb/weave/components/Button';
 import {IconNames} from '@wandb/weave/components/Icon';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {BooleanIcon} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValueBoolean';
 import {
   useEntityProject,
@@ -34,8 +35,10 @@ import {Timestamp} from '@wandb/weave/components/Timestamp';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import {parseRef} from '@wandb/weave/react';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
+
+import {MonitorDrawerRouter} from './MonitorFormDrawer';
 
 const MONITOR_VERSIONS_SORT_KEY: SortBy[] = [
   {field: 'created_at', direction: 'desc'},
@@ -59,6 +62,18 @@ export const MonitorPage = (props: {objectName: string; version: string}) => {
   });
 
   const monitorVersions = objectVersionResults.result || [];
+  const isLoading = objectVersionResults.loading;
+
+  if (isLoading) {
+    return (
+      <Tailwind>
+        <div className="flex min-h-[100vh] items-center justify-center">
+          <LoadingDots />
+        </div>
+      </Tailwind>
+    );
+  }
+
   return monitorVersions === null || monitorVersions.length === 0 ? (
     <NotFoundPanel title="Monitor not found" />
   ) : (
@@ -72,6 +87,7 @@ const MonitorPageInner = ({
   monitorVersions: ObjectVersionSchema[];
 }) => {
   const {entity, project} = useEntityProject();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const allVersionRefs = useMemo(() => {
     return monitorVersions.map(v => objectVersionKeyToRefUri(v));
   }, [monitorVersions]);
@@ -125,6 +141,9 @@ const MonitorPageInner = ({
     query: callCountQuery,
   });
 
+  const handleEditClick = useCallback(() => setIsDrawerOpen(true), []);
+  const handleCloseDrawer = useCallback(() => setIsDrawerOpen(false), []);
+
   const monitorVersionForDelete = useMemo(() => {
     return {
       ...monitorVersions[0],
@@ -134,142 +153,162 @@ const MonitorPageInner = ({
   }, [monitorVersions]);
 
   return (
-    <SimplePageLayoutWithHeader
-      title={
-        <Tailwind>
-          <div className="flex items-center gap-8">
-            <ObjectIcon baseObjectClass="Monitor" />
-            {monitorVersions[0].val['name']}
-          </div>
-        </Tailwind>
-      }
-      headerContent={
-        <Tailwind>
-          <div className="grid-cols-auto grid w-full grid-flow-col gap-16 text-sm">
-            <div className="block">
-              <p className="text-moon-500">Name</p>
-              <p>{monitorVersions[0].val['name']}</p>
+    <>
+      <SimplePageLayoutWithHeader
+        title={
+          <Tailwind>
+            <div className="flex items-center gap-8">
+              <ObjectIcon baseObjectClass="Monitor" />
+              {monitorVersions[0].val['name']}
             </div>
-            <div className="block">
-              <p className="text-moon-500">Last updated</p>
-              <p>
-                <Timestamp
-                  value={monitorVersions[0].createdAtMs / 1000}
-                  format="relative"
-                />
-              </p>
-            </div>
-            {monitorVersions[0].userId && (
+          </Tailwind>
+        }
+        headerContent={
+          <Tailwind>
+            <div className="grid-cols-auto grid w-full grid-flow-col gap-16 text-sm">
               <div className="block">
-                <p className="text-moon-500">Last updated by</p>
-                <UserLink userId={monitorVersions[0].userId} includeName />
+                <p className="text-moon-500">Name</p>
+                <p>{monitorVersions[0].val['name']}</p>
               </div>
-            )}
-            <div className="ml-auto">
-              <DeleteObjectButtonWithModal
-                overrideDisplayStr={monitorVersions[0].val['name']}
-                objVersionSchema={monitorVersionForDelete}
-              />
+              <div className="block">
+                <p className="text-moon-500">Last updated</p>
+                <p>
+                  <Timestamp
+                    value={monitorVersions[0].createdAtMs / 1000}
+                    format="relative"
+                  />
+                </p>
+              </div>
+              {monitorVersions[0].userId && (
+                <div className="block">
+                  <p className="text-moon-500">Last updated by</p>
+                  <UserLink userId={monitorVersions[0].userId} includeName />
+                </div>
+              )}
+              <div className="ml-auto flex-shrink-0">
+                <Button
+                  title="Edit monitor"
+                  tooltip="Edit monitor"
+                  variant="ghost"
+                  size="medium"
+                  icon="pencil-edit"
+                  onClick={handleEditClick}
+                />
+                <DeleteObjectButtonWithModal
+                  overrideDisplayStr={monitorVersions[0].val['name']}
+                  objVersionSchema={monitorVersionForDelete}
+                />
+              </div>
             </div>
-          </div>
-        </Tailwind>
-      }
-      tabs={[
-        {
-          label: 'Monitor',
-          content: (
-            <ScrollableTabContent>
-              <Tailwind>
-                <Box className="flex-0-auto mb-8 h-full">
-                  <Typography
-                    variant="h6"
-                    sx={{...typographyStyle}}
-                    className="font-semibold">
-                    Monitor details
-                  </Typography>
-                </Box>
-                <SimpleKeyValueTable
-                  data={{
-                    Description: monitorVersions[0].val['description'],
-                    Active: (
-                      <BooleanIcon value={monitorVersions[0].val['active']} />
-                    ),
-                    'Monitored Ops': (
-                      <Box className="flex gap-2">
-                        {monitorVersions[0].val['op_names'].map(
-                          (opRefUri: string) => (
-                            <SafeOpRef key={opRefUri} opRef={opRefUri} />
-                          )
-                        )}
-                      </Box>
-                    ),
-                    'Additional filters': (
-                      <Box className="flex gap-2">
-                        {filterItems.map(item => (
-                          <FilterTagItem
-                            key={item.id}
-                            entity={entity}
-                            project={project}
-                            item={item}
-                            disableRemove
-                          />
-                        ))}
-                      </Box>
-                    ),
-                    'Sampling rate': `${
-                      monitorVersions[0].val['sampling_rate'] * 100
-                    }%`,
-                    Scorers: (
-                      <Box className="flex gap-2">
-                        {monitorVersions[0].val['scorers'].map(
-                          (scorerRefUri: string) => (
-                            <SmallRef
-                              objRef={parseRef(scorerRefUri)}
-                              key={scorerRefUri}
+          </Tailwind>
+        }
+        tabs={[
+          {
+            label: 'Monitor',
+            content: (
+              <ScrollableTabContent>
+                <Tailwind>
+                  <Box className="flex-0-auto mb-8 h-full">
+                    <Typography
+                      variant="h6"
+                      sx={{...typographyStyle}}
+                      className="font-semibold">
+                      Monitor details
+                    </Typography>
+                  </Box>
+                  <SimpleKeyValueTable
+                    data={{
+                      Description: monitorVersions[0].val['description'],
+                      Active: (
+                        <BooleanIcon value={monitorVersions[0].val['active']} />
+                      ),
+                      'Monitored Ops': (
+                        <Box className="flex gap-2">
+                          {!monitorVersions[0].val['op_names'] ||
+                          monitorVersions[0].val['op_names'].length === 0 ? (
+                            <span>All ops</span>
+                          ) : (
+                            monitorVersions[0].val['op_names'].map(
+                              (opRefUri: string) => (
+                                <SafeOpRef key={opRefUri} opRef={opRefUri} />
+                              )
+                            )
+                          )}
+                        </Box>
+                      ),
+                      'Additional filters': (
+                        <Box className="flex gap-2">
+                          {filterItems.map(item => (
+                            <FilterTagItem
+                              key={item.id}
+                              entity={entity}
+                              project={project}
+                              item={item}
+                              disableRemove
                             />
-                          )
-                        )}
-                      </Box>
-                    ),
-                  }}
-                />
-              </Tailwind>
-            </ScrollableTabContent>
-          ),
-        },
-        {
-          label: 'Calls',
-          content: (
-            <Tailwind>
-              <Box className="flex flex-col gap-16 p-16">
-                <Box className="flex justify-between">
-                  <span>
-                    {callCountResult && (
-                      <>
-                        {callCountResult.count}{' '}
-                        {maybePluralizeWord(callCountResult.count, 'call')}
-                      </>
-                    )}
-                  </span>
-                  <Button
-                    variant={ButtonVariants.Secondary}
-                    icon={IconNames.Table}
-                    onClick={onGoToTableClick}>
-                    Go to table
-                  </Button>
+                          ))}
+                        </Box>
+                      ),
+                      'Sampling rate': `${
+                        monitorVersions[0].val['sampling_rate'] * 100
+                      }%`,
+                      Scorers: (
+                        <Box className="flex gap-2">
+                          {monitorVersions[0].val['scorers'].map(
+                            (scorerRefUri: string) => (
+                              <SmallRef
+                                objRef={parseRef(scorerRefUri)}
+                                key={scorerRefUri}
+                              />
+                            )
+                          )}
+                        </Box>
+                      ),
+                    }}
+                  />
+                </Tailwind>
+              </ScrollableTabContent>
+            ),
+          },
+          {
+            label: 'Calls',
+            content: (
+              <Tailwind>
+                <Box className="flex flex-col gap-16 p-16">
+                  <Box className="flex justify-between">
+                    <span>
+                      {callCountResult && (
+                        <>
+                          {callCountResult.count}{' '}
+                          {maybePluralizeWord(callCountResult.count, 'call')}
+                        </>
+                      )}
+                    </span>
+                    <Button
+                      variant={ButtonVariants.Secondary}
+                      icon={IconNames.Table}
+                      onClick={onGoToTableClick}>
+                      Go to table
+                    </Button>
+                  </Box>
+                  <CallsTable
+                    hideControls
+                    paginationModel={{page: 0, pageSize: 10}}
+                    entity={entity}
+                    project={project}
+                    filterModel={callsFilterModel}
+                  />
                 </Box>
-                <CallsTable
-                  hideControls
-                  paginationModel={{page: 0, pageSize: 10}}
-                  entity={entity}
-                  project={project}
-                  filterModel={callsFilterModel}
-                />
-              </Box>
-            </Tailwind>
-          ),
-        },
-      ]}
-    />
+              </Tailwind>
+            ),
+          },
+        ]}
+      />
+      <MonitorDrawerRouter
+        open={isDrawerOpen}
+        onClose={handleCloseDrawer}
+        monitor={monitorVersions[0]}
+      />
+    </>
   );
 };
