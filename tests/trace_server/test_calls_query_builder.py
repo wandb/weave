@@ -2730,3 +2730,47 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
             "pb_10": "test prompt",
         },
     )
+
+
+def test_object_ref_order_by_simple() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_order("inputs.model.temperature", "desc")
+    cq.set_expand_columns(["inputs.model"])
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS
+          (SELECT calls_merged.id AS id
+           FROM calls_merged
+           WHERE calls_merged.project_id = {pb_0:String}
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)
+           HAVING (((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
+             obj_filter_0 AS
+          (SELECT object_id,
+                  digest,
+                  any(val_dump) AS object_val_dump,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+           GROUP BY project_id,
+                    object_id,
+                    digest)
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        LEFT JOIN obj_filter_0 
+            ON JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}) = obj_filter_0.full_ref
+        WHERE calls_merged.project_id = {pb_0:String}
+            AND (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id,
+                  calls_merged.id)
+        ORDER BY JSON_VALUE(any(obj_filter_0.object_val_dump), {pb_1:String}) DESC
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": "$.temperature",
+            "pb_2": "$.model",
+        },
+    )

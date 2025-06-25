@@ -36,8 +36,11 @@ from pydantic import BaseModel, Field
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
+    ObjectRefFilterCondition,
+    ObjectRefOrderCondition,
     ObjectRefQueryProcessor,
     build_object_ref_ctes,
+    has_object_ref_field,
     is_object_ref_operand,
     process_query_for_object_refs,
 )
@@ -341,7 +344,30 @@ class OrderField(BaseModel):
     field: QueryBuilderField
     direction: Literal["ASC", "DESC"]
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        expand_columns: Optional[list[str]] = None,
+        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
+    ) -> str:
+        # Check if this is an object ref order field
+        if (
+            expand_columns
+            and field_to_object_join_alias_map
+            and has_object_ref_field(self.raw_field_path, expand_columns)
+        ):
+            order_condition = ObjectRefOrderCondition(
+                field_path=self.raw_field_path,
+                expand_columns=expand_columns,
+            )
+            cte_alias = field_to_object_join_alias_map.get(order_condition.unique_key)
+            if cte_alias:
+                leaf_property = order_condition.get_leaf_object_property_path()
+                json_path_param = pb.add_param(f"$.{leaf_property}")
+                return f"JSON_VALUE(any({cte_alias}.object_val_dump), {param_slot(json_path_param, 'String')}) {self.direction}"
+
+        # Default behavior for non-object-ref fields
         options: list[tuple[Optional[tsi_query.CastTo], str]]
         if isinstance(
             self.field,
@@ -365,6 +391,23 @@ class OrderField(BaseModel):
                 res += ", "
             res += f"{self.field.as_sql(pb, table_alias, cast)} {direction}"
         return res
+
+    @property
+    def raw_field_path(self) -> str:
+        """
+        Returns the raw field path, i.e. the field path without the _dump suffix and
+        includes the extra path.
+
+        example:
+            OrderField(field=CallsMergedField(field="inputs_dump", extra_path=["model", "temperature"])).raw_field_path
+                -> inputs.model.temperature
+        """
+        field_path = self.field.field
+        if field_path.endswith("_dump"):
+            field_path = field_path[:-5]
+        if hasattr(self.field, "extra_path"):
+            field_path += "." + ".".join(self.field.extra_path)
+        return field_path
 
 
 class Condition(BaseModel):
@@ -421,7 +464,7 @@ class Condition(BaseModel):
 
     def get_object_ref_conditions(
         self, expand_columns: Optional[list[str]] = None
-    ) -> list[ObjectRefCondition]:
+    ) -> list[ObjectRefFilterCondition]:
         """Get any object ref conditions for CTE building"""
         expand_cols = expand_columns or []
         if not expand_cols or not is_object_ref_operand(self.operand, expand_cols):
@@ -630,6 +673,14 @@ class CallsQuery(BaseModel):
         has_heavy_order = any(
             order_field.field.is_heavy() for order_field in self.order_fields
         )
+        has_object_ref_order = False
+        if self.expand_columns:
+            for order_field in self.order_fields:
+                if has_object_ref_field(
+                    order_field.raw_field_path, self.expand_columns
+                ):
+                    has_object_ref_order = True
+                    break
 
         has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
 
@@ -675,7 +726,7 @@ class CallsQuery(BaseModel):
         )
 
         # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs:
+        if not should_optimize and not self.include_costs and not has_object_ref_order:
             return self._as_sql_base_format(pb, table_alias)
 
         # If so, build the two queries
@@ -692,7 +743,7 @@ class CallsQuery(BaseModel):
             outer_query.select_fields.append(field)
 
         # Process object reference conditions using the new approach
-        all_object_ref_conditions = []
+        all_object_ref_conditions: list[ObjectRefCondition] = []
         if self.expand_columns:
             # Process each condition to extract object ref conditions
             for condition in self.query_conditions:
@@ -701,7 +752,18 @@ class CallsQuery(BaseModel):
                 )
                 all_object_ref_conditions.extend(object_ref_conditions)
 
-        # Build CTEs for object reference filtering
+            # Process order fields to extract object ref order fields
+            for order_field in self.order_fields:
+                field_path = order_field.raw_field_path
+                is_obj_ref = has_object_ref_field(field_path, self.expand_columns)
+                if is_obj_ref:
+                    obj_order_condition = ObjectRefOrderCondition(
+                        field_path=field_path,
+                        expand_columns=self.expand_columns,
+                    )
+                    all_object_ref_conditions.append(obj_order_condition)
+
+        # Build CTEs for object reference filtering and ordering
         object_join_cte, field_to_object_join_alias_map = build_object_ref_ctes(
             pb, self.project_id, all_object_ref_conditions
         )
@@ -744,14 +806,27 @@ class CallsQuery(BaseModel):
                 )
                 for sort_by in self.order_fields
             ]
+            select_fields = [field.field for field in self.select_fields]
             raw_sql += f""",
             all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}),
-            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
+            {cost_query(
+                pb,
+                "all_calls",
+                self.project_id,
+                select_fields,
+                order_by_fields,
+            )}
             """
 
         else:
             raw_sql += f"""
-            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}
+            {outer_query._as_sql_base_format(
+                pb,
+                table_alias,
+                id_subquery_name="filtered_calls",
+                field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
+            )}
             """
 
         return safely_format_sql(raw_sql, logger)
@@ -853,7 +928,9 @@ class CallsQuery(BaseModel):
         if len(self.order_fields) > 0:
             order_by_sql = "ORDER BY " + ", ".join(
                 [
-                    order_field.as_sql(pb, table_alias)
+                    order_field.as_sql(
+                        pb, table_alias, expand_columns, field_to_object_join_alias_map
+                    )
                     for order_field in self.order_fields
                 ]
             )
@@ -913,12 +990,34 @@ class CallsQuery(BaseModel):
             on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
 
+        # Add JOINs for object reference ordering
+        object_ref_joins_sql = ""
+        if expand_columns and field_to_object_join_alias_map:
+            for order_field in self.order_fields:
+                field_path = order_field.raw_field_path
+                if has_object_ref_field(field_path, expand_columns):
+                    order_condition = ObjectRefOrderCondition(
+                        field_path=field_path,
+                        expand_columns=expand_columns,
+                    )
+                    cte_alias = field_to_object_join_alias_map.get(
+                        order_condition.unique_key
+                    )
+                    if cte_alias:
+                        accessor_key = order_condition.get_accessor_key()
+                        root_field = order_condition.get_root_field()
+                        json_path_param = pb.add_param(f"$.{accessor_key}")
+                        object_ref_joins_sql += f"""
+            LEFT JOIN {cte_alias} 
+                ON JSON_VALUE({table_alias}.{root_field}, {param_slot(json_path_param, "String")}) = {cte_alias}.full_ref"""
+
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
         {feedback_join_sql}
         {storage_size_sql}
         {total_storage_size_sql}
+        {object_ref_joins_sql}
         WHERE calls_merged.project_id = {param_slot(project_param, "String")}
         {id_mask_sql}
         {id_subquery_sql}

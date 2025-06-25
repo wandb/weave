@@ -33,13 +33,11 @@ if TYPE_CHECKING:
 
 
 class ObjectRefCondition:
-    """Represents a condition that filters on object references"""
+    """Base class for object reference conditions"""
 
     def __init__(
         self,
         field_path: str,
-        operation_type: str,
-        value: Union[str, int, float, bool, list, dict, None],
         expand_columns: list[str],
         case_insensitive: bool = False,
         conversion_type: Optional[
@@ -47,8 +45,6 @@ class ObjectRefCondition:
         ] = None,
     ):
         self.field_path = field_path
-        self.operation_type = operation_type
-        self.value = value
         self.expand_columns = expand_columns
         self.case_insensitive = case_insensitive
         self.conversion_type = conversion_type
@@ -146,12 +142,68 @@ class ObjectRefCondition:
     def unique_key(self) -> str:
         """
         Map a unique condition key to the final CTE name.
+        Must be implemented by child classes.
+
+        Returns:
+            str: A unique key identifying this condition
+        """
+        raise NotImplementedError("Child classes must implement unique_key property")
+
+
+class ObjectRefFilterCondition(ObjectRefCondition):
+    """Represents a condition that filters on object references"""
+
+    def __init__(
+        self,
+        field_path: str,
+        operation_type: str,
+        value: Union[str, int, float, bool, list, dict, None],
+        expand_columns: list[str],
+        case_insensitive: bool = False,
+        conversion_type: Optional[
+            Literal["double", "string", "int", "bool", "exists"]
+        ] = None,
+    ):
+        super().__init__(field_path, expand_columns, case_insensitive, conversion_type)
+        self.operation_type = operation_type
+        self.value = value
+
+    @property
+    def unique_key(self) -> str:
+        """
+        Map a unique condition key to the final CTE name.
         Use field_path + operation + value to create unique key for each condition
 
         Returns:
             str: A unique key identifying this condition
         """
         return f"{self.field_path}_{self.operation_type}_{self.value}"
+
+
+class ObjectRefOrderCondition(ObjectRefCondition):
+    """Represents an order condition on object references"""
+
+    def __init__(
+        self,
+        field_path: str,
+        expand_columns: list[str],
+        case_insensitive: bool = False,
+        conversion_type: Optional[
+            Literal["double", "string", "int", "bool", "exists"]
+        ] = None,
+    ):
+        super().__init__(field_path, expand_columns, case_insensitive, conversion_type)
+
+    @property
+    def unique_key(self) -> str:
+        """
+        Map a unique condition key to the final CTE name.
+        For ordering, we only need the field path since we include all objects.
+
+        Returns:
+            str: A unique key identifying this condition
+        """
+        return f"order_{self.field_path}"
 
 
 class ObjectRefConditionHandler:
@@ -216,13 +268,13 @@ class ObjectRefConditionHandler:
         return filter_param, filter_type
 
     def handle_comparison_operation(
-        self, condition: ObjectRefCondition, operator: str
+        self, condition: ObjectRefFilterCondition, operator: str
     ) -> str:
         """
         Handle simple binary operations (=, >, >=) for object references.
 
         Args:
-            condition: The object reference condition
+            condition: The object reference filter condition
             operator: The SQL operator to use ("=", ">", ">=")
 
         Returns:
@@ -233,12 +285,12 @@ class ObjectRefConditionHandler:
 
         return f"{json_extract} {operator} {param_slot(filter_param, filter_type)}"
 
-    def handle_contains_operation(self, condition: ObjectRefCondition) -> str:
+    def handle_contains_operation(self, condition: ObjectRefFilterCondition) -> str:
         """
         Handle contains operations for object references.
 
         Args:
-            condition: The object reference condition
+            condition: The object reference filter condition
 
         Returns:
             str: SQL condition for contains comparison
@@ -251,12 +303,12 @@ class ObjectRefConditionHandler:
         else:
             return f"{json_extract} LIKE {param_slot(filter_param, 'String')}"
 
-    def handle_in_operation(self, condition: ObjectRefCondition) -> str:
+    def handle_in_operation(self, condition: ObjectRefFilterCondition) -> str:
         """
         Handle IN operations for object references.
 
         Args:
-            condition: The object reference condition
+            condition: The object reference filter condition
 
         Returns:
             str: SQL condition for IN comparison
@@ -439,7 +491,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                 if conversion_type in {"double", "string", "int", "bool", "exists"}:
                     condition_kwargs["conversion_type"] = conversion_type
 
-                obj_condition = ObjectRefCondition(
+                obj_condition = ObjectRefFilterCondition(
                     field_path=field_path,
                     operation_type=operation_type,
                     value=operands[1].literal_,
@@ -494,7 +546,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
             if self._is_object_ref_field(field_path) and isinstance(
                 operation.contains_.substr, tsi_query.LiteralOperation
             ):
-                obj_condition = ObjectRefCondition(
+                obj_condition = ObjectRefFilterCondition(
                     field_path=field_path,
                     operation_type="contains",
                     value=operation.contains_.substr.literal_,
@@ -527,7 +579,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                     else:
                         return None  # Can't handle non-literal values in IN
 
-                obj_condition = ObjectRefCondition(
+                obj_condition = ObjectRefFilterCondition(
                     field_path=field_path,
                     operation_type="in",
                     value=values,
@@ -547,15 +599,18 @@ def _get_cte_name_for_condition(i: int) -> str:
 
 
 def build_object_ref_ctes(
-    pb: "ParamBuilder", project_id: str, object_ref_conditions: list[ObjectRefCondition]
+    pb: "ParamBuilder",
+    project_id: str,
+    object_ref_conditions: list[ObjectRefCondition],
 ) -> tuple[str, dict[str, str]]:
     """
-    Build CTEs (Common Table Expressions) for object reference filtering.
+    Build CTEs (Common Table Expressions) for object reference filtering and ordering.
 
     Args:
         pb: Parameter builder for SQL parameters
         project_id: Project ID for filtering
         object_ref_conditions: List of object reference conditions to build CTEs for
+        include_val_dump_for_ordering: Whether to include val_dump in CTEs for ordering
 
     Returns:
         - CTE SQL string
@@ -568,6 +623,11 @@ def build_object_ref_ctes(
     cte_parts = []
     field_to_cte_alias_map = {}
     cte_counter = 0
+
+    # Decide what to select based on whether we need ordering support
+    val_dump_select = ""
+    if any(isinstance(c, ObjectRefOrderCondition) for c in object_ref_conditions):
+        val_dump_select = "any(val_dump) AS object_val_dump,"
 
     # Deduplicate conditions based on unique_key
     unique_conditions: dict[str, ObjectRefCondition] = {}
@@ -597,7 +657,10 @@ def build_object_ref_ctes(
         # Create condition handler and generate the appropriate SQL condition
         handler = ObjectRefConditionHandler(pb, json_path_param)
 
-        if condition.operation_type == "eq":
+        val_condition: Optional[str] = None
+        if isinstance(condition, ObjectRefOrderCondition):
+            val_condition = None
+        elif condition.operation_type == "eq":
             val_condition = handler.handle_comparison_operation(condition, "=")
         elif condition.operation_type == "contains":
             val_condition = handler.handle_contains_operation(condition)
@@ -607,8 +670,7 @@ def build_object_ref_ctes(
             val_condition = handler.handle_comparison_operation(condition, ">=")
         elif condition.operation_type == "in":
             val_condition = handler.handle_in_operation(condition)
-        else:
-            continue
+        val_condition_sql = f"AND {val_condition}" if val_condition else ""
 
         # Build the leaf CTE
         leaf_cte = f"""
@@ -616,10 +678,11 @@ def build_object_ref_ctes(
             SELECT
                 object_id,
                 digest,
+                {val_dump_select}
                 concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
             FROM object_versions
             WHERE project_id = {param_slot(project_param, "String")}
-                AND {val_condition}
+                {val_condition_sql}
             GROUP BY project_id, object_id, digest
         )"""
 
@@ -642,6 +705,7 @@ def build_object_ref_ctes(
                     SELECT
                         object_id,
                         digest,
+                        {val_dump_select}
                         concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
                     FROM object_versions
                     WHERE project_id = {param_slot(project_param, "String")}
@@ -662,6 +726,23 @@ def build_object_ref_ctes(
     return ",\n".join(cte_parts), field_to_cte_alias_map
 
 
+def has_object_ref_field(field_path: str, expand_columns: list[str]) -> bool:
+    """
+    Check if an order field references object fields based on expand_columns.
+
+    Args:
+        field_path: The field path to check (e.g., "inputs.model.temperature")
+        expand_columns: List of expand column patterns to match against
+
+    Returns:
+        bool: True if the field path references object fields
+    """
+    if not expand_columns:
+        return False
+
+    return any(field_path.startswith(expand_col + ".") for expand_col in expand_columns)
+
+
 def is_object_ref_operand(
     operand: "tsi_query.Operand", expand_columns: list[str]
 ) -> bool:
@@ -678,16 +759,10 @@ def is_object_ref_operand(
     if not expand_columns:
         return False
 
-    def _has_object_ref_field(field_path: str) -> bool:
-        """Check if field_path matches any expand column pattern."""
-        return any(
-            field_path.startswith(expand_col + ".") for expand_col in expand_columns
-        )
-
     # Check all GetFieldOperator operands in the expression tree
     def check_operand_recursive(op: "tsi_query.Operand") -> bool:
         if isinstance(op, tsi_query.GetFieldOperator):
-            return _has_object_ref_field(op.get_field_)
+            return has_object_ref_field(op.get_field_, expand_columns)
         elif isinstance(op, tsi_query.AndOperation):
             return any(check_operand_recursive(sub_op) for sub_op in op.and_)
         elif isinstance(op, tsi_query.OrOperation):
