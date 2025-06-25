@@ -474,6 +474,15 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         field_sql = f"any({self.table_alias}.{root_field})"
         return f"JSON_VALUE({field_sql}, {param_slot(json_path_param, 'String')}) IN (SELECT full_ref FROM {cte_name})"
 
+    def process_or(self, operation: tsi_query.OrOperation) -> Optional[str]:
+        """Process OR operations to extract object reference conditions from all operands."""
+        # Unlike the parent class, we need to process ALL operands to extract conditions,
+        # regardless of whether they can be "optimized" or not
+        for op in operation.or_:
+            self.process_operand(op)
+
+        return None
+
     def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
         """Process equality operation for object refs"""
         return self._process_binary_operation(operation.eq_, "eq")
@@ -560,7 +569,14 @@ def build_object_ref_ctes(
     field_to_cte_alias_map = {}
     cte_counter = 0
 
+    # Deduplicate conditions based on unique_key
+    unique_conditions: dict[str, ObjectRefCondition] = {}
     for condition in object_ref_conditions:
+        unique_key = condition.unique_key
+        if unique_key not in unique_conditions:
+            unique_conditions[unique_key] = condition
+
+    for condition in unique_conditions.values():
         # Get the expand column match and property path
         expand_match = condition.get_expand_column_match()
         if not expand_match:

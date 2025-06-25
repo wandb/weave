@@ -2483,3 +2483,250 @@ def test_multiple_object_ref_filters() -> None:
             "pb_4": "$.model",
         },
     )
+
+
+def test_object_ref_filter_duplicates_and_similar() -> None:
+    """Test duplicate identical conditions and very similar ones to ensure proper deduplication."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    # Identical conditions - should be deduplicated
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.model.temperature"},
+                            {"$literal": 1},
+                        ]
+                    },
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.model.temperature"},
+                            {"$literal": 1},
+                        ]
+                    },
+                    # Very similar but different value - should create separate CTEs
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.model.temperature"},
+                            {"$literal": 2},
+                        ]
+                    },
+                    # Different field path but same object - should reuse existing CTEs
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.model.max_tokens"},
+                            {"$literal": 100},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+    cq.set_hardcoded_filter(HardCodedFilter(filter={"trace_roots_only": True}))
+    cq.set_expand_columns(["inputs.model"])
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS
+          (SELECT calls_merged.id AS id
+           FROM calls_merged
+           WHERE calls_merged.project_id = {pb_0:String}
+             AND (calls_merged.parent_id IS NULL)
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)
+           HAVING (((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
+             obj_filter_0 AS
+          (SELECT object_id,
+                  digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+           GROUP BY project_id,
+                    object_id,
+                    digest),
+             obj_filter_1 AS
+          (SELECT object_id,
+                  digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_3:UInt64}
+           GROUP BY project_id,
+                    object_id,
+                    digest),
+             obj_filter_2 AS
+          (SELECT object_id,
+                  digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_4:String}) = {pb_5:UInt64}
+           GROUP BY project_id,
+                    object_id,
+                    digest)
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+          AND (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id,
+                  calls_merged.id)
+        HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) IN
+           (SELECT full_ref
+            FROM obj_filter_0))
+        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) IN
+           (SELECT full_ref
+            FROM obj_filter_0))
+        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) IN
+           (SELECT full_ref
+            FROM obj_filter_1))
+        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) IN
+           (SELECT full_ref
+            FROM obj_filter_2)))
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": "$.temperature",
+            "pb_2": 1,
+            "pb_3": 2,
+            "pb_4": "$.max_tokens",
+            "pb_5": 100,
+            "pb_6": "$.model",
+        },
+    )
+
+
+def test_object_ref_filter_complex_mixed_conditions() -> None:
+    """Test complex scenarios with OR conditions mixing object refs and non-object refs."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    # Object ref condition
+                    {
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.model.provider"},
+                                    {"$literal": "openai"},
+                                ]
+                            },
+                            {
+                                "$gt": [
+                                    {"$getField": "inputs.model.temperature"},
+                                    {"$literal": 0.5},
+                                ]
+                            },
+                        ]
+                    },
+                    # Non-object ref condition (should go to regular HAVING)
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.prompt"},
+                            {"$literal": "test prompt"},
+                        ]
+                    },
+                    # Another object ref with NOT
+                    {
+                        "$not": [
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.model.stream"},
+                                    {"$literal": True},
+                                ]
+                            }
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+    cq.set_hardcoded_filter(HardCodedFilter(filter={"op_names": ["llm_call"]}))
+    cq.add_order("started_at", "desc")
+    cq.set_limit(10)
+    cq.set_expand_columns(["inputs.model"])
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS
+          (SELECT calls_merged.id AS id
+           FROM calls_merged
+           WHERE calls_merged.project_id = {pb_0:String}
+             AND ((calls_merged.op_name IN {pb_7:Array(String)})
+                 OR (calls_merged.op_name IS NULL))
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)
+           HAVING (((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
+             obj_filter_0 AS
+          (SELECT object_id,
+                  digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
+           GROUP BY project_id,
+                    object_id,
+                    digest),
+             obj_filter_1 AS
+          (SELECT object_id,
+                  digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_3:String}) > {pb_4:Float64}
+           GROUP BY project_id,
+                    object_id,
+                    digest),
+             obj_filter_2 AS
+          (SELECT object_id,
+                  digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_5:String}) = {pb_6:Bool}
+           GROUP BY project_id,
+                    object_id,
+                    digest)
+        SELECT calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+          AND (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id,
+                  calls_merged.id)
+        HAVING ((((JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}) IN
+               (SELECT full_ref
+                FROM obj_filter_0))
+            AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}) IN
+               (SELECT full_ref
+                FROM obj_filter_1))))
+          OR ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_9:String}) = {pb_10:String}))
+          OR ((NOT (JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}) IN
+               (SELECT full_ref
+                FROM obj_filter_2)))))
+        ORDER BY any(calls_merged.started_at) DESC
+        LIMIT 10
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": "$.provider",
+            "pb_2": "openai",
+            "pb_3": "$.temperature",
+            "pb_4": 0.5,
+            "pb_5": "$.stream",
+            "pb_6": True,
+            "pb_7": ["llm_call"],
+            "pb_8": "$.model",
+            "pb_9": '$."prompt"',
+            "pb_10": "test prompt",
+        },
+    )
