@@ -271,6 +271,7 @@ select = [
   "N801",   # https://docs.astral.sh/ruff/rules/invalid-class-name/
   "N803",   # https://docs.astral.sh/ruff/rules/invalid-argument-name/
   "N804",   # https://docs.astral.sh/ruff/rules/non-lowercase-variable-in-class/
+  "N805",   # https://docs.astral.sh/ruff/rules/invalid-first-argument-name-for-method/
 ]
 ignore = [
   # we use Google style

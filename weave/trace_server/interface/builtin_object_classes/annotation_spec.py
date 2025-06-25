@@ -90,7 +90,7 @@ class AnnotationSpec(base_object_def.BaseObject):
         return data
 
     @field_validator("field_schema")
-    def validate_field_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:
+    def validate_field_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
         # Validate the schema
         try:
             jsonschema.validate(None, schema)
