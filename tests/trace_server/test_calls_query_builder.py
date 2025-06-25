@@ -2760,7 +2760,7 @@ def test_object_ref_order_by_simple() -> None:
                     digest)
         SELECT calls_merged.id AS id
         FROM calls_merged
-        LEFT JOIN obj_filter_0 
+        LEFT JOIN obj_filter_0
             ON JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}) = obj_filter_0.full_ref
         WHERE calls_merged.project_id = {pb_0:String}
             AND (calls_merged.id IN filtered_calls)

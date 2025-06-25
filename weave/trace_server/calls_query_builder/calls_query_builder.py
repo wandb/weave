@@ -36,7 +36,6 @@ from pydantic import BaseModel, Field
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
-    ObjectRefFilterCondition,
     ObjectRefOrderCondition,
     ObjectRefQueryProcessor,
     build_object_ref_ctes,
@@ -464,7 +463,7 @@ class Condition(BaseModel):
 
     def get_object_ref_conditions(
         self, expand_columns: Optional[list[str]] = None
-    ) -> list[ObjectRefFilterCondition]:
+    ) -> list[ObjectRefCondition]:
         """Get any object ref conditions for CTE building"""
         expand_cols = expand_columns or []
         if not expand_cols or not is_object_ref_operand(self.operand, expand_cols):
@@ -1008,7 +1007,7 @@ class CallsQuery(BaseModel):
                         root_field = order_condition.get_root_field()
                         json_path_param = pb.add_param(f"$.{accessor_key}")
                         object_ref_joins_sql += f"""
-            LEFT JOIN {cte_alias} 
+            LEFT JOIN {cte_alias}
                 ON JSON_VALUE({table_alias}.{root_field}, {param_slot(json_path_param, "String")}) = {cte_alias}.full_ref"""
 
         raw_sql = f"""

@@ -660,16 +660,17 @@ def build_object_ref_ctes(
         val_condition: Optional[str] = None
         if isinstance(condition, ObjectRefOrderCondition):
             val_condition = None
-        elif condition.operation_type == "eq":
-            val_condition = handler.handle_comparison_operation(condition, "=")
-        elif condition.operation_type == "contains":
-            val_condition = handler.handle_contains_operation(condition)
-        elif condition.operation_type == "gt":
-            val_condition = handler.handle_comparison_operation(condition, ">")
-        elif condition.operation_type == "gte":
-            val_condition = handler.handle_comparison_operation(condition, ">=")
-        elif condition.operation_type == "in":
-            val_condition = handler.handle_in_operation(condition)
+        elif isinstance(condition, ObjectRefFilterCondition):
+            if condition.operation_type == "eq":
+                val_condition = handler.handle_comparison_operation(condition, "=")
+            elif condition.operation_type == "contains":
+                val_condition = handler.handle_contains_operation(condition)
+            elif condition.operation_type == "gt":
+                val_condition = handler.handle_comparison_operation(condition, ">")
+            elif condition.operation_type == "gte":
+                val_condition = handler.handle_comparison_operation(condition, ">=")
+            elif condition.operation_type == "in":
+                val_condition = handler.handle_in_operation(condition)
         val_condition_sql = f"AND {val_condition}" if val_condition else ""
 
         # Build the leaf CTE
