@@ -275,7 +275,10 @@ select = [
   "N806",    # https://docs.astral.sh/ruff/rules/non-lowercase-variable-in-function/
   "PERF102", # https://docs.astral.sh/ruff/rules/incorrect-dict-iterator/
   "T20",     # https://docs.astral.sh/ruff/rules/#flake8-print-t20
+<<<<<<< andrew/pt001
   "PT001",   # https://docs.astral.sh/ruff/rules/pytest-fixture-incorrect-parentheses-style/
+=======
+>>>>>>> master
 ]
 ignore = [
   # we use Google style
