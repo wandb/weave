@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import tempfile
 import time
+from pathlib import Path
 from unittest.mock import MagicMock, call, patch
+
+import pytest
 
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 
@@ -130,6 +134,7 @@ def test_health_check_functionality_and_logging():
         assert not processor.health_check_thread.is_alive()
 
 
+@pytest.mark.disable_logging_error_check
 def test_processing_thread_exception_handling():
     """Test that processing thread exceptions are handled and logged appropriately."""
 
@@ -141,7 +146,9 @@ def test_processing_thread_exception_handling():
         "weave.trace_server_bindings.async_batch_processor.logger"
     ) as mock_logger:
         processor = AsyncBatchProcessor(
-            failing_processor_fn, max_batch_size=100, min_batch_interval=0.1
+            failing_processor_fn,
+            max_batch_size=100,
+            min_batch_interval=0.1,
         )
 
         # Enqueue some items
@@ -152,10 +159,9 @@ def test_processing_thread_exception_handling():
 
         # Stop and check logs
         processor.stop_accepting_new_work_and_flush_queue()
-
-        # Should have logged the exception
-        mock_logger.exception.assert_called_with(
-            "Error processing batch: Simulated processing error"
+        assert (
+            "Unprocessable item detected, dropping item permanently."
+            in mock_logger.exception.call_args[0][0]
         )
 
         # make sure we can restart and everything is as expected
@@ -164,11 +170,6 @@ def test_processing_thread_exception_handling():
         assert processor.health_check_thread.is_alive()
         assert processor.processing_thread.is_alive()
         processor.stop_accepting_new_work_and_flush_queue()
-
-        # Should have logged the exception
-        mock_logger.exception.assert_called_with(
-            "Error processing batch: Simulated processing error"
-        )
 
 
 def test_realistic_health_check_revival_scenario():
@@ -189,7 +190,9 @@ def test_realistic_health_check_revival_scenario():
             0.5,
         ):
             processor = AsyncBatchProcessor(
-                tracking_processor_fn, max_batch_size=10, min_batch_interval=0.1
+                tracking_processor_fn,
+                max_batch_size=10,
+                min_batch_interval=0.1,
             )
 
             # Step 1: Process 5 items successfully
@@ -243,3 +246,208 @@ def test_realistic_health_check_revival_scenario():
             assert processed_items[-3:] == [7, 8, 9]
 
             processor.stop_accepting_new_work_and_flush_queue()
+
+
+@pytest.mark.disable_logging_error_check
+def test_poison_pill_detection_and_immediate_drop():
+    """Test poison pill detection and immediate dropping of failed items."""
+    # Track what gets processed successfully
+    successful_items = []
+
+    poison_const = "poison_pill"
+    batch_killer_const = "batch_killer"
+
+    # Create processor that fails on specific items
+    def selective_failing_processor(batch):
+        nonlocal successful_items
+        processed = []
+        for item in batch:
+            if item == poison_const:
+                raise RuntimeError("Poison pill error")
+            elif item == batch_killer_const:
+                raise RuntimeError("Batch processing error")
+            processed.append(item)
+
+        successful_items += processed
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        log_path = Path(temp_dir) / "poison_test.jsonl"
+
+        processor = AsyncBatchProcessor(
+            selective_failing_processor,
+            max_batch_size=10,
+            min_batch_interval=0.1,
+            max_queue_size=5,
+            enable_disk_fallback=True,
+            disk_fallback_path=str(log_path),
+        )
+
+        # Test 1: Successful processing (baseline)
+        processor.enqueue(["good1", "good2"])
+        time.sleep(0.2)
+        assert successful_items == ["good1", "good2"]
+
+        # Test 2: Batch failure triggers individual processing - some items succeed, poison pills are immediately dropped
+        processor.enqueue(["good3", poison_const, batch_killer_const, "good4"])
+        time.sleep(0.3)
+
+        # good3 and good4 should succeed, poison_pill and batch_killer should be immediately dropped
+        assert successful_items == ["good1", "good2", "good3", "good4"]
+
+        # Test 3: Check poison pills were written to disk immediately
+        assert log_path.exists()
+        with open(log_path) as f:
+            log_content = f.read()
+            assert "Unprocessable item detected" in log_content
+            # Should have two poison pills logged (poison_const and batch_killer_const)
+            assert log_content.count("Unprocessable item detected") == 2
+
+        # Test 4: Queue full - items get written to disk instead of being enqueued
+        processor.enqueue(
+            ["fill1", "fill2", "fill3", "fill4", "fill5", "fill6", "fill7"]
+        )  # Fill the small queue (maxsize=5)
+        # Confirm extras got written to disk
+        with open(log_path) as f:
+            log_content = f.read().splitlines()
+            # Should have at least 4 log entries (2 poison pills + 2 queue full items)
+            assert len(log_content) >= 4
+            # Check that queue full items were logged
+            queue_full_entries = [
+                line for line in log_content if "Queue is full" in line
+            ]
+            assert len(queue_full_entries) >= 2
+
+        # Test 5: Disk fallback disabled - no files should be written
+        processor_no_disk = AsyncBatchProcessor(
+            selective_failing_processor,
+            enable_disk_fallback=False,  # Disabled
+            disk_fallback_path=str(Path(temp_dir) / "should_not_exist.jsonl"),
+        )
+
+        processor_no_disk.enqueue([poison_const])
+        time.sleep(0.3)
+        processor_no_disk.enqueue(["1", "2", "3", "4", "5", "6", "7"])
+        time.sleep(0.3)
+
+        # No disk file should be created when disk fallback is disabled
+        assert not Path(temp_dir, "should_not_exist.jsonl").exists()
+
+        # cleanup
+        processor.stop_accepting_new_work_and_flush_queue()
+        processor_no_disk.stop_accepting_new_work_and_flush_queue()
+
+
+def test_log_rotation_and_disk_fallback():
+    """Test log file rotation, backup management, and disk operation error handling."""
+
+    def simple_processor(batch):
+        # Simple processor that always succeeds
+        pass
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        log_path = Path(temp_dir) / "rotation_test.jsonl"
+
+        # Mock the constants to make testing faster
+        with (
+            patch(
+                "weave.trace_server_bindings.async_batch_processor.MAX_LOG_FILE_SIZE_BYTES",
+                200,
+            ),
+            patch("weave.trace_server_bindings.async_batch_processor.MAX_LOGFILES", 2),
+        ):
+            processor = AsyncBatchProcessor(
+                simple_processor,
+                enable_disk_fallback=True,
+                disk_fallback_path=str(log_path),
+            )
+
+            # Test 1: Fill up the log file to trigger rotation
+            # Add enough items to exceed the mocked 200 byte limit
+            large_items = [
+                f"large_item_{i}" * 10 for i in range(10)
+            ]  # Make items large
+            for item in large_items:
+                processor._write_item_to_disk(item, "Test rotation trigger")
+
+            # Check that rotation occurred - backup file should exist
+            backup_path = log_path.with_suffix(".1")
+            assert backup_path.exists(), "Log rotation should create backup file"
+
+            # Test 2: Continue adding to trigger multiple rotations
+            more_large_items = [f"rotation_test_{i}" * 15 for i in range(10)]
+            for item in more_large_items:
+                processor._write_item_to_disk(item, "Multiple rotation test")
+
+            # Check max backup files limit (should only keep MAX_LOGFILES-1 backups)
+            backup2_path = log_path.with_suffix(".2")
+            backup3_path = log_path.with_suffix(
+                ".3"
+            )  # Should not exist due to MAX_LOGFILES=2
+
+            assert log_path.exists(), "Main log file should exist"
+            assert backup_path.exists(), "First backup should exist"
+            assert not backup3_path.exists(), "Should not exceed MAX_LOGFILES limit"
+
+            # Test 3: Error handling in disk operations
+            with (
+                patch("builtins.open", side_effect=PermissionError("No write access")),
+                patch(
+                    "weave.trace_server_bindings.async_batch_processor.logger"
+                ) as mock_logger,
+            ):
+                processor._write_item_to_disk("test_item", "Permission test")
+
+                # Should log the disk write failure
+                mock_logger.exception.assert_called_with(
+                    f"Failed to write dropped item {id('test_item')} to disk: No write access"
+                )
+
+            # Test 4: Log rotation failure handling
+            # First ensure the log file exists and has enough content to trigger rotation
+            # Add multiple large items to exceed the 200 byte limit
+            for i in range(5):
+                processor._write_item_to_disk(
+                    f"large_setup_item_{i}" * 20, "Setup for rename failure test"
+                )
+
+            # Verify file exists and is large enough before testing rename failure
+            assert (
+                log_path.exists()
+            ), "Log file should exist before testing rename failure"
+            assert (
+                log_path.stat().st_size > 200
+            ), "Log file should be large enough to trigger rotation"
+
+            # Mock pathlib.Path.rename at the class level to simulate a rename failure
+            with (
+                patch("pathlib.Path.rename", side_effect=OSError("Rename failed")),
+                patch(
+                    "weave.trace_server_bindings.async_batch_processor.logger"
+                ) as mock_logger,
+            ):
+                processor._rotate_log_file_if_needed()
+
+                # Should handle rotation errors gracefully
+                mock_logger.exception.assert_called()
+                error_call_args = mock_logger.exception.call_args[0][0]
+                assert "Failed to rotate log file" in error_call_args
+
+            # Test 5: Directory creation during disk fallback
+            nested_log_path = Path(temp_dir) / "nested" / "deep" / "test.jsonl"
+            processor_nested = AsyncBatchProcessor(
+                simple_processor,
+                enable_disk_fallback=True,
+                disk_fallback_path=str(nested_log_path),
+            )
+
+            # Should create nested directories automatically
+            processor_nested._write_item_to_disk(
+                "test_nested", "Directory creation test"
+            )
+            assert nested_log_path.exists(), "Should create nested directories"
+            assert (
+                nested_log_path.parent.exists()
+            ), "Parent directories should be created"
+
+            processor.stop_accepting_new_work_and_flush_queue()
+            processor_nested.stop_accepting_new_work_and_flush_queue()

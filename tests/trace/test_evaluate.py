@@ -4,6 +4,7 @@ import time
 from unittest.mock import patch
 
 import pytest
+from pydantic import BaseModel
 
 import weave
 from weave import Dataset, Evaluation, Model
@@ -489,3 +490,25 @@ def test_evaluate_table_order(client):
     scores = [c.output["scores"]["score_simple"] for c in predict_and_score_calls]
     assert all(scores)
     assert len(scores) == 5
+
+
+def test_evaluate_with_pydantic_summary(client):
+    class MyScorerSummary(BaseModel):
+        awesome: int
+
+    class MyScorer(weave.Scorer):
+        @weave.op()
+        def score(self, target, output):
+            return target == output
+
+        @weave.op()
+        def summarize(self, score_rows):
+            return MyScorerSummary(awesome=3)
+
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[MyScorer()],
+    )
+    model = EvalModel()
+    result = asyncio.run(evaluation.evaluate(model))
+    assert result["MyScorer"].awesome == 3
