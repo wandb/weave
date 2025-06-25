@@ -73,7 +73,8 @@
   "dependencies": {
     "cli-progress": "^3.12.0",
     "openai": "^4.68.4",
-    "uuidv7": "^1.0.1"
+    "uuidv7": "^1.0.1",
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",
