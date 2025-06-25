@@ -534,3 +534,13 @@ export type TableCreateRes = {
   digest: string;
   row_digests: string[];
 };
+
+export type RunEvaluationReq = {
+  project_id: string;
+  evaluation_ref: string;
+  model_refs: string[];
+};
+
+export type RunEvaluationRes = {
+  eval_call_ids: string[];
+};

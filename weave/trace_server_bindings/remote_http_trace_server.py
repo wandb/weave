@@ -624,6 +624,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_request(
             "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
         )
+    
+    def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
+        return self._generic_request(
+            "/eval/run", req, tsi.RunEvaluationReq, tsi.RunEvaluationRes
+        )
 
 
 __docspec__ = [

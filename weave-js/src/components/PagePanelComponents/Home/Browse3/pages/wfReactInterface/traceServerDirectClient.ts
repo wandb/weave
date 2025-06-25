@@ -35,6 +35,8 @@ import {
   FilesStatsRes,
   ProjectStatsReq,
   ProjectStatsRes,
+  RunEvaluationReq,
+  RunEvaluationRes,
   TableCreateReq,
   TableCreateRes,
   TableUpdateReq,
@@ -482,6 +484,13 @@ export class DirectTraceServerClient {
   public projectStats(req: ProjectStatsReq): Promise<ProjectStatsRes> {
     return this.makeRequest<ProjectStatsReq, ProjectStatsRes>(
       '/project/stats',
+      req
+    );
+  }
+
+  public runEvaluation(req: RunEvaluationReq): Promise<RunEvaluationRes> {
+    return this.makeRequest<RunEvaluationReq, RunEvaluationRes>(
+      '/evaluation/evaluate',
       req
     );
   }

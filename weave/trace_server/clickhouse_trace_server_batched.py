@@ -2006,6 +2006,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._insert_call, chunk_iter, start_call, model_name, req.project_id
         )
 
+    def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
+        return tsi.RunEvaluationRes(eval_call_ids=[])
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:

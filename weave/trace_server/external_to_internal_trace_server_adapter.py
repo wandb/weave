@@ -411,3 +411,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.project_stats, req)
+
+    def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.run_evaluation, req)
