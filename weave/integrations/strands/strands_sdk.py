@@ -140,7 +140,7 @@ def get_strands_patcher(
             "postprocess_output": strands_postprocess_outputs,
         }
     )
-
+    # TODO: We need to investigate the nesting of consecutive Tools (in the UI you get them nested, you shouldn't)
     # Agent._run_loop - internal agent execution
     agent_run_loop_settings = base.model_copy(
         update={
