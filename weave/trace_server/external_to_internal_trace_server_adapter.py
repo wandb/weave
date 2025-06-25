@@ -339,11 +339,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 if feedback["project_id"] != req.project_id:
                     raise ValueError("Internal Error - Project Mismatch")
                 feedback["project_id"] = original_project_id
-            if "wb_user_id" in feedback:
-                if feedback["wb_user_id"] is not None:
-                    feedback["wb_user_id"] = self._idc.int_to_ext_user_id(
-                        feedback["wb_user_id"]
-                    )
+            if "wb_user_id" in feedback and feedback["wb_user_id"] is not None:
+                feedback["wb_user_id"] = self._idc.int_to_ext_user_id(
+                    feedback["wb_user_id"]
+                )
         return res
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:

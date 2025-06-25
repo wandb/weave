@@ -47,6 +47,11 @@ export const DeleteObjectButtonWithModal: React.FC<{
     }
   };
 
+  const digests =
+    objVersionSchema.versionHash === '*'
+      ? undefined
+      : [objVersionSchema.versionHash];
+
   return (
     <>
       <Button
@@ -63,7 +68,7 @@ export const DeleteObjectButtonWithModal: React.FC<{
             entity: objVersionSchema.entity,
             project: objVersionSchema.project,
             objectId: objVersionSchema.objectId,
-            digests: [objVersionSchema.versionHash],
+            digests,
           })
         }
         onSuccess={onSuccess}

@@ -190,6 +190,7 @@ export interface UseCallsParams {
   refetchOnDelete?: boolean;
   includeCosts?: boolean;
   includeFeedback?: boolean;
+  includeStorageSize?: boolean;
   includeTotalStorageSize?: boolean;
 }
 

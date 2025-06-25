@@ -123,6 +123,7 @@ export type TraceCallsQueryReq = {
   expand_columns?: string[];
   include_costs?: boolean;
   include_feedback?: boolean;
+  include_storage_size?: boolean;
   include_total_storage_size?: boolean;
 };
 

@@ -926,6 +926,8 @@ export const CallsTable: FC<{
                   setFilter={setFilter}
                   selectedOpVersionOption={selectedOpVersionOption}
                   opVersionOptions={opVersionOptions}
+                  useMenuPortalBody={true}
+                  width="320px"
                 />
               )}
               {filterModel && setFilterModel && (

@@ -951,6 +951,11 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
+        thread_id_sql = process_thread_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
         # ref filters also have group by filters, because output_refs exist on the
         # call end parts.
         ref_filter_opt_sql = process_ref_filters_to_sql(
@@ -1068,6 +1073,7 @@ class CallsQuery(BaseModel):
         {parent_ids_filter_sql}
         {op_name_sql}
         {trace_id_sql}
+        {thread_id_sql}
         {str_filter_opt_sql}
         {ref_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
@@ -1088,6 +1094,7 @@ ALLOWED_CALL_FIELDS = {
     "id": CallsMergedField(field="id"),
     "trace_id": CallsMergedAggField(field="trace_id", agg_fn="any"),
     "parent_id": CallsMergedAggField(field="parent_id", agg_fn="any"),
+    "thread_id": CallsMergedAggField(field="thread_id", agg_fn="any"),
     "op_name": CallsMergedAggField(field="op_name", agg_fn="any"),
     "started_at": CallsMergedAggField(field="started_at", agg_fn="any"),
     "attributes_dump": CallsMergedDynamicField(field="attributes_dump", agg_fn="any"),
@@ -1125,16 +1132,16 @@ def get_field_by_name(name: str) -> CallsMergedField:
             # Handle summary.weave.* fields
             summary_field = name[len("summary.weave.") :]
             return CallsMergedSummaryField(field=name, summary_field=summary_field)
-        field_parts = name.split(".")
-        start_part = field_parts[0]
-        dumped_start_part = start_part + "_dump"
-        if dumped_start_part in ALLOWED_CALL_FIELDS:
-            field = ALLOWED_CALL_FIELDS[dumped_start_part]
-            if isinstance(field, CallsMergedDynamicField):
-                if len(field_parts) > 1:
+        else:
+            field_parts = name.split(".")
+            start_part = field_parts[0]
+            dumped_start_part = start_part + "_dump"
+            if dumped_start_part in ALLOWED_CALL_FIELDS:
+                field = ALLOWED_CALL_FIELDS[dumped_start_part]
+                if isinstance(field, CallsMergedDynamicField) and len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
-            return field
-        raise InvalidFieldError(f"Field {name} is not allowed")
+                return field
+            raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
 
 
@@ -1416,6 +1423,41 @@ def process_trace_id_filter_to_sql(
     return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
 
 
+def process_thread_id_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the thread_id and returns a sql string if there are any thread_ids."""
+    if (
+        hardcoded_filter is None
+        or hardcoded_filter.filter.thread_ids is None
+        or len(hardcoded_filter.filter.thread_ids) == 0
+    ):
+        return ""
+
+    thread_ids = hardcoded_filter.filter.thread_ids
+
+    assert_parameter_length_less_than_max("thread_ids", len(thread_ids))
+
+    thread_id_field = get_field_by_name("thread_id")
+    if not isinstance(thread_id_field, CallsMergedAggField):
+        raise TypeError("thread_id is not an aggregate field")
+    thread_id_field_sql = thread_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    # If there's only one thread_id, use an equality condition for performance
+    if len(thread_ids) == 1:
+        thread_cond = f"{thread_id_field_sql} = {param_slot(param_builder.add_param(thread_ids[0]), 'String')}"
+    elif len(thread_ids) > 1:
+        thread_cond = f"{thread_id_field_sql} IN {param_slot(param_builder.add_param(thread_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({thread_cond} OR {thread_id_field_sql} IS NULL)"
+
+
 def process_trace_roots_only_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
@@ -1537,6 +1579,12 @@ def process_calls_filter_to_conditions(
         assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
             f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+        )
+
+    if filter.thread_ids is not None:
+        assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
+        conditions.append(
+            f"{get_field_by_name('thread_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
         )
 
     if filter.wb_user_ids:

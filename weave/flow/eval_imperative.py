@@ -7,7 +7,7 @@ import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from multiprocessing import Lock
+from threading import Lock
 from types import MethodType
 from typing import Annotated, Any, TypeVar, Union, cast
 
