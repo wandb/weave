@@ -14,8 +14,7 @@ Key components:
 - CTE building functions for efficient object reference filtering
 """
 
-import typing
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from pydantic import BaseModel
 
@@ -40,9 +39,7 @@ class ObjectRefCondition(BaseModel):
 
     field_path: str  # e.g., "inputs.model.config.temperature"
     operation_type: str  # "eq", "contains", "gt", "gte", "in"
-    value: typing.Union[
-        str, int, float, bool, list, dict, None
-    ]  # Allow dict for literal operations
+    value: Union[str, int, float, bool, list, dict, None]
     expand_columns: list[str]
     case_insensitive: bool = False
     conversion_type: Optional[Literal["double", "string", "int", "bool", "exists"]] = (
@@ -100,6 +97,49 @@ class ObjectRefCondition(BaseModel):
         field_parts = self.field_path.split(".")
         root = field_parts[0] + "_dump"
         return root
+
+    def get_accessor_key(self) -> str:
+        """
+        Get the JSON accessor key for this object reference condition.
+
+        This extracts the key that should be used in JSON_VALUE operations to access
+        the object reference within the root field's JSON structure. This is non trivial
+        because we don't know where refs stop and nested json begins.
+
+        Returns:
+            str: The key to use for JSON access
+
+        Examples:
+            >>> # json: {"inputs": {"model": <ref>}}, {"config": {"temperature": "hot"}}
+            >>> # For field_path="inputs.model.config.temperature" with expand_columns=["inputs.model"]
+            >>> condition = ObjectRefCondition(field_path="inputs.model.config.temperature", expand_columns=["inputs.model"], ...)
+            >>> condition.get_accessor_key()
+            'model'
+
+            >>> # json: {"inputs": {"model": <ref>}}, {"config": {"temperature": "hot"}}
+            >>> # For field_path="inputs.model.config" with expand_columns=["inputs"]
+            >>> condition = ObjectRefCondition(field_path="inputs.model.config", expand_columns=["inputs"], ...)
+            >>> condition.get_accessor_key()
+            'model'
+
+            >>> # json: {"inputs": {"model": {"config": <ref>}}, {"temperature": "hot"}
+            >>> # For field_path="inputs.model.config.temperature" with expand_columns=["inputs"]
+            >>> condition = ObjectRefCondition(field_path="inputs.model.config.temperature", expand_columns=["inputs"], ...)
+            >>> condition.get_accessor_key()
+            'model.config'
+        """
+        expand_match = self.get_expand_column_match()
+        if not expand_match:
+            raise ValueError(f"No expand column match found for {self.field_path}")
+
+        expand_parts = expand_match.split(".")
+
+        if len(expand_parts) > 1:
+            return expand_parts[1]
+
+        object_property_path = self.get_object_property_path()
+        property_parts = object_property_path.split(".")
+        return property_parts[0]
 
     @property
     def unique_key(self) -> str:
@@ -184,7 +224,7 @@ class ObjectRefConditionHandler:
 
         return json_extract
 
-    def _create_filter_param(self, value: typing.Any) -> tuple[str, str]:
+    def _create_filter_param(self, value: Any) -> tuple[str, str]:
         """
         Creates a filter parameter and determines its type.
 
@@ -366,20 +406,10 @@ class ObjectRefQueryProcessor:
             )
 
         correct_cte = self.field_to_object_join_alias_map[condition.unique_key]
-        # Extract the root field and key from the condition
-        expand_match = condition.get_expand_column_match()
-        if not expand_match:
-            raise ValueError(f"No expand match found for {condition.field_path}")
 
+        # Extract the root field and accessor key from the condition
         root_field = condition.get_root_field()
-        field_parts = condition.field_path.split(".")
-        expand_parts = expand_match.split(".")
-        if len(expand_parts) > 1:
-            key = expand_parts[1]
-        else:
-            object_property_path = condition.get_object_property_path()
-            property_parts = object_property_path.split(".")
-            key = property_parts[0]
+        key = condition.get_accessor_key()
 
         field_sql = f"any({self.table_alias}.{root_field})"
         json_path_param = self.pb.add_param(f"$.{key}")
@@ -403,6 +433,70 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                 return True
         return False
 
+    def _extract_field_operand(
+        self, operand: "tsi_query.Operand"
+    ) -> tuple[Optional["tsi_query.GetFieldOperator"], Optional[str]]:
+        """
+        Extract field operand and conversion type from an operand.
+
+        Returns:
+            tuple: (field_operand, conversion_type) or (None, None) if not extractable
+        """
+        # Handle direct GetFieldOperator
+        if isinstance(operand, tsi_query.GetFieldOperator):
+            return operand, None
+        # Handle ConvertOperation wrapping a GetFieldOperator
+        elif isinstance(operand, tsi_query.ConvertOperation) and isinstance(
+            operand.convert_.input, tsi_query.GetFieldOperator
+        ):
+            return operand.convert_.input, operand.convert_.to
+
+        return None, None
+
+    def _process_binary_operation(
+        self,
+        operands: tuple["tsi_query.Operand", "tsi_query.Operand"],
+        operation_type: str,
+        **kwargs: Any,
+    ) -> Optional[str]:
+        """
+        Process binary operations (eq, gt, gte) with common logic.
+
+        Args:
+            operands: Tuple of operands from the operation
+            operation_type: Type of operation ("eq", "gt", "gte")
+            **kwargs: Additional arguments for ObjectRefCondition
+
+        Returns:
+            Optional[str]: CTE-based condition or None if not processable
+        """
+        if len(operands) < 2:
+            return None
+
+        field_operand, conversion_type = self._extract_field_operand(operands[0])
+
+        if field_operand is not None:
+            field_path = field_operand.get_field_
+            if self._is_object_ref_field(field_path) and isinstance(
+                operands[1], tsi_query.LiteralOperation
+            ):
+                # Only include conversion_type if it's a valid CastTo type
+                condition_kwargs = {**kwargs}
+                if conversion_type in {"double", "string", "int", "bool", "exists"}:
+                    condition_kwargs["conversion_type"] = conversion_type
+
+                obj_condition = ObjectRefCondition(
+                    field_path=field_path,
+                    operation_type=operation_type,
+                    value=operands[1].literal_,
+                    expand_columns=self.expand_columns,
+                    **condition_kwargs,
+                )
+                self.object_ref_conditions.append(obj_condition)
+                return self._create_cte_based_condition(obj_condition)
+
+        return None
+
     def _create_cte_based_condition(self, condition: ObjectRefCondition) -> str:
         """Create a SQL condition that uses the CTE for this object ref"""
         expand_match = condition.get_expand_column_match()
@@ -412,20 +506,8 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         # Get the root field (e.g., 'inputs_dump')
         root_field = condition.get_root_field()
 
-        # Get the key from the expand column, not the object property path
-        # For "inputs.model" expand column, we want "model" (the part after "inputs.")
-        field_parts = condition.field_path.split(".")
-        expand_parts = expand_match.split(".")
-
-        # The key should be the part of the expand column after the root field
-        # e.g., for "inputs.model" expand column, key should be "model"
-        if len(expand_parts) > 1:
-            key = expand_parts[1]
-        else:
-            # This shouldn't happen if expand_match is valid, but fallback to first part
-            object_property_path = condition.get_object_property_path()
-            property_parts = object_property_path.split(".")
-            key = property_parts[0]
+        # Get the JSON accessor key for this condition
+        key = condition.get_accessor_key()
 
         # Parameterize the JSON path
         json_path_param = self.pb.add_param(f"$.{key}")
@@ -440,35 +522,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
 
     def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
         """Process equality operation for object refs"""
-        field_operand = None
-        conversion_type = None
-
-        # Handle direct GetFieldOperator
-        if isinstance(operation.eq_[0], tsi_query.GetFieldOperator):
-            field_operand = operation.eq_[0]
-        # Handle ConvertOperation wrapping a GetFieldOperator
-        elif isinstance(operation.eq_[0], tsi_query.ConvertOperation) and isinstance(
-            operation.eq_[0].convert_.input, tsi_query.GetFieldOperator
-        ):
-            field_operand = operation.eq_[0].convert_.input
-            conversion_type = operation.eq_[0].convert_.to
-
-        if field_operand is not None:
-            field_path = field_operand.get_field_
-            if self._is_object_ref_field(field_path) and isinstance(
-                operation.eq_[1], tsi_query.LiteralOperation
-            ):
-                obj_condition = ObjectRefCondition(
-                    field_path=field_path,
-                    operation_type="eq",
-                    value=operation.eq_[1].literal_,
-                    expand_columns=self.expand_columns,
-                    conversion_type=conversion_type,
-                )
-                self.object_ref_conditions.append(obj_condition)
-                return self._create_cte_based_condition(obj_condition)
-
-        return None
+        return self._process_binary_operation(operation.eq_, "eq")
 
     def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
         """Process contains operation for object refs"""
@@ -491,69 +545,11 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
 
     def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
         """Process greater than operation for object refs"""
-        field_operand = None
-        conversion_type = None
-
-        # Handle direct GetFieldOperator
-        if isinstance(operation.gt_[0], tsi_query.GetFieldOperator):
-            field_operand = operation.gt_[0]
-        # Handle ConvertOperation wrapping a GetFieldOperator
-        elif isinstance(operation.gt_[0], tsi_query.ConvertOperation) and isinstance(
-            operation.gt_[0].convert_.input, tsi_query.GetFieldOperator
-        ):
-            field_operand = operation.gt_[0].convert_.input
-            conversion_type = operation.gt_[0].convert_.to
-
-        if field_operand is not None:
-            field_path = field_operand.get_field_
-            if self._is_object_ref_field(field_path) and isinstance(
-                operation.gt_[1], tsi_query.LiteralOperation
-            ):
-                obj_condition = ObjectRefCondition(
-                    field_path=field_path,
-                    operation_type="gt",
-                    value=operation.gt_[1].literal_,
-                    expand_columns=self.expand_columns,
-                    conversion_type=conversion_type,
-                )
-                self.object_ref_conditions.append(obj_condition)
-                return self._create_cte_based_condition(obj_condition)
-
-        return None
+        return self._process_binary_operation(operation.gt_, "gt")
 
     def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
         """Process greater than or equal operation for object refs"""
-        field_operand = None
-        conversion_type = None
-
-        # Handle direct GetFieldOperator
-        if isinstance(operation.gte_[0], tsi_query.GetFieldOperator):
-            field_operand = operation.gte_[0]
-        # Handle ConvertOperation wrapping a GetFieldOperator
-        elif isinstance(operation.gte_[0], tsi_query.ConvertOperation) and isinstance(
-            operation.gte_[0].convert_.input, tsi_query.GetFieldOperator
-        ):
-            field_operand = operation.gte_[0].convert_.input
-            conversion_type = operation.gte_[0].convert_.to
-
-        if field_operand is not None:
-            field_path = field_operand.get_field_
-            if self._is_object_ref_field(field_path) and isinstance(
-                operation.gte_[1], tsi_query.LiteralOperation
-            ):
-                obj_condition = ObjectRefCondition(
-                    field_path=field_path,
-                    operation_type="gte",
-                    value=operation.gte_[1].literal_,
-                    expand_columns=self.expand_columns,
-                    conversion_type=conversion_type,
-                )
-                self.object_ref_conditions.append(obj_condition)
-
-                # Return the CTE-based condition
-                return self._create_cte_based_condition(obj_condition)
-
-        return None
+        return self._process_binary_operation(operation.gte_, "gte")
 
     def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
         """Process in operation for object refs"""
@@ -699,21 +695,29 @@ def build_object_ref_ctes(
 def is_object_ref_operand(
     operand: "tsi_query.Operand", expand_columns: list[str]
 ) -> bool:
-    """Check if an operand references object fields based on expand_columns"""
+    """
+    Check if an operand references object fields based on expand_columns.
+
+    Args:
+        operand: The operand to check
+        expand_columns: List of expand column patterns to match against
+
+    Returns:
+        bool: True if the operand references object fields
+    """
     if not expand_columns:
         return False
 
-    def check_field_operator(field_op: "tsi_query.GetFieldOperator") -> bool:
-        field_path = field_op.get_field_
-        for expand_col in expand_columns:
-            if field_path.startswith(expand_col + "."):
-                return True
-        return False
+    def _has_object_ref_field(field_path: str) -> bool:
+        """Check if field_path matches any expand column pattern."""
+        return any(
+            field_path.startswith(expand_col + ".") for expand_col in expand_columns
+        )
 
     # Check all GetFieldOperator operands in the expression tree
     def check_operand_recursive(op: "tsi_query.Operand") -> bool:
         if isinstance(op, tsi_query.GetFieldOperator):
-            return check_field_operator(op)
+            return _has_object_ref_field(op.get_field_)
         elif isinstance(op, tsi_query.AndOperation):
             return any(check_operand_recursive(sub_op) for sub_op in op.and_)
         elif isinstance(op, tsi_query.OrOperation):

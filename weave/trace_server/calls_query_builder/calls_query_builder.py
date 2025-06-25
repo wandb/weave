@@ -80,9 +80,6 @@ class QueryBuilderField(BaseModel):
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
-    def is_heavy(self) -> bool:
-        return False
-
 
 class CallsMergedField(QueryBuilderField):
     def is_heavy(self) -> bool:
@@ -382,39 +379,26 @@ class Condition(BaseModel):
         field_to_object_join_alias_map: Optional[dict[str, str]] = None,
     ) -> str:
         # Check if this condition involves object references
-        expand_cols = expand_columns or []
-        if expand_cols and is_object_ref_operand(self.operand, expand_cols):
-            assert (
-                field_to_object_join_alias_map
-            ), "field_to_object_join_alias_map is required for object ref conditions"
-            return self._as_object_ref_sql(
-                pb, table_alias, expand_cols, field_to_object_join_alias_map
+        if (
+            expand_columns
+            and is_object_ref_operand(self.operand, expand_columns)
+            and field_to_object_join_alias_map
+        ):
+            processor = ObjectRefQueryProcessor(
+                pb, table_alias, expand_columns, field_to_object_join_alias_map
             )
-        else:
-            # Handle normal (non-object-ref) conditions
-            conditions = process_query_to_conditions(
-                tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
-                pb,
-                table_alias,
-            )
-            if self._consumed_fields is None:
-                self._consumed_fields = []
-                for field in conditions.fields_used:
-                    self._consumed_fields.append(field)
-            return combine_conditions(conditions.conditions, "AND")
+            return processor.process_operand(self.operand)
 
-    def _as_object_ref_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-        expand_columns: list[str],
-        field_to_object_join_alias_map: dict[str, str],
-    ) -> str:
-        """Handle object reference conditions"""
-        processor = ObjectRefQueryProcessor(
-            pb, table_alias, expand_columns, field_to_object_join_alias_map
+        conditions = process_query_to_conditions(
+            tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
+            pb,
+            table_alias,
         )
-        return processor.process_operand(self.operand)
+        if self._consumed_fields is None:
+            self._consumed_fields = []
+            for field in conditions.fields_used:
+                self._consumed_fields.append(field)
+        return combine_conditions(conditions.conditions, "AND")
 
     def _get_consumed_fields(self) -> list[CallsMergedField]:
         if self._consumed_fields is None:
