@@ -505,10 +505,7 @@ class CallsQuery(BaseModel):
             raise ValueError(f"Direction {direction} is not allowed")
         direction = cast(Literal["ASC", "DESC"], direction)
         self.order_fields.append(
-            OrderField(
-                field=get_field_by_name(field),
-                direction=direction,
-            )
+            OrderField(field=get_field_by_name(field), direction=direction)
         )
         return self
 
@@ -834,11 +831,11 @@ class CallsQuery(BaseModel):
         )
 
         # Filter out object ref conditions from optimization since they're handled via CTEs
-        expand_cols = expand_columns or []
         non_object_ref_conditions = []
         for condition in self.query_conditions:
             if not (
-                expand_cols and is_object_ref_operand(condition.operand, expand_cols)
+                expand_columns
+                and is_object_ref_operand(condition.operand, expand_columns)
             ):
                 non_object_ref_conditions.append(condition)
 
@@ -985,7 +982,7 @@ def get_field_by_name(name: str) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
         if name.startswith("feedback."):
             return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])
-        if name.startswith("summary.weave."):
+        elif name.startswith("summary.weave."):
             # Handle summary.weave.* fields
             summary_field = name[len("summary.weave.") :]
             return CallsMergedSummaryField(field=name, summary_field=summary_field)
@@ -1484,7 +1481,7 @@ def build_calls_query_stats_query(
 ) -> tuple[str, KeysView[str]]:
     cq = CallsQuery(
         project_id=req.project_id,
-        include_total_storage_size=bool(req.include_total_storage_size),
+        include_total_storage_size=req.include_total_storage_size,
     )
 
     cq.add_field("id")
