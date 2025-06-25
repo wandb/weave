@@ -3,7 +3,7 @@ from typing import Any, Literal, Optional
 
 from weave.trace_server import refs_internal, validation_util
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
-from weave.trace_server.errors import InvalidFieldError, InvalidRequest
+from weave.trace_server.errors import InvalidFieldError, InvalidRequestError
 
 
 def project_id_validator(s: str) -> str:
@@ -103,15 +103,15 @@ MESSAGE_INVALID_PURGE = "Can only purge by specifying one or more ids"
 # Validate a dictionary only has one specific key
 def validate_dict_one_key(d: dict, key: str, typ: type) -> Any:
     if not isinstance(d, dict):
-        raise InvalidRequest(f"Expected a dictionary, got {d}")
+        raise InvalidRequestError(f"Expected a dictionary, got {d}")
     keys = list(d.keys())
     if len(keys) != 1:
-        raise InvalidRequest(f"Expected a dictionary with one key, got {d}")
+        raise InvalidRequestError(f"Expected a dictionary with one key, got {d}")
     if keys[0] != key:
-        raise InvalidRequest(f"Expected key {key}, got {keys[0]}")
+        raise InvalidRequestError(f"Expected key {key}, got {keys[0]}")
     val = d[key]
     if not isinstance(val, typ):
-        raise InvalidRequest(f"Expected value of type {typ}, got {type(val)}")
+        raise InvalidRequestError(f"Expected value of type {typ}, got {type(val)}")
     return val
 
 
@@ -123,20 +123,20 @@ def validate_purge_req_one(
 ) -> None:
     tup = validate_dict_one_key(value, operator, tuple)
     if len(tup) != 2:
-        raise InvalidRequest(invalid_message)
+        raise InvalidRequestError(invalid_message)
     get_field = validate_dict_one_key(tup[0], "get_field_", str)
     if get_field != "id":
-        raise InvalidRequest(invalid_message)
+        raise InvalidRequestError(invalid_message)
 
     if operator == "eq_":
         literal = validate_dict_one_key(tup[1], "literal_", str)
         if not isinstance(literal, str):
-            raise InvalidRequest(invalid_message)
+            raise InvalidRequestError(invalid_message)
     elif operator == "in_":
         for literal_obj in tup[1]:
             literal = validate_dict_one_key(literal_obj, "literal_", str)
             if not isinstance(literal, str):
-                raise InvalidRequest(invalid_message)
+                raise InvalidRequestError(invalid_message)
 
 
 # validate a purge query with multiple eq conditions
@@ -144,6 +144,6 @@ def validate_purge_req_multiple(
     value: Any, invalid_message: str = MESSAGE_INVALID_PURGE
 ) -> None:
     if not isinstance(value, list):
-        raise InvalidRequest(invalid_message)
+        raise InvalidRequestError(invalid_message)
     for item in value:
         validate_purge_req_one(item)

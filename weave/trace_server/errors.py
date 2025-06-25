@@ -7,19 +7,19 @@ class Error(Exception):
     pass
 
 
-class RequestTooLarge(Error):
+class RequestTooLargeError(Error):
     """Raised when a request is too large."""
 
     pass
 
 
-class InvalidRequest(Error):
+class InvalidRequestError(Error):
     """Raised when a request is invalid."""
 
     pass
 
 
-class InsertTooLarge(Error):
+class InsertTooLargeError(Error):
     """Raised when a single insert is too large."""
 
     pass

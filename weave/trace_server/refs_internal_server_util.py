@@ -1,7 +1,7 @@
 from typing import Optional, TypeVar, Union, overload
 
 from weave.trace_server import refs_internal as ri
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import InvalidRequestError
 
 T = TypeVar(
     "T", ri.InternalObjectRef, ri.InternalTableRef, ri.InternalCallRef, ri.InternalOpRef
@@ -39,9 +39,9 @@ def ensure_ref_is_valid(
     try:
         parsed_ref = ri.parse_internal_uri(ref)
     except ValueError as e:
-        raise InvalidRequest(f"Invalid ref: {ref}, {e}") from e
+        raise InvalidRequestError(f"Invalid ref: {ref}, {e}") from e
     if expected_type and not isinstance(parsed_ref, expected_type):
-        raise InvalidRequest(
+        raise InvalidRequestError(
             f"Invalid ref: {ref}, expected {(t.__name__ for t in expected_type)}"
         )
     return parsed_ref
