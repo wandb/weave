@@ -16,25 +16,23 @@ export const InferenceBanner = () => {
     getFormattedBillingDate,
   } = billing;
 
-  let exceededLimitBoldStatusMsg: string | undefined;
+  // This is constant for all cases at the moment but leaving as a variable since unclear if that will hold.
+  const exceededLimitBoldStatusMsg = 'Almost out of W&B Inference credits.';
   let exceededLimitStatusMsg: string | undefined;
 
   switch (accountPlanType) {
     case AccountPlanType.Free:
       if (inferenceSafetyLimit * 0.9 <= usage && usage < inferenceSafetyLimit) {
-        exceededLimitBoldStatusMsg = 'Almost out of W&B Inference credits.';
         exceededLimitStatusMsg = 'Upgrade your plan to keep going.';
       }
       break;
     case AccountPlanType.ThirtyDayTrial:
       if (inferenceSafetyLimit * 0.9 <= usage && usage < inferenceSafetyLimit) {
-        exceededLimitBoldStatusMsg = 'Almost out of W&B Inference credits.';
         exceededLimitStatusMsg = 'To avoid interruption, upgrade your plan.';
       }
       break;
     case AccountPlanType.Pro:
       if (inferenceSafetyLimit * 0.9 <= usage && usage < inferenceSafetyLimit) {
-        exceededLimitBoldStatusMsg = 'Almost out of W&B Inference credits.';
         exceededLimitStatusMsg = `You'll receive more credits on ${getFormattedBillingDate(
           billingPeriodEnd
         )}. Once you're out, usage will switch to pay-as-you-go pricing.`;
@@ -42,7 +40,6 @@ export const InferenceBanner = () => {
       break;
     case AccountPlanType.Academic:
       if (inferenceSafetyLimit * 0.9 <= usage && usage < inferenceSafetyLimit) {
-        exceededLimitBoldStatusMsg = 'Almost out of W&B Inference credits.';
         exceededLimitStatusMsg = `Credits refresh on ${getFormattedBillingDate(
           billingPeriodEnd
         )}. W&B Inference will pause after the credit limit is reached.`;
