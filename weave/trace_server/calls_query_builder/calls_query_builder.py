@@ -543,6 +543,8 @@ class CallsQuery(BaseModel):
         return self
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
+        if field in DISALLOWED_FILTERING_FIELDS:
+            raise ValueError(f"Field {field} is not allowed in ORDER BY")
         direction = direction.upper()
         if direction not in ("ASC", "DESC"):
             raise ValueError(f"Direction {direction} is not allowed")

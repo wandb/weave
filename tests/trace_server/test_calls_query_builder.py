@@ -2248,6 +2248,46 @@ def test_filter_length_validation():
         cq.as_sql(pb)
 
 
+def test_disallowed_fields():
+    cq = CallsQuery(project_id="test/project")
+    # allowed order field
+    cq.add_order("id", "ASC")
+    with pytest.raises(ValueError):
+        cq.add_order("storage_size_bytes", "ASC")
+    with pytest.raises(ValueError):
+        cq.add_order("total_storage_size_bytes", "DESC")
+    # with bogus direction
+    with pytest.raises(ValueError):
+        cq.add_order("storage_size_bytes", "ASCDESC")
+    # now try filtering with disallowed
+    with pytest.raises(ValueError):
+        cq.add_condition(
+            tsi_query.GtOperation.model_validate(
+                {
+                    "$gt": [
+                        {"$getField": "storage_size_bytes"},
+                        {"$literal": 1},
+                    ]
+                }
+            )
+        )
+        cq.as_sql(ParamBuilder())
+
+    cq = CallsQuery(project_id="test/project")  # reset
+    with pytest.raises(ValueError):
+        cq.add_condition(
+            tsi_query.GteOperation.model_validate(
+                {
+                    "$gte": [
+                        {"$getField": "total_storage_size_bytes"},
+                        {"$literal": 1},
+                    ]
+                }
+            )
+        )
+        cq.as_sql(ParamBuilder())
+
+
 def test_object_ref_filter_simple() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
