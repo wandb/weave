@@ -184,9 +184,8 @@ def _is_rate_limit_error(exception: Union[BaseException, None]) -> bool:
             return True
 
     # Azure - HttpResponseError with 429 status code
-    if isinstance(exception, HttpResponseError):
-        if exception.status_code == 429:
-            return True
+    if isinstance(exception, HttpResponseError) and exception.status_code == 429:
+        return True
 
     return False
 
