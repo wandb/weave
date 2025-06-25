@@ -34,11 +34,14 @@ from typing import Callable, Literal, Optional, cast
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder.optimization_builder import (
+from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
+    ObjectRefQueryProcessor,
     build_object_ref_ctes,
     is_object_ref_operand,
     process_query_for_object_refs,
+)
+from weave.trace_server.calls_query_builder.optimization_builder import (
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
@@ -381,6 +384,9 @@ class Condition(BaseModel):
         # Check if this condition involves object references
         expand_cols = expand_columns or []
         if expand_cols and is_object_ref_operand(self.operand, expand_cols):
+            assert (
+                field_to_object_join_alias_map
+            ), "field_to_object_join_alias_map is required for object ref conditions"
             return self._as_object_ref_sql(
                 pb, table_alias, expand_cols, field_to_object_join_alias_map
             )
@@ -402,142 +408,13 @@ class Condition(BaseModel):
         pb: ParamBuilder,
         table_alias: str,
         expand_columns: list[str],
-        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
+        field_to_object_join_alias_map: dict[str, str],
     ) -> str:
         """Handle object reference conditions"""
-        return self._process_operand_for_object_refs(
-            self.operand,
-            pb,
-            table_alias,
-            expand_columns,
-            field_to_object_join_alias_map,
+        processor = ObjectRefQueryProcessor(
+            pb, table_alias, expand_columns, field_to_object_join_alias_map
         )
-
-    def _process_operand_for_object_refs(
-        self,
-        operand: "tsi_query.Operand",
-        pb: ParamBuilder,
-        table_alias: str,
-        expand_columns: list[str],
-        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
-    ) -> str:
-        """Recursively process any operand, handling object refs and nested operations."""
-        if isinstance(operand, tsi_query.AndOperation):
-            conditions = []
-            for sub_operand in operand.and_:
-                condition_sql = self._process_operand_for_object_refs(
-                    sub_operand,
-                    pb,
-                    table_alias,
-                    expand_columns,
-                    field_to_object_join_alias_map,
-                )
-                conditions.append(condition_sql)
-            return combine_conditions(conditions, "AND")
-
-        elif isinstance(operand, tsi_query.OrOperation):
-            conditions = []
-            for sub_operand in operand.or_:
-                condition_sql = self._process_operand_for_object_refs(
-                    sub_operand,
-                    pb,
-                    table_alias,
-                    expand_columns,
-                    field_to_object_join_alias_map,
-                )
-                conditions.append(condition_sql)
-            return combine_conditions(conditions, "OR")
-
-        elif isinstance(operand, tsi_query.NotOperation):
-            inner_sql = self._process_operand_for_object_refs(
-                operand.not_[0],
-                pb,
-                table_alias,
-                expand_columns,
-                field_to_object_join_alias_map,
-            )
-            return f"(NOT ({inner_sql}))"
-
-        else:
-            # This is a leaf operand (like EqOperation, GtOperation, etc.)
-            return self._process_leaf_operand_for_object_refs(
-                operand, pb, table_alias, expand_columns, field_to_object_join_alias_map
-            )
-
-    def _process_leaf_operand_for_object_refs(
-        self,
-        operand: "tsi_query.Operand",
-        pb: ParamBuilder,
-        table_alias: str,
-        expand_columns: list[str],
-        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
-    ) -> str:
-        """Process a leaf operand (non-nested operation)."""
-        # Check if this specific operand is an object ref condition
-        if is_object_ref_operand(operand, expand_columns):
-            return self._handle_single_object_ref_condition(
-                operand, pb, table_alias, expand_columns, field_to_object_join_alias_map
-            )
-        else:
-            # Handle as normal condition
-            filter_conditions = process_query_to_conditions(
-                tsi_query.Query.model_validate({"$expr": {"$and": [operand]}}),
-                pb,
-                table_alias,
-            )
-            return combine_conditions(filter_conditions.conditions, "AND")
-
-    def _handle_single_object_ref_condition(
-        self,
-        operand: "tsi_query.Operand",
-        pb: ParamBuilder,
-        table_alias: str,
-        expand_columns: list[str],
-        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
-    ) -> str:
-        """Handle a single object reference condition."""
-        query_for_condition = tsi_query.Query.model_validate({"$expr": operand})
-        transformed_sql, object_ref_conditions = process_query_for_object_refs(
-            query_for_condition, pb, table_alias, expand_columns
-        )
-
-        # If we have a field-to-CTE mapping, use the corrected SQL
-        if field_to_object_join_alias_map and object_ref_conditions:
-            condition = object_ref_conditions[0]  # Single condition
-            # Generate the same unique condition key used when building the map
-            condition_key = (
-                f"{condition.field_path}_{condition.operation_type}_{condition.value}"
-            )
-            if condition_key in field_to_object_join_alias_map:
-                correct_cte = field_to_object_join_alias_map[condition_key]
-                # Extract the root field and key from the condition
-                expand_match = condition.get_expand_column_match()
-                if expand_match:
-                    root_field = condition.get_root_field()
-                    field_parts = condition.field_path.split(".")
-                    expand_parts = expand_match.split(".")
-                    if len(expand_parts) > 1:
-                        key = expand_parts[1]
-                    else:
-                        object_property_path = condition.get_object_property_path()
-                        property_parts = object_property_path.split(".")
-                        key = property_parts[0]
-
-                    field_sql = f"any({table_alias}.{root_field})"
-                    json_path_param = pb.add_param(f"$.{key}")
-                    return f"JSON_VALUE({field_sql}, {param_slot(json_path_param, 'String')}) IN (SELECT full_ref FROM {correct_cte})"
-
-        # Use the original transformed SQL if available
-        if transformed_sql:
-            return transformed_sql
-
-        # If no transformed SQL, fall back to normal processing
-        filter_conditions = process_query_to_conditions(
-            tsi_query.Query.model_validate({"$expr": {"$and": [operand]}}),
-            pb,
-            table_alias,
-        )
-        return combine_conditions(filter_conditions.conditions, "AND")
+        return processor.process_operand(self.operand)
 
     def _get_consumed_fields(self) -> list[CallsMergedField]:
         if self._consumed_fields is None:
@@ -562,15 +439,13 @@ class Condition(BaseModel):
         self, expand_columns: Optional[list[str]] = None
     ) -> list[ObjectRefCondition]:
         """Get any object ref conditions for CTE building"""
-        print(f"get_object_ref_conditions {self.operand=} {expand_columns=}")
         expand_cols = expand_columns or []
         if not expand_cols or not is_object_ref_operand(self.operand, expand_cols):
             return []
 
         query_for_condition = tsi_query.Query.model_validate({"$expr": self.operand})
-        pb = ParamBuilder()  # Dummy param builder for parsing
-        _, object_ref_conditions = process_query_for_object_refs(
-            query_for_condition, pb, "calls_merged", expand_cols
+        object_ref_conditions = process_query_for_object_refs(
+            query_for_condition, ParamBuilder(), "calls_merged", expand_cols
         )
         return object_ref_conditions
 
@@ -846,11 +721,9 @@ class CallsQuery(BaseModel):
                 all_object_ref_conditions.extend(object_ref_conditions)
 
         # Build CTEs for object reference filtering
-        cte_result = build_object_ref_ctes(
+        object_join_cte, field_to_object_join_alias_map = build_object_ref_ctes(
             pb, self.project_id, all_object_ref_conditions
         )
-        object_join_cte = cte_result[0]
-        field_to_object_join_alias_map = cte_result[1]
 
         # Query Conditions
         for condition in self.query_conditions:
