@@ -10,7 +10,7 @@ from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import Call
 
 
-@pytest.fixture
+@pytest.fixture()
 def func():
     @op
     def _func(a: int) -> int:
@@ -19,7 +19,7 @@ def func():
     yield _func
 
 
-@pytest.fixture
+@pytest.fixture()
 def afunc():
     @op
     async def _afunc(a: int) -> int:
@@ -28,7 +28,7 @@ def afunc():
     yield _afunc
 
 
-@pytest.fixture
+@pytest.fixture()
 def weave_obj():
     class A(weave.Object):
         @op
@@ -42,7 +42,7 @@ def weave_obj():
     yield A()
 
 
-@pytest.fixture
+@pytest.fixture()
 def py_obj():
     class B:
         @op

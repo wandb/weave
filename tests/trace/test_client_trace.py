@@ -3871,7 +3871,7 @@ def test_call_stream_query_heavy_query_batch(client):
         assert call.attributes["empty"] == ""
 
 
-@pytest.fixture
+@pytest.fixture()
 def clickhouse_client(client):
     if client_is_sqlite(client):
         return None

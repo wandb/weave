@@ -18,7 +18,7 @@ from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveDict, WeaveList, WeaveObject
 
 
-@pytest.fixture
+@pytest.fixture()
 def example_class():
     class Example(weave.Object):
         a: int = 1

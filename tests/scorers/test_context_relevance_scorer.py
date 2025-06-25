@@ -6,7 +6,7 @@ from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_context_and_outp
 from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorerV1
 
 
-@pytest.fixture
+@pytest.fixture()
 def weave_context_relevance_scorer():
     """
     Fixture that returns a WeaveContextRelevanceScorerV1 instance,

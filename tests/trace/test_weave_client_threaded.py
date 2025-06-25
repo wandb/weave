@@ -9,7 +9,7 @@ from flask import Flask
 import weave
 
 
-@pytest.fixture
+@pytest.fixture()
 def flask_server(client):
     app = Flask(__name__)
     server_port = 6789
