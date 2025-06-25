@@ -15,7 +15,7 @@ class ExampleRow(TypedDict):
     b: int
 
 
-@pytest.fixture
+@pytest.fixture()
 def user_dataset() -> list[ExampleRow]:
     return [
         {"a": 1, "b": 2},
@@ -24,7 +24,7 @@ def user_dataset() -> list[ExampleRow]:
     ]
 
 
-@pytest.fixture
+@pytest.fixture()
 def user_model():
     def func(a: int, b: int) -> int:
         return a + b
@@ -343,7 +343,7 @@ def generate_evaluation_logger_kwargs_permutations():
             yield kwargs
 
 
-@pytest.fixture
+@pytest.fixture()
 def scorer(request):
     if request.param == "string":
         return "string_scorer"

@@ -11,7 +11,7 @@ from weave.scorers.summarization_scorer import (
 )
 
 
-@pytest.fixture
+@pytest.fixture()
 def summarization_scorer(monkeypatch):
     async def _mock_acompletion(*args, **kwargs):
         response_format = kwargs.get("response_format")
