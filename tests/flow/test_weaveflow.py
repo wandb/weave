@@ -58,7 +58,7 @@ def test_async_ops(client):
 
     @weave.op()
     async def async_op_add5(v: int) -> int:
-        for i in range(5):
+        for _i in range(5):
             v = await async_op_add1(v)
         return v
 

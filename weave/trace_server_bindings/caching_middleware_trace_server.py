@@ -19,6 +19,7 @@ from weave.trace.settings import (
     use_server_cache,
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caches import DiskCache, LRUCache, StackedCache
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,15 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             self._cache.close()
         except Exception as e:
             logger.exception(f"Error closing cache: {e}")
+
+    def get_call_processor(self) -> AsyncBatchProcessor | None:
+        """
+        Custom method not defined on the formal TraceServerInterface to expose
+        the underlying call processor. Should be formalized in a client-side interface.
+        """
+        if hasattr(self._next_trace_server, "get_call_processor"):
+            return self._next_trace_server.get_call_processor()
+        return None
 
     @classmethod
     def from_env(cls, next_trace_server: tsi.TraceServerInterface) -> Self:
@@ -400,6 +410,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         )
 
     # Remaining Un-cacheable Methods:
+
+    def ensure_project_exists(
+        self, entity: str, project: str
+    ) -> tsi.EnsureProjectExistsRes:
+        return self._next_trace_server.ensure_project_exists(entity, project)
 
     # Call API
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

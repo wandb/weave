@@ -22,6 +22,7 @@ export type Op<T extends (...args: any[]) => any> = {
 export interface StreamReducer<T, R> {
   initialStateFn: () => R;
   reduceFn: (state: R, chunk: T) => R;
+  finalizeFn: (state: R) => void;
 }
 
 /**

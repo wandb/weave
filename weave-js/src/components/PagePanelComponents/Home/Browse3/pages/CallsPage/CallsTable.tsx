@@ -129,7 +129,23 @@ export const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   page: 0,
 };
 
-const CustomLoadingOverlay: React.FC = () => {
+const CustomLoadingOverlay: React.FC<{hideControls?: boolean}> = ({
+  hideControls,
+}) => {
+  if (hideControls) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+        <WaveLoader size="huge" />
+      </div>
+    );
+  }
   return (
     <div
       style={{
@@ -895,6 +911,8 @@ export const CallsTable: FC<{
                   setFilter={setFilter}
                   selectedOpVersionOption={selectedOpVersionOption}
                   opVersionOptions={opVersionOptions}
+                  useMenuPortalBody={true}
+                  width="320px"
                 />
               )}
               {filterModel && setFilterModel && (
@@ -1153,7 +1171,9 @@ export const CallsTable: FC<{
             <IconPinToRight style={{transform: 'scaleX(-1)'}} />
           ),
           columnMenuPinRightIcon: IconPinToRight,
-          loadingOverlay: CustomLoadingOverlay,
+          loadingOverlay: () => (
+            <CustomLoadingOverlay hideControls={hideControls} />
+          ),
         }}
         className="tw-style"
       />

@@ -6851,6 +6851,12 @@
       "input": 1e-05,
       "output": 4e-05,
       "created_at": "2025-04-16 12:44:16"
+    },
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-06-12 11:16:03"
     }
   ],
   "o3-2025-04-16": [
@@ -6859,6 +6865,12 @@
       "input": 1e-05,
       "output": 4e-05,
       "created_at": "2025-04-16 12:44:16"
+    },
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-06-12 11:16:03"
     }
   ],
   "o4-mini": [
@@ -7691,6 +7703,142 @@
       "input": 1.2e-07,
       "output": 0.0,
       "created_at": "2025-06-02 13:06:48"
+    }
+  ],
+  "gpt-4o-audio-preview-2025-06-03": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "codex-mini-latest": [
+    {
+      "provider": "openai",
+      "input": 1.5e-06,
+      "output": 6e-06,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "o3-pro": [
+    {
+      "provider": "openai",
+      "input": 2e-05,
+      "output": 8e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "o3-pro-2025-06-10": [
+    {
+      "provider": "openai",
+      "input": 2e-05,
+      "output": 8e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "azure/codex-mini-latest": [
+    {
+      "provider": "azure",
+      "input": 1.5e-06,
+      "output": 6e-06,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "mistral/magistral-medium-2506": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "mistral/magistral-small-2506": [
+    {
+      "provider": "mistral",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "cerebras/qwen-3-32b": [
+    {
+      "provider": "cerebras",
+      "input": 4e-07,
+      "output": 8e-07,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "claude-4-opus-20250514": [
+    {
+      "provider": "anthropic",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "claude-4-sonnet-20250514": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "gemini-2.5-pro-preview-06-05": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "gemini/gemini-2.5-pro-preview-06-05": [
+    {
+      "provider": "gemini",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "vertex_ai/claude-opus-4": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "vertex_ai/claude-sonnet-4": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "gemini-embedding-001": [
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1.5e-07,
+      "output": 0.0,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/llama-v3p2-90b-vision-instruct": [
+    {
+      "provider": "fireworks_ai",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/deepseek-r1-0528": [
+    {
+      "provider": "fireworks_ai",
+      "input": 3e-06,
+      "output": 8e-06,
+      "created_at": "2025-06-12 11:16:03"
     }
   ]
 }

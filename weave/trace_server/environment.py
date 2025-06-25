@@ -1,5 +1,8 @@
+import logging
 import os
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # Kafka Settings
 
@@ -19,7 +22,7 @@ def wf_kafka_broker_port() -> int:
 
 def wf_enable_online_eval() -> bool:
     """Whether to enable online evaluation."""
-    return os.environ.get("WF_ENABLE_ONLINE_EVAL", "false").lower() == "true"
+    return os.environ.get("WEAVE_ENABLE_ONLINE_EVAL", "false").lower() == "true"
 
 
 def wf_scoring_worker_batch_size() -> int:
@@ -67,7 +70,24 @@ def wf_clickhouse_max_memory_usage() -> Optional[int]:
         return None
     try:
         return int(mem)
-    except ValueError:
+    except ValueError as e:
+        logger.exception(
+            f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not a valid. Error: {str(e)}"
+        )
+        return None
+
+
+def wf_clickhouse_max_execution_time() -> Optional[int]:
+    """The maximum execution time for the clickhouse server."""
+    time = os.environ.get("WF_CLICKHOUSE_MAX_EXECUTION_TIME")
+    if time is None:
+        return None
+    try:
+        return int(time)
+    except ValueError as e:
+        logger.exception(
+            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not a valid. Error: {str(e)}"
+        )
         return None
 
 
@@ -98,7 +118,7 @@ def wf_file_storage_project_allow_list() -> Optional[list[str]]:
     except Exception as e:
         raise ValueError(
             f"WF_FILE_STORAGE_PROJECT_ALLOW_LIST is not a valid comma-separated list: {allow_list}. Error: {str(e)}"
-        )
+        ) from e
 
     return project_ids
 
@@ -167,7 +187,7 @@ def wf_file_storage_project_ramp_pct() -> Optional[int]:
     except ValueError as e:
         raise ValueError(
             f"WF_FILE_STORAGE_PROJECT_RAMP_PCT is not a valid integer: {pct_str}. Error: {str(e)}"
-        )
+        ) from e
 
     if pct < 0 or pct > 100:
         raise ValueError(
@@ -175,3 +195,13 @@ def wf_file_storage_project_ramp_pct() -> Optional[int]:
         )
 
     return pct
+
+
+# Inference Service Settings
+
+
+def inference_service_base_url() -> str:
+    """The base URL for the inference service."""
+    return os.environ.get(
+        "INFERENCE_SERVICE_BASE_URL", "https://api.inference.wandb.ai/v1"
+    )

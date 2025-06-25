@@ -32,6 +32,7 @@ from requests import HTTPError
 
 from weave import version
 from weave.trace import trace_sentry, urls
+from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -137,7 +138,6 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -232,9 +232,8 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative step not supported")
 
         # Apply limit if provided
-        if self.limit is not None:
-            if stop is None or stop > self.limit:
-                stop = self.limit
+        if self.limit is not None and (stop is None or stop > self.limit):
+            stop = self.limit
 
         # Apply offset if provided
         if self.offset is not None:
@@ -297,7 +296,7 @@ class PaginatedIterator(Generic[T, R]):
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         records = []
         for item in self:
@@ -584,7 +583,7 @@ class Call:
             try:
                 entity, project = self.project_id.split("/")
             except ValueError:
-                raise ValueError(f"Invalid project_id: {self.project_id}")
+                raise ValueError(f"Invalid project_id: {self.project_id}") from None
             weave_ref = CallRef(entity, project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
@@ -599,7 +598,7 @@ class Call:
         try:
             entity, project = self.project_id.split("/")
         except ValueError:
-            raise ValueError(f"Invalid project_id: {self.project_id}")
+            raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
 
     @property
@@ -955,9 +954,16 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
-        self._server_is_flushable = False
-        if isinstance(self.server, RemoteHTTPTraceServer):
-            self._server_is_flushable = self.server.should_batch
+        self._server_call_processor = None
+        # This is a short-term hack to get around the fact that we are reaching into
+        # the underlying implementation of the specific server to get the call processor.
+        # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
+        # some client-side flushing mechanics. We should move this to the interface layer. However,
+        # we don't really want the server-side implementaitons to need to define no-ops as that is
+        # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
+        # to define no-ops.
+        if hasattr(self.server, "get_call_processor"):
+            self._server_call_processor = self.server.get_call_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
     ################ High Level Convenience Methods ################
@@ -1007,11 +1013,13 @@ class WeaveClient:
                 if e.response.content:
                     try:
                         reason = json.loads(e.response.content).get("reason")
-                        raise ValueError(reason)
+                        raise ValueError(reason) from None
                     except json.JSONDecodeError:
-                        raise ValueError(e.response.content)
+                        raise ValueError(e.response.content) from None
                 if e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from e
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -1033,7 +1041,9 @@ class WeaveClient:
                 )
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from None
                 raise
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
@@ -1050,14 +1060,15 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
     def get_calls(
         self,
         *,
-        filter: CallsFilter | None = None,
+        filter: CallsFilterLike | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        sort_by: list[SortBy] | None = None,
-        query: Query | None = None,
+        sort_by: list[SortByLike] | None = None,
+        query: QueryLike | None = None,
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
@@ -1624,9 +1635,7 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: datetime.datetime | None = datetime.datetime.now(
-            datetime.timezone.utc
-        ),
+        effective_date: datetime.datetime | None = None,
         prompt_token_cost_unit: str | None = "USD",
         completion_token_cost_unit: str | None = "USD",
         provider_id: str | None = "default",
@@ -1654,6 +1663,8 @@ class WeaveClient:
             Which has one field called a list of tuples called ids.
             Each tuple contains the llm_id and the id of the created cost object.
         """
+        if effective_date is None:
+            effective_date = datetime.datetime.now(datetime.timezone.utc)
         cost = CostCreateInput(
             prompt_token_cost=prompt_token_cost,
             completion_token_cost=completion_token_cost,
@@ -2207,10 +2218,8 @@ class WeaveClient:
             total += self.future_executor_fastlane.num_outstanding_futures
 
         # Add call batch uploads if available
-        if self._server_is_flushable:
-            server = cast(RemoteHTTPTraceServer, self.server)
-            assert server.call_processor is not None
-            total += server.call_processor.num_outstanding_jobs
+        if self._server_call_processor:
+            total += self._server_call_processor.num_outstanding_jobs
         return total
 
     def finish(
@@ -2336,17 +2345,10 @@ class WeaveClient:
             self.future_executor.flush()
         if self.future_executor_fastlane:
             self.future_executor_fastlane.flush()
-        if self._server_is_flushable:
-            # We don't want to do an instance check here because it could
-            # be susceptible to shutdown race conditions. So we save a boolean
-            # _server_is_flushable and only call this if we know the server is
-            # flushable.
-            server = cast(RemoteHTTPTraceServer, self.server)
-            assert server.call_processor is not None
-            server.call_processor.stop_accepting_new_work_and_flush_queue()
-
+        if self._server_call_processor:
+            self._server_call_processor.stop_accepting_new_work_and_flush_queue()
             # Restart call processor processing thread after flushing
-            server.call_processor.accept_new_work()
+            self._server_call_processor.accept_new_work()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.
@@ -2363,10 +2365,8 @@ class WeaveClient:
         if self.future_executor_fastlane:
             fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
         call_processor_jobs = 0
-        if self._server_is_flushable:
-            server = cast(RemoteHTTPTraceServer, self.server)
-            assert server.call_processor is not None
-            call_processor_jobs = server.call_processor.num_outstanding_jobs
+        if self._server_call_processor:
+            call_processor_jobs = self._server_call_processor.num_outstanding_jobs
 
         return PendingJobCounts(
             main_jobs=main_jobs,

@@ -98,6 +98,8 @@ class CallSchema(BaseModel):
     trace_id: str
     # Parent ID is optional because the call may be a root
     parent_id: Optional[str] = None
+    # Thread ID is optional
+    thread_id: Optional[str] = None
 
     # Start time is required
     started_at: datetime.datetime
@@ -153,6 +155,8 @@ class StartedCallSchemaForInsert(BaseModel):
     trace_id: Optional[str] = None  # Will be generated if not provided
     # Parent ID is optional because the call may be a root
     parent_id: Optional[str] = None
+    # Thread ID is optional
+    thread_id: Optional[str] = None
 
     # Start time is required
     started_at: datetime.datetime
@@ -199,7 +203,7 @@ class ObjSchema(BaseModel):
     is_latest: int
     kind: str
     base_object_class: Optional[str]
-    leaf_object_class: Optional[str]
+    leaf_object_class: Optional[str] = None
     val: Any
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -361,6 +365,7 @@ class CallsFilter(BaseModel):
     parent_ids: Optional[list[str]] = None
     trace_ids: Optional[list[str]] = None
     call_ids: Optional[list[str]] = None
+    thread_ids: Optional[list[str]] = None
     trace_roots_only: Optional[bool] = None
     wb_user_ids: Optional[list[str]] = None
     wb_run_ids: Optional[list[str]] = None
