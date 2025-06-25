@@ -238,35 +238,43 @@ markers = [
 [tool.ruff.lint]
 preview = true
 select = [
-  "D200",   # https://docs.astral.sh/ruff/rules/fits-on-one-line/
-  "D201",   # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
-  "D202",   # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
-  "D204",   # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
-  "D210",   # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
-  "D211",   # https://docs.astral.sh/ruff/rules/blank-line-before-class/
-  "D214",   # https://docs.astral.sh/ruff/rules/section-not-over-indented/
-  "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
-  "FIX003", # https://docs.astral.sh/ruff/rules/line-contains-xxx/
-  "F541",   # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
-  "I",      # https://docs.astral.sh/ruff/rules/#isort-i
-  "W",      # https://docs.astral.sh/ruff/rules/#warning-w
-  "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
-  "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
-  "UP",     # https://docs.astral.sh/ruff/rules/#pyupgrade-up
-  "TRY002", # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
-  "TRY004", # https://docs.astral.sh/ruff/rules/type-check-without-type-error/
-  "TRY300", # https://docs.astral.sh/ruff/rules/try-consider-else/
-  "TRY400", # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
-  "C",      # https://docs.astral.sh/ruff/rules/#convention-c
-  "T201",   # https://docs.astral.sh/ruff/rules/print-statement/
-  "B006",   # https://docs.astral.sh/ruff/rules/mutable-argument-default/
-  "B007",   # https://docs.astral.sh/ruff/rules/unused-loop-control-variable/
-  "B008",   # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
-  "B009",   # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
-  "B017",   # https://docs.astral.sh/ruff/rules/assert-raises-exception/
-  "B020",   # https://docs.astral.sh/ruff/rules/loop-variable-overrides-iterator/
-  "B028",   # https://docs.astral.sh/ruff/rules/no-explicit-stacklevel/
-  "B904",   # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
+  "D200",    # https://docs.astral.sh/ruff/rules/fits-on-one-line/
+  "D201",    # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
+  "D202",    # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
+  "D204",    # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
+  "D210",    # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
+  "D211",    # https://docs.astral.sh/ruff/rules/blank-line-before-class/
+  "D214",    # https://docs.astral.sh/ruff/rules/section-not-over-indented/
+  "FIX001",  # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
+  "FIX003",  # https://docs.astral.sh/ruff/rules/line-contains-xxx/
+  "F541",    # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
+  "I",       # https://docs.astral.sh/ruff/rules/#isort-i
+  "W",       # https://docs.astral.sh/ruff/rules/#warning-w
+  "F401",    # https://docs.astral.sh/ruff/rules/unused-import/
+  "TID252",  # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
+  "UP",      # https://docs.astral.sh/ruff/rules/#pyupgrade-up
+  "TRY002",  # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
+  "TRY004",  # https://docs.astral.sh/ruff/rules/type-check-without-type-error/
+  "TRY300",  # https://docs.astral.sh/ruff/rules/try-consider-else/
+  "TRY400",  # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
+  "C",       # https://docs.astral.sh/ruff/rules/#convention-c
+  "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
+  "B006",    # https://docs.astral.sh/ruff/rules/mutable-argument-default/
+  "B007",    # https://docs.astral.sh/ruff/rules/unused-loop-control-variable/
+  "B008",    # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
+  "B009",    # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
+  "B017",    # https://docs.astral.sh/ruff/rules/assert-raises-exception/
+  "B020",    # https://docs.astral.sh/ruff/rules/loop-variable-overrides-iterator/
+  "B028",    # https://docs.astral.sh/ruff/rules/no-explicit-stacklevel/
+  "B904",    # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
+  "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
+  "N801",    # https://docs.astral.sh/ruff/rules/invalid-class-name/
+  "N803",    # https://docs.astral.sh/ruff/rules/invalid-argument-name/
+  "N804",    # https://docs.astral.sh/ruff/rules/non-lowercase-variable-in-class/
+  "N805",    # https://docs.astral.sh/ruff/rules/invalid-first-argument-name-for-method/
+  "N806",    # https://docs.astral.sh/ruff/rules/non-lowercase-variable-in-function/
+  "PERF102", # https://docs.astral.sh/ruff/rules/incorrect-dict-iterator/
+  "T20",     # https://docs.astral.sh/ruff/rules/#flake8-print-t20
 ]
 ignore = [
   # we use Google style
