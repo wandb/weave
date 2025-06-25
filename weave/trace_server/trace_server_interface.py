@@ -100,6 +100,8 @@ class CallSchema(BaseModel):
     parent_id: Optional[str] = None
     # Thread ID is optional
     thread_id: Optional[str] = None
+    # Turn ID is optional
+    turn_id: Optional[str] = None
 
     # Start time is required
     started_at: datetime.datetime
@@ -157,6 +159,8 @@ class StartedCallSchemaForInsert(BaseModel):
     parent_id: Optional[str] = None
     # Thread ID is optional
     thread_id: Optional[str] = None
+    # Turn ID is optional
+    turn_id: Optional[str] = None
 
     # Start time is required
     started_at: datetime.datetime
@@ -366,6 +370,7 @@ class CallsFilter(BaseModel):
     trace_ids: Optional[list[str]] = None
     call_ids: Optional[list[str]] = None
     thread_ids: Optional[list[str]] = None
+    turn_ids: Optional[list[str]] = None
     trace_roots_only: Optional[bool] = None
     wb_user_ids: Optional[list[str]] = None
     wb_run_ids: Optional[list[str]] = None
