@@ -615,7 +615,7 @@ def test_bedrock_agent_invoke_agent(
 
     assert call.exception is None
     assert call.ended_at is not None
-    assert  "BedrockAgentRuntime.invoke_agent" in call.op_name 
+    assert "BedrockAgentRuntime.invoke_agent" in call.op_name
     # Verify inputs were captured
     inputs = call.inputs
     assert inputs["agentId"] == "test-agent-id"
