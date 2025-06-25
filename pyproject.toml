@@ -274,6 +274,7 @@ select = [
   "N805",    # https://docs.astral.sh/ruff/rules/invalid-first-argument-name-for-method/
   "N806",    # https://docs.astral.sh/ruff/rules/non-lowercase-variable-in-function/
   "PERF102", # https://docs.astral.sh/ruff/rules/incorrect-dict-iterator/
+  "T20",     # https://docs.astral.sh/ruff/rules/#flake8-print-t20
 ]
 ignore = [
   # we use Google style

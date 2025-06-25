@@ -267,12 +267,8 @@ export const EMPTY_PROPS_MONITORS: EmptyProps = {
   moreInformation: (
     <>
       Learn{' '}
-      <TargetBlank href="http://wandb.me/weave_monitors">
+      <TargetBlank href="https://weave-docs.wandb.ai/guides/evaluation/guardrails_and_monitors#using-scorers-as-monitors">
         monitor basics
-      </TargetBlank>{' '}
-      or see how you can{' '}
-      <TargetBlank href="http://wandb.me/weave_eval_tut">
-        use monitors within an evaluation pipeline
       </TargetBlank>
       .
       <Box sx={{mt: 2}}>
