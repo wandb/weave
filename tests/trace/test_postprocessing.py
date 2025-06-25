@@ -18,7 +18,7 @@ def redact_output(s: str) -> str:
 
 
 # These globals are directly set here because we don't have a great way to test weave.init
-@pytest.fixture
+@pytest.fixture()
 def apply_postprocessing():
     original_postprocess_inputs = api._global_postprocess_inputs
     original_postprocess_output = api._global_postprocess_output

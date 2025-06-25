@@ -9,7 +9,7 @@ class User(BaseModel):
     age: int
 
 
-@pytest.fixture
+@pytest.fixture()
 def user_scorer():
     return PydanticScorer(model=User)
 

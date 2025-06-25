@@ -55,7 +55,7 @@ def generate_call_start_end_pair(
     return tsi.CallStartReq(start=start), tsi.CallEndReq(end=end)
 
 
-@pytest.fixture
+@pytest.fixture()
 def success_response():
     response = MagicMock()
     response.status_code = 200
@@ -63,7 +63,7 @@ def success_response():
     return response
 
 
-@pytest.fixture
+@pytest.fixture()
 def server(request):
     _server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
 

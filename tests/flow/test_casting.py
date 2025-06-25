@@ -7,7 +7,7 @@ from weave.flow.casting import cast_to_dataset, cast_to_scorer
 from weave.trace.op import is_op
 
 
-@pytest.fixture
+@pytest.fixture()
 def valid_dataset(client, request):
     data = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
 
@@ -25,7 +25,7 @@ def valid_dataset(client, request):
         return ref.get(objectify=False)
 
 
-@pytest.fixture
+@pytest.fixture()
 def valid_scorer(client, request):
     if request.param == "scorer":
 

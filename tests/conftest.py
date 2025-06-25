@@ -379,7 +379,7 @@ class InMemoryWeaveLogCollector(logging.Handler):
         return self._get_logs("WARNING")
 
 
-@pytest.fixture
+@pytest.fixture()
 def log_collector(request):
     handler = InMemoryWeaveLogCollector()
     logger = logging.getLogger()  # Get your specific logger here if needed
@@ -547,7 +547,7 @@ def create_client(
     return inited_client
 
 
-@pytest.fixture
+@pytest.fixture()
 def zero_stack():
     with set_call_stack([]):
         yield
@@ -591,7 +591,7 @@ def client_creator(zero_stack, request):
     yield client
 
 
-@pytest.fixture
+@pytest.fixture()
 def network_proxy_client(client):
     """
     This fixture is used to test the `RemoteHTTPTraceServer` class. There is
