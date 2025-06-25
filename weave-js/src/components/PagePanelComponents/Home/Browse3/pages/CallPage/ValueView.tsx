@@ -90,7 +90,7 @@ export const ValueView = ({data, isExpanded}: ValueViewProps) => {
   }
 
   if (data.valueType === 'number') {
-    if (isProbablyTimestamp(data.value)) {
+    if (isProbablyTimestamp(data.value, data.id)) {
       return <ValueViewNumberTimestamp value={data.value} />;
     }
     return <ValueViewNumber value={data.value} />;
