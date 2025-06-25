@@ -171,24 +171,26 @@ Learn how to [create a monitor in general](#create-a-monitor) or try out the [en
    - **Active monitor** toggle: Turn the monitor on or off. 
    - **Calls to monitor**:
         - **Operations**: Choose one or more `@weave.op`s to monitor. 
+            :::important
+            You must log at least one trace for an Op for it to appear in the list of available operations.
+            :::
         - **Filter** *(optional)*: Narrow down which op columns are eligible for monitoring (e.g., `max_tokens` or `top_p`)
         - **Sampling rate**: The percentage of calls to be scored, between 0% and 100% (e.g., 10%)
-            :::tip Understanding `sampling_rate`
-            The `sampling_rate` controls what fraction of matching calls will be scored. It is a float between `0.0` and `1.0`:
-            | Value | Meaning                              |
-            | ----- | ------------------------------------ |
-            | `1.0` | Score all matching calls         |
-            | `0.5` | Score \~50% of calls (random)        |
-            | `0.1` | Score \~10% of calls                 |
-            | `0.0` | Score no calls (useful for dry-runs) |
+            :::tip 
+            A lower sampling rate is useful for controlling costs, as each scoring call has a cost associated with it.
             :::
    - **LLM-as-a-Judge configuration**: 
         - **Scorer name**: Valid scorer names must start with a letter or number and can only contain letters, numbers, hyphens, and underscores.
-        - **Judge model**: Select the model that will score your ops and configure the following settings:
+        - **Judge model**: Select the model that will score your ops. Three types of models are available:
+            - [Saved models](../tools/playground.md#saved-models)
+            - Models from providers configured by your W&B admin
+            - [W&B Inference models](../integrations/inference.md)
+        
+        For the selected model, configure the following settings:
             - **Configuration name**
             - **System prompt**
             - **Response format**
-        - **Scoring prompt**: The prompt used by the LLM-as-a-judge to score your ops. The prompt should specify what the `{output}` and `{input}` are.
+        - **Scoring prompt**: The prompt used by the LLM-as-a-judge to score your ops. “You can reference `{output}`, individual inputs (like `{foo}`), and `{inputs}` as a dictionary. [For more information, see prompt variables](#prompt-variables).”
 4. Click **Create Monitor**. Weave will automatically begin monitoring and scoring calls that match the specified criteria. You can view monitor details in the **Monitors** tab.
 
 ### Example: Create a truthfulness monitor
@@ -224,6 +226,7 @@ In the following example, you'll create:
         else:
             return ground_truth
    ```
+2. Execute the code for `generate_statement`to log a trace. The `generate_statement` op will not appear in the Op dropdown unless it was logged at least once. 
 2. In the Weave UI, navigate to **Monitors**.
 3. From the monitors page, click **New Monitor**.
 4. Configure the monitor as follows:
@@ -273,6 +276,37 @@ In the following example, you'll create:
 8. From the list of available traces, select any trace for **LLMAsAJudgeScorer.score**. 
 9. Inspect the trace to see the monitor in action. For this example, the monitor correctly evaluated the `output` (in this instance, equivalent to the `ground_truth`) as `true` and provided sound `reasoning`.
     ![Monitor trace](img/monitors-4.png)
+
+### Prompt variables {#prompt-variables}
+
+
+
+In scoring prompts, you can reference multiple variables from your op. These values are automatically extracted from your function call when the scorer runs. Consider the following example function:
+
+```python
+@weave.op
+def my_function(foo: str, bar: str) -> str:
+    return f"{foo} and {bar}"
+```
+
+In this case, the following variables are accessible:
+
+| Variable     | Description                                           |
+|--------------|-------------------------------------------------------|
+| `{foo}`      | The value of the input argument `foo`                |
+| `{bar}`      | The value of the input argument `bar`                |
+| `{inputs}`   | A JSON dictionary of all input arguments             |
+| `{output}`   | The result returned by your op                       |
+
+For example:
+
+```text
+Input foo: {foo}
+Input bar: {bar}
+Output: {output}
+```
+
+If your op has other arguments, they’ll all be available by name.
 
 ## AWS Bedrock Guardrails
 
