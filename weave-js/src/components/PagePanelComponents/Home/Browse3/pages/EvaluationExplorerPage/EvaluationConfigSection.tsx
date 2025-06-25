@@ -1,8 +1,10 @@
 import {Select} from '@wandb/weave/components/Form/Select';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {refStringToName} from './common';
 import {LoadingSelect} from './components';
 import {BORDER_COLOR} from './constants';
 import {useEvaluationExplorerPageContext} from './context';
@@ -10,7 +12,7 @@ import {DatasetConfigSection} from './DatasetConfigSection';
 import {clientBound, hookify} from './hooks';
 import {Column} from './layout';
 import {ConfigSection, Row} from './layout';
-import {getLatestEvaluationRefs} from './query';
+import {getLatestEvaluationRefs, getObjByRef} from './query';
 import {ScorersConfigSection} from './ScorersConfigSection';
 
 export const EvaluationConfigSection: React.FC<{
@@ -35,6 +37,7 @@ export const EvaluationConfigSection: React.FC<{
             onChange={value => {
               editConfig(draft => {
                 draft.evaluationDefinition.properties.name = value;
+                draft.evaluationDefinition.dirtied = true;
               });
             }}
           />
@@ -47,6 +50,7 @@ export const EvaluationConfigSection: React.FC<{
               editConfig(draft => {
                 draft.evaluationDefinition.properties.description =
                   e.target.value;
+                draft.evaluationDefinition.dirtied = true;
               });
             }}
           />
@@ -63,28 +67,111 @@ export const EvaluationConfigSection: React.FC<{
 };
 
 const useLatestEvaluationRefs = clientBound(hookify(getLatestEvaluationRefs));
+
 const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
   entity,
   project,
 }) => {
+  const {config, editConfig} = useEvaluationExplorerPageContext();
   const refsQuery = useLatestEvaluationRefs(entity, project);
+  const getClient = useGetTraceServerClientContext();
+
   const newEvaluationOption = useMemo(() => {
     return {
       label: 'New Evaluation',
       value: 'new-evaluation',
     };
   }, []);
+
   const selectOptions = useMemo(() => {
     return [
-      newEvaluationOption,
-      ...(refsQuery.data?.map(ref => ({
-        label: ref,
-      })) ?? []),
+      {
+        label: 'Create new evaluation',
+        options: [newEvaluationOption],
+      },
+      {
+        label: 'Load existing evaluation',
+        options:
+          refsQuery.data?.map(ref => ({
+            label: refStringToName(ref),
+            value: ref,
+          })) ?? [],
+      },
     ];
   }, [refsQuery.data, newEvaluationOption]);
-  const selectedValue = useMemo(() => {
-    return selectOptions[0];
-  }, [selectOptions]);
+
+  const selectedOption = useMemo(() => {
+    if (config.evaluationDefinition.originalSourceRef) {
+      return {
+        label: refStringToName(config.evaluationDefinition.originalSourceRef),
+        value: config.evaluationDefinition.originalSourceRef,
+      };
+    }
+    return newEvaluationOption;
+  }, [config.evaluationDefinition.originalSourceRef, newEvaluationOption]);
+
+  const setEvaluationRef = useCallback(
+    async (evaluationRef: string | null) => {
+      if (evaluationRef === 'new-evaluation' || evaluationRef === null) {
+        // Reset to new evaluation
+        editConfig(draft => {
+          draft.evaluationDefinition.originalSourceRef = null;
+          draft.evaluationDefinition.dirtied = false;
+          draft.evaluationDefinition.properties.name = '';
+          draft.evaluationDefinition.properties.description = '';
+          // Clear dataset and scorers
+          draft.evaluationDefinition.properties.dataset.originalSourceRef =
+            null;
+          draft.evaluationDefinition.properties.scorers = [];
+          // Clear models
+          draft.models = [];
+        });
+      } else {
+        // First set the ref
+        editConfig(draft => {
+          draft.evaluationDefinition.originalSourceRef = evaluationRef;
+          draft.evaluationDefinition.dirtied = false;
+        });
+
+        // Then load the evaluation data
+        try {
+          const client = getClient();
+          const evaluationData = await getObjByRef(client, evaluationRef);
+
+          if (evaluationData) {
+            const evalData = evaluationData.val;
+            editConfig(draft => {
+              // Update evaluation properties from loaded data
+              draft.evaluationDefinition.properties.name = evalData.name || '';
+              draft.evaluationDefinition.properties.description =
+                evalData.description || '';
+
+              // Set dataset ref if it exists
+              if (evalData.datasetRef) {
+                draft.evaluationDefinition.properties.dataset.originalSourceRef =
+                  evalData.datasetRef;
+              }
+
+              // Set scorer refs if they exist
+              if (evalData.scorerRefs && Array.isArray(evalData.scorerRefs)) {
+                draft.evaluationDefinition.properties.scorers =
+                  evalData.scorerRefs.map((ref: string) => ({
+                    originalSourceRef: ref,
+                  }));
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Failed to load evaluation:', error);
+          // Reset on error
+          editConfig(draft => {
+            draft.evaluationDefinition.originalSourceRef = null;
+          });
+        }
+      }
+    },
+    [editConfig, getClient]
+  );
 
   if (refsQuery.loading) {
     return <LoadingSelect />;
@@ -92,11 +179,11 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
 
   return (
     <Select
+      blurInputOnSelect
       options={selectOptions}
-      value={selectedValue}
+      value={selectedOption}
       onChange={option => {
-        console.log(option);
-        console.error('TODO: Implement me');
+        setEvaluationRef(option?.value ?? null);
       }}
     />
   );

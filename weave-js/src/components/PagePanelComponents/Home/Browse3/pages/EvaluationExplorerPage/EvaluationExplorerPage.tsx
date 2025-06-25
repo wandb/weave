@@ -14,7 +14,6 @@ import {Column, Header} from './layout';
 import {Footer, Row} from './layout';
 import {ModelsConfigSection} from './ModelsConfigSection';
 import {createEvaluation, runEvaluation} from './query';
-import {ScorersConfigSection} from './ScorersConfigSection';
 
 type EvaluationExplorerPageProps = {
   entity: string;
@@ -106,7 +105,7 @@ const ConfigPanel: React.FC<{
   project: string;
   setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
 }> = ({entity, project, setNewDatasetEditorMode}) => {
-  const {config} = useEvaluationExplorerPageContext();
+  const {config, editConfig} = useEvaluationExplorerPageContext();
   const [isRunning, setIsRunning] = useState(false);
   const getClient = useGetTraceServerClientContext();
 
@@ -174,6 +173,12 @@ const ConfigPanel: React.FC<{
         scorerRefs,
       });
 
+      // Update the config with the new evaluation ref
+      editConfig(draft => {
+        draft.evaluationDefinition.originalSourceRef = evaluationRef;
+        draft.evaluationDefinition.dirtied = false;
+      });
+
       // Run evaluation
       const results = await runEvaluation(
         client,
@@ -191,7 +196,15 @@ const ConfigPanel: React.FC<{
     } finally {
       setIsRunning(false);
     }
-  }, [config, entity, project, isRunEvalEnabled, isRunning, getClient]);
+  }, [
+    config,
+    entity,
+    project,
+    isRunEvalEnabled,
+    isRunning,
+    getClient,
+    editConfig,
+  ]);
 
   return (
     <Column
