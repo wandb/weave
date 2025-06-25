@@ -1553,8 +1553,8 @@ def test_bound_op_retrieval_no_self(client):
         a: int
 
         @weave.op
-        def op_with_custom_type(me, v):
-            return me.a + v
+        def op_with_custom_type(self, v):
+            return self.a + v
 
     obj = CustomTypeWithoutSelf(a=1)
     obj_ref = weave.publish(obj)
