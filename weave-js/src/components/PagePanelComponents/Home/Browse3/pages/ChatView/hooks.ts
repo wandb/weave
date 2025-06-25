@@ -38,6 +38,11 @@ import {
   normalizeOTELChatCompletion,
   normalizeOTELChatRequest,
 } from './ChatFormats/opentelemetry';
+import {
+  isTraceCallChatFormatLangchain,
+  normalizeLangchainChatCompletion,
+  normalizeLangchainChatRequest,
+} from './ChatFormats/langchain';
 import {ChatFormat} from './ChatFormats/types';
 import {Chat, ChatCompletion, ChatRequest} from './types';
 
@@ -98,6 +103,9 @@ export const getChatFormat = (call: CallSchema): ChatFormat => {
   if (isTraceCallChatFormatOTEL(call.traceCall)) {
     return ChatFormat.OTEL;
   }
+  if (isTraceCallChatFormatLangchain(call.traceCall)) {
+    return ChatFormat.Langchain;
+  }
   return ChatFormat.None;
 };
 
@@ -153,6 +161,9 @@ export const normalizeChatRequest = (request: any): ChatRequest => {
   if (isTraceCallChatFormatOTEL(request)) {
     return normalizeOTELChatRequest(request);
   }
+  if (isTraceCallChatFormatLangchain(request)) {
+    return normalizeLangchainChatRequest(request);
+  }
   return request as ChatRequest;
 };
 
@@ -183,6 +194,12 @@ export const useCallAsChat = (
       // Use specialized OTEL handlers
       request = normalizeOTELChatRequest(call);
       result = call.output ? normalizeOTELChatCompletion(call, request) : null;
+    } else if (isTraceCallChatFormatLangchain(call)) {
+      // Use specialized Langchain handlers
+      request = normalizeLangchainChatRequest(deref(call.inputs, refsMap));
+      result = call.output
+        ? normalizeLangchainChatCompletion(deref(call.output, refsMap))
+        : null;
     } else {
       // Use standard handlers
       request = normalizeChatRequest(deref(call.inputs, refsMap));
@@ -226,6 +243,17 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
       return traceCall;
     }
     const chatCompletion = normalizeOTELChatCompletion(traceCall, chatRequest);
+
+    return {
+      inputs: chatRequest,
+      output: chatCompletion,
+      ...rest,
+    };
+  }
+
+  if (isTraceCallChatFormatLangchain(traceCall)) {
+    const chatRequest = normalizeLangchainChatRequest(traceCall.inputs);
+    const chatCompletion = normalizeLangchainChatCompletion(traceCall.output);
 
     return {
       inputs: chatRequest,
