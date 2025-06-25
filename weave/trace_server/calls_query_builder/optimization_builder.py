@@ -128,8 +128,8 @@ class QueryOptimizationProcessor(ABC):
         """
         Process OR operations into optimized SQL.
 
-        Note: If any condition in an OR cannot be processed, the entire OR
-        cannot be processed, so we return None.
+        Note: If any condition in an OR cannot be optimized, the entire OR
+        cannot be optimized, so we return None.
         """
         conditions = []
         for op in operation.or_:
@@ -359,123 +359,56 @@ def process_query_to_optimization_sql(
     )
 
 
-class OperationHandlerBase:
+def _create_like_condition(
+    field: str,
+    like_pattern: str,
+    pb: "ParamBuilder",
+    table_alias: str,
+    case_insensitive: bool = False,
+) -> str:
+    """Creates a LIKE condition for a JSON field."""
+    field_name = f"{table_alias}.{field}"
+
+    if case_insensitive:
+        param_name = pb.add_param(like_pattern.lower())
+        return f"lower({field_name}) LIKE {param_slot(param_name, 'String')}"
+    else:
+        param_name = pb.add_param(like_pattern)
+        return f"{field_name} LIKE {param_slot(param_name, 'String')}"
+
+
+def _extract_field_and_literal(
+    operation: Union[
+        tsi_query.EqOperation, tsi_query.GtOperation, tsi_query.GteOperation
+    ],
+) -> tuple[Optional[tsi_query.GetFieldOperator], Optional[tsi_query.LiteralOperation]]:
+    """Extract field and literal operands from a binary operation.
+
+    Returns a tuple of (field_operand, literal_operand) or (None, None) if invalid.
     """
-    Base class for handling common patterns in query operation processing.
+    ops = (
+        operation.eq_
+        if hasattr(operation, "eq_")
+        else (operation.gt_ if hasattr(operation, "gt_") else operation.gte_)
+    )
 
-    This class provides shared functionality for extracting fields and literals
-    from binary operations, reducing code duplication across different processors.
-    """
+    if len(ops) != 2:
+        return None, None
 
-    @staticmethod
-    def extract_field_and_literal(
-        operation: Union[
-            tsi_query.EqOperation,
-            tsi_query.GtOperation,
-            tsi_query.GteOperation,
-            tsi_query.ContainsOperation,
-            tsi_query.InOperation,
-        ],
-    ) -> tuple[
-        Optional[tsi_query.GetFieldOperator], Optional[tsi_query.LiteralOperation]
-    ]:
-        """
-        Extract field and literal operands from a binary operation.
+    field_operand = None
+    literal_operand = None
 
-        Args:
-            operation: The binary operation to extract operands from
+    if isinstance(ops[0], tsi_query.GetFieldOperator):
+        field_operand = ops[0]
+        literal_operand = ops[1]
+    elif isinstance(ops[1], tsi_query.GetFieldOperator):
+        field_operand = ops[1]
+        literal_operand = ops[0]
 
-        Returns:
-            tuple[Optional[GetFieldOperator], Optional[LiteralOperation]]:
-                A tuple of (field_operand, literal_operand) or (None, None) if invalid.
+    if not isinstance(literal_operand, tsi_query.LiteralOperation):
+        return None, None
 
-        Examples:
-            >>> op = EqOperation(eq_=[GetFieldOperator(get_field_="test"), LiteralOperation(literal_="value")])
-            >>> field_op, literal_op = OperationHandlerBase.extract_field_and_literal(op)
-            >>> field_op.get_field_
-            'test'
-            >>> literal_op.literal_
-            'value'
-        """
-        # Handle different operation types
-        if hasattr(operation, "eq_"):
-            ops = operation.eq_
-        elif hasattr(operation, "gt_"):
-            ops = operation.gt_
-        elif hasattr(operation, "gte_"):
-            ops = operation.gte_
-        elif hasattr(operation, "contains_"):
-            # Contains operation has a different structure
-            if isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
-                field_operand = operation.contains_.input
-                literal_operand = operation.contains_.substr
-                if isinstance(literal_operand, tsi_query.LiteralOperation):
-                    return field_operand, literal_operand
-            return None, None
-        elif hasattr(operation, "in_"):
-            # IN operation has a different structure
-            if len(operation.in_) >= 2 and isinstance(
-                operation.in_[0], tsi_query.GetFieldOperator
-            ):
-                field_operand = operation.in_[0]
-                # For IN operations, we don't extract a single literal but validate the structure
-                # The caller should handle the list of values separately
-                return field_operand, None
-            return None, None
-        else:
-            return None, None
-
-        if len(ops) != 2:
-            return None, None
-
-        field_operand_res = None
-        literal_operand = None
-
-        if isinstance(ops[0], tsi_query.GetFieldOperator):
-            field_operand_res = ops[0]
-            literal_operand = ops[1]
-        elif isinstance(ops[1], tsi_query.GetFieldOperator):
-            field_operand_res = ops[1]
-            literal_operand = ops[0]
-
-        if not isinstance(literal_operand, tsi_query.LiteralOperation):
-            return None, None
-
-        return field_operand_res, literal_operand
-
-    @staticmethod
-    def create_like_condition(
-        field: str,
-        like_pattern: str,
-        pb: "ParamBuilder",
-        table_alias: str,
-        case_insensitive: bool = False,
-    ) -> str:
-        """
-        Creates a LIKE condition for a JSON field.
-
-        Args:
-            field: The field name to apply the LIKE condition to
-            like_pattern: The pattern to match against
-            pb: Parameter builder for SQL parameters
-            table_alias: Table alias to use in the condition
-            case_insensitive: Whether to perform case-insensitive matching
-
-        Returns:
-            str: SQL LIKE condition
-
-        Examples:
-            >>> OperationHandlerBase.create_like_condition("inputs_dump", "%test%", pb, "calls")
-            'calls.inputs_dump LIKE {param_slot}'
-        """
-        field_name = f"{table_alias}.{field}"
-
-        if case_insensitive:
-            param_name = pb.add_param(like_pattern.lower())
-            return f"lower({field_name}) LIKE {param_slot(param_name, 'String')}"
-        else:
-            param_name = pb.add_param(like_pattern)
-            return f"{field_name} LIKE {param_slot(param_name, 'String')}"
+    return field_operand, literal_operand
 
 
 def _create_like_optimized_eq_condition(
@@ -484,9 +417,7 @@ def _create_like_optimized_eq_condition(
     table_alias: str,
 ) -> Optional[str]:
     """Creates a LIKE-optimized condition for equality operations."""
-    field_operand, literal_operand = OperationHandlerBase.extract_field_and_literal(
-        operation
-    )
+    field_operand, literal_operand = _extract_field_and_literal(operation)
     if field_operand is None or literal_operand is None:
         return None
 
@@ -514,9 +445,7 @@ def _create_like_optimized_eq_condition(
     else:
         like_pattern = f'%"{literal_value}"%'
 
-    like_condition = OperationHandlerBase.create_like_condition(
-        field, like_pattern, pb, table_alias
-    )
+    like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
     if _field_requires_null_check(field):
         return f"({like_condition} OR {table_alias}.{field} IS NULL)"
     return like_condition
@@ -553,7 +482,7 @@ def _create_like_optimized_contains_condition(
     case_insensitive = operation.contains_.case_insensitive or False
     like_pattern = f'%"%{substr_value}%"%'
 
-    like_condition = OperationHandlerBase.create_like_condition(
+    like_condition = _create_like_condition(
         field, like_pattern, pb, table_alias, case_insensitive
     )
     if _field_requires_null_check(field):
@@ -598,9 +527,7 @@ def _create_like_optimized_in_condition(
             return None
 
         like_pattern = f'%"{value_operand.literal_}"%'
-        like_condition = OperationHandlerBase.create_like_condition(
-            field, like_pattern, pb, table_alias
-        )
+        like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
         like_conditions.append(like_condition)
 
     or_sql = "(" + " OR ".join(like_conditions) + ")"
@@ -628,9 +555,7 @@ def _create_datetime_optimization_sql(
     - For normal context: Subtracts buffer from timestamp
     - For NOT context: Adds buffer to timestamp
     """
-    field_operand, literal_operand = OperationHandlerBase.extract_field_and_literal(
-        operation
-    )
+    field_operand, literal_operand = _extract_field_and_literal(operation)
     if field_operand is None or literal_operand is None:
         return None
 
