@@ -31,6 +31,7 @@ export const ComparePageCalls = ({
     entity,
     project,
     filter: {callIds},
+    includeStorageSize: true,
   });
   if (calls.loading) {
     return <LoadingDots />;

@@ -105,9 +105,7 @@ export const ModelTile = ({
   return (
     <div
       className={`group w-[500px] cursor-pointer rounded-lg border border-moon-250 bg-white px-16 pb-6 pt-12  ${
-        isSelected
-          ? 'border-teal-500 shadow-[0_0_10px_rgb(169,237,242)]'
-          : 'hover:border-moon-350'
+        isSelected ? 'border-teal-500' : 'hover:border-moon-350'
       }`}
       onClick={onClickTile}>
       <div className="mb-8 flex items-center gap-8">
