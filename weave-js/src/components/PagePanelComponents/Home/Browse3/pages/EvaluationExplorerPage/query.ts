@@ -165,6 +165,10 @@ export const runEvaluation = async (
   evaluationRef: string,
   modelRefs: string[]
 ): Promise<string[]> => {
-  console.log('TODO: Running evaluation', evaluationRef, modelRefs);
-  return ['placeholder_ref'];
+  const res = await client.runEvaluation({
+    project_id: `${entity}/${project}`,
+    evaluation_ref: evaluationRef,
+    model_refs: modelRefs,
+  });
+  return res.eval_call_ids;
 };

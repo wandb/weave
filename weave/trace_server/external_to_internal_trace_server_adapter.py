@@ -117,6 +117,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
         return self._ref_apply(self._internal_trace_server.call_end, req)
 
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        raise NotImplementedError("CallStartBatch is not supported")
+
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)

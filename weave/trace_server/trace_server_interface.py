@@ -1041,6 +1041,7 @@ class RunEvaluationReq(BaseModel):
     project_id: str
     evaluation_ref: str
     model_refs: list[str]
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class RunEvaluationRes(BaseModel):

@@ -79,6 +79,7 @@ from weave.trace_server.errors import (
     ObjectDeletedError,
     RequestTooLarge,
 )
+from weave.trace_server.evaluation_runner.server_side_object_saver import RunAsUser
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
@@ -2006,8 +2007,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._insert_call, chunk_iter, start_call, model_name, req.project_id
         )
 
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "host": self._host,
+            "port": self._port,
+            "user": self._user,
+            "password": self._password,
+            "database": self._database,
+            "use_async_insert": self._use_async_insert,
+        }
+
     def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
-        return tsi.RunEvaluationRes(eval_call_ids=[])
+        runner = RunAsUser(ch_server_dump=self.model_dump())
+        eval_call_ids = runner.run_evaluation_evaluate(req)
+        return tsi.RunEvaluationRes(eval_call_ids=eval_call_ids)
 
     # Private Methods
     @property
