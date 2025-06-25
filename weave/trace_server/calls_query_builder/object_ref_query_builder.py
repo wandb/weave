@@ -16,8 +16,6 @@ Key components:
 
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
-from pydantic import BaseModel
-
 from weave.trace_server.calls_query_builder.optimization_builder import (
     QueryOptimizationProcessor,
     apply_processor,
@@ -34,17 +32,26 @@ if TYPE_CHECKING:
     )
 
 
-class ObjectRefCondition(BaseModel):
+class ObjectRefCondition:
     """Represents a condition that filters on object references"""
 
-    field_path: str  # e.g., "inputs.model.config.temperature"
-    operation_type: str  # "eq", "contains", "gt", "gte", "in"
-    value: Union[str, int, float, bool, list, dict, None]
-    expand_columns: list[str]
-    case_insensitive: bool = False
-    conversion_type: Optional[Literal["double", "string", "int", "bool", "exists"]] = (
-        None
-    )
+    def __init__(
+        self,
+        field_path: str,
+        operation_type: str,
+        value: Union[str, int, float, bool, list, dict, None],
+        expand_columns: list[str],
+        case_insensitive: bool = False,
+        conversion_type: Optional[
+            Literal["double", "string", "int", "bool", "exists"]
+        ] = None,
+    ):
+        self.field_path = field_path
+        self.operation_type = operation_type
+        self.value = value
+        self.expand_columns = expand_columns
+        self.case_insensitive = case_insensitive
+        self.conversion_type = conversion_type
 
     def get_expand_column_match(self, shortest: bool = True) -> Optional[str]:
         """Find the matching expand column for this field path.
@@ -100,7 +107,7 @@ class ObjectRefCondition(BaseModel):
 
     def get_accessor_key(self) -> str:
         """
-        Get the JSON accessor key for this object reference condition.
+        Get the JSON accessor key for this objects *first* ref
 
         This extracts the key that should be used in JSON_VALUE operations to access
         the object reference within the root field's JSON structure. This is non trivial
@@ -113,12 +120,6 @@ class ObjectRefCondition(BaseModel):
             >>> # json: {"inputs": {"model": <ref>}}, {"config": {"temperature": "hot"}}
             >>> # For field_path="inputs.model.config.temperature" with expand_columns=["inputs.model"]
             >>> condition = ObjectRefCondition(field_path="inputs.model.config.temperature", expand_columns=["inputs.model"], ...)
-            >>> condition.get_accessor_key()
-            'model'
-
-            >>> # json: {"inputs": {"model": <ref>}}, {"config": {"temperature": "hot"}}
-            >>> # For field_path="inputs.model.config" with expand_columns=["inputs"]
-            >>> condition = ObjectRefCondition(field_path="inputs.model.config", expand_columns=["inputs"], ...)
             >>> condition.get_accessor_key()
             'model'
 
@@ -149,40 +150,8 @@ class ObjectRefCondition(BaseModel):
 
         Returns:
             str: A unique key identifying this condition
-
-        Examples:
-            >>> condition = ObjectRefCondition(field_path="inputs.model", operation_type="eq", value="test", expand_columns=[])
-            >>> condition.unique_key
-            'inputs.model_eq_test'
         """
         return f"{self.field_path}_{self.operation_type}_{self.value}"
-
-    def as_sql(
-        self,
-        pb: "ParamBuilder",
-        object_table_alias: str,
-        table_alias: str = "calls_merged",
-    ) -> str:
-        """Generate the SQL for this object ref condition"""
-        root_field = self.get_root_field()
-        expand_match = self.get_expand_column_match()
-
-        if not expand_match:
-            raise ValueError(f"No expand column match found for {self.field_path}")
-
-        # The key is the first property after the expand column
-        object_property_path = self.get_object_property_path()
-        property_parts = object_property_path.split(".")
-        key = property_parts[0]
-
-        # Parameterize the JSON path
-        json_path_param = pb.add_param(f"$.{key}")
-
-        # Build the SQL condition
-        field_sql = f"any({table_alias}.{root_field})"
-        ref_subquery = f"IN (SELECT full_ref FROM {object_table_alias})"
-
-        return f"JSON_VALUE({field_sql}, {param_slot(json_path_param, 'String')}) {ref_subquery}"
 
 
 class ObjectRefConditionHandler:
@@ -246,20 +215,23 @@ class ObjectRefConditionHandler:
         filter_type = python_value_to_ch_type(value)
         return filter_param, filter_type
 
-    def handle_eq_operation(self, condition: ObjectRefCondition) -> str:
+    def handle_comparison_operation(
+        self, condition: ObjectRefCondition, operator: str
+    ) -> str:
         """
-        Handle equality operations for object references.
+        Handle simple binary operations (=, >, >=) for object references.
 
         Args:
             condition: The object reference condition
+            operator: The SQL operator to use ("=", ">", ">=")
 
         Returns:
-            str: SQL condition for equality comparison
+            str: SQL condition for the operation
         """
         filter_param, filter_type = self._create_filter_param(condition.value)
         json_extract = self._create_json_extract_expression(condition.conversion_type)
 
-        return f"{json_extract} = {param_slot(filter_param, filter_type)}"
+        return f"{json_extract} {operator} {param_slot(filter_param, filter_type)}"
 
     def handle_contains_operation(self, condition: ObjectRefCondition) -> str:
         """
@@ -278,24 +250,6 @@ class ObjectRefConditionHandler:
             return f"lower({json_extract}) LIKE lower({param_slot(filter_param, 'String')})"
         else:
             return f"{json_extract} LIKE {param_slot(filter_param, 'String')}"
-
-    def handle_comparison_operation(
-        self, condition: ObjectRefCondition, operator: str
-    ) -> str:
-        """
-        Handle gt/gte operations for object references.
-
-        Args:
-            condition: The object reference condition
-            operator: The comparison operator ('>' or '>=')
-
-        Returns:
-            str: SQL condition for comparison
-        """
-        filter_param, filter_type = self._create_filter_param(condition.value)
-        json_extract = self._create_json_extract_expression(condition.conversion_type)
-
-        return f"{json_extract} {operator} {param_slot(filter_param, filter_type)}"
 
     def handle_in_operation(self, condition: ObjectRefCondition) -> str:
         """
@@ -628,7 +582,7 @@ def build_object_ref_ctes(
         handler = ObjectRefConditionHandler(pb, json_path_param)
 
         if condition.operation_type == "eq":
-            val_condition = handler.handle_eq_operation(condition)
+            val_condition = handler.handle_comparison_operation(condition, "=")
         elif condition.operation_type == "contains":
             val_condition = handler.handle_contains_operation(condition)
         elif condition.operation_type == "gt":
