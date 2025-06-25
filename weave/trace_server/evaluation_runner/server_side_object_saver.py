@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import multiprocessing
-from typing import Any, Callable, TypedDict
+from typing import Any, TypedDict
 
 import weave
 from weave.trace import autopatch
@@ -11,7 +11,6 @@ from weave.trace.weave_init import InitializedClient
 from weave.trace_server import external_to_internal_trace_server_adapter
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.refs_internal import (
-    InternalCallRef,
     InternalObjectRef,
     parse_internal_uri,
 )
@@ -36,6 +35,7 @@ class RunScoreCallException(Exception):
 
 class RunEvaluationException(Exception):
     pass
+
 
 class RunAsUser:
     """Executes a function in a separate process for memory isolation.
@@ -381,16 +381,14 @@ class RunAsUser:
                 model_obj = client.get(model_ref)
                 if not isinstance(model_obj, weave.Model):
                     raise TypeError("Invalid model reference")
-                
+
                 result, call = eval_obj.evaluate.call(eval_obj, model_obj)
                 eval_call_ids.append(call.id)
 
             autopatch.reset_autopatch()
             client._flush()
             ic.reset()
-            result_queue.put(
-                ("success", eval_call_ids)
-            )  # Put the result in the queue
+            result_queue.put(("success", eval_call_ids))  # Put the result in the queue
         except Exception as e:
             result_queue.put(("error", str(e)))  # Put any errors in the queue
 
