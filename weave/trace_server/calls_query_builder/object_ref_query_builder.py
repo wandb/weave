@@ -28,6 +28,8 @@ from weave.trace_server.orm import clickhouse_cast, combine_conditions
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
+        Condition,
+        OrderField,
         ParamBuilder,
     )
 
@@ -809,3 +811,39 @@ def process_query_for_object_refs(
     apply_processor(processor, query.expr_)
 
     return processor.object_ref_conditions
+
+
+def get_object_ref_conditions(
+    conditions: list["Condition"],
+    order_fields: list["OrderField"],
+    expand_columns: list[str],
+) -> list[ObjectRefCondition]:
+    """
+    Get all object reference conditions from a list of conditions.
+
+    Args:
+        conditions: List of conditions to process
+        expand_columns: List of expand columns to match against
+
+    Returns:
+        List of object reference conditions
+    """
+    if not expand_columns:
+        return []
+
+    all_object_ref_conditions: list[ObjectRefCondition] = []
+    for condition in conditions:
+        object_ref_conditions = condition.get_object_ref_conditions(expand_columns)
+        all_object_ref_conditions.extend(object_ref_conditions)
+
+    for order_field in order_fields:
+        field_path = order_field.raw_field_path
+        is_obj_ref = has_object_ref_field(field_path, expand_columns)
+        if is_obj_ref:
+            obj_order_condition = ObjectRefOrderCondition(
+                field_path=field_path,
+                expand_columns=expand_columns,
+            )
+            all_object_ref_conditions.append(obj_order_condition)
+
+    return all_object_ref_conditions

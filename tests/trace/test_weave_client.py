@@ -3600,7 +3600,6 @@ def test_filter_calls_by_ref(client):
     @weave.op()
     def process_with_config(worker_config, project_info):
         return {
-            "result": f"processed with {worker_config.config.model}",
             "processed_worker": worker_config,
             "project_context": project_info,
         }
@@ -3616,7 +3615,15 @@ def test_filter_calls_by_ref(client):
         client.get_calls(
             query={
                 "$expr": {
-                    "$eq": [{"$getField": "inputs.worker_config.id"}, {"$literal": 1}]
+                    "$eq": [
+                        {
+                            "$convert": {
+                                "input": {"$getField": "inputs.worker_config.id"},
+                                "to": "double",
+                            }
+                        },
+                        {"$literal": 1},
+                    ]
                 }
             },
             expand_columns=["inputs.worker_config"],
@@ -3640,14 +3647,14 @@ def test_filter_calls_by_ref(client):
     )
     assert len(calls) == 1  # Should get call with config1 (gpt-4)
 
-    # Test filtering by deeply nested ref value
+    # Test filtering by deeply nested ref with nested value
     calls = list(
         client.get_calls(
             query={
                 "$expr": {
                     "$eq": [
                         {"$getField": "inputs.project_info.settings.debug"},
-                        {"$literal": True},
+                        {"$literal": "true"},
                     ]
                 }
             },
@@ -3681,7 +3688,12 @@ def test_filter_calls_by_ref(client):
                         {
                             "$eq": [
                                 {
-                                    "$getField": "inputs.worker_config.config.temperature"
+                                    "$convert": {
+                                        "input": {
+                                            "$getField": "inputs.worker_config.config.temperature"
+                                        },
+                                        "to": "double",
+                                    }
                                 },
                                 {"$literal": 0.8},
                             ]
@@ -3720,18 +3732,28 @@ def test_filter_calls_by_ref(client):
     )
     assert len(calls) == 2  # Should get both calls since both models contain "gpt"
 
-    # Test filtering with numeric comparison on ref values
+    # Test filtering with numeric comparison on ref values in output
     calls = list(
         client.get_calls(
             query={
                 "$expr": {
                     "$gt": [
-                        {"$getField": "inputs.worker_config.config.max_tokens"},
+                        {
+                            "$convert": {
+                                "input": {
+                                    "$getField": "output.processed_worker.config.max_tokens"
+                                },
+                                "to": "double",
+                            }
+                        },
                         {"$literal": 150},
                     ]
                 }
             },
-            expand_columns=["inputs.worker_config", "inputs.worker_config.config"],
+            expand_columns=[
+                "output.processed_worker",
+                "output.processed_worker.config",
+            ],
         )
     )
     assert len(calls) == 1  # Should get call with config2 (max_tokens=200)
@@ -3744,7 +3766,14 @@ def test_filter_calls_by_ref(client):
                     "$or": [
                         {
                             "$eq": [
-                                {"$getField": "inputs.worker_config.id"},
+                                {
+                                    "$convert": {
+                                        "input": {
+                                            "$getField": "inputs.worker_config.id"
+                                        },
+                                        "to": "double",
+                                    }
+                                },
                                 {"$literal": 1},
                             ]
                         },
@@ -3769,7 +3798,15 @@ def test_filter_calls_by_ref(client):
         client.get_calls(
             query={
                 "$expr": {
-                    "$eq": [{"$getField": "inputs.worker_config.id"}, {"$literal": 1}]
+                    "$eq": [
+                        {
+                            "$convert": {
+                                "input": {"$getField": "inputs.worker_config.id"},
+                                "to": "double",
+                            }
+                        },
+                        {"$literal": 1},
+                    ]
                 }
             }
             # No expand_columns provided

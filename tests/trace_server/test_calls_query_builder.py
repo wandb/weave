@@ -2261,7 +2261,6 @@ def test_object_ref_filter_simple() -> None:
             }
         )
     )
-    cq.set_hardcoded_filter(HardCodedFilter(filter={"trace_roots_only": True}))
     cq.add_order("started_at", "desc")
     cq.set_expand_columns(["inputs.model"])
     assert_sql(
@@ -2271,7 +2270,6 @@ def test_object_ref_filter_simple() -> None:
           (SELECT calls_merged.id AS id
            FROM calls_merged
            WHERE calls_merged.project_id = {pb_0:String}
-             AND (calls_merged.parent_id IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -2520,6 +2518,13 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                             {"$literal": 100},
                         ]
                     },
+                    # Same ref path, different value
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.model.max_tokens.size"},
+                            {"$literal": 1},
+                        ]
+                    },
                 ]
             }
         )
@@ -2568,6 +2573,16 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
              AND JSON_VALUE(val_dump, {pb_4:String}) = {pb_5:UInt64}
            GROUP BY project_id,
                     object_id,
+                    digest),
+             obj_filter_3 AS
+          (SELECT object_id,
+                  digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_6:String}) = {pb_2:UInt64}
+           GROUP BY project_id,
+                    object_id,
                     digest)
         SELECT calls_merged.id AS id
         FROM calls_merged
@@ -2575,18 +2590,21 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
           AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
-        HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) IN
+        HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
            (SELECT full_ref
             FROM obj_filter_0))
-        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) IN
+        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
            (SELECT full_ref
             FROM obj_filter_0))
-        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) IN
+        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
            (SELECT full_ref
             FROM obj_filter_1))
-        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}) IN
+        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+            (SELECT full_ref
+            FROM obj_filter_2))
+        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
            (SELECT full_ref
-            FROM obj_filter_2)))
+            FROM obj_filter_3)))
         """,
         {
             "pb_0": "project",
@@ -2595,7 +2613,8 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
             "pb_3": 2,
             "pb_4": "$.max_tokens",
             "pb_5": 100,
-            "pb_6": "$.model",
+            "pb_6": "$.max_tokens.size",
+            "pb_7": "$.model",
         },
     )
 

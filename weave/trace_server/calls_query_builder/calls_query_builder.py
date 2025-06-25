@@ -39,6 +39,7 @@ from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefOrderCondition,
     ObjectRefQueryProcessor,
     build_object_ref_ctes,
+    get_object_ref_conditions,
     has_object_ref_field,
     is_object_ref_operand,
     process_query_for_object_refs,
@@ -672,14 +673,6 @@ class CallsQuery(BaseModel):
         has_heavy_order = any(
             order_field.field.is_heavy() for order_field in self.order_fields
         )
-        has_object_ref_order = False
-        if self.expand_columns:
-            for order_field in self.order_fields:
-                if has_object_ref_field(
-                    order_field.raw_field_path, self.expand_columns
-                ):
-                    has_object_ref_order = True
-                    break
 
         has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
 
@@ -724,8 +717,12 @@ class CallsQuery(BaseModel):
             )
         )
 
+        object_ref_conditions = get_object_ref_conditions(
+            self.query_conditions, self.order_fields, self.expand_columns
+        )
+
         # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs and not has_object_ref_order:
+        if not should_optimize and not self.include_costs and not object_ref_conditions:
             return self._as_sql_base_format(pb, table_alias)
 
         # If so, build the two queries
@@ -741,30 +738,9 @@ class CallsQuery(BaseModel):
         for field in self.select_fields:
             outer_query.select_fields.append(field)
 
-        # Process object reference conditions using the new approach
-        all_object_ref_conditions: list[ObjectRefCondition] = []
-        if self.expand_columns:
-            # Process each condition to extract object ref conditions
-            for condition in self.query_conditions:
-                object_ref_conditions = condition.get_object_ref_conditions(
-                    self.expand_columns
-                )
-                all_object_ref_conditions.extend(object_ref_conditions)
-
-            # Process order fields to extract object ref order fields
-            for order_field in self.order_fields:
-                field_path = order_field.raw_field_path
-                is_obj_ref = has_object_ref_field(field_path, self.expand_columns)
-                if is_obj_ref:
-                    obj_order_condition = ObjectRefOrderCondition(
-                        field_path=field_path,
-                        expand_columns=self.expand_columns,
-                    )
-                    all_object_ref_conditions.append(obj_order_condition)
-
         # Build CTEs for object reference filtering and ordering
         object_join_cte, field_to_object_join_alias_map = build_object_ref_ctes(
-            pb, self.project_id, all_object_ref_conditions
+            pb, self.project_id, object_ref_conditions
         )
 
         # Query Conditions
