@@ -89,7 +89,7 @@ class Dataset(Object):
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         return pd.DataFrame(self.rows)
 
@@ -136,7 +136,7 @@ class Dataset(Object):
         return new_dataset
 
     @field_validator("rows", mode="before")
-    def convert_to_table(cls, rows: Any) -> Union[weave.Table, WeaveTable]:
+    def convert_to_table(cls, rows: Any) -> Union[weave.Table, WeaveTable]:  # noqa: N805
         if weave_isinstance(rows, WeaveTable):
             return rows
         if not isinstance(rows, weave.Table):

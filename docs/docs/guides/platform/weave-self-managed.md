@@ -226,8 +226,6 @@ defaultConfigurationOverrides: |
           <path>/var/lib/clickhouse/s3_disk_cache/cache/</path>
           <!-- THE CACHE SIZE MUST BE LOWER THAN PERSISTENT VOLUME -->
           <max_size>20Gi</max_size>
-          <cache_on_write_operations>1</cache_on_write_operations>
-          <enable_filesystem_cache_on_write_operations>1</enable_filesystem_cache_on_write_operations> 
         </s3_disk_cache>
       </disks>
       <policies>

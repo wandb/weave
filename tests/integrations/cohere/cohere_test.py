@@ -80,7 +80,7 @@ def test_cohere_stream(
     )
 
     # they accumulate for us in the last message
-    for event in stream:
+    for event in stream:  # noqa: B007
         pass
 
     response = event.response  # the NonStreamedChatResponse
@@ -192,7 +192,7 @@ async def test_cohere_async_stream(
         max_tokens=1024,
     )
 
-    async for event in stream:
+    async for event in stream:  # noqa: B007
         pass
 
     response = event.response  # the NonStreamedChatResponse

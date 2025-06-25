@@ -271,9 +271,23 @@ class Evaluation(Object):
         eval_results = await self.get_eval_results(model, verbose=verbose)
         summary = await self.summarize(eval_results)
 
-        logger.info(f"Evaluation summary {json.dumps(summary, indent=2)}")
+        summary_str = _safe_summarize_to_str(summary)
+        if summary_str:
+            logger.info(f"Evaluation summary {summary_str}")
 
         return summary
+
+
+def _safe_summarize_to_str(summary: dict) -> str:
+    summary_str = ""
+    try:
+        summary_str = json.dumps(summary, indent=2)
+    except Exception:
+        try:
+            summary_str = str(summary)
+        except Exception:
+            pass
+    return summary_str
 
 
 def evaluate(

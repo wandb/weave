@@ -28,7 +28,7 @@ class ObjectRecord:
             if self._class_name != other._class_name:
                 return False
         else:
-            if other.__class__.__name__ != getattr(self, "_class_name"):
+            if other.__class__.__name__ != self._class_name:
                 return False
         for k, v in self.__dict__.items():
             if k == "_class_name" or k == "_bases":

@@ -7,7 +7,7 @@ from typing import Any, Optional, Union, cast
 from pydantic import BaseModel
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import max_calls_queue_size
+from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -87,6 +87,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor = AsyncBatchProcessor(
                 self._flush_calls,
                 max_queue_size=max_calls_queue_size(),
+                enable_disk_fallback=should_enable_disk_fallback(),
             )
         self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
@@ -162,16 +163,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._flush_calls(batch[split_idx:], _should_update_batch_size=False)
             return
 
-        # If a single item is too large, we can't send it -- raise an error
+        # If a single item is over the configured limit we should log a warning
+        # Bytes limit can change based on env so we don't want to actually error here
         if encoded_bytes > self.remote_request_bytes_limit and len(batch) == 1:
-            error_message = (
-                f"Single call size ({encoded_bytes} bytes) is too large to send. "
-                f"The maximum size is {self.remote_request_bytes_limit} bytes."
+            logger.warning(
+                f"Single call size ({encoded_bytes} bytes) may be too large to send."
+                f"The configured maximum size is {self.remote_request_bytes_limit} bytes."
             )
-            logger.error(error_message)
-            # If we get down to here we have recursed to size 1
-            # We don't want to error the whole process, just drop the call that is too large
-            return
 
         try:
             self._send_batch_to_server(encoded_data)
@@ -197,6 +195,17 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 # Only requeue if the processor is still accepting work
                 if self.call_processor and self.call_processor.is_accepting_new_work():
                     self.call_processor.enqueue(batch)
+                else:
+                    logger.exception(
+                        f"Failed to enqueue batch of size {len(batch)} - Processor is shutting down"
+                    )
+
+    def get_call_processor(self) -> Union[AsyncBatchProcessor, None]:
+        """
+        Custom method not defined on the formal TraceServerInterface to expose
+        the underlying call processor. Should be formalized in a client-side interface.
+        """
+        return self.call_processor
 
     @with_retry
     def _generic_request_executor(
@@ -602,6 +611,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             tsi.CompletionsCreateReq,
             tsi.CompletionsCreateRes,
         )
+
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        # For remote servers, streaming is not implemented
+        # Fall back to non-streaming completion
+        response = self.completions_create(req)
+        yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         return self._generic_request(

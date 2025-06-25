@@ -19,6 +19,6 @@ gha-creds-*.json
 *.log
 tests/weave_models/
 tools/codegen/generate_config.yaml
-.cursor
+.cursor/rules/personal.mdc
 pyrightconfig.json
 **/file::memory:?cache=shared

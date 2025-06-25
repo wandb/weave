@@ -186,6 +186,7 @@ export const ExportSelector = ({
   };
 
   const pythonText = makeCodeText(
+    callQueryParams.entity,
     callQueryParams.project,
     selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
@@ -570,6 +571,7 @@ function makeLeafColumns(visibleColumns: string[]) {
 }
 
 function makeCodeText(
+  entity: string,
   project: string,
   callIds: string[] | undefined,
   filter: CallFilter,
@@ -578,7 +580,7 @@ function makeCodeText(
   includeFeedback: boolean,
   includeCosts: boolean
 ) {
-  let codeStr = `import weave\n\nclient = weave.init("${project}")`;
+  let codeStr = `import weave\n\nclient = weave.init("${entity}/${project}")`;
   codeStr += `\ncalls = client.get_calls(\n`;
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
