@@ -93,17 +93,29 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
       <Column style={{flex: '1 1 600px', overflow: 'hidden'}}>
         {evaluationResults ? (
           // Show evaluation results
-          <CompareEvaluationsPageContent
-            entity={entity}
-            project={project}
-            evaluationCallIds={evaluationResults}
-            onEvaluationCallIdsUpdate={newIds => {
-              // Handle updates if needed
-              console.log('Evaluation call IDs updated:', newIds);
-            }}
-            selectedMetrics={selectedMetrics}
-            setSelectedMetrics={setSelectedMetrics}
-          />
+          <>
+            <Header>
+              <span>Results</span>
+              <Button
+                icon="back"
+                size="small"
+                variant="secondary"
+                onClick={() => setEvaluationResults(null)}>
+                Back to Dataset
+              </Button>
+            </Header>
+            <CompareEvaluationsPageContent
+              entity={entity}
+              project={project}
+              evaluationCallIds={evaluationResults}
+              onEvaluationCallIdsUpdate={newIds => {
+                // Handle updates if needed
+                console.log('Evaluation call IDs updated:', newIds);
+              }}
+              selectedMetrics={selectedMetrics}
+              setSelectedMetrics={setSelectedMetrics}
+            />
+          </>
         ) : (
           // Show dataset editor or loading state
           <>
@@ -156,7 +168,7 @@ const ConfigPanel: React.FC<{
   setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
   isRunning: boolean;
   setIsRunning: (running: boolean) => void;
-  setEvaluationResults: (results: string[]) => void;
+  setEvaluationResults: (results: string[] | null) => void;
 }> = ({
   entity,
   project,
@@ -210,6 +222,7 @@ const ConfigPanel: React.FC<{
     }
 
     setIsRunning(true);
+    setEvaluationResults(null); // Clear previous results to show loader
 
     try {
       const client = getClient();
