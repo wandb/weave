@@ -329,7 +329,7 @@ class RunAsUser:
         if status == "error":
             raise RunEvaluationException(f"Process execution failed: {result}")
 
-        if isinstance(result, dict):
+        if isinstance(result, list):
             return result
         else:
             raise RunEvaluationException(f"Unexpected result: {result}")
