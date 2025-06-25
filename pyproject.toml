@@ -278,6 +278,8 @@ select = [
   "T20",     # https://docs.astral.sh/ruff/rules/#flake8-print-t20
   "PT001",   # https://docs.astral.sh/ruff/rules/pytest-fixture-incorrect-parentheses-style/
   "PT006",   # https://docs.astral.sh/ruff/rules/pytest-parametrize-names-wrong-type/
+  "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
+
 ]
 ignore = [
   # we use Google style
@@ -292,6 +294,9 @@ exclude = ["weave_query"]
 
 [tool.ruff.lint.isort]
 known-third-party = ["wandb", "weave_query"]
+
+[tool.ruff.lint.flake8-pytest-style]
+mark-parentheses = false
 
 [tool.ruff]
 line-length = 88
