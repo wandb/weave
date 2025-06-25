@@ -1,7 +1,6 @@
 import {Box, Drawer, Typography} from '@mui/material';
 import {GridFilterModel} from '@mui/x-data-grid-pro';
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
-import {Switch} from '@wandb/weave/components';
 import {Button} from '@wandb/weave/components/Button';
 import {StyledSliderInput} from '@wandb/weave/components/Form/StyledSliderInput';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
@@ -34,6 +33,10 @@ import {
   useRootObjectVersions,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {
+  Root as SwitchRoot,
+  Thumb as SwitchThumb,
+} from '@wandb/weave/components/Switch';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
@@ -151,7 +154,7 @@ export const MonitorFormDrawer = ({
     existingScorers?.map(s => true) || [false]
   );
 
-  const [active, setActive] = useState<boolean>(false);
+  const [active, setActive] = useState<boolean>(true);
 
   useEffect(() => {
     if (!monitor) {
@@ -424,16 +427,14 @@ export const MonitorFormDrawer = ({
                       onChange={e => setDescription(e.target.value)}
                     />
                   </Box>
-                  <Box>
-                    <Box className="flex items-center gap-8">
-                      <Switch.Root
-                        checked={active}
-                        onCheckedChange={setActive}
-                        size="small">
-                        <Switch.Thumb size="small" checked={active} />
-                      </Switch.Root>
-                      <span className="font-semibold">Active monitor</span>
-                    </Box>
+                  <Box className="flex items-center gap-8">
+                    <SwitchRoot
+                      size="small"
+                      checked={active}
+                      onCheckedChange={setActive}>
+                      <SwitchThumb size="small" checked={active} />
+                    </SwitchRoot>
+                    <p className="font-semibold">Active monitor</p>
                   </Box>
                 </Box>
 

@@ -2250,9 +2250,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "table": table,
                     "data_len": len(data),
                     "data_bytes": data_bytes,
-                    "example_data": None if len(data) == 0 else data[0],
-                    "column_names": column_names,
-                    "settings": settings,
                 },
             )
             raise
