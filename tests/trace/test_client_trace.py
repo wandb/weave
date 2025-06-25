@@ -532,10 +532,14 @@ def test_trace_call_wb_run_step_query(client):
     step_counter = iter(range(100))
     with (
         mock.patch.object(
-            weave_client, "safe_current_wb_run_id", lambda: full_wb_run_id
+            weave_client,
+            "safe_current_wb_run_id",
+            return_value=full_wb_run_id,
         ),
         mock.patch.object(
-            weave_client, "safe_current_wb_run_step", lambda: next(step_counter)
+            weave_client,
+            "safe_current_wb_run_step",
+            return_value=next(step_counter),
         ),
     ):
         call_spec = simple_line_call_bootstrap()
@@ -754,11 +758,15 @@ def test_trace_call_query_filter_wb_run_ids(client):
     from weave.trace import weave_client
 
     with mock.patch.object(
-        weave_client, "safe_current_wb_run_id", lambda: full_wb_run_id_1
+        weave_client,
+        "safe_current_wb_run_id",
+        return_value=full_wb_run_id_1,
     ):
         call_spec_1 = simple_line_call_bootstrap()
     with mock.patch.object(
-        weave_client, "safe_current_wb_run_id", lambda: full_wb_run_id_2
+        weave_client,
+        "safe_current_wb_run_id",
+        return_value=full_wb_run_id_2,
     ):
         call_spec_2 = simple_line_call_bootstrap()
     call_spec_3 = simple_line_call_bootstrap()
@@ -2541,9 +2549,9 @@ def test_read_call_start_with_cost(client):
         pass
     elif isinstance(summary, dict):
         # Check that the costs object was NOT added
-        assert (
-            COST_OBJECT_NAME not in summary.get("weave", {})
-        ), f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+        assert COST_OBJECT_NAME not in summary.get("weave", {}), (
+            f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+        )
     else:
         pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
 
