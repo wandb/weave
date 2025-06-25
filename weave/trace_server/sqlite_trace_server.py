@@ -1425,7 +1425,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         response = self.completions_create(req)
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
-
     def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
         return tsi.RunEvaluationRes(eval_call_ids=[])
 
