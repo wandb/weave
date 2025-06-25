@@ -10,6 +10,34 @@ from weave.integrations.integration_utilities import op_name_from_ref
 from weave.integrations.openai import openai_sdk
 from weave.trace.autopatch import AutopatchSettings, IntegrationSettings
 
+import base64
+from vcr.stubs import httpx_stubs
+from vcr.request import Request as VCRRequest
+import httpx
+
+def _make_vcr_request_binary_safe(httpx_request: httpx.Request, **kwargs):
+    # Read the raw bytes once
+    body_bytes = httpx_request.read()
+    # Put the bytes back so httpx can still send the request
+    httpx_request.stream = httpx.ByteStream(body_bytes)
+
+    # Encode to ASCII so the cassette is text-only
+    body_b64 = base64.b64encode(body_bytes).decode("ascii")
+
+    # Add a flag header so you know it’s encoded
+    headers = dict(httpx_request.headers)
+    headers["X-VCR-Body-Base64"] = "true"
+
+    return VCRRequest(
+        method=httpx_request.method,
+        uri=str(httpx_request.url),
+        body=body_b64,
+        headers=headers,
+    )
+
+# One-line monkey-patch
+httpx_stubs._make_vcr_request = _make_vcr_request_binary_safe
+
 # Utility function to check postprocessed output
 def _check_postprocessed_output(output, expected_response, expected_size=(1024, 1024)):
     # Output can be a tuple (original_response, pil_image) or just the response
@@ -296,6 +324,8 @@ def test_openai_image_create_variation_sync(client_creator) -> None:
         )
 
         calls = list(client.calls())
+        print(calls)
+        print(len(calls))
         assert len(calls) == 1
         call = calls[0]
 
