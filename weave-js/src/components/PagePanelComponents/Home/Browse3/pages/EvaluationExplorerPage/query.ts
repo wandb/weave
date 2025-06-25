@@ -107,3 +107,64 @@ export const getObjByRef = async (
 
   return convertTraceServerObjectVersionToSchema(res.obj);
 };
+
+type CreateEvaluationSpec = {
+  name: string;
+  description: string;
+  datasetRef: string;
+  scorerRefs: string[];
+};
+
+export const createEvaluation = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  spec: CreateEvaluationSpec
+): Promise<string> => {
+  // TODO: Sanitize name
+  const objectId = spec.name;
+  const evaluationObjectVal = {
+    _type: 'Evaluation',
+    name: spec.name,
+    description: spec.description,
+    datasetRef: spec.datasetRef,
+    scorerRefs: spec.scorerRefs,
+    _class_name: 'Evaluation',
+    ss_name: 'Evaluation',
+    _bases: ['Object', 'BaseModel'],
+  };
+
+  const newEvaluationResp = await client.objCreate({
+    obj: {
+      project_id: `${entity}/${project}`,
+      // TODO: Sanitize name
+      object_id: objectId,
+      val: evaluationObjectVal,
+      // builtin_object_class?: string;
+    },
+  });
+
+  const digest = newEvaluationResp.digest;
+
+  const evaluationRef = makeRefObject(
+    entity,
+    project,
+    'object',
+    objectId,
+    digest,
+    undefined
+  );
+
+  return evaluationRef;
+};
+
+export const runEvaluation = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  evaluationRef: string,
+  modelRefs: string[]
+): Promise<string[]> => {
+  console.log('TODO: Running evaluation', evaluationRef, modelRefs);
+  return ['placeholder_ref'];
+};

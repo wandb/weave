@@ -45,7 +45,7 @@ const DatasetPicker: React.FC<{
   const newDatasetOptions = useMemo(() => {
     return [
       {
-        label: 'Start from scratch',
+        label: 'Create new dataset',
         value: 'new-empty',
       },
       {

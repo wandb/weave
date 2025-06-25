@@ -2,6 +2,7 @@ import {Button} from '@wandb/weave/components/Button';
 import React, {useCallback, useMemo, useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {BORDER_COLOR, SECONDARY_BACKGROUND_COLOR} from './constants';
 import {
   EvaluationExplorerPageProvider,
@@ -12,6 +13,8 @@ import {EvaluationConfigSection} from './EvaluationConfigSection';
 import {Column, Header} from './layout';
 import {Footer, Row} from './layout';
 import {ModelsConfigSection} from './ModelsConfigSection';
+import {createEvaluation, runEvaluation} from './query';
+import {ScorersConfigSection} from './ScorersConfigSection';
 
 type EvaluationExplorerPageProps = {
   entity: string;
@@ -104,6 +107,92 @@ const ConfigPanel: React.FC<{
   setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
 }> = ({entity, project, setNewDatasetEditorMode}) => {
   const {config} = useEvaluationExplorerPageContext();
+  const [isRunning, setIsRunning] = useState(false);
+  const getClient = useGetTraceServerClientContext();
+
+  // Validation logic
+  const isRunEvalEnabled = useMemo(() => {
+    const {evaluationDefinition, models} = config;
+
+    // Check name and description
+    if (
+      !evaluationDefinition.properties.name.trim() ||
+      !evaluationDefinition.properties.description.trim()
+    ) {
+      return false;
+    }
+
+    // Check dataset is saved as a ref
+    if (!evaluationDefinition.properties.dataset.originalSourceRef) {
+      return false;
+    }
+
+    // Check there's at least 1 scorer
+    const validScorers = evaluationDefinition.properties.scorers.filter(
+      scorer => scorer.originalSourceRef !== null
+    );
+    if (validScorers.length === 0) {
+      return false;
+    }
+
+    // Check there's at least 1 model
+    const validModels = models.filter(
+      model => model.originalSourceRef !== null
+    );
+    if (validModels.length === 0) {
+      return false;
+    }
+
+    return true;
+  }, [config]);
+
+  const handleRunEval = useCallback(async () => {
+    if (!isRunEvalEnabled || isRunning) {
+      return;
+    }
+
+    setIsRunning(true);
+
+    try {
+      const client = getClient();
+      const {evaluationDefinition, models} = config;
+
+      // Get valid scorers and models
+      const scorerRefs = evaluationDefinition.properties.scorers
+        .filter(scorer => scorer.originalSourceRef !== null)
+        .map(scorer => scorer.originalSourceRef!);
+
+      const modelRefs = models
+        .filter(model => model.originalSourceRef !== null)
+        .map(model => model.originalSourceRef!);
+
+      // Create evaluation
+      const evaluationRef = await createEvaluation(client, entity, project, {
+        name: evaluationDefinition.properties.name,
+        description: evaluationDefinition.properties.description,
+        datasetRef: evaluationDefinition.properties.dataset.originalSourceRef!,
+        scorerRefs,
+      });
+
+      // Run evaluation
+      const results = await runEvaluation(
+        client,
+        entity,
+        project,
+        evaluationRef,
+        modelRefs
+      );
+
+      console.log('Evaluation completed:', results);
+      // TODO: Handle results (show success message, navigate to results page, etc.)
+    } catch (error) {
+      console.error('Failed to run evaluation:', error);
+      // TODO: Show error message to user
+    } finally {
+      setIsRunning(false);
+    }
+  }, [config, entity, project, isRunEvalEnabled, isRunning, getClient]);
+
   return (
     <Column
       style={{
@@ -128,11 +217,9 @@ const ConfigPanel: React.FC<{
         <Button
           icon="play"
           variant="primary"
-          onClick={() => {
-            console.log(config);
-            console.error('TODO: Implement me');
-          }}>
-          Run eval
+          disabled={!isRunEvalEnabled || isRunning}
+          onClick={handleRunEval}>
+          {isRunning ? 'Running...' : 'Run eval'}
         </Button>
       </Footer>
     </Column>
