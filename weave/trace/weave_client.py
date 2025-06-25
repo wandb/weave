@@ -906,7 +906,9 @@ class AttributesDict(dict):
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
-MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MB
+# This size is correlated with the maximum single row insert size
+# in clickhouse, which is currently unavoidable.
+MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
