@@ -468,11 +468,11 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     class ServerRecorder(type(server)):  # type: ignore
         attribute_access_log: list[str]
 
-        def __init__(self, server: tsi.TraceServerInterface):  # type: ignore
+        def __init__(self, server: tsi.TraceServerInterface):  # noqa: N804, type: ignore
             self.server = server
             self.attribute_access_log = []
 
-        def __getattribute__(self, name):
+        def __getattribute__(self, name):  # noqa: N804
             self_server = super().__getattribute__("server")
             access_log = super().__getattribute__("attribute_access_log")
             if name == "server":

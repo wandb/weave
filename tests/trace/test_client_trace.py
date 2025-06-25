@@ -1553,8 +1553,8 @@ def test_bound_op_retrieval_no_self(client):
         a: int
 
         @weave.op
-        def op_with_custom_type(me, v):
-            return me.a + v
+        def op_with_custom_type(self, v):
+            return self.a + v
 
     obj = CustomTypeWithoutSelf(a=1)
     obj_ref = weave.publish(obj)
@@ -3171,8 +3171,8 @@ def test_objects_and_keys_with_special_characters(client):
 
 
 def test_calls_stream_feedback(client):
-    BATCH_SIZE = 10
-    num_calls = BATCH_SIZE + 1
+    batch_size = 10
+    num_calls = batch_size + 1
 
     @weave.op
     def test_call(x):

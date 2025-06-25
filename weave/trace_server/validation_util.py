@@ -61,7 +61,7 @@ def require_base64(s: str) -> str:
     return s
 
 
-def require_internal_ref_uri(s: str, refClass: Optional[type] = None) -> str:
+def require_internal_ref_uri(s: str, ref_class: Optional[type] = None) -> str:
     if not s.startswith(
         f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///"
     ) and not s.startswith(f"{refs_internal.ARTIFACT_REF_SCHEME}:///"):
@@ -72,8 +72,8 @@ def require_internal_ref_uri(s: str, refClass: Optional[type] = None) -> str:
 
     parsed = refs_internal.parse_internal_uri(s)
 
-    if refClass is not None and not isinstance(parsed, refClass):
-        raise CHValidationError(f"Invalid ref: {s}. Must be of type {str(refClass)}")
+    if ref_class is not None and not isinstance(parsed, ref_class):
+        raise CHValidationError(f"Invalid ref: {s}. Must be of type {str(ref_class)}")
     parsed_str = parsed.uri()
     if parsed_str != s:
         raise CHValidationError(f"Invalid ref: {s}. Ref did not round-trip")
