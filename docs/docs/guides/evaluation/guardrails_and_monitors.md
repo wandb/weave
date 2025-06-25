@@ -279,8 +279,6 @@ In the following example, you'll create:
 
 ### Prompt variables {#prompt-variables}
 
-
-
 In scoring prompts, you can reference multiple variables from your op. These values are automatically extracted from your function call when the scorer runs. Consider the following example function:
 
 ```python
