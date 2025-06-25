@@ -279,7 +279,6 @@ select = [
   "PT001",   # https://docs.astral.sh/ruff/rules/pytest-fixture-incorrect-parentheses-style/
   "PT006",   # https://docs.astral.sh/ruff/rules/pytest-parametrize-names-wrong-type/
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
-
 ]
 ignore = [
   # we use Google style
