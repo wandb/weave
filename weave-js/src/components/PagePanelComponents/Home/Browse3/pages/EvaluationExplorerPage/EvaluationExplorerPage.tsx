@@ -1,7 +1,9 @@
 import {Button} from '@wandb/weave/components/Button';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {useCallback, useMemo, useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
+import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {BORDER_COLOR, SECONDARY_BACKGROUND_COLOR} from './constants';
 import {
@@ -14,6 +16,7 @@ import {Column, Header} from './layout';
 import {Footer, Row} from './layout';
 import {ModelsConfigSection} from './ModelsConfigSection';
 import {createEvaluation, runEvaluation} from './query';
+import {ScorersConfigSection} from './ScorersConfigSection';
 
 type EvaluationExplorerPageProps = {
   entity: string;
@@ -49,6 +52,15 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
   const [newDatasetEditorMode, setNewDatasetEditorMode] = useState<
     'new-empty' | 'new-file'
   >('new-empty');
+  const [evaluationResults, setEvaluationResults] = useState<string[] | null>(
+    null
+  );
+  const [isRunning, setIsRunning] = useState(false);
+  const [selectedMetrics, setSelectedMetrics] = useState<Record<
+    string,
+    boolean
+  > | null>(null);
+
   const sourceRef =
     config.evaluationDefinition.properties.dataset.originalSourceRef;
   const datasetEditorMode = useMemo(() => {
@@ -74,26 +86,64 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
         entity={entity}
         project={project}
         setNewDatasetEditorMode={setNewDatasetEditorMode}
+        isRunning={isRunning}
+        setIsRunning={setIsRunning}
+        setEvaluationResults={setEvaluationResults}
       />
       <Column style={{flex: '1 1 600px', overflow: 'hidden'}}>
-        <Header>Dataset</Header>
-        {datasetEditorMode === 'new-empty' && (
-          <NewDatasetEditor
+        {evaluationResults ? (
+          // Show evaluation results
+          <CompareEvaluationsPageContent
             entity={entity}
             project={project}
-            onSaveComplete={onNewDatasetSaveComplete}
+            evaluationCallIds={evaluationResults}
+            onEvaluationCallIdsUpdate={newIds => {
+              // Handle updates if needed
+              console.log('Evaluation call IDs updated:', newIds);
+            }}
+            selectedMetrics={selectedMetrics}
+            setSelectedMetrics={setSelectedMetrics}
           />
-        )}
-        {datasetEditorMode === 'new-file' && (
-          <NewDatasetEditor
-            entity={entity}
-            project={project}
-            useFilePicker
-            onSaveComplete={onNewDatasetSaveComplete}
-          />
-        )}
-        {datasetEditorMode === 'existing' && sourceRef && (
-          <ExistingDatasetEditor datasetRef={sourceRef} />
+        ) : (
+          // Show dataset editor or loading state
+          <>
+            <Header>Dataset</Header>
+            {isRunning ? (
+              <Column
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '48px',
+                }}>
+                <WaveLoader size="small" />
+                <p style={{marginTop: '16px', color: '#666'}}>
+                  Running evaluation...
+                </p>
+              </Column>
+            ) : (
+              <>
+                {datasetEditorMode === 'new-empty' && (
+                  <NewDatasetEditor
+                    entity={entity}
+                    project={project}
+                    onSaveComplete={onNewDatasetSaveComplete}
+                  />
+                )}
+                {datasetEditorMode === 'new-file' && (
+                  <NewDatasetEditor
+                    entity={entity}
+                    project={project}
+                    useFilePicker
+                    onSaveComplete={onNewDatasetSaveComplete}
+                  />
+                )}
+                {datasetEditorMode === 'existing' && sourceRef && (
+                  <ExistingDatasetEditor datasetRef={sourceRef} />
+                )}
+              </>
+            )}
+          </>
         )}
       </Column>
     </Row>
@@ -104,9 +154,18 @@ const ConfigPanel: React.FC<{
   entity: string;
   project: string;
   setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
-}> = ({entity, project, setNewDatasetEditorMode}) => {
+  isRunning: boolean;
+  setIsRunning: (running: boolean) => void;
+  setEvaluationResults: (results: string[]) => void;
+}> = ({
+  entity,
+  project,
+  setNewDatasetEditorMode,
+  isRunning,
+  setIsRunning,
+  setEvaluationResults,
+}) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
-  const [isRunning, setIsRunning] = useState(false);
   const getClient = useGetTraceServerClientContext();
 
   // Validation logic
@@ -189,7 +248,7 @@ const ConfigPanel: React.FC<{
       );
 
       console.log('Evaluation completed:', results);
-      // TODO: Handle results (show success message, navigate to results page, etc.)
+      setEvaluationResults(results);
     } catch (error) {
       console.error('Failed to run evaluation:', error);
       // TODO: Show error message to user
@@ -204,6 +263,7 @@ const ConfigPanel: React.FC<{
     isRunning,
     getClient,
     editConfig,
+    setEvaluationResults,
   ]);
 
   return (

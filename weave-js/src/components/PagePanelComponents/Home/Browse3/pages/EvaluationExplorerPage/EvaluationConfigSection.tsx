@@ -138,24 +138,35 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
           const client = getClient();
           const evaluationData = await getObjByRef(client, evaluationRef);
 
+          console.log('Loading evaluation data:', evaluationData);
+
           if (evaluationData) {
             const evalData = evaluationData.val;
+            console.log('Evaluation val:', evalData);
+
             editConfig(draft => {
               // Update evaluation properties from loaded data
               draft.evaluationDefinition.properties.name = evalData.name || '';
               draft.evaluationDefinition.properties.description =
                 evalData.description || '';
 
-              // Set dataset ref if it exists
-              if (evalData.datasetRef) {
+              // Clear existing dataset and scorers first
+              draft.evaluationDefinition.properties.dataset.originalSourceRef =
+                null;
+              draft.evaluationDefinition.properties.scorers = [];
+
+              // Set dataset ref if it exists - the field is called 'dataset' not 'datasetRef'
+              if (evalData.dataset) {
+                console.log('Setting dataset ref:', evalData.dataset);
                 draft.evaluationDefinition.properties.dataset.originalSourceRef =
-                  evalData.datasetRef;
+                  evalData.dataset;
               }
 
-              // Set scorer refs if they exist
-              if (evalData.scorerRefs && Array.isArray(evalData.scorerRefs)) {
+              // Set scorer refs if they exist - the field is called 'scorers' not 'scorerRefs'
+              if (evalData.scorers && Array.isArray(evalData.scorers)) {
+                console.log('Setting scorer refs:', evalData.scorers);
                 draft.evaluationDefinition.properties.scorers =
-                  evalData.scorerRefs.map((ref: string) => ({
+                  evalData.scorers.map((ref: string) => ({
                     originalSourceRef: ref,
                   }));
               }
