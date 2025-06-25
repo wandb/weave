@@ -157,6 +157,7 @@ def test_openai_image_edit_sync(client_creator) -> None:
     image_buffer = BytesIO()
     test_image.save(image_buffer, format="PNG")
     image_buffer.seek(0)
+    image_buffer.name = "image.png"
 
     with client_creator(autopatch_settings=autopatch_settings) as client:
         openai_client = OpenAI(api_key=api_key)
@@ -220,6 +221,7 @@ async def test_openai_image_edit_async(client_creator) -> None:
     image_buffer = BytesIO()
     test_image.save(image_buffer, format="PNG")
     image_buffer.seek(0)
+    image_buffer.name = "image.png"
 
     with client_creator(autopatch_settings=autopatch_settings) as client:
         openai_client = AsyncOpenAI(api_key=api_key)
@@ -283,6 +285,7 @@ def test_openai_image_create_variation_sync(client_creator) -> None:
     image_buffer = BytesIO()
     test_image.save(image_buffer, format="PNG")
     image_buffer.seek(0)
+    image_buffer.name = "image.png"
 
     with client_creator(autopatch_settings=autopatch_settings) as client:
         openai_client = OpenAI(api_key=api_key)
@@ -337,6 +340,7 @@ async def test_openai_image_create_variation_async(client_creator) -> None:
     image_buffer = BytesIO()
     test_image.save(image_buffer, format="PNG")
     image_buffer.seek(0)
+    image_buffer.name = "image.png"
 
     with client_creator(autopatch_settings=autopatch_settings) as client:
         openai_client = AsyncOpenAI(api_key=api_key)
