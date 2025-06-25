@@ -269,6 +269,7 @@ select = [
   "B904",   # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
   "SIM102", # https://docs.astral.sh/ruff/rules/collapsible-if/,
   "N801",   # https://docs.astral.sh/ruff/rules/invalid-class-name/
+  "N803",   # https://docs.astral.sh/ruff/rules/invalid-argument-name/
 ]
 ignore = [
   # we use Google style
