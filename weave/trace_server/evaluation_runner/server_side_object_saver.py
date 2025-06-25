@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import multiprocessing
 from typing import Any, TypedDict
 
 import weave
@@ -47,189 +46,18 @@ class RunAsUser:
     def __init__(self, ch_server_dump: dict[str, Any]):
         self.ch_server_dump = ch_server_dump
 
-    # @staticmethod
-    # def _process_runner(
-    #     func: Callable[..., Any],
-    #     args: tuple[Any, ...],
-    #     kwargs: dict[str, Any],
-    #     result_queue: multiprocessing.Queue,
-    # ) -> None:
-    #     """Execute the function and put its result in the queue.
-    #     Args:
-    #         func: The function to execute
-    #         args: Positional arguments for the function
-    #         kwargs: Keyword arguments for the function
-    #         result_queue: Queue to store the function's result
-    #     """
-    #     try:
-    #         result = func(*args, **kwargs)
-    #         result_queue.put(("success", result))
-    #     except Exception as e:
-    #         result_queue.put(("error", str(e)))
+    def run_evaluation_evaluate(
+        self,
+        req: tsi.RunEvaluationReq,
+    ) -> list[str]:
+        return self._evaluation_evaluate_direct(req)
 
-    # def run_save_object(
-    #     self,
-    #     new_obj: Any,
-    #     project_id: str,
-    #     object_name: str | None,
-    #     user_id: str | None,
-    # ) -> str:
-    #     """Run the save_object operation in a separate process.
-    #     Args:
-    #         new_obj: The object to save
-    #         project_id: The project identifier
-    #         user_id: The user identifier
-    #     Returns:
-    #         str: The digest of the saved object
-    #     Raises:
-    #         Exception: If the save operation fails in the child process
-    #     """
-    #     result_queue: multiprocessing.Queue[tuple[str, str]] = multiprocessing.Queue()
-
-    #     process = multiprocessing.Process(
-    #         target=self._save_object,
-    #         args=(
-    #             new_obj,
-    #             project_id,
-    #             object_name,
-    #             user_id,
-    #             result_queue,
-    #         ),  # Pass result_queue here
-    #     )
-
-    #     process.start()
-    #     status, result = result_queue.get()
-    #     process.join()
-
-    #     if status == "error":
-    #         raise RunSaveObjectException(f"Process execution failed: {result}")
-
-    #     return result
-
-    # def _save_object(
-    #     self,
-    #     new_obj: Any,
-    #     project_id: str,
-    #     object_name: str | None,
-    #     user_id: str | None,
-    #     result_queue: multiprocessing.Queue,
-    # ) -> None:
-    #     """Save an object in a separate process.
-    #     Args:
-    #         new_obj: The object to save
-    #         project_id: The project identifier
-    #         object_name: The name of the object
-    #         user_id: The user identifier
-    #         result_queue: Queue to store the operation's result
-    #     """
-    #     try:
-    #         from weave.trace_server.clickhouse_trace_server_batched import (
-    #             ClickHouseTraceServer,
-    #         )
-
-    #         client = WeaveClient(
-    #             "_SERVER_",
-    #             project_id,
-    #             UserInjectingExternalTraceServer(
-    #                 ClickHouseTraceServer(**self.ch_server_dump),
-    #                 id_converter=IdConverter(),
-    #                 user_id=user_id,
-    #             ),
-    #             False,
-    #         )
-
-    #         ic = InitializedClient(client)
-    #         autopatch.autopatch()
-
-    #         res = weave.publish(new_obj, name=object_name).digest
-    #         autopatch.reset_autopatch()
-    #         client._flush()
-    #         ic.reset()
-    #         result_queue.put(("success", res))  # Put the result in the queue
-    #     except Exception as e:
-    #         result_queue.put(("error", str(e)))  # Put any errors in the queue
-
-    # def run_call_method(
-    #     self,
-    #     obj_ref: str,
-    #     project_id: str,
-    #     user_id: str,
-    #     method_name: str,
-    #     args: dict[str, Any],
-    # ) -> str:
-    #     result_queue: multiprocessing.Queue[tuple[str, Any]] = multiprocessing.Queue()
-
-    #     process = multiprocessing.Process(
-    #         target=self._call_method,
-    #         args=(obj_ref, project_id, user_id, method_name, args, result_queue),
-    #     )
-
-    #     process.start()
-    #     status, result = result_queue.get()
-    #     process.join()
-
-    #     if status == "error":
-    #         raise RunCallMethodException(f"Process execution failed: {result}")
-
-    #     return result
-
-    # def _call_method(
-    #     self,
-    #     obj_ref: str,
-    #     project_id: str,
-    #     user_id: str,
-    #     method_name: str,
-    #     args: dict[str, Any],
-    #     result_queue: multiprocessing.Queue,
-    # ) -> None:
-    #     try:
-    #         from weave.trace_server.clickhouse_trace_server_batched import (
-    #             ClickHouseTraceServer,
-    #         )
-
-    #         client = WeaveClient(
-    #             "_SERVER_",
-    #             project_id,
-    #             UserInjectingExternalTraceServer(
-    #                 ClickHouseTraceServer(**self.ch_server_dump),
-    #                 id_converter=IdConverter(),
-    #                 user_id=user_id,
-    #             ),
-    #             False,
-    #         )
-
-    #         ic = InitializedClient(client)
-    #         autopatch.autopatch()
-
-    #         # TODO: validate project alignment?
-    #         int_ref = parse_internal_uri(obj_ref)
-    #         assert isinstance(int_ref, InternalObjectRef)
-    #         ref = ObjectRef(
-    #             entity="_SERVER_",
-    #             project=int_ref.project_id,
-    #             name=int_ref.name,
-    #             _digest=int_ref.version,
-    #         )
-    #         obj = client.get(ref)
-    #         method = getattr(obj, method_name)
-    #         # TODO: Self might be wrong
-    #         res, call = method.call(self=obj, **args)
-    #         autopatch.reset_autopatch()
-    #         client._flush()
-    #         ic.reset()
-    #         result_queue.put(
-    #             ("success", {"output": res, "call_id": call.id})
-    #         )  # Put the result in the queue
-    #     except Exception as e:
-    #         result_queue.put(("error", str(e)))  # Put any errors in the queue
-
-    # def run_score_call(self, req: tsi.ScoreCallReq) -> ScoreCallResult:
-    #     result_queue: multiprocessing.Queue[tuple[str, ScoreCallResult | str]] = (
+    #     result_queue: multiprocessing.Queue[tuple[str, list[str] | str]] = (
     #         multiprocessing.Queue()
     #     )
 
     #     process = multiprocessing.Process(
-    #         target=self._score_call,
+    #         target=self._evaluation_evaluate,
     #         args=(req, result_queue),
     #     )
 
@@ -238,159 +66,84 @@ class RunAsUser:
     #     process.join()
 
     #     if status == "error":
-    #         raise RunScoreCallException(f"Process execution failed: {result}")
+    #         raise RunEvaluationException(f"Process execution failed: {result}")
 
-    #     if isinstance(result, dict):
+    #     if isinstance(result, list):
     #         return result
     #     else:
-    #         raise RunScoreCallException(f"Unexpected result: {result}")
+    #         raise RunEvaluationException(f"Unexpected result: {result}")
 
-    # def _score_call(
+    # def _evaluation_evaluate(
     #     self,
-    #     req: tsi.ScoreCallReq,
-    #     result_queue: multiprocessing.Queue[tuple[str, ScoreCallResult | str]],
+    #     req: tsi.RunEvaluationReq,
+    #     result_queue: multiprocessing.Queue[tuple[str, list[str] | str]],
     # ) -> None:
     #     try:
-    #         from weave.trace.weave_client import Call
-    #         from weave.trace_server.clickhouse_trace_server_batched import (
-    #             ClickHouseTraceServer,
-    #         )
-
-    #         client = WeaveClient(
-    #             "_SERVER_",
-    #             req.project_id,
-    #             UserInjectingExternalTraceServer(
-    #                 ClickHouseTraceServer(**self.ch_server_dump),
-    #                 id_converter=IdConverter(),
-    #                 user_id=req.wb_user_id,
-    #             ),
-    #             False,
-    #         )
-
-    #         ic = InitializedClient(client)
-    #         autopatch.autopatch()
-
-    #         target_call_ref = parse_internal_uri(req.call_ref)
-    #         if not isinstance(target_call_ref, InternalCallRef):
-    #             raise TypeError("Invalid call reference")
-    #         target_call = client.get_call(target_call_ref.id)._val
-    #         if not isinstance(target_call, Call):
-    #             raise TypeError("Invalid call reference")
-    #         scorer_ref = parse_internal_uri(req.scorer_ref)
-    #         if not isinstance(scorer_ref, InternalObjectRef):
-    #             raise TypeError("Invalid scorer reference")
-    #         scorer = weave.ref(
-    #             ObjectRef(
-    #                 entity="_SERVER_",
-    #                 project=scorer_ref.project_id,
-    #                 name=scorer_ref.name,
-    #                 _digest=scorer_ref.version,
-    #             ).uri()
-    #         ).get()
-    #         if not isinstance(scorer, weave.Scorer):
-    #             raise TypeError("Invalid scorer reference")
-    #         apply_scorer_res = target_call._apply_scorer(scorer)
-
-    #         autopatch.reset_autopatch()
-    #         client._flush()
-    #         ic.reset()
-    #         scorer_call_id = apply_scorer_res["score_call"].id
-    #         if not scorer_call_id:
-    #             raise ValueError("Scorer call ID is required")
-    #         result_queue.put(
-    #             (
-    #                 "success",
-    #                 ScoreCallResult(
-    #                     feedback_id=apply_scorer_res["feedback_id"],
-    #                     scorer_call_id=scorer_call_id,
-    #                 ),
-    #             )
-    #         )  # Put the result in the queue
+    #         eval_call_ids = self._evaluation_evaluate_direct(req)
+    #         result_queue.put(("success", eval_call_ids))  # Put the result in the queue
     #     except Exception as e:
     #         result_queue.put(("error", str(e)))  # Put any errors in the queue
 
-    def run_evaluation_evaluate(
+    def _evaluation_evaluate_direct(
         self,
         req: tsi.RunEvaluationReq,
     ) -> list[str]:
-        result_queue: multiprocessing.Queue[tuple[str, list[str] | str]] = (
-            multiprocessing.Queue()
+        from weave.trace_server.clickhouse_trace_server_batched import (
+            ClickHouseTraceServer,
         )
 
-        process = multiprocessing.Process(
-            target=self._evaluation_evaluate,
-            args=(req, result_queue),
+        client = WeaveClient(
+            "_SERVER_",
+            req.project_id,
+            UserInjectingExternalTraceServer(
+                ClickHouseTraceServer(**self.ch_server_dump),
+                id_converter=IdConverter(),
+                user_id=req.wb_user_id,
+            ),
+            False,
         )
 
-        process.start()
-        status, result = result_queue.get()
-        process.join()
+        ic = InitializedClient(client)
+        autopatch.autopatch()
 
-        if status == "error":
-            raise RunEvaluationException(f"Process execution failed: {result}")
-
-        if isinstance(result, list):
-            return result
-        else:
-            raise RunEvaluationException(f"Unexpected result: {result}")
-
-    def _evaluation_evaluate(
-        self,
-        req: tsi.RunEvaluationReq,
-        result_queue: multiprocessing.Queue[tuple[str, list[str] | str]],
-    ) -> None:
+        # TODO: validate project alignment?
+        eval_ref = parse_internal_uri(req.evaluation_ref)
+        assert isinstance(eval_ref, InternalObjectRef)
+        ref = ObjectRef(
+            entity="_SERVER_",
+            project=eval_ref.project_id,
+            name=eval_ref.name,
+            _digest=eval_ref.version,
+        )
+        print(f"ref: {ref}")
         try:
-            from weave.trace_server.clickhouse_trace_server_batched import (
-                ClickHouseTraceServer,
-            )
-
-            client = WeaveClient(
-                "_SERVER_",
-                req.project_id,
-                UserInjectingExternalTraceServer(
-                    ClickHouseTraceServer(**self.ch_server_dump),
-                    id_converter=IdConverter(),
-                    user_id=req.wb_user_id,
-                ),
-                False,
-            )
-
-            ic = InitializedClient(client)
-            autopatch.autopatch()
-
-            # TODO: validate project alignment?
-            eval_ref = parse_internal_uri(req.evaluation_ref)
-            assert isinstance(eval_ref, InternalObjectRef)
-            ref = ObjectRef(
-                entity="_SERVER_",
-                project=eval_ref.project_id,
-                name=eval_ref.name,
-                _digest=eval_ref.version,
-            )
             eval_obj = client.get(ref)
-            eval_call_ids = []
-            for model_ref_str in req.model_refs:
-                model_ref_internal = parse_internal_uri(model_ref_str)
-                assert isinstance(model_ref_internal, InternalObjectRef)
-                model_ref = ObjectRef(
-                    entity="_SERVER_",
-                    project=model_ref_internal.project_id,
-                    name=model_ref_internal.name,
-                    _digest=model_ref_internal.version,
-                )
-                model_obj = client.get(model_ref)
-                if not isinstance(model_obj, weave.Model):
-                    raise TypeError("Invalid model reference")
-
-                result, call = eval_obj.evaluate.call(eval_obj, model_obj)
-                eval_call_ids.append(call.id)
-
-            autopatch.reset_autopatch()
-            client._flush()
-            ic.reset()
-            result_queue.put(("success", eval_call_ids))  # Put the result in the queue
         except Exception as e:
-            result_queue.put(("error", str(e)))  # Put any errors in the queue
+            print(f"Error getting evaluation object: {e}")
+            raise e
+
+        print(f"eval_obj: {eval_obj}")
+        eval_call_ids = []
+        for model_ref_str in req.model_refs:
+            model_ref_internal = parse_internal_uri(model_ref_str)
+            assert isinstance(model_ref_internal, InternalObjectRef)
+            model_ref = ObjectRef(
+                entity="_SERVER_",
+                project=model_ref_internal.project_id,
+                name=model_ref_internal.name,
+                _digest=model_ref_internal.version,
+            )
+            model_obj = client.get(model_ref)
+            if not isinstance(model_obj, weave.Model):
+                raise TypeError("Invalid model reference")
+
+            result, call = eval_obj.evaluate.call(eval_obj, model_obj)
+            eval_call_ids.append(call.id)
+
+        autopatch.reset_autopatch()
+        client._flush()
+        ic.reset()
+        return eval_call_ids
 
 
 class IdConverter(external_to_internal_trace_server_adapter.IdConverter):

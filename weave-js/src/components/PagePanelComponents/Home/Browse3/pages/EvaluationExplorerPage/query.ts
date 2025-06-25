@@ -127,10 +127,9 @@ export const createEvaluation = async (
     _type: 'Evaluation',
     name: spec.name,
     description: spec.description,
-    datasetRef: spec.datasetRef,
-    scorerRefs: spec.scorerRefs,
+    dataset: spec.datasetRef,
+    scorers: spec.scorerRefs,
     _class_name: 'Evaluation',
-    ss_name: 'Evaluation',
     _bases: ['Object', 'BaseModel'],
   };
 
