@@ -2,6 +2,10 @@ import 'yet-another-react-lightbox/plugins/thumbnails.css';
 import 'yet-another-react-lightbox/styles.css';
 import 'yet-another-react-lightbox/plugins/counter.css';
 
+import {StyledTooltip} from '@wandb/weave/components/DraggablePopups';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {Tailwind, TailwindContents} from '@wandb/weave/components/Tailwind';
 import type {PDFDocumentProxy} from 'pdfjs-dist';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import Lightbox, {Slide} from 'yet-another-react-lightbox';
@@ -9,9 +13,15 @@ import Counter from 'yet-another-react-lightbox/plugins/counter';
 import Download from 'yet-another-react-lightbox/plugins/download';
 import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
 
-import {WaveLoader} from '../../../../../Loaders/WaveLoader';
-import {LoadingDots} from '../../../../../LoadingDots';
-import {Tailwind} from '../../../../../Tailwind';
+import {useWFHooks} from '../../pages/wfReactInterface/context';
+import {
+  ContentMetadataTooltip,
+  DownloadButton,
+  getIconName,
+  IconWithText,
+  saveBlob,
+} from './Shared';
+import {ContentViewMetadataLoadedProps} from './types';
 
 type PDFViewProps = {
   blob: Blob;
@@ -28,6 +38,126 @@ const makePlaceholder = (page: number): Slide => ({
   width: -1,
   height: page, // PDF pages are 1-indexed
 });
+
+export const PDFContent = (props: ContentViewMetadataLoadedProps) => {
+  const [contentResult, setContentResult] = useState<Blob | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const {useFileContent} = useWFHooks();
+  const {metadata, project, entity, content} = props;
+  const {filename, size, mimetype} = metadata;
+
+  const contentContent = useFileContent({
+    entity,
+    project,
+    digest: content,
+    skip: !isDownloading,
+  });
+
+  // Store the last non-null content content result in state
+  // We do this because passing skip: true to useFileContent will
+  // result in contentContent.result getting returned as null even
+  // if it was previously downloaded successfully.
+  useEffect(() => {
+    if (contentContent.result) {
+      const blob = new Blob([contentContent.result], {
+        type: mimetype,
+      });
+
+      setContentResult(blob);
+      setIsDownloading(false);
+    }
+  }, [contentContent.result, mimetype]);
+
+  const doSave = useCallback(() => {
+    if (!contentResult) {
+      console.error('No content result');
+      return;
+    }
+    saveBlob(contentResult, filename);
+  }, [contentResult, filename]);
+
+  const downloadContent = () => {
+    if (!contentResult && !isDownloading) {
+      setIsDownloading(true);
+    } else if (contentResult) {
+      // We really want to know if we are duplicating these large downloads
+      console.warn('Attempted to download previously loaded content.');
+    }
+  };
+
+  const openPreview = () => {
+    setShowPreview(true);
+    if (!contentResult && !isDownloading) {
+      downloadContent();
+    }
+  };
+
+  const closePreview = () => {
+    setShowPreview(false);
+  };
+  const iconName = getIconName(mimetype);
+
+  const iconWithText = (
+    <div>
+      <IconWithText
+        iconName={iconName}
+        filename={filename}
+        onClick={openPreview}
+      />
+    </div>
+  );
+
+  const preview = showPreview && contentResult && (
+    <PDFView
+      open={true}
+      onClose={closePreview}
+      blob={contentResult}
+      onDownload={doSave}
+    />
+  );
+
+  if (showPreview) {
+    return (
+      <TailwindContents>
+        {iconWithText}
+        {preview}
+      </TailwindContents>
+    );
+  }
+
+  const tooltipTrigger = (
+    <StyledTooltip
+      enterDelay={500}
+      title={
+        <TailwindContents>
+          <ContentMetadataTooltip
+            filename={filename}
+            mimetype={mimetype}
+            size={size}
+          />
+          <div className="text-sm">
+            <div className="mt-8 text-center text-xs">
+              Click icon or filename to preview, button to download
+            </div>
+          </div>
+        </TailwindContents>
+      }>
+      {iconWithText}
+    </StyledTooltip>
+  );
+
+  return (
+    <TailwindContents>
+      <div className="group flex items-center gap-4">
+        {tooltipTrigger}
+        <div className="opacity-0 group-hover:opacity-100">
+          <DownloadButton isDownloading={isDownloading} doSave={doSave} />
+        </div>
+      </div>
+    </TailwindContents>
+  );
+};
 
 export const PDFView = ({blob, open, onClose, onDownload}: PDFViewProps) => {
   // We need to maintain the page index ourselves because we are changing the
