@@ -417,4 +417,6 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
     def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.run_evaluation, req)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any, TypedDict
 
 import weave
@@ -137,7 +138,7 @@ class RunAsUser:
             if not isinstance(model_obj, weave.Model):
                 raise TypeError("Invalid model reference")
 
-            result, call = eval_obj.evaluate.call(eval_obj, model_obj)
+            result, call = asyncio.run(eval_obj.evaluate.call(eval_obj, model_obj))
             eval_call_ids.append(call.id)
 
         autopatch.reset_autopatch()
