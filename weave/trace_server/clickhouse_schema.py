@@ -12,6 +12,7 @@ class CallStartCHInsertable(BaseModel):
     trace_id: str
     parent_id: Optional[str] = None
     thread_id: Optional[str] = None
+    turn_id: Optional[str] = None
     op_name: str
     started_at: datetime.datetime
     attributes_dump: str
@@ -104,6 +105,7 @@ class SelectableCHCallSchema(BaseModel):
     trace_id: str
     parent_id: Optional[str] = None
     thread_id: Optional[str] = None
+    turn_id: Optional[str] = None
 
     started_at: datetime.datetime
     ended_at: Optional[datetime.datetime] = None
