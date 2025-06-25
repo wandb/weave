@@ -165,9 +165,9 @@ Learn how to [create a monitor in general](#create-a-monitor) or try out the [en
 
 1. From the left menu, select the **Monitors** tab.
 2. From the monitors page, click **New Monitor**.
-3. In the pop-up, configure the monitor:
+3. In the drawer, configure the monitor:
    - **Name**: Valid monitor names must start with a letter or number and can only contain letters, numbers, hyphens, and underscores.
-   - **Description**: Explain what the monitor does.
+   - **Description** *(optional)*: Explain what the monitor does.
    - **Active monitor** toggle: Turn the monitor on or off. 
    - **Calls to monitor**:
         - **Operations**: Choose one or more `@weave.op`s to monitor. 
