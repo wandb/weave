@@ -234,7 +234,7 @@ class Evaluation(Object):
             console=console,
             transient=True,
         ) as progress:
-            async for index, example, eval_row in util.async_foreach(
+            async for index, _example, eval_row in util.async_foreach(
                 trial_rows_list,
                 eval_example,
                 get_weave_parallelism(),

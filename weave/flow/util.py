@@ -7,7 +7,7 @@ import random
 import warnings
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, TypeVar
 
 from rich.progress import Progress, ProgressColumn, Task, TaskID, Text
 from rich.text import Text
@@ -58,7 +58,7 @@ async def async_foreach(
     sequence: Iterable[T],
     func: Callable[[T], Awaitable[U]],
     max_concurrent_tasks: int,
-    progress: Optional[Progress] = None,
+    progress: Progress | None = None,
     progress_desc: str = "Processing items",
 ) -> AsyncIterator[ItemReturnType]:
     """Process items from a sequence concurrently with a maximum number of parallel tasks.
@@ -96,8 +96,8 @@ async def async_foreach(
     """
     semaphore: asyncio.Semaphore = asyncio.Semaphore(max_concurrent_tasks)
     active_tasks: list[asyncio.Task[ItemReturnType]] = []
-    task_id: Optional[TaskID] = None
-    total: Optional[int] = None
+    task_id: TaskID | None = None
+    total: int | None = None
     processed_count = 0
 
     if progress:
