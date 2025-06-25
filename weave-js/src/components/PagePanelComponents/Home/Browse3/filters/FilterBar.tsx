@@ -35,6 +35,12 @@ import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
 export const FILTER_INPUT_DEBOUNCE_MS = 1000;
 
+export type FieldOption = {
+  readonly value: string;
+  readonly label: string;
+  readonly description?: string;
+};
+
 type FilterBarProps = {
   entity: string;
   project: string;
@@ -43,6 +49,7 @@ type FilterBarProps = {
   columnInfo: ColumnInfo;
   selectedCalls: string[];
   clearSelectedCalls: () => void;
+  alwaysPresentFilterOptions?: FieldOption[];
 
   width: number;
   height: number;
@@ -65,6 +72,7 @@ export const FilterBar = ({
   columnInfo,
   selectedCalls,
   clearSelectedCalls,
+  alwaysPresentFilterOptions = [],
   width,
 }: FilterBarProps) => {
   const refBar = useRef<HTMLDivElement>(null);
@@ -173,14 +181,10 @@ export const FilterBar = ({
       });
     }
   }
-  (options[0] as GroupedOption).options.unshift({
-    value: 'id',
-    label: 'Call ID',
-  });
-  (options[0] as GroupedOption).options.push({
-    value: MONITORED_FILTER_VALUE,
-    label: 'Monitored',
-    description: 'Find all calls scored by a particular monitor',
+
+  // Add always present filter options to the Metadata group
+  alwaysPresentFilterOptions.forEach(option => {
+    (options[0] as GroupedOption).options.push(option);
   });
 
   const onRemoveAll = () => {

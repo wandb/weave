@@ -233,6 +233,24 @@ export const CallsTable: FC<{
   const isReadonly =
     loadingUserInfo || !userInfo?.username || !userInfo?.teams.includes(entity);
 
+  const alwaysPresentFilterOptions = useMemo(() => {
+    return [
+      {
+        value: 'id',
+        label: 'Call ID',
+      },
+      ...(!loadingUserInfo && userInfo && 'admin' in userInfo && userInfo.admin
+        ? [
+            {
+              value: 'feedback.[*].trigger_ref',
+              label: 'Monitored',
+              description: 'Find all calls scored by a particular monitor',
+            },
+          ]
+        : []),
+    ];
+  }, [loadingUserInfo, userInfo]);
+
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
 
@@ -1081,6 +1099,7 @@ export const CallsTable: FC<{
                   setFilterModel={setFilterModel}
                   selectedCalls={selectedCalls}
                   clearSelectedCalls={clearSelectedCalls}
+                  alwaysPresentFilterOptions={alwaysPresentFilterOptions}
                 />
               )}
             </>
