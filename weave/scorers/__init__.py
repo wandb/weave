@@ -1,4 +1,4 @@
-from weave.scorers.auto_summarize import auto_summarize
+from weave.scorers import auto_summarize
 from weave.scorers.classification_scorer import (
     MultiTaskBinaryClassificationF1,
 )
@@ -9,7 +9,6 @@ from weave.scorers.hallucination_scorer import (
     HallucinationFreeScorer,
     WeaveHallucinationScorerV1,
 )
-from weave.scorers.instructor_scorer import InstructorLLMScorer
 from weave.scorers.json_scorer import ValidJSONScorer
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.scorers.moderation_scorer import (
@@ -28,11 +27,7 @@ from weave.scorers.ragas_scorer import (
     ContextEntityRecallScorer,
     ContextRelevancyScorer,
 )
-from weave.scorers.scorer_types import (
-    LLMScorer,
-    _has_oldstyle_scorers,
-    get_scorer_attributes,
-)
+from weave.scorers.scorer_types import LLMScorer
 from weave.scorers.similarity_scorer import EmbeddingSimilarityScorer
 from weave.scorers.string_scorer import (
     LevenshteinScorer,
@@ -47,10 +42,7 @@ __all__ = [
     "ContextEntityRecallScorer",
     "ContextRelevancyScorer",
     "EmbeddingSimilarityScorer",
-    "get_scorer_attributes",
-    "_has_oldstyle_scorers",
     "HallucinationFreeScorer",
-    "InstructorLLMScorer",
     "ValidJSONScorer",
     "LevenshteinScorer",
     "LLMAsAJudgeScorer",
