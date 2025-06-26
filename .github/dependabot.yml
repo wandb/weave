@@ -3,7 +3,7 @@ updates:
   # Monitor Python dependencies in pyproject.toml
   - package-ecosystem: "pip"
     directory: "/"
-    target-branch: "andrew/dependabot" # TODO: remove when ready to merge
+    target-branch: "master"
     schedule:
       interval: "weekly"
       day: "monday"

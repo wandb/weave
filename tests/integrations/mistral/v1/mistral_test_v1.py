@@ -52,7 +52,8 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
@@ -110,7 +111,8 @@ Each of these cheeses offers a unique taste and texture, so the "best" one is a 
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
@@ -169,7 +171,8 @@ Each of these cheeses offers a unique taste and texture, so the "best" one depen
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
@@ -237,7 +240,8 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"

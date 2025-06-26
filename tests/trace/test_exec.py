@@ -8,7 +8,7 @@ import pytest
     sys.version_info > (3, 9), reason="TODO: Different behavior on 3.10+"
 )
 @pytest.mark.parametrize(
-    "code, expected_captured_code",
+    ("code", "expected_captured_code"),
     [
         # Basic
         (

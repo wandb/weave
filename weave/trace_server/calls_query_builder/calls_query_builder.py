@@ -665,17 +665,13 @@ class CallsQuery(BaseModel):
             raise ValueError("Missing select columns")
 
         # Determine if the query `has_heavy_fields` by checking
-        # if it `has_heavy_select or has_heavy_filter or has_heavy_order`
         has_heavy_select = any(field.is_heavy() for field in self.select_fields)
-
         has_heavy_filter = any(
             condition.is_heavy() for condition in self.query_conditions
         )
-
         has_heavy_order = any(
             order_field.field.is_heavy() for order_field in self.order_fields
         )
-
         has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
 
         # Determine if `predicate_pushdown_possible` which is
@@ -712,7 +708,7 @@ class CallsQuery(BaseModel):
         # This can occur when there is an out of order call part insertion or worse,
         # when such occurance happens and the client terminates early.
         # Additionally: This condition is also REQUIRED for proper functioning
-        # when using the op_name and trace_id pre-group by optimizations
+        # when using pre-group by (WHERE) optimizations
         self.add_condition(
             tsi_query.NotOperation.model_validate(
                 {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
@@ -727,9 +723,9 @@ class CallsQuery(BaseModel):
         if not should_optimize and not self.include_costs and not object_ref_conditions:
             return self._as_sql_base_format(pb, table_alias)
 
-        # If so, build the two queries
+        # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(project_id=self.project_id)
-        outer_query = CallsQuery(
+        select_query = CallsQuery(
             project_id=self.project_id,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
@@ -738,34 +734,25 @@ class CallsQuery(BaseModel):
         # Select Fields:
         filter_query.add_field("id")
         for field in self.select_fields:
-            outer_query.select_fields.append(field)
+            select_query.select_fields.append(field)
 
         # Build CTEs for object reference filtering and ordering
         object_join_cte, field_to_object_join_alias_map = build_object_ref_ctes(
             pb, self.project_id, object_ref_conditions
         )
 
-        # Query Conditions
+        # Query conditions and filter
         for condition in self.query_conditions:
-            if condition.is_heavy():
-                outer_query.query_conditions.append(condition)
-            else:
-                filter_query.query_conditions.append(condition)
+            filter_query.query_conditions.append(condition)
 
-        # Hardcoded Filter - always light
         filter_query.hardcoded_filter = self.hardcoded_filter
 
         # Order Fields:
-        if has_light_order_filter:
-            filter_query.order_fields = self.order_fields
-            filter_query.limit = self.limit
-            filter_query.offset = self.offset
-            # SUPER IMPORTANT: still need to re-sort the final query
-            outer_query.order_fields = self.order_fields
-        else:
-            outer_query.order_fields = self.order_fields
-            outer_query.limit = self.limit
-            outer_query.offset = self.offset
+        filter_query.order_fields = self.order_fields
+        filter_query.limit = self.limit
+        filter_query.offset = self.offset
+        # SUPER IMPORTANT: still need to re-sort the final query
+        select_query.order_fields = self.order_fields
 
         raw_sql = f"""
         WITH filtered_calls AS ({filter_query._as_sql_base_format(
@@ -785,7 +772,7 @@ class CallsQuery(BaseModel):
             ]
             select_fields = [field.field for field in self.select_fields]
             raw_sql += f""",
-            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}),
+            all_calls AS ({select_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}),
             {cost_query(
                 pb,
                 "all_calls",
@@ -797,7 +784,7 @@ class CallsQuery(BaseModel):
 
         else:
             raw_sql += f"""
-            {outer_query._as_sql_base_format(
+            {select_query._as_sql_base_format(
                 pb,
                 table_alias,
                 id_subquery_name="filtered_calls",
