@@ -267,7 +267,6 @@ export const normalizeLangchainChatCompletion = (
   const firstOutput = langchainOutput.outputs[0];
   const firstGeneration = firstOutput.generations[0][0];
   const message = langchainMessageToMessage(firstGeneration.message);
-  const finishReason = firstGeneration
 
   const choice: Choice = {
     index: 0,
@@ -275,18 +274,47 @@ export const normalizeLangchainChatCompletion = (
     finish_reason: firstGeneration?.generation_info?.finish_reason ?? "",
   };
 
-  const usage: Usage = firstOutput.llm_output.token_usage || {
+  let usage: Usage = {
     completion_tokens: 0,
     prompt_tokens: 0,
     total_tokens: 0,
   };
 
+  // Handle standard format (OpenAI-like)
+  if (firstOutput.llm_output?.token_usage) {
+    usage = firstOutput.llm_output.token_usage;
+  } 
+  // Handle VertexAI format
+  else if (firstGeneration.message?.kwargs?.usage_metadata) {
+    const usageMetadata = firstGeneration.message.kwargs.usage_metadata;
+    usage = {
+      completion_tokens: usageMetadata.output_tokens || 0,
+      prompt_tokens: usageMetadata.input_tokens || 0,
+      total_tokens: usageMetadata.total_tokens || 0,
+    };
+  }
+
+  // Extract model name from multiple possible locations
+  const modelName = firstOutput.llm_output?.model_name || 
+                    firstGeneration.message?.kwargs?.response_metadata?.model_name ||
+                    'unknown';
+
+  // Extract ID from multiple possible locations
+  const id = firstOutput.llm_output?.id || 
+             firstGeneration.message?.kwargs?.response_metadata?.id ||
+             langchainOutput.id;
+
+  // Extract system fingerprint if available
+  const systemFingerprint = firstOutput.llm_output?.system_fingerprint ||
+                            firstGeneration.message?.kwargs?.response_metadata?.system_fingerprint ||
+                            '';
+
   return {
-    id: firstOutput.llm_output.id || langchainOutput.id,
+    id,
     choices: [choice],
     created: new Date(langchainOutput.start_time).getTime() / 1000,
-    model: firstOutput.llm_output.model_name || 'unknown',
-    system_fingerprint: firstOutput.llm_output.system_fingerprint || '',
+    model: modelName,
+    system_fingerprint: systemFingerprint,
     usage,
   };
 };
