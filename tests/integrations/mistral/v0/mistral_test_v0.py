@@ -43,7 +43,8 @@ def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> Non
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
@@ -95,7 +96,8 @@ Ultimately, the best French cheese is a matter of personal taste. I would recomm
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
@@ -153,7 +155,8 @@ def test_mistral_quickstart_with_stream(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
@@ -210,7 +213,8 @@ async def test_mistral_quickstart_with_stream_async(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content == exp
     assert output.choices[0].finish_reason == "stop"
