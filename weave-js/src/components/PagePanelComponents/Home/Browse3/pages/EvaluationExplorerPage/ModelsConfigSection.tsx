@@ -141,11 +141,7 @@ export const ModelsConfigSection: React.FC<{
   return (
     <ConfigSection
       title="Models"
-      icon="model"
-      style={{
-        paddingBottom: '0px',
-        paddingRight: '0px',
-      }}>
+      icon="model">
       <Column style={{gap: '8px'}}>
         {models.map((model, modelNdx) => {
           let selectedOption = newModelOption;

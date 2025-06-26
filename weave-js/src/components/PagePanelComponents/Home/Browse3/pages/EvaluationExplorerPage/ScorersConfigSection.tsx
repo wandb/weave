@@ -107,11 +107,7 @@ export const ScorersConfigSection: React.FC<{
   return (
     <ConfigSection
       title="Scorers"
-      icon="type-number-alt"
-      style={{
-        paddingBottom: '0px',
-        paddingRight: '0px',
-      }}>
+      icon="type-number-alt">
       <Column style={{gap: '8px'}}>
         {scorers.map((scorer, scorerNdx) => {
           let selectedOption = newScorerOption;

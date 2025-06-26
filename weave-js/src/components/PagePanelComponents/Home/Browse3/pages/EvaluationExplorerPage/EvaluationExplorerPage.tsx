@@ -12,12 +12,15 @@ import {
   useEvaluationExplorerPageContext,
 } from './context';
 import {ExistingDatasetEditor, NewDatasetEditor} from './DatasetEditor';
-import {EvaluationConfigSection, EvaluationPicker} from './EvaluationConfigSection';
-import {Column, Header} from './layout';
-import {Footer, Row} from './layout';
+import {EvaluationPicker} from './EvaluationConfigSection';
+import {DatasetConfigSection} from './DatasetConfigSection';
+import {ScorersConfigSection} from './ScorersConfigSection';
+import {TextField} from '@wandb/weave/components/Form/TextField';
+import {TextArea} from '@wandb/weave/components/Form/TextArea';
+import {Column, Header, ConfigSection, Row} from './layout';
+import {Footer} from './layout';
 import {ModelsConfigSection} from './ModelsConfigSection';
 import {createEvaluation, runEvaluation} from './query';
-import {ScorersConfigSection} from './ScorersConfigSection';
 
 type EvaluationExplorerPageProps = {
   entity: string;
@@ -339,11 +342,45 @@ const ConfigPanel: React.FC<{
             />
           </div>
         )}
-        <EvaluationConfigSection
+        
+        {/* Evaluation name and description */}
+        <ConfigSection title="Evaluation" icon="baseline-alt">
+          <Column style={{gap: '8px'}}>
+            <TextField
+              value={config.evaluationDefinition.properties.name}
+              placeholder="Evaluation Name"
+              onChange={value => {
+                editConfig(draft => {
+                  draft.evaluationDefinition.properties.name = value;
+                  draft.evaluationDefinition.dirtied = true;
+                });
+              }}
+            />
+            <TextArea
+              value={config.evaluationDefinition.properties.description}
+              placeholder="Evaluation Description"
+              onChange={e => {
+                editConfig(draft => {
+                  draft.evaluationDefinition.properties.description =
+                    e.target.value;
+                  draft.evaluationDefinition.dirtied = true;
+                });
+              }}
+            />
+          </Column>
+        </ConfigSection>
+        
+        {/* Dataset section */}
+        <DatasetConfigSection
           entity={entity}
           project={project}
           setNewDatasetEditorMode={setNewDatasetEditorMode}
         />
+        
+        {/* Scorers section */}
+        <ScorersConfigSection entity={entity} project={project} />
+        
+        {/* Models section */}
         <ModelsConfigSection entity={entity} project={project} />
       </Column>
       <Footer>

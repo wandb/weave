@@ -17,11 +17,7 @@ export const DatasetConfigSection: React.FC<{
   return (
     <ConfigSection
       title="Dataset"
-      icon="table"
-      style={{
-        paddingTop: '0px',
-        paddingRight: '0px',
-      }}>
+      icon="table">
       <DatasetPicker
         entity={entity}
         project={project}
