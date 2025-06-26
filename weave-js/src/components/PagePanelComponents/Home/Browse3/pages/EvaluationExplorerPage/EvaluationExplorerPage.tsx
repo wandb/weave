@@ -306,8 +306,21 @@ const ConfigPanel: React.FC<{
           disabled={!isRunEvalEnabled || isRunning}
           onClick={handleRunEval}>
           {isRunning ? 'Running...' : 'Run eval'}
-        </Button>
-      </Footer>
-    </Column>
+                  </Button>
+          {/* DEBUG BUTTON - REMOVE BEFORE PRODUCTION */}
+          <Button
+            variant="secondary"
+            onClick={() => {
+              console.log('Current config state:', {
+                evaluation: config.evaluationDefinition.originalSourceRef,
+                dataset: config.evaluationDefinition.properties.dataset.originalSourceRef,
+                scorers: config.evaluationDefinition.properties.scorers.map(s => s.originalSourceRef),
+                models: config.models.map(m => m.originalSourceRef),
+              });
+            }}>
+            Debug State
+          </Button>
+        </Footer>
+      </Column>
   );
 };

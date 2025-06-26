@@ -13,6 +13,7 @@ import {useEvaluationExplorerPageContext} from './context';
 import {clientBound, hookify} from './hooks';
 import {Column, ConfigSection, Row} from './layout';
 import {getLatestScorerRefs, getObjByRef} from './query';
+import {VersionedObjectPicker} from './VersionedObjectPicker';
 
 const newScorerOption = {
   label: 'New Scorer',
@@ -75,6 +76,12 @@ export const ScorersConfigSection: React.FC<{
   const updateScorerRef = useCallback(
     (scorerNdx: number, ref: string | null) => {
       editConfig(draft => {
+        // Don't update if the ref hasn't changed
+        const currentRef = draft.evaluationDefinition.properties.scorers[scorerNdx]?.originalSourceRef;
+        if (ref === currentRef) {
+          return;
+        }
+        
         if (ref === 'new-scorer' || ref === null) {
           // Reset to empty scorer
           draft.evaluationDefinition.properties.scorers[
@@ -86,6 +93,9 @@ export const ScorersConfigSection: React.FC<{
             scorerNdx
           ].originalSourceRef = ref;
         }
+        
+        // Only mark as dirty if we're actually changing something
+        draft.evaluationDefinition.dirtied = true;
       });
     },
     [editConfig]
@@ -135,12 +145,18 @@ export const ScorersConfigSection: React.FC<{
           return (
             <Row key={scorerNdx} style={{alignItems: 'center', gap: '8px'}}>
               <div style={{flex: 1}}>
-                <Select
-                  options={options}
-                  value={selectedOption}
-                  onChange={option => {
-                    updateScorerRef(scorerNdx, option?.value ?? null);
+                <VersionedObjectPicker
+                  entity={entity}
+                  project={project}
+                  objectType="scorer"
+                  selectedRef={scorer.originalSourceRef}
+                  onRefChange={(ref) => {
+                    updateScorerRef(scorerNdx, ref);
                   }}
+                  latestObjectRefs={scorerRefsQuery.data ?? []}
+                  loading={scorerRefsQuery.loading}
+                  newOptions={[{label: "New Scorer", value: "new-scorer"}]}
+                  allowNewOption={true}
                 />
               </div>
               <Button
@@ -157,9 +173,9 @@ export const ScorersConfigSection: React.FC<{
                   deleteScorer(scorerNdx);
                 }}
               />
-            </Row>
-          );
-        })}
+                      </Row>
+        );
+      })}
         <Row>
           <Button
             icon="add-new"
@@ -173,7 +189,7 @@ export const ScorersConfigSection: React.FC<{
           entity={entity}
           project={project}
           open={currentlyEditingScorerNdx !== null}
-          onClose={newScorerRef => {
+          onClose={(newScorerRef?: string) => {
             if (newScorerRef && currentlyEditingScorerNdx !== null) {
               editConfig(draft => {
                 draft.evaluationDefinition.properties.scorers[
@@ -210,6 +226,8 @@ const emptyScorer = (entity: string, project: string): ObjectVersionSchema => ({
 });
 
 const useScorer = clientBound(hookify(getObjByRef));
+
+const useScorerOptions = clientBound(hookify(getLatestScorerRefs));
 
 const ScorerDrawer: React.FC<{
   entity: string;

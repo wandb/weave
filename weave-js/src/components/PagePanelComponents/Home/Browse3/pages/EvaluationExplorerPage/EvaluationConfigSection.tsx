@@ -1,7 +1,7 @@
 import {Select} from '@wandb/weave/components/Form/Select';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {refStringToName} from './common';
@@ -14,6 +14,7 @@ import {Column} from './layout';
 import {ConfigSection, Row} from './layout';
 import {getLatestEvaluationRefs, getObjByRef} from './query';
 import {ScorersConfigSection} from './ScorersConfigSection';
+import {VersionedObjectPicker} from './VersionedObjectPicker';
 
 export const EvaluationConfigSection: React.FC<{
   entity: string;
@@ -67,6 +68,7 @@ export const EvaluationConfigSection: React.FC<{
 };
 
 const useLatestEvaluationRefs = clientBound(hookify(getLatestEvaluationRefs));
+const useEvaluationByRef = clientBound(hookify(getObjByRef));
 
 const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
   entity,
@@ -75,41 +77,7 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const refsQuery = useLatestEvaluationRefs(entity, project);
   const getClient = useGetTraceServerClientContext();
-
-  const newEvaluationOption = useMemo(() => {
-    return {
-      label: 'New Evaluation',
-      value: 'new-evaluation',
-    };
-  }, []);
-
-  const selectOptions = useMemo(() => {
-    return [
-      {
-        label: 'Create new evaluation',
-        options: [newEvaluationOption],
-      },
-      {
-        label: 'Load existing evaluation',
-        options:
-          refsQuery.data?.map(ref => ({
-            label: refStringToName(ref),
-            value: ref,
-          })) ?? [],
-      },
-    ];
-  }, [refsQuery.data, newEvaluationOption]);
-
-  const selectedOption = useMemo(() => {
-    if (config.evaluationDefinition.originalSourceRef) {
-      return {
-        label: refStringToName(config.evaluationDefinition.originalSourceRef),
-        value: config.evaluationDefinition.originalSourceRef,
-      };
-    }
-    return newEvaluationOption;
-  }, [config.evaluationDefinition.originalSourceRef, newEvaluationOption]);
-
+  
   const setEvaluationRef = useCallback(
     async (evaluationRef: string | null) => {
       if (evaluationRef === 'new-evaluation' || evaluationRef === null) {
@@ -120,8 +88,7 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
           draft.evaluationDefinition.properties.name = '';
           draft.evaluationDefinition.properties.description = '';
           // Clear dataset and scorers
-          draft.evaluationDefinition.properties.dataset.originalSourceRef =
-            null;
+          draft.evaluationDefinition.properties.dataset.originalSourceRef = null;
           draft.evaluationDefinition.properties.scorers = [];
           // Clear models
           draft.models = [];
@@ -132,18 +99,18 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
           draft.evaluationDefinition.originalSourceRef = evaluationRef;
           draft.evaluationDefinition.dirtied = false;
         });
-
+        
         // Then load the evaluation data
         try {
           const client = getClient();
           const evaluationData = await getObjByRef(client, evaluationRef);
-
+          
           console.log('Loading evaluation data:', evaluationData);
-
+          
           if (evaluationData) {
             const evalData = evaluationData.val;
             console.log('Evaluation val:', evalData);
-
+            
             editConfig(draft => {
               // Update evaluation properties from loaded data
               draft.evaluationDefinition.properties.name = evalData.name || '';
@@ -151,17 +118,16 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
                 evalData.description || '';
 
               // Clear existing dataset and scorers first
-              draft.evaluationDefinition.properties.dataset.originalSourceRef =
-                null;
+              draft.evaluationDefinition.properties.dataset.originalSourceRef = null;
               draft.evaluationDefinition.properties.scorers = [];
-
+              
               // Set dataset ref if it exists - the field is called 'dataset' not 'datasetRef'
               if (evalData.dataset) {
                 console.log('Setting dataset ref:', evalData.dataset);
                 draft.evaluationDefinition.properties.dataset.originalSourceRef =
                   evalData.dataset;
               }
-
+              
               // Set scorer refs if they exist - the field is called 'scorers' not 'scorerRefs'
               if (evalData.scorers && Array.isArray(evalData.scorers)) {
                 console.log('Setting scorer refs:', evalData.scorers);
@@ -184,18 +150,17 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
     [editConfig, getClient]
   );
 
-  if (refsQuery.loading) {
-    return <LoadingSelect />;
-  }
-
   return (
-    <Select
-      blurInputOnSelect
-      options={selectOptions}
-      value={selectedOption}
-      onChange={option => {
-        setEvaluationRef(option?.value ?? null);
-      }}
+    <VersionedObjectPicker
+      entity={entity}
+      project={project}
+      objectType="evaluation"
+      selectedRef={config.evaluationDefinition.originalSourceRef}
+      onRefChange={setEvaluationRef}
+      latestObjectRefs={refsQuery.data ?? []}
+      loading={refsQuery.loading}
+      newOptions={[{label: "New Evaluation", value: "new-evaluation"}]}
+      allowNewOption={true}
     />
   );
 };

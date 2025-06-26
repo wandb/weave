@@ -7,6 +7,7 @@ import {useEvaluationExplorerPageContext} from './context';
 import {clientBound, hookify} from './hooks';
 import {ConfigSection} from './layout';
 import {getLatestDatasetRefs} from './query';
+import {VersionedObjectPicker} from './VersionedObjectPicker';
 
 export const DatasetConfigSection: React.FC<{
   entity: string;
@@ -38,99 +39,57 @@ const DatasetPicker: React.FC<{
 }> = ({entity, project, setNewDatasetEditorMode}) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const refsQuery = useLatestDatasetRefs(entity, project);
-  const [newDatasetEditorMode, setNewDatasetEditorModeInternal] = useState<
-    'new-empty' | 'new-file'
-  >('new-empty');
-
-  const newDatasetOptions = useMemo(() => {
-    return [
-      {
-        label: 'Create new dataset',
-        value: 'new-empty',
-      },
-      {
-        label: 'Upload a file',
-        value: 'new-file',
-      },
-    ];
-  }, []);
-
-  const selectOptions = useMemo(() => {
-    return [
-      {
-        label: 'Create new dataset',
-        options: newDatasetOptions,
-      },
-      {
-        label: 'Load existing dataset',
-        options:
-          refsQuery.data?.map(ref => ({
-            label: refStringToName(ref),
-            value: ref,
-          })) ?? [],
-      },
-    ];
-  }, [refsQuery.data, newDatasetOptions]);
-
-  const selectedOption = useMemo(() => {
-    if (config.evaluationDefinition.properties.dataset.originalSourceRef) {
-      return {
-        label: refStringToName(
-          config.evaluationDefinition.properties.dataset.originalSourceRef
-        ),
-        value: config.evaluationDefinition.properties.dataset.originalSourceRef,
-      };
-    }
-    if (newDatasetEditorMode === 'new-empty') {
-      return selectOptions[0].options[0];
-    }
-    if (newDatasetEditorMode === 'new-file') {
-      return selectOptions[0].options[1];
-    }
-    return null;
-  }, [
-    config.evaluationDefinition.properties.dataset.originalSourceRef,
-    newDatasetEditorMode,
-    selectOptions,
-  ]);
 
   const setDatasetRef = useCallback(
     (datasetRef: string | null) => {
-      editConfig(draft => {
-        draft.evaluationDefinition.properties.dataset.originalSourceRef =
-          datasetRef;
-      });
+      // Don't update if the ref hasn't changed
+      const currentRef = config.evaluationDefinition.properties.dataset.originalSourceRef;
+      if (datasetRef === currentRef) {
+        return;
+      }
+      
+      if (datasetRef === 'new-empty' || datasetRef === 'new-file') {
+        // Handle special new dataset modes
+        const mode = datasetRef as 'new-empty' | 'new-file';
+        setNewDatasetEditorMode(mode);
+        editConfig(draft => {
+          draft.evaluationDefinition.properties.dataset.originalSourceRef = null;
+        });
+      } else {
+        // Set selected dataset ref
+        editConfig(draft => {
+          draft.evaluationDefinition.properties.dataset.originalSourceRef = datasetRef;
+        });
+      }
     },
-    [editConfig]
+    [editConfig, setNewDatasetEditorMode, config.evaluationDefinition.properties.dataset.originalSourceRef]
   );
 
-  if (refsQuery.loading) {
-    return <LoadingSelect />;
-  }
+  const currentRef = config.evaluationDefinition.properties.dataset.originalSourceRef;
+
+  // Dataset has two special "new" options
+  const datasetNewOptions = [
+    {
+      label: 'Start from scratch',
+      value: 'new-empty',
+    },
+    {
+      label: 'Upload a file',
+      value: 'new-file',
+    },
+  ];
 
   return (
-    <Select
-      blurInputOnSelect
-      options={selectOptions}
-      value={selectedOption}
-      onChange={option => {
-        // TODO: clean this up - this is super messy and needs to be refactored
-        if (option?.value === 'new-empty') {
-          setNewDatasetEditorMode('new-empty');
-          setNewDatasetEditorModeInternal('new-empty');
-
-          setDatasetRef(null);
-        } else if (option?.value === 'new-file') {
-          setNewDatasetEditorMode('new-file');
-          setNewDatasetEditorModeInternal('new-file');
-
-          setDatasetRef(null);
-        } else if (option) {
-          setDatasetRef(option.value);
-        } else {
-          setDatasetRef(null);
-        }
-      }}
+    <VersionedObjectPicker
+      entity={entity}
+      project={project}
+      objectType="dataset"
+      selectedRef={currentRef}
+      onRefChange={setDatasetRef}
+      latestObjectRefs={refsQuery.data ?? []}
+      loading={refsQuery.loading}
+      newOptions={datasetNewOptions}
+      allowNewOption={true}
     />
   );
 };

@@ -52,6 +52,7 @@ import {
   DELETED_CELL_STYLES,
 } from './CellRenderers';
 import {useDatasetEditContext} from './DatasetEditorContext';
+import {InlineCellRenderer} from './InlineCellRenderer';
 
 const ADDED_ROW_ID_PREFIX = 'new-';
 
@@ -81,6 +82,8 @@ export interface EditableDatasetViewProps {
   columnsBeforeData?: GridColDef[];
   columnsAfterData?: GridColDef[];
   columnGroups?: GridColumnGroup[];
+  // New prop for inline edit mode
+  inlineEditMode?: boolean;
 }
 
 interface OrderedRow {
@@ -101,12 +104,16 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   columnsBeforeData = [],
   columnsAfterData = [],
   columnGroups = [],
+  inlineEditMode = false,
 }) => {
   const {useTableRowsQuery, useTableQueryStats} = useWFHooks();
   const [sortBy, setSortBy] = useState<SortBy[]>([]);
   const [sortModel, setSortModel] = useState<GridSortModel>([]);
   const [columnWidths, setColumnWidths] = useState<{[key: string]: number}>({});
   const apiRef = useGridApiRef();
+
+  // Track which cell is currently being edited in inline mode
+  const [editingCell, setEditingCell] = useState<{id: string; field: string} | null>(null);
 
   const onSortModelChange = useCallback((model: GridSortModel) => {
     setSortBy(
@@ -480,6 +487,32 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
             </div>
           );
         }
+        
+        // Use inline renderer if inlineEditMode is enabled
+        if (inlineEditMode) {
+          const rowIndex = params.row.___weave?.index;
+          return (
+            <InlineCellRenderer
+              {...params}
+              isEdited={
+                rowIndex != null && !params.row.___weave?.isNew
+                  ? isFieldEdited(rowIndex, field as string)
+                  : false
+              }
+              isDeleted={deletedRows.includes(params.row.___weave?.index)}
+              isNew={params.row.___weave?.isNew}
+              serverValue={get(
+                loadedRows[rowIndex - offset]?.val ?? {},
+                field as string
+              )}
+              disableNewRowHighlight={disableNewRowHighlight}
+              preserveFieldOrder={preserveFieldOrder}
+              onCellEditStart={(cellParams) => setEditingCell(cellParams)}
+              onCellEditStop={() => setEditingCell(null)}
+            />
+          );
+        }
+        
         const rowIndex = params.row.___weave?.index;
 
         return (
@@ -528,6 +561,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     preserveFieldOrder,
     columnsBeforeData,
     columnsAfterData,
+    inlineEditMode,
   ]);
 
   const handleColumnWidthChange = useCallback((params: any) => {
@@ -731,6 +765,58 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     );
   }
 
+  // Keyboard navigation handler for inline edit mode
+  const handleCellKeyDown = useCallback(
+    (params: any, event: any) => {
+      if (!inlineEditMode || !isEditing || editingCell) {
+        return;
+      }
+
+      const {field, id} = params;
+      
+      // Start editing on Enter or F2
+      if (event.key === 'Enter' || event.key === 'F2') {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      
+      // Arrow key navigation when not editing
+      if (!editingCell && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        event.stopPropagation();
+        const api = apiRef.current;
+        const rowIds = api.getAllRowIds();
+        const currentRowIndex = rowIds.indexOf(id);
+        const columns = api.getAllColumns();
+        const currentColIndex = columns.findIndex(col => col.field === field);
+        
+        if (currentRowIndex !== -1 && currentColIndex !== -1) {
+          let newRowIndex = currentRowIndex;
+          let newColIndex = currentColIndex;
+          
+          switch (event.key) {
+            case 'ArrowUp':
+              newRowIndex = Math.max(0, currentRowIndex - 1);
+              break;
+            case 'ArrowDown':
+              newRowIndex = Math.min(rowIds.length - 1, currentRowIndex + 1);
+              break;
+            case 'ArrowLeft':
+              newColIndex = Math.max(0, currentColIndex - 1);
+              break;
+            case 'ArrowRight':
+              newColIndex = Math.min(columns.length - 1, currentColIndex + 1);
+              break;
+          }
+          
+          if (rowIds[newRowIndex] && columns[newColIndex]) {
+            api.setCellFocus(rowIds[newRowIndex], columns[newColIndex].field);
+          }
+        }
+      }
+    },
+    [inlineEditMode, isEditing, editingCell, apiRef]
+  );
+
   return (
     <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
       <ReusableDrawer
@@ -803,6 +889,15 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               },
             },
             lineHeight: '20px',
+            // Add focus styles for inline edit mode
+            ...(inlineEditMode && isEditing ? {
+              '&:focus': {
+                outline: 'none',
+              },
+              '&.Mui-focusVisible': {
+                outline: 'none',
+              },
+            } : {}),
           },
           // Removed default MUI blue from editing cell
           '.MuiDataGrid-cell.MuiDataGrid-cell--editing': {
@@ -853,6 +948,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
           },
         }}
         getRowId={(row: GridRowModel) => row.___weave?.id ?? row.id}
+        onCellKeyDown={handleCellKeyDown}
       />
     </div>
   );

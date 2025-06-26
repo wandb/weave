@@ -117,6 +117,49 @@ const EditableDatasetViewInner: React.FC<
           Save Changes
         </Button>
       }
+      inlineEditMode={true}
+      // columnsBeforeData={[
+      //   {
+      //     field: 'name_a',
+      //     headerName: 'Name_a',
+      //     width: 150,
+      //   },
+      //   {
+      //     field: 'name_b',
+      //     headerName: 'Name_b',
+      //     width: 150,
+      //   },
+      // ]}
+      // columnsAfterData={[
+      //   {
+      //     field: 'name_c',
+      //     headerName: 'Name_c',
+      //     width: 150,
+      //   },
+      //   {
+      //     field: 'name_d',
+      //     headerName: 'Name_d',
+      //     width: 150,
+      //   },
+      // ]}
+      // columnGroups={[
+      //   {
+      //     groupId: 'name_a',
+      //     headerName: 'Prefix',
+      //     children: [
+      //       {field: "name_a"},
+      //       {field: "name_b"}
+      //     ],
+      //   },
+      //   {
+      //     groupId: 'name_c',
+      //     headerName: 'Suffix',
+      //     children: [
+      //       {field: "name_c"},
+      //       {field: "name_d"}
+      //     ],
+      //   },
+      // ]}
     />
   );
 };
@@ -146,6 +189,7 @@ export const ExistingDatasetEditor: React.FC<{datasetRef: string}> = ({
             Save Changes
           </Button>
         }
+      inlineEditMode={true}
       />
     </DatasetEditProvider>
   );

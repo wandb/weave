@@ -171,3 +171,22 @@ export const runEvaluation = async (
   });
   return res.eval_call_ids;
 };
+
+
+export const getAllVersionsOfObject = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  objectId: string
+): Promise<string[]> => {
+  const res = await client.objsQuery({
+    project_id: `${entity}/${project}`,
+    filter: {
+      object_ids: [objectId],
+    },
+    sort_by: [{field: 'created_at', direction: 'desc'}],
+    limit: 1000,
+    metadata_only: true,
+  });
+  return res.objs.map(o => makeRefObject(entity, project, 'object', o.object_id, o.digest, undefined));
+};

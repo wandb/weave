@@ -14,6 +14,7 @@ import {useEvaluationExplorerPageContext} from './context';
 import {clientBound, hookify} from './hooks';
 import {Column, ConfigSection, Row} from './layout';
 import {getLatestModelRefs} from './query';
+import {VersionedObjectPicker} from './VersionedObjectPicker';
 
 // Default option for creating a new model from scratch
 const newModelOption = {
@@ -24,6 +25,50 @@ const newModelOption = {
 // Create the hook for fetching model refs
 // This wraps the async query function in a React hook that manages loading/error states
 const useLatestModelRefs = clientBound(hookify(getLatestModelRefs));
+
+/**
+ * Drawer component for configuring model details.
+ * Provides a form interface for editing model properties like name, prompts, and output schema.
+ *
+ * @param entity - The Weave entity (organization/user)
+ * @param project - The Weave project
+ * @param open - Whether the drawer is open
+ * @param onClose - Callback when drawer closes, receives new model ref if saved
+ * @param initialModel - Existing model data to edit (optional)
+ */
+const ModelDrawer: React.FC<{
+  entity: string;
+  project: string;
+  open: boolean;
+  onClose: (newModelRef?: string) => void;
+  initialModelRef?: string;
+}> = ({entity, project, open, onClose, initialModelRef}) => {
+  const modelFormRef = useRef<ModelConfigurationFormRef | null>(null);
+
+  const onSave = useCallback(async () => {
+    const newModelRef = await modelFormRef.current?.saveModel();
+    onClose(newModelRef);
+  }, [onClose]);
+
+  return (
+    <ReusableDrawer
+      open={open}
+      onClose={() => onClose()}
+      title="Model Configuration"
+      onSave={onSave}>
+      <Tailwind>
+        <ModelConfigurationForm
+          key={initialModelRef ?? 'new-model'}
+          ref={modelFormRef}
+          initialModelRef={initialModelRef ?? undefined}
+          onValidationChange={() => {
+            // Pass - validation is handled internally by the form
+          }}
+        />
+      </Tailwind>
+    </ReusableDrawer>
+  );
+};
 
 /**
  * Configuration section for managing models in the evaluation.
@@ -137,12 +182,18 @@ export const ModelsConfigSection: React.FC<{
           return (
             <Row key={modelNdx} style={{alignItems: 'center', gap: '8px'}}>
               <div style={{flex: 1}}>
-                <Select
-                  options={options}
-                  value={selectedOption}
-                  onChange={option => {
-                    updateModelRef(modelNdx, option?.value ?? null);
+                <VersionedObjectPicker
+                  entity={entity}
+                  project={project}
+                  objectType="model"
+                  selectedRef={model.originalSourceRef}
+                  onRefChange={(ref) => {
+                    updateModelRef(modelNdx, ref);
                   }}
+                  latestObjectRefs={modelRefsQuery.data ?? []}
+                  loading={modelRefsQuery.loading}
+                  newOptions={[{label: "New Model", value: "new-model"}]}
+                  allowNewOption={true}
                 />
               </div>
               <Button
@@ -201,49 +252,5 @@ export const ModelsConfigSection: React.FC<{
         />
       </Column>
     </ConfigSection>
-  );
-};
-
-/**
- * Drawer component for configuring model details.
- * Provides a form interface for editing model properties like name, prompts, and output schema.
- *
- * @param entity - The Weave entity (organization/user)
- * @param project - The Weave project
- * @param open - Whether the drawer is open
- * @param onClose - Callback when drawer closes, receives new model ref if saved
- * @param initialModel - Existing model data to edit (optional)
- */
-const ModelDrawer: React.FC<{
-  entity: string;
-  project: string;
-  open: boolean;
-  onClose: (newModelRef?: string) => void;
-  initialModelRef?: string;
-}> = ({entity, project, open, onClose, initialModelRef}) => {
-  const modelFormRef = useRef<ModelConfigurationFormRef | null>(null);
-
-  const onSave = useCallback(async () => {
-    const newModelRef = await modelFormRef.current?.saveModel();
-    onClose(newModelRef);
-  }, [onClose]);
-
-  return (
-    <ReusableDrawer
-      open={open}
-      onClose={() => onClose()}
-      title="Model Configuration"
-      onSave={onSave}>
-      <Tailwind>
-        <ModelConfigurationForm
-          key={initialModelRef ?? 'new-model'}
-          ref={modelFormRef}
-          initialModelRef={initialModelRef ?? undefined}
-          onValidationChange={() => {
-            // Pass - validation is handled internally by the form
-          }}
-        />
-      </Tailwind>
-    </ReusableDrawer>
   );
 };
