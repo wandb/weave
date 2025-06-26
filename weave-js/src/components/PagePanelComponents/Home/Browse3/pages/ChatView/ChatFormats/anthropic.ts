@@ -109,23 +109,27 @@ export const normalizeAnthropicChatRequest = (
     if (typeof message.content === 'string' || !message.content) {
       return [message];
     }
-    
+
     // Handle array content (Anthropic format)
     if (Array.isArray(message.content)) {
       // Check if this is a tool_result message
-      const toolResult = message.content.find((part: any) => part.type === 'tool_result');
+      const toolResult = message.content.find(
+        (part: any) => part.type === 'tool_result'
+      );
       if (toolResult) {
-        return [{
-          role: 'tool',
-          content: toolResult.content,
-          tool_call_id: toolResult.tool_use_id,
-        }];
+        return [
+          {
+            role: 'tool',
+            content: toolResult.content,
+            tool_call_id: toolResult.tool_use_id,
+          },
+        ];
       }
-      
+
       // Extract tool uses and text content
       const textParts: any[] = [];
       const toolCalls: any[] = [];
-      
+
       message.content.forEach((part: any) => {
         if (part.type === 'text') {
           textParts.push(part.text);
@@ -140,24 +144,24 @@ export const normalizeAnthropicChatRequest = (
           });
         }
       });
-      
+
       // Build the normalized message
       const normalizedMessage: any = {
         ...message,
         content: textParts.length > 0 ? textParts.join('') : null,
       };
-      
+
       if (toolCalls.length > 0) {
         normalizedMessage.tool_calls = toolCalls;
       }
-      
+
       return [normalizedMessage];
     }
-    
+
     // Return message as-is for other formats
     return [message];
   });
-  
+
   // Add system message if present
   if (request.system) {
     return {
@@ -171,7 +175,7 @@ export const normalizeAnthropicChatRequest = (
       ],
     };
   }
-  
+
   return {
     ...request,
     messages: normalizedMessages,
