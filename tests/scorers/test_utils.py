@@ -6,7 +6,12 @@ import torch
 from pydantic import BaseModel
 from torch import Tensor
 
-from weave.scorers.utils import download_model_from_wandb, download_model_from_huggingface_hub, load_hf_model_weights, stringify
+from weave.scorers.utils import (
+    download_model_from_huggingface_hub,
+    download_model_from_wandb,
+    load_hf_model_weights,
+    stringify,
+)
 
 # Model paths for various scorers (W&B artifacts)
 TINY_MODEL_PATHS = {
@@ -128,7 +133,9 @@ def test_download_model_custom_env_var():
 
 def test_download_model_from_huggingface_hub():
     """Test downloading a model from Hugging Face Hub."""
-    tiny_model_path = download_model_from_huggingface_hub(TINY_HF_MODEL_PATHS["bias_scorer"])
+    tiny_model_path = download_model_from_huggingface_hub(
+        TINY_HF_MODEL_PATHS["bias_scorer"]
+    )
     assert os.path.exists(tiny_model_path)
     assert os.path.isdir(tiny_model_path)
 

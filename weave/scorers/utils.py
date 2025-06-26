@@ -77,6 +77,7 @@ def download_model_from_huggingface_hub(model_name: str) -> str:
         str: Path to the downloaded model directory.
     """
     from huggingface_hub import snapshot_download
+
     model_dir_name = model_name.split("/")[-1].replace(":", "_")
     local_dir = Path(scorers_dir()) / model_dir_name
     return snapshot_download(model_name, local_dir=str(local_dir))
@@ -87,9 +88,10 @@ def load_hf_model_weights(
 ) -> str:
     """Load the local model weights for a Hugging Face model.
 
-    If model_name_or_path is a directory, it is assumed to be the local model weights path.
-    If model_name_or_path is provided and there is no default_model set, first try laod the model from a local dir and then from wandb artifacts if it fails.
-    If a default_model is supplied, it downloads the default model from the Hugging Face Hub.
+    If a default_model is supplied, it downloads the default model from the
+    Hugging Face Hub. Otherwise, if model_name_or_path is a directory, it is
+    assumed to be the local model weights path. If model_name_or_path is provided
+    and is not a local directory, it will be downloaded from wandb artifacts.
 
     Args:
         model_name_or_path (str): The path or name of the model.
@@ -103,13 +105,14 @@ def load_hf_model_weights(
     """
     import os
 
-    if not model_name_or_path and not default_model:
-        raise ValueError("No model_name_or_path or no default_model provided, please set one of the two.")
-
     if default_model:
         return str(download_model_from_huggingface_hub(default_model))
 
-    if os.path.isdir(model_name_or_path):
-        return model_name_or_path
     if model_name_or_path:
+        if os.path.isdir(model_name_or_path):
+            return model_name_or_path
         return str(download_model_from_wandb(model_name_or_path))
+
+    raise ValueError(
+        "No model_name_or_path or no default_model provided, please set one of the two."
+    )
