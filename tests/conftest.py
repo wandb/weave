@@ -101,6 +101,12 @@ def pytest_addoption(parser):
         help="Specify the client object to use: sqlite or clickhouse",
     )
     parser.addoption(
+        "--ch",
+        "--clickhouse",
+        action="store_true",
+        help="Use clickhouse server (shorthand for --weave-server=clickhouse)",
+    )
+    parser.addoption(
         "--clickhouse-process",
         action="store",
         default="false",
@@ -204,7 +210,7 @@ class ThrowingServer(tsi.TraceServerInterface):
         raise DummyTestException("FAILURE - feedback_purge, req:", req)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_with_throwing_server(client):
     curr_server = client.server
     client.server = ThrowingServer()
@@ -468,11 +474,11 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     class ServerRecorder(type(server)):  # type: ignore
         attribute_access_log: list[str]
 
-        def __init__(self, server: tsi.TraceServerInterface):  # type: ignore
+        def __init__(self, server: tsi.TraceServerInterface):  # noqa: N804, type: ignore
             self.server = server
             self.attribute_access_log = []
 
-        def __getattribute__(self, name):
+        def __getattribute__(self, name):  # noqa: N804
             self_server = super().__getattribute__("server")
             access_log = super().__getattribute__("attribute_access_log")
             if name == "server":
@@ -494,6 +500,11 @@ def create_client(
 ) -> weave_init.InitializedClient:
     inited_client = None
     weave_server_flag = request.config.getoption("--weave-server")
+
+    # Check if -ch/--clickhouse flag is used
+    if request.config.getoption("--clickhouse"):
+        weave_server_flag = "clickhouse"
+
     server: tsi.TraceServerInterface
     entity = "shawn"
     project = "test-project"
@@ -553,7 +564,7 @@ def zero_stack():
         yield
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(zero_stack, request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
@@ -565,7 +576,7 @@ def client(zero_stack, request):
         autopatch.reset_autopatch()
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_creator(zero_stack, request):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 

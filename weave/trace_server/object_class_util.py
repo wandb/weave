@@ -26,20 +26,22 @@ class GetObjectClassesResult(TypedDict):
 
 
 def get_object_classes(val: Any) -> Optional[GetObjectClassesResult]:
-    if isinstance(val, dict):
-        if "_bases" in val:
-            if isinstance(val["_bases"], list):
-                if len(val["_bases"]) >= 2:
-                    if val["_bases"][-1] == "BaseModel":
-                        if val["_bases"][-2] in base_object_class_names:
-                            object_class = val["_class_name"]
-                            base_object_class = object_class
-                            if len(val["_bases"]) > 2:
-                                base_object_class = val["_bases"][-3]
-                            return GetObjectClassesResult(
-                                object_class=object_class,
-                                base_object_class=base_object_class,
-                            )
+    if (
+        isinstance(val, dict)
+        and "_bases" in val
+        and isinstance(val["_bases"], list)
+        and len(val["_bases"]) >= 2
+        and val["_bases"][-1] == "BaseModel"
+        and val["_bases"][-2] in base_object_class_names
+    ):
+        object_class = val["_class_name"]
+        base_object_class = object_class
+        if len(val["_bases"]) > 2:
+            base_object_class = val["_bases"][-3]
+        return GetObjectClassesResult(
+            object_class=object_class,
+            base_object_class=base_object_class,
+        )
     return None
 
 

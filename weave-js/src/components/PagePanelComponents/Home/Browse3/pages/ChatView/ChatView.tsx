@@ -1,6 +1,7 @@
 import {Callout} from '@wandb/weave/components/Callout';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {useEffect, useMemo, useRef} from 'react';
+import {usePrevious} from 'react-use';
 
 import {useDeepMemo} from '../../../../../../hookUtils';
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
@@ -48,16 +49,16 @@ export const ChatView = ({chat}: ChatViewProps) => {
     [chatResult]
   );
 
+  const currentMessageCount = chat.request?.messages?.length || 0;
+  const previousMessageCount = usePrevious(currentMessageCount) || 0;
+
   useEffect(() => {
-    if (
-      outputRef.current &&
-      chatResult &&
-      'choices' in chatResult &&
-      chatResult.choices
-    ) {
+    const hasNewMessage = currentMessageCount > previousMessageCount;
+
+    if (hasNewMessage && outputRef.current) {
       outputRef.current.scrollIntoView();
     }
-  }, [chatResult]);
+  }, [currentMessageCount, previousMessageCount]);
 
   return (
     <div className="flex flex-col pb-32">
