@@ -57,6 +57,7 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const [startedWithChar, setStartedWithChar] = useState(false);
   const [appendedContent, setAppendedContent] = useState(false);
+  const [lastCursorPosition, setLastCursorPosition] = useState<number | null>(null);
 
   const isWeaveUrl = isRefPrefixedString(value);
   const isJsonList = Array.isArray(value);
@@ -113,6 +114,11 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Don't handle keys if an input/textarea is focused (they should handle their own keys)
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
       if (!isEditing && (e.key === 'Enter' || e.key === 'F2')) {
         e.preventDefault();
         e.stopPropagation();
@@ -168,47 +174,58 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
         }
         return;
       }
+    },
+    [isEditing, isEditable, value, handleUpdateValue, startEditing, isJsonList, onCellEditStart, id, field]
+  );
 
-      if (isEditing) {
-        switch (e.key) {
-          case 'Enter':
-            if (!e.shiftKey) {
-              e.preventDefault();
-              e.stopPropagation();
-              stopEditing(true);
-              // Move to next row
-              const rowIds = api?.getAllRowIds() || [];
-              const currentRowIndex = rowIds.indexOf(id as string);
-              if (currentRowIndex !== -1 && currentRowIndex < rowIds.length - 1) {
-                api?.setCellFocus(rowIds[currentRowIndex + 1], field);
-              }
+  // Separate handler for edit mode - only intercept specific keys
+  const handleEditKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      switch (e.key) {
+        case 'Enter':
+          // For multiline content, Enter adds newlines, Ctrl/Cmd+Enter saves
+          const isMultilineContent = isJsonList || (typeof editedValue === 'string' && (editedValue.includes('\n') || editedValue.length > 50));
+          
+          if (isMultilineContent && !e.ctrlKey && !e.metaKey) {
+            // Let the default behavior happen (add newline)
+            return;
+          }
+          
+          // Save on Enter for single-line, or Ctrl/Cmd+Enter for multiline
+          e.preventDefault();
+          e.stopPropagation();
+          stopEditing(true);
+          
+          // Move to next row only for single-line content
+          if (!isMultilineContent) {
+            const rowIds = api?.getAllRowIds() || [];
+            const currentRowIndex = rowIds.indexOf(id as string);
+            if (currentRowIndex !== -1 && currentRowIndex < rowIds.length - 1) {
+              api?.setCellFocus(rowIds[currentRowIndex + 1], field);
             }
-            break;
-          case 'Tab':
-            e.preventDefault();
-            e.stopPropagation();
-            stopEditing(true);
-            // Check if we're at the last cell and Tab was pressed (not Shift+Tab)
-            if (isLastCell && !e.shiftKey && onTabAtEnd) {
-              onTabAtEnd();
-            }
-            // Let DataGrid handle Tab navigation
-            break;
-          case 'Escape':
-            e.preventDefault();
-            e.stopPropagation();
-            stopEditing(false);
-            break;
-          case 'ArrowUp':
-          case 'ArrowDown':
-          case 'ArrowLeft':
-          case 'ArrowRight':
-            // Only navigate cells if not editing or if modifier keys are pressed
-            if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-              // Let arrow keys work normally in the input/textarea
-              return;
-            }
-            // If modifier keys are pressed, stop editing and navigate
+          }
+          break;
+        case 'Tab':
+          e.preventDefault();
+          e.stopPropagation();
+          stopEditing(true);
+          // Check if we're at the last cell and Tab was pressed (not Shift+Tab)
+          if (isLastCell && !e.shiftKey && onTabAtEnd) {
+            onTabAtEnd();
+          }
+          // Let DataGrid handle Tab navigation
+          break;
+        case 'Escape':
+          e.preventDefault();
+          e.stopPropagation();
+          stopEditing(false);
+          break;
+        case 'ArrowUp':
+        case 'ArrowDown':
+        case 'ArrowLeft':
+        case 'ArrowRight':
+          // Only navigate cells if modifier keys are pressed
+          if (e.shiftKey || e.ctrlKey || e.metaKey) {
             e.preventDefault();
             e.stopPropagation();
             stopEditing(true);
@@ -242,11 +259,13 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
                 api?.setCellFocus(rowIds[newRowIndex], columns[newColIndex].field);
               }
             }
-            break;
-        }
+          }
+          // Let arrow keys work normally for text navigation when no modifiers
+          break;
+        // Don't handle any other keys - let them work normally
       }
     },
-    [isEditing, startEditing, stopEditing, api, id, field]
+    [editedValue, isJsonList, stopEditing, api, id, field, isLastCell, onTabAtEnd]
   );
 
   useEffect(() => {
@@ -259,6 +278,11 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
           inputRef.current.setSelectionRange(1, 1);
           setStartedWithChar(false);
           setAppendedContent(false);
+        } else if (lastCursorPosition !== null) {
+          // Restore cursor position when switching between input types
+          const pos = Math.min(lastCursorPosition, inputRef.current.value.length);
+          inputRef.current.setSelectionRange(pos, pos);
+          setLastCursorPosition(null);
         } else {
           // Put cursor at end when appending or normal editing
           const length = inputRef.current.value.length;
@@ -268,7 +292,7 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
         }
       }
     }
-  }, [isEditing, startedWithChar, appendedContent]);
+  }, [isEditing, startedWithChar, appendedContent, lastCursorPosition]);
 
   const getBackgroundColor = () => {
     if (isDeleted) {
@@ -351,7 +375,12 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
   // Editing mode
   if (isEditing) {
     const isNumber = typeof value === 'number';
-    const isMultiline = isJsonList || (typeof value === 'string' && value.includes('\n'));
+    // Switch to multiline for JSON, existing newlines, or long text
+    const isMultiline = isJsonList || 
+      (typeof editedValue === 'string' && (
+        editedValue.includes('\n') || 
+        editedValue.length > 50
+      ));
     
     return (
       <Box
@@ -362,33 +391,65 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
           width: '100%',
           border: '2px solid rgb(77, 208, 225)',
           backgroundColor: 'rgba(77, 208, 225, 0.1)',
+          position: 'relative',
         }}>
         {isMultiline ? (
-          <textarea
-            ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-            value={isJsonList ? JSON.stringify(editedValue, null, 2) : String(editedValue)}
-            onChange={e => setEditedValue(isJsonList ? e.target.value : e.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={() => stopEditing(true)}
-            style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              outline: 'none',
-              background: 'none',
-              padding: '4px 8px',
-              fontFamily: 'monospace',
-              fontSize: '12px',
-              resize: 'none',
-            }}
-          />
+          <>
+            <textarea
+              ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+              value={isJsonList ? JSON.stringify(editedValue, null, 2) : String(editedValue)}
+              onChange={e => {
+                setEditedValue(isJsonList ? e.target.value : e.target.value);
+                // Track cursor position for smooth transitions
+                setLastCursorPosition(e.target.selectionStart);
+              }}
+              onKeyDown={handleEditKeyDown}
+              onBlur={() => stopEditing(true)}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                outline: 'none',
+                background: 'none',
+                padding: '4px 8px',
+                fontFamily: isJsonList ? 'monospace' : 'inherit',
+                fontSize: isJsonList ? '12px' : 'inherit',
+                resize: 'none',
+                lineHeight: '1.5',
+              }}
+              placeholder={isJsonList ? 'Enter JSON array...' : 'Enter text...'}
+            />
+            <CellTooltip title="Enter for new line, Ctrl+Enter to save" placement="top">
+              <Box
+                sx={{
+                  position: 'absolute',
+                  bottom: 2,
+                  right: 4,
+                  opacity: 0.5,
+                  fontSize: '10px',
+                  color: 'text.secondary',
+                  pointerEvents: 'none',
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  padding: '0 2px',
+                  borderRadius: '2px',
+                }}>
+                ⌃↵
+              </Box>
+            </CellTooltip>
+          </>
         ) : (
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type={isNumber ? 'number' : 'text'}
             value={String(editedValue)}
-            onChange={e => setEditedValue(isNumber ? Number(e.target.value) : e.target.value)}
-            onKeyDown={handleKeyDown}
+            onChange={e => {
+              setEditedValue(isNumber ? Number(e.target.value) : e.target.value);
+              // Track cursor position for smooth transitions
+              if (!isNumber) {
+                setLastCursorPosition(e.target.selectionStart);
+              }
+            }}
+            onKeyDown={handleEditKeyDown}
             onBlur={() => stopEditing(true)}
             style={{
               width: '100%',
@@ -400,6 +461,7 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
               fontFamily: 'inherit',
               fontSize: 'inherit',
             }}
+            placeholder={isNumber ? 'Enter number...' : 'Enter text...'}
           />
         )}
       </Box>
