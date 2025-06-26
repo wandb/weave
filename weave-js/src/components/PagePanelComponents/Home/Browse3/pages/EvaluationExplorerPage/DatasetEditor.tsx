@@ -109,7 +109,7 @@ const EditableDatasetViewInner: React.FC<
       hideRemoveForAddedRows={false}
       showAddRowButton={true}
       hideIdColumn={true}
-      disableNewRowHighlight={true}
+      // disableNewRowHighlight={true}
       isNewDataset={true}
       footerHeight={HEADER_HEIGHT_PX}
       extraFooterContent={
@@ -118,6 +118,7 @@ const EditableDatasetViewInner: React.FC<
         </Button>
       }
       inlineEditMode={true}
+      autoAddRows={true}
       // columnsBeforeData={[
       //   {
       //     field: 'name_a',

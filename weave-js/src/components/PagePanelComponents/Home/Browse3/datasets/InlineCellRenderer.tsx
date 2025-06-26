@@ -21,6 +21,9 @@ interface InlineCellProps extends GridRenderCellParams {
   preserveFieldOrder?: (row: any) => any;
   onCellEditStart?: (params: {id: string; field: string}) => void;
   onCellEditStop?: () => void;
+  isLastCell?: boolean;
+  onTabAtEnd?: () => void;
+  rowHasContent?: boolean;
 }
 
 /**
@@ -44,11 +47,16 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
   api,
   onCellEditStart,
   onCellEditStop,
+  isLastCell,
+  onTabAtEnd,
+  rowHasContent = true,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedValue, setEditedValue] = useState(value);
   const {updateCellValue} = useDatasetEditContext();
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const [startedWithChar, setStartedWithChar] = useState(false);
+  const [appendedContent, setAppendedContent] = useState(false);
 
   const isWeaveUrl = isRefPrefixedString(value);
   const isJsonList = Array.isArray(value);
@@ -69,6 +77,8 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
     if (isEditable && !isEditing) {
       setIsEditing(true);
       setEditedValue(value);
+      setStartedWithChar(false);
+      setAppendedContent(false);
       onCellEditStart?.({id: id as string, field});
     }
   }, [isEditable, isEditing, value, onCellEditStart, id, field]);
@@ -110,6 +120,55 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
         return;
       }
 
+      // Start editing immediately if a printable character is typed
+      if (!isEditing && isEditable && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // For numbers, start with the typed digit
+        if (typeof value === 'number' && /^\d$/.test(e.key)) {
+          setEditedValue(Number(e.key));
+          setAppendedContent(false);
+        } else if (typeof value === 'number' && (e.key === '-' || e.key === '.')) {
+          // Allow starting with negative or decimal for numbers
+          setEditedValue(e.key === '-' ? '-' : '0.');
+          setAppendedContent(false);
+        } else if (typeof value !== 'number') {
+          // For text values, handle space specially to append instead of replace
+          if (e.key === ' ' && typeof value === 'string') {
+            setEditedValue(value + ' ');
+            setAppendedContent(true);
+          } else {
+            // Replace content with the typed character
+            setEditedValue(e.key);
+            setAppendedContent(false);
+          }
+        }
+        
+        setIsEditing(true);
+        setStartedWithChar(true);
+        onCellEditStart?.({id: id as string, field});
+        
+        // Focus will be set by the useEffect
+        return;
+      }
+
+      // Handle Delete or Backspace to clear cell when not editing
+      if (!isEditing && isEditable && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Clear the cell value
+        if (typeof value === 'number') {
+          handleUpdateValue(0);
+        } else if (isJsonList) {
+          handleUpdateValue([]);
+        } else {
+          handleUpdateValue('');
+        }
+        return;
+      }
+
       if (isEditing) {
         switch (e.key) {
           case 'Enter':
@@ -129,6 +188,10 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
             e.preventDefault();
             e.stopPropagation();
             stopEditing(true);
+            // Check if we're at the last cell and Tab was pressed (not Shift+Tab)
+            if (isLastCell && !e.shiftKey && onTabAtEnd) {
+              onTabAtEnd();
+            }
             // Let DataGrid handle Tab navigation
             break;
           case 'Escape':
@@ -140,39 +203,43 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
           case 'ArrowDown':
           case 'ArrowLeft':
           case 'ArrowRight':
+            // Only navigate cells if not editing or if modifier keys are pressed
             if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-              e.preventDefault();
-              e.stopPropagation();
-              stopEditing(true);
+              // Let arrow keys work normally in the input/textarea
+              return;
+            }
+            // If modifier keys are pressed, stop editing and navigate
+            e.preventDefault();
+            e.stopPropagation();
+            stopEditing(true);
+            
+            // Navigate to the appropriate cell
+            const rowIds = api?.getAllRowIds() || [];
+            const currentRowIndex = rowIds.indexOf(id as string);
+            const columns = api?.getAllColumns() || [];
+            const currentColIndex = columns.findIndex(col => col.field === field);
+            
+            if (currentRowIndex !== -1 && currentColIndex !== -1) {
+              let newRowIndex = currentRowIndex;
+              let newColIndex = currentColIndex;
               
-              // Navigate to the appropriate cell
-              const rowIds = api?.getAllRowIds() || [];
-              const currentRowIndex = rowIds.indexOf(id as string);
-              const columns = api?.getAllColumns() || [];
-              const currentColIndex = columns.findIndex(col => col.field === field);
+              switch (e.key) {
+                case 'ArrowUp':
+                  newRowIndex = Math.max(0, currentRowIndex - 1);
+                  break;
+                case 'ArrowDown':
+                  newRowIndex = Math.min(rowIds.length - 1, currentRowIndex + 1);
+                  break;
+                case 'ArrowLeft':
+                  newColIndex = Math.max(0, currentColIndex - 1);
+                  break;
+                case 'ArrowRight':
+                  newColIndex = Math.min(columns.length - 1, currentColIndex + 1);
+                  break;
+              }
               
-              if (currentRowIndex !== -1 && currentColIndex !== -1) {
-                let newRowIndex = currentRowIndex;
-                let newColIndex = currentColIndex;
-                
-                switch (e.key) {
-                  case 'ArrowUp':
-                    newRowIndex = Math.max(0, currentRowIndex - 1);
-                    break;
-                  case 'ArrowDown':
-                    newRowIndex = Math.min(rowIds.length - 1, currentRowIndex + 1);
-                    break;
-                  case 'ArrowLeft':
-                    newColIndex = Math.max(0, currentColIndex - 1);
-                    break;
-                  case 'ArrowRight':
-                    newColIndex = Math.min(columns.length - 1, currentColIndex + 1);
-                    break;
-                }
-                
-                if (rowIds[newRowIndex] && columns[newColIndex]) {
-                  api?.setCellFocus(rowIds[newRowIndex], columns[newColIndex].field);
-                }
+              if (rowIds[newRowIndex] && columns[newColIndex]) {
+                api?.setCellFocus(rowIds[newRowIndex], columns[newColIndex].field);
               }
             }
             break;
@@ -185,9 +252,23 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select();
+      // Place cursor at end, or after first character if we started by typing
+      if ('setSelectionRange' in inputRef.current) {
+        if (startedWithChar && !appendedContent) {
+          // Put cursor after the first character when we replaced content
+          inputRef.current.setSelectionRange(1, 1);
+          setStartedWithChar(false);
+          setAppendedContent(false);
+        } else {
+          // Put cursor at end when appending or normal editing
+          const length = inputRef.current.value.length;
+          inputRef.current.setSelectionRange(length, length);
+          setStartedWithChar(false);
+          setAppendedContent(false);
+        }
+      }
     }
-  }, [isEditing]);
+  }, [isEditing, startedWithChar, appendedContent]);
 
   const getBackgroundColor = () => {
     if (isDeleted) {
@@ -353,6 +434,20 @@ export const InlineCellRenderer: React.FC<InlineCellProps> = ({
       <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
         {isJsonList ? JSON.stringify(value) : String(value ?? '')}
       </span>
+      {isLastCell && onTabAtEnd && rowHasContent && (
+        <CellTooltip title="Press Tab to add a new row" placement="left">
+          <Box
+            sx={{
+              marginLeft: 'auto',
+              paddingLeft: '4px',
+              opacity: 0.5,
+              fontSize: '10px',
+              color: 'text.secondary',
+            }}>
+            Tab →
+          </Box>
+        </CellTooltip>
+      )}
     </Box>
   );
 }; 
