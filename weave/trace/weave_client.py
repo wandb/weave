@@ -628,7 +628,6 @@ class Call:
                 "Can't get children of call without ID, was `weave.init` called?"
             )
 
-        client = weave_client_context.require_weave_client()
         return _make_calls_iterator(
             client.server,
             self.project_id,
