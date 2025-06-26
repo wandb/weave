@@ -1,6 +1,6 @@
 import {Select} from '@wandb/weave/components/Form/Select';
 import {parseWeaveRef} from '@wandb/weave/react';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {LoadingSelect} from './components';
@@ -40,6 +40,7 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [objectVersions, setObjectVersions] = useState<string[]>([]);
   const [pendingObjectId, setPendingObjectId] = useState<string | null>(null);
+  const hasSetDefaultRef = useRef(false);
 
   // Default new options if not provided
   const effectiveNewOptions = useMemo(() => {
@@ -57,10 +58,45 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
     ];
   }, [newOptions, objectType]);
 
+  // Auto-select the default option when mounting with null ref
+  useEffect(() => {
+    if (
+      !hasSetDefaultRef.current &&
+      selectedRef === null &&
+      allowNewOption &&
+      effectiveNewOptions.length > 0
+    ) {
+      // Propagate the default selection to parent
+      hasSetDefaultRef.current = true;
+      onRefChange(effectiveNewOptions[0].value);
+    } else if (selectedRef !== null) {
+      // Reset the flag when user makes an explicit selection
+      hasSetDefaultRef.current = true;
+    }
+  }, [selectedRef, allowNewOption, effectiveNewOptions, onRefChange]);
+
   // Check if current value is a "new" option
   const isNewOption = useMemo(() => {
     return effectiveNewOptions.some(opt => opt.value === selectedRef);
   }, [effectiveNewOptions, selectedRef]);
+
+  // When there's no selection, we want to show the first new option as placeholder
+  // but NOT actually select it (which would put us in new option mode)
+  const displayValue = useMemo(() => {
+    if (
+      selectedRef === null &&
+      allowNewOption &&
+      effectiveNewOptions.length > 0
+    ) {
+      // Return the first new option for display only
+      return effectiveNewOptions[0];
+    }
+    // For actual selections, find the matching option
+    if (selectedRef && isNewOption) {
+      return effectiveNewOptions.find(opt => opt.value === selectedRef);
+    }
+    return null;
+  }, [selectedRef, allowNewOption, effectiveNewOptions, isNewOption]);
 
   // Extract object ID from the selected ref
   const selectedObjectId = useMemo(() => {
@@ -68,7 +104,7 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
     if (pendingObjectId) {
       return pendingObjectId;
     }
-    // Otherwise extract from ref
+    // Otherwise extract from ref - use actual selectedRef, not display value
     if (selectedRef && !isNewOption) {
       const parsedRef = parseWeaveRef(selectedRef);
       return parsedRef.artifactName;
@@ -120,12 +156,16 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
     onRefChange,
   ]);
 
-  // Clear pending when ref changes externally
+  // Clear pending when ref changes externally (but not when it's null)
   useEffect(() => {
-    if (selectedRef) {
-      setPendingObjectId(null);
+    if (selectedRef && pendingObjectId) {
+      // Only clear if we have a ref and it matches what we were pending
+      const parsedRef = parseWeaveRef(selectedRef);
+      if (parsedRef.artifactName === pendingObjectId) {
+        setPendingObjectId(null);
+      }
     }
-  }, [selectedRef]);
+  }, [selectedRef, pendingObjectId]);
 
   // Group objects by their ID (name)
   const objectGroups = useMemo(() => {
@@ -236,13 +276,30 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
     );
   }
 
-  // Determine selected values
-  const selectedObjectOption = selectedObjectId
-    ? {
-        label: selectedObjectId,
-        value: selectedObjectId,
-      }
-    : null;
+  // Determine selected values for the two-dropdown mode
+  let selectedObjectOption = null;
+
+  if (pendingObjectId) {
+    // When we have a pending object selection, show that
+    selectedObjectOption = {
+      label: pendingObjectId,
+      value: pendingObjectId,
+    };
+  } else if (selectedRef === null && displayValue) {
+    // When nothing is selected, use the display value (e.g., "Start from scratch")
+    selectedObjectOption = displayValue;
+  } else if (isNewOption && selectedRef) {
+    // If a new option is actually selected, find it
+    selectedObjectOption = effectiveNewOptions.find(
+      opt => opt.value === selectedRef
+    );
+  } else if (selectedObjectId) {
+    // Otherwise use the object ID
+    selectedObjectOption = {
+      label: selectedObjectId,
+      value: selectedObjectId,
+    };
+  }
 
   const selectedVersionOption =
     selectedRef && selectedObjectId && !isNewOption
@@ -264,7 +321,7 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
         />
       </div>
 
-      {selectedObjectId && !isNewOption && (
+      {(selectedObjectId || pendingObjectId) && !isNewOption && (
         <>
           <span style={{color: '#666', flex: '0 0 auto'}}>→</span>
           <div style={{flex: '0 0 40%'}}>
