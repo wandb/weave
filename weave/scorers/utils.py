@@ -9,7 +9,7 @@ from weave.scorers.default_models import MODEL_PATHS
 from weave.trace.settings import scorers_dir
 
 
-def download_model(artifact_path: Union[str, Path]) -> Path:
+def download_model_from_wandb(artifact_path: Union[str, Path]) -> Path:
     try:
         from wandb import Api
     except ImportError:
@@ -65,14 +65,31 @@ def ensure_hf_imports() -> None:
         )
 
 
+def download_model_from_huggingface_hub(model_name: str) -> str:
+    """
+    Download a model from the Hugging Face Hub to a specified directory.
+
+    Args:
+        model_name (str): The name of the model on Hugging Face Hub.
+        local_dir (str or Path, optional): Directory to download the model to. Defaults to scorers_dir()/model_name.
+
+    Returns:
+        str: Path to the downloaded model directory.
+    """
+    from huggingface_hub import snapshot_download
+    model_dir_name = model_name.split("/")[-1].replace(":", "_")
+    local_dir = Path(scorers_dir()) / model_dir_name
+    return snapshot_download(model_name, local_dir=str(local_dir))
+
+
 def load_hf_model_weights(
-    model_name_or_path: str, default_model: Optional[str] = None
+    model_name_or_path: str = "", default_model: Optional[str] = None
 ) -> str:
     """Load the local model weights for a Hugging Face model.
 
     If model_name_or_path is a directory, it is assumed to be the local model weights path.
-    If model_name_or_path is provided (non-empty), it is used to download the model using the existing download_model function.
-    If no model_name_or_path is provided, and a default_model is supplied, it downloads the default model.
+    If model_name_or_path is provided and there is no default_model set, first try laod the model from a local dir and then from wandb artifacts if it fails.
+    If a default_model is supplied, it downloads the default model from the Hugging Face Hub.
 
     Args:
         model_name_or_path (str): The path or name of the model.
@@ -86,11 +103,13 @@ def load_hf_model_weights(
     """
     import os
 
+    if not model_name_or_path and not default_model:
+        raise ValueError("No model_name_or_path or no default_model provided, please set one of the two.")
+
+    if default_model:
+        return str(download_model_from_huggingface_hub(default_model))
+
     if os.path.isdir(model_name_or_path):
         return model_name_or_path
-    elif model_name_or_path:
-        return str(download_model(model_name_or_path))
-    elif default_model:
-        return str(download_model(default_model))
-    else:
-        raise ValueError("No model path provided and no default model available.")
+    if model_name_or_path:
+        return str(download_model_from_wandb(model_name_or_path))
