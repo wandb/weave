@@ -5,7 +5,7 @@ The EvaluationExplorerPage provides an interactive interface for building and ru
 ## Directory Structure
 
 ### Core Files
-- **`EvaluationExplorerPage.tsx`**: Main component that orchestrates the evaluation explorer UI
+- **`EvaluationExplorerPage.tsx`**: Main component that orchestrates the evaluation explorer UI with validation and evaluation running
 - **`context.tsx`**: React context for managing evaluation configuration state
 - **`types.ts`**: TypeScript type definitions for evaluation configuration structures
 - **`state.ts`**: State initialization and management utilities
@@ -13,17 +13,34 @@ The EvaluationExplorerPage provides an interactive interface for building and ru
 
 ### Configuration Sections
 - **`DatasetConfigSection.tsx`**: UI for selecting and configuring datasets
+  - Supports creating new datasets (from scratch or file upload)
+  - Integrates with VersionedObjectPicker for dataset selection
 - **`ModelsConfigSection.tsx`**: UI for managing models to evaluate
+  - Allows adding multiple models with version selection
+  - Uses ModelRow component for optimized rendering
 - **`ScorersConfigSection.tsx`**: UI for configuring evaluation scorers
-- **`EvaluationConfigSection.tsx`**: UI for overall evaluation configuration
+  - Supports LLM-as-a-Judge scorers
+  - Uses ScorerRow component for optimized rendering
+- **`EvaluationConfigSection.tsx`**: Evaluation picker for loading previous evaluations
 
 ### Supporting Components
 - **`DatasetEditor.tsx`**: Components for creating and editing datasets
-- **`layout.tsx`**: Reusable layout components (Column, Row, Header, Footer, etc.)
+  - `NewDatasetEditor`: Create datasets from scratch or upload files
+  - `ExistingDatasetEditor`: View and edit existing datasets
+- **`VersionedObjectPicker.tsx`**: Unified component for selecting versioned objects
+  - Two-level selection: object → version
+  - Shows version labels (latest, v1, v2) with commit hashes
+  - Supports "new" options for creating new objects
+- **`layout.tsx`**: Reusable layout components
+  - `ConfigSection`: Section wrapper with validation support
+  - `Column`, `Row`, `Header`, `Footer`: Layout primitives
 - **`components.tsx`**: Shared UI components
+  - `LabeledTextField`: Text input with label, validation, and instructions
+  - `LabeledTextArea`: Text area with same features
+  - `LoadingSelect`: Select component in loading state
 
 ### Shared Components (from MonitorsPage)
-- **`ModelConfigurationForm.tsx`**: Reusable form for configuring LLM models with structured completion capabilities
+- **`ModelConfigurationForm.tsx`**: Reusable form for configuring LLM models
   - Used by both LLMAsAJudgeScorerForm and ModelsConfigSection
   - Handles model selection, configuration, and saving
   - Provides validation and state management
@@ -35,65 +52,89 @@ The EvaluationExplorerPage provides an interactive interface for building and ru
   - `getLatestDatasetRefs`: Fetches available dataset references
   - `getLatestModelRefs`: Fetches available model references
   - `getLatestScorerRefs`: Fetches available scorer references
+  - `getLatestEvaluationRefs`: Fetches available evaluation references
   - `getObjByRef`: Loads a specific object by its reference
+  - `createEvaluation`: Creates new evaluation in Weave
+  - `runEvaluation`: Executes evaluation against models
 
 ## Architecture
 
 The page follows a modular architecture:
 
-1. **State Management**: Uses React Context (`context.tsx`) with Immer for immutable state updates
-2. **Configuration Structure**: Defined in `types.ts`, supports:
+1. **State Management**: Uses React Context with Immer for immutable state updates
+2. **Configuration Structure**: 
    - Evaluation definition (name, description, dataset, scorers)
-   - Models array with properties and references
-   - Dataset with rows and metadata
-3. **Lazy References**: Components use Weave refs (`originalSourceRef`) to lazily load data
-4. **Dirty Tracking**: Tracks whether configurations have been modified from their sources
+   - Models array separate from evaluation (model-agnostic evaluations)
+   - Lazy references with version tracking
+3. **Validation System**:
+   - Field-level validation (shows errors after blur)
+   - Section-level validation (always visible)
+   - Required field indicators
+   - Comprehensive error/warning/info messaging
+4. **Performance Optimizations**:
+   - Memoized callbacks for object pickers
+   - Separate row components to prevent unnecessary re-renders
+   - Lazy loading with Weave refs
 
-## Key Patterns
+## Key Features
 
-### Configuration Sections
-Each config section follows a similar pattern:
-- List view with add/delete capabilities
-- Dropdown populated with existing objects from the project
-- Loading states while fetching available options
-- Drawer for detailed editing
-- Reference management for saved objects
-- Dirty state tracking
+### Form Validation
+The UI provides comprehensive validation feedback:
+- **Required Fields**: Name and description with asterisk indicators
+- **Touch State**: Errors only show after field interaction
+- **Section Errors**: Guide users on what needs configuration
+- **Visual Hierarchy**: Red errors, yellow warnings, gray info
 
-The sections use a consistent dropdown pattern:
-1. Query functions (`getLatest*Refs`) fetch available objects
-2. `hookify` and `clientBound` wrap queries in React hooks
-3. Dropdowns show "New [Type]" option plus existing objects
-4. Selected refs are stored in the configuration state
+### Version-Aware Object Selection
+The `VersionedObjectPicker` provides sophisticated object selection:
+- Two dropdowns: object selector (60%) and version selector (40%)
+- Auto-selects latest version when object is chosen
+- Shows meaningful version labels with commit info
+- Supports multiple "new" options for flexibility
 
-### Drawer Components
-Drawers provide detailed editing interfaces:
-- Open/close state management
-- Save functionality
-- Form validation
-- Integration with Weave object storage
+### Evaluation Running
+Complete workflow for running evaluations:
+1. Validates all required fields are filled
+2. Creates evaluation object in Weave
+3. Runs evaluation against selected models
+4. Shows loading state during execution
+5. Displays results using CompareEvaluationsPageContent
 
-### Shared Model Configuration
-The `ModelConfigurationForm` component provides a reusable interface for:
-- Selecting LLM models from available options
-- Configuring model parameters (name, system prompt, response format)
-- Saving models as `LLMStructuredCompletionModel` objects
-- Validation and error handling
+### Evaluation Loading
+Users can load previous evaluations:
+- Toggle button in header to show/hide picker
+- Loads all evaluation properties including datasets and scorers
+- Clears state when creating new evaluation
+- Shows selected evaluation name when picker is hidden
 
-This component is shared between:
-- **LLMAsAJudgeScorerForm**: For configuring judge models in scorers
-- **ModelsConfigSection**: For configuring models in evaluations
+## UI Flow
 
-## Usage
+1. **Configuration Phase**:
+   - Fill in evaluation name and description
+   - Select or create a dataset
+   - Add one or more scorers
+   - Add one or more models to evaluate
 
-The page is typically accessed through the Weave UI navigation and allows users to:
-1. Create or select a dataset
-2. Add one or more models to evaluate
-3. Configure scorers to assess model outputs
-4. Run the evaluation and view results
+2. **Validation**:
+   - Real-time validation feedback
+   - "Run eval" button disabled until all requirements met
+   - Clear error messages guide user actions
+
+3. **Execution**:
+   - Click "Run eval" to start
+   - Loading state shows progress
+   - Results automatically display when complete
+
+4. **Results**:
+   - Shows evaluation results in main panel
+   - Configuration panel remains visible
+   - "Back to Dataset" button returns to configuration
 
 ## Development Notes
 
-- Models and scorers support both creating new instances and referencing existing Weave objects
-- The UI uses the Tailwind CSS framework for styling within drawer components
-- Configuration changes are tracked but not auto-saved - users must explicitly save 
+- Uses Wandb's component library for consistent styling
+- Tailwind CSS for drawer components
+- React hooks follow naming convention: `use[Feature]`
+- Query functions wrapped with `clientBound(hookify())` pattern
+- All callbacks passed to child components are properly memoized
+- Follows TypeScript strict mode with comprehensive type safety 
