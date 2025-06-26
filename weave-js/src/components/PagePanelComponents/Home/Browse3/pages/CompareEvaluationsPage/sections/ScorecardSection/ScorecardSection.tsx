@@ -142,6 +142,7 @@ export const ScorecardSection: React.FC<{
   return (
     <Box
       sx={{
+        fontSize: '14px',
         width: '100%',
         flex: '0 0 auto',
         paddingLeft: STANDARD_PADDING,
@@ -159,7 +160,7 @@ export const ScorecardSection: React.FC<{
         {/* Header Row */}
         <GridCell
           style={{
-            fontWeight: 'bold',
+            fontWeight: '600',
             textAlign: 'right',
             gridColumnEnd: 'span 2',
           }}>
@@ -170,7 +171,7 @@ export const ScorecardSection: React.FC<{
             <GridCell
               key={evalCallId}
               style={{
-                fontWeight: 'bold',
+                fontWeight: '600',
               }}>
               <EvaluationCallLink callId={evalCallId} state={props.state} />
             </GridCell>
@@ -178,7 +179,7 @@ export const ScorecardSection: React.FC<{
         })}
         <GridCell
           style={{
-            fontWeight: 'bold',
+            fontWeight: '600',
             textAlign: 'right',
             gridColumnEnd: 'span 2',
           }}>
@@ -189,7 +190,7 @@ export const ScorecardSection: React.FC<{
             <GridCell
               key={evalCallId}
               style={{
-                fontWeight: 'bold',
+                fontWeight: '600',
               }}>
               <EvaluationModelLink callId={evalCallId} state={props.state} />
             </GridCell>
@@ -199,7 +200,7 @@ export const ScorecardSection: React.FC<{
           <>
             <GridCell
               style={{
-                fontWeight: 'bold',
+                fontWeight: '600',
                 textAlign: 'right',
                 gridColumnEnd: 'span 2',
               }}>
@@ -224,7 +225,7 @@ export const ScorecardSection: React.FC<{
                 <GridCell
                   key={evalCallId}
                   style={{
-                    fontWeight: 'bold',
+                    fontWeight: '600',
                     display: 'flex',
                     alignItems: 'center',
                   }}>
@@ -242,7 +243,7 @@ export const ScorecardSection: React.FC<{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
             backgroundColor: MOON_100,
             color: MOON_600,
-            fontWeight: 'bold',
+            fontWeight: '600',
             borderTop: '1px solid #ccc',
             borderBottom: '1px solid #ccc',
             display: 'flex',
@@ -272,7 +273,7 @@ export const ScorecardSection: React.FC<{
               <GridCell
                 style={{
                   gridColumnEnd: 'span 2',
-                  fontWeight: 'bold',
+                  fontWeight: '600',
                   textAlign: 'right',
                   textOverflow: 'ellipsis',
                 }}>
@@ -312,7 +313,7 @@ export const ScorecardSection: React.FC<{
             gridColumnEnd: 'span ' + (evalCallIds.length + 2),
             backgroundColor: MOON_100,
             color: MOON_600,
-            fontWeight: 'bold',
+            fontWeight: '600',
             borderTop: '1px solid #ccc',
             borderBottom: '1px solid #ccc',
           }}>
@@ -336,7 +337,7 @@ export const ScorecardSection: React.FC<{
                     style={{
                       gridColumnEnd: 'span 2',
                       borderTop: '1px solid #ccc',
-                      fontWeight: 'bold',
+                      fontWeight: '600',
                       textAlign: 'left',
                     }}>
                     {scorersAreComparable ? (
@@ -392,7 +393,7 @@ export const ScorecardSection: React.FC<{
                           metricNdx === Object.keys(group.metrics).length - 1
                             ? '1px solid #ccc'
                             : '',
-                        fontWeight: 'bold',
+                        fontWeight: '600',
                         textAlign: 'right',
                         textOverflow: 'ellipsis',
                       }}>

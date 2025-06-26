@@ -32,6 +32,7 @@ from requests import HTTPError
 
 from weave import version
 from weave.trace import trace_sentry, urls
+from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -231,9 +232,8 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative step not supported")
 
         # Apply limit if provided
-        if self.limit is not None:
-            if stop is None or stop > self.limit:
-                stop = self.limit
+        if self.limit is not None and (stop is None or stop > self.limit):
+            stop = self.limit
 
         # Apply offset if provided
         if self.offset is not None:
@@ -296,7 +296,7 @@ class PaginatedIterator(Generic[T, R]):
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         records = []
         for item in self:
@@ -583,7 +583,7 @@ class Call:
             try:
                 entity, project = self.project_id.split("/")
             except ValueError:
-                raise ValueError(f"Invalid project_id: {self.project_id}")
+                raise ValueError(f"Invalid project_id: {self.project_id}") from None
             weave_ref = CallRef(entity, project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
@@ -598,7 +598,7 @@ class Call:
         try:
             entity, project = self.project_id.split("/")
         except ValueError:
-            raise ValueError(f"Invalid project_id: {self.project_id}")
+            raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
 
     @property
@@ -906,6 +906,9 @@ class AttributesDict(dict):
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
+# This size is correlated with the maximum single row insert size
+# in clickhouse, which is currently unavoidable.
+MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
@@ -1013,11 +1016,13 @@ class WeaveClient:
                 if e.response.content:
                     try:
                         reason = json.loads(e.response.content).get("reason")
-                        raise ValueError(reason)
+                        raise ValueError(reason) from None
                     except json.JSONDecodeError:
-                        raise ValueError(e.response.content)
+                        raise ValueError(e.response.content) from None
                 if e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from e
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -1039,7 +1044,9 @@ class WeaveClient:
                 )
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from None
                 raise
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
@@ -1056,14 +1063,15 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
     def get_calls(
         self,
         *,
-        filter: CallsFilter | None = None,
+        filter: CallsFilterLike | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        sort_by: list[SortBy] | None = None,
-        query: Query | None = None,
+        sort_by: list[SortByLike] | None = None,
+        query: QueryLike | None = None,
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
@@ -1301,23 +1309,30 @@ class WeaveClient:
             inputs_json = to_json(
                 maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
             )
-            self.server.call_start(
-                CallStartReq(
-                    start=StartedCallSchemaForInsert(
-                        project_id=project_id,
-                        id=call_id,
-                        op_name=op_def_ref.uri(),
-                        display_name=call.display_name,
-                        trace_id=trace_id,
-                        started_at=started_at,
-                        parent_id=parent_id,
-                        inputs=inputs_json,
-                        attributes=attributes_dict,
-                        wb_run_id=current_wb_run_id,
-                        wb_run_step=current_wb_run_step,
-                    )
+            call_start_req = CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    op_name=op_def_ref.uri(),
+                    display_name=call.display_name,
+                    trace_id=trace_id,
+                    started_at=started_at,
+                    parent_id=parent_id,
+                    inputs=inputs_json,
+                    attributes=attributes_dict,
+                    wb_run_id=current_wb_run_id,
+                    wb_run_step=current_wb_run_step,
                 )
             )
+
+            bytes_size = len(call_start_req.model_dump_json())
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    f"Trace input size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes."
+                    "Inputs may be dropped."
+                )
+
+            self.server.call_start(call_start_req)
             return True
 
         def on_complete(f: Future) -> None:
@@ -1454,18 +1469,23 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
-            self.server.call_end(
-                CallEndReq(
-                    end=EndedCallSchemaForInsert(
-                        project_id=project_id,
-                        id=call.id,
-                        ended_at=ended_at,
-                        output=output_json,
-                        summary=merged_summary,
-                        exception=exception_str,
-                    )
+            call_end_req = CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call.id,
+                    ended_at=ended_at,
+                    output=output_json,
+                    summary=merged_summary,
+                    exception=exception_str,
                 )
             )
+            bytes_size = len(call_end_req.model_dump_json())
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
+                    "Output may be dropped."
+                )
+            self.server.call_end(call_end_req)
 
         self.future_executor.defer(send_end_call)
 
@@ -1630,9 +1650,7 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: datetime.datetime | None = datetime.datetime.now(
-            datetime.timezone.utc
-        ),
+        effective_date: datetime.datetime | None = None,
         prompt_token_cost_unit: str | None = "USD",
         completion_token_cost_unit: str | None = "USD",
         provider_id: str | None = "default",
@@ -1660,6 +1678,8 @@ class WeaveClient:
             Which has one field called a list of tuples called ids.
             Each tuple contains the llm_id and the id of the created cost object.
         """
+        if effective_date is None:
+            effective_date = datetime.datetime.now(datetime.timezone.utc)
         cost = CostCreateInput(
             prompt_token_cost=prompt_token_cost,
             completion_token_cost=completion_token_cost,

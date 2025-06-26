@@ -1,9 +1,6 @@
-import {WHITE} from '@wandb/weave/common/css/color.styles';
-import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {useIsTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
-import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
 
 import {CallChat} from '../../CallPage/CallChat';
@@ -17,6 +14,7 @@ import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundMessageRole, PlaygroundState} from '../types';
 import {ProviderStatus} from '../useConfiguredProviders';
+import {InferenceBanner} from './InferenceBanner';
 import {useLLMDropdownOptions} from './LLMDropdownOptions';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
@@ -209,7 +207,8 @@ export const PlaygroundChat = ({
 
   return (
     <div className="flex h-full w-full flex-col items-center overflow-hidden">
-      <div className="mx-auto flex h-full w-full overflow-y-hidden overflow-x-scroll">
+      <InferenceBanner />
+      <div className="mx-auto flex h-full w-full overflow-x-auto overflow-y-hidden">
         <div className="mx-auto flex">
           {playgroundStates.map((state, idx) => (
             <React.Fragment key={idx}>
@@ -221,15 +220,6 @@ export const PlaygroundChat = ({
                     ? 'border-teal-400 outline outline-[1.5px] outline-teal-400'
                     : 'border-moon-200'
                 }`}>
-                {state.loading && (
-                  <div
-                    className={`absolute bottom-0 left-0 right-0 top-0 z-[100] flex items-center justify-center bg-[${hexToRGB(
-                      WHITE,
-                      0.7
-                    )}] pointer-events-none`}>
-                    <WaveLoader size="small" />
-                  </div>
-                )}
                 <div className="absolute top-0 z-[10] w-full rounded-t-[4px] bg-white px-[16px] py-[8px]">
                   <PlaygroundChatTopBar
                     idx={idx}
@@ -252,8 +242,8 @@ export const PlaygroundChat = ({
                     customProvidersResult={customProvidersResult}
                   />
                 </div>
-                <div className="h-full w-full flex-grow overflow-scroll px-[16px] pt-[48px]">
-                  <div className=" mx-auto mt-[32px] h-full pb-8">
+                <div className="h-full w-full flex-grow overflow-auto px-[16px] pt-[48px]">
+                  <div className=" mx-auto mt-[32px] pb-8">
                     {state.traceCall && (
                       <PlaygroundContext.Provider
                         value={{
@@ -298,7 +288,7 @@ export const PlaygroundChat = ({
                     )}
                   </div>
                 </div>
-                <div className="mx-auto mb-[8px] w-full max-w-[800px] p-[8px] pl-[12px]">
+                <div className="relative mx-auto w-full max-w-[800px] p-[8px] pl-[12px]">
                   {state.traceCall.summary && (
                     <PlaygroundCallStats
                       call={state.traceCall as TraceCallSchema}

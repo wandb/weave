@@ -8,20 +8,9 @@ const RESPONSE_FORMATS: PlaygroundResponseFormats[] = Object.values(
   PlaygroundResponseFormats
 );
 
-type ResponseFormatEditorProps = {
-  responseFormat: PlaygroundResponseFormats;
-  setResponseFormat: (value: PlaygroundResponseFormats) => void;
-};
-
-export const ResponseFormatEditor: React.FC<ResponseFormatEditorProps> = ({
-  responseFormat,
-  setResponseFormat,
-}) => {
-  const options = RESPONSE_FORMATS.map(format => ({
-    value: format,
-    label: format,
-  }));
-
+export const ResponseFormatEditor: React.FC<
+  ResponseFormatSelectProps
+> = props => {
   return (
     <Box
       sx={{
@@ -30,18 +19,36 @@ export const ResponseFormatEditor: React.FC<ResponseFormatEditorProps> = ({
         gap: '4px',
       }}>
       <span style={{fontSize: '14px'}}>Response format</span>
-      <Select
-        value={options.find(opt => opt.value === responseFormat)}
-        onChange={option => {
-          if (option) {
-            setResponseFormat(
-              (option as {value: PlaygroundResponseFormats}).value
-            );
-          }
-        }}
-        options={options}
-        size="medium"
-      />
+      <ResponseFormatSelect {...props} />
     </Box>
+  );
+};
+
+interface ResponseFormatSelectProps {
+  responseFormat: PlaygroundResponseFormats;
+  setResponseFormat: (value: PlaygroundResponseFormats) => void;
+}
+
+export const ResponseFormatSelect = ({
+  responseFormat,
+  setResponseFormat,
+}: ResponseFormatSelectProps) => {
+  const options = RESPONSE_FORMATS.map(format => ({
+    value: format,
+    label: format,
+  }));
+  return (
+    <Select
+      value={options.find(opt => opt.value === responseFormat)}
+      onChange={option => {
+        if (option) {
+          setResponseFormat(
+            (option as {value: PlaygroundResponseFormats}).value
+          );
+        }
+      }}
+      options={options}
+      size="medium"
+    />
   );
 };

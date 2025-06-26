@@ -157,9 +157,8 @@ def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
             rep = str(obj)
         except Exception:
             rep = f"<{type(obj).__name__}: {id(obj)}>"
-    if isinstance(rep, str):
-        if len(rep) > limit:
-            rep = rep[: limit - 3] + "..."
+    if isinstance(rep, str) and len(rep) > limit:
+        rep = rep[: limit - 3] + "..."
     return rep
 
 
@@ -220,7 +219,7 @@ def dictify(
                         to_dict_result[k] = stringify(v)
                 return to_dict_result
         except Exception:
-            raise ValueError("to_dict failed")
+            raise ValueError("to_dict failed") from None
 
     result: dict[Any, Any] = {}
     result["__class__"] = {
@@ -272,9 +271,8 @@ def fallback_encode(obj: Any) -> Any:
             rep = str(obj)
         except Exception:
             rep = f"<{type(obj).__name__}: {id(obj)}>"
-    if isinstance(rep, str):
-        if len(rep) > MAX_STR_LEN:
-            rep = rep[:MAX_STR_LEN] + "..."
+    if isinstance(rep, str) and len(rep) > MAX_STR_LEN:
+        rep = rep[:MAX_STR_LEN] + "..."
     return rep
 
 

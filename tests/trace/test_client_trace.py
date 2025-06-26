@@ -50,6 +50,7 @@ from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
 )
+from weave.trace_server.validation_util import CHValidationError
 
 ## Hacky interface compatibility helpers
 
@@ -200,6 +201,7 @@ def test_trace_server_call_start_and_end(client):
         "display_name": None,
         "storage_size_bytes": None,
         "total_storage_size_bytes": None,
+        "thread_id": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -249,6 +251,7 @@ def test_trace_server_call_start_and_end(client):
         "display_name": None,
         "storage_size_bytes": None,
         "total_storage_size_bytes": None,
+        "thread_id": None,
     }
 
 
@@ -478,7 +481,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
     )
     assert len(input_object_version_refs) > 3  # > 3
 
-    for input_object_version_refs, exp_count in [
+    for input_refs, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -515,7 +518,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(input_refs=input_object_version_refs),
+                filter=tsi.CallsFilter(input_refs=input_refs),
             )
         )
 
@@ -590,7 +593,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
     )
     assert len(output_object_version_refs) > 3
 
-    for output_object_version_refs, exp_count in [
+    for output_refs, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -627,7 +630,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(output_refs=output_object_version_refs),
+                filter=tsi.CallsFilter(output_refs=output_refs),
             )
         )
 
@@ -644,7 +647,7 @@ def test_trace_call_query_filter_parent_ids(client):
     )
     assert len(parent_ids) > 3
 
-    for parent_ids, exp_count in [
+    for parent_id_list, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -663,7 +666,7 @@ def test_trace_call_query_filter_parent_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(parent_ids=parent_ids),
+                filter=tsi.CallsFilter(parent_ids=parent_id_list),
             )
         )
 
@@ -677,7 +680,7 @@ def test_trace_call_query_filter_trace_ids(client):
 
     trace_ids = [call.trace_id for call in res.calls]
 
-    for trace_ids, exp_count in [
+    for trace_id_list, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -690,7 +693,7 @@ def test_trace_call_query_filter_trace_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(trace_ids=trace_ids),
+                filter=tsi.CallsFilter(trace_ids=trace_id_list),
             )
         )
 
@@ -704,7 +707,7 @@ def test_trace_call_query_filter_call_ids(client):
 
     call_ids = [call.id for call in res.calls]
 
-    for call_ids, exp_count in [
+    for call_id_list, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -717,7 +720,7 @@ def test_trace_call_query_filter_call_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(call_ids=call_ids),
+                filter=tsi.CallsFilter(call_ids=call_id_list),
             )
         )
 
@@ -1550,8 +1553,8 @@ def test_bound_op_retrieval_no_self(client):
         a: int
 
         @weave.op
-        def op_with_custom_type(me, v):
-            return me.a + v
+        def op_with_custom_type(self, v):
+            return self.a + v
 
     obj = CustomTypeWithoutSelf(a=1)
     obj_ref = weave.publish(obj)
@@ -2644,7 +2647,7 @@ def test_sort_and_filter_through_refs(client):
         {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})},
     )
 
-    for first, last, sort_by in [
+    for first, _last, sort_by in [
         (0, 21, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
         (21, 0, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
         (0, 21, [tsi.SortBy(field="output.a.b.c.d", direction="asc")]),
@@ -2660,7 +2663,7 @@ def test_sort_and_filter_through_refs(client):
         assert inner_res.calls[0].inputs["label"] == first
         assert inner_res.calls[1].inputs["label"] == first
 
-    for first, last, count, query in [
+    for _first, _last, count, query in [
         (
             6,
             21,
@@ -2838,7 +2841,7 @@ def test_calls_iter_cached(client):
     calls = func.calls()
 
     elapsed_times = []
-    for i in range(3):
+    for _ in range(3):
         start_time = time.time()
         c = calls[0]
         end_time = time.time()
@@ -3109,7 +3112,7 @@ def test_object_with_char_over_limit(client):
             }
         }
     )
-    with pytest.raises(Exception):
+    with pytest.raises(CHValidationError):
         client.server.obj_create(create_req)
 
 
@@ -3168,8 +3171,8 @@ def test_objects_and_keys_with_special_characters(client):
 
 
 def test_calls_stream_feedback(client):
-    BATCH_SIZE = 10
-    num_calls = BATCH_SIZE + 1
+    batch_size = 10
+    num_calls = batch_size + 1
 
     @weave.op
     def test_call(x):
@@ -3760,7 +3763,7 @@ def test_call_stream_query_heavy_query_batch(client):
     # start 10 calls
     call_ids = []
     project_id = get_client_project_id(client)
-    for i in range(10):
+    for _ in range(10):
         call_id = generate_id()
         call_ids.append(call_id)
         trace_id = generate_id()

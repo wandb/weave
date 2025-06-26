@@ -54,7 +54,8 @@ class PromptInjectionLLMGuardrail(LLMScorer):
         if self.model_id not in SUPPORTED_MODELS:
             warnings.warn(
                 f"The prompting strategy used in this guardrail has been tested with the following models: {', '.join(SUPPORTED_MODELS)}."
-                f"The model {self.model_id} might not yield the best results for this guardrail."
+                f"The model {self.model_id} might not yield the best results for this guardrail.",
+                stacklevel=2,
             )
 
     @weave.op
