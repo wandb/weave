@@ -8,7 +8,7 @@ from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.trust_scorer import WeaveTrustScorerV1
 
 
-@pytest.fixture()
+@pytest.fixture
 def dummy_scorer():
     "Dummy scorer to test _filter_inputs_for_scorer functionality."
 
@@ -20,7 +20,7 @@ def dummy_scorer():
     return DummyScorer()
 
 
-@pytest.fixture()
+@pytest.fixture
 def trust_scorer():
     scorer = WeaveTrustScorerV1(
         device="cpu",

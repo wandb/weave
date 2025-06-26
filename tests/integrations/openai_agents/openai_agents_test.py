@@ -9,7 +9,7 @@ from weave.trace.weave_client import WeaveClient
 # TODO: Responses should be updated once we have patching for the new Responses API
 
 
-@pytest.fixture()
+@pytest.fixture
 def setup_tests():
     # This is required because OpenAI by default adds its own trace processor which causes issues in the test.
     # We can't just add our trace processor with autopatching because it wont remove the OpenAI trace processor.

@@ -369,7 +369,7 @@ def assert_correct_calls_for_rag_chain(calls: list[Call]) -> None:
     assert (got == exp) or (got == exp_2)
 
 
-@pytest.fixture()
+@pytest.fixture
 def fix_chroma_ci() -> Generator[None, None, None]:
     # According to https://docs.trychroma.com/troubleshooting#sqlite
     # which references https://gist.github.com/defulmere/8b9695e415a44271061cc8e272f3c300,

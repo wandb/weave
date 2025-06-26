@@ -10,7 +10,7 @@ from weave.scorers.similarity_scorer import (
 
 
 # mock the aembedding function
-@pytest.fixture()
+@pytest.fixture
 def mock_aembedding(monkeypatch):
     async def _mock_aembedding(*args, **kwargs):
         class Response(weave.Model):
@@ -28,7 +28,7 @@ def mock_aembedding(monkeypatch):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def similarity_scorer(mock_aembedding):
     return EmbeddingSimilarityScorer(
         model_id=OPENAI_DEFAULT_EMBEDDING_MODEL,

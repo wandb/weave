@@ -28,7 +28,7 @@ class RollingWindowScorerMock(RollingWindowScorer):
         return self._model(input_ids)
 
 
-@pytest.fixture()
+@pytest.fixture
 def rolling_window_scorer():
     scorer_instance = RollingWindowScorerMock()
     return scorer_instance

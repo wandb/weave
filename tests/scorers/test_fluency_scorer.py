@@ -4,7 +4,7 @@ from tests.scorers.test_utils import TINY_MODEL_PATHS
 from weave.scorers.fluency_scorer import WeaveFluencyScorerV1
 
 
-@pytest.fixture()
+@pytest.fixture
 def weave_fluency_scorer():
     """Fixture to return a WeaveFluencyScorerV1 instance."""
     scorer = WeaveFluencyScorerV1(

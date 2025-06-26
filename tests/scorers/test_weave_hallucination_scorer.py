@@ -4,7 +4,7 @@ from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
 from weave.scorers.hallucination_scorer import WeaveHallucinationScorerV1
 
 
-@pytest.fixture()
+@pytest.fixture
 def weave_hallucination_scorer():
     """Fixture that returns a WeaveHallucinationScorerV1 instance using a tiny downloaded model."""
     return WeaveHallucinationScorerV1(

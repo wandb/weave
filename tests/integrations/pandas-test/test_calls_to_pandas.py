@@ -14,7 +14,7 @@ def raising_func(name: str, age: int) -> str:
     raise ValueError("This is a test error")
 
 
-@pytest.fixture()
+@pytest.fixture
 def logging_example(client):
     func("Alice", 30)
 

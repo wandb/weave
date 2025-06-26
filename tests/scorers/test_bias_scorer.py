@@ -4,7 +4,7 @@ from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
 from weave.scorers.moderation_scorer import WeaveBiasScorerV1
 
 
-@pytest.fixture()
+@pytest.fixture
 def weave_bias_scorer():
     """Fixture that returns a WeaveBiasScorer instance using a tiny downloaded model."""
     return WeaveBiasScorerV1(
