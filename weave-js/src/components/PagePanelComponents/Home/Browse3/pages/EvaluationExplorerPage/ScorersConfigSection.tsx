@@ -87,15 +87,18 @@ export const ScorersConfigSection: React.FC<{
           draft.evaluationDefinition.properties.scorers[
             scorerNdx
           ].originalSourceRef = null;
+          // Only mark as dirty if we're actually changing something
+          if (currentRef !== null) {
+            draft.evaluationDefinition.dirtied = true;
+          }
         } else {
           // Set the selected scorer ref
           draft.evaluationDefinition.properties.scorers[
             scorerNdx
           ].originalSourceRef = ref;
+          // Mark as dirty since we're changing
+          draft.evaluationDefinition.dirtied = true;
         }
-        
-        // Only mark as dirty if we're actually changing something
-        draft.evaluationDefinition.dirtied = true;
       });
     },
     [editConfig]

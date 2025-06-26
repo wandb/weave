@@ -5,13 +5,14 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {refStringToName} from './common';
 import {BORDER_COLOR, SECONDARY_BACKGROUND_COLOR} from './constants';
 import {
   EvaluationExplorerPageProvider,
   useEvaluationExplorerPageContext,
 } from './context';
 import {ExistingDatasetEditor, NewDatasetEditor} from './DatasetEditor';
-import {EvaluationConfigSection} from './EvaluationConfigSection';
+import {EvaluationConfigSection, EvaluationPicker} from './EvaluationConfigSection';
 import {Column, Header} from './layout';
 import {Footer, Row} from './layout';
 import {ModelsConfigSection} from './ModelsConfigSection';
@@ -50,8 +51,8 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
 }) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const [newDatasetEditorMode, setNewDatasetEditorMode] = useState<
-    'new-empty' | 'new-file'
-  >('new-empty');
+    'new-empty' | 'new-file' | null
+  >(null);
   const [evaluationResults, setEvaluationResults] = useState<string[] | null>(
     null
   );
@@ -165,7 +166,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
 const ConfigPanel: React.FC<{
   entity: string;
   project: string;
-  setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
+  setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file' | null) => void;
   isRunning: boolean;
   setIsRunning: (running: boolean) => void;
   setEvaluationResults: (results: string[] | null) => void;
@@ -179,6 +180,7 @@ const ConfigPanel: React.FC<{
 }) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const getClient = useGetTraceServerClientContext();
+  const [showEvaluationPicker, setShowEvaluationPicker] = useState(false);
 
   // Validation logic
   const isRunEvalEnabled = useMemo(() => {
@@ -290,8 +292,53 @@ const ConfigPanel: React.FC<{
       }}>
       <Header>
         <span>Configuration</span>
+        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+          {!showEvaluationPicker && config.evaluationDefinition.originalSourceRef && (
+            <span style={{fontSize: '14px', color: '#666'}}>
+              ({refStringToName(config.evaluationDefinition.originalSourceRef)})
+            </span>
+          )}
+          <Button
+            icon={showEvaluationPicker ? "chevron-up" : "chevron-down"}
+            variant="ghost"
+            tooltip={showEvaluationPicker ? "Hide evaluation picker" : "Load from a previous evaluation"}
+            onClick={() => {
+              setShowEvaluationPicker(!showEvaluationPicker);
+            }}>
+            {showEvaluationPicker ? 'Hide' : 'Load'}
+          </Button>
+        </div>
       </Header>
-      <Column style={{flex: 1, overflowY: 'auto'}}>
+      <Column
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '16px',
+          backgroundColor: SECONDARY_BACKGROUND_COLOR,
+        }}>
+        {showEvaluationPicker && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '4px',
+          }}>
+            <div style={{
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#666',
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Select Evaluation
+            </div>
+            <EvaluationPicker 
+              entity={entity} 
+              project={project}
+            />
+          </div>
+        )}
         <EvaluationConfigSection
           entity={entity}
           project={project}
@@ -306,21 +353,8 @@ const ConfigPanel: React.FC<{
           disabled={!isRunEvalEnabled || isRunning}
           onClick={handleRunEval}>
           {isRunning ? 'Running...' : 'Run eval'}
-                  </Button>
-          {/* DEBUG BUTTON - REMOVE BEFORE PRODUCTION */}
-          <Button
-            variant="secondary"
-            onClick={() => {
-              console.log('Current config state:', {
-                evaluation: config.evaluationDefinition.originalSourceRef,
-                dataset: config.evaluationDefinition.properties.dataset.originalSourceRef,
-                scorers: config.evaluationDefinition.properties.scorers.map(s => s.originalSourceRef),
-                models: config.models.map(m => m.originalSourceRef),
-              });
-            }}>
-            Debug State
-          </Button>
-        </Footer>
-      </Column>
+        </Button>
+      </Footer>
+    </Column>
   );
 };

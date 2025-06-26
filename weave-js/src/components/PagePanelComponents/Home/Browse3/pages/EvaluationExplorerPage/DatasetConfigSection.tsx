@@ -53,12 +53,16 @@ const DatasetPicker: React.FC<{
         const mode = datasetRef as 'new-empty' | 'new-file';
         setNewDatasetEditorMode(mode);
         editConfig(draft => {
-          draft.evaluationDefinition.properties.dataset.originalSourceRef = null;
+          if (draft.evaluationDefinition.properties.dataset.originalSourceRef !== null) {
+            draft.evaluationDefinition.properties.dataset.originalSourceRef = null;
+          }
         });
       } else {
         // Set selected dataset ref
         editConfig(draft => {
-          draft.evaluationDefinition.properties.dataset.originalSourceRef = datasetRef;
+          if (draft.evaluationDefinition.properties.dataset.originalSourceRef !== datasetRef) {
+            draft.evaluationDefinition.properties.dataset.originalSourceRef = datasetRef;
+          }
         });
       }
     },

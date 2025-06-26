@@ -1,5 +1,5 @@
 import {Select} from '@wandb/weave/components/Form/Select';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {parseWeaveRef} from '@wandb/weave/react';
 import {refStringToName} from './common';
@@ -41,10 +41,9 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   allowNewOption = true,
 }) => {
   const getClient = useGetTraceServerClientContext();
-  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [objectVersions, setObjectVersions] = useState<string[]>([]);
-  const [shouldAutoSelectLatest, setShouldAutoSelectLatest] = useState(false);
+  const [pendingObjectId, setPendingObjectId] = useState<string | null>(null);
 
   // Default new options if not provided
   const effectiveNewOptions = useMemo(() => {
@@ -64,53 +63,58 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   }, [effectiveNewOptions, selectedRef]);
 
   // Extract object ID from the selected ref
-  useEffect(() => {
+  const selectedObjectId = useMemo(() => {
+    // If we have a pending selection, use that
+    if (pendingObjectId) {
+      return pendingObjectId;
+    }
+    // Otherwise extract from ref
     if (selectedRef && !isNewOption) {
       const parsedRef = parseWeaveRef(selectedRef);
-      const newObjectId = parsedRef.artifactName;
-      
-      // Only update if the object ID actually changed
-      if (newObjectId !== selectedObjectId) {
-        setSelectedObjectId(newObjectId);
-        // Don't auto-select when loading an existing ref
-        setShouldAutoSelectLatest(false);
-      }
-    } else if (!selectedRef) {
-      setSelectedObjectId(null);
-      setObjectVersions([]);
-      setShouldAutoSelectLatest(false);
+      return parsedRef.artifactName;
     }
-  }, [selectedRef, isNewOption, selectedObjectId]);
+    return null;
+  }, [selectedRef, isNewOption, pendingObjectId]);
 
   // Load versions when object is selected
   useEffect(() => {
     if (selectedObjectId && !isNewOption) {
-      console.log(`[VersionedObjectPicker ${objectType}] Loading versions for`, selectedObjectId);
       setVersionsLoading(true);
       const client = getClient();
       getAllVersionsOfObject(client, entity, project, selectedObjectId)
         .then(versions => {
-          console.log(`[VersionedObjectPicker ${objectType}] Loaded ${versions.length} versions`);
           setObjectVersions(versions);
           setVersionsLoading(false);
           
-          // Only auto-select if we explicitly want to (user just selected an object)
-          if (versions.length > 0 && shouldAutoSelectLatest) {
-            console.log(`[VersionedObjectPicker ${objectType}] Auto-selecting latest version`);
-            onRefChange(versions[0]);
-            setShouldAutoSelectLatest(false);
-          } else if (selectedRef && versions.length > 0) {
-            // Check if the current ref is in the versions list
-            const refInVersions = versions.includes(selectedRef);
-            console.log(`[VersionedObjectPicker ${objectType}] Current ref ${selectedRef} is ${refInVersions ? 'in' : 'NOT in'} versions list`);
+          // Auto-select latest if this was a pending selection
+          // Check if either:
+          // 1. We don't have a ref yet, OR
+          // 2. The current ref is for a different object
+          if (versions.length > 0 && pendingObjectId) {
+            const needsAutoSelect = !selectedRef || 
+              (selectedRef && parseWeaveRef(selectedRef).artifactName !== pendingObjectId);
+            
+            if (needsAutoSelect) {
+              onRefChange(versions[0]);
+              setPendingObjectId(null);
+            }
           }
         })
         .catch(error => {
           console.error('Failed to load versions:', error);
           setVersionsLoading(false);
         });
+    } else {
+      setObjectVersions([]);
     }
-  }, [selectedObjectId, entity, project, getClient, isNewOption, onRefChange, shouldAutoSelectLatest, selectedRef, objectType]);
+  }, [selectedObjectId, entity, project, getClient, isNewOption, selectedRef, pendingObjectId, onRefChange]);
+
+  // Clear pending when ref changes externally
+  useEffect(() => {
+    if (selectedRef) {
+      setPendingObjectId(null);
+    }
+  }, [selectedRef]);
 
   // Group objects by their ID (name)
   const objectGroups = useMemo(() => {
@@ -175,34 +179,29 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   // Handle object selection
   const handleObjectChange = useCallback((option: any) => {
     const value = option?.value;
-    console.log(`[VersionedObjectPicker ${objectType}] handleObjectChange:`, value);
     
     if (!value) {
       onRefChange(null);
-      setShouldAutoSelectLatest(false);
+      setPendingObjectId(null);
       return;
     }
     
     // Check if it's a new option
     if (effectiveNewOptions.some(opt => opt.value === value)) {
       onRefChange(value);
-      setSelectedObjectId(null);
-      setObjectVersions([]);
-      setShouldAutoSelectLatest(false);
+      setPendingObjectId(null);
       return;
     }
     
     // User is selecting a new object - we should auto-select latest
-    setSelectedObjectId(value);
-    setShouldAutoSelectLatest(true);
-  }, [onRefChange, effectiveNewOptions, objectType]);
+    setPendingObjectId(value);
+  }, [onRefChange, effectiveNewOptions]);
 
   // Handle version selection
   const handleVersionChange = useCallback((option: any) => {
     const ref = option?.value;
-    console.log(`[VersionedObjectPicker ${objectType}] handleVersionChange:`, ref);
     onRefChange(ref || null);
-  }, [onRefChange, objectType]);
+  }, [onRefChange]);
 
   // If we're in new object mode, just show a single select
   if (isNewOption) {

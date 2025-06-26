@@ -24,14 +24,11 @@ export const EvaluationConfigSection: React.FC<{
   const {config, editConfig} = useEvaluationExplorerPageContext();
   return (
     <ConfigSection title="Evaluation" icon="baseline-alt">
-      <EvaluationPicker entity={entity} project={project} />
       <Column
         style={{
           flex: 0,
-          borderLeft: `1px solid ${BORDER_COLOR}`,
-          marginTop: '16px',
         }}>
-        <Row style={{padding: '8px 0px 8px 16px'}}>
+        <Row style={{paddingBottom: '8px'}}>
           <TextField
             value={config.evaluationDefinition.properties.name}
             placeholder="Evaluation Name"
@@ -43,7 +40,7 @@ export const EvaluationConfigSection: React.FC<{
             }}
           />
         </Row>
-        <Row style={{padding: '8px 0px 16px 16px'}}>
+        <Row style={{paddingBottom: '16px'}}>
           <TextArea
             value={config.evaluationDefinition.properties.description}
             placeholder="Evaluation Description"
@@ -70,7 +67,10 @@ export const EvaluationConfigSection: React.FC<{
 const useLatestEvaluationRefs = clientBound(hookify(getLatestEvaluationRefs));
 const useEvaluationByRef = clientBound(hookify(getObjByRef));
 
-const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
+export const EvaluationPicker: React.FC<{
+  entity: string; 
+  project: string;
+}> = ({
   entity,
   project,
 }) => {
@@ -93,25 +93,21 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
           // Clear models
           draft.models = [];
         });
-      } else {
-        // First set the ref
-        editConfig(draft => {
-          draft.evaluationDefinition.originalSourceRef = evaluationRef;
-          draft.evaluationDefinition.dirtied = false;
-        });
-        
-        // Then load the evaluation data
+      } else if (evaluationRef !== config.evaluationDefinition.originalSourceRef) {
+        // Only update if the ref actually changed
         try {
           const client = getClient();
           const evaluationData = await getObjByRef(client, evaluationRef);
           
-          console.log('Loading evaluation data:', evaluationData);
-          
           if (evaluationData) {
             const evalData = evaluationData.val;
-            console.log('Evaluation val:', evalData);
             
+            // Batch all updates into a single editConfig call
             editConfig(draft => {
+              // Set the ref
+              draft.evaluationDefinition.originalSourceRef = evaluationRef;
+              draft.evaluationDefinition.dirtied = false;
+              
               // Update evaluation properties from loaded data
               draft.evaluationDefinition.properties.name = evalData.name || '';
               draft.evaluationDefinition.properties.description =
@@ -121,16 +117,14 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
               draft.evaluationDefinition.properties.dataset.originalSourceRef = null;
               draft.evaluationDefinition.properties.scorers = [];
               
-              // Set dataset ref if it exists - the field is called 'dataset' not 'datasetRef'
+              // Set dataset ref if it exists
               if (evalData.dataset) {
-                console.log('Setting dataset ref:', evalData.dataset);
                 draft.evaluationDefinition.properties.dataset.originalSourceRef =
                   evalData.dataset;
               }
               
-              // Set scorer refs if they exist - the field is called 'scorers' not 'scorerRefs'
+              // Set scorer refs if they exist
               if (evalData.scorers && Array.isArray(evalData.scorers)) {
-                console.log('Setting scorer refs:', evalData.scorers);
                 draft.evaluationDefinition.properties.scorers =
                   evalData.scorers.map((ref: string) => ({
                     originalSourceRef: ref,
@@ -147,7 +141,7 @@ const EvaluationPicker: React.FC<{entity: string; project: string}> = ({
         }
       }
     },
-    [editConfig, getClient]
+    [editConfig, getClient, config.evaluationDefinition.originalSourceRef]
   );
 
   return (
