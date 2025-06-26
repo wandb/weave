@@ -285,7 +285,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
         sig = inspect.signature(func)
         inputs = sig.bind(*args, **kwargs).arguments
     except TypeError as e:
-        raise OpCallError(f"Error calling {func.name}: {e}")
+        raise OpCallError(f"Error calling {func.name}: {e}") from e
 
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
     return ProcessedInputs(
@@ -1335,7 +1335,7 @@ def get_captured_code(op: Op) -> str:
     except Exception:
         raise RuntimeError(
             "Failed to get captured code for op (this only works when you get an op back from a ref)."
-        )
+        ) from None
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Callable | MethodType:
@@ -1472,7 +1472,7 @@ class _IteratorWrapper(Generic[V]):
             except TypeError:
                 raise TypeError(
                     f"Cannot call next on an object of type {type(self._iterator_or_ctx_manager)}"
-                )
+                ) from None
         try:
             value = next(self._iterator_or_ctx_manager)  # type: ignore
             try:
@@ -1511,7 +1511,7 @@ class _IteratorWrapper(Generic[V]):
             except TypeError:
                 raise TypeError(
                     f"Cannot call anext on an object of type {type(self._iterator_or_ctx_manager)}"
-                )
+                ) from None
         try:
             value = await self._iterator_or_ctx_manager.__anext__()  # type: ignore
             try:
@@ -1530,7 +1530,7 @@ class _IteratorWrapper(Generic[V]):
                 log_once(logger.error, ON_AYIELD_MSG.format(traceback.format_exc()))
         except (StopAsyncIteration, StopIteration) as e:
             self._call_on_close_once()
-            raise StopAsyncIteration
+            raise StopAsyncIteration from e
         except Exception as e:
             self._call_on_error_once(e)
             # Always re-raise user exceptions to maintain the expected behavior

@@ -21,9 +21,15 @@ type CellValueProps = {
   noLink?: boolean;
   /** Optional style overrides for string values */
   stringStyle?: React.CSSProperties;
+  field?: string;
 };
 
-export const CellValue = ({value, noLink, stringStyle}: CellValueProps) => {
+export const CellValue = ({
+  value,
+  noLink,
+  stringStyle,
+  field,
+}: CellValueProps) => {
   if (value === undefined) {
     return null;
   }
@@ -52,7 +58,7 @@ export const CellValue = ({value, noLink, stringStyle}: CellValueProps) => {
     return <CellValueString value={value} style={stringStyle} />;
   }
   if (typeof value === 'number') {
-    if (isProbablyTimestamp(value)) {
+    if (field && isProbablyTimestamp(value, field)) {
       return <ValueViewNumberTimestamp value={value} />;
     }
     return (

@@ -195,12 +195,14 @@ export const getModelLicense = (model: Model): string => {
 export const getDefaultInferenceContext = (): InferenceContextType => {
   return {
     isLoggedIn: false,
+    isCatalogEnabled: false,
     isInferenceEnabled: false,
     availabilityMessage: '',
     playgroundEntity: '',
     playgroundProject: '',
     projectExists: false,
     ensureProjectExists: () => Promise.resolve(),
+    billing: null,
   };
 };
 
