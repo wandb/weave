@@ -22,7 +22,7 @@ Calls:
 """
 
 
-@pytest.fixture()
+@pytest.fixture
 def test_video() -> VideoClip:
     clip = ColorClip(size=(64, 64), color=(128, 0, 128), duration=1)
     clip.fps = 24
@@ -305,7 +305,7 @@ def make_random_video(video_size: tuple[int, int] = (64, 64), duration: float = 
     return clip
 
 
-@pytest.fixture()
+@pytest.fixture
 def dataset_ref(client):
     # This fixture represents a saved dataset containing videos
     n_rows = 3

@@ -7,7 +7,7 @@ from weave.trace_server import clickhouse_trace_server_migrator as trace_server_
 from weave.trace_server.clickhouse_trace_server_migrator import MigrationError
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_costs():
     with patch(
         "weave.trace_server.costs.insert_costs.should_insert_costs", return_value=False
@@ -18,7 +18,7 @@ def mock_costs():
             yield
 
 
-@pytest.fixture()
+@pytest.fixture
 def migrator():
     ch_client = Mock()
     migrator = trace_server_migrator.ClickHouseTraceServerMigrator(ch_client)

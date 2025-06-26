@@ -12,12 +12,12 @@ from weave.integrations.notdiamond.util import get_model_evals
 from weave.trace.weave_client import WeaveClient
 
 
-@pytest.fixture()
+@pytest.fixture
 def model_evals():
     return get_model_evals()
 
 
-@pytest.fixture()
+@pytest.fixture
 def model_datasets(model_evals: dict[str, EvaluationResults]):
     model_datasets = {}
     for model, eval_results in model_evals.items():
@@ -37,7 +37,7 @@ def model_datasets(model_evals: dict[str, EvaluationResults]):
     return model_datasets
 
 
-@pytest.fixture()
+@pytest.fixture
 def preference_id():
     try:
         with open(

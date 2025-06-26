@@ -299,6 +299,9 @@ exclude = ["weave_query"]
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
 
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+
 [tool.pyright]
 include = ["weave"]
 exclude = ["weave_query", "tests", "examples", "docs", "noxfile.py"]

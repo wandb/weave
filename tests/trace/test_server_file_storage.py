@@ -30,7 +30,7 @@ AZURITE_KEY = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1
 AZURITE_URL = f"http://127.0.0.1:10000/{AZURITE_ACCOUNT}"
 
 
-@pytest.fixture()
+@pytest.fixture
 def run_storage_test(client: WeaveClient):
     """Shared test runner for all storage implementations."""
 
@@ -61,7 +61,7 @@ def run_storage_test(client: WeaveClient):
 class TestS3Storage:
     """Tests for AWS S3 storage implementation."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def s3(self):
         """Moto S3 mock that implements the S3 API."""
         with mock_aws():
@@ -74,7 +74,7 @@ class TestS3Storage:
             s3_client.create_bucket(Bucket=TEST_BUCKET)
             yield s3_client
 
-    @pytest.fixture()
+    @pytest.fixture
     def aws_storage_env(self):
         """Setup AWS storage environment."""
         with mock.patch.dict(
@@ -158,7 +158,7 @@ class TestS3Storage:
 class TestGCSStorage:
     """Tests for Google Cloud Storage implementation."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def mock_gcp_credentials(self):
         """Mock GCP credentials to prevent authentication."""
         with mock.patch(
@@ -167,7 +167,7 @@ class TestGCSStorage:
             mock_creds.return_value = AnonymousCredentials()
             yield
 
-    @pytest.fixture()
+    @pytest.fixture
     def gcs(self):
         """Google Cloud Storage mock using method patches."""
         mock_storage_client = mock.MagicMock()
@@ -199,7 +199,7 @@ class TestGCSStorage:
         ):
             yield mock_storage_client
 
-    @pytest.fixture()
+    @pytest.fixture
     def gcp_storage_env(self):
         """Setup GCP storage environment."""
         with mock.patch.dict(
@@ -239,7 +239,7 @@ class TestGCSStorage:
 class TestAzureStorage:
     """Tests for Azure Blob Storage implementation."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def azure_blob(self):
         """Azure Blob Storage using Azurite emulator."""
         conn_str = (
@@ -265,7 +265,7 @@ class TestAzureStorage:
 
             yield azurite_client
 
-    @pytest.fixture()
+    @pytest.fixture
     def azure_storage_env(self):
         """Setup Azure storage environment."""
         with mock.patch.dict(

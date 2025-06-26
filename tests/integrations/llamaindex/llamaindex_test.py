@@ -42,7 +42,7 @@ def assert_calls_correct_for_quickstart(flattened_calls: list[Call]) -> None:
     assert flattened_calls_to_names(flattened_calls) == exp
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_api_key() -> Generator[None, None, None]:
     import os
 

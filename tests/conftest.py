@@ -210,7 +210,7 @@ class ThrowingServer(tsi.TraceServerInterface):
         raise DummyTestException("FAILURE - feedback_purge, req:", req)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_with_throwing_server(client):
     curr_server = client.server
     client.server = ThrowingServer()
@@ -385,7 +385,7 @@ class InMemoryWeaveLogCollector(logging.Handler):
         return self._get_logs("WARNING")
 
 
-@pytest.fixture()
+@pytest.fixture
 def log_collector(request):
     handler = InMemoryWeaveLogCollector()
     logger = logging.getLogger()  # Get your specific logger here if needed
@@ -558,13 +558,13 @@ def create_client(
     return inited_client
 
 
-@pytest.fixture()
+@pytest.fixture
 def zero_stack():
     with set_call_stack([]):
         yield
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(zero_stack, request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
@@ -576,7 +576,7 @@ def client(zero_stack, request):
         autopatch.reset_autopatch()
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_creator(zero_stack, request):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
@@ -602,7 +602,7 @@ def client_creator(zero_stack, request):
     yield client
 
 
-@pytest.fixture()
+@pytest.fixture
 def network_proxy_client(client):
     """
     This fixture is used to test the `RemoteHTTPTraceServer` class. There is
