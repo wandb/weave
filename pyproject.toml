@@ -276,10 +276,7 @@ select = [
   "PERF102", # https://docs.astral.sh/ruff/rules/incorrect-dict-iterator/
   "T20",     # https://docs.astral.sh/ruff/rules/#flake8-print-t20
   "PT001",   # https://docs.astral.sh/ruff/rules/pytest-fixture-incorrect-parentheses-style/
-<<<<<<< andrew/pt006
   "PT006",   # https://docs.astral.sh/ruff/rules/pytest-parametrize-names-wrong-type/
-=======
->>>>>>> master
 ]
 ignore = [
   # we use Google style
