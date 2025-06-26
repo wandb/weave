@@ -805,25 +805,39 @@ class CallsQuery(BaseModel):
         storage_size_sql = ""
         if self.include_storage_size:
             storage_size_sql = f"""
-            LEFT JOIN (SELECT
-                id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as storage_size_bytes
-            FROM calls_merged_stats
-            WHERE project_id = {param_slot(project_param, "String")}
-            GROUP BY id) as {STORAGE_SIZE_TABLE_NAME}
-            on calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
+            /* light one-to-one join kept in RAM once */
+            ANY LEFT JOIN (
+                SELECT
+                    id,
+                    sum(
+                        coalesce(attributes_size_bytes, 0) +
+                        coalesce(inputs_size_bytes,     0) +
+                        coalesce(output_size_bytes,     0) +
+                        coalesce(summary_size_bytes,    0)
+                    ) as storage_size_bytes
+                FROM calls_merged_stats
+                WHERE project_id = {param_slot(project_param, "String")}
+                GROUP BY id
+            ) as {STORAGE_SIZE_TABLE_NAME} USING id
             """
 
         total_storage_size_sql = ""
         if self.include_total_storage_size:
             total_storage_size_sql = f"""
-            LEFT JOIN (SELECT
-                trace_id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as total_storage_size_bytes
-            FROM calls_merged_stats
-            WHERE project_id = {param_slot(project_param, "String")}
-            GROUP BY trace_id) as {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
-            on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
+            /* light one-to-one join kept in RAM once */
+            ANY LEFT JOIN (
+                SELECT
+                    trace_id,
+                    sum(
+                        coalesce(attributes_size_bytes, 0) +
+                        coalesce(inputs_size_bytes,     0) +
+                        coalesce(output_size_bytes,     0) +
+                        coalesce(summary_size_bytes,    0)
+                    ) as total_storage_size_bytes
+                FROM calls_merged_stats
+                WHERE project_id = {param_slot(project_param, "String")}
+                GROUP BY trace_id
+            ) as {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME} USING trace_id
             """
 
         raw_sql = f"""
