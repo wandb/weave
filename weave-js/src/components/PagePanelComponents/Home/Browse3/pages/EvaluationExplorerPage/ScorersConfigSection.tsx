@@ -1,4 +1,7 @@
 import {Button} from '@wandb/weave/components/Button';
+import {Select} from '@wandb/weave/components/Form/Select';
+import {TextArea} from '@wandb/weave/components/Form/TextArea';
+import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useCallback, useMemo, useRef, useState} from 'react';
 
@@ -31,8 +34,12 @@ const ScorerRow: React.FC<{
   scorerNdx: number;
   updateScorerRef: (scorerNdx: number, ref: string | null) => void;
   deleteScorer: (scorerNdx: number) => void;
-  setCurrentlyEditingScorerNdx: (ndx: number | null) => void;
+  setCurrentlyEditingScorerNdx: (ndx: number, simplifiedConfig?: any) => void;
   scorerRefsQuery: ReturnType<typeof useLatestScorerRefs>;
+  onSaveScorer: (
+    scorerNdx: number,
+    simplifiedConfig?: any
+  ) => Promise<string | null>;
 }> = ({
   entity,
   project,
@@ -42,6 +49,7 @@ const ScorerRow: React.FC<{
   deleteScorer,
   setCurrentlyEditingScorerNdx,
   scorerRefsQuery,
+  onSaveScorer,
 }) => {
   const handleRefChange = useCallback(
     (ref: string | null) => {
@@ -72,23 +80,232 @@ const ScorerRow: React.FC<{
   }
 
   return (
-    <Row style={{alignItems: 'center', gap: '8px'}}>
-      <div style={{flex: 1}}>
-        <VersionedObjectPicker
-          entity={entity}
-          project={project}
-          objectType="scorer"
-          selectedRef={scorer.originalSourceRef}
-          onRefChange={handleRefChange}
-          latestObjectRefs={scorerRefsQuery.data ?? []}
-          loading={scorerRefsQuery.loading}
-          newOptions={[{label: 'New Scorer', value: 'new-scorer'}]}
-          allowNewOption={true}
-        />
+    <Column style={{gap: '8px'}}>
+      <Row style={{alignItems: 'center', gap: '8px'}}>
+        <div style={{flex: 1}}>
+          <VersionedObjectPicker
+            entity={entity}
+            project={project}
+            objectType="scorer"
+            selectedRef={scorer.originalSourceRef}
+            onRefChange={handleRefChange}
+            latestObjectRefs={scorerRefsQuery.data ?? []}
+            loading={scorerRefsQuery.loading}
+            newOptions={[{label: 'New Scorer', value: 'new-scorer'}]}
+            allowNewOption={true}
+          />
+        </div>
+        <Button icon="settings" variant="ghost" onClick={handleSettings} />
+        <Button icon="delete" variant="ghost" onClick={handleDelete} />
+      </Row>
+      <SimplifiedScorerConfig
+        entity={entity}
+        project={project}
+        scorerRef={scorer.originalSourceRef}
+        scorerNdx={scorerNdx}
+        onSaveScorer={onSaveScorer}
+        onOpenAdvancedSettings={setCurrentlyEditingScorerNdx}
+      />
+    </Column>
+  );
+};
+
+// Stub function to determine if a scorer qualifies for simplified config
+// TODO: Fill this out with actual logic
+export const scorerQualifiesForSimplifiedConfig = (
+  scorerRef: string | null,
+  scorerData?: any
+): boolean => {
+  // New scorers always qualify
+  if (scorerRef === null || scorerRef === 'new-scorer') {
+    return true;
+  }
+
+  // TODO: Add logic to check if existing scorer has simple structure
+  // For now, return false for all existing scorers
+  return false;
+};
+
+// Convert simplified config to full scorer object
+export const mapSimplifiedConfigToScorer = (simplifiedConfig: {
+  name: string;
+  type: 'boolean' | 'number';
+  model: string;
+  prompt: string;
+}): any => {
+  // The model will be created/selected in the ModelConfigurationForm
+  // For now, we just pass the prompt and let the form handle model creation
+
+  return {
+    _type: 'LLMAsAJudgeScorer',
+    _class_name: 'LLMAsAJudgeScorer',
+    _bases: ['Scorer', 'Object', 'BaseModel'],
+    name: simplifiedConfig.name,
+    scoring_prompt: simplifiedConfig.prompt,
+    // Store the simplified config model choice and type in a special field
+    // so ModelConfigurationForm can use it
+    _simplifiedConfig: {
+      modelChoice: simplifiedConfig.model,
+      scoreType: simplifiedConfig.type,
+    },
+    // Note: name is not part of val, it's handled as objectId in the scorer object
+  };
+};
+
+interface SimplifiedScorerConfigProps {
+  entity: string;
+  project: string;
+  scorerRef: string | null;
+  scorerNdx: number;
+  onSaveScorer: (
+    scorerNdx: number,
+    simplifiedConfig?: any
+  ) => Promise<string | null>;
+  onOpenAdvancedSettings: (scorerNdx: number, simplifiedConfig?: any) => void;
+}
+
+const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
+  entity,
+  project,
+  scorerRef,
+  scorerNdx,
+  onSaveScorer,
+  onOpenAdvancedSettings,
+}) => {
+  // Local state for the simplified form
+  const [config, setConfig] = useState({
+    name: '',
+    type: 'boolean' as 'boolean' | 'number',
+    model: 'gpt-4o',
+    prompt: '',
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Check if this scorer qualifies for simplified config
+  const qualifies = scorerQualifiesForSimplifiedConfig(scorerRef);
+
+  if (!qualifies) {
+    return (
+      <div
+        style={{
+          padding: '12px',
+          backgroundColor: '#f5f5f5',
+          borderRadius: '4px',
+          fontSize: '14px',
+          color: '#666',
+          fontStyle: 'italic',
+        }}>
+        This scorer uses advanced configuration.{' '}
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={() => onOpenAdvancedSettings(scorerNdx, config)}
+          style={{padding: '2px 8px', fontSize: '14px'}}>
+          Edit settings →
+        </Button>
       </div>
-      <Button icon="settings" variant="ghost" onClick={handleSettings} />
-      <Button icon="delete" variant="ghost" onClick={handleDelete} />
-    </Row>
+    );
+  }
+
+  // Validation
+  const isValid = config.name.trim() !== '' && config.prompt.trim() !== '';
+
+  const handleSave = async () => {
+    if (!isValid || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      // Save the scorer with current config
+      const newRef = await onSaveScorer(scorerNdx, config);
+      if (newRef) {
+        // TODO: Show success message
+        console.log('Scorer saved with ref:', newRef);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleOpenAdvanced = () => {
+    // Just open the advanced settings drawer (same as gear button)
+    // User can save their simplified config first if they want to
+    onOpenAdvancedSettings(scorerNdx, config);
+  };
+
+  return (
+    <Column
+      style={{
+        padding: '12px',
+        backgroundColor: '#f5f5f5',
+        borderRadius: '4px',
+        gap: '8px',
+      }}>
+      <Row style={{gap: '8px'}}>
+        <div style={{flex: '1 1 1px'}}>
+          <TextField
+            placeholder="Scorer name"
+            value={config.name}
+            onChange={value => setConfig({...config, name: value})}
+          />
+        </div>
+        <div style={{flex: '0 0 120px'}}>
+          <Select
+            value={{
+              label: config.type === 'boolean' ? 'Boolean' : 'Number',
+              value: config.type,
+            }}
+            options={[
+              {label: 'Boolean', value: 'boolean'},
+              {label: 'Number', value: 'number'},
+            ]}
+            onChange={option =>
+              setConfig({
+                ...config,
+                type: option?.value as 'boolean' | 'number',
+              })
+            }
+          />
+        </div>
+        <div style={{flex: '0 0 140px'}}>
+          <Select
+            value={{label: config.model, value: config.model}}
+            options={[
+              {label: 'gpt-4o', value: 'gpt-4o'},
+              {label: 'gpt-4o-mini', value: 'gpt-4o-mini'},
+              {label: 'gpt-3.5-turbo', value: 'gpt-3.5-turbo'},
+              {label: 'claude-3-opus', value: 'claude-3-opus'},
+              {label: 'claude-3-sonnet', value: 'claude-3-sonnet'},
+            ]}
+            onChange={option =>
+              setConfig({...config, model: option?.value || 'gpt-4o'})
+            }
+          />
+        </div>
+      </Row>
+      <Row>
+        <TextArea
+          placeholder="Enter the scoring prompt (e.g., 'Is the response helpful and accurate?')"
+          value={config.prompt}
+          onChange={e => setConfig({...config, prompt: e.target.value})}
+          rows={3}
+          style={{width: '100%'}}
+        />
+      </Row>
+      <Row style={{justifyContent: 'flex-end', gap: '8px'}}>
+        <Button variant="secondary" size="small" onClick={handleOpenAdvanced}>
+          Advanced settings
+        </Button>
+        <Button
+          variant="primary"
+          size="small"
+          onClick={handleSave}
+          icon={isSaving ? undefined : 'save'}
+          disabled={!isValid || isSaving}>
+          {isSaving ? 'Saving...' : 'Save'}
+        </Button>
+      </Row>
+    </Column>
   );
 };
 
@@ -103,6 +320,10 @@ export const ScorersConfigSection: React.FC<{
   const [currentlyEditingScorerNdx, setCurrentlyEditingScorerNdx] = useState<
     number | null
   >(null);
+
+  // Track simplified config data to pass to drawer
+  const [pendingSimplifiedConfig, setPendingSimplifiedConfig] =
+    useState<any>(null);
 
   const scorers = useMemo(() => {
     return config.evaluationDefinition.properties.scorers;
@@ -175,6 +396,48 @@ export const ScorersConfigSection: React.FC<{
     [editConfig]
   );
 
+  // Save scorer handler for simplified config
+  const saveScorer = useCallback(
+    async (
+      scorerNdx: number,
+      simplifiedConfig?: any
+    ): Promise<string | null> => {
+      // TODO: Implement actual save logic
+      // This should:
+      // 1. Use the simplifiedConfig passed from the component
+      // 2. Convert it to a full scorer object using mapSimplifiedConfigToScorer
+      // 3. Save it to Weave
+      // 4. Update the scorer ref
+      console.log('Saving scorer', scorerNdx, simplifiedConfig);
+
+      if (simplifiedConfig) {
+        // TODO: Convert simplified config to full scorer object
+        const scorerObject = mapSimplifiedConfigToScorer(simplifiedConfig);
+
+        // TODO: Save to Weave and get ref
+        // const newRef = await saveToWeave(scorerObject);
+        // updateScorerRef(scorerNdx, newRef);
+        // return newRef;
+      }
+
+      // For now, return null as placeholder
+      return null;
+    },
+    []
+  );
+
+  // Handle opening advanced settings (either from gear or from simplified form)
+  const handleOpenAdvancedSettings = useCallback(
+    (scorerNdx: number | null, simplifiedConfig?: any) => {
+      if (simplifiedConfig) {
+        // Store the simplified config to pass to the drawer
+        setPendingSimplifiedConfig(simplifiedConfig);
+      }
+      setCurrentlyEditingScorerNdx(scorerNdx);
+    },
+    []
+  );
+
   return (
     <ConfigSection title="Scorers" icon="type-number-alt" error={error}>
       <Column style={{gap: '8px'}}>
@@ -206,8 +469,9 @@ export const ScorersConfigSection: React.FC<{
               scorerNdx={scorerNdx}
               updateScorerRef={updateScorerRef}
               deleteScorer={deleteScorer}
-              setCurrentlyEditingScorerNdx={setCurrentlyEditingScorerNdx}
+              setCurrentlyEditingScorerNdx={handleOpenAdvancedSettings}
               scorerRefsQuery={scorerRefsQuery}
+              onSaveScorer={saveScorer}
             />
           );
         })}
@@ -233,6 +497,7 @@ export const ScorersConfigSection: React.FC<{
               });
             }
             setCurrentlyEditingScorerNdx(null);
+            setPendingSimplifiedConfig(null); // Clear pending config
           }}
           initialScorerRef={
             currentlyEditingScorerNdx !== null
@@ -240,6 +505,7 @@ export const ScorersConfigSection: React.FC<{
                 undefined
               : undefined
           }
+          pendingSimplifiedConfig={pendingSimplifiedConfig}
         />
       </Column>
     </ConfigSection>
@@ -268,7 +534,15 @@ const ScorerDrawer: React.FC<{
   open: boolean;
   onClose: (newScorerRef?: string) => void;
   initialScorerRef?: string;
-}> = ({entity, project, open, onClose, initialScorerRef}) => {
+  pendingSimplifiedConfig?: any;
+}> = ({
+  entity,
+  project,
+  open,
+  onClose,
+  initialScorerRef,
+  pendingSimplifiedConfig,
+}) => {
   const scorerFormRef = useRef<ScorerFormRef | null>(null);
   const onSave = useCallback(async () => {
     const newScorerRef = await scorerFormRef.current?.saveScorer();
@@ -278,12 +552,35 @@ const ScorerDrawer: React.FC<{
   const scorerQuery = useScorer(initialScorerRef);
 
   const scorerObj = useMemo(() => {
+    let baseScorer;
     if (initialScorerRef) {
-      return scorerQuery.data ?? emptyScorer(entity, project);
+      baseScorer = scorerQuery.data ?? emptyScorer(entity, project);
     } else {
-      return emptyScorer(entity, project);
+      baseScorer = emptyScorer(entity, project);
     }
-  }, [entity, initialScorerRef, project, scorerQuery.data]);
+
+    // If we have pendingSimplifiedConfig, merge it into the scorer object
+    if (pendingSimplifiedConfig) {
+      const mappedConfig = mapSimplifiedConfigToScorer(pendingSimplifiedConfig);
+      // Merge the mapped config into the base scorer
+      return {
+        ...baseScorer,
+        objectId: pendingSimplifiedConfig.name || baseScorer.objectId, // Set the name as objectId
+        val: {
+          ...baseScorer.val,
+          ...mappedConfig,
+        },
+      };
+    }
+
+    return baseScorer;
+  }, [
+    entity,
+    initialScorerRef,
+    project,
+    scorerQuery.data,
+    pendingSimplifiedConfig,
+  ]);
 
   if (scorerQuery.loading) {
     // TODO: Show a loading indicator
@@ -303,7 +600,9 @@ const ScorerDrawer: React.FC<{
       onSave={onSave}>
       <Tailwind>
         <LLMAsAJudgeScorerForm
-          key={initialScorerRef}
+          key={`${initialScorerRef || 'new'}-${JSON.stringify(
+            pendingSimplifiedConfig
+          )}`}
           ref={scorerFormRef}
           scorer={scorerObj}
           onValidationChange={() => {

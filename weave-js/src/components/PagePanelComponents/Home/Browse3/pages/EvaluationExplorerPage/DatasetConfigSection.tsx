@@ -19,10 +19,8 @@ export const DatasetConfigSection: React.FC<{
   const currentRef =
     config.evaluationDefinition.properties.dataset.originalSourceRef;
 
-  // Start with picker visible if we're in the default "new-empty" state
-  const [showDatasetPicker, setShowDatasetPicker] = useState(
-    currentRef === null || currentRef === 'new-empty'
-  );
+  // Always start with picker closed for cleaner UI
+  const [showDatasetPicker, setShowDatasetPicker] = useState(false);
 
   // Get a display name for the current selection
   const getDisplayName = (ref: string | null) => {
