@@ -33,7 +33,8 @@ def test_anthropic(
     calls = list(client.calls())
     assert len(calls) == 1
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.id == message.id
     assert output.model == message.model
@@ -81,7 +82,8 @@ def test_anthropic_stream(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.id == message.id
     assert output.model == message.model
@@ -122,7 +124,8 @@ async def test_async_anthropic(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.id == message.id
     assert output.model == message.model
@@ -172,7 +175,8 @@ async def test_async_anthropic_stream(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.id == message.id
     assert output.model == message.model
@@ -233,7 +237,8 @@ def test_tools_calling(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.id == message.id
     assert output.model == message.model
@@ -282,7 +287,8 @@ def test_anthropic_messages_stream_ctx_manager(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.model == model
     assert output.stop_reason == "end_turn"
@@ -331,7 +337,8 @@ async def test_async_anthropic_messages_stream_ctx_manager(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.model == model
     assert output.stop_reason == "end_turn"
@@ -378,7 +385,8 @@ def test_anthropic_messages_stream_ctx_manager_text(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.model == model
     assert output.stop_reason == "end_turn"
@@ -426,7 +434,8 @@ async def test_async_anthropic_messages_stream_ctx_manager_text(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.model == model
     assert output.stop_reason == "end_turn"
