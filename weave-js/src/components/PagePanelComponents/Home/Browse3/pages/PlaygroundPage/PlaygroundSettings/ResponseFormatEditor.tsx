@@ -15,16 +15,35 @@ const RESPONSE_FORMATS: PlaygroundResponseFormats[] = Object.values(
   PlaygroundResponseFormats
 );
 
+interface ResponseFormatEditorProps {
+  jsonSchema: string | undefined;
+  responseFormat: PlaygroundResponseFormats;
+  setResponseFormat: (value: PlaygroundResponseFormats) => void;
+  setJsonSchema: (value: string | undefined) => void;
+}
+
 export const ResponseFormatEditor: React.FC<
-  ResponseFormatSelectProps
+  ResponseFormatEditorProps
 > = props => {
   const [jsonSchemaDrawerOpen, setJsonSchemaDrawerOpen] = useState(false);
+
+  const setResponseFormat = (value: PlaygroundResponseFormats) => {
+    props.setResponseFormat(value);
+    if (value === PlaygroundResponseFormats.JsonSchema) {
+      props.setJsonSchema(DEFAULT_SCHEMA);
+    } else {
+      props.setJsonSchema(undefined);
+    }
+  };
 
   return (
     <Tailwind>
       <div className="flex flex-col gap-4">
         <span className="text-sm">Response format</span>
-        <ResponseFormatSelect {...props} />
+        <ResponseFormatSelect
+          {...props}
+          setResponseFormat={setResponseFormat}
+        />
         {props.responseFormat !== PlaygroundResponseFormats.Text &&
           (props.jsonSchema &&
           props.jsonSchema.trim() &&
@@ -67,14 +86,11 @@ export const ResponseFormatEditor: React.FC<
 };
 
 interface ResponseFormatSelectProps {
-  jsonSchema: string | undefined;
   responseFormat: PlaygroundResponseFormats;
   setResponseFormat: (value: PlaygroundResponseFormats) => void;
-  setJsonSchema: (value: string | undefined) => void;
 }
 
 export const ResponseFormatSelect = ({
-  setJsonSchema,
   responseFormat,
   setResponseFormat,
 }: ResponseFormatSelectProps) => {
@@ -90,11 +106,6 @@ export const ResponseFormatSelect = ({
           setResponseFormat(
             (option as {value: PlaygroundResponseFormats}).value
           );
-          if (option.value === PlaygroundResponseFormats.JsonSchema) {
-            setJsonSchema(DEFAULT_SCHEMA);
-          } else {
-            setJsonSchema(undefined);
-          }
         }
       }}
       options={options}
