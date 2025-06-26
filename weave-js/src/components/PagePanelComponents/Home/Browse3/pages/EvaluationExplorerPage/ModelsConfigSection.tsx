@@ -69,6 +69,83 @@ const ModelDrawer: React.FC<{
   );
 };
 
+// Separate component for each model row to properly memoize callbacks
+const ModelRow: React.FC<{
+  entity: string;
+  project: string;
+  model: {originalSourceRef: string | null};
+  modelNdx: number;
+  updateModelRef: (modelNdx: number, ref: string | null) => void;
+  deleteModel: (modelNdx: number) => void;
+  setCurrentlyEditingModelNdx: (ndx: number | null) => void;
+  modelRefsQuery: ReturnType<typeof useLatestModelRefs>;
+}> = ({
+  entity,
+  project,
+  model,
+  modelNdx,
+  updateModelRef,
+  deleteModel,
+  setCurrentlyEditingModelNdx,
+  modelRefsQuery,
+}) => {
+  const handleRefChange = useCallback(
+    (ref: string | null) => {
+      updateModelRef(modelNdx, ref);
+    },
+    [modelNdx, updateModelRef]
+  );
+
+  const handleSettings = useCallback(() => {
+    setCurrentlyEditingModelNdx(modelNdx);
+  }, [modelNdx, setCurrentlyEditingModelNdx]);
+
+  const handleDelete = useCallback(() => {
+    deleteModel(modelNdx);
+  }, [modelNdx, deleteModel]);
+
+  // Show loading state for individual dropdowns if query is loading
+  if (modelRefsQuery.loading) {
+    return (
+      <Row style={{alignItems: 'center', gap: '8px'}}>
+        <div style={{flex: 1}}>
+          <LoadingSelect />
+        </div>
+        <Button icon="settings" variant="ghost" disabled />
+        <Button icon="delete" variant="ghost" disabled />
+      </Row>
+    );
+  }
+
+  return (
+    <Row style={{alignItems: 'center', gap: '8px'}}>
+      <div style={{flex: 1}}>
+        <VersionedObjectPicker
+          entity={entity}
+          project={project}
+          objectType="model"
+          selectedRef={model.originalSourceRef}
+          onRefChange={handleRefChange}
+          latestObjectRefs={modelRefsQuery.data ?? []}
+          loading={modelRefsQuery.loading}
+          newOptions={[{label: 'New Model', value: 'new-model'}]}
+          allowNewOption={true}
+        />
+      </div>
+      <Button icon="settings" variant="ghost" onClick={handleSettings} />
+      {/* TODO: Implement copy functionality
+      <Button
+        icon="copy"
+        variant="ghost"
+        onClick={() => {
+          console.error('TODO: Implement copy model');
+        }}
+      /> */}
+      <Button icon="delete" variant="ghost" onClick={handleDelete} />
+    </Row>
+  );
+};
+
 /**
  * Configuration section for managing models in the evaluation.
  * Allows users to add, edit, and remove models that will be evaluated.
@@ -160,59 +237,18 @@ export const ModelsConfigSection: React.FC<{
             }
           }
 
-          // Show loading state for individual dropdowns if query is loading
-          if (modelRefsQuery.loading) {
-            return (
-              <Row key={modelNdx} style={{alignItems: 'center', gap: '8px'}}>
-                <div style={{flex: 1}}>
-                  <LoadingSelect />
-                </div>
-                <Button icon="settings" variant="ghost" disabled />
-                <Button icon="delete" variant="ghost" disabled />
-              </Row>
-            );
-          }
-
           return (
-            <Row key={modelNdx} style={{alignItems: 'center', gap: '8px'}}>
-              <div style={{flex: 1}}>
-                <VersionedObjectPicker
-                  entity={entity}
-                  project={project}
-                  objectType="model"
-                  selectedRef={model.originalSourceRef}
-                  onRefChange={ref => {
-                    updateModelRef(modelNdx, ref);
-                  }}
-                  latestObjectRefs={modelRefsQuery.data ?? []}
-                  loading={modelRefsQuery.loading}
-                  newOptions={[{label: 'New Model', value: 'new-model'}]}
-                  allowNewOption={true}
-                />
-              </div>
-              <Button
-                icon="settings"
-                variant="ghost"
-                onClick={() => {
-                  setCurrentlyEditingModelNdx(modelNdx);
-                }}
-              />
-              {/* TODO: Implement copy functionality
-              <Button
-                icon="copy"
-                variant="ghost"
-                onClick={() => {
-                  console.error('TODO: Implement copy model');
-                }}
-              /> */}
-              <Button
-                icon="delete"
-                variant="ghost"
-                onClick={() => {
-                  deleteModel(modelNdx);
-                }}
-              />
-            </Row>
+            <ModelRow
+              key={modelNdx}
+              entity={entity}
+              project={project}
+              model={model}
+              modelNdx={modelNdx}
+              updateModelRef={updateModelRef}
+              deleteModel={deleteModel}
+              setCurrentlyEditingModelNdx={setCurrentlyEditingModelNdx}
+              modelRefsQuery={modelRefsQuery}
+            />
           );
         })}
         <Row>

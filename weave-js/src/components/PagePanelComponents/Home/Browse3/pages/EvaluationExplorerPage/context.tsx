@@ -40,9 +40,9 @@ export const EvaluationExplorerPageProvider: React.FC<{
 
   const editConfig = useCallback(
     (fn: (draft: EvaluationExplorationConfig) => void) => {
-      setConfig(produce(config, fn));
+      setConfig(c => produce(c, fn));
     },
-    [config]
+    []
   );
 
   return (

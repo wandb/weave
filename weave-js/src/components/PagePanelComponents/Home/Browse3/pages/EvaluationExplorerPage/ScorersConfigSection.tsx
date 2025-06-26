@@ -23,6 +23,75 @@ const newScorerOption = {
 // This wraps the async query function in a React hook that manages loading/error states
 const useLatestScorerRefs = clientBound(hookify(getLatestScorerRefs));
 
+// Separate component for each scorer row to properly memoize callbacks
+const ScorerRow: React.FC<{
+  entity: string;
+  project: string;
+  scorer: {originalSourceRef: string | null};
+  scorerNdx: number;
+  updateScorerRef: (scorerNdx: number, ref: string | null) => void;
+  deleteScorer: (scorerNdx: number) => void;
+  setCurrentlyEditingScorerNdx: (ndx: number | null) => void;
+  scorerRefsQuery: ReturnType<typeof useLatestScorerRefs>;
+}> = ({
+  entity,
+  project,
+  scorer,
+  scorerNdx,
+  updateScorerRef,
+  deleteScorer,
+  setCurrentlyEditingScorerNdx,
+  scorerRefsQuery,
+}) => {
+  const handleRefChange = useCallback(
+    (ref: string | null) => {
+      updateScorerRef(scorerNdx, ref);
+    },
+    [scorerNdx, updateScorerRef]
+  );
+
+  const handleSettings = useCallback(() => {
+    setCurrentlyEditingScorerNdx(scorerNdx);
+  }, [scorerNdx, setCurrentlyEditingScorerNdx]);
+
+  const handleDelete = useCallback(() => {
+    deleteScorer(scorerNdx);
+  }, [scorerNdx, deleteScorer]);
+
+  // Show loading state for individual dropdowns if query is loading
+  if (scorerRefsQuery.loading) {
+    return (
+      <Row style={{alignItems: 'center', gap: '8px'}}>
+        <div style={{flex: 1}}>
+          <LoadingSelect />
+        </div>
+        <Button icon="settings" variant="ghost" disabled />
+        <Button icon="delete" variant="ghost" disabled />
+      </Row>
+    );
+  }
+
+  return (
+    <Row style={{alignItems: 'center', gap: '8px'}}>
+      <div style={{flex: 1}}>
+        <VersionedObjectPicker
+          entity={entity}
+          project={project}
+          objectType="scorer"
+          selectedRef={scorer.originalSourceRef}
+          onRefChange={handleRefChange}
+          latestObjectRefs={scorerRefsQuery.data ?? []}
+          loading={scorerRefsQuery.loading}
+          newOptions={[{label: 'New Scorer', value: 'new-scorer'}]}
+          allowNewOption={true}
+        />
+      </div>
+      <Button icon="settings" variant="ghost" onClick={handleSettings} />
+      <Button icon="delete" variant="ghost" onClick={handleDelete} />
+    </Row>
+  );
+};
+
 export const ScorersConfigSection: React.FC<{
   entity: string;
   project: string;
@@ -128,51 +197,18 @@ export const ScorersConfigSection: React.FC<{
             }
           }
 
-          // Show loading state for individual dropdowns if query is loading
-          if (scorerRefsQuery.loading) {
-            return (
-              <Row key={scorerNdx} style={{alignItems: 'center', gap: '8px'}}>
-                <div style={{flex: 1}}>
-                  <LoadingSelect />
-                </div>
-                <Button icon="settings" variant="ghost" disabled />
-                <Button icon="delete" variant="ghost" disabled />
-              </Row>
-            );
-          }
-
           return (
-            <Row key={scorerNdx} style={{alignItems: 'center', gap: '8px'}}>
-              <div style={{flex: 1}}>
-                <VersionedObjectPicker
-                  entity={entity}
-                  project={project}
-                  objectType="scorer"
-                  selectedRef={scorer.originalSourceRef}
-                  onRefChange={ref => {
-                    updateScorerRef(scorerNdx, ref);
-                  }}
-                  latestObjectRefs={scorerRefsQuery.data ?? []}
-                  loading={scorerRefsQuery.loading}
-                  newOptions={[{label: 'New Scorer', value: 'new-scorer'}]}
-                  allowNewOption={true}
-                />
-              </div>
-              <Button
-                icon="settings"
-                variant="ghost"
-                onClick={() => {
-                  setCurrentlyEditingScorerNdx(scorerNdx);
-                }}
-              />
-              <Button
-                icon="delete"
-                variant="ghost"
-                onClick={() => {
-                  deleteScorer(scorerNdx);
-                }}
-              />
-            </Row>
+            <ScorerRow
+              key={scorerNdx}
+              entity={entity}
+              project={project}
+              scorer={scorer}
+              scorerNdx={scorerNdx}
+              updateScorerRef={updateScorerRef}
+              deleteScorer={deleteScorer}
+              setCurrentlyEditingScorerNdx={setCurrentlyEditingScorerNdx}
+              scorerRefsQuery={scorerRefsQuery}
+            />
           );
         })}
         <Row>
