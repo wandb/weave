@@ -252,7 +252,7 @@ select = [
   "I",       # https://docs.astral.sh/ruff/rules/#isort-i
   "W",       # https://docs.astral.sh/ruff/rules/#warning-w
   "F401",    # https://docs.astral.sh/ruff/rules/unused-import/
-  "F402",
+  "F402",    # https://docs.astral.sh/ruff/rules/import-shadowed-by-loop-var/
   "TID252",  # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
   "UP",      # https://docs.astral.sh/ruff/rules/#pyupgrade-up
   "TRY002",  # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
