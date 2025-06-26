@@ -1,8 +1,6 @@
 import _ from 'lodash';
 
-import {
-  TraceCallSchema,
-} from '../../wfReactInterface/traceServerClientTypes';
+import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {
   ChatCompletion,
   ChatRequest,
@@ -78,15 +76,17 @@ interface LangchainOutput {
     metadata: any;
   };
   outputs: Array<{
-    generations: Array<Array<{
-      text: string;
-      generation_info?: {
-        finish_reason: string;
-        logprobs: null;
-      };
-      type: string;
-      message: LangchainMessage;
-    }>>;
+    generations: Array<
+      Array<{
+        text: string;
+        generation_info?: {
+          finish_reason: string;
+          logprobs: null;
+        };
+        type: string;
+        message: LangchainMessage;
+      }>
+    >;
     llm_output: {
       token_usage: {
         completion_tokens: number;
@@ -201,7 +201,11 @@ const isLangchainMessage = (message: any): boolean => {
 };
 
 export const normalizeLangchainChatRequest = (request: any): ChatRequest => {
-  if (!request.messages || !_.isArray(request.messages) || request.messages.length === 0) {
+  if (
+    !request.messages ||
+    !_.isArray(request.messages) ||
+    request.messages.length === 0
+  ) {
     return {
       model: 'unknown',
       messages: [],
@@ -231,7 +235,11 @@ const extractModelFromRequest = (request: any): string => {
     return request.model;
   }
 
-  if (request.messages && _.isArray(request.messages) && request.messages.length > 0) {
+  if (
+    request.messages &&
+    _.isArray(request.messages) &&
+    request.messages.length > 0
+  ) {
     const firstMessages = request.messages[0];
     if (_.isArray(firstMessages)) {
       for (const msg of firstMessages) {
@@ -271,7 +279,7 @@ export const normalizeLangchainChatCompletion = (
   const choice: Choice = {
     index: 0,
     message,
-    finish_reason: firstGeneration?.generation_info?.finish_reason ?? "",
+    finish_reason: firstGeneration?.generation_info?.finish_reason ?? '',
   };
 
   let usage: Usage = {
@@ -283,7 +291,7 @@ export const normalizeLangchainChatCompletion = (
   // Handle standard format (OpenAI-like)
   if (firstOutput.llm_output?.token_usage) {
     usage = firstOutput.llm_output.token_usage;
-  } 
+  }
   // Handle VertexAI format
   else if (firstGeneration.message?.kwargs?.usage_metadata) {
     const usageMetadata = firstGeneration.message.kwargs.usage_metadata;
@@ -295,19 +303,22 @@ export const normalizeLangchainChatCompletion = (
   }
 
   // Extract model name from multiple possible locations
-  const modelName = firstOutput.llm_output?.model_name || 
-                    firstGeneration.message?.kwargs?.response_metadata?.model_name ||
-                    'unknown';
+  const modelName =
+    firstOutput.llm_output?.model_name ||
+    firstGeneration.message?.kwargs?.response_metadata?.model_name ||
+    'unknown';
 
   // Extract ID from multiple possible locations
-  const id = firstOutput.llm_output?.id || 
-             firstGeneration.message?.kwargs?.response_metadata?.id ||
-             langchainOutput.id;
+  const id =
+    firstOutput.llm_output?.id ||
+    firstGeneration.message?.kwargs?.response_metadata?.id ||
+    langchainOutput.id;
 
   // Extract system fingerprint if available
-  const systemFingerprint = firstOutput.llm_output?.system_fingerprint ||
-                            firstGeneration.message?.kwargs?.response_metadata?.system_fingerprint ||
-                            '';
+  const systemFingerprint =
+    firstOutput.llm_output?.system_fingerprint ||
+    firstGeneration.message?.kwargs?.response_metadata?.system_fingerprint ||
+    '';
 
   return {
     id,

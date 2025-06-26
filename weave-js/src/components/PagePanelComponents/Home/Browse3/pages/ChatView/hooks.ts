@@ -21,6 +21,11 @@ import {
   normalizeGeminiChatRequest,
 } from './ChatFormats/gemini';
 import {
+  isTraceCallChatFormatLangchain,
+  normalizeLangchainChatCompletion,
+  normalizeLangchainChatRequest,
+} from './ChatFormats/langchain';
+import {
   isMistralCompletionFormat,
   isTraceCallChatFormatMistral,
   normalizeMistralChatCompletion,
@@ -38,11 +43,6 @@ import {
   normalizeOTELChatCompletion,
   normalizeOTELChatRequest,
 } from './ChatFormats/opentelemetry';
-import {
-  isTraceCallChatFormatLangchain,
-  normalizeLangchainChatCompletion,
-  normalizeLangchainChatRequest,
-} from './ChatFormats/langchain';
 import {ChatFormat} from './ChatFormats/types';
 import {Chat, ChatCompletion, ChatRequest} from './types';
 
