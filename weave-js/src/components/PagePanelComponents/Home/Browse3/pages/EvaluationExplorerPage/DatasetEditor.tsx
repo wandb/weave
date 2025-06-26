@@ -190,7 +190,7 @@ export const ExistingDatasetEditor: React.FC<{datasetRef: string}> = ({
             Save Changes
           </Button>
         }
-      inlineEditMode={true}
+        inlineEditMode={true}
       />
     </DatasetEditProvider>
   );

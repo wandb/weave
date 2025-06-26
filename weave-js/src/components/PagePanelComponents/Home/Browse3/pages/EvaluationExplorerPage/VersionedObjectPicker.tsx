@@ -1,12 +1,12 @@
 import {Select} from '@wandb/weave/components/Form/Select';
+import {parseWeaveRef} from '@wandb/weave/react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
-import {parseWeaveRef} from '@wandb/weave/react';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {refStringToName} from './common';
 import {LoadingSelect} from './components';
 import {clientBound, hookify} from './hooks';
 import {getAllVersionsOfObject} from './query';
-import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 
 const useObjectVersions = clientBound(hookify(getAllVersionsOfObject));
 
@@ -26,7 +26,7 @@ export interface VersionedObjectPickerProps {
  * A unified picker component that handles two-level selection:
  * 1. Object selection (e.g., "my-dataset")
  * 2. Version selection (e.g., "v1", "v2", "v3")
- * 
+ *
  * This bad boy replaces all our individual pickers with a single, powerful interface!
  */
 export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
@@ -51,10 +51,14 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
       return newOptions;
     }
     // Default single new option
-    return [{
-      label: `New ${objectType.charAt(0).toUpperCase() + objectType.slice(1)}`,
-      value: `new-${objectType}`,
-    }];
+    return [
+      {
+        label: `New ${
+          objectType.charAt(0).toUpperCase() + objectType.slice(1)
+        }`,
+        value: `new-${objectType}`,
+      },
+    ];
   }, [newOptions, objectType]);
 
   // Check if current value is a "new" option
@@ -85,15 +89,17 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
         .then(versions => {
           setObjectVersions(versions);
           setVersionsLoading(false);
-          
+
           // Auto-select latest if this was a pending selection
           // Check if either:
           // 1. We don't have a ref yet, OR
           // 2. The current ref is for a different object
           if (versions.length > 0 && pendingObjectId) {
-            const needsAutoSelect = !selectedRef || 
-              (selectedRef && parseWeaveRef(selectedRef).artifactName !== pendingObjectId);
-            
+            const needsAutoSelect =
+              !selectedRef ||
+              (selectedRef &&
+                parseWeaveRef(selectedRef).artifactName !== pendingObjectId);
+
             if (needsAutoSelect) {
               onRefChange(versions[0]);
               setPendingObjectId(null);
@@ -107,7 +113,16 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
     } else {
       setObjectVersions([]);
     }
-  }, [selectedObjectId, entity, project, getClient, isNewOption, selectedRef, pendingObjectId, onRefChange]);
+  }, [
+    selectedObjectId,
+    entity,
+    project,
+    getClient,
+    isNewOption,
+    selectedRef,
+    pendingObjectId,
+    onRefChange,
+  ]);
 
   // Clear pending when ref changes externally
   useEffect(() => {
@@ -119,43 +134,43 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   // Group objects by their ID (name)
   const objectGroups = useMemo(() => {
     const groups: Record<string, string[]> = {};
-    
+
     latestObjectRefs.forEach(ref => {
       const parsedRef = parseWeaveRef(ref);
       const objectId = parsedRef.artifactName;
-      
+
       if (!groups[objectId]) {
         groups[objectId] = [];
       }
       groups[objectId].push(ref);
     });
-    
+
     return groups;
   }, [latestObjectRefs]);
 
   // First level options: object names
   const objectOptions = useMemo(() => {
     const options: any[] = [];
-    
+
     if (allowNewOption) {
       options.push({
         label: 'Create new',
         options: effectiveNewOptions,
       });
     }
-    
+
     const existingOptions = Object.keys(objectGroups).map(objectId => ({
       label: objectId,
       value: objectId,
     }));
-    
+
     if (existingOptions.length > 0) {
       options.push({
         label: `Existing ${objectType}s`,
         options: existingOptions,
       });
     }
-    
+
     return options;
   }, [objectGroups, allowNewOption, effectiveNewOptions, objectType]);
 
@@ -164,11 +179,12 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
     if (!selectedObjectId || isNewOption) {
       return [];
     }
-    
+
     return objectVersions.map((ref, index) => {
       const parsedRef = parseWeaveRef(ref);
-      const versionLabel = index === 0 ? 'latest' : `v${objectVersions.length - index}`;
-      
+      const versionLabel =
+        index === 0 ? 'latest' : `v${objectVersions.length - index}`;
+
       return {
         label: `${versionLabel} (${parsedRef.artifactVersion.slice(0, 6)})`,
         value: ref,
@@ -177,35 +193,43 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   }, [objectVersions, selectedObjectId, isNewOption]);
 
   // Handle object selection
-  const handleObjectChange = useCallback((option: any) => {
-    const value = option?.value;
-    
-    if (!value) {
-      onRefChange(null);
-      setPendingObjectId(null);
-      return;
-    }
-    
-    // Check if it's a new option
-    if (effectiveNewOptions.some(opt => opt.value === value)) {
-      onRefChange(value);
-      setPendingObjectId(null);
-      return;
-    }
-    
-    // User is selecting a new object - we should auto-select latest
-    setPendingObjectId(value);
-  }, [onRefChange, effectiveNewOptions]);
+  const handleObjectChange = useCallback(
+    (option: any) => {
+      const value = option?.value;
+
+      if (!value) {
+        onRefChange(null);
+        setPendingObjectId(null);
+        return;
+      }
+
+      // Check if it's a new option
+      if (effectiveNewOptions.some(opt => opt.value === value)) {
+        onRefChange(value);
+        setPendingObjectId(null);
+        return;
+      }
+
+      // User is selecting a new object - we should auto-select latest
+      setPendingObjectId(value);
+    },
+    [onRefChange, effectiveNewOptions]
+  );
 
   // Handle version selection
-  const handleVersionChange = useCallback((option: any) => {
-    const ref = option?.value;
-    onRefChange(ref || null);
-  }, [onRefChange]);
+  const handleVersionChange = useCallback(
+    (option: any) => {
+      const ref = option?.value;
+      onRefChange(ref || null);
+    },
+    [onRefChange]
+  );
 
   // If we're in new object mode, just show a single select
   if (isNewOption) {
-    const selectedNewOption = effectiveNewOptions.find(opt => opt.value === selectedRef);
+    const selectedNewOption = effectiveNewOptions.find(
+      opt => opt.value === selectedRef
+    );
     return (
       <Select
         value={selectedNewOption}
@@ -217,13 +241,17 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   }
 
   // Determine selected values
-  const selectedObjectOption = selectedObjectId ? {
-    label: selectedObjectId,
-    value: selectedObjectId,
-  } : null;
+  const selectedObjectOption = selectedObjectId
+    ? {
+        label: selectedObjectId,
+        value: selectedObjectId,
+      }
+    : null;
 
-  const selectedVersionOption = selectedRef && selectedObjectId && !isNewOption ? 
-    versionOptions.find(opt => opt.value === selectedRef) : null;
+  const selectedVersionOption =
+    selectedRef && selectedObjectId && !isNewOption
+      ? versionOptions.find(opt => opt.value === selectedRef)
+      : null;
 
   if (loading) {
     return <LoadingSelect />;
@@ -239,7 +267,7 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
           onChange={handleObjectChange}
         />
       </div>
-      
+
       {selectedObjectId && !isNewOption && (
         <>
           <span style={{color: '#666', flex: '0 0 auto'}}>→</span>
@@ -259,4 +287,4 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
       )}
     </div>
   );
-}; 
+};

@@ -9,19 +9,73 @@ export const ConfigSection: React.FC<{
   icon: IconName;
   style?: React.CSSProperties;
   children?: React.ReactNode;
-}> = ({title, icon, style, children}) => {
+  error?: string;
+  warning?: string;
+  info?: string;
+  headerAction?: React.ReactNode;
+}> = ({title, icon, style, children, error, warning, info, headerAction}) => {
   return (
-    <Column style={{padding: '8px 16px 16px 16px', flex: 0, ...style}}>
+    <Column style={{flex: 0, ...style}}>
       <Row
         style={{
           alignItems: 'center',
           flex: 0,
           fontWeight: 600,
           paddingBottom: '8px',
+          justifyContent: 'space-between',
         }}>
-        <Icon name={icon} />
-        <span style={{marginLeft: '4px'}}>{title}</span>
+        <Row style={{alignItems: 'center', gap: '4px'}}>
+          <Icon name={icon} />
+          <span style={{marginLeft: '4px'}}>{title}</span>
+        </Row>
+        {headerAction && <div style={{marginLeft: 'auto'}}>{headerAction}</div>}
       </Row>
+      {/* Validation messages */}
+      {(error || warning || info) && (
+        <div style={{marginBottom: '8px'}}>
+          {error && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '4px',
+                fontSize: '12px',
+                color: '#ef4444',
+                marginBottom: '4px',
+              }}>
+              <Icon name="failed" size="small" />
+              <span>{error}</span>
+            </div>
+          )}
+          {!error && warning && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '4px',
+                fontSize: '12px',
+                color: '#f59e0b',
+                marginBottom: '4px',
+              }}>
+              <Icon name="warning" size="small" />
+              <span>{warning}</span>
+            </div>
+          )}
+          {!error && !warning && info && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '4px',
+                fontSize: '12px',
+                color: '#6b7280',
+              }}>
+              <Icon name="info" size="small" />
+              <span>{info}</span>
+            </div>
+          )}
+        </div>
+      )}
       {children}
     </Column>
   );

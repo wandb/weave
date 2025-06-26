@@ -13,11 +13,10 @@ export const DatasetConfigSection: React.FC<{
   entity: string;
   project: string;
   setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
-}> = ({entity, project, setNewDatasetEditorMode}) => {
+  error?: string;
+}> = ({entity, project, setNewDatasetEditorMode, error}) => {
   return (
-    <ConfigSection
-      title="Dataset"
-      icon="table">
+    <ConfigSection title="Dataset" icon="table" error={error}>
       <DatasetPicker
         entity={entity}
         project={project}
@@ -39,33 +38,47 @@ const DatasetPicker: React.FC<{
   const setDatasetRef = useCallback(
     (datasetRef: string | null) => {
       // Don't update if the ref hasn't changed
-      const currentRef = config.evaluationDefinition.properties.dataset.originalSourceRef;
+      const currentRef =
+        config.evaluationDefinition.properties.dataset.originalSourceRef;
       if (datasetRef === currentRef) {
         return;
       }
-      
+
       if (datasetRef === 'new-empty' || datasetRef === 'new-file') {
         // Handle special new dataset modes
         const mode = datasetRef as 'new-empty' | 'new-file';
         setNewDatasetEditorMode(mode);
         editConfig(draft => {
-          if (draft.evaluationDefinition.properties.dataset.originalSourceRef !== null) {
-            draft.evaluationDefinition.properties.dataset.originalSourceRef = null;
+          if (
+            draft.evaluationDefinition.properties.dataset.originalSourceRef !==
+            null
+          ) {
+            draft.evaluationDefinition.properties.dataset.originalSourceRef =
+              null;
           }
         });
       } else {
         // Set selected dataset ref
         editConfig(draft => {
-          if (draft.evaluationDefinition.properties.dataset.originalSourceRef !== datasetRef) {
-            draft.evaluationDefinition.properties.dataset.originalSourceRef = datasetRef;
+          if (
+            draft.evaluationDefinition.properties.dataset.originalSourceRef !==
+            datasetRef
+          ) {
+            draft.evaluationDefinition.properties.dataset.originalSourceRef =
+              datasetRef;
           }
         });
       }
     },
-    [editConfig, setNewDatasetEditorMode, config.evaluationDefinition.properties.dataset.originalSourceRef]
+    [
+      editConfig,
+      setNewDatasetEditorMode,
+      config.evaluationDefinition.properties.dataset.originalSourceRef,
+    ]
   );
 
-  const currentRef = config.evaluationDefinition.properties.dataset.originalSourceRef;
+  const currentRef =
+    config.evaluationDefinition.properties.dataset.originalSourceRef;
 
   // Dataset has two special "new" options
   const datasetNewOptions = [

@@ -1,69 +1,175 @@
 import {Select} from '@wandb/weave/components/Form/Select';
+import {TextArea} from '@wandb/weave/components/Form/TextArea';
+import {TextField} from '@wandb/weave/components/Form/TextField';
+import {Icon, IconName} from '@wandb/weave/components/Icon';
 import React from 'react';
-
-import { Box, TextField, TextFieldProps, Typography } from '@material-ui/core';
-import { Icon, IconName } from '@wandb/weave/components/Icon';
 
 export const LoadingSelect: typeof Select = props => {
   return <Select isDisabled placeholder="Loading..." {...props} />;
 };
 
-
-const FieldName: React.FC<{name: string, icon?: IconName}> = ({name, icon}) => {
+const FieldLabel: React.FC<{
+  label: string;
+  icon?: IconName;
+  required?: boolean;
+}> = ({label, icon, required}) => {
   return (
-    <Typography className="mb-8 font-semibold">
-      {icon && <Icon name={icon} />}
-      {name}
-    </Typography>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        marginBottom: '8px',
+        fontWeight: 600,
+        fontSize: '14px',
+      }}>
+      {icon && <Icon name={icon} size="small" />}
+      <span>{label}</span>
+      {required && <span style={{color: '#ef4444'}}>*</span>}
+    </div>
   );
 };
 
-const WarningMessage: React.FC<{warning: string}> = ({warning}) => {
-  return (
-    <Typography
-      className="mt-1 text-sm">
-      {warning}
-    </Typography>
-  );
-};
+const ValidationMessage: React.FC<{
+  message: string;
+  type: 'error' | 'warning' | 'info';
+}> = ({message, type}) => {
+  const colors = {
+    error: '#ef4444',
+    warning: '#f59e0b',
+    info: '#6b7280',
+  };
 
-const ErrorMessage: React.FC<{error: string}> = ({error}) => {
+  const icons: Record<string, IconName> = {
+    error: 'failed',
+    warning: 'warning',
+    info: 'info',
+  };
+
   return (
-    <Typography
-      className="mt-1 text-sm">
-      {error}
-    </Typography>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '4px',
+        marginTop: '4px',
+        fontSize: '12px',
+        color: colors[type],
+      }}>
+      <Icon name={icons[type]} size="small" />
+      <span>{message}</span>
+    </div>
   );
 };
 
 const Instructions: React.FC<{instructions: string}> = ({instructions}) => {
   return (
-    <Typography
-      className="mt-4 text-sm font-normal">
+    <div
+      style={{
+        marginTop: '4px',
+        fontSize: '12px',
+        color: '#6b7280',
+      }}>
       {instructions}
-    </Typography>
+    </div>
   );
 };
 
-
-
-export const LabeledFormTextField: React.FC<{
-  name: string;
-  textFieldProps: TextFieldProps;
+export const LabeledTextField: React.FC<{
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
   icon?: IconName;
-  warning?: string;
+  required?: boolean;
   error?: string;
+  warning?: string;
   instructions?: string;
-}> = ({name, textFieldProps, icon, warning, error, instructions}) => {
-  return <Box sx={{
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-  }}>
-  <FieldName name={name} />
-  <TextField {...textFieldProps} />
-  {error && <ErrorMessage error={error} />}
-  {warning && <WarningMessage warning={warning} />}
-  {instructions && <Instructions instructions={instructions} />}
-</Box>
-}
+  disabled?: boolean;
+  onBlur?: () => void;
+}> = ({
+  label,
+  value,
+  onChange,
+  placeholder,
+  icon,
+  required,
+  error,
+  warning,
+  instructions,
+  disabled,
+  onBlur,
+}) => {
+  return (
+    <div style={{display: 'flex', flexDirection: 'column'}}>
+      <FieldLabel label={label} icon={icon} required={required} />
+      <TextField
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        errorState={!!error}
+        onBlur={onBlur}
+      />
+      {error && <ValidationMessage message={error} type="error" />}
+      {!error && warning && (
+        <ValidationMessage message={warning} type="warning" />
+      )}
+      {!error && !warning && instructions && (
+        <Instructions instructions={instructions} />
+      )}
+    </div>
+  );
+};
+
+export const LabeledTextArea: React.FC<{
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  icon?: IconName;
+  required?: boolean;
+  error?: string;
+  warning?: string;
+  instructions?: string;
+  disabled?: boolean;
+  rows?: number;
+  onBlur?: () => void;
+}> = ({
+  label,
+  value,
+  onChange,
+  placeholder,
+  icon,
+  required,
+  error,
+  warning,
+  instructions,
+  disabled,
+  rows = 3,
+  onBlur,
+}) => {
+  return (
+    <div style={{display: 'flex', flexDirection: 'column'}}>
+      <FieldLabel label={label} icon={icon} required={required} />
+      <TextArea
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        rows={rows}
+        style={{
+          borderColor: error ? '#ef4444' : undefined,
+        }}
+        onBlur={onBlur}
+      />
+      {error && <ValidationMessage message={error} type="error" />}
+      {!error && warning && (
+        <ValidationMessage message={warning} type="warning" />
+      )}
+      {!error && !warning && instructions && (
+        <Instructions instructions={instructions} />
+      )}
+    </div>
+  );
+};

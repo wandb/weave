@@ -77,7 +77,8 @@ const ModelDrawer: React.FC<{
 export const ModelsConfigSection: React.FC<{
   entity: string;
   project: string;
-}> = ({entity, project}) => {
+  error?: string;
+}> = ({entity, project, error}) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const modelRefsQuery = useLatestModelRefs(entity, project);
 
@@ -139,9 +140,7 @@ export const ModelsConfigSection: React.FC<{
   );
 
   return (
-    <ConfigSection
-      title="Models"
-      icon="model">
+    <ConfigSection title="Models" icon="model" error={error}>
       <Column style={{gap: '8px'}}>
         {models.map((model, modelNdx) => {
           let selectedOption = newModelOption;
@@ -183,12 +182,12 @@ export const ModelsConfigSection: React.FC<{
                   project={project}
                   objectType="model"
                   selectedRef={model.originalSourceRef}
-                  onRefChange={(ref) => {
+                  onRefChange={ref => {
                     updateModelRef(modelNdx, ref);
                   }}
                   latestObjectRefs={modelRefsQuery.data ?? []}
                   loading={modelRefsQuery.loading}
-                  newOptions={[{label: "New Model", value: "new-model"}]}
+                  newOptions={[{label: 'New Model', value: 'new-model'}]}
                   allowNewOption={true}
                 />
               </div>

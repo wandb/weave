@@ -116,7 +116,10 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   const apiRef = useGridApiRef();
 
   // Track which cell is currently being edited in inline mode
-  const [editingCell, setEditingCell] = useState<{id: string; field: string} | null>(null);
+  const [editingCell, setEditingCell] = useState<{
+    id: string;
+    field: string;
+  } | null>(null);
 
   const onSortModelChange = useCallback((model: GridSortModel) => {
     setSortBy(
@@ -348,13 +351,15 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     }
     setAddedRows(prev => {
       const addedRowEntries = Array.from(prev.entries());
-      const newEntries: Array<[string, any]> = addedRowEntries.map(([key, row]) => {
-        const newRow = {
-          ...row,
-          [newFieldName]: '',
-        };
-        return [key, newRow] as [string, any];
-      });
+      const newEntries: Array<[string, any]> = addedRowEntries.map(
+        ([key, row]) => {
+          const newRow = {
+            ...row,
+            [newFieldName]: '',
+          };
+          return [key, newRow] as [string, any];
+        }
+      );
 
       return new Map(newEntries);
     });
@@ -388,7 +393,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   const columns = useMemo(() => {
     // Create an array to hold all columns
     const allColumns: GridColDef[] = [];
-    
+
     // Start with columnsBeforeData
     allColumns.push(...columnsBeforeData);
 
@@ -490,73 +495,92 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
             </div>
           );
         }
-        
+
         // Use inline renderer if inlineEditMode is enabled
         if (inlineEditMode) {
           const rowIndex = params.row.___weave?.index;
-          
+
           // Determine if this is the last cell (last row, last editable column)
           const rowIds = apiRef.current?.getAllRowIds() || [];
           const isLastRow = params.id === rowIds[rowIds.length - 1];
-          
+
           // Check if this is an editable data field (not control/id columns or columnsAfterData)
-          const isEditableDataField = allFields.includes(field as string) && 
-            !columnsAfterData.some((afterCol: GridColDef) => afterCol.field === field);
-          
+          const isEditableDataField =
+            allFields.includes(field as string) &&
+            !columnsAfterData.some(
+              (afterCol: GridColDef) => afterCol.field === field
+            );
+
           // Find the last editable field
-          const editableFields = allFields.filter(f => 
-            !columnsAfterData.some((afterCol: GridColDef) => afterCol.field === f)
+          const editableFields = allFields.filter(
+            f =>
+              !columnsAfterData.some(
+                (afterCol: GridColDef) => afterCol.field === f
+              )
           );
           const lastEditableField = editableFields[editableFields.length - 1];
           const isLastEditableColumn = field === lastEditableField;
-          const isLastCell = isLastRow && isLastEditableColumn && isEditableDataField;
-          
+          const isLastCell =
+            isLastRow && isLastEditableColumn && isEditableDataField;
+
           // Check if current row has content
-          const currentRow = combinedRows.find(row => row.___weave?.id === params.id);
-          const rowHasContent = currentRow && allFields.some(f => {
-            const value = (currentRow as any)[f];
-            return value !== '' && value !== null && value !== undefined;
-          });
-          
-          // Callback to add a new row and focus on its first cell
-          const handleTabAtEnd = autoAddRows ? () => {
-            // Check if current row has any non-empty values
-            const currentRow = combinedRows.find(row => row.___weave?.id === params.id);
-            const hasContent = currentRow && allFields.some(f => {
+          const currentRow = combinedRows.find(
+            row => row.___weave?.id === params.id
+          );
+          const rowHasContent =
+            currentRow &&
+            allFields.some(f => {
               const value = (currentRow as any)[f];
               return value !== '' && value !== null && value !== undefined;
             });
-            
-            // If row is empty, don't add a new row
-            if (!hasContent) {
-              return;
-            }
-            
-            // Add a new row
-            const newId = `${ADDED_ROW_ID_PREFIX}${uuidv4()}`;
-            const newRow = {
-              ___weave: {
-                id: newId,
-                isNew: true,
-              },
-              ...Object.fromEntries(allFields.map(f => [f, ''])),
-            };
-            
-            setAddedRows(prev => {
-              const updatedMap = new Map(prev);
-              updatedMap.set(newId, newRow);
-              return updatedMap;
-            });
-            
-            // Focus on the first editable cell of the new row
-            setTimeout(() => {
-              const firstEditableField = editableFields[0];
-              if (firstEditableField) {
-                apiRef.current.setCellFocus(newId, firstEditableField);
+
+          // Callback to add a new row and focus on its first cell
+          const handleTabAtEnd = autoAddRows
+            ? () => {
+                // Check if current row has any non-empty values
+                const currentRow = combinedRows.find(
+                  row => row.___weave?.id === params.id
+                );
+                const hasContent =
+                  currentRow &&
+                  allFields.some(f => {
+                    const value = (currentRow as any)[f];
+                    return (
+                      value !== '' && value !== null && value !== undefined
+                    );
+                  });
+
+                // If row is empty, don't add a new row
+                if (!hasContent) {
+                  return;
+                }
+
+                // Add a new row
+                const newId = `${ADDED_ROW_ID_PREFIX}${uuidv4()}`;
+                const newRow = {
+                  ___weave: {
+                    id: newId,
+                    isNew: true,
+                  },
+                  ...Object.fromEntries(allFields.map(f => [f, ''])),
+                };
+
+                setAddedRows(prev => {
+                  const updatedMap = new Map(prev);
+                  updatedMap.set(newId, newRow);
+                  return updatedMap;
+                });
+
+                // Focus on the first editable cell of the new row
+                setTimeout(() => {
+                  const firstEditableField = editableFields[0];
+                  if (firstEditableField) {
+                    apiRef.current.setCellFocus(newId, firstEditableField);
+                  }
+                }, 100);
               }
-            }, 100);
-          } : undefined;
-          
+            : undefined;
+
           return (
             <InlineCellRenderer
               {...params}
@@ -573,7 +597,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               )}
               disableNewRowHighlight={disableNewRowHighlight}
               preserveFieldOrder={preserveFieldOrder}
-              onCellEditStart={(cellParams) => setEditingCell(cellParams)}
+              onCellEditStart={cellParams => setEditingCell(cellParams)}
               onCellEditStop={() => setEditingCell(null)}
               isLastCell={isLastCell}
               onTabAtEnd={handleTabAtEnd}
@@ -581,7 +605,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
             />
           );
         }
-        
+
         const rowIndex = params.row.___weave?.index;
 
         return (
@@ -607,7 +631,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
 
     // Add field columns
     allColumns.push(...fieldColumns);
-    
+
     // Add columnsAfterData
     allColumns.push(...columnsAfterData);
 
@@ -773,14 +797,16 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   const handleSaveNewFieldName = useCallback(() => {
     setAddedRows(prev => {
       const addedRowEntries = Array.from(prev.entries());
-      const newEntries: Array<[string, any]> = addedRowEntries.map(([key, row]) => {
-        const val = row[edittingFieldName ?? ''];
-        const newRow = {
-          ..._.omit(row, edittingFieldName ?? ''),
-          [newFieldName ?? '']: val,
-        };
-        return [key, newRow] as [string, any];
-      });
+      const newEntries: Array<[string, any]> = addedRowEntries.map(
+        ([key, row]) => {
+          const val = row[edittingFieldName ?? ''];
+          const newRow = {
+            ..._.omit(row, edittingFieldName ?? ''),
+            [newFieldName ?? '']: val,
+          };
+          return [key, newRow] as [string, any];
+        }
+      );
 
       return new Map(newEntries);
     });
@@ -791,10 +817,12 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   const handleDeleteColumn = useCallback(
     (fieldName: string) => {
       setAddedRows(prev => {
-        const newEntries: Array<[string, any]> = Array.from(prev.entries()).map(([key, row]) => {
-          const newRow = _.omit(row, fieldName);
-          return [key, newRow] as [string, any];
-        });
+        const newEntries: Array<[string, any]> = Array.from(prev.entries()).map(
+          ([key, row]) => {
+            const newRow = _.omit(row, fieldName);
+            return [key, newRow] as [string, any];
+          }
+        );
         console.log(newEntries);
         return new Map(newEntries);
       });
@@ -847,35 +875,42 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
       }
 
       const {field, id} = params;
-      
+
       // Handle Tab key for auto row addition when at the last cell
       if (event.key === 'Tab' && !editingCell && autoAddRows) {
         const rowIds = apiRef.current.getAllRowIds();
         const isLastRow = id === rowIds[rowIds.length - 1];
-        
+
         if (isLastRow && !event.shiftKey) {
           // Check if we're at the last editable field
-          const editableFields = allFields.filter(f => 
-            !columnsAfterData.some((afterCol: GridColDef) => afterCol.field === f)
+          const editableFields = allFields.filter(
+            f =>
+              !columnsAfterData.some(
+                (afterCol: GridColDef) => afterCol.field === f
+              )
           );
           const lastEditableField = editableFields[editableFields.length - 1];
-          
+
           if (field === lastEditableField) {
             event.stopPropagation();
             event.preventDefault();
-            
+
             // Check if current row has any non-empty values
-            const currentRow = combinedRows.find(row => row.___weave?.id === id);
-            const hasContent = currentRow && allFields.some(f => {
-              const value = (currentRow as any)[f];
-              return value !== '' && value !== null && value !== undefined;
-            });
-            
+            const currentRow = combinedRows.find(
+              row => row.___weave?.id === id
+            );
+            const hasContent =
+              currentRow &&
+              allFields.some(f => {
+                const value = (currentRow as any)[f];
+                return value !== '' && value !== null && value !== undefined;
+              });
+
             // If row is empty, don't add a new row
             if (!hasContent) {
               return;
             }
-            
+
             // Add a new row
             const newId = `${ADDED_ROW_ID_PREFIX}${uuidv4()}`;
             const newRow = {
@@ -885,13 +920,13 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               },
               ...Object.fromEntries(allFields.map(f => [f, ''])),
             };
-            
+
             setAddedRows(prev => {
               const updatedMap = new Map(prev);
               updatedMap.set(newId, newRow);
               return updatedMap;
             });
-            
+
             // Focus on the first editable cell of the new row
             setTimeout(() => {
               const firstEditableField = editableFields[0];
@@ -899,31 +934,36 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
                 apiRef.current.setCellFocus(newId, firstEditableField);
               }
             }, 100);
-            
+
             return;
           }
         }
       }
-      
+
       // Start editing on Enter or F2
       if (event.key === 'Enter' || event.key === 'F2') {
         event.stopPropagation();
         event.preventDefault();
       }
-      
+
       // Arrow key navigation when not editing
-      if (!editingCell && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      if (
+        !editingCell &&
+        ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)
+      ) {
         event.stopPropagation();
         const api = apiRef.current;
         const rowIds = api.getAllRowIds();
         const currentRowIndex = rowIds.indexOf(id);
         const allColumns = api.getAllColumns();
-        const currentColIndex = allColumns.findIndex((col: GridColDef) => col.field === field);
-        
+        const currentColIndex = allColumns.findIndex(
+          (col: GridColDef) => col.field === field
+        );
+
         if (currentRowIndex !== -1 && currentColIndex !== -1) {
           let newRowIndex = currentRowIndex;
           let newColIndex = currentColIndex;
-          
+
           switch (event.key) {
             case 'ArrowUp':
               newRowIndex = Math.max(0, currentRowIndex - 1);
@@ -935,17 +975,33 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               newColIndex = Math.max(0, currentColIndex - 1);
               break;
             case 'ArrowRight':
-              newColIndex = Math.min(allColumns.length - 1, currentColIndex + 1);
+              newColIndex = Math.min(
+                allColumns.length - 1,
+                currentColIndex + 1
+              );
               break;
           }
-          
+
           if (rowIds[newRowIndex] && allColumns[newColIndex]) {
-            api.setCellFocus(rowIds[newRowIndex], allColumns[newColIndex].field);
+            api.setCellFocus(
+              rowIds[newRowIndex],
+              allColumns[newColIndex].field
+            );
           }
         }
       }
     },
-    [inlineEditMode, isEditing, editingCell, apiRef, columnsAfterData, allFields, setAddedRows, autoAddRows, combinedRows]
+    [
+      inlineEditMode,
+      isEditing,
+      editingCell,
+      apiRef,
+      columnsAfterData,
+      allFields,
+      setAddedRows,
+      autoAddRows,
+      combinedRows,
+    ]
   );
 
   return (
@@ -1021,14 +1077,16 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
             },
             lineHeight: '20px',
             // Add focus styles for inline edit mode
-            ...(inlineEditMode && isEditing ? {
-              '&:focus': {
-                outline: 'none',
-              },
-              '&.Mui-focusVisible': {
-                outline: 'none',
-              },
-            } : {}),
+            ...(inlineEditMode && isEditing
+              ? {
+                  '&:focus': {
+                    outline: 'none',
+                  },
+                  '&.Mui-focusVisible': {
+                    outline: 'none',
+                  },
+                }
+              : {}),
           },
           // Removed default MUI blue from editing cell
           '.MuiDataGrid-cell.MuiDataGrid-cell--editing': {

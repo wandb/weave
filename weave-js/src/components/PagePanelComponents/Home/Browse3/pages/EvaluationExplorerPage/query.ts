@@ -172,7 +172,6 @@ export const runEvaluation = async (
   return res.eval_call_ids;
 };
 
-
 export const getAllVersionsOfObject = async (
   client: TraceServerClient,
   entity: string,
@@ -188,5 +187,7 @@ export const getAllVersionsOfObject = async (
     limit: 1000,
     metadata_only: true,
   });
-  return res.objs.map(o => makeRefObject(entity, project, 'object', o.object_id, o.digest, undefined));
+  return res.objs.map(o =>
+    makeRefObject(entity, project, 'object', o.object_id, o.digest, undefined)
+  );
 };

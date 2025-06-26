@@ -27,7 +27,8 @@ const useLatestScorerRefs = clientBound(hookify(getLatestScorerRefs));
 export const ScorersConfigSection: React.FC<{
   entity: string;
   project: string;
-}> = ({entity, project}) => {
+  error?: string;
+}> = ({entity, project, error}) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const scorerRefsQuery = useLatestScorerRefs(entity, project);
 
@@ -77,11 +78,13 @@ export const ScorersConfigSection: React.FC<{
     (scorerNdx: number, ref: string | null) => {
       editConfig(draft => {
         // Don't update if the ref hasn't changed
-        const currentRef = draft.evaluationDefinition.properties.scorers[scorerNdx]?.originalSourceRef;
+        const currentRef =
+          draft.evaluationDefinition.properties.scorers[scorerNdx]
+            ?.originalSourceRef;
         if (ref === currentRef) {
           return;
         }
-        
+
         if (ref === 'new-scorer' || ref === null) {
           // Reset to empty scorer
           draft.evaluationDefinition.properties.scorers[
@@ -105,9 +108,7 @@ export const ScorersConfigSection: React.FC<{
   );
 
   return (
-    <ConfigSection
-      title="Scorers"
-      icon="type-number-alt">
+    <ConfigSection title="Scorers" icon="type-number-alt" error={error}>
       <Column style={{gap: '8px'}}>
         {scorers.map((scorer, scorerNdx) => {
           let selectedOption = newScorerOption;
@@ -149,12 +150,12 @@ export const ScorersConfigSection: React.FC<{
                   project={project}
                   objectType="scorer"
                   selectedRef={scorer.originalSourceRef}
-                  onRefChange={(ref) => {
+                  onRefChange={ref => {
                     updateScorerRef(scorerNdx, ref);
                   }}
                   latestObjectRefs={scorerRefsQuery.data ?? []}
                   loading={scorerRefsQuery.loading}
-                  newOptions={[{label: "New Scorer", value: "new-scorer"}]}
+                  newOptions={[{label: 'New Scorer', value: 'new-scorer'}]}
                   allowNewOption={true}
                 />
               </div>
@@ -172,9 +173,9 @@ export const ScorersConfigSection: React.FC<{
                   deleteScorer(scorerNdx);
                 }}
               />
-                      </Row>
-        );
-      })}
+            </Row>
+          );
+        })}
         <Row>
           <Button
             icon="add-new"
