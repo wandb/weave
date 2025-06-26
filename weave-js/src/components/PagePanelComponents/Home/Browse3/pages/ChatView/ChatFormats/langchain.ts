@@ -1,7 +1,6 @@
 import _ from 'lodash';
 
 import {
-  KeyedDictType,
   TraceCallSchema,
 } from '../../wfReactInterface/traceServerClientTypes';
 import {
@@ -81,7 +80,7 @@ interface LangchainOutput {
   outputs: Array<{
     generations: Array<Array<{
       text: string;
-      generation_info: {
+      generation_info?: {
         finish_reason: string;
         logprobs: null;
       };
@@ -268,11 +267,12 @@ export const normalizeLangchainChatCompletion = (
   const firstOutput = langchainOutput.outputs[0];
   const firstGeneration = firstOutput.generations[0][0];
   const message = langchainMessageToMessage(firstGeneration.message);
+  const finishReason = firstGeneration
 
   const choice: Choice = {
     index: 0,
     message,
-    finish_reason: firstGeneration.generation_info.finish_reason,
+    finish_reason: firstGeneration?.generation_info?.finish_reason ?? "",
   };
 
   const usage: Usage = firstOutput.llm_output.token_usage || {
