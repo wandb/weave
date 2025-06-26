@@ -345,7 +345,7 @@ const ConfigPanel: React.FC<{
         )}
 
         <LabeledTextField
-          label="Evaluation Name"
+          label="Title"
           value={config.evaluationDefinition.properties.name}
           onChange={value => {
             editConfig(draft => {
@@ -383,7 +383,7 @@ const ConfigPanel: React.FC<{
               ? 'Description is required'
               : undefined
           }
-          instructions="Describe what this evaluation is testing"
+          // instructions="Describe what this evaluation is testing"
           rows={3}
           onBlur={() => markFieldTouched('description')}
         />

@@ -216,7 +216,20 @@ export const ModelsConfigSection: React.FC<{
   );
 
   return (
-    <ConfigSection title="Models" icon="model" error={error}>
+    <ConfigSection
+      title="Models"
+      icon="model"
+      headerAction={
+        <Button
+          icon="add-new"
+          variant="ghost"
+          size="small"
+          onClick={() => {
+            addModel();
+          }}>
+          Add Model
+        </Button>
+      }>
       <Column style={{gap: '8px'}}>
         {models.map((model, modelNdx) => {
           let selectedOption = newModelOption;
@@ -251,15 +264,6 @@ export const ModelsConfigSection: React.FC<{
             />
           );
         })}
-        <Row>
-          <Button
-            icon="add-new"
-            variant="ghost"
-            onClick={() => {
-              addModel();
-            }}
-          />
-        </Row>
         <ModelDrawer
           entity={entity}
           project={project}

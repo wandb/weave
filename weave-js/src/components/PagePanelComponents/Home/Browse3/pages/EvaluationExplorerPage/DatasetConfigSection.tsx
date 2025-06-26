@@ -54,20 +54,12 @@ export const DatasetConfigSection: React.FC<{
   );
 
   return (
-    <ConfigSection
-      title="Dataset"
-      icon="table"
-      error={error}
-      headerAction={headerAction}>
-      {showDatasetPicker && (
-        <PickerContainer title="Select Dataset" style={{marginBottom: '12px'}}>
-          <DatasetPicker
-            entity={entity}
-            project={project}
-            setNewDatasetEditorMode={setNewDatasetEditorMode}
-          />
-        </PickerContainer>
-      )}
+    <ConfigSection title="Dataset" icon="table">
+      <DatasetPicker
+        entity={entity}
+        project={project}
+        setNewDatasetEditorMode={setNewDatasetEditorMode}
+      />
     </ConfigSection>
   );
 };

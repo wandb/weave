@@ -254,6 +254,8 @@ interface LLMDropdownLoadedProps {
   className?: string;
   direction: OpenDirection;
   selectFirstAvailable?: boolean;
+  // Tim: I think this should always be true, but messes with other products
+  hideSavedModels?: boolean;
 }
 
 export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
@@ -263,6 +265,7 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
   className,
   direction,
   selectFirstAvailable = false,
+  hideSavedModels = false,
 }) => {
   const {entity, project, projectId} = useEntityProject();
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
@@ -343,8 +346,8 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
     customProvidersResult || [],
     customProviderModelsResult || [],
     customProvidersLoading,
-    savedModelsResult || [],
-    savedModelsLoading
+    hideSavedModels ? [] : savedModelsResult || [],
+    hideSavedModels ? false : savedModelsLoading
   );
 
   const isValueAvailable = useMemo(

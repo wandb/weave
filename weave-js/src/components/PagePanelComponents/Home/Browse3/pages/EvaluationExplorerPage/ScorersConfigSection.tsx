@@ -8,6 +8,7 @@ import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {ReusableDrawer} from '../../ReusableDrawer';
 import {ScorerFormRef} from '../MonitorsPage/MonitorFormDrawer';
 import {LLMAsAJudgeScorerForm} from '../MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
+import {LLMDropdownLoaded} from '../PlaygroundPage/PlaygroundChat/LLMDropdown';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {refStringToName} from './common';
 import {LoadingSelect} from './components';
@@ -268,18 +269,15 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
           />
         </div>
         <div style={{flex: '0 0 140px'}}>
-          <Select
-            value={{label: config.model, value: config.model}}
-            options={[
-              {label: 'gpt-4o', value: 'gpt-4o'},
-              {label: 'gpt-4o-mini', value: 'gpt-4o-mini'},
-              {label: 'gpt-3.5-turbo', value: 'gpt-3.5-turbo'},
-              {label: 'claude-3-opus', value: 'claude-3-opus'},
-              {label: 'claude-3-sonnet', value: 'claude-3-sonnet'},
-            ]}
-            onChange={option =>
-              setConfig({...config, model: option?.value || 'gpt-4o'})
-            }
+          <LLMDropdownLoaded
+            className="w-full"
+            hideSavedModels
+            value={config.model || ''}
+            isTeamAdmin={false}
+            direction={{horizontal: 'left'}}
+            onChange={(modelValue: string) => {
+              setConfig({...config, model: modelValue});
+            }}
           />
         </div>
       </Row>
@@ -439,7 +437,20 @@ export const ScorersConfigSection: React.FC<{
   );
 
   return (
-    <ConfigSection title="Scorers" icon="type-number-alt" error={error}>
+    <ConfigSection
+      title="Scorers"
+      icon="type-number-alt"
+      headerAction={
+        <Button
+          icon="add-new"
+          variant="ghost"
+          size="small"
+          onClick={() => {
+            addScorer();
+          }}>
+          Add Scorer
+        </Button>
+      }>
       <Column style={{gap: '8px'}}>
         {scorers.map((scorer, scorerNdx) => {
           let selectedOption = newScorerOption;
@@ -475,15 +486,6 @@ export const ScorersConfigSection: React.FC<{
             />
           );
         })}
-        <Row>
-          <Button
-            icon="add-new"
-            variant="ghost"
-            onClick={() => {
-              addScorer();
-            }}
-          />
-        </Row>
         <ScorerDrawer
           entity={entity}
           project={project}

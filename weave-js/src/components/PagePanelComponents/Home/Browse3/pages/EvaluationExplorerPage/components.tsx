@@ -19,7 +19,7 @@ export const LoadingSelect: typeof Select = props => {
   return <Select isDisabled placeholder="Loading..." {...props} />;
 };
 
-const FieldLabel: React.FC<{
+export const FieldLabel: React.FC<{
   label: string;
   icon?: IconName;
   required?: boolean;
