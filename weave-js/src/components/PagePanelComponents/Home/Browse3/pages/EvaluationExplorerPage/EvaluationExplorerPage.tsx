@@ -376,13 +376,6 @@ const ConfigPanel: React.FC<{
             });
           }}
           placeholder="Enter evaluation description"
-          required
-          error={
-            touchedFields.description &&
-            config.evaluationDefinition.properties.description === ''
-              ? 'Description is required'
-              : undefined
-          }
           // instructions="Describe what this evaluation is testing"
           rows={3}
           onBlur={() => markFieldTouched('description')}
