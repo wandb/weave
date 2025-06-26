@@ -81,12 +81,13 @@ class Dataset(Object):
             raise ImportError(
                 "huggingface datasets is required to use this method. "
                 "Install with `pip install datasets`"
-            )
+            ) from None
 
         if isinstance(hf_dataset, HFDatasetDict):
             if "train" in hf_dataset:
                 warnings.warn(
-                    "Input dataset has multiple splits. Using 'train' split by default."
+                    "Input dataset has multiple splits. Using 'train' split by default.",
+                    stacklevel=2,
                 )
                 target_hf_dataset = hf_dataset["train"]
             else:
@@ -122,7 +123,7 @@ class Dataset(Object):
             raise ImportError(
                 "huggingface datasets is required to use this method. "
                 "Install with `pip install datasets`"
-            )
+            ) from None
         # Convert list of dicts to HF Dataset format (dict of lists)
         if not self.rows:
             return HFDataset.from_dict({})
