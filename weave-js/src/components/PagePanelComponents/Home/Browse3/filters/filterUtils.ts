@@ -2,25 +2,27 @@ import {GridFilterItem} from '@mui/x-data-grid-pro';
 
 import {FilterId} from './common';
 
+// Global counter to ensure unique filter IDs
+let globalFilterIdCounter = 0;
+
 /**
- * Computes the next available filter ID based on existing filter items.
- * - Returns 0 if items array is empty
- * - Handles null/undefined IDs by defaulting to 0
- * - Converts string IDs to numbers, defaulting to 0 if parsing fails
- * - Returns the maximum ID + 1
+ * Computes the next available filter ID using a global counter.
+ * This ensures unique IDs even when filters are deleted and added.
  */
 export const getNextFilterId = (items: GridFilterItem[]): number => {
-  if (items.length === 0) {
-    return 0;
+  // Initialize counter based on existing items if this is the first call
+  if (globalFilterIdCounter === 0 && items.length > 0) {
+    const existingIds = items.map(item => {
+      const id = item.id;
+      if (id == null) {
+        return 0;
+      }
+      return typeof id === 'number' ? id : parseInt(String(id), 10) || 0;
+    });
+    globalFilterIdCounter = Math.max(...existingIds) + 1;
   }
-  const ids = items.map(item => {
-    const id = item.id;
-    if (id == null) {
-      return 0;
-    }
-    return typeof id === 'number' ? id : parseInt(String(id), 10) || 0;
-  });
-  return Math.max(...ids) + 1;
+
+  return globalFilterIdCounter++;
 };
 
 /**
