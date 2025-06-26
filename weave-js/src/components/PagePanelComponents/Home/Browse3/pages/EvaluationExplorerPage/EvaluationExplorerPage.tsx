@@ -6,7 +6,7 @@ import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {refStringToName} from './common';
-import {LabeledTextArea, LabeledTextField} from './components';
+import {LabeledTextArea, LabeledTextField, PickerContainer} from './components';
 import {BORDER_COLOR, SECONDARY_BACKGROUND_COLOR} from './constants';
 import {
   EvaluationExplorerPageProvider,
@@ -337,25 +337,11 @@ const ConfigPanel: React.FC<{
           gap: '16px',
         }}>
         {showEvaluationPicker && (
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: '#f5f5f5',
-              borderRadius: '4px',
-            }}>
-            <div
-              style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                color: '#666',
-                marginBottom: '8px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}>
-              Select Evaluation
-            </div>
+          <PickerContainer
+            title="Select Evaluation"
+            style={{marginBottom: '16px'}}>
             <EvaluationPicker entity={entity} project={project} />
-          </div>
+          </PickerContainer>
         )}
 
         <LabeledTextField

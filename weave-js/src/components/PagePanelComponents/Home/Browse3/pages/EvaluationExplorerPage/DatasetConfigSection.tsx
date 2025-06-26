@@ -1,5 +1,8 @@
-import React, {useCallback} from 'react';
+import {Button} from '@wandb/weave/components/Button';
+import React, {useCallback, useState} from 'react';
 
+import {refStringToName} from './common';
+import {PickerContainer} from './components';
 import {useEvaluationExplorerPageContext} from './context';
 import {clientBound, hookify} from './hooks';
 import {ConfigSection} from './layout';
@@ -12,13 +15,61 @@ export const DatasetConfigSection: React.FC<{
   setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file') => void;
   error?: string;
 }> = ({entity, project, setNewDatasetEditorMode, error}) => {
+  const {config} = useEvaluationExplorerPageContext();
+  const currentRef =
+    config.evaluationDefinition.properties.dataset.originalSourceRef;
+
+  // Start with picker visible if we're in the default "new-empty" state
+  const [showDatasetPicker, setShowDatasetPicker] = useState(
+    currentRef === null || currentRef === 'new-empty'
+  );
+
+  // Get a display name for the current selection
+  const getDisplayName = (ref: string | null) => {
+    if (ref === 'new-empty') return 'New dataset';
+    if (ref === 'new-file') return 'Upload file';
+    if (ref) return refStringToName(ref);
+    return null;
+  };
+
+  const displayName = getDisplayName(currentRef);
+
+  const headerAction = (
+    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+      {!showDatasetPicker && displayName && (
+        <span style={{fontSize: '14px', color: '#666'}}>({displayName})</span>
+      )}
+      <Button
+        icon={showDatasetPicker ? 'chevron-up' : 'chevron-down'}
+        variant="ghost"
+        tooltip={
+          showDatasetPicker
+            ? 'Hide dataset picker'
+            : 'Load from an existing dataset'
+        }
+        onClick={() => {
+          setShowDatasetPicker(!showDatasetPicker);
+        }}>
+        {showDatasetPicker ? 'Hide' : 'Load'}
+      </Button>
+    </div>
+  );
+
   return (
-    <ConfigSection title="Dataset" icon="table" error={error}>
-      <DatasetPicker
-        entity={entity}
-        project={project}
-        setNewDatasetEditorMode={setNewDatasetEditorMode}
-      />
+    <ConfigSection
+      title="Dataset"
+      icon="table"
+      error={error}
+      headerAction={headerAction}>
+      {showDatasetPicker && (
+        <PickerContainer title="Select Dataset" style={{marginBottom: '12px'}}>
+          <DatasetPicker
+            entity={entity}
+            project={project}
+            setNewDatasetEditorMode={setNewDatasetEditorMode}
+          />
+        </PickerContainer>
+      )}
     </ConfigSection>
   );
 };

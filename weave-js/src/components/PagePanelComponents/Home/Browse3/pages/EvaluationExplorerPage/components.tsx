@@ -4,6 +4,17 @@ import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
 import React from 'react';
 
+import {SECONDARY_BACKGROUND_COLOR} from './constants';
+
+// Common styles for consistent UI
+const UPPERCASE_LABEL_STYLE: React.CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 600,
+  color: '#666',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+};
+
 export const LoadingSelect: typeof Select = props => {
   return <Select isDisabled placeholder="Loading..." {...props} />;
 };
@@ -170,6 +181,31 @@ export const LabeledTextArea: React.FC<{
       {!error && !warning && instructions && (
         <Instructions instructions={instructions} />
       )}
+    </div>
+  );
+};
+
+export const PickerContainer: React.FC<{
+  title: string;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}> = ({title, children, style}) => {
+  return (
+    <div
+      style={{
+        padding: '12px',
+        backgroundColor: SECONDARY_BACKGROUND_COLOR,
+        borderRadius: '4px',
+        ...style,
+      }}>
+      <div
+        style={{
+          ...UPPERCASE_LABEL_STYLE,
+          marginBottom: '8px',
+        }}>
+        {title}
+      </div>
+      {children}
     </div>
   );
 };
