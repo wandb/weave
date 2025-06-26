@@ -199,7 +199,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             <FieldName name="Scoring prompt" />
             <TextArea
               value={scoringPrompt}
-              placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
+              placeholder="Enter a scoring prompt. You can interpolate input and output values from your op."
               onChange={e => {
                 setScoringPrompt(e.target.value);
                 onValidationChange(
@@ -224,13 +224,12 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                 color: 'text.secondary',
               }}>
               The scoring prompt will be used to score the output of your ops.
-              You can use the following variables: {'{output}'} and {'{input}'}.
-              See{' '}
+              You can interpolate input and output values from your op. See{' '}
               <Link
-                to="https://docs.wandb.ai/guides/monitors/scorers#llm-as-a-judge-scorer"
+                to="https://weave-docs.wandb.ai/guides/evaluation/guardrails_and_monitors#prompt-variables"
                 target="_blank"
                 className="text-blue-500">
-                docs
+                documentation
               </Link>{' '}
               for more details.
             </Typography>
