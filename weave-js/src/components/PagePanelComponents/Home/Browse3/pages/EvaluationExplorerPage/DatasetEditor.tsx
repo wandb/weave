@@ -103,65 +103,67 @@ const EditableDatasetViewInner: React.FC<
     handlePublishDataset();
   }, [handlePublishDataset]);
   return (
-    <EditableDatasetView
-      {...props}
-      isEditing={true}
-      hideRemoveForAddedRows={false}
-      showAddRowButton={true}
-      hideIdColumn={true}
-      // disableNewRowHighlight={true}
-      isNewDataset={true}
-      footerHeight={HEADER_HEIGHT_PX}
-      extraFooterContent={
-        <Button icon="save" variant="primary" onClick={onSave}>
-          Save Changes
-        </Button>
-      }
-      inlineEditMode={true}
-      autoAddRows={true}
-      // columnsBeforeData={[
-      //   {
-      //     field: 'name_a',
-      //     headerName: 'Name_a',
-      //     width: 150,
-      //   },
-      //   {
-      //     field: 'name_b',
-      //     headerName: 'Name_b',
-      //     width: 150,
-      //   },
-      // ]}
-      // columnsAfterData={[
-      //   {
-      //     field: 'name_c',
-      //     headerName: 'Name_c',
-      //     width: 150,
-      //   },
-      //   {
-      //     field: 'name_d',
-      //     headerName: 'Name_d',
-      //     width: 150,
-      //   },
-      // ]}
-      // columnGroups={[
-      //   {
-      //     groupId: 'name_a',
-      //     headerName: 'Prefix',
-      //     children: [
-      //       {field: "name_a"},
-      //       {field: "name_b"}
-      //     ],
-      //   },
-      //   {
-      //     groupId: 'name_c',
-      //     headerName: 'Suffix',
-      //     children: [
-      //       {field: "name_c"},
-      //       {field: "name_d"}
-      //     ],
-      //   },
-      // ]}
-    />
+    <Box sx={{height: '100%', width: '100%', overflow: 'hidden'}}>
+      <EditableDatasetView
+        {...props}
+        isEditing={true}
+        hideRemoveForAddedRows={false}
+        showAddRowButton={true}
+        hideIdColumn={true}
+        // disableNewRowHighlight={true}
+        isNewDataset={true}
+        footerHeight={HEADER_HEIGHT_PX}
+        extraFooterContent={
+          <Button icon="save" variant="primary" onClick={onSave}>
+            Save Changes
+          </Button>
+        }
+        inlineEditMode={true}
+        autoAddRows={true}
+        // columnsBeforeData={[
+        //   {
+        //     field: 'name_a',
+        //     headerName: 'Name_a',
+        //     width: 150,
+        //   },
+        //   {
+        //     field: 'name_b',
+        //     headerName: 'Name_b',
+        //     width: 150,
+        //   },
+        // ]}
+        // columnsAfterData={[
+        //   {
+        //     field: 'name_c',
+        //     headerName: 'Name_c',
+        //     width: 150,
+        //   },
+        //   {
+        //     field: 'name_d',
+        //     headerName: 'Name_d',
+        //     width: 150,
+        //   },
+        // ]}
+        // columnGroups={[
+        //   {
+        //     groupId: 'name_a',
+        //     headerName: 'Prefix',
+        //     children: [
+        //       {field: "name_a"},
+        //       {field: "name_b"}
+        //     ],
+        //   },
+        //   {
+        //     groupId: 'name_c',
+        //     headerName: 'Suffix',
+        //     children: [
+        //       {field: "name_c"},
+        //       {field: "name_d"}
+        //     ],
+        //   },
+        // ]}
+      />
+    </Box>
   );
 };
 
@@ -177,21 +179,23 @@ export const ExistingDatasetEditor: React.FC<{datasetRef: string}> = ({
   }
   return (
     <DatasetEditProvider>
-      <EditableDatasetView
-        // TODO: unsafe cast
-        datasetObject={datasetObject.data.val as DatasetObjectVal}
-        isEditing={true}
-        hideRemoveForAddedRows={false}
-        showAddRowButton={true}
-        hideIdColumn={true}
-        footerHeight={HEADER_HEIGHT_PX}
-        extraFooterContent={
-          <Button icon="save" variant="primary" onClick={() => {}}>
-            Save Changes
-          </Button>
-        }
-        inlineEditMode={true}
-      />
+      <Box sx={{height: '100%', width: '100%', overflow: 'hidden'}}>
+        <EditableDatasetView
+          // TODO: unsafe cast
+          datasetObject={datasetObject.data.val as DatasetObjectVal}
+          isEditing={true}
+          hideRemoveForAddedRows={false}
+          showAddRowButton={true}
+          hideIdColumn={true}
+          footerHeight={HEADER_HEIGHT_PX}
+          extraFooterContent={
+            <Button icon="save" variant="primary" onClick={() => {}}>
+              Save Changes
+            </Button>
+          }
+          inlineEditMode={true}
+        />
+      </Box>
     </DatasetEditProvider>
   );
 };

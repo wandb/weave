@@ -361,7 +361,7 @@ const ConfigPanel: React.FC<{
               ? 'Evaluation name is required'
               : undefined
           }
-          instructions="A unique name to identify this evaluation"
+          // instructions="A unique name to identify this evaluation"
           onBlur={() => markFieldTouched('name')}
         />
 
