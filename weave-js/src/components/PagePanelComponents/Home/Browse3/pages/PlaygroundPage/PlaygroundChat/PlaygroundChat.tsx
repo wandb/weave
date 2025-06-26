@@ -14,6 +14,7 @@ import {TraceCallSchema} from '../../wfReactInterface/traceServerClientTypes';
 import {PlaygroundContext} from '../PlaygroundContext';
 import {PlaygroundMessageRole, PlaygroundState} from '../types';
 import {ProviderStatus} from '../useConfiguredProviders';
+import {InferenceBanner} from './InferenceBanner';
 import {useLLMDropdownOptions} from './LLMDropdownOptions';
 import {PlaygroundCallStats} from './PlaygroundCallStats';
 import {PlaygroundChatInput} from './PlaygroundChatInput';
@@ -206,6 +207,7 @@ export const PlaygroundChat = ({
 
   return (
     <div className="flex h-full w-full flex-col items-center overflow-hidden">
+      <InferenceBanner />
       <div className="mx-auto flex h-full w-full overflow-x-auto overflow-y-hidden">
         <div className="mx-auto flex">
           {playgroundStates.map((state, idx) => (
