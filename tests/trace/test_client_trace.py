@@ -2908,9 +2908,8 @@ def test_model_save(client):
 
     assert len(inner_res.objs) == 1
     expected_predict_op = inner_res.objs[0].val["predict"]
-    assert isinstance(expected_predict_op, str) and expected_predict_op.startswith(
-        "weave:///"
-    )
+    assert isinstance(expected_predict_op, str)
+    assert expected_predict_op.startswith("weave:///")
 
 
 def test_calls_stream_column_expansion(client):
