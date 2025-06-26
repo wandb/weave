@@ -180,7 +180,8 @@ def test_openai_image_wrapper_async(mock_create_wrapper):
 
 
 def test_openai_image_postprocess_outputs_with_invalid_base64():
-    """Test output postprocessing with invalid base64 data."""
+    "Test output postprocessing with invalid base64 data."
+    import binascii
 
     class MockImageData:
         def __init__(self, b64_json):
@@ -194,8 +195,8 @@ def test_openai_image_postprocess_outputs_with_invalid_base64():
     # Use invalid base64 data
     mock_response = MockResponse("invalid-base64-data")
 
-    # Should raise an exception when trying to decode invalid base64
-    with pytest.raises(Exception):  # This could be various exception types
+    # Should raise a binascii.Error or ValueError when trying to decode invalid base64
+    with pytest.raises((binascii.Error, ValueError)):
         openai_image_postprocess_outputs(mock_response)
 
 
