@@ -6,6 +6,7 @@ import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import {
   GridColDef,
+  GridColumnGroup,
   GridColumnMenu,
   GridColumnMenuItemProps,
   GridColumnMenuProps,
@@ -76,6 +77,10 @@ export interface EditableDatasetViewProps {
   isNewDataset?: boolean;
   extraFooterContent?: React.ReactNode;
   footerHeight?: number;
+  // New props for column injection
+  columnsBeforeData?: GridColDef[];
+  columnsAfterData?: GridColDef[];
+  columnGroups?: GridColumnGroup[];
 }
 
 interface OrderedRow {
@@ -93,6 +98,9 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   isNewDataset = false,
   extraFooterContent = null,
   footerHeight = undefined,
+  columnsBeforeData = [],
+  columnsAfterData = [],
+  columnGroups = [],
 }) => {
   const {useTableRowsQuery, useTableQueryStats} = useWFHooks();
   const [sortBy, setSortBy] = useState<SortBy[]>([]);
@@ -330,12 +338,12 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     }
     setAddedRows(prev => {
       const addedRowEntries = Array.from(prev.entries());
-      const newEntries = addedRowEntries.map(([key, row]) => {
+      const newEntries: Array<[string, any]> = addedRowEntries.map(([key, row]) => {
         const newRow = {
           ...row,
           [newFieldName]: '',
         };
-        return [key, newRow];
+        return [key, newRow] as [string, any];
       });
 
       return new Map(newEntries);
@@ -368,12 +376,15 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   );
 
   const columns = useMemo(() => {
-    // Create an array to hold all base columns
-    const baseColumns: GridColDef[] = [];
+    // Create an array to hold all columns
+    const allColumns: GridColDef[] = [];
+    
+    // Start with columnsBeforeData
+    allColumns.push(...columnsBeforeData);
 
     // Add ID column only if not hidden
     if (!hideIdColumn) {
-      baseColumns.push({
+      allColumns.push({
         field: '_row_click',
         headerName: 'id',
         sortable: false,
@@ -421,7 +432,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
 
     // Add control column if editing is enabled, regardless of hideIdColumn setting
     if (isEditing) {
-      baseColumns.push({
+      allColumns.push({
         field: 'controls',
         headerName: '',
         width: columnWidths.controls ?? 48,
@@ -492,7 +503,13 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
       },
     }));
 
-    return [...baseColumns, ...fieldColumns];
+    // Add field columns
+    allColumns.push(...fieldColumns);
+    
+    // Add columnsAfterData
+    allColumns.push(...columnsAfterData);
+
+    return allColumns;
   }, [
     allFields,
     hideIdColumn,
@@ -509,6 +526,8 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     loadedRows,
     offset,
     preserveFieldOrder,
+    columnsBeforeData,
+    columnsAfterData,
   ]);
 
   const handleColumnWidthChange = useCallback((params: any) => {
@@ -646,13 +665,13 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   const handleSaveNewFieldName = useCallback(() => {
     setAddedRows(prev => {
       const addedRowEntries = Array.from(prev.entries());
-      const newEntries = addedRowEntries.map(([key, row]) => {
+      const newEntries: Array<[string, any]> = addedRowEntries.map(([key, row]) => {
         const val = row[edittingFieldName ?? ''];
         const newRow = {
           ..._.omit(row, edittingFieldName ?? ''),
           [newFieldName ?? '']: val,
         };
-        return [key, newRow];
+        return [key, newRow] as [string, any];
       });
 
       return new Map(newEntries);
@@ -664,9 +683,9 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
   const handleDeleteColumn = useCallback(
     (fieldName: string) => {
       setAddedRows(prev => {
-        const newEntries = Array.from(prev.entries()).map(([key, row]) => {
+        const newEntries: Array<[string, any]> = Array.from(prev.entries()).map(([key, row]) => {
           const newRow = _.omit(row, fieldName);
-          return [key, newRow];
+          return [key, newRow] as [string, any];
         });
         console.log(newEntries);
         return new Map(newEntries);
@@ -742,6 +761,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
             orderedFields: columns.map(col => col.field),
           },
         }}
+        columnGroupingModel={columnGroups}
         onColumnWidthChange={handleColumnWidthChange}
         columnBufferPx={50}
         autoHeight={false}
