@@ -297,6 +297,7 @@ known-third-party = ["wandb", "weave_query"]
 
 [tool.ruff.lint.flake8-pytest-style]
 mark-parentheses = false
+fixture-parentheses = false
 
 [tool.ruff]
 line-length = 88
@@ -305,9 +306,6 @@ exclude = ["weave_query"]
 
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
-
-[tool.ruff.lint.flake8-pytest-style]
-fixture-parentheses = false
 
 [tool.pyright]
 include = ["weave"]
