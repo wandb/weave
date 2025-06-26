@@ -12,7 +12,7 @@ from weave.scorers.ragas_scorer import (
 
 
 # Mock the acompletion function
-@pytest.fixture()
+@pytest.fixture
 def mock_acompletion(monkeypatch):
     async def _mock_acompletion(*args, **kwargs):
         response_format = kwargs.get("response_format")
@@ -42,7 +42,7 @@ def mock_acompletion(monkeypatch):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def context_entity_recall_scorer(mock_acompletion):
     return ContextEntityRecallScorer(
         model_id="gpt-4o",
@@ -51,7 +51,7 @@ def context_entity_recall_scorer(mock_acompletion):
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def context_relevancy_scorer(mock_acompletion):
     return ContextRelevancyScorer(
         model_id="gpt-4o",

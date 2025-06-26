@@ -158,7 +158,7 @@ def make_random_image(image_size: tuple[int, int] = (64, 64)):
     return Image.new("RGB", image_size, random_colour)
 
 
-@pytest.fixture()
+@pytest.fixture
 def dataset_ref(client):
     # This fixture represents a saved dataset containing images
     n_rows = 5

@@ -4,7 +4,7 @@ from tests.scorers.test_utils import TINY_MODEL_PATHS
 from weave.scorers.coherence_scorer import WeaveCoherenceScorerV1
 
 
-@pytest.fixture()
+@pytest.fixture
 def weave_coherence_scorer():
     """Fixture to return a WeaveCoherenceScorer instance."""
     scorer = WeaveCoherenceScorerV1(

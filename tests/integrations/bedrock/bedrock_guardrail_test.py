@@ -89,7 +89,7 @@ MOCK_APPLY_GUARDRAIL_ERROR_RESPONSE = {
 class TestBedrockGuardrailScorer:
     """Tests for the BedrockGuardrailScorer class."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def mock_bedrock_client(self):
         """Create a mock Bedrock client."""
         with mock_aws():
@@ -98,7 +98,7 @@ class TestBedrockGuardrailScorer:
             client.apply_guardrail = MagicMock()
             return client
 
-    @pytest.fixture()
+    @pytest.fixture
     def scorer(self, mock_bedrock_client):
         """Create a BedrockGuardrailScorer instance with a mock client."""
         scorer = BedrockGuardrailScorer(

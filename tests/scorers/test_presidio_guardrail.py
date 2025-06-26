@@ -5,7 +5,7 @@ from presidio_analyzer.nlp_engine import NlpArtifacts
 from weave.scorers import PresidioScorer
 
 
-@pytest.fixture()
+@pytest.fixture
 def presidio_entity_recognition_guardrail():
     return PresidioScorer()
 

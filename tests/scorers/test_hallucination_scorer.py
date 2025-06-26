@@ -12,7 +12,7 @@ from weave.scorers.hallucination_scorer import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def hallucination_scorer(monkeypatch):
     async def _mock_acompletion(*args, **kwargs):
         content = {
