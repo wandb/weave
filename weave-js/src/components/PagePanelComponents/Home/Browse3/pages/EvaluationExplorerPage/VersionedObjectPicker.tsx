@@ -1,14 +1,10 @@
 import {Select} from '@wandb/weave/components/Form/Select';
 import {parseWeaveRef} from '@wandb/weave/react';
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
-import {refStringToName} from './common';
 import {LoadingSelect} from './components';
-import {clientBound, hookify} from './hooks';
 import {getAllVersionsOfObject} from './query';
-
-const useObjectVersions = clientBound(hookify(getAllVersionsOfObject));
 
 export interface VersionedObjectPickerProps {
   entity: string;

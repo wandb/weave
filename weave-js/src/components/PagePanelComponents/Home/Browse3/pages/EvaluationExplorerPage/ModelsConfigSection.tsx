@@ -1,5 +1,4 @@
 import {Button} from '@wandb/weave/components/Button';
-import {Select} from '@wandb/weave/components/Form/Select';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useCallback, useMemo, useRef, useState} from 'react';
 

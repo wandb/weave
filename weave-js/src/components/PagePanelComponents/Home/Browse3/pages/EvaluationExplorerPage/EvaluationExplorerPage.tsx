@@ -1,6 +1,4 @@
 import {Button} from '@wandb/weave/components/Button';
-import {TextArea} from '@wandb/weave/components/Form/TextArea';
-import {TextField} from '@wandb/weave/components/Form/TextField';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import React, {useCallback, useMemo, useState} from 'react';
 
@@ -8,7 +6,6 @@ import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {refStringToName} from './common';
-import {LoadingSelect} from './components';
 import {LabeledTextArea, LabeledTextField} from './components';
 import {BORDER_COLOR, SECONDARY_BACKGROUND_COLOR} from './constants';
 import {
@@ -18,7 +15,7 @@ import {
 import {DatasetConfigSection} from './DatasetConfigSection';
 import {ExistingDatasetEditor, NewDatasetEditor} from './DatasetEditor';
 import {EvaluationPicker} from './EvaluationConfigSection';
-import {Column, ConfigSection, Header, Row} from './layout';
+import {Column, Header, Row} from './layout';
 import {Footer} from './layout';
 import {ModelsConfigSection} from './ModelsConfigSection';
 import {createEvaluation, runEvaluation} from './query';

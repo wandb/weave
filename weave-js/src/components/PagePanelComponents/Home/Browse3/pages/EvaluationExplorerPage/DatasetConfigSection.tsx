@@ -1,8 +1,5 @@
-import {Select} from '@wandb/weave/components/Form/Select';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback} from 'react';
 
-import {refStringToName} from './common';
-import {LoadingSelect} from './components';
 import {useEvaluationExplorerPageContext} from './context';
 import {clientBound, hookify} from './hooks';
 import {ConfigSection} from './layout';
