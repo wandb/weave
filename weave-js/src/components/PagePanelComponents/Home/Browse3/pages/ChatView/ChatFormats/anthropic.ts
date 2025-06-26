@@ -113,17 +113,19 @@ export const normalizeAnthropicChatRequest = (
     // Handle array content (Anthropic format)
     if (Array.isArray(message.content)) {
       // Check if this is a tool_result message
-      const toolResult = message.content.find(
+      const toolResult: any = message.content.find(
         (part: any) => part.type === 'tool_result'
       );
-      if (toolResult) {
-        return [
-          {
-            role: 'tool',
-            content: toolResult.content,
-            tool_call_id: toolResult.tool_use_id,
-          },
-        ];
+      if (toolResult && !_.isString(toolResult)) {
+        if ('content' in toolResult && 'tool_use_id' in toolResult) {
+          return [
+            {
+              role: 'tool',
+              content: toolResult.content,
+              tool_call_id: toolResult.tool_use_id,
+            },
+          ];
+        }
       }
 
       // Extract tool uses and text content
