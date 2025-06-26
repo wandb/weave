@@ -818,7 +818,8 @@ class CallsQuery(BaseModel):
                 FROM calls_merged_stats
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY id
-            ) as {STORAGE_SIZE_TABLE_NAME} USING id
+            ) as {STORAGE_SIZE_TABLE_NAME}
+                ON calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
             """
 
         total_storage_size_sql = ""
@@ -837,7 +838,8 @@ class CallsQuery(BaseModel):
                 FROM calls_merged_stats
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY trace_id
-            ) as {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME} USING trace_id
+            ) as {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
+                ON calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
 
         raw_sql = f"""
