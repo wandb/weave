@@ -12,6 +12,7 @@ from weave.trace.weave_client import Call
 DEFAULT_IMAGE_MODEL = "dall-e-2"
 DEFAULT_IMAGE_SIZE = "1024x1024"
 
+
 def _postprocess_inputs_with_defaults(inputs: dict[str, Any]) -> dict[str, Any]:
     """Returns the inputs, setting default model and size if not present."""
     result = dict(inputs) if inputs is not None else {}
@@ -21,9 +22,11 @@ def _postprocess_inputs_with_defaults(inputs: dict[str, Any]) -> dict[str, Any]:
         result["size"] = DEFAULT_IMAGE_SIZE
     return result
 
+
 def _postprocess_inputs_passthrough(inputs: dict[str, Any]) -> dict[str, Any]:
     """Returns the inputs unchanged."""
     return inputs
+
 
 def _postprocess_outputs_image(outputs: dict[str, Any]) -> Any:
     """
@@ -34,8 +37,9 @@ def _postprocess_outputs_image(outputs: dict[str, Any]) -> Any:
     If no images are found, returns just the original response.
     """
     import base64
-    import requests
     from io import BytesIO
+
+    import requests
     from PIL import Image
     from requests.exceptions import RequestException
 
@@ -60,7 +64,13 @@ def _postprocess_outputs_image(outputs: dict[str, Any]) -> Any:
             return (outputs, *images)
     return outputs
 
-def _on_finish_image(call: Call, output: Any, exception: Optional[BaseException] = None, default_model: str = DEFAULT_IMAGE_MODEL) -> None:
+
+def _on_finish_image(
+    call: Call,
+    output: Any,
+    exception: Optional[BaseException] = None,
+    default_model: str = DEFAULT_IMAGE_MODEL,
+) -> None:
     """
     On finish handler for OpenAI Image APIs that ensures the usage
     metadata is added to the summary of the trace.
@@ -71,19 +81,23 @@ def _on_finish_image(call: Call, output: Any, exception: Optional[BaseException]
     if call.summary is not None:
         call.summary.update(summary_update)
 
+
 def openai_image_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     "Postprocess inputs for the OpenAI Image API (set default model and size)."
     return _postprocess_inputs_with_defaults(inputs)
 
+
 def openai_image_postprocess_outputs(outputs: dict[str, Any]) -> Any:
     "Postprocess outputs for the OpenAI Image API."
     return _postprocess_outputs_image(outputs)
+
 
 def openai_image_on_finish(
     call: Call, output: Any, exception: Optional[BaseException] = None
 ) -> None:
     "On finish handler for the OpenAI Image API."
     _on_finish_image(call, output, exception)
+
 
 def openai_image_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     "Creates a wrapper for synchronous OpenAI image API operations."
@@ -94,6 +108,7 @@ def openai_image_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Call
         on_finish_handler=openai_image_on_finish,
     )
 
+
 def openai_image_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     "Creates a wrapper for asynchronous OpenAI image API operations."
     return create_basic_wrapper_async(
@@ -103,13 +118,16 @@ def openai_image_wrapper_async(settings: OpSettings) -> Callable[[Callable], Cal
         on_finish_handler=openai_image_on_finish,
     )
 
+
 def openai_image_edit_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     "Postprocess inputs for the OpenAI Image Edit API (set default model and size)."
     return _postprocess_inputs_with_defaults(inputs)
 
+
 def openai_image_edit_postprocess_outputs(outputs: dict[str, Any]) -> Any:
     "Postprocess outputs for the OpenAI Image Edit API."
     return _postprocess_outputs_image(outputs)
+
 
 def openai_image_edit_on_finish(
     call: Call, output: Any, exception: Optional[BaseException] = None
@@ -117,7 +135,10 @@ def openai_image_edit_on_finish(
     "On finish handler for the OpenAI Image Edit API."
     _on_finish_image(call, output, exception)
 
-def openai_image_edit_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
+
+def openai_image_edit_wrapper_sync(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
     "Creates a wrapper for synchronous OpenAI image edit API operations."
     return create_basic_wrapper_sync(
         settings,
@@ -126,7 +147,10 @@ def openai_image_edit_wrapper_sync(settings: OpSettings) -> Callable[[Callable],
         on_finish_handler=openai_image_edit_on_finish,
     )
 
-def openai_image_edit_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
+
+def openai_image_edit_wrapper_async(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
     "Creates a wrapper for asynchronous OpenAI image edit API operations."
     return create_basic_wrapper_async(
         settings,
@@ -134,6 +158,7 @@ def openai_image_edit_wrapper_async(settings: OpSettings) -> Callable[[Callable]
         postprocess_output=openai_image_edit_postprocess_outputs,
         on_finish_handler=openai_image_edit_on_finish,
     )
+
 
 def openai_image_variation_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     "Postprocess inputs for the OpenAI Image Variation API (set default size only)."
@@ -146,9 +171,11 @@ def openai_image_variation_postprocess_inputs(inputs: dict[str, Any]) -> dict[st
         result["size"] = DEFAULT_IMAGE_SIZE
     return result
 
+
 def openai_image_variation_postprocess_outputs(outputs: dict[str, Any]) -> Any:
     "Postprocess outputs for the OpenAI Image Variation API."
     return _postprocess_outputs_image(outputs)
+
 
 def openai_image_variation_on_finish(
     call: Call, output: Any, exception: Optional[BaseException] = None
@@ -163,7 +190,10 @@ def openai_image_variation_on_finish(
     if call.summary is not None:
         call.summary.update(summary_update)
 
-def openai_image_variation_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
+
+def openai_image_variation_wrapper_sync(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
     "Creates a wrapper for synchronous OpenAI image variation API operations."
     return create_basic_wrapper_sync(
         settings,
@@ -172,7 +202,10 @@ def openai_image_variation_wrapper_sync(settings: OpSettings) -> Callable[[Calla
         on_finish_handler=openai_image_variation_on_finish,
     )
 
-def openai_image_variation_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
+
+def openai_image_variation_wrapper_async(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
     "Creates a wrapper for asynchronous OpenAI image variation API operations."
     return create_basic_wrapper_async(
         settings,

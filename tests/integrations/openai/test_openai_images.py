@@ -2,18 +2,17 @@ import base64
 import os
 from io import BytesIO
 
+import httpx
 import pytest
 from openai import AsyncOpenAI, OpenAI
 from PIL import Image
+from vcr.request import Request as VCRRequest
+from vcr.stubs import httpx_stubs
 
 from weave.integrations.integration_utilities import op_name_from_ref
 from weave.integrations.openai import openai_sdk
 from weave.trace.autopatch import AutopatchSettings, IntegrationSettings
 
-import base64
-from vcr.stubs import httpx_stubs
-from vcr.request import Request as VCRRequest
-import httpx
 
 def _make_vcr_request_binary_safe(httpx_request: httpx.Request, **kwargs):
     # Read the raw bytes once
@@ -35,8 +34,10 @@ def _make_vcr_request_binary_safe(httpx_request: httpx.Request, **kwargs):
         headers=headers,
     )
 
+
 # One-line monkey-patch
 httpx_stubs._make_vcr_request = _make_vcr_request_binary_safe
+
 
 # Utility function to check postprocessed output
 def _check_postprocessed_output(output, expected_response, expected_size=(1024, 1024)):
@@ -51,6 +52,7 @@ def _check_postprocessed_output(output, expected_response, expected_size=(1024, 
         # If not a tuple, just check it's the response
         # assert output == expected_response
         assert output is not None
+
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
