@@ -188,7 +188,7 @@ def test_empty_required_components(storage_class, bad_args):
 
 
 @pytest.mark.parametrize(
-    ("original_uri"),
+    "original_uri",
     [
         "s3://bucket/simple/path",
         "s3://bucket/path/with/many/segments",
