@@ -21,37 +21,11 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
     apply_processor,
 )
 from weave.trace_server.calls_query_builder.utils import (
+    json_dump_field_as_sql,
     param_slot,
 )
-
-
-def _quote_json_path(path: str) -> str:
-    """
-    Convert a dot-separated path to a properly quoted JSON path.
-
-    Args:
-        path: Dot-separated path like "temperature.value.unit"
-
-    Returns:
-        Properly quoted JSON path like '$."temperature"."value"."unit"'
-
-    Examples:
-        >>> _quote_json_path("temperature")
-        '$."temperature"'
-        >>> _quote_json_path("temperature.value.unit")
-        '$."temperature"."value"."unit"'
-    """
-    if not path:
-        return "$"
-
-    # Split on dots and quote each segment
-    segments = path.split(".")
-    quoted_segments = [f'"{segment}"' for segment in segments if segment]
-    return "$." + ".".join(quoted_segments)
-
-
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import clickhouse_cast, combine_conditions
+from weave.trace_server.orm import clickhouse_cast, combine_conditions, quote_json_path
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -130,6 +104,47 @@ class ObjectRefCondition:
         root = field_parts[0] + "_dump"
         return root
 
+    def get_intermediate_object_refs(self) -> list[str]:
+        """
+        Get the intermediate object reference property paths between the shortest and longest expand columns.
+
+        Args:
+            condition: The object reference condition
+
+        Returns:
+            List of property paths for intermediate object references based on expand columns
+
+        Examples:
+            >>> # For path "inputs.a.b.c.d.e" with expand_columns ["inputs.a.b", "inputs.a.b.c.d"]
+            >>> # We have segments: ["inputs.a.b", "c.d", "e"]
+            >>> # intermediate refs = ["c.d"] (the property path between the two expand columns)
+        """
+        # Get all matching expand columns for this field path, sorted by length
+        matching_columns = []
+        for expand_col in self.expand_columns:
+            if self.field_path.startswith(expand_col + "."):
+                matching_columns.append(expand_col)
+
+        if len(matching_columns) <= 1:
+            # No intermediate refs if we only have 0 or 1 expand column
+            return []
+
+        # Sort by length to get shortest to longest
+        matching_columns.sort(key=len)
+
+        # Calculate intermediate property paths between consecutive expand columns
+        intermediate_refs = []
+        for i in range(len(matching_columns) - 1):
+            current_expand = matching_columns[i]
+            next_expand = matching_columns[i + 1]
+
+            # The intermediate property is the part of next_expand that comes after current_expand
+            if next_expand.startswith(current_expand + "."):
+                intermediate_prop = next_expand[len(current_expand) + 1 :]
+                intermediate_refs.append(intermediate_prop)
+
+        return intermediate_refs
+
     def get_accessor_key(self) -> str:
         """
         Get the JSON accessor key for this objects *first* ref
@@ -148,20 +163,19 @@ class ObjectRefCondition:
             >>> condition.get_accessor_key()
             'model'
 
-            >>> # json: {"inputs": {"model": {"config": <ref>}}, {"temperature": "hot"}
-            >>> # For field_path="inputs.model.config.temperature" with expand_columns=["inputs"]
-            >>> condition = ObjectRefCondition(field_path="inputs.model.config.temperature", expand_columns=["inputs"], ...)
+            >>> # json: {"inputs": {"a": {"b": <ref>}}}
+            >>> # For field_path="inputs.a.b.c.d.e" with expand_columns=["inputs.a.b"]
+            >>> condition = ObjectRefCondition(field_path="inputs.a.b.c.d.e", expand_columns=["inputs.a.b"], ...)
             >>> condition.get_accessor_key()
-            'model.config'
+            'a.b'
         """
         expand_match = self.get_expand_column_match()
         if not expand_match:
             raise ValueError(f"No expand column match found for {self.field_path}")
 
         expand_parts = expand_match.split(".")
-
         if len(expand_parts) > 1:
-            return expand_parts[1]
+            return ".".join(expand_parts[1:])
 
         object_property_path = self.get_object_property_path()
         property_parts = object_property_path.split(".")
@@ -446,9 +460,12 @@ class ObjectRefQueryProcessor:
         root_field = condition.get_root_field()
         key = condition.get_accessor_key()
 
+        key_parts = key.split(".") if key else []
         field_sql = f"any({self.table_alias}.{root_field})"
-        json_path_param = self.pb.add_param(_quote_json_path(key))
-        return f"JSON_VALUE({field_sql}, {param_slot(json_path_param, 'String')}) IN (SELECT full_ref FROM {correct_cte})"
+        json_extract_sql = json_dump_field_as_sql(
+            self.pb, self.table_alias, field_sql, key_parts, use_agg_fn=False
+        )
+        return f"{json_extract_sql} IN (SELECT full_ref FROM {correct_cte})"
 
 
 class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
@@ -545,15 +562,18 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         key = condition.get_accessor_key()
 
         # Parameterize the JSON path
-        json_path_param = self.pb.add_param(_quote_json_path(key))
+        json_path_param = self.pb.add_param(quote_json_path(key))
 
         # Get the CTE name for this condition
         index = self.object_ref_conditions.index(condition)
         cte_name = _get_cte_name_for_condition(index)
 
-        # Create the SQL condition
+        key_parts = key.split(".") if key else []
         field_sql = f"any({self.table_alias}.{root_field})"
-        return f"JSON_VALUE({field_sql}, {param_slot(json_path_param, 'String')}) IN (SELECT full_ref FROM {cte_name})"
+        json_extract_sql = json_dump_field_as_sql(
+            self.pb, self.table_alias, field_sql, key_parts, use_agg_fn=False
+        )
+        return f"{json_extract_sql} IN (SELECT full_ref FROM {cte_name})"
 
     def process_or(self, operation: tsi_query.OrOperation) -> Optional[str]:
         """Process OR operations to extract object reference conditions from all operands."""
@@ -635,11 +655,18 @@ def build_object_ref_ctes(
     """
     Build CTEs (Common Table Expressions) for object reference filtering and ordering.
 
+    For ordering conditions, this function creates a chain of CTEs where:
+    1. The leaf CTE selects the actual value to order by from the deepest object
+    2. Each intermediate CTE propagates this value up the reference chain
+    3. The final CTE contains the top-level object reference with the leaf value
+
+    This ensures that when ordering by nested object properties (e.g., inputs.model.config.temperature),
+    we sort by the actual temperature value rather than the object reference itself.
+
     Args:
         pb: Parameter builder for SQL parameters
         project_id: Project ID for filtering
         object_ref_conditions: List of object reference conditions to build CTEs for
-        include_val_dump_for_ordering: Whether to include val_dump in CTEs for ordering
 
     Returns:
         - CTE SQL string
@@ -652,11 +679,6 @@ def build_object_ref_ctes(
     cte_parts = []
     field_to_cte_alias_map = {}
     cte_counter = 0
-
-    # Decide what to select based on whether we need ordering support
-    val_dump_select = ""
-    if any(isinstance(c, ObjectRefOrderCondition) for c in object_ref_conditions):
-        val_dump_select = "any(val_dump) AS object_val_dump,"
 
     # Deduplicate conditions based on unique_key
     unique_conditions: dict[str, ObjectRefCondition] = {}
@@ -671,24 +693,29 @@ def build_object_ref_ctes(
         if not expand_match:
             continue
 
-        object_property_path = condition.get_object_property_path()
-        leaf_property = condition.get_leaf_object_property_path()
-        # the number of refs in the path:
-        intermediate_parts = object_property_path.replace(leaf_property, "").split(".")
-
         # Build the leaf-level CTE (filters on the actual property value)
         leaf_cte_name = f"obj_filter_{cte_counter}"
         cte_counter += 1
 
-        # Parameterize the JSON path
-        json_path_param = pb.add_param(_quote_json_path(leaf_property))
+        leaf_property = condition.get_leaf_object_property_path()
+        json_path_param = pb.add_param(quote_json_path(leaf_property))
 
         # Create condition handler and generate the appropriate SQL condition
         handler = ObjectRefConditionHandler(pb, json_path_param)
 
+        # For filters, don't select object value. Only needed when ordering
+        val_dump_select = ""
         val_condition: Optional[str] = None
         if isinstance(condition, ObjectRefOrderCondition):
-            val_condition = None
+            # For ordering, select the actual leaf value that we want to order by
+            # This value will be propagated through intermediate CTEs to the final result
+            json_extract_sql = json_dump_field_as_sql(
+                pb,
+                "object_versions",
+                "any(val_dump)",
+                leaf_property.split("."),
+            )
+            val_dump_select = f"{json_extract_sql} AS object_val_dump,"
         elif isinstance(condition, ObjectRefFilterCondition):
             if condition.operation_type == "eq":
                 val_condition = handler.handle_comparison_operation(condition, "=")
@@ -719,31 +746,40 @@ def build_object_ref_ctes(
         cte_parts.append(leaf_cte)
         current_cte_name = leaf_cte_name
 
-        # If we have nested properties, build intermediate CTEs
-        if len(intermediate_parts) > 1:
-            # Work backwards from the leaf to build the chain
-            remaining_properties = intermediate_parts[:-1]  # All but the last property
-            for prop in reversed(remaining_properties):
+        intermediate_refs = condition.get_intermediate_object_refs()
+        # If we have intermediate object references, build CTEs for them
+        if intermediate_refs:
+            # Work backwards to build the chain
+            for ref_property in reversed(intermediate_refs):
                 intermediate_cte_name = f"obj_filter_{cte_counter}"
                 cte_counter += 1
 
-                # Parameterize the JSON path for this property
-                prop_json_path_param = pb.add_param(_quote_json_path(prop))
+                prop_json_path_param = pb.add_param(quote_json_path(ref_property))
+
+                # For intermediate CTEs, we need to propagate the object_val_dump from the previous CTE
+                # rather than selecting it from the current object's val_dump
+                intermediate_val_dump_select, join_clause_for_ordering = "", ""
+                if isinstance(condition, ObjectRefOrderCondition):
+                    # Select the object_val_dump from the previous CTE to propagate the leaf value
+                    intermediate_val_dump_select = (
+                        "any(prev.object_val_dump) AS object_val_dump,"
+                    )
+                    join_clause_for_ordering = f"JOIN {current_cte_name} prev ON JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) = prev.full_ref"
 
                 intermediate_cte = f"""
                 {intermediate_cte_name} AS (
                     SELECT
-                        object_id,
-                        digest,
-                        {val_dump_select}
-                        concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
-                    FROM object_versions
-                    WHERE project_id = {param_slot(project_param, "String")}
-                    AND JSON_VALUE(val_dump, {param_slot(prop_json_path_param, 'String')}) IN (
-                        SELECT full_ref
-                        FROM {current_cte_name}
-                    )
-                    GROUP BY project_id, object_id, digest
+                        ov.object_id,
+                        ov.digest,
+                        {intermediate_val_dump_select}
+                        concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS full_ref
+                    FROM object_versions ov
+                    {join_clause_for_ordering}
+                    WHERE ov.project_id = {param_slot(project_param, "String")}
+                        AND JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) IN (
+                            SELECT full_ref FROM {current_cte_name}
+                        )
+                    GROUP BY ov.project_id, ov.object_id, ov.digest
                 )"""
                 cte_parts.append(intermediate_cte)
                 current_cte_name = intermediate_cte_name

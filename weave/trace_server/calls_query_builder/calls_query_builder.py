@@ -48,6 +48,7 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
+    json_dump_field_as_sql,
     param_slot,
     safely_format_sql,
 )
@@ -58,7 +59,6 @@ from weave.trace_server.orm import (
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
-    quote_json_path_parts,
 )
 from weave.trace_server.token_costs import cost_query
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
@@ -311,38 +311,44 @@ class QueryBuilderDynamicField(QueryBuilderField):
         return f"{super().as_sql(pb, table_alias)} AS {self.field}"
 
 
-def json_dump_field_as_sql(
-    pb: ParamBuilder,
-    table_alias: str,
-    root_field_sanitized: str,
-    extra_path: Optional[list[str]] = None,
-    cast: Optional[tsi_query.CastTo] = None,
-    use_agg_fn: bool = True,
-) -> str:
-    if cast != "exists":
-        if not use_agg_fn:
-            return f"{root_field_sanitized}"
-
-        path_str = "'$'"
-        if extra_path:
-            param_name = pb.add_param(quote_json_path_parts(extra_path))
-            path_str = param_slot(param_name, "String")
-        val = f"JSON_VALUE({root_field_sanitized}, {path_str})"
-        return clickhouse_cast(val, cast)
-    else:
-        # Note: ClickHouse has limitations in distinguishing between null, non-existent, empty string, and "null".
-        # This workaround helps to handle these cases.
-        path_parts = []
-        if extra_path:
-            for part in extra_path:
-                path_parts.append(", " + param_slot(pb.add_param(part), "String"))
-        safe_path = "".join(path_parts)
-        return f"(NOT (JSONType({root_field_sanitized}{safe_path}) = 'Null' OR JSONType({root_field_sanitized}{safe_path}) IS NULL))"
-
-
 class OrderField(BaseModel):
     field: QueryBuilderField
     direction: Literal["ASC", "DESC"]
+
+    def _get_order_options(
+        self, is_object_ref: bool = False
+    ) -> list[tuple[Optional[tsi_query.CastTo], str]]:
+        """Get the order options for this field."""
+        if is_object_ref or isinstance(
+            self.field,
+            (
+                QueryBuilderDynamicField,
+                CallsMergedDynamicField,
+                CallsMergedFeedbackPayloadField,
+            ),
+        ):
+            # Prioritize existence, then cast to double, then str
+            return [
+                ("exists", "desc"),
+                ("double", self.direction),
+                ("string", self.direction),
+            ]
+        else:
+            return [(None, self.direction)]
+
+    def _build_order_sql_from_options(
+        self,
+        pb: ParamBuilder,
+        base_sql: str,
+        options: list[tuple[Optional[tsi_query.CastTo], str]],
+    ) -> str:
+        """Build the order SQL from options."""
+        res = ""
+        for index, (cast_to, direction) in enumerate(options):
+            if index > 0:
+                res += ", "
+            res += f"{clickhouse_cast(base_sql, cast_to)} {direction}"
+        return res
 
     def as_sql(
         self,
@@ -363,34 +369,13 @@ class OrderField(BaseModel):
             )
             cte_alias = field_to_object_join_alias_map.get(order_condition.unique_key)
             if cte_alias:
-                leaf_property = order_condition.get_leaf_object_property_path()
-                json_path_param = pb.add_param(f"$.{leaf_property}")
-                return f"JSON_VALUE(any({cte_alias}.object_val_dump), {param_slot(json_path_param, 'String')}) {self.direction}"
+                base_sql = f"any({cte_alias}.object_val_dump)"
+                options = self._get_order_options(is_object_ref=True)
+                return self._build_order_sql_from_options(pb, base_sql, options)
 
-        # Default behavior for non-object-ref fields
-        options: list[tuple[Optional[tsi_query.CastTo], str]]
-        if isinstance(
-            self.field,
-            (
-                QueryBuilderDynamicField,
-                CallsMergedDynamicField,
-                CallsMergedFeedbackPayloadField,
-            ),
-        ):
-            # Prioritize existence, then cast to double, then str
-            options = [
-                ("exists", "desc"),
-                ("double", self.direction),
-                ("string", self.direction),
-            ]
-        else:
-            options = [(None, self.direction)]
-        res = ""
-        for index, (cast_to, direction) in enumerate(options):
-            if index > 0:
-                res += ", "
-            res += f"{self.field.as_sql(pb, table_alias, cast_to)} {direction}"
-        return res
+        options = self._get_order_options()
+        base_sql = self.field.as_sql(pb, table_alias)
+        return self._build_order_sql_from_options(pb, base_sql, options)
 
     @property
     def raw_field_path(self) -> str:
