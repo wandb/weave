@@ -89,7 +89,7 @@ describe('updateExistingDataset', () => {
 
   it('should update existing dataset with new version', async () => {
     mockTableUpdate.mockResolvedValue({digest: 'updated-digest'});
-    mockObjCreate.mockResolvedValue("v2");
+    mockObjCreate.mockResolvedValue('v2');
 
     const result = await updateExistingDataset(updateOptions);
 
