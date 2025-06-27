@@ -26,6 +26,10 @@ type EvaluationExplorerPageProps = {
   project: string;
 };
 
+/**
+ * Main entry point for the Evaluation Explorer page.
+ * Wraps the inner component with necessary providers and layout.
+ */
 export const EvaluationExplorerPage = (props: EvaluationExplorerPageProps) => {
   return (
     <SimplePageLayoutWithHeader
@@ -47,23 +51,47 @@ export const EvaluationExplorerPage = (props: EvaluationExplorerPageProps) => {
   );
 };
 
+// Helper functions to reduce repetition
+const getValidRefs = <T extends {originalSourceRef: string | null}>(
+  items: T[]
+): string[] => {
+  return items
+    .filter(item => item.originalSourceRef !== null)
+    .map(item => item.originalSourceRef!);
+};
+
+/**
+ * Core component that manages the evaluation configuration and execution flow.
+ * Split into three main states:
+ * 1. Configuration - Setting up the evaluation parameters
+ * 2. Running - Executing the evaluation
+ * 3. Results - Viewing the evaluation results
+ */
 const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
   entity,
   project,
 }) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const getClient = useGetTraceServerClientContext();
+
+  // Dataset editor state management
   const [newDatasetEditorMode, setNewDatasetEditorMode] = useState<
     'new-empty' | 'new-file' | null
   >(null);
+
+  // Evaluation execution state
   const [evaluationResults, setEvaluationResults] = useState<string[] | null>(
     null
   );
   const [isRunning, setIsRunning] = useState(false);
+
+  // Results view state
   const [selectedMetrics, setSelectedMetrics] = useState<Record<
     string,
     boolean
   > | null>(null);
+
+  // Form validation state
   const [touchedFields, setTouchedFields] = useState<{
     name: boolean;
     description: boolean;
@@ -72,6 +100,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
     description: false,
   });
 
+  // Determine which dataset editor mode to use based on current state
   const sourceRef =
     config.evaluationDefinition.properties.dataset.originalSourceRef;
   const datasetEditorMode = useMemo(() => {
@@ -95,9 +124,11 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
     setTouchedFields(prev => ({...prev, [field]: true}));
   }, []);
 
+  // Validation logic for enabling the "Run eval" button
   const isRunEvalEnabled = useMemo(() => {
     const {evaluationDefinition, models} = config;
 
+    // Check required text fields
     if (
       !evaluationDefinition.properties.name.trim() ||
       !evaluationDefinition.properties.description.trim()
@@ -105,20 +136,19 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
       return false;
     }
 
+    // Check dataset is selected
     if (!evaluationDefinition.properties.dataset.originalSourceRef) {
       return false;
     }
 
-    const validScorers = evaluationDefinition.properties.scorers.filter(
-      scorer => scorer.originalSourceRef !== null
-    );
+    // Check at least one scorer is configured
+    const validScorers = getValidRefs(evaluationDefinition.properties.scorers);
     if (validScorers.length === 0) {
       return false;
     }
 
-    const validModels = models.filter(
-      model => model.originalSourceRef !== null
-    );
+    // Check at least one model is configured
+    const validModels = getValidRefs(models);
     if (validModels.length === 0) {
       return false;
     }
@@ -126,26 +156,27 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
     return true;
   }, [config]);
 
+  /**
+   * Main evaluation execution handler.
+   * Creates the evaluation object and runs it with the configured models.
+   */
   const handleRunEval = useCallback(async () => {
     if (!isRunEvalEnabled || isRunning) {
       return;
     }
 
     setIsRunning(true);
-    setEvaluationResults(null);
+    setEvaluationResults(null); // Clear any previous results
 
     try {
       const client = getClient();
       const {evaluationDefinition, models} = config;
 
-      const scorerRefs = evaluationDefinition.properties.scorers
-        .filter(scorer => scorer.originalSourceRef !== null)
-        .map(scorer => scorer.originalSourceRef!);
+      // Extract valid refs from configuration
+      const scorerRefs = getValidRefs(evaluationDefinition.properties.scorers);
+      const modelRefs = getValidRefs(models);
 
-      const modelRefs = models
-        .filter(model => model.originalSourceRef !== null)
-        .map(model => model.originalSourceRef!);
-
+      // Create the evaluation object
       const evaluationRef = await createEvaluation(client, entity, project, {
         name: evaluationDefinition.properties.name,
         description: evaluationDefinition.properties.description,
@@ -153,11 +184,13 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
         scorerRefs,
       });
 
+      // Update the config with the created evaluation ref
       editConfig(draft => {
         draft.evaluationDefinition.originalSourceRef = evaluationRef;
         draft.evaluationDefinition.dirtied = false;
       });
 
+      // Execute the evaluation
       const results = await runEvaluation(
         client,
         entity,
@@ -170,6 +203,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
       setEvaluationResults(results);
     } catch (error) {
       console.error('Failed to run evaluation:', error);
+      // TODO: Add proper error handling/display
     } finally {
       setIsRunning(false);
     }
@@ -181,7 +215,6 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
     isRunning,
     getClient,
     editConfig,
-    setEvaluationResults,
   ]);
 
   return (
@@ -191,8 +224,6 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
         project={project}
         setNewDatasetEditorMode={setNewDatasetEditorMode}
         isRunning={isRunning}
-        setIsRunning={setIsRunning}
-        setEvaluationResults={setEvaluationResults}
         touchedFields={touchedFields}
         markFieldTouched={markFieldTouched}
         isRunEvalEnabled={isRunEvalEnabled}
@@ -200,6 +231,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
       />
       <Column style={{flex: '1 1 600px', overflow: 'hidden'}}>
         {evaluationResults ? (
+          // Results view
           <>
             <Header>
               <span>Results</span>
@@ -223,6 +255,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
             />
           </>
         ) : (
+          // Dataset editor view
           <>
             <Header>Dataset</Header>
             {isRunning ? (
@@ -267,13 +300,15 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
   );
 };
 
+/**
+ * Configuration panel component that contains all the evaluation setup forms.
+ * Manages the evaluation, dataset, scorers, and models configuration.
+ */
 const ConfigPanel: React.FC<{
   entity: string;
   project: string;
   setNewDatasetEditorMode: (mode: 'new-empty' | 'new-file' | null) => void;
   isRunning: boolean;
-  setIsRunning: (running: boolean) => void;
-  setEvaluationResults: (results: string[] | null) => void;
   touchedFields: {name: boolean; description: boolean};
   markFieldTouched: (field: 'name' | 'description') => void;
   isRunEvalEnabled: boolean;
@@ -283,8 +318,6 @@ const ConfigPanel: React.FC<{
   project,
   setNewDatasetEditorMode,
   isRunning,
-  setIsRunning,
-  setEvaluationResults,
   touchedFields,
   markFieldTouched,
   isRunEvalEnabled,
@@ -292,6 +325,29 @@ const ConfigPanel: React.FC<{
 }) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const [showEvaluationPicker, setShowEvaluationPicker] = useState(false);
+
+  // Helper to get validation error messages
+  const getValidationErrors = useMemo(() => {
+    const errors = {
+      name:
+        touchedFields.name && config.evaluationDefinition.properties.name === ''
+          ? 'Evaluation name is required'
+          : undefined,
+      dataset: !config.evaluationDefinition.properties.dataset.originalSourceRef
+        ? 'Please select or create a dataset'
+        : undefined,
+      scorers:
+        getValidRefs(config.evaluationDefinition.properties.scorers).length ===
+        0
+          ? 'Please add at least one scorer'
+          : undefined,
+      models:
+        getValidRefs(config.models).length === 0
+          ? 'Please add at least one model to evaluate'
+          : undefined,
+    };
+    return errors;
+  }, [config, touchedFields]);
 
   return (
     <Column
@@ -355,13 +411,7 @@ const ConfigPanel: React.FC<{
           }}
           placeholder="Enter evaluation name"
           required
-          error={
-            touchedFields.name &&
-            config.evaluationDefinition.properties.name === ''
-              ? 'Evaluation name is required'
-              : undefined
-          }
-          // instructions="A unique name to identify this evaluation"
+          error={getValidationErrors.name}
           onBlur={() => markFieldTouched('name')}
         />
 
@@ -376,7 +426,6 @@ const ConfigPanel: React.FC<{
             });
           }}
           placeholder="Enter evaluation description"
-          // instructions="Describe what this evaluation is testing"
           rows={3}
           onBlur={() => markFieldTouched('description')}
         />
@@ -385,34 +434,19 @@ const ConfigPanel: React.FC<{
           entity={entity}
           project={project}
           setNewDatasetEditorMode={setNewDatasetEditorMode}
-          error={
-            !config.evaluationDefinition.properties.dataset.originalSourceRef
-              ? 'Please select or create a dataset'
-              : undefined
-          }
+          error={getValidationErrors.dataset}
         />
 
         <ScorersConfigSection
           entity={entity}
           project={project}
-          error={
-            config.evaluationDefinition.properties.scorers.filter(
-              scorer => scorer.originalSourceRef !== null
-            ).length === 0
-              ? 'Please add at least one scorer'
-              : undefined
-          }
+          error={getValidationErrors.scorers}
         />
 
         <ModelsConfigSection
           entity={entity}
           project={project}
-          error={
-            config.models.filter(model => model.originalSourceRef !== null)
-              .length === 0
-              ? 'Please add at least one model to evaluate'
-              : undefined
-          }
+          error={getValidationErrors.models}
         />
       </Column>
       <Footer>

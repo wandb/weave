@@ -355,19 +355,25 @@ export const publishSimplifiedLLMStructuredCompletionModel = async (
   const modelObjectId = sanitizeObjectId(modelName);
   const modelObjectVal: LlmStructuredCompletionModel = {
     default_params: {
-      messages_template: [{role: 'system', content: simplifiedModel.systemPrompt}],
+      messages_template: [
+        {role: 'system', content: simplifiedModel.systemPrompt},
+      ],
     },
     llm_model_id: simplifiedModel.llmModelId,
     name: modelName,
   };
 
-  const res = await createBuiltinObjectInstance(client, 'LLMStructuredCompletionModel', {
-    obj: {
-      project_id: `${entity}/${project}`,
-      object_id: modelObjectId,
-      val: modelObjectVal,
-    },
-  });
+  const res = await createBuiltinObjectInstance(
+    client,
+    'LLMStructuredCompletionModel',
+    {
+      obj: {
+        project_id: `${entity}/${project}`,
+        object_id: modelObjectId,
+        val: modelObjectVal,
+      },
+    }
+  );
 
   const modelRef = makeRefObject(
     entity,

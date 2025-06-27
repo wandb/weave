@@ -6,6 +6,10 @@ import {ConfigSection} from './layout';
 import {getLatestDatasetRefs} from './query';
 import {VersionedObjectPicker} from './VersionedObjectPicker';
 
+/**
+ * Dataset configuration section component.
+ * Provides a picker for selecting existing datasets or creating new ones.
+ */
 export const DatasetConfigSection: React.FC<{
   entity: string;
   project: string;
@@ -23,7 +27,13 @@ export const DatasetConfigSection: React.FC<{
   );
 };
 
+// Create the hook for fetching dataset refs
 const useLatestDatasetRefs = clientBound(hookify(getLatestDatasetRefs));
+
+/**
+ * Dataset picker component that integrates with the VersionedObjectPicker.
+ * Supports special "new" options for creating datasets from scratch or uploading files.
+ */
 const DatasetPicker: React.FC<{
   entity: string;
   project: string;
@@ -42,7 +52,7 @@ const DatasetPicker: React.FC<{
       }
 
       if (datasetRef === 'new-empty' || datasetRef === 'new-file') {
-        // Handle special new dataset modes
+        // Handle special new dataset modes - these trigger the dataset editor
         const mode = datasetRef as 'new-empty' | 'new-file';
         setNewDatasetEditorMode(mode);
         editConfig(draft => {
@@ -52,10 +62,11 @@ const DatasetPicker: React.FC<{
           ) {
             draft.evaluationDefinition.properties.dataset.originalSourceRef =
               null;
+            draft.evaluationDefinition.dirtied = true;
           }
         });
       } else {
-        // Set selected dataset ref
+        // Set selected dataset ref for existing datasets
         editConfig(draft => {
           if (
             draft.evaluationDefinition.properties.dataset.originalSourceRef !==
@@ -63,6 +74,7 @@ const DatasetPicker: React.FC<{
           ) {
             draft.evaluationDefinition.properties.dataset.originalSourceRef =
               datasetRef;
+            draft.evaluationDefinition.dirtied = true;
           }
         });
       }
@@ -77,7 +89,7 @@ const DatasetPicker: React.FC<{
   const currentRef =
     config.evaluationDefinition.properties.dataset.originalSourceRef;
 
-  // Dataset has two special "new" options
+  // Dataset has two special "new" options for creating datasets
   const datasetNewOptions = [
     {
       label: 'Start from scratch',

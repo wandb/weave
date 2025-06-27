@@ -155,7 +155,6 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
       []
     );
 
-    console.log('scorer', scorer);
     return (
       <Box className="flex flex-col gap-8 pt-16">
         <Typography

@@ -52,6 +52,10 @@ interface SimplifiedModelConfigProps {
   ) => void;
 }
 
+/**
+ * Simplified model configuration form for basic LLM models.
+ * Provides an inline form for models that don't require advanced configuration.
+ */
 const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
   entity,
   project,
@@ -75,6 +79,7 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
     modelRef ?? ''
   );
 
+  // Load existing model configuration when ref changes
   useEffect(() => {
     if (modelRef && simplifiedModelQuery.data !== null) {
       setConfig(simplifiedModelQuery.data);
@@ -84,6 +89,7 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
   // Check if this model qualifies for simplified config
   const qualifies = !modelRef || simplifiedModelQuery.data !== null;
 
+  // Show advanced configuration notice for complex models
   if (!qualifies) {
     return (
       <div
@@ -107,8 +113,11 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
     );
   }
 
-  // Validation
-  const isValid = config.name.trim() !== '' && config.systemPrompt.trim() !== '' && config.llmModelId.trim() !== '';
+  // Validation: all fields are required
+  const isValid =
+    config.name.trim() !== '' &&
+    config.systemPrompt.trim() !== '' &&
+    config.llmModelId.trim() !== '';
 
   const handleSave = async () => {
     if (!isValid || isSaving) return;
@@ -222,7 +231,10 @@ const ModelDrawer: React.FC<{
   );
 };
 
-// Separate component for each model row to properly memoize callbacks
+/**
+ * Individual model row component with object picker and simplified configuration.
+ * Handles both simple and advanced model configurations.
+ */
 const ModelRow: React.FC<{
   entity: string;
   project: string;
@@ -319,10 +331,6 @@ export const ModelsConfigSection: React.FC<{
     number | null
   >(null);
 
-  // Track simplified config data to pass to drawer
-  const [pendingSimplifiedConfig, setPendingSimplifiedConfig] =
-    useState<any>(null);
-
   const models = useMemo(() => {
     return config.models;
   }, [config]);
@@ -396,13 +404,14 @@ export const ModelsConfigSection: React.FC<{
     [client, entity, project, updateModelRef]
   );
 
-  // Handle opening advanced settings (either from gear or from simplified form)
+  // Handle opening advanced settings
   const handleOpenAdvancedSettings = useCallback(
-    (modelNdx: number | null, simplifiedConfig?: any) => {
-      if (simplifiedConfig) {
-        // Store the simplified config to pass to the drawer
-        setPendingSimplifiedConfig(simplifiedConfig);
-      }
+    (
+      modelNdx: number | null,
+      simplifiedConfig?: SimplifiedLLMStructuredCompletionModel
+    ) => {
+      // TODO: In the future, we could pass simplifiedConfig to the drawer
+      // to pre-populate the advanced form with current values
       setCurrentlyEditingModelNdx(modelNdx);
     },
     []
@@ -471,7 +480,6 @@ export const ModelsConfigSection: React.FC<{
               });
             }
             setCurrentlyEditingModelNdx(null);
-            setPendingSimplifiedConfig(null); // Clear pending config
           }}
           initialModelRef={
             currentlyEditingModelNdx !== null

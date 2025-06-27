@@ -83,7 +83,6 @@ const ScorerRow: React.FC<{
         <div style={{flex: 1}}>
           <LoadingSelect />
         </div>
-        <Button icon="settings" variant="ghost" disabled />
         <Button icon="delete" variant="ghost" disabled />
       </Row>
     );
@@ -134,6 +133,10 @@ interface SimplifiedScorerConfigProps {
   ) => void;
 }
 
+/**
+ * Simplified scorer configuration form for basic LLM-as-a-Judge scorers.
+ * Provides an inline form for scorers that don't require advanced configuration.
+ */
 const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
   entity,
   project,
@@ -158,21 +161,17 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
     scorerRef ?? ''
   );
 
+  // Load existing scorer configuration when ref changes
   useEffect(() => {
     if (scorerRef && simplifiedScorerQuery.data !== null) {
       setConfig(simplifiedScorerQuery.data);
     }
-  }, [
-    scorerRef,
-    simplifiedScorerQuery.data,
-    scorerNdx,
-    onOpenAdvancedSettings,
-    config,
-  ]);
+  }, [scorerRef, simplifiedScorerQuery.data]);
 
   // Check if this scorer qualifies for simplified config
   const qualifies = !scorerRef || simplifiedScorerQuery.data !== null;
 
+  // Show advanced configuration notice for complex scorers
   if (!qualifies) {
     return (
       <div
@@ -196,8 +195,11 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
     );
   }
 
-  // Validation
-  const isValid = config.name.trim() !== '' && config.prompt.trim() !== '';
+  // Validation: name and prompt are required, LLM is automatically selected
+  const isValid =
+    config.name.trim() !== '' &&
+    config.prompt.trim() !== '' &&
+    config.llmModelId.trim() !== '';
 
   const handleSave = async () => {
     if (!isValid || isSaving) return;
@@ -285,6 +287,11 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
   );
 };
 
+/**
+ * Main scorer configuration section component.
+ * Manages the list of scorers with simplified inline configuration
+ * and advanced configuration drawer for complex scorers.
+ */
 export const ScorersConfigSection: React.FC<{
   entity: string;
   project: string;
@@ -299,7 +306,7 @@ export const ScorersConfigSection: React.FC<{
 
   // Track simplified config data to pass to drawer
   const [pendingSimplifiedConfig, setPendingSimplifiedConfig] =
-    useState<any>(null);
+    useState<SimplifiedLLMAsAJudgeScorer | null>(null);
 
   const scorers = useMemo(() => {
     return config.evaluationDefinition.properties.scorers;
@@ -394,7 +401,10 @@ export const ScorersConfigSection: React.FC<{
 
   // Handle opening advanced settings (either from gear or from simplified form)
   const handleOpenAdvancedSettings = useCallback(
-    (scorerNdx: number | null, simplifiedConfig?: any) => {
+    (
+      scorerNdx: number | null,
+      simplifiedConfig?: SimplifiedLLMAsAJudgeScorer
+    ) => {
       if (simplifiedConfig) {
         // Store the simplified config to pass to the drawer
         setPendingSimplifiedConfig(simplifiedConfig);
@@ -498,13 +508,17 @@ const emptyScorer = (entity: string, project: string): ObjectVersionSchema => ({
 
 const useScorer = clientBound(hookify(getObjByRef));
 
+/**
+ * Drawer component for advanced scorer configuration.
+ * Opened when a scorer requires configuration beyond the simplified form.
+ */
 const ScorerDrawer: React.FC<{
   entity: string;
   project: string;
   open: boolean;
   onClose: (newScorerRef?: string) => void;
   initialScorerRef?: string;
-  pendingSimplifiedConfig?: any;
+  pendingSimplifiedConfig?: SimplifiedLLMAsAJudgeScorer | null;
 }> = ({
   entity,
   project,

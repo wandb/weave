@@ -6,6 +6,17 @@ import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerCli
 import {LoadingSelect} from './components';
 import {getAllVersionsOfObject} from './query';
 
+// Type definitions for Select component options
+type SelectOption = {
+  label: string;
+  value: string;
+};
+
+type GroupedSelectOption = {
+  label: string;
+  options: SelectOption[];
+};
+
 export interface VersionedObjectPickerProps {
   entity: string;
   project: string;
@@ -14,7 +25,7 @@ export interface VersionedObjectPickerProps {
   onRefChange: (ref: string | null) => void;
   latestObjectRefs: string[];
   loading?: boolean;
-  newOptions?: Array<{label: string; value: string}>;
+  newOptions?: SelectOption[];
   allowNewOption?: boolean;
 }
 
@@ -23,7 +34,7 @@ export interface VersionedObjectPickerProps {
  * 1. Object selection (e.g., "my-dataset")
  * 2. Version selection (e.g., "v1", "v2", "v3")
  *
- * This bad boy replaces all our individual pickers with a single, powerful interface!
+ * Supports creating new objects and selecting specific versions of existing objects.
  */
 export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   entity,
@@ -123,9 +134,6 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
           setVersionsLoading(false);
 
           // Auto-select latest if this was a pending selection
-          // Check if either:
-          // 1. We don't have a ref yet, OR
-          // 2. The current ref is for a different object
           if (versions.length > 0 && pendingObjectId) {
             const needsAutoSelect =
               !selectedRef ||
@@ -156,7 +164,7 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
     onRefChange,
   ]);
 
-  // Clear pending when ref changes externally (but not when it's null)
+  // Clear pending when ref changes externally
   useEffect(() => {
     if (selectedRef && pendingObjectId) {
       // Only clear if we have a ref and it matches what we were pending
@@ -185,8 +193,8 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   }, [latestObjectRefs]);
 
   // First level options: object names
-  const objectOptions = useMemo(() => {
-    const options: any[] = [];
+  const objectOptions = useMemo((): (SelectOption | GroupedSelectOption)[] => {
+    const options: (SelectOption | GroupedSelectOption)[] = [];
 
     if (allowNewOption) {
       options.push({
@@ -230,7 +238,7 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
 
   // Handle object selection
   const handleObjectChange = useCallback(
-    (option: any) => {
+    (option: SelectOption | null) => {
       const value = option?.value;
 
       if (!value) {
@@ -254,7 +262,7 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
 
   // Handle version selection
   const handleVersionChange = useCallback(
-    (option: any) => {
+    (option: SelectOption | null) => {
       const ref = option?.value;
       onRefChange(ref || null);
     },
@@ -277,7 +285,7 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   }
 
   // Determine selected values for the two-dropdown mode
-  let selectedObjectOption = null;
+  let selectedObjectOption: SelectOption | null = null;
 
   if (pendingObjectId) {
     // When we have a pending object selection, show that
@@ -290,9 +298,8 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
     selectedObjectOption = displayValue;
   } else if (isNewOption && selectedRef) {
     // If a new option is actually selected, find it
-    selectedObjectOption = effectiveNewOptions.find(
-      opt => opt.value === selectedRef
-    );
+    selectedObjectOption =
+      effectiveNewOptions.find(opt => opt.value === selectedRef) || null;
   } else if (selectedObjectId) {
     // Otherwise use the object ID
     selectedObjectOption = {
@@ -303,7 +310,7 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
 
   const selectedVersionOption =
     selectedRef && selectedObjectId && !isNewOption
-      ? versionOptions.find(opt => opt.value === selectedRef)
+      ? versionOptions.find(opt => opt.value === selectedRef) || null
       : null;
 
   if (loading) {
