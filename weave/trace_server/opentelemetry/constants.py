@@ -84,10 +84,6 @@ USAGE_KEYS = {
     "input_tokens": [
         ("gen_ai.usage.input_tokens", try_parse_int),
     ],
-    # Maps Weave's "completion_tokens" to keys from different standards
-    "completion_tokens": [
-        ("gen_ai.usage.output_tokens", try_parse_int),
-    ],
     "prompt_tokens": [
         ("gen_ai.usage.prompt_tokens", try_parse_int),
         ("llm.token_count.prompt", try_parse_int),
