@@ -76,9 +76,38 @@ const deref = (object: any, refsMap: Record<string, any>): any => {
   return mapObject(object, mapper);
 };
 
+// Safely validate if normalization will succeed for a call
+const canNormalizeCall = (call: CallSchema): boolean => {
+  try {
+    if (!('traceCall' in call) || !call.traceCall) {
+      return false;
+    }
+
+    const traceCall = call.traceCall;
+
+    // Quick validation based on format type
+    if (isTraceCallChatFormatOTEL(traceCall)) {
+      normalizeOTELChatRequest(traceCall);
+    } else {
+      normalizeChatRequest(traceCall.inputs);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Chat format detected but normalization would fail:', error);
+    return false;
+  }
+};
+
 // Does this call look like a chat formatted object?
 export const isCallChat = (call: CallSchema): boolean => {
-  return getChatFormat(call) !== ChatFormat.None;
+  const format = getChatFormat(call);
+  if (format === ChatFormat.None) {
+    return false;
+  }
+
+  // Validate that normalization will succeed
+  return canNormalizeCall(call);
 };
 
 export const getChatFormat = (call: CallSchema): ChatFormat => {
@@ -152,6 +181,9 @@ export const normalizeChatRequest = (request: any): ChatRequest => {
   if (isGeminiRequestFormat(request)) {
     return normalizeGeminiChatRequest(request);
   }
+  if (isTraceCallChatFormatLangchain(request)) {
+    return normalizeLangchainChatRequest(request);
+  }
   if (isTraceCallChatFormatOAIResponsesRequest(request)) {
     return normalizeOAIResponsesRequest(request);
   }
@@ -184,44 +216,57 @@ export const useCallAsChat = (
 
   // Only recalculate when refs data or call data changes
   const result = useMemo(() => {
-    const refsMap = _.zipObject(refs, refsData.result ?? []);
-    // Handle OTEL span format differently
-    let request: ChatRequest;
-    let result: ChatCompletion | null = null;
+    try {
+      const refsMap = _.zipObject(refs, refsData.result ?? []);
+      // Handle OTEL span format differently
+      let request: ChatRequest;
+      let result: ChatCompletion | null = null;
 
-    // Check if this is an OTEL span
-    if (isTraceCallChatFormatOTEL(call)) {
-      // Use specialized OTEL handlers
-      request = normalizeOTELChatRequest(call);
-      result = call.output ? normalizeOTELChatCompletion(call, request) : null;
-    } else if (isTraceCallChatFormatLangchain(call)) {
-      // Use specialized Langchain handlers
-      request = normalizeLangchainChatRequest(deref(call.inputs, refsMap));
-      result = call.output
-        ? normalizeLangchainChatCompletion(deref(call.output, refsMap))
-        : null;
-    } else {
-      // Use standard handlers
-      request = normalizeChatRequest(deref(call.inputs, refsMap));
-      result = call.output
-        ? normalizeChatCompletion(request, deref(call.output, refsMap))
-        : null;
+      // Check if this is an OTEL span
+      if (isTraceCallChatFormatOTEL(call)) {
+        // Use specialized OTEL handlers
+        request = normalizeOTELChatRequest(call);
+        result = call.output
+          ? normalizeOTELChatCompletion(call, request)
+          : null;
+      } else if (isTraceCallChatFormatLangchain(call)) {
+        // Use specialized Langchain handlers
+        request = normalizeLangchainChatRequest(deref(call.inputs, refsMap));
+        result = call.output
+          ? normalizeLangchainChatCompletion(deref(call.output, refsMap))
+          : null;
+      } else {
+        // Use standard handlers
+        request = normalizeChatRequest(deref(call.inputs, refsMap));
+        result = call.output
+          ? normalizeChatCompletion(request, deref(call.output, refsMap))
+          : null;
+      }
+
+      // TODO: It is possible that all of the choices are refs again, handle this better.
+      if (
+        result &&
+        result.choices &&
+        result.choices.some(choice => isWeaveRef(choice))
+      ) {
+        result.choices = [];
+      }
+
+      return {
+        isStructuredOutput: isStructuredOutputCall(call),
+        request,
+        result,
+      };
+    } catch (error) {
+      console.error('Chat normalization failed:', error);
+      // Return null values to indicate normalization failure
+      // This will prevent the chat tab from appearing
+      return {
+        isStructuredOutput: false,
+        request: null as any,
+        result: null,
+      };
     }
-
-    // TODO: It is possible that all of the choices are refs again, handle this better.
-    if (
-      result &&
-      result.choices &&
-      result.choices.some(choice => isWeaveRef(choice))
-    ) {
-      result.choices = [];
-    }
-
-    return {
-      isStructuredOutput: isStructuredOutputCall(call),
-      request,
-      result,
-    };
   }, [refsData.result, call, refs]);
 
   return {
@@ -243,17 +288,6 @@ export const normalizeChatTraceCall = (traceCall: OptionalTraceCallSchema) => {
       return traceCall;
     }
     const chatCompletion = normalizeOTELChatCompletion(traceCall, chatRequest);
-
-    return {
-      inputs: chatRequest,
-      output: chatCompletion,
-      ...rest,
-    };
-  }
-
-  if (isTraceCallChatFormatLangchain(traceCall)) {
-    const chatRequest = normalizeLangchainChatRequest(traceCall.inputs);
-    const chatCompletion = normalizeLangchainChatCompletion(traceCall.output);
 
     return {
       inputs: chatRequest,
