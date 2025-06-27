@@ -3,6 +3,12 @@ from weave.scorers.classification_scorer import (
 )
 from weave.scorers.coherence_scorer import WeaveCoherenceScorerV1
 from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorerV1
+from weave.scorers.deepeval_scorer import (
+    DeepEvalAnswerRelevancyScorer,
+    DeepEvalContextualPrecisionScorer,
+    DeepEvalContextualRecallScorer,
+    DeepEvalFaithfulnessScorer,
+)
 from weave.scorers.fluency_scorer import WeaveFluencyScorerV1
 from weave.scorers.hallucination_scorer import (
     HallucinationFreeScorer,
@@ -66,4 +72,8 @@ __all__ = [
     "WeaveHallucinationScorerV1",
     "WeaveContextRelevanceScorerV1",
     "WeaveTrustScorerV1",
+    "DeepEvalAnswerRelevancyScorer",
+    "DeepEvalContextualPrecisionScorer",
+    "DeepEvalContextualRecallScorer",
+    "DeepEvalFaithfulnessScorer",
 ]
