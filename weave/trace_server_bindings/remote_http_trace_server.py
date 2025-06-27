@@ -7,7 +7,7 @@ from typing import Any, Optional, Union, cast
 from pydantic import BaseModel
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import max_calls_queue_size
+from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -87,6 +87,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor = AsyncBatchProcessor(
                 self._flush_calls,
                 max_queue_size=max_calls_queue_size(),
+                enable_disk_fallback=should_enable_disk_fallback(),
             )
         self._auth: Optional[tuple[str, str]] = None
         self.remote_request_bytes_limit = remote_request_bytes_limit

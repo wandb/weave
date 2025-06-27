@@ -411,6 +411,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     # Remaining Un-cacheable Methods:
 
+    def ensure_project_exists(
+        self, entity: str, project: str
+    ) -> tsi.EnsureProjectExistsRes:
+        return self._next_trace_server.ensure_project_exists(entity, project)
+
     # Call API
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         return self._next_trace_server.call_start(req)

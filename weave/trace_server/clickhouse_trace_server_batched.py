@@ -292,6 +292,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         try:
             yield
             self._flush_calls()
+            self.kafka_producer.flush()
         finally:
             self._call_batch = []
             self._flush_immediately = True
@@ -303,7 +304,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if item.mode == "start":
                     res.append(self.call_start(item.req))
                 elif item.mode == "end":
-                    res.append(self.call_end(item.req))
+                    res.append(self.call_end(item.req, flush_immediately=False))
                 else:
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
@@ -325,7 +326,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
-    def call_end(self, req: tsi.CallEndReq, publish: bool = True) -> tsi.CallEndRes:
+    def call_end(
+        self,
+        req: tsi.CallEndReq,
+        publish: bool = True,
+        flush_immediately: bool = False,
+    ) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
@@ -336,7 +342,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._insert_call(ch_call)
 
         if wf_env.wf_enable_online_eval() and publish:
-            self.kafka_producer.produce_call_end(req.end)
+            # Strip large and optional fields, dont modify param
+            end_copy = req.end.model_copy()
+            end_copy.output = None
+            end_copy.summary = {}
+            end_copy.exception = None
+            # Don't flush immediately by default, rely on explicit flush
+            self.kafka_producer.produce_call_end(end_copy, flush_immediately)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
@@ -801,10 +813,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         If no digests are provided all versions will have their data overwritten with
         an empty val_dump.
         """
-        MAX_OBJECTS_TO_DELETE = 100
-        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+        max_objects_to_delete = 100
+        if req.digests and len(req.digests) > max_objects_to_delete:
             raise ValueError(
-                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+                f"Object delete request contains {len(req.digests)} objects. Please delete {max_objects_to_delete} or fewer objects at a time."
             )
 
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -992,11 +1004,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> Iterator[tsi.TableRowSchema]:
         conds = []
         pb = ParamBuilder()
-        if req.filter:
-            if req.filter.row_digests:
-                conds.append(
-                    f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
-                )
+        if req.filter and req.filter.row_digests:
+            conds.append(
+                f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
+            )
 
         sort_fields = []
         if req.sort_by:
@@ -1772,8 +1783,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
         payload = _dict_value_to_dump(req.payload)
-        MAX_PAYLOAD = 1 << 20  # 1 MiB
-        if len(payload) > MAX_PAYLOAD:
+        max_payload = 1 << 20  # 1 MiB
+        if len(payload) > max_payload:
             raise InvalidRequest("Feedback payload too large")
         row: Row = {
             "id": feedback_id,
@@ -2226,7 +2237,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "Database insertion failed. Record too large. "
                     "A likely cause is that a single row or cell exceeded "
                     "the limit. If logging images, save them as `Image.PIL`."
-                )
+                ) from e
             raise
         except Exception as e:
             # Do potentially expensive data length calculation, only on
@@ -2239,9 +2250,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "table": table,
                     "data_len": len(data),
                     "data_bytes": data_bytes,
-                    "example_data": None if len(data) == 0 else data[0],
-                    "column_names": column_names,
-                    "settings": settings,
                 },
             )
             raise
@@ -2391,6 +2399,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "id": ch_call_dict.get("id"),
         "trace_id": ch_call_dict.get("trace_id"),
         "parent_id": ch_call_dict.get("parent_id"),
+        "thread_id": ch_call_dict.get("thread_id"),
         "op_name": ch_call_dict.get("op_name"),
         "started_at": started_at,
         "ended_at": ended_at,
@@ -2459,6 +2468,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         id=call_id,
         trace_id=trace_id,
         parent_id=start_call.parent_id,
+        thread_id=start_call.thread_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
@@ -2840,18 +2850,20 @@ def _setup_completion_model_info(
     elif model_name.startswith("coreweave/"):
         # See https://docs.litellm.ai/docs/providers/openai_compatible
         # but ignore the bit about omitting the /v1 because it is actually necessary
-        req.inputs.model = "openai/" + model_name.replace("coreweave/", "", 1)
+        req.inputs.model = model_name.replace("coreweave/", "openai/", 1)
+
         provider = "custom"
-        base_url = "https://api.inference.wandb.ai/v1"
+
+        base_url = wf_env.inference_service_base_url()
+
         # The API key should have been passed in as an extra header.
         if req.inputs.extra_headers:
-            hostname = req.inputs.extra_headers.get("trace_server_hostname", None)
-            if hostname == "weave-trace.qa.wandb.ai":
-                base_url = "https://api.qa.inference.coreweave.com/v1"
             api_key = req.inputs.extra_headers.pop("api_key", None)
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None
+
         return_type = "openai"
+
     else:
         # Custom provider path
         custom_provider_info = get_custom_provider_info(

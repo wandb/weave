@@ -103,7 +103,7 @@ huggingface = ["huggingface-hub>=0.28.1"]
 smolagents = [
   "openai>=1.0.0",
   "litellm>=1.58",
-  "smolagents>=1.17.0",
+  "smolagents>=1.17.0,<1.19.0",
   "huggingface-hub>=0.28.1",
   "SQLAlchemy>=2.0.38",
 ]
@@ -122,6 +122,7 @@ langchain = [
   "chromadb>=0.5.0",
   "pysqlite3",
   "opentelemetry-exporter-otlp",
+  "openai<1.92.0",
 ]
 langchain_nvidia_ai_endpoints = [
   "langchain-core>=0.2.1",
@@ -129,9 +130,8 @@ langchain_nvidia_ai_endpoints = [
 ]
 litellm = ["litellm>=1.36.1"]
 # temporary max pin b/c 0.12.0 changes call structure and therefor tests
-llamaindex = ["llama-index>=0.10.35,<0.12.0"]
-mistral0 = ["mistralai>=0.1.8,<1.0.0"]
-mistral1 = ["mistralai>=1.0.0"]
+llamaindex = ["llama-index>=0.10.35,<0.12.0", "openai<1.92.0"]
+mistral = ["mistralai>=1.0.0"]
 scorers = [
   "Levenshtein>=0.26.0",
   "litellm>=1.58",
@@ -145,12 +145,12 @@ scorers = [
   "presidio-anonymizer>=2.2.0",
 ]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
-openai = ["openai>=1.0.0"]
+openai = ["openai>=1.0.0,<1.92.0"]
 openai_agents = ["openai-agents>=0.0.4"]
 pandas-test = ["pandas>=2.2.3"]
 presidio = ["presidio-analyzer==2.2.357", "presidio-anonymizer==2.2.357"]
 modal = ["modal", "python-dotenv"]
-mcp = ["mcp[cli]>=1.6.0"]
+mcp = ["mcp[cli]>=1.6.0,<1.10.0"]
 vertexai = ["vertexai>=1.70.0", "shapely<=2.0.6"] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 test = [
@@ -238,32 +238,52 @@ markers = [
 [tool.ruff.lint]
 preview = true
 select = [
-  "D200",   # https://docs.astral.sh/ruff/rules/fits-on-one-line/
-  "D201",   # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
-  "D202",   # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
-  "D204",   # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
-  "D210",   # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
-  "D211",   # https://docs.astral.sh/ruff/rules/blank-line-before-class/
-  "D214",   # https://docs.astral.sh/ruff/rules/section-not-over-indented/
-  "FIX001", # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
-  "FIX003", # https://docs.astral.sh/ruff/rules/line-contains-xxx/
-  "F541",   # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
-  "I",      # https://docs.astral.sh/ruff/rules/#isort-i
-  "W",      # https://docs.astral.sh/ruff/rules/#warning-w
-  "F401",   # https://docs.astral.sh/ruff/rules/unused-import/
-  "TID252", # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
-  "UP",     # https://docs.astral.sh/ruff/rules/#pyupgrade-up
-  "TRY002", # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
-  "TRY004", # https://docs.astral.sh/ruff/rules/type-check-without-type-error/
-  "TRY300", # https://docs.astral.sh/ruff/rules/try-consider-else/
-  "TRY400", # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
-  "C",      # https://docs.astral.sh/ruff/rules/#convention-c
-  "T201",   # https://docs.astral.sh/ruff/rules/print-statement/
-  "B006",   # https://docs.astral.sh/ruff/rules/mutable-argument-default/
-  "B007",   # https://docs.astral.sh/ruff/rules/unused-loop-control-variable/
-  "B008",   # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
-  "B009",   # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
-  "B028",   # https://docs.astral.sh/ruff/rules/no-explicit-stacklevel/
+  "D200",    # https://docs.astral.sh/ruff/rules/fits-on-one-line/
+  "D201",    # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
+  "D202",    # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
+  "D204",    # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
+  "D210",    # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
+  "D211",    # https://docs.astral.sh/ruff/rules/blank-line-before-class/
+  "D214",    # https://docs.astral.sh/ruff/rules/section-not-over-indented/
+  "FIX001",  # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
+  "FIX003",  # https://docs.astral.sh/ruff/rules/line-contains-xxx/
+  "F541",    # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
+  "I",       # https://docs.astral.sh/ruff/rules/#isort-i
+  "W",       # https://docs.astral.sh/ruff/rules/#warning-w
+  "F401",    # https://docs.astral.sh/ruff/rules/unused-import/
+  "F402",    # https://docs.astral.sh/ruff/rules/import-shadowed-by-loop-var/
+  "F6",      # https://docs.astral.sh/ruff/rules/multi-value-repeated-key-literal/
+  "F811",    # https://docs.astral.sh/ruff/rules/redefined-while-unused/
+  "F821",    # https://docs.astral.sh/ruff/rules/undefined-name/
+  "TID252",  # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
+  "UP",      # https://docs.astral.sh/ruff/rules/#pyupgrade-up
+  "TRY002",  # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
+  "TRY004",  # https://docs.astral.sh/ruff/rules/type-check-without-type-error/
+  "TRY300",  # https://docs.astral.sh/ruff/rules/try-consider-else/
+  "TRY400",  # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
+  "C",       # https://docs.astral.sh/ruff/rules/#convention-c
+  "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
+  "B006",    # https://docs.astral.sh/ruff/rules/mutable-argument-default/
+  "B007",    # https://docs.astral.sh/ruff/rules/unused-loop-control-variable/
+  "B008",    # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
+  "B009",    # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
+  "B017",    # https://docs.astral.sh/ruff/rules/assert-raises-exception/
+  "B020",    # https://docs.astral.sh/ruff/rules/loop-variable-overrides-iterator/
+  "B028",    # https://docs.astral.sh/ruff/rules/no-explicit-stacklevel/
+  "B904",    # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
+  "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
+  "N801",    # https://docs.astral.sh/ruff/rules/invalid-class-name/
+  "N803",    # https://docs.astral.sh/ruff/rules/invalid-argument-name/
+  "N804",    # https://docs.astral.sh/ruff/rules/non-lowercase-variable-in-class/
+  "N805",    # https://docs.astral.sh/ruff/rules/invalid-first-argument-name-for-method/
+  "N806",    # https://docs.astral.sh/ruff/rules/non-lowercase-variable-in-function/
+  "PERF102", # https://docs.astral.sh/ruff/rules/incorrect-dict-iterator/
+  "T20",     # https://docs.astral.sh/ruff/rules/#flake8-print-t20
+  "PT001",   # https://docs.astral.sh/ruff/rules/pytest-fixture-incorrect-parentheses-style/
+  "PT006",   # https://docs.astral.sh/ruff/rules/pytest-parametrize-names-wrong-type/
+  "PT018",   # https://docs.astral.sh/ruff/rules/pytest-composite-assertion/
+  "PT022",   # https://docs.astral.sh/ruff/rules/pytest-useless-yield-fixture/
+  "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
 ]
 ignore = [
   # we use Google style
@@ -278,6 +298,10 @@ exclude = ["weave_query"]
 
 [tool.ruff.lint.isort]
 known-third-party = ["wandb", "weave_query"]
+
+[tool.ruff.lint.flake8-pytest-style]
+mark-parentheses = false
+fixture-parentheses = false
 
 [tool.ruff]
 line-length = 88

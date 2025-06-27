@@ -26,7 +26,6 @@ from weave.trace.refs import ObjectRef
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization import serializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-from weave.trace.term import logger
 from weave.trace_server.trace_server_interface_util import str_digest
 
 logger = logging.getLogger(__name__)
@@ -222,9 +221,11 @@ def reconstruct_signature(fn: Callable) -> str:
                 return annotation.__name__
             # Otherwise, check if the type is imported and use the alias if given
             for name, obj in module.__dict__.items():
-                if isinstance(obj, py_types.ModuleType):
-                    if annotation.__module__ == obj.__name__:
-                        return f"{name}.{annotation.__name__}"
+                if (
+                    isinstance(obj, py_types.ModuleType)
+                    and annotation.__module__ == obj.__name__
+                ):
+                    return f"{name}.{annotation.__name__}"
         return str(annotation)
 
     def quote_default_str(default: Any) -> Any:

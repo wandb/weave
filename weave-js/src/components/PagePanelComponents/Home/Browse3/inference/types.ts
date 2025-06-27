@@ -100,18 +100,44 @@ export type SelectedState = {
   selectedWithPlayground: ModelId[];
 };
 
+// Must keep in sync with app/src/components/Search/SearchNav/types.ts
+export enum AccountPlanType {
+  Personal = 'Personal',
+  Enterprise = 'Enterprise',
+  Academic = 'Academic',
+  Pro = 'Pro',
+  Teams = 'Teams',
+  Free = 'Free',
+  ThirtyDayTrial = '30 Day Trial',
+  Legacy = 'Legacy',
+}
+
+// There are better types for some of this but we can't reach back into core repo for them.
+export type InferenceBillingInfo = {
+  accountPlanType: AccountPlanType;
+  billingPeriodStart: Date;
+  billingPeriodEnd: Date;
+  usage: number;
+  inferenceSafetyLimit: number;
+
+  formatAsDollar: (value: number) => string;
+  getFormattedBillingDate: (currentPeriodEnd: Date) => string;
+};
+
 // The Inference code living in Weave needs to be able to do things like
 // create a project like a quickstart does. Rather than move or duplicate code
 // from core we wrap inference pages with a context object that has the necessary
 // information and methods.
 export type InferenceContextType = {
   isLoggedIn: boolean;
-  isInferenceEnabled: boolean;
+  isCatalogEnabled?: boolean; // Viewer can see model catalog page
+  isInferenceEnabled: boolean; // Viewer can call inference service
   availabilityMessage: string;
   playgroundEntity: string;
   playgroundProject: string;
   projectExists: boolean | undefined;
   ensureProjectExists: () => Promise<void>;
+  billing?: InferenceBillingInfo | null;
 };
 
 export const InferenceContext = createContext<InferenceContextType | undefined>(

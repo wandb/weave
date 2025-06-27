@@ -92,6 +92,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 id TEXT PRIMARY KEY,
                 trace_id TEXT,
                 parent_id TEXT,
+                thread_id TEXT,
                 op_name TEXT,
                 started_at TEXT,
                 ended_at TEXT,
@@ -188,6 +189,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     id,
                     trace_id,
                     parent_id,
+                    thread_id,
                     op_name,
                     display_name,
                     started_at,
@@ -197,12 +199,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     wb_user_id,
                     wb_run_id,
                     wb_run_step
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
                     req.start.trace_id,
                     req.start.parent_id,
+                    req.start.thread_id,
                     req.start.op_name,
                     req.start.display_name,
                     req.start.started_at.isoformat(),
@@ -912,10 +915,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=objs)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        MAX_OBJECTS_TO_DELETE = 100
-        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+        max_objects_to_delete = 100
+        if req.digests and len(req.digests) > max_objects_to_delete:
             raise ValueError(
-                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+                f"Object delete request contains {len(req.digests)} objects. Please delete {max_objects_to_delete} or fewer objects at a time."
             )
 
         # First, select the objects that match the query
@@ -1277,8 +1280,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
         payload = json.dumps(req.payload)
-        MAX_PAYLOAD = 1024
-        if len(payload) > MAX_PAYLOAD:
+        max_payload = 1024
+        if len(payload) > max_payload:
             raise InvalidRequest("Feedback payload too large")
         row: Row = {
             "id": feedback_id,

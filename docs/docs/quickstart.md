@@ -3,6 +3,12 @@ import TabItem from '@theme/TabItem';
 
 # Track LLM inputs & outputs
 
+:::tip
+For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave [Playground](./guides/tools/playground.md). 
+- [Developer documentation](./guides/integrations/inference.md)
+- [Product page](https://wandb.ai/site/inference) 
+:::
+
 <!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
 
 Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="https://weave-docs.wandb.ai/reference/gen_notebooks/intro_notebook/"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Try the notebook"/></a>

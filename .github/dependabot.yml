@@ -3,7 +3,7 @@ updates:
   # Monitor Python dependencies in pyproject.toml
   - package-ecosystem: "pip"
     directory: "/"
-    target-branch: "andrew/dependabot" # TODO: remove when ready to merge
+    target-branch: "master"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -146,11 +146,7 @@ updates:
         patterns:
           - "llama-index*"
 
-      mistral0:
-        patterns:
-          - "mistralai*"
-
-      mistral1:
+      mistral:
         patterns:
           - "mistralai*"
 
@@ -231,3 +227,11 @@ updates:
     allow:
       - dependency-type: "direct"
       - dependency-type: "indirect"
+
+  # ignore all weave_query updates
+  - package-ecosystem: "pip"
+    directory: "/weave_query"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "*"

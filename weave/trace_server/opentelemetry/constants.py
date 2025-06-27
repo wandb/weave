@@ -44,7 +44,6 @@ This would be the resulting dict dumped to clickhouse:
 # INPUT_KEYS: Maps attribute keys that represent user prompts or inputs to LLMs
 # Priority is given to standards in this order:
 # This is used to populate the `inputs_dump` column in clickhouse
-from weave.trace_server.opentelemetry.helpers import try_parse_int
 
 INPUT_KEYS = [
     "ai.prompt",  # Vercel
@@ -83,10 +82,6 @@ USAGE_KEYS = {
     # Maps Weave's "prompt_tokens" to keys from different standards
     "input_tokens": [
         ("gen_ai.usage.input_tokens", try_parse_int),
-    ],
-    # Maps Weave's "completion_tokens" to keys from different standards
-    "completion_tokens": [
-        ("gen_ai.usage.output_tokens", try_parse_int),
     ],
     "prompt_tokens": [
         ("gen_ai.usage.prompt_tokens", try_parse_int),
