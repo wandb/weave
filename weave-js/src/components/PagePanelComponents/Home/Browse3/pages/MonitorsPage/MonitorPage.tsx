@@ -131,18 +131,10 @@ const MonitorPageInner = ({
     history.push(url);
   }, [baseRouter, history, callsFilterModel, entity, project]);
 
-  const callCountQuery: Query = useMemo(() => {
-    return {
-      $expr: {
-        $contains: {
-          input: {$getField: MONITORED_FILTER_VALUE},
-          substr: {
-            $literal: `${allVersionsRef.split(':').slice(0, -1).join(':')}:`,
-          },
-        },
-      },
-    };
-  }, [allVersionsRef]);
+  const callCountQuery: Query = useMemo(
+    () => matchAllMonitorVersionsQuery(allVersionsRef),
+    [allVersionsRef]
+  );
 
   const {result: callCountResult} = useCallsStats({
     entity,
@@ -314,3 +306,14 @@ const MonitorPageInner = ({
     </>
   );
 };
+
+export function matchAllMonitorVersionsQuery(monitorRef: string): Query {
+  return {
+    $expr: {
+      $contains: {
+        input: {$getField: MONITORED_FILTER_VALUE},
+        substr: {$literal: `${monitorRef.split(':').slice(0, -1).join(':')}:`},
+      },
+    },
+  };
+}
