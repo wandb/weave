@@ -97,9 +97,7 @@ def _async_call(target: Callable, timeout: int | float | None = None) -> Callabl
             q.put(e)
 
     def wrapper(*args: Any, **kwargs: Any) -> tuple[Exception | None, threading.Thread]:
-        thread = threading.Thread(
-            target=wrapped_target, args=(q,) + args, kwargs=kwargs
-        )
+        thread = threading.Thread(target=wrapped_target, args=(q, *args), kwargs=kwargs)
         thread.daemon = True
         thread.start()
         try:

@@ -45,10 +45,10 @@ def find_path_to_root(schema: dict[str, Any], root_def: str) -> list[str]:
         for child_def in child_defs:
             if child_def == root_def:
                 # Found a path back to root
-                return path + [child_def]
+                return path + [child_def]  # noqa: RUF005
             if child_def not in visited:
                 visited.add(child_def)
-                queue.append((child_def, path + [child_def]))
+                queue.append((child_def, path + [child_def]))  # noqa: RUF005
 
     return []
 

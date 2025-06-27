@@ -135,7 +135,7 @@ def _run_in_process(
 
     queue: multiprocessing.Queue = multiprocessing.Queue()
     process: multiprocessing.Process = multiprocessing.Process(
-        target=_subproc, args=(queue, func) + args, kwargs=kwargs
+        target=_subproc, args=(queue, func, *args), kwargs=kwargs
     )
     process.start()
     return process, queue
