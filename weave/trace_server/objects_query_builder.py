@@ -91,7 +91,7 @@ def format_metadata_objects_from_query_result(
     result = []
     for row in query_result:
         # Add an empty val_dump to the end of the row
-        row_with_val_dump = row + ("{}",)
+        row_with_val_dump = (*row, "{}")
         columns_with_val_dump = list(OBJECT_METADATA_COLUMNS)
 
         if include_storage_size:

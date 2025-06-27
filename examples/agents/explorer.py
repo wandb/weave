@@ -72,11 +72,11 @@ if __name__ == "__main__":
         if last_message["role"] == "assistant" and "tool_calls" not in last_message:
             user_input = input("User input: ")
             state = AgentState(
-                history=state.history
-                + [
+                history=[
+                    *state.history,
                     {
                         "role": "user",
                         "content": user_input,
-                    }
+                    },
                 ]
             )
