@@ -17,6 +17,7 @@ import {
   callQueryFieldForScorerVersion,
 } from '../../feedback/StructuredFeedback/runnableFeedbackTypes';
 import {NotFoundPanel} from '../../NotFoundPanel';
+import {PromptVersionPage} from '../../prompts/PromptVersionPage';
 import {CustomWeaveTypeProjectContext} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {WeaveCHTableSourceRefContext} from '../CallPage/DataTableView';
 import {ObjectViewerSection} from '../CallPage/ObjectViewerSection';
@@ -53,7 +54,6 @@ import {
   WeaveObjectVersionKey,
 } from '../wfReactInterface/wfDataModelHooksInterface';
 import {DeleteObjectButtonWithModal} from './ObjectDeleteButtons';
-import {TabPrompt} from './Tabs/TabPrompt';
 import {TabUseAnnotationSpec} from './Tabs/TabUseAnnotationSpec';
 import {TabUseModel} from './Tabs/TabUseModel';
 import {TabUseObject} from './Tabs/TabUseObject';
@@ -163,8 +163,6 @@ const ObjectVersionPageInner: React.FC<{
   }, [objectVersion.baseObjectClass]);
   const refUri = objectVersionKeyToRefUri(objectVersion);
 
-  const showPromptTab = objectVersion.val._class_name === 'EasyPrompt';
-
   const minimalColumns = useMemo(() => {
     return ['id', 'op_name', 'project_id'];
   }, []);
@@ -214,18 +212,23 @@ const ObjectVersionPageInner: React.FC<{
     return viewerData;
   }, [viewerData]);
 
+  const isPrompt = baseObjectClass === 'Prompt' && refExtra == null;
   const isDataset = baseObjectClass === 'Dataset' && refExtra == null;
   const isEvaluation = baseObjectClass === 'Evaluation' && refExtra == null;
   const isScorer = baseObjectClass === 'Scorer' && refExtra == null;
   const evalHasCalls = (consumingCalls.result?.length ?? 0) > 0;
   const evalHasCallsLoading = consumingCalls.loading;
 
+  const storageSizeResult = useObjectStorageSizeCalculation(
+    objectVersions,
+    objectVersionIndex
+  );
   const {
     currentVersionSizeBytes,
     allVersionsSizeBytes,
     shouldShowAllVersions,
     isLoading,
-  } = useObjectStorageSizeCalculation(objectVersions, objectVersionIndex);
+  } = storageSizeResult;
 
   if (isEvaluation && evalHasCallsLoading) {
     return <CenteredAnimatedLoader />;
@@ -239,6 +242,16 @@ const ObjectVersionPageInner: React.FC<{
           showDeleteButton={showDeleteButton}
         />
       </DatasetEditProvider>
+    );
+  }
+
+  if (isPrompt) {
+    return (
+      <PromptVersionPage
+        objectVersion={objectVersion}
+        showDeleteButton={showDeleteButton}
+        storageSizeResult={storageSizeResult}
+      />
     );
   }
 
@@ -353,26 +366,6 @@ const ObjectVersionPageInner: React.FC<{
         </Tailwind>
       }
       tabs={[
-        ...(showPromptTab
-          ? [
-              {
-                label: 'Prompt',
-                content: (
-                  <ScrollableTabContent>
-                    {data.loading ? (
-                      <CenteredAnimatedLoader />
-                    ) : (
-                      <TabPrompt
-                        entity={entityName}
-                        project={projectName}
-                        data={viewerDataAsObject}
-                      />
-                    )}
-                  </ScrollableTabContent>
-                ),
-              },
-            ]
-          : []),
         ...(isEvaluation && evalHasCalls
           ? [
               {

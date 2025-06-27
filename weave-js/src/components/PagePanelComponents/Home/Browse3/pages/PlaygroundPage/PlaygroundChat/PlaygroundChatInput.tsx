@@ -7,10 +7,11 @@ import {PlaygroundMessageRole} from '../types';
 type PlaygroundChatInputProps = {
   chatText: string;
   setChatText: (text: string) => void;
-  isLoading: boolean;
-  onSend: (role: PlaygroundMessageRole, chatText: string) => void;
+  isLoading?: boolean;
+  onSend?: (role: PlaygroundMessageRole, chatText: string) => void;
   onAdd: (role: PlaygroundMessageRole, chatText: string) => void;
   hasConfiguredProviders?: boolean;
+  defaultMessageRole?: PlaygroundMessageRole;
 };
 
 const isMac = () => {
@@ -26,13 +27,14 @@ const isMac = () => {
 export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   chatText,
   setChatText,
-  isLoading,
+  isLoading = false,
   onSend,
   onAdd,
   hasConfiguredProviders = true,
+  defaultMessageRole = 'user',
 }) => {
   const [addMessageRole, setAddMessageRole] =
-    useState<PlaygroundMessageRole>('user');
+    useState<PlaygroundMessageRole>(defaultMessageRole);
   const [shouldReset, setShouldReset] = useState(false);
 
   const handleReset = () => {
@@ -41,7 +43,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
   };
 
   const handleSend = (role: PlaygroundMessageRole) => {
-    onSend(role, chatText);
+    onSend?.(role, chatText);
     handleReset();
   };
 
@@ -59,11 +61,13 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
 
   return (
     // WARN: z-index position of navbar overflow menu is `2`, check first if changing
-    <div className="z-1 flex min-h-[160px] w-full flex-shrink-0 bg-white p-16 pt-8">
+    <div className="z-1 flex min-h-[160px] w-full flex-shrink-0 bg-white">
       <div className="mx-auto w-full max-w-[800px]">
-        <div className="mb-8 text-right text-xs text-moon-500">
-          Press {isMac() ? 'CMD' : 'Ctrl'} + Enter to send
-        </div>
+        {onSend && (
+          <div className="mb-8 text-right text-xs text-moon-500">
+            Press {isMac() ? 'CMD' : 'Ctrl'} + Enter to send
+          </div>
+        )}
         <StyledTextArea
           onChange={e => setChatText(e.target.value)}
           value={chatText}
@@ -121,15 +125,21 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               onClick={() => handleAdd(addMessageRole, chatText)}>
               Add
             </Button>
-            <div className="h-full w-px bg-moon-250" />
-            <Button
-              size="medium"
-              onClick={() => handleSend(addMessageRole)}
-              disabled={
-                isLoading || chatText.trim() === '' || !hasConfiguredProviders
-              }>
-              {isLoading ? 'Sending...' : 'Send'}
-            </Button>
+            {onSend && (
+              <>
+                <div className="h-full w-px bg-moon-250" />
+                <Button
+                  size="medium"
+                  onClick={() => handleSend(addMessageRole)}
+                  disabled={
+                    isLoading ||
+                    chatText.trim() === '' ||
+                    !hasConfiguredProviders
+                  }>
+                  {isLoading ? 'Sending...' : 'Send'}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

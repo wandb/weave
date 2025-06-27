@@ -6,11 +6,13 @@ import {Message, Messages, ToolCall} from './types';
 type MessageListProps = {
   messages: Messages;
   scrollLastMessage?: boolean;
+  alwaysShowButtons?: boolean;
 };
 
 export const MessageList = ({
   messages,
   scrollLastMessage = false,
+  alwaysShowButtons = false,
 }: MessageListProps) => {
   const lastMessageRef = useRef<HTMLDivElement>(null);
   const processedMessages = processToolCallMessages(messages);
@@ -38,7 +40,11 @@ export const MessageList = ({
         <div
           ref={i === processedMessages.length - 1 ? lastMessageRef : null}
           key={i}>
-          <MessagePanel index={m.original_index ?? i} message={m} />
+          <MessagePanel
+            index={m.original_index ?? i}
+            message={m}
+            alwaysShowButtons={alwaysShowButtons}
+          />
         </div>
       ))}
     </div>

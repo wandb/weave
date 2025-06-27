@@ -13,7 +13,7 @@ export type PlaygroundContextType = {
   editChoice: (choiceIndex: number, newChoice: Message) => void;
   deleteChoice: (messageIndex: number, choiceIndex: number) => void;
 
-  retry: (messageIndex: number, choiceIndex?: number) => void;
+  retry?: (messageIndex: number, choiceIndex?: number) => void;
   sendMessage: (
     role: PlaygroundMessageRole,
     content: string,

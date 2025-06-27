@@ -55,6 +55,7 @@ import {OpsPage} from './Browse3/pages/OpsPage/OpsPage';
 import {OpVersionPage} from './Browse3/pages/OpsPage/OpVersionPage';
 import {OpVersionsPage} from './Browse3/pages/OpsPage/OpVersionsPage';
 import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
+import {PromptsPage} from './Browse3/pages/PromptsPage/PromptsPage';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
@@ -399,10 +400,13 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route
           path={[
-            `${projectRoot}/:tab(prompts|models|objects)`,
+            `${projectRoot}/:tab(models|objects)`,
             `${projectRoot}/object-versions`,
           ]}>
           <ObjectVersionsPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/:tab(prompts)`}>
+          <PromptsPageBinding />
         </Route>
         <Route path={`${projectRoot}/:tab(datasets)`}>
           <DatasetsPageBinding />
@@ -809,6 +813,40 @@ const ObjectVersionsPageBinding = () => {
   );
   return (
     <ObjectVersionsPage
+      entity={entity}
+      project={project}
+      initialFilter={filters}
+      onFilterUpdate={onFilterUpdate}
+    />
+  );
+};
+
+const PromptsPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  const query = useURLSearchParamsDict();
+  const filters = useMemo(() => {
+    if (query.filter === undefined) {
+      return {};
+    }
+    try {
+      return JSON.parse(query.filter);
+    } catch (e) {
+      console.log(e);
+      return {};
+    }
+  }, [query.filter]);
+
+  const history = useHistory();
+  const routerContext = useWeaveflowCurrentRouteContext();
+  const onFilterUpdate = useCallback(
+    filter => {
+      history.push(routerContext.objectVersionsUIUrl(entity, project, filter));
+    },
+    [history, entity, project, routerContext]
+  );
+
+  return (
+    <PromptsPage
       entity={entity}
       project={project}
       initialFilter={filters}

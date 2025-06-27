@@ -21,6 +21,7 @@ type MessagePanelProps = {
   pendingToolResponseId?: string;
   messageHeader?: React.ReactNode;
   isLast?: boolean;
+  alwaysShowButtons?: boolean;
 };
 
 export const MessagePanel = ({
@@ -35,6 +36,7 @@ export const MessagePanel = ({
   pendingToolResponseId,
   messageHeader,
   isLast = false,
+  alwaysShowButtons = false,
 }: MessagePanelProps) => {
   // If the message is the last message, we show the whole message by default
   const [isShowingMore, setIsShowingMore] = useState(false);
@@ -221,7 +223,10 @@ export const MessagePanel = ({
 
       {/* Playground buttons (retry, edit, delete) - using group and group-hover to control opacity. */}
       {isPlayground && !editorHeight ? (
-        <div className="flex w-full items-center justify-start opacity-0 group-hover:opacity-100">
+        <div
+          className={classNames('flex w-full items-center justify-start', {
+            'opacity-0 group-hover:opacity-100': !alwaysShowButtons,
+          })}>
           <PlaygroundMessagePanelButtons
             index={message.original_index ?? index}
             choiceIndex={choiceIndex}
