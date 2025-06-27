@@ -1,3 +1,4 @@
+import {IconForwardNext} from '@wandb/weave/components/Icon';
 import React, {useMemo} from 'react';
 
 import {ValueViewImage} from '../pages/CallPage/ValueViewImage';
@@ -64,12 +65,12 @@ export const ImageCompareViewer = ({
 
   // Show side-by-side comparison for different images
   return (
-    <div className="flex items-start gap-4">
+    <div className="flex items-start items-center gap-4">
       <div className="flex flex-col items-center">
         <div className="text-gray-500 mb-2 text-xs">Before</div>
         <ValueViewImage value={processedCompareValue} />
       </div>
-      <div className="text-gray-400 flex items-center">→</div>
+      <IconForwardNext />
       <div className="flex flex-col items-center">
         <div className="text-gray-500 mb-2 text-xs">After</div>
         <ValueViewImage value={processedValue} />

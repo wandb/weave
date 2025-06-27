@@ -14,6 +14,7 @@ import {CompareGridPill} from './CompareGridPill';
 import {ImageCompareViewer} from './ImageCompareViewer';
 
 const ARROW = '→';
+const MAX_STRING_LENGTH_IN_DIFF_VIEW = 10000;
 
 type CompareGridCellProps = {
   path: ObjectPath;
@@ -84,8 +85,11 @@ export const CompareGridCell = ({
     return (
       <div className="m-[-6px] flex items-start text-xs">
         <ReactDiffViewer
-          oldValue={limitStringLength(compareValue, 10000)}
-          newValue={limitStringLength(value, 10000)}
+          oldValue={limitStringLength(
+            compareValue,
+            MAX_STRING_LENGTH_IN_DIFF_VIEW
+          )}
+          newValue={limitStringLength(value, MAX_STRING_LENGTH_IN_DIFF_VIEW)}
           splitView={false}
           compareMethod={DiffMethod.WORDS}
           hideLineNumbers={true}
