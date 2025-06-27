@@ -148,7 +148,7 @@ class HallucinationFreeScorer(LLMScorer):
     )
 
     @weave.op
-    async def score(self, *, output: str, context: str, **kwargs: Any) -> dict:
+    async def score(self, *, output: str, context: str) -> dict:
         output = stringify(output)
         response = await self._acompletion(
             messages=[
@@ -284,7 +284,6 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
         query: str,
         context: Union[str, list[str]],
         output: str,
-        **kwargs: Any,
     ) -> WeaveScorerResult:
         """
         Score the hallucination of the query and context.

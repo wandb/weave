@@ -17,7 +17,7 @@ def weave_fluency_scorer():
 def test_score(weave_fluency_scorer):
     """Test score with a fluent response."""
     output = "This is a fluent response."
-    result = weave_fluency_scorer.score(output)
+    result = weave_fluency_scorer.score(output=output)
     # Check that the pydantic model has the expected attributes.
     assert not result.passed
     assert result.metadata is not None
