@@ -16,7 +16,15 @@ interface LangchainMessage {
   type: 'constructor';
   id: string[];
   kwargs: {
-    content: string;
+    content:
+      | string
+      | Array<{
+          type: string;
+          text?: string;
+          id?: string;
+          input?: any;
+          name?: string;
+        }>;
     type: string;
     tool_call_id?: string;
     status?: string;
@@ -107,7 +115,19 @@ interface LangchainOutput {
 
 const langchainMessageToMessage = (lcMessage: LangchainMessage): Message => {
   const role = getLangchainMessageRole(lcMessage);
-  const content = lcMessage.kwargs.content;
+  let content: string | undefined = undefined;
+
+  // Handle Anthropic's array content format
+  if (Array.isArray(lcMessage.kwargs.content)) {
+    // Extract only the text content, ignoring tool_use blocks
+    const textContent = lcMessage.kwargs.content
+      .filter((item: any) => item.type === 'text')
+      .map((item: any) => item.text)
+      .join('');
+    content = textContent || undefined;
+  } else if (typeof lcMessage.kwargs.content === 'string') {
+    content = lcMessage.kwargs.content;
+  }
 
   if (lcMessage.kwargs.tool_call_id) {
     return {
@@ -129,7 +149,7 @@ const langchainMessageToMessage = (lcMessage: LangchainMessage): Message => {
 
     return {
       role,
-      content: content || undefined,
+      content,
       tool_calls: toolCalls,
     };
   }
