@@ -228,7 +228,7 @@ export const DatasetCellRenderer: React.FC<CellProps> = ({
             alignContent: 'center',
             paddingLeft: '8px',
           }}>
-          <CellValue value={value} noLink={true} />
+          <CellValue value={value} noLink={true} field={field} />
         </Box>
       </CellTooltip>
     );

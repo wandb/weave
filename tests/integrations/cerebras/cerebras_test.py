@@ -28,7 +28,8 @@ def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content.strip() == exp
     assert output.choices[0].finish_reason == "stop"
@@ -64,7 +65,8 @@ async def test_cerebras_async(client: weave.trace.weave_client.WeaveClient) -> N
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content.strip() == exp
     assert output.choices[0].finish_reason == "stop"

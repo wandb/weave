@@ -160,7 +160,7 @@ def test_score_with_custom_summarize(client):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "scorers,expected_output_key",
+    ("scorers", "expected_output_key"),
     [
         # All scorer styles
         (
