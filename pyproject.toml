@@ -76,6 +76,7 @@ trace_server = [
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
   "openinference-semantic-conventions>=0.1.17",
+  "deepeval>=3.2.0"
 ]
 trace_server_tests = [
   # BYOB - S3
