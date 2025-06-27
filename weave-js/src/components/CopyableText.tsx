@@ -39,6 +39,8 @@ const Wrapper = styled.div<{isMultiline?: boolean}>`
   padding: 8px;
   border-radius: 8px;
   margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   &:hover {
     background-color: ${MOON_150};
     & > .button_copy {

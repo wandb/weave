@@ -55,6 +55,7 @@ class AutopatchSettings(BaseModel):
     openai_agents: IntegrationSettings = Field(default_factory=IntegrationSettings)
     vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     chatnvidia: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    smolagents: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
 
 @validate_call
@@ -87,10 +88,11 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.litellm.litellm import get_litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
-    from weave.integrations.mistral import get_mistral_patcher
+    from weave.integrations.mistral.mistral_sdk import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
+    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
     get_openai_patcher(settings.openai).attempt_patch()
@@ -111,6 +113,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_vertexai_patcher(settings.vertexai).attempt_patch()
     get_nvidia_ai_patcher(settings.chatnvidia).attempt_patch()
     get_huggingface_patcher(settings.huggingface).attempt_patch()
+    get_smolagents_patcher(settings.smolagents).attempt_patch()
     get_openai_agents_patcher(settings.openai_agents).attempt_patch()
 
     llamaindex_patcher.attempt_patch()
@@ -141,10 +144,11 @@ def reset_autopatch() -> None:
     from weave.integrations.litellm.litellm import get_litellm_patcher
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
-    from weave.integrations.mistral import get_mistral_patcher
+    from weave.integrations.mistral.mistral_sdk import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
+    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
     get_openai_patcher().undo_patch()
@@ -165,6 +169,7 @@ def reset_autopatch() -> None:
     get_vertexai_patcher().undo_patch()
     get_nvidia_ai_patcher().undo_patch()
     get_huggingface_patcher().undo_patch()
+    get_smolagents_patcher().undo_patch()
     get_openai_agents_patcher().undo_patch()
 
     llamaindex_patcher.undo_patch()

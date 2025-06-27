@@ -15,7 +15,7 @@ def download_model(artifact_path: Union[str, Path]) -> Path:
     except ImportError:
         raise ImportError(
             "The `wandb` package is required to download models, please run `pip install wandb`"
-        )
+        ) from None
 
     api = Api()
     art = api.artifact(

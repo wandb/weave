@@ -59,22 +59,20 @@ export const CallPage: FC<CallPageProps> = props => {
 
   // Note to future devs: We could delay the cost (and i/o) fetching. This is
   // just needed to validate that the call truly exists.
-  const call = useCall(
-    {
+  const call = useCall({
+    key: {
       entity: props.entity,
       project: props.project,
       callId: descendentCallId,
     },
-    {
-      // Sadly we cannot include costs as unfinished calls will result
-      // in null response (bug on server side). As a result, the summary
-      // will not show costs. FIXME (This results in a second query in
-      // CallSummary.tsx)
-      // includeCosts: true,
-      includeTotalStorageSize: true,
-      refetchOnRename: true,
-    }
-  );
+    // Sadly we cannot include costs as unfinished calls will result
+    // in null response (bug on server side). As a result, the summary
+    // will not show costs. FIXME (This results in a second query in
+    // CallSummary.tsx)
+    // includeCosts: true,
+    includeTotalStorageSize: true,
+    refetchOnRename: true,
+  });
 
   // This is a little hack, but acceptable for now.
   // We don't want the entire page to re-render when the call result is updated.

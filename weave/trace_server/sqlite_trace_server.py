@@ -92,6 +92,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 id TEXT PRIMARY KEY,
                 trace_id TEXT,
                 parent_id TEXT,
+                thread_id TEXT,
                 op_name TEXT,
                 started_at TEXT,
                 ended_at TEXT,
@@ -104,6 +105,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 summary TEXT,
                 wb_user_id TEXT,
                 wb_run_id TEXT,
+                wb_run_step INTEGER,
                 deleted_at TEXT,
                 display_name TEXT
             )
@@ -118,6 +120,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 created_at TEXT,
                 kind TEXT,
                 base_object_class TEXT,
+                leaf_object_class TEXT,
                 refs TEXT,
                 val_dump TEXT,
                 digest TEXT,
@@ -186,6 +189,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     id,
                     trace_id,
                     parent_id,
+                    thread_id,
                     op_name,
                     display_name,
                     started_at,
@@ -193,13 +197,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     inputs,
                     input_refs,
                     wb_user_id,
-                    wb_run_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    wb_run_id,
+                    wb_run_step
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
                     req.start.trace_id,
                     req.start.parent_id,
+                    req.start.thread_id,
                     req.start.op_name,
                     req.start.display_name,
                     req.start.started_at.isoformat(),
@@ -210,6 +216,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     ),
                     req.start.wb_user_id,
                     req.start.wb_run_id,
+                    req.start.wb_run_step,
                 ),
             )
             conn.commit()
@@ -260,7 +267,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallReadRes(call=calls[0] if calls else None)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        print("REQ", req)
         conn, cursor = get_conn_cursor(self.db_path)
         conds = []
         filter = req.filter
@@ -281,7 +287,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     in_expr = ", ".join(f"'{x}'" for x in non_wildcarded_names)
                     or_conditions += [f"op_name IN ({', '.join({in_expr})})"]
 
-                for name_ndx, name in enumerate(wildcarded_names):
+                for _name_ndx, name in enumerate(wildcarded_names):
                     like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + "%"
                     or_conditions.append(f"op_name LIKE '{like_name}'")
 
@@ -507,6 +513,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                             CASE
                                 WHEN exception IS NOT NULL THEN 'error'
                                 WHEN ended_at IS NULL THEN 'running'
+                                WHEN json_extract(summary, '$.status_counts.error') > 0 THEN 'descendant_error'
                                 ELSE 'success'
                             END
                         """
@@ -565,8 +572,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if limit is None:
                 query += " LIMIT -1"
             query += f" OFFSET {req.offset}"
-
-        print("QUERY", query)
 
         cursor.execute(query)
 
@@ -768,6 +773,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     created_at,
                     kind,
                     base_object_class,
+                    leaf_object_class,
                     refs,
                     val_dump,
                     digest,
@@ -775,11 +781,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     is_latest,
                     deleted_at,
                     wb_user_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(project_id, kind, object_id, digest) DO UPDATE SET
                     created_at = excluded.created_at,
                     kind = excluded.kind,
                     base_object_class = excluded.base_object_class,
+                    leaf_object_class = excluded.leaf_object_class,
                     refs = excluded.refs,
                     val_dump = excluded.val_dump,
                     version_index = excluded.version_index,
@@ -792,6 +799,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     datetime.datetime.now().isoformat(),
                     get_kind(processed_val),
                     processed_result["base_object_class"],
+                    processed_result["leaf_object_class"],
                     json.dumps([]),
                     json_val,
                     digest,
@@ -889,6 +897,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 placeholders = ",".join(["?" for _ in req.filter.base_object_classes])
                 conds.append(f"base_object_class IN ({placeholders})")
                 parameters["base_object_classes"] = req.filter.base_object_classes
+            if req.filter.leaf_object_classes:
+                placeholders = ",".join(["?" for _ in req.filter.leaf_object_classes])
+                conds.append(f"leaf_object_class IN ({placeholders})")
+                parameters["leaf_object_classes"] = req.filter.leaf_object_classes
 
         objs = self._select_objs_query(
             req.project_id,
@@ -903,10 +915,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=objs)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        MAX_OBJECTS_TO_DELETE = 100
-        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+        max_objects_to_delete = 100
+        if req.digests and len(req.digests) > max_objects_to_delete:
             raise ValueError(
-                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+                f"Object delete request contains {len(req.digests)} objects. Please delete {max_objects_to_delete} or fewer objects at a time."
             )
 
         # First, select the objects that match the query
@@ -1268,8 +1280,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
         payload = json.dumps(req.payload)
-        MAX_PAYLOAD = 1024
-        if len(payload) > MAX_PAYLOAD:
+        max_payload = 1024
+        if len(payload) > max_payload:
             raise InvalidRequest("Feedback payload too large")
         row: Row = {
             "id": feedback_id,
@@ -1401,8 +1413,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        print("COMPLETIONS CREATE is not implemented for local sqlite", req)
-        return tsi.CompletionsCreateRes()
+        # TODO: This is not implemented for the sqlite trace server
+        # Currently, this will only be called from the weave file, so we return an empty dict for now
+        return tsi.CompletionsCreateRes(response={})
+
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        # TODO: This is not implemented for the sqlite trace server
+        # Fall back to non-streaming completion
+        response = self.completions_create(req)
+        yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -1431,6 +1452,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         # Return the empty ExportTraceServiceResponse as per the OTLP spec
         return tsi.OtelExportRes()
+
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        raise NotImplementedError(
+            "project_stats is not implemented for SQLite trace server"
+        )
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1480,7 +1506,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 version_index,
                 is_latest,
                 deleted_at,
-                wb_user_id
+                wb_user_id,
+                leaf_object_class
             FROM objects
             WHERE project_id = ? AND {pred}
         """
@@ -1526,6 +1553,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     is_latest=row[8],
                     deleted_at=row[9],
                     wb_user_id=row[10],
+                    leaf_object_class=row[11],
                 )
             )
         return result
@@ -1591,6 +1619,15 @@ def _transform_external_calls_field_to_internal_calls_field(
             END
         """
         json_path = None
+    elif field == "summary.weave.status":
+        field = """
+                            CASE
+                                WHEN exception IS NOT NULL THEN 'error'
+                                WHEN ended_at IS NULL THEN 'running'
+                                WHEN json_extract(summary, '$.status_counts.error') > 0 THEN 'descendant_error'
+                                ELSE 'success'
+                            END
+                        """
     elif field == "summary" or field.startswith("summary."):
         if field == "summary":
             json_path = "$"

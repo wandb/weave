@@ -144,20 +144,20 @@ export const ExportSelector = ({
       ? makeLeafColumns(visibleColumns)
       : undefined;
     const startTime = Date.now();
-    download(
-      callQueryParams.entity,
-      callQueryParams.project,
+    download({
+      entity: callQueryParams.entity,
+      project: callQueryParams.project,
       contentType,
-      lowLevelFilter,
+      filter: lowLevelFilter,
       limit,
       offset,
       sortBy,
-      filterBy,
-      leafColumns,
-      refColumnsToExpand,
+      query: filterBy,
+      columns: leafColumns,
+      expandedRefCols: refColumnsToExpand,
       includeFeedback,
-      includeCosts
-    ).then(blob => {
+      includeCosts,
+    }).then(blob => {
       const fileExtension = fileExtensions[contentType];
       const date = new Date().toISOString().split('T')[0];
       const fileName = `weave_export_${callQueryParams.project}_${date}.${fileExtension}`;
@@ -186,6 +186,7 @@ export const ExportSelector = ({
   };
 
   const pythonText = makeCodeText(
+    callQueryParams.entity,
     callQueryParams.project,
     selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
@@ -570,6 +571,7 @@ function makeLeafColumns(visibleColumns: string[]) {
 }
 
 function makeCodeText(
+  entity: string,
   project: string,
   callIds: string[] | undefined,
   filter: CallFilter,
@@ -578,7 +580,7 @@ function makeCodeText(
   includeFeedback: boolean,
   includeCosts: boolean
 ) {
-  let codeStr = `import weave\n\nclient = weave.init("${project}")`;
+  let codeStr = `import weave\n\nclient = weave.init("${entity}/${project}")`;
   codeStr += `\ncalls = client.get_calls(\n`;
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {

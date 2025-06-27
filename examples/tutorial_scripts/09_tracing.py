@@ -63,8 +63,6 @@ pokemon_data = pokedex(random.choice(POKEMON), PROMPT)
 
 import json
 
-from openai import OpenAI
-
 import weave
 
 

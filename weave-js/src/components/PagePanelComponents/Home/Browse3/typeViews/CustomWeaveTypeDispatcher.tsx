@@ -1,9 +1,11 @@
 import React from 'react';
 
 import {AudioPlayer} from './Audio/AudioPlayer';
+import {ContentView} from './Content/ContentView';
 import {CustomWeaveTypePayload} from './customWeaveType.types';
 import {DateTimeView} from './datetime.datetime/DateTimeView';
 import {MarkdownView} from './Markdown/MarkdownView';
+import {VideoPlayer} from './moviepy.video.VideoClip/VideoPlayer';
 import {PILImageImage} from './PIL.Image.Image/PILImageImage';
 
 type CustomWeaveTypeDispatcherProps = {
@@ -45,12 +47,21 @@ const customWeaveTypeRegistry: {
   'wave.Wave_read': {
     component: AudioPlayer,
   },
+  'weave.type_handlers.Audio.audio.Audio': {
+    component: AudioPlayer,
+  },
   'datetime.datetime': {
     component: DateTimeView,
   },
   'rich.markdown.Markdown': {
     component: MarkdownView,
     preferredRowHeight: 350,
+  },
+  'moviepy.video.VideoClip.VideoClip': {
+    component: VideoPlayer,
+  },
+  'weave.type_wrappers.Content.content.Content': {
+    component: ContentView,
   },
 };
 
@@ -87,7 +98,7 @@ export const CustomWeaveTypeDispatcher: React.FC<
   const projectContext = React.useContext(CustomWeaveTypeProjectContext);
   const typeId = data.weave_type.type;
   const comp = customWeaveTypeRegistry[typeId]?.component;
-  const defaultReturn = <span>Custom Weave Type: {data.weave_type.type}</span>;
+  const defaultReturn = <span>Custom Weave Type: {typeId}</span>;
 
   if (comp) {
     const applicableEntity = entity || projectContext?.entity;

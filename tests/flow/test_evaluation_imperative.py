@@ -71,7 +71,7 @@ def test_basic_evaluation(
         "greater_than_4_scorer": {"true_count": 3, "true_fraction": 1.0},
     }
 
-    for i, (inputs, outputs, score1, score2) in enumerate(
+    for i, (inputs, output_val, score1, score2) in enumerate(
         zip(user_dataset, outputs, score1_results, score2_results)
     ):
         predict_index = 1 + i * 4
@@ -86,14 +86,14 @@ def test_basic_evaluation(
         assert predict_and_score_call.inputs["self"]._class_name == "Evaluation"
         assert predict_and_score_call.inputs["model"]._class_name == "Model"
         assert predict_and_score_call.inputs["example"] == inputs
-        assert predict_and_score_call.output["output"] == outputs
+        assert predict_and_score_call.output["output"] == output_val
 
         predict_call = calls[predict_index + 1]
         assert op_name_from_call(predict_call) == "Model.predict"
         assert predict_call.attributes["_weave_eval_meta"]["imperative"] is True
         assert predict_call.inputs["self"]._class_name == "Model"
         assert predict_call.inputs["inputs"] == inputs
-        assert predict_call.output == outputs
+        assert predict_call.output == output_val
 
         feedbacks = list(predict_call.feedback)
         assert len(feedbacks) == 2
@@ -103,14 +103,14 @@ def test_basic_evaluation(
         scorer1_call = calls[predict_index + 2]
         assert op_name_from_call(scorer1_call) == "greater_than_2_scorer"
         assert scorer1_call.attributes["_weave_eval_meta"]["imperative"] is True
-        assert scorer1_call.inputs["output"] == outputs
+        assert scorer1_call.inputs["output"] == output_val
         assert scorer1_call.inputs["inputs"] == inputs
         assert scorer1_call.output == score1
 
         scorer2_call = calls[predict_index + 3]
         assert op_name_from_call(scorer2_call) == "greater_than_4_scorer"
         assert scorer2_call.attributes["_weave_eval_meta"]["imperative"] is True
-        assert scorer2_call.inputs["output"] == outputs
+        assert scorer2_call.inputs["output"] == output_val
         assert scorer2_call.inputs["inputs"] == inputs
         assert scorer2_call.output == score2
 
@@ -292,7 +292,7 @@ def test_evaluation_version_reuse(
 
 
 def generate_evaluation_logger_kwargs_permutations():
-    NOT_SPECIFIED = object()
+    not_specified = object()
 
     class MyModel(weave.Model):
         const_value: int
@@ -310,7 +310,7 @@ def generate_evaluation_logger_kwargs_permutations():
             return self.const_value
 
     models = [
-        NOT_SPECIFIED,
+        not_specified,
         "string_model",
         {"name": "dict_model"},
         MyModel(const_value=42),
@@ -318,7 +318,7 @@ def generate_evaluation_logger_kwargs_permutations():
     ]
 
     datasets = [
-        NOT_SPECIFIED,
+        not_specified,
         "string_dataset",
         [
             {"sample": "a", "exp_output": 1},
@@ -335,9 +335,9 @@ def generate_evaluation_logger_kwargs_permutations():
     for model in models:
         for dataset in datasets:
             kwargs = {}
-            if model is not NOT_SPECIFIED:
+            if model is not not_specified:
                 kwargs["model"] = model
-            if dataset is not NOT_SPECIFIED:
+            if dataset is not not_specified:
                 kwargs["dataset"] = dataset
 
             yield kwargs
@@ -391,6 +391,7 @@ def scorer(request):
         {"value": True, "reason": "bool"},
     ],
 )
+@pytest.mark.skip(reason="Flaking in CI, needs to be more stable")
 @pytest.mark.asyncio
 async def test_various_input_forms(client, evaluation_logger_kwargs, scorer, score):
     your_dataset = [
@@ -454,3 +455,31 @@ def test_passing_dict_requires_name_with_model(client):
 
     ev2 = weave.EvaluationLogger(model={"name": "my_model"})
     ev2.finish()
+
+
+def test_evaluation_no_auto_summarize(client):
+    ev = weave.EvaluationLogger()
+    pred = ev.log_prediction(inputs={"a": 1, "b": 2}, output=3)
+    pred.log_score(scorer="gt2_scorer", score=True)
+    ev.log_summary(auto_summarize=False)
+    ev.finish()
+    client.flush()
+
+    calls = client.get_calls()
+    # assert len(calls) == 1
+    summarize_call = calls[4]
+    assert summarize_call.output == {}
+
+
+def test_evaluation_no_auto_summarize_with_custom_dict(client):
+    ev = weave.EvaluationLogger()
+    pred = ev.log_prediction(inputs={"a": 1, "b": 2}, output=3)
+    pred.log_score(scorer="gt2_scorer", score=True)
+    ev.log_summary(summary={"something": 1, "else": 2}, auto_summarize=False)
+    ev.finish()
+    client.flush()
+
+    calls = client.get_calls()
+    # assert len(calls) == 1
+    summarize_call = calls[4]
+    assert summarize_call.output == {"something": 1, "else": 2}

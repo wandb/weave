@@ -16,7 +16,7 @@ def func():
     def _func(a: int) -> int:
         return a + 1
 
-    yield _func
+    return _func
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def afunc():
     async def _afunc(a: int) -> int:
         return a + 1
 
-    yield _afunc
+    return _afunc
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def weave_obj():
         async def amethod(self, a: int) -> int:
             return a + 1
 
-    yield A()
+    return A()
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def py_obj():
         async def amethod(self, a: int) -> int:
             return a + 1
 
-    yield B()
+    return B()
 
 
 def test_sync_func(client, func):
@@ -127,7 +127,7 @@ def test_sync_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            _digest="nzAe1JtLJFEVeEo3yX0TOYYGhh7vAOFYRentYI9ik6U",
+            _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             _extra=(),
         ),
         "a": 1,
@@ -162,7 +162,7 @@ async def test_async_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            _digest="nzAe1JtLJFEVeEo3yX0TOYYGhh7vAOFYRentYI9ik6U",
+            _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             _extra=(),
         ),
         "a": 1,

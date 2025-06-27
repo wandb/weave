@@ -75,7 +75,11 @@ def write_video(fp: str, clip: VideoClip) -> None:
     Takes a filepath and a VideoClip and writes the video to the file.
     errors if the file does not end in a supported video extension.
     """
-    fps = clip.fps or None
+    try:
+        fps = clip.fps or 24
+    except Exception as _:
+        fps = 24
+
     audio = clip.audio
     fmt_str = get_format_from_filename(fp)
     fmt = VideoFormat(fmt_str)
@@ -160,7 +164,7 @@ def save(
         else:
             save_non_file_clip(obj, artifact, name)
     except Exception as e:
-        raise ValueError(f"Failed to write video file with error: {e}")
+        raise ValueError(f"Failed to write video file with error: {e}") from e
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:

@@ -163,9 +163,6 @@ export const ObjectVersionLink: React.FC<{
   hideVersionSuffix?: boolean;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  // const text = props.hideName
-  //   ? props.version
-  //   : props.objectName + ': ' + truncateID(props.version);
   const text = props.hideVersionSuffix
     ? props.objectName
     : objectVersionText(props.objectName, props.versionIndex);
@@ -231,9 +228,6 @@ export const OpVersionLink: React.FC<{
   color?: string;
 }> = props => {
   const {peekingRouter} = useWeaveflowRouteContext();
-  // const text = props.hideName
-  //   ? props.version
-  //   : props.opName + ': ' + truncateID(props.version);
   const text = opVersionText(props.opName, props.versionIndex);
   const to = peekingRouter.opVersionUIUrl(
     props.entityName,
@@ -299,6 +293,7 @@ export const CallLink: React.FC<{
   focusedCallId?: string;
   tracetree?: boolean;
   icon?: React.ReactNode;
+  noName?: boolean;
   color?: string;
   isEval?: boolean;
 }> = props => {
@@ -354,16 +349,18 @@ export const CallLink: React.FC<{
             minWidth: 0,
           }}>
           {props.icon}
-          <span
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              flexGrow: 1,
-              flexShrink: 1,
-            }}>
-            {opName}
-          </span>
+          {!props.noName && (
+            <span
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flexGrow: 1,
+                flexShrink: 1,
+              }}>
+              {opName}
+            </span>
+          )}
           <span style={{flexShrink: 0}}>
             <Id id={props.callId} type="Call" />
           </span>
@@ -380,6 +377,7 @@ export const CustomLink: React.FC<{
   color?: string;
   variant?: LinkVariant;
   icon?: React.ReactNode;
+  fontWeight?: number | string;
 }> = props => {
   // Used to look like our other links, but delegate to a custom onClick
   return (
@@ -396,6 +394,7 @@ export const CustomLink: React.FC<{
             gap: '4px',
             // allow flex items to shrink below their minimum content size
             minWidth: 0,
+            fontWeight: props.fontWeight,
           }}>
           {props.icon}
           <span
