@@ -35,3 +35,9 @@ export type SimplifiedLLMAsAJudgeScorer = {
   llmModelId: string;
   prompt: string;
 };
+
+export type SimplifiedLLMStructuredCompletionModel = {
+  name: string;
+  llmModelId: string;
+  systemPrompt: string;
+};

@@ -11,7 +11,10 @@ import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
 import {convertTraceServerObjectVersionToSchema} from '../wfReactInterface/tsDataModelHooks';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {SimplifiedLLMAsAJudgeScorer} from './types';
+import {
+  SimplifiedLLMAsAJudgeScorer,
+  SimplifiedLLMStructuredCompletionModel,
+} from './types';
 
 export const getLatestEvaluationRefs = async (
   client: TraceServerClient,
@@ -339,5 +342,80 @@ export const getSimplifiedLLMAsAJudgeScorer = async (
     scoreType: scoreTypeGuess,
     llmModelId: llmModelId ?? '',
     prompt: prompt ?? '',
+  };
+};
+
+export const publishSimplifiedLLMStructuredCompletionModel = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  simplifiedModel: SimplifiedLLMStructuredCompletionModel
+): Promise<string> => {
+  const modelName = simplifiedModel.name;
+  const modelObjectId = sanitizeObjectId(modelName);
+  const modelObjectVal: LlmStructuredCompletionModel = {
+    default_params: {
+      messages_template: [{role: 'system', content: simplifiedModel.systemPrompt}],
+    },
+    llm_model_id: simplifiedModel.llmModelId,
+    name: modelName,
+  };
+
+  const res = await createBuiltinObjectInstance(client, 'LLMStructuredCompletionModel', {
+    obj: {
+      project_id: `${entity}/${project}`,
+      object_id: modelObjectId,
+      val: modelObjectVal,
+    },
+  });
+
+  const modelRef = makeRefObject(
+    entity,
+    project,
+    'object',
+    modelObjectId,
+    res.digest,
+    undefined
+  );
+
+  return modelRef;
+};
+
+export const getSimplifiedLLMStructuredCompletionModel = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  modelRef: string
+): Promise<SimplifiedLLMStructuredCompletionModel | null> => {
+  const model = await getObjByRef(client, modelRef);
+  if (!model) {
+    return null;
+  }
+
+  // Check if this is a simplified model
+  // Must have exactly one system message and no response format specified
+  const messagesTemplate = model.val?.default_params?.messages_template ?? [];
+  if (messagesTemplate.length !== 1) {
+    return null;
+  }
+
+  const firstMessage = messagesTemplate[0];
+  if (firstMessage.role !== 'system') {
+    return null;
+  }
+
+  // If it has response_format specified, it's not a simple model
+  if (model.val?.default_params?.response_format) {
+    return null;
+  }
+
+  const llmModelId = model.val?.llm_model_id;
+  const systemPrompt = firstMessage.content ?? '';
+  const name = model.val?.name ?? '';
+
+  return {
+    name,
+    llmModelId: llmModelId ?? '',
+    systemPrompt,
   };
 };

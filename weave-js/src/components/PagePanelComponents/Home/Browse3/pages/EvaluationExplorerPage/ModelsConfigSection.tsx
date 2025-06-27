@@ -1,18 +1,27 @@
 import {Button} from '@wandb/weave/components/Button';
+import {TextArea} from '@wandb/weave/components/Form/TextArea';
+import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {ReusableDrawer} from '../../ReusableDrawer';
 import {
   ModelConfigurationForm,
   ModelConfigurationFormRef,
 } from '../MonitorsPage/ScorerForms/ModelConfigurationForm';
+import {LLMDropdownLoaded} from '../PlaygroundPage/PlaygroundChat/LLMDropdown';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {refStringToName} from './common';
 import {LoadingSelect} from './components';
 import {useEvaluationExplorerPageContext} from './context';
 import {clientBound, hookify} from './hooks';
 import {Column, ConfigSection, Row} from './layout';
-import {getLatestModelRefs} from './query';
+import {
+  getLatestModelRefs,
+  getSimplifiedLLMStructuredCompletionModel,
+  publishSimplifiedLLMStructuredCompletionModel,
+} from './query';
+import {SimplifiedLLMStructuredCompletionModel} from './types';
 import {VersionedObjectPicker} from './VersionedObjectPicker';
 
 // Default option for creating a new model from scratch
@@ -24,6 +33,150 @@ const newModelOption = {
 // Create the hook for fetching model refs
 // This wraps the async query function in a React hook that manages loading/error states
 const useLatestModelRefs = clientBound(hookify(getLatestModelRefs));
+const useSimplifiedModel = clientBound(
+  hookify(getSimplifiedLLMStructuredCompletionModel)
+);
+
+interface SimplifiedModelConfigProps {
+  entity: string;
+  project: string;
+  modelRef: string | null;
+  modelNdx: number;
+  onSaveModel: (
+    modelNdx: number,
+    simplifiedConfig: SimplifiedLLMStructuredCompletionModel
+  ) => Promise<string | null>;
+  onOpenAdvancedSettings: (
+    modelNdx: number,
+    simplifiedConfig: SimplifiedLLMStructuredCompletionModel
+  ) => void;
+}
+
+const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
+  entity,
+  project,
+  modelRef,
+  modelNdx,
+  onSaveModel,
+  onOpenAdvancedSettings,
+}) => {
+  // Local state for the simplified form
+  const [config, setConfig] = useState<SimplifiedLLMStructuredCompletionModel>({
+    name: '',
+    llmModelId: '',
+    systemPrompt: '',
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const simplifiedModelQuery = useSimplifiedModel(
+    entity,
+    project,
+    modelRef ?? ''
+  );
+
+  useEffect(() => {
+    if (modelRef && simplifiedModelQuery.data !== null) {
+      setConfig(simplifiedModelQuery.data);
+    }
+  }, [modelRef, simplifiedModelQuery.data]);
+
+  // Check if this model qualifies for simplified config
+  const qualifies = !modelRef || simplifiedModelQuery.data !== null;
+
+  if (!qualifies) {
+    return (
+      <div
+        style={{
+          padding: '12px',
+          backgroundColor: '#f5f5f5',
+          borderRadius: '4px',
+          fontSize: '14px',
+          color: '#666',
+          fontStyle: 'italic',
+        }}>
+        This model uses advanced configuration.{' '}
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={() => onOpenAdvancedSettings(modelNdx, config)}
+          style={{padding: '2px 8px', fontSize: '14px'}}>
+          Edit settings →
+        </Button>
+      </div>
+    );
+  }
+
+  // Validation
+  const isValid = config.name.trim() !== '' && config.systemPrompt.trim() !== '' && config.llmModelId.trim() !== '';
+
+  const handleSave = async () => {
+    if (!isValid || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      // Save the model with current config
+      const newRef = await onSaveModel(modelNdx, config);
+      if (newRef) {
+        // TODO: Show success message
+        console.log('Model saved with ref:', newRef);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Column
+      style={{
+        padding: '12px',
+        backgroundColor: '#f5f5f5',
+        borderRadius: '4px',
+        gap: '8px',
+      }}>
+      <Row style={{gap: '8px'}}>
+        <div style={{flex: '1 1 1px'}}>
+          <TextField
+            placeholder="Model name"
+            value={config.name}
+            onChange={value => setConfig({...config, name: value})}
+          />
+        </div>
+        <div style={{flex: '0 0 140px'}}>
+          <LLMDropdownLoaded
+            className="w-full"
+            hideSavedModels
+            value={config.llmModelId || ''}
+            isTeamAdmin={false}
+            direction={{horizontal: 'left'}}
+            onChange={(modelValue: string) => {
+              setConfig({...config, llmModelId: modelValue});
+            }}
+          />
+        </div>
+      </Row>
+      <Row>
+        <TextArea
+          placeholder="Enter the system prompt (e.g., 'You are a helpful assistant that...')"
+          value={config.systemPrompt}
+          onChange={e => setConfig({...config, systemPrompt: e.target.value})}
+          rows={3}
+          style={{width: '100%'}}
+        />
+      </Row>
+      <Row style={{justifyContent: 'flex-end', gap: '8px'}}>
+        <Button
+          variant="primary"
+          size="small"
+          onClick={handleSave}
+          icon={isSaving ? undefined : 'save'}
+          disabled={!isValid || isSaving}>
+          {isSaving ? 'Saving...' : 'Save'}
+        </Button>
+      </Row>
+    </Column>
+  );
+};
 
 /**
  * Drawer component for configuring model details.
@@ -77,8 +230,15 @@ const ModelRow: React.FC<{
   modelNdx: number;
   updateModelRef: (modelNdx: number, ref: string | null) => void;
   deleteModel: (modelNdx: number) => void;
-  setCurrentlyEditingModelNdx: (ndx: number | null) => void;
+  setCurrentlyEditingModelNdx: (
+    ndx: number,
+    simplifiedConfig?: SimplifiedLLMStructuredCompletionModel
+  ) => void;
   modelRefsQuery: ReturnType<typeof useLatestModelRefs>;
+  onSaveModel: (
+    modelNdx: number,
+    simplifiedConfig: SimplifiedLLMStructuredCompletionModel
+  ) => Promise<string | null>;
 }> = ({
   entity,
   project,
@@ -88,6 +248,7 @@ const ModelRow: React.FC<{
   deleteModel,
   setCurrentlyEditingModelNdx,
   modelRefsQuery,
+  onSaveModel,
 }) => {
   const handleRefChange = useCallback(
     (ref: string | null) => {
@@ -95,10 +256,6 @@ const ModelRow: React.FC<{
     },
     [modelNdx, updateModelRef]
   );
-
-  const handleSettings = useCallback(() => {
-    setCurrentlyEditingModelNdx(modelNdx);
-  }, [modelNdx, setCurrentlyEditingModelNdx]);
 
   const handleDelete = useCallback(() => {
     deleteModel(modelNdx);
@@ -111,38 +268,38 @@ const ModelRow: React.FC<{
         <div style={{flex: 1}}>
           <LoadingSelect />
         </div>
-        <Button icon="settings" variant="ghost" disabled />
         <Button icon="delete" variant="ghost" disabled />
       </Row>
     );
   }
 
   return (
-    <Row style={{alignItems: 'center', gap: '8px'}}>
-      <div style={{flex: 1}}>
-        <VersionedObjectPicker
-          entity={entity}
-          project={project}
-          objectType="model"
-          selectedRef={model.originalSourceRef}
-          onRefChange={handleRefChange}
-          latestObjectRefs={modelRefsQuery.data ?? []}
-          loading={modelRefsQuery.loading}
-          newOptions={[{label: 'New Model', value: 'new-model'}]}
-          allowNewOption={true}
-        />
-      </div>
-      <Button icon="settings" variant="ghost" onClick={handleSettings} />
-      {/* TODO: Implement copy functionality
-      <Button
-        icon="copy"
-        variant="ghost"
-        onClick={() => {
-          console.error('TODO: Implement copy model');
-        }}
-      /> */}
-      <Button icon="delete" variant="ghost" onClick={handleDelete} />
-    </Row>
+    <Column style={{gap: '8px'}}>
+      <Row style={{alignItems: 'center', gap: '8px'}}>
+        <div style={{flex: 1}}>
+          <VersionedObjectPicker
+            entity={entity}
+            project={project}
+            objectType="model"
+            selectedRef={model.originalSourceRef}
+            onRefChange={handleRefChange}
+            latestObjectRefs={modelRefsQuery.data ?? []}
+            loading={modelRefsQuery.loading}
+            newOptions={[{label: 'New Model', value: 'new-model'}]}
+            allowNewOption={true}
+          />
+        </div>
+        <Button icon="delete" variant="ghost" onClick={handleDelete} />
+      </Row>
+      <SimplifiedModelConfig
+        entity={entity}
+        project={project}
+        modelRef={model.originalSourceRef}
+        modelNdx={modelNdx}
+        onSaveModel={onSaveModel}
+        onOpenAdvancedSettings={setCurrentlyEditingModelNdx}
+      />
+    </Column>
   );
 };
 
@@ -162,9 +319,15 @@ export const ModelsConfigSection: React.FC<{
     number | null
   >(null);
 
+  // Track simplified config data to pass to drawer
+  const [pendingSimplifiedConfig, setPendingSimplifiedConfig] =
+    useState<any>(null);
+
   const models = useMemo(() => {
     return config.models;
   }, [config]);
+
+  const client = useGetTraceServerClientContext()();
 
   const addModel = useCallback(() => {
     editConfig(draft => {
@@ -215,6 +378,36 @@ export const ModelsConfigSection: React.FC<{
     [editConfig]
   );
 
+  // Save model handler for simplified config
+  const saveModel = useCallback(
+    async (
+      modelNdx: number,
+      simplifiedConfig: SimplifiedLLMStructuredCompletionModel
+    ): Promise<string | null> => {
+      const modelRef = await publishSimplifiedLLMStructuredCompletionModel(
+        client,
+        entity,
+        project,
+        simplifiedConfig
+      );
+      updateModelRef(modelNdx, modelRef);
+      return modelRef;
+    },
+    [client, entity, project, updateModelRef]
+  );
+
+  // Handle opening advanced settings (either from gear or from simplified form)
+  const handleOpenAdvancedSettings = useCallback(
+    (modelNdx: number | null, simplifiedConfig?: any) => {
+      if (simplifiedConfig) {
+        // Store the simplified config to pass to the drawer
+        setPendingSimplifiedConfig(simplifiedConfig);
+      }
+      setCurrentlyEditingModelNdx(modelNdx);
+    },
+    []
+  );
+
   return (
     <ConfigSection
       title="Models"
@@ -259,8 +452,9 @@ export const ModelsConfigSection: React.FC<{
               modelNdx={modelNdx}
               updateModelRef={updateModelRef}
               deleteModel={deleteModel}
-              setCurrentlyEditingModelNdx={setCurrentlyEditingModelNdx}
+              setCurrentlyEditingModelNdx={handleOpenAdvancedSettings}
               modelRefsQuery={modelRefsQuery}
+              onSaveModel={saveModel}
             />
           );
         })}
@@ -277,6 +471,7 @@ export const ModelsConfigSection: React.FC<{
               });
             }
             setCurrentlyEditingModelNdx(null);
+            setPendingSimplifiedConfig(null); // Clear pending config
           }}
           initialModelRef={
             currentlyEditingModelNdx !== null
