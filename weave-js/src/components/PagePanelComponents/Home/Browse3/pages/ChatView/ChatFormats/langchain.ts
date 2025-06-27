@@ -192,7 +192,7 @@ export const isChatRequestFormatLangchain = (request: any) => {
   }
 
   return firstMessages.every(isLangchainMessage);
-}
+};
 export const isTraceCallChatFormatLangchain = (
   call: TraceCallSchema
 ): boolean => {
@@ -234,7 +234,9 @@ export const normalizeLangchainChatRequest = (request: any): ChatRequest => {
     !_.isArray(request.messages) ||
     request.messages.length === 0
   ) {
-    throw new Error("Error: Input Messages missing or empty. ChatView will be hidden")
+    throw new Error(
+      'Error: Input Messages missing or empty. ChatView will be hidden'
+    );
   }
 
   const firstMessages = request.messages[0];

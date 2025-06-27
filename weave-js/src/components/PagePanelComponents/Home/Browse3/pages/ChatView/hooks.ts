@@ -21,7 +21,7 @@ import {
   normalizeGeminiChatRequest,
 } from './ChatFormats/gemini';
 import {
-    isChatRequestFormatLangchain,
+  isChatRequestFormatLangchain,
   isTraceCallChatFormatLangchain,
   normalizeLangchainChatCompletion,
   normalizeLangchainChatRequest,
@@ -45,7 +45,7 @@ import {
   normalizeOTELChatRequest,
 } from './ChatFormats/opentelemetry';
 import {ChatFormat} from './ChatFormats/types';
-import { hasStringProp } from './ChatFormats/utils';
+import {hasStringProp} from './ChatFormats/utils';
 import {Chat, ChatCompletion, ChatRequest} from './types';
 
 // Traverse input and outputs looking for any ref strings.
@@ -92,7 +92,7 @@ const canNormalizeCall = (call: CallSchema): boolean => {
       // Use specialized OTEL handlers
       const request = normalizeOTELChatRequest(traceCall);
       if (traceCall.output) {
-        normalizeOTELChatCompletion(traceCall, request)
+        normalizeOTELChatCompletion(traceCall, request);
       }
     } else {
       normalizeChatRequest(traceCall.inputs);
@@ -196,12 +196,12 @@ export const normalizeChatRequest = (request: any): ChatRequest => {
   }
 
   const validMessages = request.messages.every((msg: any) => {
-    return hasStringProp(msg, 'role')
+    return hasStringProp(msg, 'role');
   });
 
   // Throw this error so the validation check can hide ChatView
   if (!validMessages) {
-    throw new Error("Invalid message format. Messages missing role");
+    throw new Error('Invalid message format. Messages missing role');
   }
 
   return request as ChatRequest;
@@ -233,9 +233,7 @@ export const useCallAsChat = (
     if (isTraceCallChatFormatOTEL(call)) {
       // Use specialized OTEL handlers
       request = normalizeOTELChatRequest(call);
-      result = call.output
-        ? normalizeOTELChatCompletion(call, request)
-        : null;
+      result = call.output ? normalizeOTELChatCompletion(call, request) : null;
     } else if (isTraceCallChatFormatLangchain(call)) {
       // Use specialized Langchain handlers
       request = normalizeLangchainChatRequest(deref(call.inputs, refsMap));
