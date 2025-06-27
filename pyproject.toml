@@ -289,6 +289,7 @@ select = [
   "RUF001",  # https://docs.astral.sh/ruff/rules/ambiguous-unicode-character-string/
   "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
+  "RUF013",  # https://docs.astral.sh/ruff/rules/implicit-optional/
 ]
 ignore = [
   # we use Google style
