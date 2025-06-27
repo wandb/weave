@@ -253,6 +253,7 @@ select = [
   "F401",    # https://docs.astral.sh/ruff/rules/unused-import/
   "F402",    # https://docs.astral.sh/ruff/rules/import-shadowed-by-loop-var/
   "F6",      # https://docs.astral.sh/ruff/rules/multi-value-repeated-key-literal/
+  "F811",    # https://docs.astral.sh/ruff/rules/redefined-while-unused/
   "TID252",  # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
   "UP",      # https://docs.astral.sh/ruff/rules/#pyupgrade-up
   "TRY002",  # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
