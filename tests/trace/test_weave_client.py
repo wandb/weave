@@ -888,12 +888,12 @@ def test_object_mismatch_project_ref_nested(client):
     res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
     assert len(res.objs) == 2
 
-    op = [x for x in res.objs if x.kind == "op"][0]
+    op = next(x for x in res.objs if x.kind == "op")
     assert op.object_id == "hello_world"
     assert op.project_id == "shawn/test-project2"
     assert op.kind == "op"
 
-    obj = [x for x in res.objs if x.kind == "object"][0]
+    obj = next(x for x in res.objs if x.kind == "object")
     assert obj.object_id == "my-object"
     assert obj.project_id == "shawn/test-project2"
 
@@ -1317,7 +1317,7 @@ def test_summary_tokens(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert call.summary["usage"] == {
         "model_a": {"requests": 2, "prompt_tokens": 10, "completion_tokens": 16},
@@ -1361,7 +1361,7 @@ def test_summary_descendents(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello error: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert list(call.summary["descendants"].items()) == [
         (ObjectRefStrMatcher(name="model_a"), {"successes": 2, "errors": 0}),
@@ -1499,7 +1499,7 @@ def test_summary_tokens_cost(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert call.summary["usage"] == {
         "gpt-4": {
