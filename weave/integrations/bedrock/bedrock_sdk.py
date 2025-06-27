@@ -143,7 +143,7 @@ def postprocess_inputs_apply_guardrail(inputs: dict[str, Any]) -> dict[str, Any]
 
 
 def postprocess_inputs_invoke_agent(inputs: dict[str, Any]) -> dict[str, Any]:
-    """Post-process the inputs for the invoke_agent API call."""
+    """unpack kwargs to render them in the UI."""
     return inputs.get("kwargs", {})
 
 
