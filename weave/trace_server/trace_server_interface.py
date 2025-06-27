@@ -1042,6 +1042,69 @@ class ProjectStatsRes(BaseModel):
     files_storage_size_bytes: int
 
 
+# Thread API
+
+
+class ThreadSchema(BaseModel):
+    thread_id: str
+    turn_count: int = Field(description="Number of turn calls in this thread")
+    start_time: datetime.datetime = Field(
+        description="Earliest start time of turn calls in this thread"
+    )
+    last_updated: datetime.datetime = Field(
+        description="Latest end time of turn calls in this thread"
+    )
+    first_call_id: Optional[str] = Field(
+        description="Call ID of the first call in this thread (earliest start_time)"
+    )
+    latest_call_id: Optional[str] = Field(
+        description="Call ID of the latest call in this thread (latest end_time)"
+    )
+    p50_call_duration_ms: Optional[float] = Field(
+        description="50th percentile (median) of call durations in milliseconds within this thread"
+    )
+    p99_call_duration_ms: Optional[float] = Field(
+        description="99th percentile of call durations in milliseconds within this thread"
+    )
+
+
+class ThreadsQueryReq(BaseModel):
+    """
+    Query threads with aggregated statistics based on turn calls only.
+
+    Turn calls are the immediate children of thread contexts (where call.id == turn_id).
+    This provides meaningful conversation-level statistics rather than including all
+    nested implementation details.
+    """
+
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of threads to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of threads to skip")
+    sort_by: Optional[list[SortBy]] = Field(
+        default=None,
+        description="Sorting criteria for the threads. Supported fields: 'thread_id', 'turn_count', 'start_time', 'last_updated', 'p50_call_duration_ms', 'p99_call_duration_ms'.",
+        examples=[[SortBy(field="last_updated", direction="desc")]],
+    )
+    sortable_datetime_after: Optional[datetime.datetime] = Field(
+        default=None,
+        description="Only include calls with sortable_datetime after this timestamp. Used for ClickHouse granule optimization to limit memory usage by filtering out old data granules efficiently. For SQLite, filters on started_at.",
+        examples=["2024-01-01T00:00:00Z"],
+    )
+    sortable_datetime_before: Optional[datetime.datetime] = Field(
+        default=None,
+        description="Only include calls with sortable_datetime before this timestamp. Used for ClickHouse granule optimization to limit memory usage by filtering out recent data granules efficiently. For SQLite, filters on started_at.",
+        examples=["2024-12-31T23:59:59Z"],
+    )
+
+
+class ThreadsQueryRes(BaseModel):
+    threads: list[ThreadSchema]
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1120,3 +1183,6 @@ class TraceServerInterface(Protocol):
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
+
+    # Thread API
+    def threads_query(self, req: ThreadsQueryReq) -> ThreadsQueryRes: ...
