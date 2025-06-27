@@ -1,4 +1,4 @@
-import {MOON_100, MOON_200} from '@wandb/weave/common/css/color.styles';
+import {MOON_100} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
@@ -32,15 +32,6 @@ import {
 import {defaultModelConfigPayload} from './state';
 import {SimplifiedLLMStructuredCompletionModel} from './types';
 import {VersionedObjectPicker} from './VersionedObjectPicker';
-
-// Helper to get valid refs from items
-const getValidRefs = <T extends {originalSourceRef: string | null}>(
-  items: T[]
-): string[] => {
-  return items
-    .filter(item => item.originalSourceRef !== null)
-    .map(item => item.originalSourceRef!);
-};
 
 // Default option for creating a new model from scratch
 const newModelOption = {

@@ -132,8 +132,6 @@ export const createEvaluation = async (
   project: string,
   spec: CreateEvaluationSpec
 ): Promise<string> => {
-  console.log('createEvaluation called with spec:', spec);
-
   // TODO: Sanitize name
   const objectId = spec.name;
   const evaluationObjectVal = {
@@ -145,8 +143,6 @@ export const createEvaluation = async (
     _class_name: 'Evaluation',
     _bases: ['Object', 'BaseModel'],
   };
-
-  console.log('Creating evaluation object:', evaluationObjectVal);
 
   const newEvaluationResp = await client.objCreate({
     obj: {

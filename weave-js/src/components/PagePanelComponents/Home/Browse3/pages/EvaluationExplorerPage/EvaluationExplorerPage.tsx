@@ -14,7 +14,11 @@ import {
   useEvaluationExplorerPageContext,
 } from './context';
 import {DatasetConfigSection} from './DatasetConfigSection';
-import {ExistingDatasetEditor, NewDatasetEditor} from './DatasetEditor';
+import {
+  DatasetEditorRef,
+  ExistingDatasetEditor,
+  NewDatasetEditor,
+} from './DatasetEditor';
 import {EvaluationPicker} from './EvaluationConfigSection';
 import {Column, ConfigSection, Header, Row} from './layout';
 import {Footer} from './layout';
@@ -74,6 +78,9 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
 }) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const getClient = useGetTraceServerClientContext();
+
+  // Dataset editor refs
+  const datasetEditorRef = useRef<DatasetEditorRef | null>(null);
 
   // Dataset editor state management
   const [newDatasetEditorMode, setNewDatasetEditorMode] = useState<
@@ -160,13 +167,11 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
    * Creates the evaluation object and runs it with the configured models.
    */
   const handleRunEval = useCallback(
-    async (scorerRefs?: string[], modelRefs?: string[]) => {
-      console.log('handleRunEval called');
-      console.log('scorerRefs:', scorerRefs);
-      console.log('modelRefs:', modelRefs);
-      console.log('isRunEvalEnabled:', isRunEvalEnabled);
-      console.log('isRunning:', isRunning);
-
+    async (
+      scorerRefs?: string[],
+      modelRefs?: string[],
+      datasetRef?: string
+    ) => {
       if (!isRunEvalEnabled || isRunning) {
         return;
       }
@@ -182,16 +187,11 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
         const finalScorerRefs =
           scorerRefs ?? getValidRefs(evaluationDefinition.properties.scorers);
         const finalModelRefs = modelRefs ?? getValidRefs(models);
+        const finalDatasetRef =
+          datasetRef ??
+          evaluationDefinition.properties.dataset.originalSourceRef;
 
-        console.log('Creating evaluation with:');
-        console.log('- Scorer refs:', finalScorerRefs);
-        console.log('- Model refs:', finalModelRefs);
-        console.log(
-          '- Dataset ref:',
-          evaluationDefinition.properties.dataset.originalSourceRef
-        );
-
-        if (!evaluationDefinition.properties.dataset.originalSourceRef) {
+        if (!finalDatasetRef) {
           throw new Error('Dataset ref is required but was not found');
         }
 
@@ -199,7 +199,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
         const evaluationRef = await createEvaluation(client, entity, project, {
           name: sanitizeObjectId(evaluationDefinition.properties.name),
           description: evaluationDefinition.properties.description,
-          datasetRef: evaluationDefinition.properties.dataset.originalSourceRef,
+          datasetRef: finalDatasetRef,
           scorerRefs: finalScorerRefs,
         });
 
@@ -217,7 +217,6 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
           finalModelRefs
         );
 
-        console.log('Evaluation completed:', results);
         setEvaluationResults(results);
       } catch (error) {
         console.error('Failed to run evaluation:', error);
@@ -248,6 +247,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
         markFieldTouched={markFieldTouched}
         isRunEvalEnabled={isRunEvalEnabled}
         handleRunEval={handleRunEval}
+        datasetEditorRef={datasetEditorRef}
       />
       <Column style={{flex: '1 1 600px', overflow: 'hidden'}}>
         {evaluationResults ? (
@@ -268,11 +268,12 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
               project={project}
               evaluationCallIds={evaluationResults}
               onEvaluationCallIdsUpdate={newIds => {
-                console.log('Evaluation call IDs updated:', newIds);
+                // Pass - remove?
               }}
               selectedMetrics={selectedMetrics}
               setSelectedMetrics={setSelectedMetrics}
               initialTabValue="results"
+              hideEvalPicker
             />
           </>
         ) : (
@@ -296,6 +297,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
               <>
                 {datasetEditorMode === 'new-empty' && (
                   <NewDatasetEditor
+                    ref={datasetEditorRef}
                     entity={entity}
                     project={project}
                     onSaveComplete={onNewDatasetSaveComplete}
@@ -303,6 +305,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
                 )}
                 {datasetEditorMode === 'new-file' && (
                   <NewDatasetEditor
+                    ref={datasetEditorRef}
                     entity={entity}
                     project={project}
                     useFilePicker
@@ -310,7 +313,10 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
                   />
                 )}
                 {datasetEditorMode === 'existing' && sourceRef && (
-                  <ExistingDatasetEditor datasetRef={sourceRef} />
+                  <ExistingDatasetEditor
+                    ref={datasetEditorRef}
+                    datasetRef={sourceRef}
+                  />
                 )}
               </>
             )}
@@ -333,7 +339,12 @@ const ConfigPanel: React.FC<{
   touchedFields: {name: boolean; description: boolean};
   markFieldTouched: (field: 'name' | 'description') => void;
   isRunEvalEnabled: boolean;
-  handleRunEval: (scorerRefs?: string[], modelRefs?: string[]) => Promise<void>;
+  handleRunEval: (
+    scorerRefs?: string[],
+    modelRefs?: string[],
+    datasetRef?: string
+  ) => Promise<void>;
+  datasetEditorRef: React.MutableRefObject<DatasetEditorRef | null>;
 }> = ({
   entity,
   project,
@@ -343,6 +354,7 @@ const ConfigPanel: React.FC<{
   markFieldTouched,
   isRunEvalEnabled,
   handleRunEval,
+  datasetEditorRef,
 }) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const [showEvaluationPicker, setShowEvaluationPicker] = useState(false);
@@ -359,6 +371,20 @@ const ConfigPanel: React.FC<{
 
   // Wrap handleRunEval to save all unsaved changes first
   const handleRunEvalWithSave = useCallback(async () => {
+    // Save dataset first if there's one being edited
+    let freshDatasetRef: string | undefined;
+    if (datasetEditorRef.current) {
+      const savedDatasetRef = await datasetEditorRef.current.save();
+      if (savedDatasetRef) {
+        freshDatasetRef = savedDatasetRef;
+        // Update the config with the saved dataset ref
+        editConfig(draft => {
+          draft.evaluationDefinition.properties.dataset.originalSourceRef =
+            savedDatasetRef;
+        });
+      }
+    }
+
     // Save all unsaved changes and get fresh refs
     const promises: {
       scorerRefs?: Promise<string[]>;
@@ -366,17 +392,11 @@ const ConfigPanel: React.FC<{
     } = {};
 
     if (scorersConfigRef.current?.saveAllUnsavedAndGetRefs) {
-      console.log('Calling saveAllUnsavedAndGetRefs for scorers');
       promises.scorerRefs = scorersConfigRef.current.saveAllUnsavedAndGetRefs();
-    } else {
-      console.log('No saveAllUnsavedAndGetRefs for scorers');
     }
 
     if (modelsConfigRef.current?.saveAllUnsavedAndGetRefs) {
-      console.log('Calling saveAllUnsavedAndGetRefs for models');
       promises.modelRefs = modelsConfigRef.current.saveAllUnsavedAndGetRefs();
-    } else {
-      console.log('No saveAllUnsavedAndGetRefs for models');
     }
 
     // Wait for all saves to complete and get the fresh refs
@@ -385,12 +405,9 @@ const ConfigPanel: React.FC<{
       promises.modelRefs || Promise.resolve(undefined),
     ]);
 
-    console.log('Fresh scorer refs:', freshScorerRefs);
-    console.log('Fresh model refs:', freshModelRefs);
-
     // Run the evaluation with the fresh refs
-    await handleRunEval(freshScorerRefs, freshModelRefs);
-  }, [handleRunEval]);
+    await handleRunEval(freshScorerRefs, freshModelRefs, freshDatasetRef);
+  }, [handleRunEval, datasetEditorRef, editConfig]);
 
   return (
     <Column

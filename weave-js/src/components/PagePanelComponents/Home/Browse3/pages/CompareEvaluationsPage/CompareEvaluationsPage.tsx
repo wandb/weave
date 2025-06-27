@@ -6,7 +6,6 @@ import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
 import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
@@ -47,6 +46,7 @@ type CompareEvaluationsPageProps = {
   selectedMetrics: Record<string, boolean> | null;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
   initialTabValue?: TabType;
+  hideEvalPicker?: boolean;
 };
 
 export const CompareEvaluationsPage: React.FC<
@@ -72,6 +72,7 @@ export const CompareEvaluationsPage: React.FC<
               selectedMetrics={props.selectedMetrics}
               setSelectedMetrics={props.setSelectedMetrics}
               initialTabValue={props.initialTabValue}
+              hideEvalPicker={props.hideEvalPicker}
             />
           ),
         },
@@ -130,6 +131,7 @@ export const CompareEvaluationsPageContent: React.FC<
         <CompareEvaluationsPageInner
           evaluationCallIds={props.evaluationCallIds}
           initialTabValue={props.initialTabValue}
+          hideEvalPicker={props.hideEvalPicker}
         />
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
@@ -184,6 +186,7 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 const CompareEvaluationsPageInner: React.FC<{
   evaluationCallIds: string[];
   initialTabValue?: TabType;
+  hideEvalPicker?: boolean;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const {isPeeking} = useContext(WeaveflowPeekContext);
@@ -191,7 +194,9 @@ const CompareEvaluationsPageInner: React.FC<{
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
-  const [tabValue, setTabValue] = useState<TabType>(props.initialTabValue ?? 'summary');
+  const [tabValue, setTabValue] = useState<TabType>(
+    props.initialTabValue ?? 'summary'
+  );
 
   return (
     <Box
@@ -206,7 +211,9 @@ const CompareEvaluationsPageInner: React.FC<{
             <InvalidEvaluationBanner
               evaluationCalls={Object.values(state.summary.evaluationCalls)}
             />
-            <ComparisonDefinitionSection state={state} />
+            {!props.hideEvalPicker && (
+              <ComparisonDefinitionSection state={state} />
+            )}
           </>
         }
         headerContainerSx={{
@@ -308,9 +315,7 @@ const CompareEvaluationsPageInner: React.FC<{
           },
         ]}
         tabValue={tabValue}
-        handleTabChange={newValue =>
-          setTabValue(newValue as TabType)
-        }
+        handleTabChange={newValue => setTabValue(newValue as TabType)}
       />
     </Box>
   );

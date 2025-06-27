@@ -1,4 +1,4 @@
-import {MOON_100, MOON_200} from '@wandb/weave/common/css/color.styles';
+import {MOON_100} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Select} from '@wandb/weave/components/Form/Select';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
@@ -33,15 +33,6 @@ import {
 import {defaultScorerConfigPayload} from './state';
 import {SimplifiedLLMAsAJudgeScorer} from './types';
 import {VersionedObjectPicker} from './VersionedObjectPicker';
-
-// Helper to get valid refs from items
-const getValidRefs = <T extends {originalSourceRef: string | null}>(
-  items: T[]
-): string[] => {
-  return items
-    .filter(item => item.originalSourceRef !== null)
-    .map(item => item.originalSourceRef!);
-};
 
 const newScorerOption = {
   label: 'New Scorer',
@@ -506,8 +497,6 @@ export const ScorersConfigSection = React.forwardRef<
     [editConfig]
   );
 
-  const client = useGetTraceServerClientContext()();
-
   const registerSaveHandler = useCallback(
     (scorerNdx: number, handler: (() => Promise<string>) | null) => {
       if (handler) {
@@ -709,22 +698,6 @@ const ScorerDrawer: React.FC<{
     } else {
       baseScorer = emptyScorer(entity, project);
     }
-
-    // If we have pendingSimplifiedConfig, merge it into the scorer object
-    // if (pendingSimplifiedConfig) {
-    //   const mappedConfig = mapSimplifiedConfigToScorer(pendingSimplifiedConfig);
-    //   console.log('mappedConfig', mappedConfig);
-    //   // Merge the mapped config into the base scorer
-    //   return {
-    //     ...baseScorer,
-    //     objectId:
-    //       sanitizeObjectId(pendingSimplifiedConfig.name) || baseScorer.objectId, // Set the name as objectId
-    //     val: {
-    //       ...baseScorer.val,
-    //       ...mappedConfig,
-    //     },
-    //   };
-    // }
 
     return baseScorer;
   }, [entity, initialScorerRef, project, scorerQuery.data]);
