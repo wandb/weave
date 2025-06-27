@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Union, cast
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -25,9 +25,13 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.term import configure_logger
+from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
 logger = logging.getLogger(__name__)
+
+# Sentinel object to distinguish between "not provided" (auto-generate) and explicit None (disable)
+_AUTO_GENERATE = object()
 
 _global_postprocess_inputs: PostprocessInputsFunc | None = None
 _global_postprocess_output: PostprocessOutputFunc | None = None
@@ -265,6 +269,85 @@ def attributes(attributes: dict[str, Any]) -> Iterator:
         call_context.call_attributes.reset(token)
 
 
+class ThreadContext:
+    """Context object providing access to current thread and turn information."""
+
+    def __init__(self, thread_id: str | None):
+        """Initialize ThreadContext with the specified thread_id.
+
+        Args:
+            thread_id: The thread identifier for this context, or None if disabled.
+        """
+        self._thread_id = thread_id
+
+    @property
+    def thread_id(self) -> str | None:
+        """Get the thread_id for this context.
+
+        Returns:
+            The thread identifier, or None if thread tracking is disabled.
+        """
+        return self._thread_id
+
+    @property
+    def turn_id(self) -> str | None:
+        """Get the current turn_id from the active context.
+
+        Returns:
+            The current turn_id if set, None otherwise.
+        """
+        return call_context.get_turn_id()
+
+
+@contextlib.contextmanager
+def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadContext]:
+    """
+    Context manager for setting thread_id on calls within the context.
+
+    Examples:
+
+    ```python
+    # Auto-generate thread_id
+    with weave.thread() as t:
+        print(f"Thread ID: {t.thread_id}")
+        result = my_function("input")  # This call will have the auto-generated thread_id
+        print(f"Current turn: {t.turn_id}")
+
+    # Explicit thread_id
+    with weave.thread("custom_thread") as t:
+        result = my_function("input")  # This call will have thread_id="custom_thread"
+
+    # Disable threading
+    with weave.thread(None) as t:
+        result = my_function("input")  # This call will have thread_id=None
+    ```
+
+    Args:
+        thread_id: The thread identifier to associate with calls in this context.
+                  If not provided, a UUID v7 will be auto-generated.
+                  If None, thread tracking will be disabled.
+
+    Yields:
+        ThreadContext: An object providing access to thread_id and current turn_id.
+    """
+    # Determine actual thread_id to use
+    actual_thread_id: str | None
+    if thread_id is _AUTO_GENERATE:
+        # No argument provided - auto-generate
+        actual_thread_id = generate_id()
+    else:
+        # Explicit thread_id (string or None)
+        actual_thread_id = cast(Union[str, None], thread_id)
+
+    # Create context object
+    context = ThreadContext(actual_thread_id)
+
+    with call_context.set_thread_id(actual_thread_id):
+        # Reset turn lineage when entering new thread context
+        call_context.set_turn_id(None)
+        yield context
+
+
 def finish() -> None:
     """Stops logging to weave.
 
@@ -294,6 +377,8 @@ __all__ = [
     "obj_ref",
     "output_of",
     "attributes",
+    "thread",
+    "ThreadContext",
     "finish",
     "op",
     "Table",

@@ -21,5 +21,7 @@ def test_call_to_dict(client):
         "id": call.id,
         "parent_id": call.parent_id,
         "trace_id": call.trace_id,
+        "thread_id": call.thread_id,
+        "turn_id": call.turn_id,
         "project_id": call.project_id,
     }
