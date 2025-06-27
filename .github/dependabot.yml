@@ -146,11 +146,7 @@ updates:
         patterns:
           - "llama-index*"
 
-      mistral0:
-        patterns:
-          - "mistralai*"
-
-      mistral1:
+      mistral:
         patterns:
           - "mistralai*"
 
