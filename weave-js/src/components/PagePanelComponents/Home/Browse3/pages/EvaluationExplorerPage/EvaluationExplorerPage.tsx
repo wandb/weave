@@ -316,6 +316,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
                   <ExistingDatasetEditor
                     ref={datasetEditorRef}
                     datasetRef={sourceRef}
+                    onSaveComplete={onNewDatasetSaveComplete}
                   />
                 )}
               </>

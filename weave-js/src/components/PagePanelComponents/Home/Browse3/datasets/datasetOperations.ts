@@ -146,5 +146,6 @@ export const updateExistingDataset = async ({
   return {
     url: updatedDatasetUrl,
     objectId: selectedDataset.objectId,
+    objectDigest: updatedDatasetResp,
   };
 };

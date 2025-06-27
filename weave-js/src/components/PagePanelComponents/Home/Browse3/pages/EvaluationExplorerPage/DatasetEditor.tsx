@@ -8,6 +8,9 @@ import React, {
   useRef,
 } from 'react';
 
+import {isWeaveObjectRef, parseRef} from '../../../../../../react';
+import {makeRefObject} from '../../../../../../util/refs';
+import {useWeaveflowCurrentRouteContext} from '../../context';
 import {DatasetFilePicker} from '../../datasets/CreateDatasetDrawer';
 import {
   CREATE_DATASET_ACTIONS,
@@ -18,16 +21,17 @@ import {
   DatasetEditProvider,
   useDatasetEditContext,
 } from '../../datasets/DatasetEditorContext';
+import {updateExistingDataset} from '../../datasets/datasetOperations';
 import {
   DatasetObjectVal,
   EditableDatasetView,
   EditableDatasetViewProps,
 } from '../../datasets/EditableDatasetView';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
+import {useWFHooks} from '../wfReactInterface/context';
 import {HEADER_HEIGHT_PX} from './constants';
 import {clientBound, hookify} from './hooks';
 import {getObjByRef} from './query';
-import {defaultScorerConfigPayload} from './state';
 
 const initializationRows = [
   {
@@ -256,8 +260,8 @@ const useObjByRef = clientBound(hookify(getObjByRef));
 
 export const ExistingDatasetEditor = forwardRef<
   DatasetEditorRef,
-  {datasetRef: string}
->(({datasetRef}, ref) => {
+  {datasetRef: string; onSaveComplete?: (datasetRef?: string) => void}
+>(({datasetRef, onSaveComplete}, ref) => {
   const innerRef = useRef<{handleSave: () => Promise<string | null>} | null>(
     null
   );
@@ -286,6 +290,7 @@ export const ExistingDatasetEditor = forwardRef<
         ref={innerRef}
         datasetRef={datasetRef}
         datasetObject={datasetObject.data.val as DatasetObjectVal}
+        onSaveComplete={onSaveComplete}
       />
     </DatasetEditProvider>
   );
@@ -296,10 +301,20 @@ const ExistingDatasetEditorInner = forwardRef<
   {
     datasetRef: string;
     datasetObject: DatasetObjectVal;
+    onSaveComplete?: (datasetRef?: string) => void;
   }
->(({datasetRef, datasetObject}, ref) => {
-  const {editedRows, deletedRows, addedRows, resetEditState} =
-    useDatasetEditContext();
+>(({datasetRef, datasetObject, onSaveComplete}, ref) => {
+  const {
+    editedRows,
+    deletedRows,
+    addedRows,
+    resetEditState,
+    convertEditsToTableUpdateSpec,
+  } = useDatasetEditContext();
+  const {useTableUpdate, useObjCreate} = useWFHooks();
+  const tableUpdate = useTableUpdate();
+  const objCreate = useObjCreate();
+  const router = useWeaveflowCurrentRouteContext();
 
   // Check if there are any unsaved changes
   const hasChanges = React.useMemo(() => {
@@ -307,22 +322,75 @@ const ExistingDatasetEditorInner = forwardRef<
   }, [editedRows.size, deletedRows.length, addedRows.size]);
 
   const handleSave = React.useCallback(async () => {
-    // TODO: Implement actual save logic
-    console.log('Saving dataset changes...', {
-      editedRows: editedRows.size,
-      deletedRows: deletedRows.length,
-      addedRows: addedRows.size,
-    });
+    try {
+      // Parse the dataset ref to get entity and project
+      const parsedRef = parseRef(datasetRef);
+      if (!isWeaveObjectRef(parsedRef)) {
+        throw new Error('Invalid dataset reference');
+      }
 
-    // For now, just return the existing dataset ref
-    // In the future, this should create a new version of the dataset with the changes
-    // and return the new ref
+      const entity = parsedRef.entityName;
+      const project = parsedRef.projectName;
+      const projectId = `${entity}/${project}`;
 
-    // After save, reset the edit state
-    resetEditState();
-    // Return the existing dataset ref since we're updating it
-    return datasetRef;
-  }, [editedRows, deletedRows, addedRows, resetEditState, datasetRef]);
+      // Get the update specs from the context
+      const updateSpecs = convertEditsToTableUpdateSpec();
+
+      if (updateSpecs.length === 0) {
+        // No changes to save
+        return datasetRef;
+      }
+
+      // Create the selected dataset object for the update function
+      // Only objectId is actually used by updateExistingDataset
+      const selectedDataset: any = {
+        objectId: parsedRef.artifactName,
+      };
+
+      // Update the dataset
+      const result = await updateExistingDataset({
+        projectId,
+        entity,
+        project,
+        selectedDataset,
+        datasetObject,
+        updateSpecs,
+        tableUpdate,
+        objCreate,
+        router,
+      });
+
+      // Reset the edit state after successful save
+      resetEditState();
+
+      // Construct the new ref with the updated digest
+      const newRef = makeRefObject(
+        entity,
+        project,
+        'object',
+        result.objectId,
+        result.objectDigest,
+        undefined
+      );
+
+      // Call the save complete callback with the new ref
+      onSaveComplete?.(newRef);
+
+      return newRef;
+    } catch (error: any) {
+      console.error('Failed to update dataset:', error);
+      return null;
+    }
+  }, [
+    datasetRef,
+    convertEditsToTableUpdateSpec,
+    datasetObject,
+    tableUpdate,
+    objCreate,
+    router,
+    resetEditState,
+    onSaveComplete,
+  ]);
 
   useImperativeHandle(
     ref,
