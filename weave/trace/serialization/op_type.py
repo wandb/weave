@@ -166,7 +166,7 @@ class RefJSONEncoder(json.JSONEncoder):
 
     def default(self, o: Any) -> Any:
         if isinstance(o, (ObjectRef)):
-            ref_code = f"weave.ref('{str(o)}')"
+            ref_code = f"weave.ref('{o!s}')"
 
         if ref_code is not None:
             # This will be a quoted json string in the json.dumps result. We put special

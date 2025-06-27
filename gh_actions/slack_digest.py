@@ -894,7 +894,7 @@ def main():
             output.send(content)
 
     except Exception as e:
-        logger.exception(f"Error: {str(e)}")
+        logger.exception(f"Error: {e!s}")
         raise
 
 

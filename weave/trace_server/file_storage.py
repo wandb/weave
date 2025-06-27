@@ -135,7 +135,7 @@ def store_in_bucket(
         logger.exception(
             "Failed to store file at %s: %s", target_file_storage_uri, str(e)
         )
-        raise FileStorageWriteError(f"Failed to store file at {path}: {str(e)}") from e
+        raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
     return target_file_storage_uri
 
 
@@ -148,7 +148,7 @@ def read_from_bucket(
     except Exception as e:
         logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))
         raise FileStorageReadError(
-            f"Failed to read file from {file_storage_uri}: {str(e)}"
+            f"Failed to read file from {file_storage_uri}: {e!s}"
         ) from e
 
 

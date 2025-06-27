@@ -272,7 +272,7 @@ def get_custom_provider_info(
         return_type = provider_obj.return_type
 
     except Exception as e:
-        raise InvalidRequest(f"Failed to fetch provider information: {str(e)}") from e
+        raise InvalidRequest(f"Failed to fetch provider information: {e!s}") from e
 
     try:
         # Fetch the provider model object
@@ -299,7 +299,7 @@ def get_custom_provider_info(
 
     except Exception as e:
         raise InvalidRequest(
-            f"Failed to fetch provider_model information: {str(e)}"
+            f"Failed to fetch provider_model information: {e!s}"
         ) from e
 
     # Get the API key
