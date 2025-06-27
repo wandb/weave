@@ -28,6 +28,7 @@ import {
   getSimplifiedLLMStructuredCompletionModel,
   publishSimplifiedLLMStructuredCompletionModel,
 } from './query';
+import {defaultModelConfigPayload} from './state';
 import {SimplifiedLLMStructuredCompletionModel} from './types';
 import {VersionedObjectPicker} from './VersionedObjectPicker';
 
@@ -76,11 +77,9 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
   onUnregisterSave,
 }) => {
   // Local state for the simplified form
-  const [config, setConfig] = useState<SimplifiedLLMStructuredCompletionModel>({
-    name: '',
-    llmModelId: '',
-    systemPrompt: '',
-  });
+  const [config, setConfig] = useState<SimplifiedLLMStructuredCompletionModel>(
+    defaultModelConfigPayload
+  );
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -192,18 +191,6 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
             onChange={value => updateConfig({name: value})}
           />
         </div>
-        <div style={{flex: '0 0 140px'}}>
-          <LLMDropdownLoaded
-            className="w-full"
-            hideSavedModels
-            value={config.llmModelId || ''}
-            isTeamAdmin={false}
-            direction={{horizontal: 'left'}}
-            onChange={(modelValue: string) => {
-              updateConfig({llmModelId: modelValue});
-            }}
-          />
-        </div>
       </Row>
       <Row>
         <TextArea
@@ -214,6 +201,17 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
           style={{width: '100%'}}
         />
       </Row>
+      <LLMDropdownLoaded
+        className="w-full"
+        hideSavedModels
+        value={config.llmModelId || ''}
+        isTeamAdmin={false}
+        direction={{horizontal: 'left'}}
+        selectFirstAvailable={true}
+        onChange={(modelValue: string) => {
+          updateConfig({llmModelId: modelValue});
+        }}
+      />
       <Row style={{justifyContent: 'flex-end', gap: '8px'}}>
         <Button
           variant="primary"

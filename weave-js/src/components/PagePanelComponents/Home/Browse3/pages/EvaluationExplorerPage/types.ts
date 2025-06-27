@@ -3,8 +3,6 @@ export type EvaluationExplorationConfig = {
   evaluationDefinition: {
     // The Weave Ref pointing to the evaluation definition
     originalSourceRef: string | null;
-    // Whether the properties deviated from the referenced source
-    dirtied: boolean;
     properties: {
       // The name of the evaluation
       name: string;

@@ -216,7 +216,7 @@ export const publishSimplifiedLLMAsAJudgeScorer = async (
     simplifiedScorer.scoreType === 'number'
       ? numberInstruction
       : booleanInstruction;
-  const systemPrompt = `You are a judge of model performance. Repond in JSON with the following fields:
+  const systemPrompt = `You are a judge of performance. Repond in JSON with the following fields:
   * score: ${scoreTypeInstruction}
   * reason: (string) a short explanation of the score
   `;

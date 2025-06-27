@@ -62,7 +62,6 @@ const DatasetPicker: React.FC<{
           ) {
             draft.evaluationDefinition.properties.dataset.originalSourceRef =
               null;
-            draft.evaluationDefinition.dirtied = true;
           }
         });
       } else {
@@ -74,7 +73,6 @@ const DatasetPicker: React.FC<{
           ) {
             draft.evaluationDefinition.properties.dataset.originalSourceRef =
               datasetRef;
-            draft.evaluationDefinition.dirtied = true;
           }
         });
       }

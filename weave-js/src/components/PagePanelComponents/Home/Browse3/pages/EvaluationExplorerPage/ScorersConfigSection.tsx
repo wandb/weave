@@ -29,6 +29,7 @@ import {
   getSimplifiedLLMAsAJudgeScorer,
   publishSimplifiedLLMAsAJudgeScorer,
 } from './query';
+import {defaultScorerConfigPayload} from './state';
 import {SimplifiedLLMAsAJudgeScorer} from './types';
 import {VersionedObjectPicker} from './VersionedObjectPicker';
 
@@ -163,12 +164,9 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
   onUnregisterSave,
 }) => {
   // Local state for the simplified form
-  const [config, setConfig] = useState<SimplifiedLLMAsAJudgeScorer>({
-    name: '',
-    scoreType: 'boolean',
-    llmModelId: '',
-    prompt: '',
-  });
+  const [config, setConfig] = useState<SimplifiedLLMAsAJudgeScorer>(
+    defaultScorerConfigPayload
+  );
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -297,28 +295,27 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
             }
           />
         </div>
-        <div style={{flex: '0 0 140px'}}>
-          <LLMDropdownLoaded
-            className="w-full"
-            hideSavedModels
-            value={config.llmModelId || ''}
-            isTeamAdmin={false}
-            direction={{horizontal: 'left'}}
-            onChange={(modelValue: string) => {
-              updateConfig({llmModelId: modelValue});
-            }}
-          />
-        </div>
       </Row>
       <Row>
         <TextArea
           placeholder="Enter the scoring prompt (e.g., 'Is the response helpful and accurate?')"
           value={config.prompt}
           onChange={e => updateConfig({prompt: e.target.value})}
-          rows={3}
+          rows={10}
           style={{width: '100%'}}
         />
       </Row>
+      <LLMDropdownLoaded
+        className="w-full"
+        hideSavedModels
+        value={config.llmModelId || ''}
+        isTeamAdmin={false}
+        direction={{horizontal: 'right'}}
+        selectFirstAvailable={true}
+        onChange={(modelValue: string) => {
+          updateConfig({llmModelId: modelValue});
+        }}
+      />
       <Row style={{justifyContent: 'flex-end', gap: '8px'}}>
         <Button
           variant="primary"
@@ -422,17 +419,11 @@ export const ScorersConfigSection = React.forwardRef<
           draft.evaluationDefinition.properties.scorers[
             scorerNdx
           ].originalSourceRef = null;
-          // Only mark as dirty if we're actually changing something
-          if (currentRef !== null) {
-            draft.evaluationDefinition.dirtied = true;
-          }
         } else {
           // Set the selected scorer ref
           draft.evaluationDefinition.properties.scorers[
             scorerNdx
           ].originalSourceRef = ref;
-          // Mark as dirty since we're changing
-          draft.evaluationDefinition.dirtied = true;
         }
       });
     },

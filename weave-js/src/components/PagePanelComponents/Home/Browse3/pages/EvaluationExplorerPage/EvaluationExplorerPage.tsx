@@ -7,7 +7,7 @@ import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEv
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
 import {refStringToName} from './common';
-import {LabeledTextArea, LabeledTextField, PickerContainer} from './components';
+import {LabeledTextArea, LabeledTextField} from './components';
 import {BORDER_COLOR, SECONDARY_BACKGROUND_COLOR} from './constants';
 import {
   EvaluationExplorerPageProvider,
@@ -16,7 +16,7 @@ import {
 import {DatasetConfigSection} from './DatasetConfigSection';
 import {ExistingDatasetEditor, NewDatasetEditor} from './DatasetEditor';
 import {EvaluationPicker} from './EvaluationConfigSection';
-import {Column, Header, Row} from './layout';
+import {Column, ConfigSection, Header, Row} from './layout';
 import {Footer} from './layout';
 import {ModelsConfigSection} from './ModelsConfigSection';
 import {createEvaluation, runEvaluation} from './query';
@@ -130,10 +130,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
     const {evaluationDefinition, models} = config;
 
     // Check required text fields
-    if (
-      !evaluationDefinition.properties.name.trim() ||
-      !evaluationDefinition.properties.description.trim()
-    ) {
+    if (!evaluationDefinition.properties.name.trim()) {
       return false;
     }
 
@@ -188,7 +185,6 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
       // Update the config with the created evaluation ref
       editConfig(draft => {
         draft.evaluationDefinition.originalSourceRef = evaluationRef;
-        draft.evaluationDefinition.dirtied = false;
       });
 
       // Execute the evaluation
@@ -355,29 +351,6 @@ const ConfigPanel: React.FC<{
     await handleRunEval();
   }, [handleRunEval]);
 
-  // Helper to get validation error messages
-  const getValidationErrors = useMemo(() => {
-    const errors = {
-      name:
-        touchedFields.name && config.evaluationDefinition.properties.name === ''
-          ? 'Evaluation name is required'
-          : undefined,
-      dataset: !config.evaluationDefinition.properties.dataset.originalSourceRef
-        ? 'Please select or create a dataset'
-        : undefined,
-      scorers:
-        getValidRefs(config.evaluationDefinition.properties.scorers).length ===
-        0
-          ? 'Please add at least one scorer'
-          : undefined,
-      models:
-        getValidRefs(config.models).length === 0
-          ? 'Please add at least one model to evaluate'
-          : undefined,
-    };
-    return errors;
-  }, [config, touchedFields]);
-
   return (
     <Column
       style={{
@@ -390,14 +363,11 @@ const ConfigPanel: React.FC<{
       <Header>
         <span>Configuration</span>
         <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-          {!showEvaluationPicker &&
-            config.evaluationDefinition.originalSourceRef && (
-              <span style={{fontSize: '14px', color: '#666'}}>
-                (
-                {refStringToName(config.evaluationDefinition.originalSourceRef)}
-                )
-              </span>
-            )}
+          {config.evaluationDefinition.originalSourceRef && (
+            <span style={{fontSize: '14px', color: '#666'}}>
+              ({refStringToName(config.evaluationDefinition.originalSourceRef)})
+            </span>
+          )}
           <Button
             icon={showEvaluationPicker ? 'chevron-up' : 'chevron-down'}
             variant="ghost"
@@ -408,9 +378,7 @@ const ConfigPanel: React.FC<{
             }
             onClick={() => {
               setShowEvaluationPicker(!showEvaluationPicker);
-            }}>
-            {showEvaluationPicker ? 'Hide' : 'Load'}
-          </Button>
+            }}></Button>
         </div>
       </Header>
       <Column
@@ -422,25 +390,26 @@ const ConfigPanel: React.FC<{
           gap: '16px',
         }}>
         {showEvaluationPicker && (
-          <PickerContainer
-            title="Select Evaluation"
-            style={{marginBottom: '16px'}}>
+          <ConfigSection
+            title="Load existing evaluation"
+            icon="baseline-alt"
+            style={{
+              borderBottom: `1px solid ${BORDER_COLOR}`,
+              paddingBottom: '16px',
+            }}>
             <EvaluationPicker entity={entity} project={project} />
-          </PickerContainer>
+          </ConfigSection>
         )}
-
         <LabeledTextField
           label="Title"
           value={config.evaluationDefinition.properties.name}
           onChange={value => {
             editConfig(draft => {
               draft.evaluationDefinition.properties.name = value;
-              draft.evaluationDefinition.dirtied = true;
             });
           }}
           placeholder="Enter evaluation name"
           required
-          error={getValidationErrors.name}
           onBlur={() => markFieldTouched('name')}
         />
 
@@ -451,7 +420,6 @@ const ConfigPanel: React.FC<{
             editConfig(draft => {
               draft.evaluationDefinition.properties.description =
                 e.target.value;
-              draft.evaluationDefinition.dirtied = true;
             });
           }}
           placeholder="Enter evaluation description"
@@ -463,20 +431,17 @@ const ConfigPanel: React.FC<{
           entity={entity}
           project={project}
           setNewDatasetEditorMode={setNewDatasetEditorMode}
-          error={getValidationErrors.dataset}
         />
 
         <ScorersConfigSection
           entity={entity}
           project={project}
-          error={getValidationErrors.scorers}
           ref={scorersConfigRef}
         />
 
         <ModelsConfigSection
           entity={entity}
           project={project}
-          error={getValidationErrors.models}
           ref={modelsConfigRef}
         />
       </Column>

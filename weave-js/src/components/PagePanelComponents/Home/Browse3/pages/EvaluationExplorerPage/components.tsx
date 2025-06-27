@@ -193,7 +193,6 @@ export const PickerContainer: React.FC<{
   return (
     <div
       style={{
-        padding: '12px',
         backgroundColor: SECONDARY_BACKGROUND_COLOR,
         borderRadius: '4px',
         ...style,

@@ -22,7 +22,6 @@ export const EvaluationPicker: React.FC<{
         // Reset to new evaluation
         editConfig(draft => {
           draft.evaluationDefinition.originalSourceRef = null;
-          draft.evaluationDefinition.dirtied = false;
           draft.evaluationDefinition.properties.name = '';
           draft.evaluationDefinition.properties.description = '';
           // Clear dataset and scorers
@@ -47,7 +46,6 @@ export const EvaluationPicker: React.FC<{
             editConfig(draft => {
               // Set the ref
               draft.evaluationDefinition.originalSourceRef = evaluationRef;
-              draft.evaluationDefinition.dirtied = false;
 
               // Update evaluation properties from loaded data
               draft.evaluationDefinition.properties.name = evalData.name || '';
