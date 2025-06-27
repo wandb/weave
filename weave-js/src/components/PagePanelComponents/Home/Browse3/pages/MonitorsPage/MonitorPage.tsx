@@ -87,22 +87,30 @@ const MonitorPageInner = ({
   monitorVersions: ObjectVersionSchema[];
 }) => {
   const {entity, project} = useEntityProject();
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const allVersionRefs = useMemo(() => {
-    return monitorVersions.map(v => objectVersionKeyToRefUri(v));
-  }, [monitorVersions]);
+
+  const allVersionsSchema = useMemo(
+    () => ({...monitorVersions[0], versionHash: '*'}),
+    [monitorVersions]
+  );
+
+  const allVersionsRef = useMemo(
+    () => objectVersionKeyToRefUri(allVersionsSchema),
+    [allVersionsSchema]
+  );
 
   const callsFilterModel = useMemo(
     () => ({
       items: [
         {
           field: MONITORED_FILTER_VALUE,
-          operator: '(string): in',
-          value: allVersionRefs,
+          operator: '(monitored): by',
+          value: allVersionsRef,
         },
       ],
     }),
-    [allVersionRefs]
+    [allVersionsRef]
   );
 
   const filterItems: GridFilterItem[] = useMemo(
@@ -124,15 +132,17 @@ const MonitorPageInner = ({
   }, [baseRouter, history, callsFilterModel, entity, project]);
 
   const callCountQuery: Query = useMemo(() => {
-    const allVersionRefOperands = allVersionRefs.map(versionRefUri => ({
-      $literal: versionRefUri,
-    }));
     return {
       $expr: {
-        $in: [{$getField: MONITORED_FILTER_VALUE}, allVersionRefOperands],
+        $contains: {
+          input: {$getField: MONITORED_FILTER_VALUE},
+          substr: {
+            $literal: `${allVersionsRef.split(':').slice(0, -1).join(':')}:`,
+          },
+        },
       },
     };
-  }, [allVersionRefs]);
+  }, [allVersionsRef]);
 
   const {result: callCountResult} = useCallsStats({
     entity,
@@ -143,14 +153,6 @@ const MonitorPageInner = ({
 
   const handleEditClick = useCallback(() => setIsDrawerOpen(true), []);
   const handleCloseDrawer = useCallback(() => setIsDrawerOpen(false), []);
-
-  const monitorVersionForDelete = useMemo(() => {
-    return {
-      ...monitorVersions[0],
-      // We want to delete all versions of the monitor
-      versionHash: '*',
-    };
-  }, [monitorVersions]);
 
   return (
     <>
@@ -196,7 +198,7 @@ const MonitorPageInner = ({
                 />
                 <DeleteObjectButtonWithModal
                   overrideDisplayStr={monitorVersions[0].val['name']}
-                  objVersionSchema={monitorVersionForDelete}
+                  objVersionSchema={allVersionsSchema}
                 />
               </div>
             </div>
