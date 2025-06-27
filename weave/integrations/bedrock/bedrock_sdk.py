@@ -207,59 +207,55 @@ def postprocess_output_invoke_agent(
         try:
             # Consume the completion EventStream to collect events
             completion = outputs["completion"]
-            if hasattr(completion, "__iter__"):
-                # Collect all events from the stream
-                for event in completion:
-                    all_events.append(event)
+            # Collect all events from the stream
+            for event in completion:
+                all_events.append(event)
 
-                    # Extract text from chunk events
-                    if "chunk" in event and "bytes" in event["chunk"]:
-                        chunk_bytes = event["chunk"]["bytes"]
-                        text = chunk_bytes.decode("utf-8")
-                        extracted_text += text
+                # Extract text from chunk events
+                if (chunk := event.get("chunk")) is not None and (
+                    chunk_bytes := chunk.get("bytes")
+                ) is not None:
+                    text = chunk_bytes.decode("utf-8")
+                    extracted_text += text
 
-                    # Extract only essential trace information (model and usage)
-                    elif (
-                        "trace" in event
-                        and "trace" in event["trace"]
-                        and "orchestrationTrace" in event["trace"]["trace"]
+                # Extract only essential trace information (model and usage)
+                elif (
+                    (trace := event.get("trace")) is not None
+                    and (trace_inner := trace.get("trace")) is not None
+                    and (orchestration := trace_inner.get("orchestrationTrace"))
+                    is not None
+                ):
+                    # Get foundation model info (once)
+                    if (
+                        foundation_model is None
+                        and (model_input := orchestration.get("modelInvocationInput"))
+                        is not None
+                        and (foundation := model_input.get("foundationModel"))
+                        is not None
                     ):
-                        orchestration = event["trace"]["trace"]["orchestrationTrace"]
+                        foundation_model = foundation
 
-                        # Get foundation model info (once)
-                        if (
-                            foundation_model is None
-                            and "modelInvocationInput" in orchestration
-                            and "foundationModel"
-                            in orchestration["modelInvocationInput"]
-                        ):
-                            foundation_model = orchestration["modelInvocationInput"][
-                                "foundationModel"
-                            ]
+                    # Get usage info (replaces previous if multiple found)
+                    if (
+                        (model_output := orchestration.get("modelInvocationOutput"))
+                        is not None
+                        and (metadata := model_output.get("metadata")) is not None
+                        and (usage := metadata.get("usage")) is not None
+                    ):
+                        usage_info = usage
 
-                        # Get usage info (replaces previous if multiple found)
-                        if (
-                            "modelInvocationOutput" in orchestration
-                            and "metadata" in orchestration["modelInvocationOutput"]
-                            and "usage"
-                            in orchestration["modelInvocationOutput"]["metadata"]
-                        ):
-                            usage_info = orchestration["modelInvocationOutput"][
-                                "metadata"
-                            ]["usage"]
+            # Recreate an iterable for the original response so user can still consume it
+            def recreate_stream() -> Any:
+                """Recreate the stream from captured events."""
+                yield from all_events
 
-                # Recreate an iterable for the original response so user can still consume it
-                def recreate_stream() -> Any:
-                    """Recreate the stream from captured events."""
-                    yield from all_events
+            outputs["completion"] = recreate_stream()
 
-                outputs["completion"] = recreate_stream()
-
-                # Store usage and model info in the original output for the finish handler
-                if usage_info:
-                    outputs["_bedrock_agent_usage"] = usage_info
-                if foundation_model:
-                    outputs["_bedrock_agent_foundation_model"] = foundation_model
+            # Store usage and model info in the original output for the finish handler
+            if usage_info:
+                outputs["_bedrock_agent_usage"] = usage_info
+            if foundation_model:
+                outputs["_bedrock_agent_foundation_model"] = foundation_model
 
         except Exception as e:
             # If we can't iterate, just note that it's an EventStream
@@ -381,7 +377,7 @@ def create_stream_wrapper(
         op._set_on_finish_handler(bedrock_on_finish_converse)
 
         class BedrockIteratorWrapper(_IteratorWrapper):
-            def get(self, key: str, default: Any = None) -> Any:  # noqa: ARG002
+            def get(self, key: str, default: Any = None) -> Any:
                 """Delegate 'get' method to the response object."""
                 if key == "stream":
                     if hasattr(self._iterator_or_ctx_manager, "get"):
@@ -409,8 +405,8 @@ def _patch_converse_stream(bedrock_client: "BaseClient") -> None:
 
 
 def patch_client(bedrock_client: "BaseClient") -> None:
-    # Check if this is a bedrock-agent-runtime client
     if hasattr(bedrock_client, "invoke_agent"):
+        # Check if this is a bedrock-agent-runtime client
         _patch_invoke_agent(bedrock_client)
     elif hasattr(bedrock_client, "converse") or hasattr(bedrock_client, "invoke_model"):
         # This is a standard bedrock-runtime client
@@ -418,6 +414,7 @@ def patch_client(bedrock_client: "BaseClient") -> None:
         _patch_converse_stream(bedrock_client)
         _patch_invoke(bedrock_client)
     elif hasattr(bedrock_client, "apply_guardrail"):
+        # This is a standard bedrock-runtime client
         _patch_apply_guardrail(bedrock_client)
     else:
         # Unsupported client type
