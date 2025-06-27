@@ -27,6 +27,7 @@ export interface VersionedObjectPickerProps {
   loading?: boolean;
   newOptions?: SelectOption[];
   allowNewOption?: boolean;
+  disableAutoSelect?: boolean;
 }
 
 /**
@@ -46,6 +47,7 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
   loading = false,
   newOptions,
   allowNewOption = true,
+  disableAutoSelect = false,
 }) => {
   const getClient = useGetTraceServerClientContext();
   const [versionsLoading, setVersionsLoading] = useState(false);
@@ -75,7 +77,8 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
       !hasSetDefaultRef.current &&
       selectedRef === null &&
       allowNewOption &&
-      effectiveNewOptions.length > 0
+      effectiveNewOptions.length > 0 &&
+      !disableAutoSelect
     ) {
       // Propagate the default selection to parent
       hasSetDefaultRef.current = true;
@@ -84,7 +87,13 @@ export const VersionedObjectPicker: React.FC<VersionedObjectPickerProps> = ({
       // Reset the flag when user makes an explicit selection
       hasSetDefaultRef.current = true;
     }
-  }, [selectedRef, allowNewOption, effectiveNewOptions, onRefChange]);
+  }, [
+    selectedRef,
+    allowNewOption,
+    effectiveNewOptions,
+    onRefChange,
+    disableAutoSelect,
+  ]);
 
   // Check if current value is a "new" option
   const isNewOption = useMemo(() => {

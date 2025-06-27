@@ -133,7 +133,7 @@ export const createEvaluation = async (
   spec: CreateEvaluationSpec
 ): Promise<string> => {
   console.log('createEvaluation called with spec:', spec);
-  
+
   // TODO: Sanitize name
   const objectId = spec.name;
   const evaluationObjectVal = {
@@ -340,7 +340,7 @@ export const getSimplifiedLLMAsAJudgeScorer = async (
   }
   const prompt = scorer.val?.scoring_prompt;
   const name = scorer.val?.name ?? '';
-  console.log({scorer, innerModel});
+
   return {
     name,
     scoreType: scoreTypeGuess,

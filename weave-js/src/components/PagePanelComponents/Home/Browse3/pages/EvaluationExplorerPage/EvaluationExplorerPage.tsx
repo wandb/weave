@@ -161,6 +161,12 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
    */
   const handleRunEval = useCallback(
     async (scorerRefs?: string[], modelRefs?: string[]) => {
+      console.log('handleRunEval called');
+      console.log('scorerRefs:', scorerRefs);
+      console.log('modelRefs:', modelRefs);
+      console.log('isRunEvalEnabled:', isRunEvalEnabled);
+      console.log('isRunning:', isRunning);
+
       if (!isRunEvalEnabled || isRunning) {
         return;
       }
@@ -180,7 +186,10 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
         console.log('Creating evaluation with:');
         console.log('- Scorer refs:', finalScorerRefs);
         console.log('- Model refs:', finalModelRefs);
-        console.log('- Dataset ref:', evaluationDefinition.properties.dataset.originalSourceRef);
+        console.log(
+          '- Dataset ref:',
+          evaluationDefinition.properties.dataset.originalSourceRef
+        );
 
         if (!evaluationDefinition.properties.dataset.originalSourceRef) {
           throw new Error('Dataset ref is required but was not found');
@@ -190,8 +199,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
         const evaluationRef = await createEvaluation(client, entity, project, {
           name: sanitizeObjectId(evaluationDefinition.properties.name),
           description: evaluationDefinition.properties.description,
-          datasetRef:
-            evaluationDefinition.properties.dataset.originalSourceRef,
+          datasetRef: evaluationDefinition.properties.dataset.originalSourceRef,
           scorerRefs: finalScorerRefs,
         });
 
@@ -264,6 +272,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
               }}
               selectedMetrics={selectedMetrics}
               setSelectedMetrics={setSelectedMetrics}
+              initialTabValue="results"
             />
           </>
         ) : (
@@ -350,10 +359,6 @@ const ConfigPanel: React.FC<{
 
   // Wrap handleRunEval to save all unsaved changes first
   const handleRunEvalWithSave = useCallback(async () => {
-    console.log('handleRunEvalWithSave called');
-    console.log('scorersConfigRef.current:', scorersConfigRef.current);
-    console.log('modelsConfigRef.current:', modelsConfigRef.current);
-    
     // Save all unsaved changes and get fresh refs
     const promises: {
       scorerRefs?: Promise<string[]>;

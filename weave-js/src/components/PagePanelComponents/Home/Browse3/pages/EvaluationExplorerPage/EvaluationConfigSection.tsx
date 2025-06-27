@@ -4,6 +4,7 @@ import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerCli
 import {useEvaluationExplorerPageContext} from './context';
 import {clientBound, hookify} from './hooks';
 import {getLatestEvaluationRefs, getObjByRef} from './query';
+import {initializeEmptyConfig} from './state';
 import {VersionedObjectPicker} from './VersionedObjectPicker';
 
 const useLatestEvaluationRefs = clientBound(hookify(getLatestEvaluationRefs));
@@ -21,15 +22,8 @@ export const EvaluationPicker: React.FC<{
       if (evaluationRef === 'new-evaluation' || evaluationRef === null) {
         // Reset to new evaluation
         editConfig(draft => {
-          draft.evaluationDefinition.originalSourceRef = null;
-          draft.evaluationDefinition.properties.name = '';
-          draft.evaluationDefinition.properties.description = '';
-          // Clear dataset and scorers
-          draft.evaluationDefinition.properties.dataset.originalSourceRef =
-            null;
-          draft.evaluationDefinition.properties.scorers = [];
-          // Clear models
-          draft.models = [];
+          draft.evaluationDefinition =
+            initializeEmptyConfig().evaluationDefinition;
         });
       } else if (
         evaluationRef !== config.evaluationDefinition.originalSourceRef
@@ -95,6 +89,7 @@ export const EvaluationPicker: React.FC<{
       loading={refsQuery.loading}
       newOptions={[{label: 'New Evaluation', value: 'new-evaluation'}]}
       allowNewOption={true}
+      disableAutoSelect={true}
     />
   );
 };

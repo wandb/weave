@@ -1,3 +1,4 @@
+import {MOON_100, MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Select} from '@wandb/weave/components/Form/Select';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
@@ -67,12 +68,10 @@ const ScorerRow: React.FC<{
     simplifiedConfig?: SimplifiedLLMAsAJudgeScorer
   ) => void;
   scorerRefsQuery: ReturnType<typeof useLatestScorerRefs>;
-  onSaveScorer: (
+  onRegisterSaveHandler: (
     scorerNdx: number,
-    simplifiedConfig: SimplifiedLLMAsAJudgeScorer
-  ) => Promise<string | null>;
-  onRegisterSave: (scorerNdx: number, saveMethod: () => Promise<void>) => void;
-  onUnregisterSave: (scorerNdx: number) => void;
+    handler: (() => Promise<string>) | null
+  ) => void;
 }> = ({
   entity,
   project,
@@ -82,10 +81,13 @@ const ScorerRow: React.FC<{
   deleteScorer,
   setCurrentlyEditingScorerNdx,
   scorerRefsQuery,
-  onSaveScorer,
-  onRegisterSave,
-  onUnregisterSave,
+  onRegisterSaveHandler,
 }) => {
+  const [canSave, setCanSave] = useState(false);
+  const [saveHandler, setSaveHandler] = useState<
+    (() => Promise<string>) | null
+  >(null);
+
   const handleRefChange = useCallback(
     (ref: string | null) => {
       updateScorerRef(scorerNdx, ref);
@@ -96,6 +98,16 @@ const ScorerRow: React.FC<{
   const handleDelete = useCallback(() => {
     deleteScorer(scorerNdx);
   }, [scorerNdx, deleteScorer]);
+
+  const handleSaveStateChange = useCallback(
+    (canSave: boolean, handler: () => Promise<string>) => {
+      setCanSave(canSave);
+      setSaveHandler(() => handler);
+      // Register/unregister with parent
+      onRegisterSaveHandler(scorerNdx, canSave ? handler : null);
+    },
+    [scorerNdx, onRegisterSaveHandler]
+  );
 
   // Show loading state for individual dropdowns if query is loading
   if (scorerRefsQuery.loading) {
@@ -110,8 +122,18 @@ const ScorerRow: React.FC<{
   }
 
   return (
-    <Column style={{gap: '8px'}}>
-      <Row style={{alignItems: 'center', gap: '8px'}}>
+    <Column style={{}}>
+      <Row
+        style={{
+          alignItems: 'center',
+          gap: '8px',
+          borderTop: `2px solid ${MOON_100}`,
+          borderLeft: `2px solid ${MOON_100}`,
+          borderRight: `2px solid ${MOON_100}`,
+          borderTopLeftRadius: '4px',
+          borderTopRightRadius: '4px',
+          padding: '8px',
+        }}>
         <div style={{flex: 1}}>
           <VersionedObjectPicker
             entity={entity}
@@ -125,6 +147,15 @@ const ScorerRow: React.FC<{
             allowNewOption={true}
           />
         </div>
+
+        <Button
+          icon="save"
+          variant="primary"
+          size="small"
+          onClick={() => saveHandler?.()}
+          tooltip="Save scorer configuration"
+          disabled={!(canSave && saveHandler)}
+        />
         <Button icon="delete" variant="ghost" onClick={handleDelete} />
       </Row>
       <SimplifiedScorerConfig
@@ -132,10 +163,9 @@ const ScorerRow: React.FC<{
         project={project}
         scorerRef={scorer.originalSourceRef}
         scorerNdx={scorerNdx}
-        onSaveScorer={onSaveScorer}
+        onScorerSaved={updateScorerRef}
         onOpenAdvancedSettings={setCurrentlyEditingScorerNdx}
-        onRegisterSave={onRegisterSave}
-        onUnregisterSave={onUnregisterSave}
+        onSaveStateChange={handleSaveStateChange}
       />
     </Column>
   );
@@ -146,16 +176,15 @@ interface SimplifiedScorerConfigProps {
   project: string;
   scorerRef: string | null;
   scorerNdx: number;
-  onSaveScorer: (
-    scorerNdx: number,
-    simplifiedConfig: SimplifiedLLMAsAJudgeScorer
-  ) => Promise<string | null>;
+  onScorerSaved: (scorerNdx: number, newRef: string) => void;
   onOpenAdvancedSettings: (
     scorerNdx: number,
     simplifiedConfig: SimplifiedLLMAsAJudgeScorer
   ) => void;
-  onRegisterSave?: (scorerNdx: number, saveMethod: () => Promise<void>) => void;
-  onUnregisterSave?: (scorerNdx: number) => void;
+  onSaveStateChange: (
+    canSave: boolean,
+    saveHandler: () => Promise<string>
+  ) => void;
 }
 
 /**
@@ -167,11 +196,11 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
   project,
   scorerRef,
   scorerNdx,
-  onSaveScorer,
+  onScorerSaved,
   onOpenAdvancedSettings,
-  onRegisterSave,
-  onUnregisterSave,
+  onSaveStateChange,
 }) => {
+  const client = useGetTraceServerClientContext()();
   // Local state for the simplified form
   const [config, setConfig] = useState<SimplifiedLLMAsAJudgeScorer>(
     defaultScorerConfigPayload
@@ -179,6 +208,7 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(!scorerRef); // New scorers start with unsaved changes
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const simplifiedScorerQuery = useSimplifiedScorer(
     entity,
@@ -188,11 +218,19 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
 
   // Load existing scorer configuration when ref changes
   useEffect(() => {
-    if (scorerRef && simplifiedScorerQuery.data !== null) {
+    if (
+      scorerRef &&
+      simplifiedScorerQuery.data !== null &&
+      !simplifiedScorerQuery.loading
+    ) {
       setConfig(simplifiedScorerQuery.data);
       setHasUnsavedChanges(false);
+      setInitialLoadComplete(true);
+    } else if (!scorerRef) {
+      // For new scorers, mark as loaded immediately
+      setInitialLoadComplete(true);
     }
-  }, [scorerRef, simplifiedScorerQuery.data]);
+  }, [scorerRef, simplifiedScorerQuery.data, simplifiedScorerQuery.loading]);
 
   // Track unsaved changes
   const updateConfig = useCallback(
@@ -210,43 +248,77 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
     config.llmModelId.trim() !== '';
 
   const handleSave = useCallback(async () => {
-    if (!isValid || isSaving || !hasUnsavedChanges) return;
+    if (!isValid || isSaving) return '';
 
     setIsSaving(true);
     try {
-      // Save the scorer with current config
-      const newRef = await onSaveScorer(scorerNdx, config);
-      if (newRef) {
+      // Save the scorer directly
+      const scorerRef = await publishSimplifiedLLMAsAJudgeScorer(
+        client,
+        entity,
+        project,
+        config
+      );
+
+      if (scorerRef) {
         setHasUnsavedChanges(false);
-        // TODO: Show success message
-        console.log('Scorer saved with ref:', newRef);
+        onScorerSaved(scorerNdx, scorerRef);
+        return scorerRef; // Return the ref for the save-all handler
       }
+      return '';
+    } catch (error) {
+      console.error('Failed to save scorer:', error);
+      // TODO: Add proper error handling
+      return '';
     } finally {
       setIsSaving(false);
     }
-  }, [isValid, isSaving, hasUnsavedChanges, onSaveScorer, scorerNdx, config]);
-
-  // Register save method when this is a new scorer or has unsaved changes
-  useEffect(() => {
-    if (!scorerRef && onRegisterSave && hasUnsavedChanges && isValid) {
-      onRegisterSave(scorerNdx, handleSave);
-      return () => {
-        onUnregisterSave?.(scorerNdx);
-      };
-    }
   }, [
-    scorerNdx,
-    scorerRef,
-    hasUnsavedChanges,
     isValid,
-    handleSave,
-    onRegisterSave,
-    onUnregisterSave,
-    config.llmModelId, // Re-evaluate when LLM is selected
+    isSaving,
+    client,
+    entity,
+    project,
+    config,
+    scorerNdx,
+    onScorerSaved,
   ]);
 
   // Check if this scorer qualifies for simplified config
   const qualifies = !scorerRef || simplifiedScorerQuery.data !== null;
+  const isLoading = scorerRef && simplifiedScorerQuery.loading;
+
+  // For new scorers, if LLM is auto-selected, mark as having unsaved changes
+  useEffect(() => {
+    if (!scorerRef && config.llmModelId && initialLoadComplete) {
+      setHasUnsavedChanges(true);
+    }
+  }, [scorerRef, config.llmModelId, initialLoadComplete]);
+
+  // Notify parent about save state changes
+  useEffect(() => {
+    const canSave = hasUnsavedChanges && isValid && !isSaving;
+    // Pass the handler directly since it already returns a Promise<string>
+    onSaveStateChange(canSave, canSave ? handleSave : (null as any));
+  }, [hasUnsavedChanges, isValid, isSaving, handleSave, onSaveStateChange]);
+
+  // Show loading state while checking if scorer qualifies
+  if (isLoading || !initialLoadComplete) {
+    return (
+      <div
+        style={{
+          padding: '12px',
+          backgroundColor: MOON_100,
+          borderBottomLeftRadius: '4px',
+          borderBottomRightRadius: '4px',
+          fontSize: '14px',
+          color: '#666',
+          textAlign: 'center',
+        }}>
+        Loading scorer configuration...
+      </div>
+    );
+  }
 
   // Show advanced configuration notice for complex scorers
   if (!qualifies) {
@@ -254,8 +326,9 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
       <div
         style={{
           padding: '12px',
-          backgroundColor: '#f5f5f5',
-          borderRadius: '4px',
+          backgroundColor: MOON_100,
+          borderBottomLeftRadius: '4px',
+          borderBottomRightRadius: '4px',
           fontSize: '14px',
           color: '#666',
           fontStyle: 'italic',
@@ -276,8 +349,9 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
     <Column
       style={{
         padding: '12px',
-        backgroundColor: '#f5f5f5',
-        borderRadius: '4px',
+        backgroundColor: MOON_100,
+        borderBottomLeftRadius: '4px',
+        borderBottomRightRadius: '4px',
         gap: '8px',
       }}>
       <Row style={{gap: '8px'}}>
@@ -324,22 +398,8 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
         selectFirstAvailable={true}
         onChange={(modelValue: string) => {
           updateConfig({llmModelId: modelValue});
-          // For new scorers, ensure we maintain unsaved state when auto-selecting
-          if (!scorerRef && !hasUnsavedChanges) {
-            setHasUnsavedChanges(true);
-          }
         }}
       />
-      <Row style={{justifyContent: 'flex-end', gap: '8px'}}>
-        <Button
-          variant="primary"
-          size="small"
-          onClick={handleSave}
-          icon={isSaving ? undefined : 'save'}
-          disabled={!isValid || isSaving}>
-          {isSaving ? 'Saving...' : 'Save'}
-        </Button>
-      </Row>
     </Column>
   );
 };
@@ -377,13 +437,11 @@ export const ScorersConfigSection = React.forwardRef<
     return config.evaluationDefinition.properties.scorers;
   }, [config]);
 
-  // Keep track of simplified config forms
-  const simplifiedConfigRefs = useRef<Map<number, {save: () => Promise<void>}>>(
-    new Map()
-  );
-  
-  // Keep track of newly saved refs
-  const newlySavedRefs = useRef<Map<number, string>>(new Map());
+  // Keep track of save handlers for each scorer
+  const saveHandlersRef = useRef<Map<number, () => Promise<string>>>(new Map());
+
+  // Keep track of newly saved refs to avoid stale closure issue
+  const newlySavedRefsRef = useRef<Map<number, string>>(new Map());
 
   const addScorer = useCallback(() => {
     editConfig(draft => {
@@ -415,9 +473,8 @@ export const ScorersConfigSection = React.forwardRef<
       editConfig(draft => {
         draft.evaluationDefinition.properties.scorers.splice(scorerNdx, 1);
       });
-      // Clean up refs
-      simplifiedConfigRefs.current.delete(scorerNdx);
-      newlySavedRefs.current.delete(scorerNdx);
+      // Clean up save handler when deleting
+      saveHandlersRef.current.delete(scorerNdx);
     },
     [editConfig]
   );
@@ -451,26 +508,15 @@ export const ScorersConfigSection = React.forwardRef<
 
   const client = useGetTraceServerClientContext()();
 
-  // Save scorer handler for simplified config
-  const saveScorer = useCallback(
-    async (
-      scorerNdx: number,
-      simplifiedConfig: SimplifiedLLMAsAJudgeScorer
-    ): Promise<string | null> => {
-      const scorerRef = await publishSimplifiedLLMAsAJudgeScorer(
-        client,
-        entity,
-        project,
-        simplifiedConfig
-      );
-      // Store the newly saved ref
-      if (scorerRef) {
-        newlySavedRefs.current.set(scorerNdx, scorerRef);
+  const registerSaveHandler = useCallback(
+    (scorerNdx: number, handler: (() => Promise<string>) | null) => {
+      if (handler) {
+        saveHandlersRef.current.set(scorerNdx, handler);
+      } else {
+        saveHandlersRef.current.delete(scorerNdx);
       }
-      updateScorerRef(scorerNdx, scorerRef);
-      return scorerRef;
     },
-    [client, entity, project, updateScorerRef]
+    []
   );
 
   // Handle opening advanced settings (either from gear or from simplified form)
@@ -493,65 +539,47 @@ export const ScorersConfigSection = React.forwardRef<
     ref,
     () => ({
       saveAllUnsaved: async () => {
-        const savePromises: Promise<void>[] = [];
-
-        // Save all unsaved simplified configs
-        simplifiedConfigRefs.current.forEach(configRef => {
-          if (configRef.save) {
-            savePromises.push(configRef.save());
+        // Save all scorers that have save handlers
+        const savePromises = Array.from(saveHandlersRef.current.entries()).map(
+          async ([idx, handler]) => {
+            const ref = await handler();
+            if (ref) {
+              newlySavedRefsRef.current.set(idx, ref);
+            }
           }
-        });
-
+        );
         await Promise.all(savePromises);
       },
       saveAllUnsavedAndGetRefs: async () => {
-        // First, wait for any pending saves
-        const savePromises: Promise<void>[] = [];
-        simplifiedConfigRefs.current.forEach(configRef => {
-          if (configRef.save) {
-            savePromises.push(configRef.save());
+        // Clear previous saves
+        newlySavedRefsRef.current.clear();
+
+        // Save all unsaved scorers and capture their refs
+        const savePromises = Array.from(saveHandlersRef.current.entries()).map(
+          async ([idx, handler]) => {
+            const ref = await handler();
+            if (ref) {
+              newlySavedRefsRef.current.set(idx, ref);
+            }
           }
-        });
+        );
         await Promise.all(savePromises);
-        
-        // Wait a tick for React to process state updates
-        await new Promise(resolve => setTimeout(resolve, 10));
-        
-        // Now get the latest config state by re-evaluating
-        const latestScorers = config.evaluationDefinition.properties.scorers;
-        
-        // Collect all scorer refs, including newly saved ones
+
+        // Build the list of all refs, using newly saved ones where available
         const allRefs: string[] = [];
-        latestScorers.forEach((scorer, idx) => {
-          const newRef = newlySavedRefs.current.get(idx);
+        scorers.forEach((scorer, idx) => {
+          const newRef = newlySavedRefsRef.current.get(idx);
           const ref = newRef || scorer.originalSourceRef;
           if (ref) {
             allRefs.push(ref);
           }
         });
-        
-        console.log('Collected scorer refs:', allRefs);
-        console.log('Newly saved refs map:', Array.from(newlySavedRefs.current.entries()));
-        
-        // Clear the newly saved refs for next time
-        newlySavedRefs.current.clear();
-        
+
         return allRefs;
       },
     }),
-    [scorers, config]
+    [scorers]
   );
-
-  const registerSimplifiedConfigRef = useCallback(
-    (scorerNdx: number, saveMethod: () => Promise<void>) => {
-      simplifiedConfigRefs.current.set(scorerNdx, {save: saveMethod});
-    },
-    []
-  );
-
-  const unregisterSimplifiedConfigRef = useCallback((scorerNdx: number) => {
-    simplifiedConfigRefs.current.delete(scorerNdx);
-  }, []);
 
   return (
     <ConfigSection
@@ -599,9 +627,7 @@ export const ScorersConfigSection = React.forwardRef<
               deleteScorer={deleteScorer}
               setCurrentlyEditingScorerNdx={handleOpenAdvancedSettings}
               scorerRefsQuery={scorerRefsQuery}
-              onSaveScorer={saveScorer}
-              onRegisterSave={registerSimplifiedConfigRef}
-              onUnregisterSave={unregisterSimplifiedConfigRef}
+              onRegisterSaveHandler={registerSaveHandler}
             />
           );
         })}

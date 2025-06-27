@@ -37,6 +37,8 @@ import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilte
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
 
+type TabType = 'summary' | 'results';
+
 type CompareEvaluationsPageProps = {
   entity: string;
   project: string;
@@ -44,6 +46,7 @@ type CompareEvaluationsPageProps = {
   onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
   selectedMetrics: Record<string, boolean> | null;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+  initialTabValue?: TabType;
 };
 
 export const CompareEvaluationsPage: React.FC<
@@ -68,6 +71,7 @@ export const CompareEvaluationsPage: React.FC<
               onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
               selectedMetrics={props.selectedMetrics}
               setSelectedMetrics={props.setSelectedMetrics}
+              initialTabValue={props.initialTabValue}
             />
           ),
         },
@@ -125,6 +129,7 @@ export const CompareEvaluationsPageContent: React.FC<
         value={{entity: props.entity, project: props.project}}>
         <CompareEvaluationsPageInner
           evaluationCallIds={props.evaluationCallIds}
+          initialTabValue={props.initialTabValue}
         />
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
@@ -178,6 +183,7 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 
 const CompareEvaluationsPageInner: React.FC<{
   evaluationCallIds: string[];
+  initialTabValue?: TabType;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const {isPeeking} = useContext(WeaveflowPeekContext);
@@ -185,7 +191,7 @@ const CompareEvaluationsPageInner: React.FC<{
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
-  const [tabValue, setTabValue] = useState('summary');
+  const [tabValue, setTabValue] = useState<TabType>(props.initialTabValue ?? 'summary');
 
   return (
     <Box
@@ -254,14 +260,7 @@ const CompareEvaluationsPageInner: React.FC<{
           },
           {
             value: 'results',
-            label: (
-              <>
-                Dataset results
-                <Tailwind>
-                  <Pill label="New" color="gold" className="ml-2" />
-                </Tailwind>
-              </>
-            ) as any,
+            label: 'Dataset results',
             loading: resultsLoading,
             content: (
               <VerticalBox
@@ -309,7 +308,9 @@ const CompareEvaluationsPageInner: React.FC<{
           },
         ]}
         tabValue={tabValue}
-        handleTabChange={setTabValue}
+        handleTabChange={newValue =>
+          setTabValue(newValue as TabType)
+        }
       />
     </Box>
   );

@@ -1,3 +1,4 @@
+import {MOON_100, MOON_200} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
@@ -59,16 +60,15 @@ interface SimplifiedModelConfigProps {
   project: string;
   modelRef: string | null;
   modelNdx: number;
-  onSaveModel: (
-    modelNdx: number,
-    simplifiedConfig: SimplifiedLLMStructuredCompletionModel
-  ) => Promise<string | null>;
+  onModelSaved: (modelNdx: number, newRef: string) => void;
   onOpenAdvancedSettings: (
     modelNdx: number,
     simplifiedConfig: SimplifiedLLMStructuredCompletionModel
   ) => void;
-  onRegisterSave?: (modelNdx: number, saveMethod: () => Promise<void>) => void;
-  onUnregisterSave?: (modelNdx: number) => void;
+  onSaveStateChange: (
+    canSave: boolean,
+    saveHandler: () => Promise<string>
+  ) => void;
 }
 
 /**
@@ -80,11 +80,11 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
   project,
   modelRef,
   modelNdx,
-  onSaveModel,
+  onModelSaved,
   onOpenAdvancedSettings,
-  onRegisterSave,
-  onUnregisterSave,
+  onSaveStateChange,
 }) => {
+  const client = useGetTraceServerClientContext()();
   // Local state for the simplified form
   const [config, setConfig] = useState<SimplifiedLLMStructuredCompletionModel>(
     defaultModelConfigPayload
@@ -92,6 +92,7 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(!modelRef); // New models start with unsaved changes
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const simplifiedModelQuery = useSimplifiedModel(
     entity,
@@ -101,11 +102,19 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
 
   // Load existing model configuration when ref changes
   useEffect(() => {
-    if (modelRef && simplifiedModelQuery.data !== null) {
+    if (
+      modelRef &&
+      simplifiedModelQuery.data !== null &&
+      !simplifiedModelQuery.loading
+    ) {
       setConfig(simplifiedModelQuery.data);
       setHasUnsavedChanges(false);
+      setInitialLoadComplete(true);
+    } else if (!modelRef) {
+      // For new models, mark as loaded immediately
+      setInitialLoadComplete(true);
     }
-  }, [modelRef, simplifiedModelQuery.data]);
+  }, [modelRef, simplifiedModelQuery.data, simplifiedModelQuery.loading]);
 
   // Track unsaved changes
   const updateConfig = useCallback(
@@ -123,43 +132,76 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
     config.llmModelId.trim() !== '';
 
   const handleSave = useCallback(async () => {
-    if (!isValid || isSaving || !hasUnsavedChanges) return;
+    if (!isValid || isSaving) return '';
 
     setIsSaving(true);
     try {
-      // Save the model with current config
-      const newRef = await onSaveModel(modelNdx, config);
-      if (newRef) {
+      // Save the model directly
+      const modelRef = await publishSimplifiedLLMStructuredCompletionModel(
+        client,
+        entity,
+        project,
+        config
+      );
+
+      if (modelRef) {
         setHasUnsavedChanges(false);
-        // TODO: Show success message
-        console.log('Model saved with ref:', newRef);
+        onModelSaved(modelNdx, modelRef);
+        return modelRef; // Return the ref for the save-all handler
       }
+      return '';
+    } catch (error) {
+      console.error('Failed to save model:', error);
+      // TODO: Add proper error handling
+      return '';
     } finally {
       setIsSaving(false);
     }
-  }, [isValid, isSaving, hasUnsavedChanges, onSaveModel, modelNdx, config]);
-
-  // Register save method when this is a new model or has unsaved changes
-  useEffect(() => {
-    if (!modelRef && onRegisterSave && hasUnsavedChanges && isValid) {
-      onRegisterSave(modelNdx, handleSave);
-      return () => {
-        onUnregisterSave?.(modelNdx);
-      };
-    }
   }, [
-    modelNdx,
-    modelRef,
-    hasUnsavedChanges,
     isValid,
-    handleSave,
-    onRegisterSave,
-    onUnregisterSave,
-    config.llmModelId, // Re-evaluate when LLM is selected
+    isSaving,
+    client,
+    entity,
+    project,
+    config,
+    modelNdx,
+    onModelSaved,
   ]);
 
   // Check if this model qualifies for simplified config
   const qualifies = !modelRef || simplifiedModelQuery.data !== null;
+  const isLoading = modelRef && simplifiedModelQuery.loading;
+
+  // Notify parent about save state changes
+  useEffect(() => {
+    const canSave = hasUnsavedChanges && isValid && !isSaving;
+    onSaveStateChange(canSave, canSave ? handleSave : (null as any));
+  }, [hasUnsavedChanges, isValid, isSaving, handleSave, onSaveStateChange]);
+
+  // For new models, if LLM is auto-selected, mark as having unsaved changes
+  useEffect(() => {
+    if (!modelRef && config.llmModelId && initialLoadComplete) {
+      setHasUnsavedChanges(true);
+    }
+  }, [modelRef, config.llmModelId, initialLoadComplete]);
+
+  // Show loading state while checking if model qualifies
+  if (isLoading || !initialLoadComplete) {
+    return (
+      <div
+        style={{
+          padding: '12px',
+          backgroundColor: MOON_100,
+          borderBottomLeftRadius: '4px',
+          borderBottomRightRadius: '4px',
+          fontSize: '14px',
+          color: '#666',
+          textAlign: 'center',
+        }}>
+        Loading model configuration...
+      </div>
+    );
+  }
 
   // Show advanced configuration notice for complex models
   if (!qualifies) {
@@ -167,8 +209,9 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
       <div
         style={{
           padding: '12px',
-          backgroundColor: '#f5f5f5',
-          borderRadius: '4px',
+          backgroundColor: MOON_100,
+          borderBottomLeftRadius: '4px',
+          borderBottomRightRadius: '4px',
           fontSize: '14px',
           color: '#666',
           fontStyle: 'italic',
@@ -189,8 +232,9 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
     <Column
       style={{
         padding: '12px',
-        backgroundColor: '#f5f5f5',
-        borderRadius: '4px',
+        backgroundColor: MOON_100,
+        borderBottomLeftRadius: '4px',
+        borderBottomRightRadius: '4px',
         gap: '8px',
       }}>
       <Row style={{gap: '8px'}}>
@@ -216,26 +260,12 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
         hideSavedModels
         value={config.llmModelId || ''}
         isTeamAdmin={false}
-        direction={{horizontal: 'left'}}
+        direction={{horizontal: 'right'}}
         selectFirstAvailable={true}
         onChange={(modelValue: string) => {
           updateConfig({llmModelId: modelValue});
-          // For new models, ensure we maintain unsaved state when auto-selecting
-          if (!modelRef && !hasUnsavedChanges) {
-            setHasUnsavedChanges(true);
-          }
         }}
       />
-      <Row style={{justifyContent: 'flex-end', gap: '8px'}}>
-        <Button
-          variant="primary"
-          size="small"
-          onClick={handleSave}
-          icon={isSaving ? undefined : 'save'}
-          disabled={!isValid || isSaving}>
-          {isSaving ? 'Saving...' : 'Save'}
-        </Button>
-      </Row>
     </Column>
   );
 };
@@ -300,12 +330,10 @@ const ModelRow: React.FC<{
     simplifiedConfig?: SimplifiedLLMStructuredCompletionModel
   ) => void;
   modelRefsQuery: ReturnType<typeof useLatestModelRefs>;
-  onSaveModel: (
+  onRegisterSaveHandler: (
     modelNdx: number,
-    simplifiedConfig: SimplifiedLLMStructuredCompletionModel
-  ) => Promise<string | null>;
-  onRegisterSave: (modelNdx: number, saveMethod: () => Promise<void>) => void;
-  onUnregisterSave: (modelNdx: number) => void;
+    handler: (() => Promise<string>) | null
+  ) => void;
 }> = ({
   entity,
   project,
@@ -315,10 +343,13 @@ const ModelRow: React.FC<{
   deleteModel,
   setCurrentlyEditingModelNdx,
   modelRefsQuery,
-  onSaveModel,
-  onRegisterSave,
-  onUnregisterSave,
+  onRegisterSaveHandler,
 }) => {
+  const [canSave, setCanSave] = useState(false);
+  const [saveHandler, setSaveHandler] = useState<
+    (() => Promise<string>) | null
+  >(null);
+
   const handleRefChange = useCallback(
     (ref: string | null) => {
       updateModelRef(modelNdx, ref);
@@ -330,6 +361,16 @@ const ModelRow: React.FC<{
     deleteModel(modelNdx);
   }, [modelNdx, deleteModel]);
 
+  const handleSaveStateChange = useCallback(
+    (canSave: boolean, handler: () => Promise<string>) => {
+      setCanSave(canSave);
+      setSaveHandler(() => handler);
+      // Register/unregister with parent
+      onRegisterSaveHandler(modelNdx, canSave ? handler : null);
+    },
+    [modelNdx, onRegisterSaveHandler]
+  );
+
   // Show loading state for individual dropdowns if query is loading
   if (modelRefsQuery.loading) {
     return (
@@ -337,14 +378,30 @@ const ModelRow: React.FC<{
         <div style={{flex: 1}}>
           <LoadingSelect />
         </div>
+        <Button icon="save" variant="primary" size="small" disabled />
         <Button icon="delete" variant="ghost" disabled />
       </Row>
     );
   }
 
   return (
-    <Column style={{gap: '8px'}}>
-      <Row style={{alignItems: 'center', gap: '8px'}}>
+    <Column
+      style={
+        {
+          // gap: '8px'
+        }
+      }>
+      <Row
+        style={{
+          alignItems: 'center',
+          gap: '8px',
+          borderTop: '2px solid ' + MOON_100,
+          borderLeft: '2px solid ' + MOON_100,
+          borderRight: '2px solid ' + MOON_100,
+          borderTopLeftRadius: '4px',
+          borderTopRightRadius: '4px',
+          padding: '8px',
+        }}>
         <div style={{flex: 1}}>
           <VersionedObjectPicker
             entity={entity}
@@ -358,6 +415,14 @@ const ModelRow: React.FC<{
             allowNewOption={true}
           />
         </div>
+        <Button
+          icon="save"
+          variant="primary"
+          size="small"
+          onClick={() => saveHandler?.()}
+          tooltip="Save model configuration"
+          disabled={!(canSave && saveHandler)}
+        />
         <Button icon="delete" variant="ghost" onClick={handleDelete} />
       </Row>
       <SimplifiedModelConfig
@@ -365,10 +430,9 @@ const ModelRow: React.FC<{
         project={project}
         modelRef={model.originalSourceRef}
         modelNdx={modelNdx}
-        onSaveModel={onSaveModel}
+        onModelSaved={updateModelRef}
         onOpenAdvancedSettings={setCurrentlyEditingModelNdx}
-        onRegisterSave={onRegisterSave}
-        onUnregisterSave={onUnregisterSave}
+        onSaveStateChange={handleSaveStateChange}
       />
     </Column>
   );
@@ -398,19 +462,15 @@ export const ModelsConfigSection = React.forwardRef<
     number | null
   >(null);
 
+  // Keep track of save handlers for each model
+  const saveHandlersRef = useRef<Map<number, () => Promise<string>>>(new Map());
+
+  // Keep track of newly saved refs to avoid stale closure issue
+  const newlySavedRefsRef = useRef<Map<number, string>>(new Map());
+
   const models = useMemo(() => {
     return config.models;
   }, [config]);
-
-  const client = useGetTraceServerClientContext()();
-
-  // Keep track of simplified config forms
-  const simplifiedConfigRefs = useRef<Map<number, {save: () => Promise<void>}>>(
-    new Map()
-  );
-  
-  // Keep track of newly saved refs
-  const newlySavedRefs = useRef<Map<number, string>>(new Map());
 
   const addModel = useCallback(() => {
     editConfig(draft => {
@@ -442,11 +502,21 @@ export const ModelsConfigSection = React.forwardRef<
       editConfig(draft => {
         draft.models.splice(modelNdx, 1);
       });
-      // Clean up refs
-      simplifiedConfigRefs.current.delete(modelNdx);
-      newlySavedRefs.current.delete(modelNdx);
+      // Clean up save handler when deleting
+      saveHandlersRef.current.delete(modelNdx);
     },
     [editConfig]
+  );
+
+  const registerSaveHandler = useCallback(
+    (modelNdx: number, handler: (() => Promise<string>) | null) => {
+      if (handler) {
+        saveHandlersRef.current.set(modelNdx, handler);
+      } else {
+        saveHandlersRef.current.delete(modelNdx);
+      }
+    },
+    []
   );
 
   const updateModelRef = useCallback(
@@ -464,105 +534,63 @@ export const ModelsConfigSection = React.forwardRef<
     [editConfig]
   );
 
-  // Save model handler for simplified config
-  const saveModel = useCallback(
-    async (
-      modelNdx: number,
-      simplifiedConfig: SimplifiedLLMStructuredCompletionModel
-    ): Promise<string | null> => {
-      const modelRef = await publishSimplifiedLLMStructuredCompletionModel(
-        client,
-        entity,
-        project,
-        simplifiedConfig
-      );
-      // Store the newly saved ref
-      if (modelRef) {
-        newlySavedRefs.current.set(modelNdx, modelRef);
-      }
-      updateModelRef(modelNdx, modelRef);
-      return modelRef;
-    },
-    [client, entity, project, updateModelRef]
-  );
-
   // Handle opening advanced settings
   const handleOpenAdvancedSettings = useCallback(
     (
       modelNdx: number | null,
       simplifiedConfig?: SimplifiedLLMStructuredCompletionModel
     ) => {
-      // TODO: In the future, we could pass simplifiedConfig to the drawer
-      // to pre-populate the advanced form with current values
       setCurrentlyEditingModelNdx(modelNdx);
     },
     []
   );
 
-  // Expose save all method via ref
+  // Expose method via ref to get current model refs for evaluation
   useImperativeHandle(
     ref,
     () => ({
       saveAllUnsaved: async () => {
-        const savePromises: Promise<void>[] = [];
-
-        // Save all unsaved simplified configs
-        simplifiedConfigRefs.current.forEach(configRef => {
-          if (configRef.save) {
-            savePromises.push(configRef.save());
+        // Save all models that have save handlers
+        const savePromises = Array.from(saveHandlersRef.current.entries()).map(
+          async ([idx, handler]) => {
+            const ref = await handler();
+            if (ref) {
+              newlySavedRefsRef.current.set(idx, ref);
+            }
           }
-        });
-
+        );
         await Promise.all(savePromises);
       },
       saveAllUnsavedAndGetRefs: async () => {
-        // First, wait for any pending saves
-        const savePromises: Promise<void>[] = [];
-        simplifiedConfigRefs.current.forEach(configRef => {
-          if (configRef.save) {
-            savePromises.push(configRef.save());
+        // Clear previous saves
+        newlySavedRefsRef.current.clear();
+
+        // Save all unsaved models and capture their refs
+        const savePromises = Array.from(saveHandlersRef.current.entries()).map(
+          async ([idx, handler]) => {
+            const ref = await handler();
+            if (ref) {
+              newlySavedRefsRef.current.set(idx, ref);
+            }
           }
-        });
+        );
         await Promise.all(savePromises);
-        
-        // Wait a tick for React to process state updates
-        await new Promise(resolve => setTimeout(resolve, 10));
-        
-        // Now get the latest config state by re-evaluating
-        const latestModels = config.models;
-        
-        // Collect all model refs, including newly saved ones
+
+        // Build the list of all refs, using newly saved ones where available
         const allRefs: string[] = [];
-        latestModels.forEach((model, idx) => {
-          const newRef = newlySavedRefs.current.get(idx);
+        models.forEach((model, idx) => {
+          const newRef = newlySavedRefsRef.current.get(idx);
           const ref = newRef || model.originalSourceRef;
           if (ref) {
             allRefs.push(ref);
           }
         });
-        
-        console.log('Collected model refs:', allRefs);
-        console.log('Newly saved refs map:', Array.from(newlySavedRefs.current.entries()));
-        
-        // Clear the newly saved refs for next time
-        newlySavedRefs.current.clear();
-        
+
         return allRefs;
       },
     }),
-    [models, config]
+    [models]
   );
-
-  const registerSimplifiedConfigRef = useCallback(
-    (modelNdx: number, saveMethod: () => Promise<void>) => {
-      simplifiedConfigRefs.current.set(modelNdx, {save: saveMethod});
-    },
-    []
-  );
-
-  const unregisterSimplifiedConfigRef = useCallback((modelNdx: number) => {
-    simplifiedConfigRefs.current.delete(modelNdx);
-  }, []);
 
   return (
     <ConfigSection
@@ -610,9 +638,7 @@ export const ModelsConfigSection = React.forwardRef<
               deleteModel={deleteModel}
               setCurrentlyEditingModelNdx={handleOpenAdvancedSettings}
               modelRefsQuery={modelRefsQuery}
-              onSaveModel={saveModel}
-              onRegisterSave={registerSimplifiedConfigRef}
-              onUnregisterSave={unregisterSimplifiedConfigRef}
+              onRegisterSaveHandler={registerSaveHandler}
             />
           );
         })}
