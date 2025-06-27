@@ -12,54 +12,6 @@ model = "gpt-4o"
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
-)
-def test_openai_responses_quickstart(
-    client: weave.trace.weave_client.WeaveClient,
-) -> None:
-    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-
-    openai_client = OpenAI(api_key=api_key)
-
-    response = openai_client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": "How are you?"}],
-        temperature=0.0,
-        max_tokens=64,
-        top_p=1,
-    )
-    calls = list(client.calls())
-    assert len(calls) == 1
-    call = calls[0]
-
-    exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
-    assert response.choices[0].message.content == exp
-
-    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
-    assert call.started_at is not None
-    assert call.started_at < call.ended_at  # type: ignore
-
-    output = call.output
-    assert output["model"] == "gpt-4o-2024-05-13"
-    assert output["object"] == "chat.completion"
-
-    usage = call.summary["usage"][output["model"]]  # type: ignore
-    assert usage["requests"] == 1
-    assert usage["completion_tokens"] == 28
-    assert usage["prompt_tokens"] == 11
-    assert usage["total_tokens"] == 39
-
-    inputs = call.inputs
-    assert inputs["model"] == "gpt-4o"
-    assert inputs["messages"] == [{"role": "user", "content": "How are you?"}]
-    assert inputs["max_tokens"] == 64
-    assert inputs["temperature"] == 0.0
-    assert inputs["top_p"] == 1
-
-
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio

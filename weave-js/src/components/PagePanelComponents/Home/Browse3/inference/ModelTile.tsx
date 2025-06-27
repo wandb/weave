@@ -69,16 +69,15 @@ export const ModelTile = ({
     (model.priceCentsPerBillionTokensInput ?? 0) > 0 ||
     (model.priceCentsPerBillionTokensOutput ?? 0) > 0;
 
-  const hasPlayground = !!model.idPlayground && inferenceContext.isLoggedIn;
+  const hasPlayground =
+    !!model.idPlayground && inferenceContext.isInferenceEnabled;
   const textPlayground =
     selected && selected.selectedWithPlayground.length > 1 && hasPlayground
       ? `Try ${selected.selectedWithPlayground.length} in playground`
       : 'Try in playground';
   const tooltipPlayground = hasPlayground
     ? undefined
-    : inferenceContext.isLoggedIn
-    ? 'This model is not available in the playground'
-    : 'You must be logged in to use the playground';
+    : inferenceContext.availabilityMessage;
 
   const onClickPlayground = onOpenPlayground
     ? (e: React.MouseEvent) => {

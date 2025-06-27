@@ -292,7 +292,7 @@ def test_evaluation_version_reuse(
 
 
 def generate_evaluation_logger_kwargs_permutations():
-    NOT_SPECIFIED = object()
+    not_specified = object()
 
     class MyModel(weave.Model):
         const_value: int
@@ -310,7 +310,7 @@ def generate_evaluation_logger_kwargs_permutations():
             return self.const_value
 
     models = [
-        NOT_SPECIFIED,
+        not_specified,
         "string_model",
         {"name": "dict_model"},
         MyModel(const_value=42),
@@ -318,7 +318,7 @@ def generate_evaluation_logger_kwargs_permutations():
     ]
 
     datasets = [
-        NOT_SPECIFIED,
+        not_specified,
         "string_dataset",
         [
             {"sample": "a", "exp_output": 1},
@@ -335,9 +335,9 @@ def generate_evaluation_logger_kwargs_permutations():
     for model in models:
         for dataset in datasets:
             kwargs = {}
-            if model is not NOT_SPECIFIED:
+            if model is not not_specified:
                 kwargs["model"] = model
-            if dataset is not NOT_SPECIFIED:
+            if dataset is not not_specified:
                 kwargs["dataset"] = dataset
 
             yield kwargs

@@ -148,7 +148,7 @@ def test_trust_scorer_parallelism(trust_scorer):
     raw_outputs = eval_result["WeaveTrustScorerV1"]["metadata"]["raw_outputs"]
 
     # it's kind of boring...
-    for _, scorer_results in raw_outputs.items():
+    for scorer_results in raw_outputs.values():
         assert scorer_results["passed"]["true_count"] == 0
         assert scorer_results["passed"]["true_fraction"] == 0.0
 

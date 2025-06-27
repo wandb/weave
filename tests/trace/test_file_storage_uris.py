@@ -10,7 +10,7 @@ from weave.trace_server.file_storage_uris import (
 
 
 @pytest.mark.parametrize(
-    "uri,expected_class",
+    ("uri", "expected_class"),
     [
         ("s3://bucket/path", S3FileStorageURI),
         ("gs://bucket/path", GCSFileStorageURI),
@@ -45,7 +45,7 @@ def test_parse_uri_str_failure(uri: str):
 
 
 @pytest.mark.parametrize(
-    "uri,expected_attrs",
+    ("uri", "expected_attrs"),
     [
         (
             "s3://my-bucket/path/to/object",
@@ -117,7 +117,7 @@ def test_uri_with_extra_components(uri: str):
 
 
 @pytest.mark.parametrize(
-    "storage_class,constructor_args,expected_uri",
+    ("storage_class", "constructor_args", "expected_uri"),
     [
         (S3FileStorageURI, ("bucket", ""), "s3://bucket"),
         (S3FileStorageURI, ("bucket", "path"), "s3://bucket/path"),
@@ -141,7 +141,7 @@ def test_empty_paths(storage_class, constructor_args, expected_uri):
 
 
 @pytest.mark.parametrize(
-    "storage_class,constructor_args,new_path,expected_uri",
+    ("storage_class", "constructor_args", "new_path", "expected_uri"),
     [
         (
             S3FileStorageURI,
@@ -173,7 +173,7 @@ def test_with_path_all_types(storage_class, constructor_args, new_path, expected
 
 
 @pytest.mark.parametrize(
-    "storage_class,bad_args",
+    ("storage_class", "bad_args"),
     [
         (S3FileStorageURI, ("", "path")),  # Empty bucket
         (GCSFileStorageURI, ("", "path")),  # Empty bucket
@@ -188,7 +188,7 @@ def test_empty_required_components(storage_class, bad_args):
 
 
 @pytest.mark.parametrize(
-    "original_uri",
+    ("original_uri"),
     [
         "s3://bucket/simple/path",
         "s3://bucket/path/with/many/segments",
