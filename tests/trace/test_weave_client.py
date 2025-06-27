@@ -3570,7 +3570,7 @@ def test_sum_dict_leaves_deep_nested(client):
     }
 
 
-def test_filter_calls_by_ref(client):
+def test_filter_calls_by_ref_properties(client):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")

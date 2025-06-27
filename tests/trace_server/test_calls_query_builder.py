@@ -2327,8 +2327,12 @@ def test_object_ref_filter_simple() -> None:
            WHERE calls_merged.project_id = {pb_0:String}
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
+           HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) IN
+                      (SELECT full_ref
+                       FROM obj_filter_0))
+                   AND ((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+           ORDER BY any(calls_merged.started_at) DESC),
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
@@ -2345,9 +2349,6 @@ def test_object_ref_filter_simple() -> None:
           AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
-        HAVING JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) IN
-          (SELECT full_ref
-           FROM obj_filter_0)
         ORDER BY any(calls_merged.started_at) DESC
         """,
         {
@@ -2389,8 +2390,14 @@ def test_object_ref_filter_nested() -> None:
              AND (calls_merged.parent_id IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
+           HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}) IN
+                      (SELECT full_ref
+                       FROM obj_filter_2))
+                   AND ((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+           ORDER BY any(calls_merged.started_at) DESC
+           LIMIT 50
+           OFFSET 0),
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
@@ -2427,12 +2434,7 @@ def test_object_ref_filter_nested() -> None:
           AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
-        HAVING JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}) IN
-          (SELECT full_ref
-           FROM obj_filter_2)
         ORDER BY any(calls_merged.started_at) DESC
-        LIMIT 50
-        OFFSET 0
         """,
         {
             "pb_0": "project",
@@ -2492,8 +2494,15 @@ def test_multiple_object_ref_filters() -> None:
              AND (calls_merged.parent_id IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
+           HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
+                      (SELECT full_ref
+                       FROM obj_filter_0))
+                   AND ((NOT (JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
+                               (SELECT full_ref
+                                FROM obj_filter_1))))
+                   AND ((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+           ORDER BY any(calls_merged.started_at) DESC),
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
@@ -2520,12 +2529,6 @@ def test_multiple_object_ref_filters() -> None:
           AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
-        HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
-           (SELECT full_ref
-            FROM obj_filter_0))
-        AND ((NOT (JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
-               (SELECT full_ref
-                FROM obj_filter_1)))))
         ORDER BY any(calls_merged.started_at) DESC
         """,
         {
@@ -2597,8 +2600,23 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
              AND (calls_merged.parent_id IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
+           HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+              (SELECT full_ref
+               FROM obj_filter_0))
+           AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+              (SELECT full_ref
+               FROM obj_filter_0))
+           AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+              (SELECT full_ref
+               FROM obj_filter_1))
+           AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+               (SELECT full_ref
+               FROM obj_filter_2))
+           AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+              (SELECT full_ref
+               FROM obj_filter_3))
+           AND ((any(calls_merged.deleted_at) IS NULL))
+           AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
@@ -2645,21 +2663,6 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
           AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
-        HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-           (SELECT full_ref
-            FROM obj_filter_0))
-        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-           (SELECT full_ref
-            FROM obj_filter_0))
-        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-           (SELECT full_ref
-            FROM obj_filter_1))
-        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-            (SELECT full_ref
-            FROM obj_filter_2))
-        AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-           (SELECT full_ref
-            FROM obj_filter_3)))
         """,
         {
             "pb_0": "project",
@@ -2730,17 +2733,28 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
     assert_sql(
         cq,
         """
-        WITH filtered_calls AS
-          (SELECT calls_merged.id AS id
-           FROM calls_merged
-           WHERE calls_merged.project_id = {pb_0:String}
-             AND ((calls_merged.op_name IN {pb_7:Array(String)})
-                 OR (calls_merged.op_name IS NULL))
-           GROUP BY (calls_merged.project_id,
-                     calls_merged.id)
-           HAVING (((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
-             obj_filter_0 AS
+        WITH filtered_calls AS (
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+          AND ((calls_merged.op_name IN {pb_10:Array(String)})
+               OR (calls_merged.op_name IS NULL))
+        GROUP BY (calls_merged.project_id,
+                  calls_merged.id)
+        HAVING ((((((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+                       (SELECT full_ref
+                        FROM obj_filter_0))
+                    AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+                           (SELECT full_ref
+                            FROM obj_filter_1))))
+                  OR ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}) = {pb_9:String}))
+                  OR ((NOT (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+                              (SELECT full_ref
+                               FROM obj_filter_2))))))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+                ORDER BY any(calls_merged.started_at) DESC
+                LIMIT 10), obj_filter_0 AS
           (SELECT object_id,
                   digest,
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
@@ -2750,7 +2764,7 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
            GROUP BY project_id,
                     object_id,
                     digest),
-             obj_filter_1 AS
+                           obj_filter_1 AS
           (SELECT object_id,
                   digest,
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
@@ -2760,7 +2774,7 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
            GROUP BY project_id,
                     object_id,
                     digest),
-             obj_filter_2 AS
+                           obj_filter_2 AS
           (SELECT object_id,
                   digest,
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
@@ -2771,24 +2785,13 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
                     object_id,
                     digest)
         SELECT calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+               any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_0:String}
           AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
-        HAVING ((((JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}) IN
-               (SELECT full_ref
-                FROM obj_filter_0))
-            AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}) IN
-               (SELECT full_ref
-                FROM obj_filter_1))))
-          OR ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_9:String}) = {pb_10:String}))
-          OR ((NOT (JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}) IN
-               (SELECT full_ref
-                FROM obj_filter_2)))))
         ORDER BY any(calls_merged.started_at) DESC
-        LIMIT 10
         """,
         {
             "pb_0": "project",
@@ -2798,10 +2801,10 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
             "pb_4": 0.5,
             "pb_5": "$.stream",
             "pb_6": True,
-            "pb_7": ["llm_call"],
-            "pb_8": "$.model",
-            "pb_9": '$."prompt"',
-            "pb_10": "test prompt",
+            "pb_7": "$.model",
+            "pb_8": '$."prompt"',
+            "pb_9": "test prompt",
+            "pb_10": ["llm_call"],
         },
     )
 
@@ -2817,11 +2820,14 @@ def test_object_ref_order_by_simple() -> None:
         WITH filtered_calls AS
           (SELECT calls_merged.id AS id
            FROM calls_merged
+           LEFT JOIN obj_filter_0
+               ON JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}) = obj_filter_0.full_ref
            WHERE calls_merged.project_id = {pb_0:String}
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((any(calls_merged.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+           ORDER BY JSON_VALUE(any(obj_filter_0.object_val_dump), {pb_1:String}) DESC),
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
