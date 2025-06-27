@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Union
+from typing import Union
 
 from pydantic import BaseModel, Field, PrivateAttr, validate_call
 
