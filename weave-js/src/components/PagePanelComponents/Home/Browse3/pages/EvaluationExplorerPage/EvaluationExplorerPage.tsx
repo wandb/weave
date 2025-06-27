@@ -1,10 +1,11 @@
 import {Button} from '@wandb/weave/components/Button';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import React, {useCallback, useMemo, useState, useRef} from 'react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {sanitizeObjectId} from '../wfReactInterface/traceServerDirectClient';
 import {refStringToName} from './common';
 import {LabeledTextArea, LabeledTextField, PickerContainer} from './components';
 import {BORDER_COLOR, SECONDARY_BACKGROUND_COLOR} from './constants';
@@ -20,7 +21,6 @@ import {Footer} from './layout';
 import {ModelsConfigSection} from './ModelsConfigSection';
 import {createEvaluation, runEvaluation} from './query';
 import {ScorersConfigSection} from './ScorersConfigSection';
-import { sanitizeObjectId } from '../wfReactInterface/traceServerDirectClient';
 
 type EvaluationExplorerPageProps = {
   entity: string;

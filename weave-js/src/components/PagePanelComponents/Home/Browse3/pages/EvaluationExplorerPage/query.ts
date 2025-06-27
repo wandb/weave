@@ -210,14 +210,14 @@ export const publishSimplifiedLLMAsAJudgeScorer = async (
   simplifiedScorer: SimplifiedLLMAsAJudgeScorer
 ) => {
   // Step 1: Create the inner model object
-  const numberInstruction = 'a float between 0 and 1';
-  const booleanInstruction = 'a boolean';
+  const numberInstruction = '(number) a float between 0 and 1';
+  const booleanInstruction = '(boolean) a boolean';
+  const scoreTypeInstruction =
+    simplifiedScorer.scoreType === 'number'
+      ? numberInstruction
+      : booleanInstruction;
   const systemPrompt = `You are a judge of model performance. Repond in JSON with the following fields:
-  * score: (${
-    simplifiedScorer.scoreType === 'boolean'
-      ? booleanInstruction
-      : numberInstruction
-  }) a 
+  * score: ${scoreTypeInstruction}
   * reason: (string) a short explanation of the score
   `;
   const innerModelName = simplifiedScorer.name + ' model';
@@ -358,6 +358,8 @@ export const publishSimplifiedLLMStructuredCompletionModel = async (
       messages_template: [
         {role: 'system', content: simplifiedModel.systemPrompt},
       ],
+      // Sad: should be configurable
+      response_format: 'text',
     },
     llm_model_id: simplifiedModel.llmModelId,
     name: modelName,
@@ -411,7 +413,7 @@ export const getSimplifiedLLMStructuredCompletionModel = async (
   }
 
   // If it has response_format specified, it's not a simple model
-  if (model.val?.default_params?.response_format) {
+  if (model.val?.default_params?.response_format !== 'text') {
     return null;
   }
 

@@ -3,7 +3,6 @@ import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {
-  forwardRef,
   useCallback,
   useEffect,
   useImperativeHandle,
