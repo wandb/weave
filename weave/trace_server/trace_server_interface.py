@@ -786,7 +786,7 @@ class TableQueryStatsBatchReq(BaseModel):
         description="The digests of the tables to query",
         examples=[
             "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
-            "smirva431etnsroatsratlrampgrmeangmpr5344aplatmipa31ltvsmiераnoa",
+            "smirva431etnsroatsratlrampgrmeangmpr5344aplatmipa31ltvsmiepanoa",
         ],
         default=[],
     )
