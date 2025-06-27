@@ -1,3 +1,4 @@
+import warnings
 import copy
 import inspect
 import traceback
@@ -36,6 +37,10 @@ console = Console()
 
 if TYPE_CHECKING:
     import pandas as pd
+
+    # Import huggingface datasets for type checking
+    from datasets import Dataset as HFDataset
+    from datasets import DatasetDict as HFDatasetDict
 
 
 @register_object
@@ -85,6 +90,42 @@ class Dataset(Object):
         rows = df.to_dict(orient="records")
         return cls(rows=rows)
 
+    @classmethod
+    def from_hf(cls, hf_dataset: Union["HFDataset", "HFDatasetDict"]) -> Self:
+        try:
+            from datasets import Dataset as HFDataset
+            from datasets import DatasetDict as HFDatasetDict
+        except ImportError:
+            raise ImportError(
+                "huggingface datasets is required to use this method. "
+                "Install with `pip install datasets`"
+            ) from None
+
+        if isinstance(hf_dataset, HFDatasetDict):
+            if "train" in hf_dataset:
+                warnings.warn(
+                    "Input dataset has multiple splits. Using 'train' split by default.",
+                    stacklevel=2,
+                )
+                target_hf_dataset = hf_dataset["train"]
+            else:
+                raise ValueError(
+                    "Input is a DatasetDict but does not contain a 'train' split. "
+                    "Please provide a specific split (e.g., dataset_dict['test']) "
+                    "or a datasets.Dataset object."
+                )
+        elif isinstance(hf_dataset, HFDataset):
+            target_hf_dataset = hf_dataset
+        else:
+            raise TypeError(
+                "Expected a datasets.Dataset or datasets.DatasetDict object, "
+                f"got {type(hf_dataset)}"
+            )
+
+        # Convert HF Dataset to list of dicts
+        rows = target_hf_dataset.to_list()
+        return cls(rows=rows)
+
     def to_pandas(self) -> "pd.DataFrame":
         try:
             import pandas as pd
@@ -92,6 +133,20 @@ class Dataset(Object):
             raise ImportError("pandas is required to use this method") from None
 
         return pd.DataFrame(self.rows)
+
+    def to_hf(self) -> "HFDataset":
+        try:
+            from datasets import Dataset as HFDataset
+        except ImportError:
+            raise ImportError(
+                "huggingface datasets is required to use this method. "
+                "Install with `pip install datasets`"
+            ) from None
+        # Convert list of dicts to HF Dataset format (dict of lists)
+        if not self.rows:
+            return HFDataset.from_dict({})
+        data = {key: [row.get(key) for row in self.rows] for key in self.rows[0]}
+        return HFDataset.from_dict(data)
 
     def add_rows(self, rows: Iterable[dict]) -> "Dataset":
         """Create a new dataset version by appending rows to the existing dataset.

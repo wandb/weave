@@ -6,7 +6,11 @@ export type ActionType = z.infer<typeof ActionTypeSchema>;
 export const ModelSchema = z.enum(['gpt-4o', 'gpt-4o-mini']);
 export type Model = z.infer<typeof ModelSchema>;
 
-export const ResponseFormatSchema = z.enum(['json_object', 'text']);
+export const ResponseFormatSchema = z.enum([
+  'json_object',
+  'json_schema',
+  'text',
+]);
 export type ResponseFormat = z.infer<typeof ResponseFormatSchema>;
 
 export const ProviderReturnTypeSchema = z.enum(['openai']);

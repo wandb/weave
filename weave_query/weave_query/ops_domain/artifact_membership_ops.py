@@ -30,6 +30,9 @@ static_art_membership_file_gql = """
                     }
                 }
             }
+            artifact {
+                id
+            }
             """
 
 
@@ -121,8 +124,9 @@ def _artifact_membership_to_wb_artifact(artifactMembership: wdt.ArtifactCollecti
     version = f"v{artifactMembership['versionIndex']}"
     entity_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['entity']['name']
     project_name = artifactMembership["artifactCollection"]['defaultArtifactType']['project']['name']
+    artifact_id = artifactMembership["artifact"]["id"]
     uri = artifact_wandb.WeaveWBArtifactURI(
-        collection_name, version, entity_name, project_name
+        name=collection_name, version=version, entity_name=entity_name, project_name=project_name, extra=[artifact_id]
     )
     return artifact_wandb.WandbArtifact(
         name=collection_name,
