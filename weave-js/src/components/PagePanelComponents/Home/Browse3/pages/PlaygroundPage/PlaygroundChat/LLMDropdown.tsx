@@ -146,6 +146,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     onChange,
     value,
     areProvidersLoading,
+    selectFirstAvailable,
   ]);
 
   const handleMenuOpen = () => {
@@ -310,7 +311,6 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
     refetchCustomProviderModels();
   }, [refetchCustomProviders, refetchCustomProviderModels]);
 
-
   const llmDropdownOptions = useLLMDropdownOptions(
     configuredProviders,
     configuredProvidersLoading,
@@ -327,7 +327,8 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
   const areProvidersLoading =
     configuredProvidersLoading || areCustomProvidersLoading;
 
-  return <LLMDropdown
+  return (
+    <LLMDropdown
       value={value}
       onChange={onChange}
       isTeamAdmin={isTeamAdmin}
