@@ -210,7 +210,7 @@ class ThrowingServer(tsi.TraceServerInterface):
         raise DummyTestException("FAILURE - feedback_purge, req:", req)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_with_throwing_server(client):
     curr_server = client.server
     client.server = ThrowingServer()
@@ -564,7 +564,7 @@ def zero_stack():
         yield
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(zero_stack, request):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
@@ -576,7 +576,7 @@ def client(zero_stack, request):
         autopatch.reset_autopatch()
 
 
-@pytest.fixture()
+@pytest.fixture
 def client_creator(zero_stack, request):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
@@ -599,7 +599,7 @@ def client_creator(zero_stack, request):
                 weave.trace.settings.UserSettings()
             )
 
-    yield client
+    return client
 
 
 @pytest.fixture
@@ -664,5 +664,5 @@ def caching_client_isolation(monkeypatch, tmp_path):
     test_specific_cache_dir.mkdir(parents=True, exist_ok=True)
 
     monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
-    yield test_specific_cache_dir
+    return test_specific_cache_dir
     # tmp_path and monkeypatch automatically handle cleanup

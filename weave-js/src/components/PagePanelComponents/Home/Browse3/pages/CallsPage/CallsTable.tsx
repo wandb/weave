@@ -55,6 +55,7 @@ import {
 import {OnUpdateFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
+import {getNextFilterId} from '../../filters/filterUtils';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
 import {StyledDataGrid} from '../../StyledDataGrid';
@@ -479,7 +480,7 @@ export const CallsTable: FC<{
             items: [
               ...filterModel.items,
               {
-                id: filterModel.items.length,
+                id: getNextFilterId(filterModel.items),
                 field,
                 operator: op,
                 value: strVal,

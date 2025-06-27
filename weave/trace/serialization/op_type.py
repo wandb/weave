@@ -26,7 +26,6 @@ from weave.trace.refs import ObjectRef
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization import serializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-from weave.trace.term import logger
 from weave.trace_server.trace_server_interface_util import str_digest
 
 logger = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ from weave.scorers import ValidJSONScorer
 
 
 @pytest.mark.parametrize(
-    "output, expected_result",
+    ("output", "expected_result"),
     [
         ('{"city": "San Francisco", "country": "USA"}', True),
         ('{"city": "San Francisco", "country": "USA"', False),

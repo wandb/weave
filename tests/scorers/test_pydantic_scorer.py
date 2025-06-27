@@ -15,7 +15,7 @@ def user_scorer():
 
 
 @pytest.mark.parametrize(
-    "input_data, expected_result",
+    ("input_data", "expected_result"),
     [
         ('{"name": "John", "age": 30}', {"valid_pydantic": True}),
         ({"name": "John", "age": 30}, {"valid_pydantic": True}),

@@ -5,8 +5,7 @@ import {LLMMaxTokensKey} from './llmMaxTokens';
 export enum PlaygroundResponseFormats {
   Text = 'text',
   JsonObject = 'json_object',
-  // Fast follow
-  // JsonSchema = 'json_schema',
+  JsonSchema = 'json_schema',
 }
 
 export type SavedPlaygroundModelState = {
@@ -41,6 +40,7 @@ export type PlaygroundModelParams = {
   }>;
   stopSequences: string[];
   responseFormatSchema?: Record<string, any>;
+  jsonSchema?: string;
 };
 
 // Define the keys from PlaygroundModelParams to iterate and compare
