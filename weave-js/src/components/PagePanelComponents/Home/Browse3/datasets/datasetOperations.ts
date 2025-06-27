@@ -30,7 +30,7 @@ export interface UpdateDatasetOptions {
     {pop: {index: number}} | {insert: {index: number; row: Record<string, any>}}
   >;
   tableUpdate: (useTableUpdateParams: UseTableUpdateParams) => Promise<any>;
-  objCreate: (useObjCreateParams: UseObjCreateParams) => Promise<any>;
+  objCreate: (useObjCreateParams: UseObjCreateParams) => Promise<string>;
   router: any;
 }
 
