@@ -101,9 +101,9 @@ class TestObjectPathDunderMethods:
         assert path[2] == "bar"
 
     def test_add(self) -> None:
-        assert ObjectPath() + ["foo"] == ObjectPath(["foo"])
-        assert ObjectPath(["foo"]) + [0] == ObjectPath(["foo", 0])
-        assert ObjectPath(["foo"]) + [0, "bar"] == ObjectPath(["foo", 0, "bar"])
+        assert [*ObjectPath(), "foo"] == ObjectPath(["foo"])
+        assert [*ObjectPath(["foo"]), 0] == ObjectPath(["foo", 0])
+        assert [*ObjectPath(["foo"]), 0, "bar"] == ObjectPath(["foo", 0, "bar"])
 
     def test_len(self) -> None:
         assert len(ObjectPath(["foo", 42, "bar"])) == 3

@@ -197,10 +197,10 @@ def test_nested_futures_with_1_max_worker_classic_deadlock_case() -> None:
         return [0]
 
     def inner_1() -> list[int]:
-        return executor.defer(inner_0).result() + [1]
+        return [*executor.defer(inner_0).result(), 1]
 
     def inner_2() -> list[int]:
-        return executor.defer(inner_1).result() + [2]
+        return [*executor.defer(inner_1).result(), 2]
 
     res = executor.defer(inner_2).result()
     assert res == [0, 1, 2]
@@ -214,10 +214,10 @@ def test_nested_futures_with_0_max_workers_direct() -> None:
         return [0]
 
     def inner_1() -> list[int]:
-        return executor.defer(inner_0).result() + [1]
+        return [*executor.defer(inner_0).result(), 1]
 
     def inner_2() -> list[int]:
-        return executor.defer(inner_1).result() + [2]
+        return [*executor.defer(inner_1).result(), 2]
 
     res = executor.defer(inner_2).result()
     assert executor._executor is None

@@ -118,8 +118,8 @@ if __name__ == "__main__":
             teacher_message = teacher.step(agent_state)
 
             agent_state = AgentState(
-                history=agent_state.history
-                + [
+                history=[
+                    *agent_state.history,
                     {
                         "role": "user",
                         "content": teacher_message,

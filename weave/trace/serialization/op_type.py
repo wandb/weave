@@ -558,7 +558,7 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
     with artifact.new_file(f"{name}.py") as f:
         assert isinstance(f, io.StringIO)
         import_block = "\n".join(import_code)
-        import_lines = ["import weave"] + import_block.split("\n")
+        import_lines = ["import weave", *import_block.split("\n")]
         import_lines = dedupe_list(import_lines)
         import_lines = [l for l in import_lines if "weave.api" not in l]
         import_block = "\n".join(import_lines)
