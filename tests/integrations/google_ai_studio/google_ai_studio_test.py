@@ -19,7 +19,8 @@ def assert_correct_output_shape(output: dict):
     assert "candidates" in output
     assert isinstance(output["candidates"], list)
     for candidate in output["candidates"]:
-        assert isinstance(parts := candidate["content"]["parts"], list)
+        parts = candidate["content"]["parts"]
+        assert isinstance(parts, list)
         for part in parts:
             assert isinstance(part["text"], str)
 
