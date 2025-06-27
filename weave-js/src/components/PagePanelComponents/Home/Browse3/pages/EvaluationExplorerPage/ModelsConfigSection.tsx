@@ -32,6 +32,15 @@ import {defaultModelConfigPayload} from './state';
 import {SimplifiedLLMStructuredCompletionModel} from './types';
 import {VersionedObjectPicker} from './VersionedObjectPicker';
 
+// Helper to get valid refs from items
+const getValidRefs = <T extends {originalSourceRef: string | null}>(
+  items: T[]
+): string[] => {
+  return items
+    .filter(item => item.originalSourceRef !== null)
+    .map(item => item.originalSourceRef!);
+};
+
 // Default option for creating a new model from scratch
 const newModelOption = {
   label: 'New Model',
@@ -82,7 +91,7 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
   );
 
   const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(!modelRef); // New models start with unsaved changes
 
   const simplifiedModelQuery = useSimplifiedModel(
     entity,
@@ -146,6 +155,7 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
     handleSave,
     onRegisterSave,
     onUnregisterSave,
+    config.llmModelId, // Re-evaluate when LLM is selected
   ]);
 
   // Check if this model qualifies for simplified config
@@ -210,6 +220,10 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
         selectFirstAvailable={true}
         onChange={(modelValue: string) => {
           updateConfig({llmModelId: modelValue});
+          // For new models, ensure we maintain unsaved state when auto-selecting
+          if (!modelRef && !hasUnsavedChanges) {
+            setHasUnsavedChanges(true);
+          }
         }}
       />
       <Row style={{justifyContent: 'flex-end', gap: '8px'}}>
@@ -366,6 +380,7 @@ const ModelRow: React.FC<{
  */
 export interface ModelsConfigSectionRef {
   saveAllUnsaved: () => Promise<void>;
+  saveAllUnsavedAndGetRefs: () => Promise<string[]>;
 }
 
 export const ModelsConfigSection = React.forwardRef<
@@ -393,6 +408,9 @@ export const ModelsConfigSection = React.forwardRef<
   const simplifiedConfigRefs = useRef<Map<number, {save: () => Promise<void>}>>(
     new Map()
   );
+  
+  // Keep track of newly saved refs
+  const newlySavedRefs = useRef<Map<number, string>>(new Map());
 
   const addModel = useCallback(() => {
     editConfig(draft => {
@@ -424,8 +442,9 @@ export const ModelsConfigSection = React.forwardRef<
       editConfig(draft => {
         draft.models.splice(modelNdx, 1);
       });
-      // Clean up ref
+      // Clean up refs
       simplifiedConfigRefs.current.delete(modelNdx);
+      newlySavedRefs.current.delete(modelNdx);
     },
     [editConfig]
   );
@@ -457,6 +476,10 @@ export const ModelsConfigSection = React.forwardRef<
         project,
         simplifiedConfig
       );
+      // Store the newly saved ref
+      if (modelRef) {
+        newlySavedRefs.current.set(modelNdx, modelRef);
+      }
       updateModelRef(modelNdx, modelRef);
       return modelRef;
     },
@@ -492,8 +515,42 @@ export const ModelsConfigSection = React.forwardRef<
 
         await Promise.all(savePromises);
       },
+      saveAllUnsavedAndGetRefs: async () => {
+        // First, wait for any pending saves
+        const savePromises: Promise<void>[] = [];
+        simplifiedConfigRefs.current.forEach(configRef => {
+          if (configRef.save) {
+            savePromises.push(configRef.save());
+          }
+        });
+        await Promise.all(savePromises);
+        
+        // Wait a tick for React to process state updates
+        await new Promise(resolve => setTimeout(resolve, 10));
+        
+        // Now get the latest config state by re-evaluating
+        const latestModels = config.models;
+        
+        // Collect all model refs, including newly saved ones
+        const allRefs: string[] = [];
+        latestModels.forEach((model, idx) => {
+          const newRef = newlySavedRefs.current.get(idx);
+          const ref = newRef || model.originalSourceRef;
+          if (ref) {
+            allRefs.push(ref);
+          }
+        });
+        
+        console.log('Collected model refs:', allRefs);
+        console.log('Newly saved refs map:', Array.from(newlySavedRefs.current.entries()));
+        
+        // Clear the newly saved refs for next time
+        newlySavedRefs.current.clear();
+        
+        return allRefs;
+      },
     }),
-    []
+    [models, config]
   );
 
   const registerSimplifiedConfigRef = useCallback(

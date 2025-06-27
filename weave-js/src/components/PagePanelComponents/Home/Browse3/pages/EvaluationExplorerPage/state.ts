@@ -40,7 +40,7 @@ User Input: {user_input}
 ---
 Expected Output: {expected_output}
 ---
-Model Output: {model_output}
+Model Output: {output}
 ---
 Is the model output correct?`,
 };

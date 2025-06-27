@@ -33,6 +33,15 @@ import {defaultScorerConfigPayload} from './state';
 import {SimplifiedLLMAsAJudgeScorer} from './types';
 import {VersionedObjectPicker} from './VersionedObjectPicker';
 
+// Helper to get valid refs from items
+const getValidRefs = <T extends {originalSourceRef: string | null}>(
+  items: T[]
+): string[] => {
+  return items
+    .filter(item => item.originalSourceRef !== null)
+    .map(item => item.originalSourceRef!);
+};
+
 const newScorerOption = {
   label: 'New Scorer',
   value: 'new-scorer',
@@ -169,7 +178,7 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
   );
 
   const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(!scorerRef); // New scorers start with unsaved changes
 
   const simplifiedScorerQuery = useSimplifiedScorer(
     entity,
@@ -233,6 +242,7 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
     handleSave,
     onRegisterSave,
     onUnregisterSave,
+    config.llmModelId, // Re-evaluate when LLM is selected
   ]);
 
   // Check if this scorer qualifies for simplified config
@@ -314,6 +324,10 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
         selectFirstAvailable={true}
         onChange={(modelValue: string) => {
           updateConfig({llmModelId: modelValue});
+          // For new scorers, ensure we maintain unsaved state when auto-selecting
+          if (!scorerRef && !hasUnsavedChanges) {
+            setHasUnsavedChanges(true);
+          }
         }}
       />
       <Row style={{justifyContent: 'flex-end', gap: '8px'}}>
@@ -337,6 +351,7 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
  */
 export interface ScorersConfigSectionRef {
   saveAllUnsaved: () => Promise<void>;
+  saveAllUnsavedAndGetRefs: () => Promise<string[]>;
 }
 
 export const ScorersConfigSection = React.forwardRef<
@@ -366,6 +381,9 @@ export const ScorersConfigSection = React.forwardRef<
   const simplifiedConfigRefs = useRef<Map<number, {save: () => Promise<void>}>>(
     new Map()
   );
+  
+  // Keep track of newly saved refs
+  const newlySavedRefs = useRef<Map<number, string>>(new Map());
 
   const addScorer = useCallback(() => {
     editConfig(draft => {
@@ -397,8 +415,9 @@ export const ScorersConfigSection = React.forwardRef<
       editConfig(draft => {
         draft.evaluationDefinition.properties.scorers.splice(scorerNdx, 1);
       });
-      // Clean up ref
+      // Clean up refs
       simplifiedConfigRefs.current.delete(scorerNdx);
+      newlySavedRefs.current.delete(scorerNdx);
     },
     [editConfig]
   );
@@ -444,6 +463,10 @@ export const ScorersConfigSection = React.forwardRef<
         project,
         simplifiedConfig
       );
+      // Store the newly saved ref
+      if (scorerRef) {
+        newlySavedRefs.current.set(scorerNdx, scorerRef);
+      }
       updateScorerRef(scorerNdx, scorerRef);
       return scorerRef;
     },
@@ -481,8 +504,42 @@ export const ScorersConfigSection = React.forwardRef<
 
         await Promise.all(savePromises);
       },
+      saveAllUnsavedAndGetRefs: async () => {
+        // First, wait for any pending saves
+        const savePromises: Promise<void>[] = [];
+        simplifiedConfigRefs.current.forEach(configRef => {
+          if (configRef.save) {
+            savePromises.push(configRef.save());
+          }
+        });
+        await Promise.all(savePromises);
+        
+        // Wait a tick for React to process state updates
+        await new Promise(resolve => setTimeout(resolve, 10));
+        
+        // Now get the latest config state by re-evaluating
+        const latestScorers = config.evaluationDefinition.properties.scorers;
+        
+        // Collect all scorer refs, including newly saved ones
+        const allRefs: string[] = [];
+        latestScorers.forEach((scorer, idx) => {
+          const newRef = newlySavedRefs.current.get(idx);
+          const ref = newRef || scorer.originalSourceRef;
+          if (ref) {
+            allRefs.push(ref);
+          }
+        });
+        
+        console.log('Collected scorer refs:', allRefs);
+        console.log('Newly saved refs map:', Array.from(newlySavedRefs.current.entries()));
+        
+        // Clear the newly saved refs for next time
+        newlySavedRefs.current.clear();
+        
+        return allRefs;
+      },
     }),
-    []
+    [scorers, config]
   );
 
   const registerSimplifiedConfigRef = useCallback(

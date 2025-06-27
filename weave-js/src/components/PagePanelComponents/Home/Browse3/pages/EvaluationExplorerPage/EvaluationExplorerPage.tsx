@@ -127,92 +127,107 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
 
   // Validation logic for enabling the "Run eval" button
   const isRunEvalEnabled = useMemo(() => {
-    const {evaluationDefinition, models} = config;
-
-    // Check required text fields
-    if (!evaluationDefinition.properties.name.trim()) {
-      return false;
-    }
-
-    // Check dataset is selected
-    if (!evaluationDefinition.properties.dataset.originalSourceRef) {
-      return false;
-    }
-
-    // Check at least one scorer is configured
-    const validScorers = getValidRefs(evaluationDefinition.properties.scorers);
-    if (validScorers.length === 0) {
-      return false;
-    }
-
-    // Check at least one model is configured
-    const validModels = getValidRefs(models);
-    if (validModels.length === 0) {
-      return false;
-    }
-
     return true;
-  }, [config]);
+    // const {evaluationDefinition, models} = config;
+
+    // // Check required text fields
+    // if (!evaluationDefinition.properties.name.trim()) {
+    //   return false;
+    // }
+
+    // // Check dataset is selected
+    // if (!evaluationDefinition.properties.dataset.originalSourceRef) {
+    //   return false;
+    // }
+
+    // // Check at least one scorer is configured
+    // const validScorers = getValidRefs(evaluationDefinition.properties.scorers);
+    // if (validScorers.length === 0) {
+    //   return false;
+    // }
+
+    // // Check at least one model is configured
+    // const validModels = getValidRefs(models);
+    // if (validModels.length === 0) {
+    //   return false;
+    // }
+
+    // return true;
+  }, []);
 
   /**
    * Main evaluation execution handler.
    * Creates the evaluation object and runs it with the configured models.
    */
-  const handleRunEval = useCallback(async () => {
-    if (!isRunEvalEnabled || isRunning) {
-      return;
-    }
+  const handleRunEval = useCallback(
+    async (scorerRefs?: string[], modelRefs?: string[]) => {
+      if (!isRunEvalEnabled || isRunning) {
+        return;
+      }
 
-    setIsRunning(true);
-    setEvaluationResults(null); // Clear any previous results
+      setIsRunning(true);
+      setEvaluationResults(null); // Clear any previous results
 
-    try {
-      const client = getClient();
-      const {evaluationDefinition, models} = config;
+      try {
+        const client = getClient();
+        const {evaluationDefinition, models} = config;
 
-      // Extract valid refs from configuration
-      const scorerRefs = getValidRefs(evaluationDefinition.properties.scorers);
-      const modelRefs = getValidRefs(models);
+        // Use provided refs or extract from current configuration
+        const finalScorerRefs =
+          scorerRefs ?? getValidRefs(evaluationDefinition.properties.scorers);
+        const finalModelRefs = modelRefs ?? getValidRefs(models);
 
-      // Create the evaluation object
-      const evaluationRef = await createEvaluation(client, entity, project, {
-        name: sanitizeObjectId(evaluationDefinition.properties.name),
-        description: evaluationDefinition.properties.description,
-        datasetRef: evaluationDefinition.properties.dataset.originalSourceRef!,
-        scorerRefs,
-      });
+        console.log('Creating evaluation with:');
+        console.log('- Scorer refs:', finalScorerRefs);
+        console.log('- Model refs:', finalModelRefs);
+        console.log('- Dataset ref:', evaluationDefinition.properties.dataset.originalSourceRef);
 
-      // Update the config with the created evaluation ref
-      editConfig(draft => {
-        draft.evaluationDefinition.originalSourceRef = evaluationRef;
-      });
+        if (!evaluationDefinition.properties.dataset.originalSourceRef) {
+          throw new Error('Dataset ref is required but was not found');
+        }
 
-      // Execute the evaluation
-      const results = await runEvaluation(
-        client,
-        entity,
-        project,
-        evaluationRef,
-        modelRefs
-      );
+        // Create the evaluation object
+        const evaluationRef = await createEvaluation(client, entity, project, {
+          name: sanitizeObjectId(evaluationDefinition.properties.name),
+          description: evaluationDefinition.properties.description,
+          datasetRef:
+            evaluationDefinition.properties.dataset.originalSourceRef,
+          scorerRefs: finalScorerRefs,
+        });
 
-      console.log('Evaluation completed:', results);
-      setEvaluationResults(results);
-    } catch (error) {
-      console.error('Failed to run evaluation:', error);
-      // TODO: Add proper error handling/display
-    } finally {
-      setIsRunning(false);
-    }
-  }, [
-    config,
-    entity,
-    project,
-    isRunEvalEnabled,
-    isRunning,
-    getClient,
-    editConfig,
-  ]);
+        // Update the config with the created evaluation ref
+        await editConfig(draft => {
+          draft.evaluationDefinition.originalSourceRef = evaluationRef;
+        });
+
+        // Execute the evaluation
+        const results = await runEvaluation(
+          client,
+          entity,
+          project,
+          evaluationRef,
+          finalModelRefs
+        );
+
+        console.log('Evaluation completed:', results);
+        setEvaluationResults(results);
+      } catch (error) {
+        console.error('Failed to run evaluation:', error);
+        // TODO: Add proper error handling/display
+      } finally {
+        setIsRunning(false);
+      }
+    },
+    [
+      config,
+      entity,
+      project,
+      isRunEvalEnabled,
+      isRunning,
+      getClient,
+      editConfig,
+    ]
+  );
 
   return (
     <Row>
@@ -309,7 +324,7 @@ const ConfigPanel: React.FC<{
   touchedFields: {name: boolean; description: boolean};
   markFieldTouched: (field: 'name' | 'description') => void;
   isRunEvalEnabled: boolean;
-  handleRunEval: () => Promise<void>;
+  handleRunEval: (scorerRefs?: string[], modelRefs?: string[]) => Promise<void>;
 }> = ({
   entity,
   project,
@@ -324,31 +339,52 @@ const ConfigPanel: React.FC<{
   const [showEvaluationPicker, setShowEvaluationPicker] = useState(false);
 
   // Refs for config sections to save unsaved changes
-  const scorersConfigRef = useRef<{saveAllUnsaved: () => Promise<void>} | null>(
-    null
-  );
-  const modelsConfigRef = useRef<{saveAllUnsaved: () => Promise<void>} | null>(
-    null
-  );
+  const scorersConfigRef = useRef<{
+    saveAllUnsaved: () => Promise<void>;
+    saveAllUnsavedAndGetRefs: () => Promise<string[]>;
+  } | null>(null);
+  const modelsConfigRef = useRef<{
+    saveAllUnsaved: () => Promise<void>;
+    saveAllUnsavedAndGetRefs: () => Promise<string[]>;
+  } | null>(null);
 
   // Wrap handleRunEval to save all unsaved changes first
   const handleRunEvalWithSave = useCallback(async () => {
-    // Save all unsaved changes first
-    const savePromises: Promise<void>[] = [];
+    console.log('handleRunEvalWithSave called');
+    console.log('scorersConfigRef.current:', scorersConfigRef.current);
+    console.log('modelsConfigRef.current:', modelsConfigRef.current);
+    
+    // Save all unsaved changes and get fresh refs
+    const promises: {
+      scorerRefs?: Promise<string[]>;
+      modelRefs?: Promise<string[]>;
+    } = {};
 
-    if (scorersConfigRef.current?.saveAllUnsaved) {
-      savePromises.push(scorersConfigRef.current.saveAllUnsaved());
+    if (scorersConfigRef.current?.saveAllUnsavedAndGetRefs) {
+      console.log('Calling saveAllUnsavedAndGetRefs for scorers');
+      promises.scorerRefs = scorersConfigRef.current.saveAllUnsavedAndGetRefs();
+    } else {
+      console.log('No saveAllUnsavedAndGetRefs for scorers');
     }
 
-    if (modelsConfigRef.current?.saveAllUnsaved) {
-      savePromises.push(modelsConfigRef.current.saveAllUnsaved());
+    if (modelsConfigRef.current?.saveAllUnsavedAndGetRefs) {
+      console.log('Calling saveAllUnsavedAndGetRefs for models');
+      promises.modelRefs = modelsConfigRef.current.saveAllUnsavedAndGetRefs();
+    } else {
+      console.log('No saveAllUnsavedAndGetRefs for models');
     }
 
-    // Wait for all saves to complete
-    await Promise.all(savePromises);
+    // Wait for all saves to complete and get the fresh refs
+    const [freshScorerRefs, freshModelRefs] = await Promise.all([
+      promises.scorerRefs || Promise.resolve(undefined),
+      promises.modelRefs || Promise.resolve(undefined),
+    ]);
 
-    // Then run the evaluation
-    await handleRunEval();
+    console.log('Fresh scorer refs:', freshScorerRefs);
+    console.log('Fresh model refs:', freshModelRefs);
+
+    // Run the evaluation with the fresh refs
+    await handleRunEval(freshScorerRefs, freshModelRefs);
   }, [handleRunEval]);
 
   return (

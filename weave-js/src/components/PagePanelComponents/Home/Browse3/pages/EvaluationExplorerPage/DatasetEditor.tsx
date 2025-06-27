@@ -18,11 +18,22 @@ import {useDatasetSaving} from '../../datasets/useDatasetSaving';
 import {HEADER_HEIGHT_PX} from './constants';
 import {clientBound, hookify} from './hooks';
 import {getObjByRef} from './query';
+import {defaultScorerConfigPayload} from './state';
 
-const dummyRow = {
-  user_input: 'Hello, how are you?',
-  expected_output: "I'm good, thank you!",
-};
+const initializationRows = [
+  {
+    user_input: 'Hello, how are you?',
+    expected_output: "I'm good, thank you!",
+  },
+  {
+    user_input: 'What is the capital of France?',
+    expected_output: 'Paris',
+  },
+  {
+    user_input: 'What are you?',
+    expected_output: 'I am a helpful AI assistant.',
+  },
+];
 
 export const NewDatasetEditor = ({
   entity,
@@ -59,7 +70,7 @@ const NewEmptyDatasetEditorInner = () => {
 
   useEffect(() => {
     if (!parsedData) {
-      initializeDataset([dummyRow]);
+      initializeDataset(initializationRows);
     }
   }, [initializeDataset, parsedData]);
 
