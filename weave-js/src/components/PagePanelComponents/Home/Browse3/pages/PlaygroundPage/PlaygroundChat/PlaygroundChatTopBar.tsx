@@ -195,6 +195,9 @@ export const PlaygroundChatTopBar: React.FC<PlaygroundChatTopBarProps> = ({
           llmDropdownOptions={llmDropdownOptions}
           areProvidersLoading={areProvidersLoading}
           customProvidersResult={customProvidersResult}
+          direction={{horizontal: 'right'}}
+          selectFirstAvailable={true}
+          className="w-[300px]"
         />
         {playgroundStates[idx].traceCall?.id && (
           <CopyableId id={playgroundStates[idx]!.traceCall!.id!} type="Call" />
