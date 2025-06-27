@@ -221,7 +221,7 @@ class ScoreLogger(BaseModel):
 
     def finish(self) -> None:
         if self._has_finished:
-            logger.warn("(NO-OP): Already called finish, returning.")
+            logger.warning("(NO-OP): Already called finish, returning.")
             return
 
         scores = self._captured_scores
@@ -529,7 +529,7 @@ class EvaluationLogger(BaseModel):
         the evaluation, meaning no more predictions or scores can be logged.
         """
         if self._is_finalized:
-            logger.warn("(NO-OP): Evaluation already finalized, cannot log summary.")
+            logger.warning("(NO-OP): Evaluation already finalized, cannot log summary.")
             return
 
         if summary is None:
