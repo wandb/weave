@@ -353,10 +353,10 @@ class OrderField(BaseModel):
         else:
             options = [(None, self.direction)]
         res = ""
-        for index, (cast, direction) in enumerate(options):
+        for index, (cast_to, direction) in enumerate(options):
             if index > 0:
                 res += ", "
-            res += f"{self.field.as_sql(pb, table_alias, cast)} {direction}"
+            res += f"{self.field.as_sql(pb, table_alias, cast_to)} {direction}"
         return res
 
 
