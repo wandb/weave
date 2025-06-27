@@ -77,66 +77,17 @@ export const CompareGrid = ({
       ...(baselineEnabled ? [objectIds[0]] : []),
     ],
   };
-  const columns: GridColDef[] = [];
-  if (mode === 'unified' && objectIds.length === 2) {
-    columns.push({
-      field: 'value',
-      headerName: 'Value',
-      flex: 1,
-      display: 'flex',
-      sortable: false,
-      renderCell: cellParams => {
-        const objId = objectIds[1];
-        const compareIdx = baselineEnabled
-          ? 0
-          : Math.max(0, objectIds.indexOf(objId) - 1);
-        const compareId = objectIds[compareIdx];
-        const compareValue = cellParams.row.values[compareId];
-        const compareValueType = cellParams.row.types[compareId];
-        const value = cellParams.row.values[objId];
-        const valueType = cellParams.row.types[objId];
-        const rowChangeType = cellParams.row.changeType;
-        return (
-          <div className="w-full p-8">
-            <CompareGridCell
-              path={cellParams.row.path}
-              displayType="both"
-              value={value}
-              valueType={valueType}
-              compareValue={compareValue}
-              compareValueType={compareValueType}
-              rowChangeType={rowChangeType}
-            />
-          </div>
-        );
-      },
-    });
-  } else {
-    const versionCols: GridColDef[] = objectIds
-      .slice(0, MAX_OBJECT_COLS)
-      .map(objId => ({
-        field: objId,
-        headerName: objId,
+  const columns: GridColDef[] = useMemo(() => {
+    const columns: GridColDef[] = [];
+    if (mode === 'unified' && objectIds.length === 2) {
+      columns.push({
+        field: 'value',
+        headerName: 'Value',
         flex: 1,
         display: 'flex',
-        width: 500,
         sortable: false,
-        valueGetter: (unused: any, row: any) => {
-          return row.values[objId];
-        },
-        renderHeader: (params: any) => {
-          if (objectType === 'call') {
-            // TODO: Make this a peek drawer link
-            return objId;
-          }
-          const idx = objectIds.indexOf(objId);
-          const objVersion = objects[idx];
-          const objRef = objectVersionSchemaToRef(
-            objVersion as ObjectVersionSchema
-          );
-          return <SmallRef objRef={objRef} />;
-        },
-        renderCell: (cellParams: any) => {
+        renderCell: cellParams => {
+          const objId = objectIds[1];
           const compareIdx = baselineEnabled
             ? 0
             : Math.max(0, objectIds.indexOf(objId) - 1);
@@ -150,7 +101,7 @@ export const CompareGrid = ({
             <div className="w-full p-8">
               <CompareGridCell
                 path={cellParams.row.path}
-                displayType="diff"
+                displayType="both"
                 value={value}
                 valueType={valueType}
                 compareValue={compareValue}
@@ -160,9 +111,61 @@ export const CompareGrid = ({
             </div>
           );
         },
-      }));
-    columns.push(...versionCols);
-  }
+      });
+    } else {
+      const versionCols: GridColDef[] = objectIds
+        .slice(0, MAX_OBJECT_COLS)
+        .map(objId => ({
+          field: objId,
+          headerName: objId,
+          flex: 1,
+          display: 'flex',
+          width: 500,
+          sortable: false,
+          valueGetter: (unused: any, row: any) => {
+            return row.values[objId];
+          },
+          renderHeader: (params: any) => {
+            if (objectType === 'call') {
+              // TODO: Make this a peek drawer link
+              return objId;
+            }
+            const idx = objectIds.indexOf(objId);
+            const objVersion = objects[idx];
+            const objRef = objectVersionSchemaToRef(
+              objVersion as ObjectVersionSchema
+            );
+            return <SmallRef objRef={objRef} />;
+          },
+          renderCell: (cellParams: any) => {
+            const compareIdx = baselineEnabled
+              ? 0
+              : Math.max(0, objectIds.indexOf(objId) - 1);
+            const compareId = objectIds[compareIdx];
+            const compareValue = cellParams.row.values[compareId];
+            const compareValueType = cellParams.row.types[compareId];
+            const value = cellParams.row.values[objId];
+            const valueType = cellParams.row.types[objId];
+            const rowChangeType = cellParams.row.changeType;
+            return (
+              <div className="w-full p-8">
+                <CompareGridCell
+                  path={cellParams.row.path}
+                  displayType="diff"
+                  value={value}
+                  valueType={valueType}
+                  compareValue={compareValue}
+                  compareValueType={compareValueType}
+                  rowChangeType={rowChangeType}
+                />
+              </div>
+            );
+          },
+        }));
+      columns.push(...versionCols);
+    }
+    return columns;
+  }, [baselineEnabled, mode, objectIds, objectType, objects]);
 
   const groupingColDef: DataGridProProps['groupingColDef'] = useMemo(
     () => ({
