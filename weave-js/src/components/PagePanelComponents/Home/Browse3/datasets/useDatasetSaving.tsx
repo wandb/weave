@@ -65,15 +65,15 @@ export const useDatasetSaving = ({
 
         // Show success message with link to the new dataset
         if (showToast) {
-        toast(
-          <DatasetPublishToast
-            message={'Dataset created successfully!'}
-            url={result.url}
-          />,
-          {
-            position: 'top-right',
-            autoClose: 5000,
-            hideProgressBar: true,
+          toast(
+            <DatasetPublishToast
+              message={'Dataset created successfully!'}
+              url={result.url}
+            />,
+            {
+              position: 'top-right',
+              autoClose: 5000,
+              hideProgressBar: true,
               closeOnClick: true,
               pauseOnHover: true,
             }

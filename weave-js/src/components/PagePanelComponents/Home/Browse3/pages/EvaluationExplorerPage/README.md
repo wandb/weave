@@ -16,17 +16,20 @@ The EvaluationExplorerPage provides an interactive interface for building and ru
   - Supports creating new datasets (from scratch or file upload)
   - Integrates with VersionedObjectPicker for dataset selection
 - **`ModelsConfigSection.tsx`**: UI for managing models to evaluate
-  - Allows adding multiple models with version selection
-  - Uses ModelRow component for optimized rendering
+  - Inline simplified configuration for basic LLM models
+  - Advanced configuration drawer for complex models
+  - Individual save buttons with state tracking
 - **`ScorersConfigSection.tsx`**: UI for configuring evaluation scorers
-  - Supports LLM-as-a-Judge scorers
-  - Uses ScorerRow component for optimized rendering
+  - Inline simplified configuration for LLM-as-a-Judge scorers
+  - Advanced configuration drawer for complex scorers
+  - Individual save buttons with state tracking
 - **`EvaluationConfigSection.tsx`**: Evaluation picker for loading previous evaluations
 
 ### Supporting Components
 - **`DatasetEditor.tsx`**: Components for creating and editing datasets
   - `NewDatasetEditor`: Create datasets from scratch or upload files
-  - `ExistingDatasetEditor`: View and edit existing datasets
+  - `ExistingDatasetEditor`: View and edit existing datasets with save functionality
+  - Returns updated dataset refs when saving changes
 - **`VersionedObjectPicker.tsx`**: Unified component for selecting versioned objects
   - Two-level selection: object → version
   - Shows version labels (latest, v1, v2) with commit hashes
@@ -56,6 +59,8 @@ The EvaluationExplorerPage provides an interactive interface for building and ru
   - `getObjByRef`: Loads a specific object by its reference
   - `createEvaluation`: Creates new evaluation in Weave
   - `runEvaluation`: Executes evaluation against models
+  - `publishSimplifiedLLMStructuredCompletionModel`: Saves simplified model configs
+  - `publishSimplifiedLLMAsAJudgeScorer`: Saves simplified scorer configs
 
 ## Architecture
 
@@ -66,17 +71,43 @@ The page follows a modular architecture:
    - Evaluation definition (name, description, dataset, scorers)
    - Models array separate from evaluation (model-agnostic evaluations)
    - Lazy references with version tracking
-3. **Validation System**:
+3. **Save Pattern**:
+   - Each component manages its own save state
+   - Save buttons appear inline next to each configuration
+   - Parent tracks save handlers for batch operations
+   - Fresh refs passed directly to avoid stale closures
+4. **Validation System**:
    - Field-level validation (shows errors after blur)
    - Section-level validation (always visible)
    - Required field indicators
    - Comprehensive error/warning/info messaging
-4. **Performance Optimizations**:
+5. **Performance Optimizations**:
    - Memoized callbacks for object pickers
    - Separate row components to prevent unnecessary re-renders
    - Lazy loading with Weave refs
 
 ## Key Features
+
+### Simplified Inline Configuration
+Models and scorers support inline configuration for simple cases:
+- **Models**: Name, system prompt, and LLM selection
+- **Scorers**: Name, prompt, score type (boolean/number), and LLM selection
+- Save buttons appear when changes are made
+- Advanced settings available for complex configurations
+
+### Save-All Functionality
+The "Run eval" button automatically saves all unsaved changes:
+1. Saves dataset if editing
+2. Saves all unsaved models and scorers in parallel
+3. Passes fresh refs directly to evaluation to avoid stale closures
+4. Updates UI with new refs after saving
+
+### Dataset Version Management
+When editing existing datasets:
+- Creates new dataset version on save
+- Returns updated ref with new digest
+- UI automatically updates to show new version
+- Evaluation uses latest saved version
 
 ### Form Validation
 The UI provides comprehensive validation feedback:
@@ -95,10 +126,11 @@ The `VersionedObjectPicker` provides sophisticated object selection:
 ### Evaluation Running
 Complete workflow for running evaluations:
 1. Validates all required fields are filled
-2. Creates evaluation object in Weave
-3. Runs evaluation against selected models
-4. Shows loading state during execution
-5. Displays results using CompareEvaluationsPageContent
+2. Saves all unsaved changes automatically
+3. Creates evaluation object in Weave
+4. Runs evaluation against selected models
+5. Shows loading state during execution
+6. Displays results using CompareEvaluationsPageContent
 
 ### Evaluation Loading
 Users can load previous evaluations:
@@ -112,16 +144,17 @@ Users can load previous evaluations:
 1. **Configuration Phase**:
    - Fill in evaluation name and description
    - Select or create a dataset
-   - Add one or more scorers
-   - Add one or more models to evaluate
+   - Add one or more scorers (with inline configuration)
+   - Add one or more models to evaluate (with inline configuration)
 
 2. **Validation**:
    - Real-time validation feedback
-   - "Run eval" button disabled until all requirements met
-   - Clear error messages guide user actions
+   - Save buttons appear when changes are made
+   - "Run eval" button tooltip indicates it will save changes
 
 3. **Execution**:
    - Click "Run eval" to start
+   - All unsaved changes are automatically saved
    - Loading state shows progress
    - Results automatically display when complete
 
@@ -137,4 +170,14 @@ Users can load previous evaluations:
 - React hooks follow naming convention: `use[Feature]`
 - Query functions wrapped with `clientBound(hookify())` pattern
 - All callbacks passed to child components are properly memoized
-- Follows TypeScript strict mode with comprehensive type safety 
+- Follows TypeScript strict mode with comprehensive type safety
+- Save handlers use Map for efficient tracking and cleanup
+- Fresh refs passed directly to avoid React closure issues
+
+## Known Limitations
+
+- Error handling needs improvement in save operations (shows console errors but no UI feedback)
+- Loading states could be more consistent across components
+- `SimplifiedModelConfig` and `SimplifiedScorerConfig` have similar structure that could be abstracted
+- Inline styles should be extracted to constants or styled components
+- Some TODO comments remain for error handling and loading states 
