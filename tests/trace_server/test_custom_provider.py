@@ -42,7 +42,7 @@ def create_provider_obj(
     provider_id: str,
     base_url: str = "https://api.example.com",
     api_key_name: str = "EXAMPLE_API_KEY",
-    extra_headers: dict = None,
+    extra_headers: dict | None = None,
     return_type: str = "openai",
 ) -> tsi.ObjSchema:
     """Create a Provider object for testing.
@@ -84,7 +84,7 @@ def create_provider_model_obj(
     project_id: str,
     provider_id: str,
     model_id: str,
-    model_name: str = None,
+    model_name: str | None = None,
     max_tokens: int = 4096,
 ) -> tsi.ObjSchema:
     """Create a ProviderModel object for testing.

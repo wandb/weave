@@ -108,7 +108,9 @@ class MCPClient:
         return result
 
     @weave.op()
-    async def get_prompt(self, prompt_name: str, arguments: dict[str, str] = None):
+    async def get_prompt(
+        self, prompt_name: str, arguments: dict[str, str] | None = None
+    ):
         """Get a prompt from the MCP server
 
         Args:
