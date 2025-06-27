@@ -1,6 +1,6 @@
 import {Button} from '@wandb/weave/components/Button';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useState, useRef} from 'react';
 
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
@@ -20,6 +20,7 @@ import {Footer} from './layout';
 import {ModelsConfigSection} from './ModelsConfigSection';
 import {createEvaluation, runEvaluation} from './query';
 import {ScorersConfigSection} from './ScorersConfigSection';
+import { sanitizeObjectId } from '../wfReactInterface/traceServerDirectClient';
 
 type EvaluationExplorerPageProps = {
   entity: string;
@@ -178,7 +179,7 @@ const EvaluationExplorerPageInner: React.FC<EvaluationExplorerPageProps> = ({
 
       // Create the evaluation object
       const evaluationRef = await createEvaluation(client, entity, project, {
-        name: evaluationDefinition.properties.name,
+        name: sanitizeObjectId(evaluationDefinition.properties.name),
         description: evaluationDefinition.properties.description,
         datasetRef: evaluationDefinition.properties.dataset.originalSourceRef!,
         scorerRefs,
@@ -326,6 +327,34 @@ const ConfigPanel: React.FC<{
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const [showEvaluationPicker, setShowEvaluationPicker] = useState(false);
 
+  // Refs for config sections to save unsaved changes
+  const scorersConfigRef = useRef<{saveAllUnsaved: () => Promise<void>} | null>(
+    null
+  );
+  const modelsConfigRef = useRef<{saveAllUnsaved: () => Promise<void>} | null>(
+    null
+  );
+
+  // Wrap handleRunEval to save all unsaved changes first
+  const handleRunEvalWithSave = useCallback(async () => {
+    // Save all unsaved changes first
+    const savePromises: Promise<void>[] = [];
+
+    if (scorersConfigRef.current?.saveAllUnsaved) {
+      savePromises.push(scorersConfigRef.current.saveAllUnsaved());
+    }
+
+    if (modelsConfigRef.current?.saveAllUnsaved) {
+      savePromises.push(modelsConfigRef.current.saveAllUnsaved());
+    }
+
+    // Wait for all saves to complete
+    await Promise.all(savePromises);
+
+    // Then run the evaluation
+    await handleRunEval();
+  }, [handleRunEval]);
+
   // Helper to get validation error messages
   const getValidationErrors = useMemo(() => {
     const errors = {
@@ -441,12 +470,14 @@ const ConfigPanel: React.FC<{
           entity={entity}
           project={project}
           error={getValidationErrors.scorers}
+          ref={scorersConfigRef}
         />
 
         <ModelsConfigSection
           entity={entity}
           project={project}
           error={getValidationErrors.models}
+          ref={modelsConfigRef}
         />
       </Column>
       <Footer>
@@ -454,7 +485,12 @@ const ConfigPanel: React.FC<{
           icon="play"
           variant="primary"
           disabled={!isRunEvalEnabled || isRunning}
-          onClick={handleRunEval}>
+          onClick={handleRunEvalWithSave}
+          tooltip={
+            isRunEvalEnabled && !isRunning
+              ? 'Saves all unsaved changes before running'
+              : undefined
+          }>
           {isRunning ? 'Running...' : 'Run eval'}
         </Button>
       </Footer>

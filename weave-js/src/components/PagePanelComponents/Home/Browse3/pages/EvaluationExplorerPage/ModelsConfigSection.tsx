@@ -2,7 +2,15 @@ import {Button} from '@wandb/weave/components/Button';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {ReusableDrawer} from '../../ReusableDrawer';
 import {
@@ -50,6 +58,8 @@ interface SimplifiedModelConfigProps {
     modelNdx: number,
     simplifiedConfig: SimplifiedLLMStructuredCompletionModel
   ) => void;
+  onRegisterSave?: (modelNdx: number, saveMethod: () => Promise<void>) => void;
+  onUnregisterSave?: (modelNdx: number) => void;
 }
 
 /**
@@ -63,6 +73,8 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
   modelNdx,
   onSaveModel,
   onOpenAdvancedSettings,
+  onRegisterSave,
+  onUnregisterSave,
 }) => {
   // Local state for the simplified form
   const [config, setConfig] = useState<SimplifiedLLMStructuredCompletionModel>({
@@ -72,6 +84,7 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const simplifiedModelQuery = useSimplifiedModel(
     entity,
@@ -83,8 +96,59 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
   useEffect(() => {
     if (modelRef && simplifiedModelQuery.data !== null) {
       setConfig(simplifiedModelQuery.data);
+      setHasUnsavedChanges(false);
     }
   }, [modelRef, simplifiedModelQuery.data]);
+
+  // Track unsaved changes
+  const updateConfig = useCallback(
+    (updates: Partial<SimplifiedLLMStructuredCompletionModel>) => {
+      setConfig(prev => ({...prev, ...updates}));
+      setHasUnsavedChanges(true);
+    },
+    []
+  );
+
+  // Validation: all fields are required
+  const isValid =
+    config.name.trim() !== '' &&
+    config.systemPrompt.trim() !== '' &&
+    config.llmModelId.trim() !== '';
+
+  const handleSave = useCallback(async () => {
+    if (!isValid || isSaving || !hasUnsavedChanges) return;
+
+    setIsSaving(true);
+    try {
+      // Save the model with current config
+      const newRef = await onSaveModel(modelNdx, config);
+      if (newRef) {
+        setHasUnsavedChanges(false);
+        // TODO: Show success message
+        console.log('Model saved with ref:', newRef);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isValid, isSaving, hasUnsavedChanges, onSaveModel, modelNdx, config]);
+
+  // Register save method when this is a new model or has unsaved changes
+  useEffect(() => {
+    if (!modelRef && onRegisterSave && hasUnsavedChanges && isValid) {
+      onRegisterSave(modelNdx, handleSave);
+      return () => {
+        onUnregisterSave?.(modelNdx);
+      };
+    }
+  }, [
+    modelNdx,
+    modelRef,
+    hasUnsavedChanges,
+    isValid,
+    handleSave,
+    onRegisterSave,
+    onUnregisterSave,
+  ]);
 
   // Check if this model qualifies for simplified config
   const qualifies = !modelRef || simplifiedModelQuery.data !== null;
@@ -113,28 +177,6 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
     );
   }
 
-  // Validation: all fields are required
-  const isValid =
-    config.name.trim() !== '' &&
-    config.systemPrompt.trim() !== '' &&
-    config.llmModelId.trim() !== '';
-
-  const handleSave = async () => {
-    if (!isValid || isSaving) return;
-
-    setIsSaving(true);
-    try {
-      // Save the model with current config
-      const newRef = await onSaveModel(modelNdx, config);
-      if (newRef) {
-        // TODO: Show success message
-        console.log('Model saved with ref:', newRef);
-      }
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
     <Column
       style={{
@@ -148,7 +190,7 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
           <TextField
             placeholder="Model name"
             value={config.name}
-            onChange={value => setConfig({...config, name: value})}
+            onChange={value => updateConfig({name: value})}
           />
         </div>
         <div style={{flex: '0 0 140px'}}>
@@ -159,7 +201,7 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
             isTeamAdmin={false}
             direction={{horizontal: 'left'}}
             onChange={(modelValue: string) => {
-              setConfig({...config, llmModelId: modelValue});
+              updateConfig({llmModelId: modelValue});
             }}
           />
         </div>
@@ -168,7 +210,7 @@ const SimplifiedModelConfig: React.FC<SimplifiedModelConfigProps> = ({
         <TextArea
           placeholder="Enter the system prompt (e.g., 'You are a helpful assistant that...')"
           value={config.systemPrompt}
-          onChange={e => setConfig({...config, systemPrompt: e.target.value})}
+          onChange={e => updateConfig({systemPrompt: e.target.value})}
           rows={3}
           style={{width: '100%'}}
         />
@@ -251,6 +293,8 @@ const ModelRow: React.FC<{
     modelNdx: number,
     simplifiedConfig: SimplifiedLLMStructuredCompletionModel
   ) => Promise<string | null>;
+  onRegisterSave: (modelNdx: number, saveMethod: () => Promise<void>) => void;
+  onUnregisterSave: (modelNdx: number) => void;
 }> = ({
   entity,
   project,
@@ -261,6 +305,8 @@ const ModelRow: React.FC<{
   setCurrentlyEditingModelNdx,
   modelRefsQuery,
   onSaveModel,
+  onRegisterSave,
+  onUnregisterSave,
 }) => {
   const handleRefChange = useCallback(
     (ref: string | null) => {
@@ -310,6 +356,8 @@ const ModelRow: React.FC<{
         modelNdx={modelNdx}
         onSaveModel={onSaveModel}
         onOpenAdvancedSettings={setCurrentlyEditingModelNdx}
+        onRegisterSave={onRegisterSave}
+        onUnregisterSave={onUnregisterSave}
       />
     </Column>
   );
@@ -319,11 +367,18 @@ const ModelRow: React.FC<{
  * Configuration section for managing models in the evaluation.
  * Allows users to add, edit, and remove models that will be evaluated.
  */
-export const ModelsConfigSection: React.FC<{
-  entity: string;
-  project: string;
-  error?: string;
-}> = ({entity, project, error}) => {
+export interface ModelsConfigSectionRef {
+  saveAllUnsaved: () => Promise<void>;
+}
+
+export const ModelsConfigSection = React.forwardRef<
+  ModelsConfigSectionRef,
+  {
+    entity: string;
+    project: string;
+    error?: string;
+  }
+>(({entity, project, error}, ref) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const modelRefsQuery = useLatestModelRefs(entity, project);
 
@@ -336,6 +391,11 @@ export const ModelsConfigSection: React.FC<{
   }, [config]);
 
   const client = useGetTraceServerClientContext()();
+
+  // Keep track of simplified config forms
+  const simplifiedConfigRefs = useRef<Map<number, {save: () => Promise<void>}>>(
+    new Map()
+  );
 
   const addModel = useCallback(() => {
     editConfig(draft => {
@@ -367,6 +427,8 @@ export const ModelsConfigSection: React.FC<{
       editConfig(draft => {
         draft.models.splice(modelNdx, 1);
       });
+      // Clean up ref
+      simplifiedConfigRefs.current.delete(modelNdx);
     },
     [editConfig]
   );
@@ -417,6 +479,37 @@ export const ModelsConfigSection: React.FC<{
     []
   );
 
+  // Expose save all method via ref
+  useImperativeHandle(
+    ref,
+    () => ({
+      saveAllUnsaved: async () => {
+        const savePromises: Promise<void>[] = [];
+
+        // Save all unsaved simplified configs
+        simplifiedConfigRefs.current.forEach(configRef => {
+          if (configRef.save) {
+            savePromises.push(configRef.save());
+          }
+        });
+
+        await Promise.all(savePromises);
+      },
+    }),
+    []
+  );
+
+  const registerSimplifiedConfigRef = useCallback(
+    (modelNdx: number, saveMethod: () => Promise<void>) => {
+      simplifiedConfigRefs.current.set(modelNdx, {save: saveMethod});
+    },
+    []
+  );
+
+  const unregisterSimplifiedConfigRef = useCallback((modelNdx: number) => {
+    simplifiedConfigRefs.current.delete(modelNdx);
+  }, []);
+
   return (
     <ConfigSection
       title="Models"
@@ -464,6 +557,8 @@ export const ModelsConfigSection: React.FC<{
               setCurrentlyEditingModelNdx={handleOpenAdvancedSettings}
               modelRefsQuery={modelRefsQuery}
               onSaveModel={saveModel}
+              onRegisterSave={registerSimplifiedConfigRef}
+              onUnregisterSave={unregisterSimplifiedConfigRef}
             />
           );
         })}
@@ -490,4 +585,4 @@ export const ModelsConfigSection: React.FC<{
       </Column>
     </ConfigSection>
   );
-};
+});

@@ -3,7 +3,14 @@ import {Select} from '@wandb/weave/components/Form/Select';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {ReusableDrawer} from '../../ReusableDrawer';
 import {ScorerFormRef} from '../MonitorsPage/MonitorFormDrawer';
@@ -54,6 +61,8 @@ const ScorerRow: React.FC<{
     scorerNdx: number,
     simplifiedConfig: SimplifiedLLMAsAJudgeScorer
   ) => Promise<string | null>;
+  onRegisterSave: (scorerNdx: number, saveMethod: () => Promise<void>) => void;
+  onUnregisterSave: (scorerNdx: number) => void;
 }> = ({
   entity,
   project,
@@ -64,6 +73,8 @@ const ScorerRow: React.FC<{
   setCurrentlyEditingScorerNdx,
   scorerRefsQuery,
   onSaveScorer,
+  onRegisterSave,
+  onUnregisterSave,
 }) => {
   const handleRefChange = useCallback(
     (ref: string | null) => {
@@ -113,6 +124,8 @@ const ScorerRow: React.FC<{
         scorerNdx={scorerNdx}
         onSaveScorer={onSaveScorer}
         onOpenAdvancedSettings={setCurrentlyEditingScorerNdx}
+        onRegisterSave={onRegisterSave}
+        onUnregisterSave={onUnregisterSave}
       />
     </Column>
   );
@@ -131,6 +144,8 @@ interface SimplifiedScorerConfigProps {
     scorerNdx: number,
     simplifiedConfig: SimplifiedLLMAsAJudgeScorer
   ) => void;
+  onRegisterSave?: (scorerNdx: number, saveMethod: () => Promise<void>) => void;
+  onUnregisterSave?: (scorerNdx: number) => void;
 }
 
 /**
@@ -144,6 +159,8 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
   scorerNdx,
   onSaveScorer,
   onOpenAdvancedSettings,
+  onRegisterSave,
+  onUnregisterSave,
 }) => {
   // Local state for the simplified form
   const [config, setConfig] = useState<SimplifiedLLMAsAJudgeScorer>({
@@ -154,6 +171,7 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const simplifiedScorerQuery = useSimplifiedScorer(
     entity,
@@ -165,8 +183,59 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
   useEffect(() => {
     if (scorerRef && simplifiedScorerQuery.data !== null) {
       setConfig(simplifiedScorerQuery.data);
+      setHasUnsavedChanges(false);
     }
   }, [scorerRef, simplifiedScorerQuery.data]);
+
+  // Track unsaved changes
+  const updateConfig = useCallback(
+    (updates: Partial<SimplifiedLLMAsAJudgeScorer>) => {
+      setConfig(prev => ({...prev, ...updates}));
+      setHasUnsavedChanges(true);
+    },
+    []
+  );
+
+  // Validation: name and prompt are required, LLM is automatically selected
+  const isValid =
+    config.name.trim() !== '' &&
+    config.prompt.trim() !== '' &&
+    config.llmModelId.trim() !== '';
+
+  const handleSave = useCallback(async () => {
+    if (!isValid || isSaving || !hasUnsavedChanges) return;
+
+    setIsSaving(true);
+    try {
+      // Save the scorer with current config
+      const newRef = await onSaveScorer(scorerNdx, config);
+      if (newRef) {
+        setHasUnsavedChanges(false);
+        // TODO: Show success message
+        console.log('Scorer saved with ref:', newRef);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isValid, isSaving, hasUnsavedChanges, onSaveScorer, scorerNdx, config]);
+
+  // Register save method when this is a new scorer or has unsaved changes
+  useEffect(() => {
+    if (!scorerRef && onRegisterSave && hasUnsavedChanges && isValid) {
+      onRegisterSave(scorerNdx, handleSave);
+      return () => {
+        onUnregisterSave?.(scorerNdx);
+      };
+    }
+  }, [
+    scorerNdx,
+    scorerRef,
+    hasUnsavedChanges,
+    isValid,
+    handleSave,
+    onRegisterSave,
+    onUnregisterSave,
+  ]);
 
   // Check if this scorer qualifies for simplified config
   const qualifies = !scorerRef || simplifiedScorerQuery.data !== null;
@@ -195,28 +264,6 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
     );
   }
 
-  // Validation: name and prompt are required, LLM is automatically selected
-  const isValid =
-    config.name.trim() !== '' &&
-    config.prompt.trim() !== '' &&
-    config.llmModelId.trim() !== '';
-
-  const handleSave = async () => {
-    if (!isValid || isSaving) return;
-
-    setIsSaving(true);
-    try {
-      // Save the scorer with current config
-      const newRef = await onSaveScorer(scorerNdx, config);
-      if (newRef) {
-        // TODO: Show success message
-        console.log('Scorer saved with ref:', newRef);
-      }
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
     <Column
       style={{
@@ -230,7 +277,7 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
           <TextField
             placeholder="Scorer name"
             value={config.name}
-            onChange={value => setConfig({...config, name: value})}
+            onChange={value => updateConfig({name: value})}
           />
         </div>
         <div style={{flex: '0 0 120px'}}>
@@ -244,8 +291,7 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
               {label: 'Number', value: 'number'},
             ]}
             onChange={option =>
-              setConfig({
-                ...config,
+              updateConfig({
                 scoreType: option?.value as 'boolean' | 'number',
               })
             }
@@ -259,7 +305,7 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
             isTeamAdmin={false}
             direction={{horizontal: 'left'}}
             onChange={(modelValue: string) => {
-              setConfig({...config, llmModelId: modelValue});
+              updateConfig({llmModelId: modelValue});
             }}
           />
         </div>
@@ -268,7 +314,7 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
         <TextArea
           placeholder="Enter the scoring prompt (e.g., 'Is the response helpful and accurate?')"
           value={config.prompt}
-          onChange={e => setConfig({...config, prompt: e.target.value})}
+          onChange={e => updateConfig({prompt: e.target.value})}
           rows={3}
           style={{width: '100%'}}
         />
@@ -292,11 +338,18 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
  * Manages the list of scorers with simplified inline configuration
  * and advanced configuration drawer for complex scorers.
  */
-export const ScorersConfigSection: React.FC<{
-  entity: string;
-  project: string;
-  error?: string;
-}> = ({entity, project, error}) => {
+export interface ScorersConfigSectionRef {
+  saveAllUnsaved: () => Promise<void>;
+}
+
+export const ScorersConfigSection = React.forwardRef<
+  ScorersConfigSectionRef,
+  {
+    entity: string;
+    project: string;
+    error?: string;
+  }
+>(({entity, project, error}, ref) => {
   const {config, editConfig} = useEvaluationExplorerPageContext();
   const scorerRefsQuery = useLatestScorerRefs(entity, project);
 
@@ -311,6 +364,11 @@ export const ScorersConfigSection: React.FC<{
   const scorers = useMemo(() => {
     return config.evaluationDefinition.properties.scorers;
   }, [config]);
+
+  // Keep track of simplified config forms
+  const simplifiedConfigRefs = useRef<Map<number, {save: () => Promise<void>}>>(
+    new Map()
+  );
 
   const addScorer = useCallback(() => {
     editConfig(draft => {
@@ -342,6 +400,8 @@ export const ScorersConfigSection: React.FC<{
       editConfig(draft => {
         draft.evaluationDefinition.properties.scorers.splice(scorerNdx, 1);
       });
+      // Clean up ref
+      simplifiedConfigRefs.current.delete(scorerNdx);
     },
     [editConfig]
   );
@@ -414,6 +474,37 @@ export const ScorersConfigSection: React.FC<{
     []
   );
 
+  // Expose save all method via ref
+  useImperativeHandle(
+    ref,
+    () => ({
+      saveAllUnsaved: async () => {
+        const savePromises: Promise<void>[] = [];
+
+        // Save all unsaved simplified configs
+        simplifiedConfigRefs.current.forEach(configRef => {
+          if (configRef.save) {
+            savePromises.push(configRef.save());
+          }
+        });
+
+        await Promise.all(savePromises);
+      },
+    }),
+    []
+  );
+
+  const registerSimplifiedConfigRef = useCallback(
+    (scorerNdx: number, saveMethod: () => Promise<void>) => {
+      simplifiedConfigRefs.current.set(scorerNdx, {save: saveMethod});
+    },
+    []
+  );
+
+  const unregisterSimplifiedConfigRef = useCallback((scorerNdx: number) => {
+    simplifiedConfigRefs.current.delete(scorerNdx);
+  }, []);
+
   return (
     <ConfigSection
       title="Scorers"
@@ -461,6 +552,8 @@ export const ScorersConfigSection: React.FC<{
               setCurrentlyEditingScorerNdx={handleOpenAdvancedSettings}
               scorerRefsQuery={scorerRefsQuery}
               onSaveScorer={saveScorer}
+              onRegisterSave={registerSimplifiedConfigRef}
+              onUnregisterSave={unregisterSimplifiedConfigRef}
             />
           );
         })}
@@ -490,7 +583,7 @@ export const ScorersConfigSection: React.FC<{
       </Column>
     </ConfigSection>
   );
-};
+});
 
 const emptyScorer = (entity: string, project: string): ObjectVersionSchema => ({
   scheme: 'weave',
