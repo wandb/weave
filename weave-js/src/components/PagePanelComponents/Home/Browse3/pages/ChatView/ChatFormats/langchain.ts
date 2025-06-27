@@ -176,14 +176,12 @@ const getLangchainMessageRole = (lcMessage: LangchainMessage): string => {
   return lcMessage.kwargs.type || 'assistant';
 };
 
-export const isTraceCallChatFormatLangchain = (
-  call: TraceCallSchema
-): boolean => {
-  if (!call.inputs || !('messages' in call.inputs)) {
+export const isChatRequestFormatLangchain = (request: any) => {
+  if (!request || !('messages' in request)) {
     return false;
   }
 
-  const {messages} = call.inputs;
+  const {messages} = request;
   if (!_.isArray(messages) || messages.length === 0) {
     return false;
   }
@@ -194,6 +192,16 @@ export const isTraceCallChatFormatLangchain = (
   }
 
   return firstMessages.every(isLangchainMessage);
+}
+export const isTraceCallChatFormatLangchain = (
+  call: TraceCallSchema
+): boolean => {
+  if (!call.inputs) {
+    return false;
+  }
+  const validInput = isChatRequestFormatLangchain(call.inputs);
+  const validOutput = isLangchainOutput(call.output);
+  return validInput && validOutput;
 };
 
 const isLangchainMessage = (message: any): boolean => {
@@ -226,10 +234,7 @@ export const normalizeLangchainChatRequest = (request: any): ChatRequest => {
     !_.isArray(request.messages) ||
     request.messages.length === 0
   ) {
-    return {
-      model: 'unknown',
-      messages: [],
-    };
+    throw new Error("Error: Input Messages missing or empty. ChatView will be hidden")
   }
 
   const firstMessages = request.messages[0];
