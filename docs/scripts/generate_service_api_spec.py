@@ -60,19 +60,25 @@ def apply_doc_fixes(raw_json):
     # Specifically, when we have Optional[Any] or Optional[Dict] fields, the generator
     # dies.
     def optional_any_fix_mapper(value):
-        if isinstance(value, dict) and "anyOf" in value:
-            if value["anyOf"] == [{}, {"type": "null"}]:
-                del value["anyOf"]
-                value["type"] = "object"
+        if (
+            isinstance(value, dict)
+            and "anyOf" in value
+            and value["anyOf"] == [{}, {"type": "null"}]
+        ):
+            del value["anyOf"]
+            value["type"] = "object"
         return value
 
     raw_json = apply_mapper(raw_json, optional_any_fix_mapper)
 
     def optional_dict_fix_mapper(value):
-        if isinstance(value, dict) and "anyOf" in value:
-            if value["anyOf"] == [{"type": "object"}, {"type": "null"}]:
-                del value["anyOf"]
-                value["type"] = "object"
+        if (
+            isinstance(value, dict)
+            and "anyOf" in value
+            and value["anyOf"] == [{"type": "object"}, {"type": "null"}]
+        ):
+            del value["anyOf"]
+            value["type"] = "object"
         return value
 
     raw_json = apply_mapper(raw_json, optional_dict_fix_mapper)
