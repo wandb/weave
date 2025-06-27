@@ -539,7 +539,8 @@ const pointCloudScene = (
       textBlock.linkOffsetY = -20;
     }
 
-    lines.color = new Color3(...color);
+    // Babylon expects colors in the range 0-1 but our sdk is expecting 0-255. So convert it here.
+    lines.color = new Color3(color[0] / 255, color[1] / 255, color[2] / 255);
   });
 
   itemsInScene.push(pcMesh);
