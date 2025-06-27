@@ -458,7 +458,7 @@ If a rate limit is exceeded, the API will return a `429 Concurrency limit reache
 
 ### Pricing
 
-For model pricing information, visit [http://wandb.com/site/pricing/inference](http://wandb.com/site/pricing/inference).
+For model pricing information, visit [https://wandb.ai/site/pricing/inference](https://wandb.ai/site/pricing/inference).
 
 ## API errors
 
