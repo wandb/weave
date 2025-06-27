@@ -23,6 +23,33 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
 from weave.trace_server.calls_query_builder.utils import (
     param_slot,
 )
+
+
+def _quote_json_path(path: str) -> str:
+    """
+    Convert a dot-separated path to a properly quoted JSON path.
+
+    Args:
+        path: Dot-separated path like "temperature.value.unit"
+
+    Returns:
+        Properly quoted JSON path like '$."temperature"."value"."unit"'
+
+    Examples:
+        >>> _quote_json_path("temperature")
+        '$."temperature"'
+        >>> _quote_json_path("temperature.value.unit")
+        '$."temperature"."value"."unit"'
+    """
+    if not path:
+        return "$"
+
+    # Split on dots and quote each segment
+    segments = path.split(".")
+    quoted_segments = [f'"{segment}"' for segment in segments if segment]
+    return "$." + ".".join(quoted_segments)
+
+
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import clickhouse_cast, combine_conditions
 
@@ -420,7 +447,7 @@ class ObjectRefQueryProcessor:
         key = condition.get_accessor_key()
 
         field_sql = f"any({self.table_alias}.{root_field})"
-        json_path_param = self.pb.add_param(f"$.{key}")
+        json_path_param = self.pb.add_param(_quote_json_path(key))
         return f"JSON_VALUE({field_sql}, {param_slot(json_path_param, 'String')}) IN (SELECT full_ref FROM {correct_cte})"
 
 
@@ -518,7 +545,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         key = condition.get_accessor_key()
 
         # Parameterize the JSON path
-        json_path_param = self.pb.add_param(f"$.{key}")
+        json_path_param = self.pb.add_param(_quote_json_path(key))
 
         # Get the CTE name for this condition
         index = self.object_ref_conditions.index(condition)
@@ -654,7 +681,7 @@ def build_object_ref_ctes(
         cte_counter += 1
 
         # Parameterize the JSON path
-        json_path_param = pb.add_param(f"$.{leaf_property}")
+        json_path_param = pb.add_param(_quote_json_path(leaf_property))
 
         # Create condition handler and generate the appropriate SQL condition
         handler = ObjectRefConditionHandler(pb, json_path_param)
@@ -701,7 +728,7 @@ def build_object_ref_ctes(
                 cte_counter += 1
 
                 # Parameterize the JSON path for this property
-                prop_json_path_param = pb.add_param(f"$.{prop}")
+                prop_json_path_param = pb.add_param(_quote_json_path(prop))
 
                 intermediate_cte = f"""
                 {intermediate_cte_name} AS (

@@ -3575,11 +3575,26 @@ def test_filter_calls_by_ref_properties(client):
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
 
+    nested1 = {"nested key with spaces": {"1": "1"}}
+    nested_ref = weave.publish(nested1, "nested")
+    nested2 = {"nested key with spaces": {"1": "2"}}
+    nested2_ref = weave.publish(nested2, "nested")
+
     # Create configuration objects to be referenced
-    config1 = {"temperature": 0.5, "model": "gpt-4", "max_tokens": 100}
+    config1 = {
+        "temperature": 0.5,
+        "model": "gpt-4",
+        "max_tokens": 100,
+        "nested": nested_ref,
+    }
     config1_ref = weave.publish(config1, "config1")
 
-    config2 = {"temperature": 0.8, "model": "gpt-3.5", "max_tokens": 200}
+    config2 = {
+        "temperature": 0.8,
+        "model": "gpt-3.5",
+        "max_tokens": 200,
+        "nested": nested2_ref,
+    }
     config2_ref = weave.publish(config2, "config2")
 
     # Create nested objects with references
@@ -3813,3 +3828,25 @@ def test_filter_calls_by_ref_properties(client):
         )
     )
     assert len(calls) == 0  # Should get no calls since refs are not expanded
+
+    # Test filtering by deeply nested keys with spaces
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$getField": "inputs.worker_config.config.nested.nested key with spaces.1"
+                        },
+                        {"$literal": "1"},
+                    ]
+                }
+            },
+            expand_columns=[
+                "inputs.worker_config",
+                "inputs.worker_config.config",
+                "inputs.worker_config.config.nested",
+            ],
+        )
+    )
+    assert len(calls) == 1

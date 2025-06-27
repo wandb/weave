@@ -2353,9 +2353,9 @@ def test_object_ref_filter_simple() -> None:
         """,
         {
             "pb_0": "project",
-            "pb_1": "$.temperature",
+            "pb_1": '$."temperature"',
             "pb_2": 1,
-            "pb_3": "$.model",
+            "pb_3": '$."model"',
         },
     )
 
@@ -2438,11 +2438,11 @@ def test_object_ref_filter_nested() -> None:
         """,
         {
             "pb_0": "project",
-            "pb_1": "$.size",
+            "pb_1": '$."size"',
             "pb_2": "large",
-            "pb_3": "$.unit",
-            "pb_4": "$.temperature",
-            "pb_5": "$.model",
+            "pb_3": '$."unit"',
+            "pb_4": '$."temperature"',
+            "pb_5": '$."model"',
         },
     )
 
@@ -2533,10 +2533,10 @@ def test_multiple_object_ref_filters() -> None:
         """,
         {
             "pb_0": "project",
-            "pb_1": "$.temperature",
+            "pb_1": '$."temperature"',
             "pb_2": 1,
             "pb_3": 2,
-            "pb_4": "$.model",
+            "pb_4": '$."model"',
         },
     )
 
@@ -2600,7 +2600,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
              AND (calls_merged.parent_id IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+           HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
               (SELECT full_ref
                FROM obj_filter_0))
            AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
@@ -2666,13 +2666,13 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
         """,
         {
             "pb_0": "project",
-            "pb_1": "$.temperature",
+            "pb_1": '$."temperature"',
             "pb_2": 1,
             "pb_3": 2,
-            "pb_4": "$.max_tokens",
+            "pb_4": '$."max_tokens"',
             "pb_5": 100,
-            "pb_6": "$.max_tokens.size",
-            "pb_7": "$.model",
+            "pb_6": '$."max_tokens"."size"',
+            "pb_7": '$."model"',
         },
     )
 
@@ -2795,13 +2795,13 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
         """,
         {
             "pb_0": "project",
-            "pb_1": "$.provider",
+            "pb_1": '$."provider"',
             "pb_2": "openai",
-            "pb_3": "$.temperature",
+            "pb_3": '$."temperature"',
             "pb_4": 0.5,
-            "pb_5": "$.stream",
+            "pb_5": '$."stream"',
             "pb_6": True,
-            "pb_7": "$.model",
+            "pb_7": '$."model"',
             "pb_8": '$."prompt"',
             "pb_9": "test prompt",
             "pb_10": ["llm_call"],
@@ -2850,7 +2850,74 @@ def test_object_ref_order_by_simple() -> None:
         """,
         {
             "pb_0": "project",
-            "pb_1": "$.temperature",
-            "pb_2": "$.model",
+            "pb_1": '$."temperature"',
+            "pb_2": '$."model"',
+        },
+    )
+
+
+def test_object_ref_filter_heavily_nested_keys() -> None:
+    """Test that heavily nested keys are properly quoted in JSON paths."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "inputs.model.config.temperature.value.unit"},
+                    {"$literal": "celsius"},
+                ]
+            }
+        )
+    )
+    cq.set_expand_columns(["inputs.model", "inputs.model.config"])
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS
+          (SELECT calls_merged.id AS id
+           FROM calls_merged
+           WHERE calls_merged.project_id = {pb_0:String}
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)
+           HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
+                      (SELECT full_ref
+                       FROM obj_filter_1))
+                   AND ((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        ),
+             obj_filter_0 AS
+          (SELECT object_id,
+                  digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
+           GROUP BY project_id,
+                    object_id,
+                    digest),
+             obj_filter_1 AS
+          (SELECT object_id,
+                  digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_3:String}) IN (SELECT full_ref FROM obj_filter_0)
+           GROUP BY project_id,
+                    object_id,
+                    digest)
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_0:String}
+          AND (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id,
+                  calls_merged.id)
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": '$."temperature"."value"."unit"',
+            "pb_2": "celsius",
+            "pb_3": '$."config"',
+            "pb_4": '$."model"',
         },
     )
