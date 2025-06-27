@@ -3,19 +3,26 @@ import {Select} from '@wandb/weave/components/Form/Select';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
 import {TextField} from '@wandb/weave/components/Form/TextField';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import {ReusableDrawer} from '../../ReusableDrawer';
 import {ScorerFormRef} from '../MonitorsPage/MonitorFormDrawer';
 import {LLMAsAJudgeScorerForm} from '../MonitorsPage/ScorerForms/LLMAsAJudgeScorerForm';
 import {LLMDropdownLoaded} from '../PlaygroundPage/PlaygroundChat/LLMDropdown';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {refStringToName} from './common';
 import {LoadingSelect} from './components';
 import {useEvaluationExplorerPageContext} from './context';
 import {clientBound, hookify} from './hooks';
 import {Column, ConfigSection, Row} from './layout';
-import {getLatestScorerRefs, getObjByRef} from './query';
+import {
+  getLatestScorerRefs,
+  getObjByRef,
+  getSimplifiedLLMAsAJudgeScorer,
+  publishSimplifiedLLMAsAJudgeScorer,
+} from './query';
+import {SimplifiedLLMAsAJudgeScorer} from './types';
 import {VersionedObjectPicker} from './VersionedObjectPicker';
 
 const newScorerOption = {
@@ -26,6 +33,9 @@ const newScorerOption = {
 // Create the hook for fetching scorer refs
 // This wraps the async query function in a React hook that manages loading/error states
 const useLatestScorerRefs = clientBound(hookify(getLatestScorerRefs));
+const useSimplifiedScorer = clientBound(
+  hookify(getSimplifiedLLMAsAJudgeScorer)
+);
 
 // Separate component for each scorer row to properly memoize callbacks
 const ScorerRow: React.FC<{
@@ -35,11 +45,14 @@ const ScorerRow: React.FC<{
   scorerNdx: number;
   updateScorerRef: (scorerNdx: number, ref: string | null) => void;
   deleteScorer: (scorerNdx: number) => void;
-  setCurrentlyEditingScorerNdx: (ndx: number, simplifiedConfig?: any) => void;
+  setCurrentlyEditingScorerNdx: (
+    ndx: number,
+    simplifiedConfig?: SimplifiedLLMAsAJudgeScorer
+  ) => void;
   scorerRefsQuery: ReturnType<typeof useLatestScorerRefs>;
   onSaveScorer: (
     scorerNdx: number,
-    simplifiedConfig?: any
+    simplifiedConfig: SimplifiedLLMAsAJudgeScorer
   ) => Promise<string | null>;
 }> = ({
   entity,
@@ -58,10 +71,6 @@ const ScorerRow: React.FC<{
     },
     [scorerNdx, updateScorerRef]
   );
-
-  const handleSettings = useCallback(() => {
-    setCurrentlyEditingScorerNdx(scorerNdx);
-  }, [scorerNdx, setCurrentlyEditingScorerNdx]);
 
   const handleDelete = useCallback(() => {
     deleteScorer(scorerNdx);
@@ -96,7 +105,6 @@ const ScorerRow: React.FC<{
             allowNewOption={true}
           />
         </div>
-        <Button icon="settings" variant="ghost" onClick={handleSettings} />
         <Button icon="delete" variant="ghost" onClick={handleDelete} />
       </Row>
       <SimplifiedScorerConfig
@@ -111,48 +119,6 @@ const ScorerRow: React.FC<{
   );
 };
 
-// Stub function to determine if a scorer qualifies for simplified config
-// TODO: Fill this out with actual logic
-export const scorerQualifiesForSimplifiedConfig = (
-  scorerRef: string | null,
-  scorerData?: any
-): boolean => {
-  // New scorers always qualify
-  if (scorerRef === null || scorerRef === 'new-scorer') {
-    return true;
-  }
-
-  // TODO: Add logic to check if existing scorer has simple structure
-  // For now, return false for all existing scorers
-  return false;
-};
-
-// Convert simplified config to full scorer object
-export const mapSimplifiedConfigToScorer = (simplifiedConfig: {
-  name: string;
-  type: 'boolean' | 'number';
-  model: string;
-  prompt: string;
-}): any => {
-  // The model will be created/selected in the ModelConfigurationForm
-  // For now, we just pass the prompt and let the form handle model creation
-
-  return {
-    _type: 'LLMAsAJudgeScorer',
-    _class_name: 'LLMAsAJudgeScorer',
-    _bases: ['Scorer', 'Object', 'BaseModel'],
-    name: simplifiedConfig.name,
-    scoring_prompt: simplifiedConfig.prompt,
-    // Store the simplified config model choice and type in a special field
-    // so ModelConfigurationForm can use it
-    _simplifiedConfig: {
-      modelChoice: simplifiedConfig.model,
-      scoreType: simplifiedConfig.type,
-    },
-    // Note: name is not part of val, it's handled as objectId in the scorer object
-  };
-};
-
 interface SimplifiedScorerConfigProps {
   entity: string;
   project: string;
@@ -160,9 +126,12 @@ interface SimplifiedScorerConfigProps {
   scorerNdx: number;
   onSaveScorer: (
     scorerNdx: number,
-    simplifiedConfig?: any
+    simplifiedConfig: SimplifiedLLMAsAJudgeScorer
   ) => Promise<string | null>;
-  onOpenAdvancedSettings: (scorerNdx: number, simplifiedConfig?: any) => void;
+  onOpenAdvancedSettings: (
+    scorerNdx: number,
+    simplifiedConfig: SimplifiedLLMAsAJudgeScorer
+  ) => void;
 }
 
 const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
@@ -174,17 +143,35 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
   onOpenAdvancedSettings,
 }) => {
   // Local state for the simplified form
-  const [config, setConfig] = useState({
+  const [config, setConfig] = useState<SimplifiedLLMAsAJudgeScorer>({
     name: '',
-    type: 'boolean' as 'boolean' | 'number',
-    model: 'gpt-4o',
+    scoreType: 'boolean',
+    llmModelId: '',
     prompt: '',
   });
 
   const [isSaving, setIsSaving] = useState(false);
 
+  const simplifiedScorerQuery = useSimplifiedScorer(
+    entity,
+    project,
+    scorerRef ?? ''
+  );
+
+  useEffect(() => {
+    if (scorerRef && simplifiedScorerQuery.data !== null) {
+      setConfig(simplifiedScorerQuery.data);
+    }
+  }, [
+    scorerRef,
+    simplifiedScorerQuery.data,
+    scorerNdx,
+    onOpenAdvancedSettings,
+    config,
+  ]);
+
   // Check if this scorer qualifies for simplified config
-  const qualifies = scorerQualifiesForSimplifiedConfig(scorerRef);
+  const qualifies = !scorerRef || simplifiedScorerQuery.data !== null;
 
   if (!qualifies) {
     return (
@@ -228,12 +215,6 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
     }
   };
 
-  const handleOpenAdvanced = () => {
-    // Just open the advanced settings drawer (same as gear button)
-    // User can save their simplified config first if they want to
-    onOpenAdvancedSettings(scorerNdx, config);
-  };
-
   return (
     <Column
       style={{
@@ -253,8 +234,8 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
         <div style={{flex: '0 0 120px'}}>
           <Select
             value={{
-              label: config.type === 'boolean' ? 'Boolean' : 'Number',
-              value: config.type,
+              label: config.scoreType === 'boolean' ? 'Boolean' : 'Number',
+              value: config.scoreType,
             }}
             options={[
               {label: 'Boolean', value: 'boolean'},
@@ -263,7 +244,7 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
             onChange={option =>
               setConfig({
                 ...config,
-                type: option?.value as 'boolean' | 'number',
+                scoreType: option?.value as 'boolean' | 'number',
               })
             }
           />
@@ -272,11 +253,11 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
           <LLMDropdownLoaded
             className="w-full"
             hideSavedModels
-            value={config.model || ''}
+            value={config.llmModelId || ''}
             isTeamAdmin={false}
             direction={{horizontal: 'left'}}
             onChange={(modelValue: string) => {
-              setConfig({...config, model: modelValue});
+              setConfig({...config, llmModelId: modelValue});
             }}
           />
         </div>
@@ -291,9 +272,6 @@ const SimplifiedScorerConfig: React.FC<SimplifiedScorerConfigProps> = ({
         />
       </Row>
       <Row style={{justifyContent: 'flex-end', gap: '8px'}}>
-        <Button variant="secondary" size="small" onClick={handleOpenAdvanced}>
-          Advanced settings
-        </Button>
         <Button
           variant="primary"
           size="small"
@@ -394,34 +372,24 @@ export const ScorersConfigSection: React.FC<{
     [editConfig]
   );
 
+  const client = useGetTraceServerClientContext()();
+
   // Save scorer handler for simplified config
   const saveScorer = useCallback(
     async (
       scorerNdx: number,
-      simplifiedConfig?: any
+      simplifiedConfig: SimplifiedLLMAsAJudgeScorer
     ): Promise<string | null> => {
-      // TODO: Implement actual save logic
-      // This should:
-      // 1. Use the simplifiedConfig passed from the component
-      // 2. Convert it to a full scorer object using mapSimplifiedConfigToScorer
-      // 3. Save it to Weave
-      // 4. Update the scorer ref
-      console.log('Saving scorer', scorerNdx, simplifiedConfig);
-
-      if (simplifiedConfig) {
-        // TODO: Convert simplified config to full scorer object
-        const scorerObject = mapSimplifiedConfigToScorer(simplifiedConfig);
-
-        // TODO: Save to Weave and get ref
-        // const newRef = await saveToWeave(scorerObject);
-        // updateScorerRef(scorerNdx, newRef);
-        // return newRef;
-      }
-
-      // For now, return null as placeholder
-      return null;
+      const scorerRef = await publishSimplifiedLLMAsAJudgeScorer(
+        client,
+        entity,
+        project,
+        simplifiedConfig
+      );
+      updateScorerRef(scorerNdx, scorerRef);
+      return scorerRef;
     },
-    []
+    [client, entity, project, updateScorerRef]
   );
 
   // Handle opening advanced settings (either from gear or from simplified form)
@@ -562,27 +530,23 @@ const ScorerDrawer: React.FC<{
     }
 
     // If we have pendingSimplifiedConfig, merge it into the scorer object
-    if (pendingSimplifiedConfig) {
-      const mappedConfig = mapSimplifiedConfigToScorer(pendingSimplifiedConfig);
-      // Merge the mapped config into the base scorer
-      return {
-        ...baseScorer,
-        objectId: pendingSimplifiedConfig.name || baseScorer.objectId, // Set the name as objectId
-        val: {
-          ...baseScorer.val,
-          ...mappedConfig,
-        },
-      };
-    }
+    // if (pendingSimplifiedConfig) {
+    //   const mappedConfig = mapSimplifiedConfigToScorer(pendingSimplifiedConfig);
+    //   console.log('mappedConfig', mappedConfig);
+    //   // Merge the mapped config into the base scorer
+    //   return {
+    //     ...baseScorer,
+    //     objectId:
+    //       sanitizeObjectId(pendingSimplifiedConfig.name) || baseScorer.objectId, // Set the name as objectId
+    //     val: {
+    //       ...baseScorer.val,
+    //       ...mappedConfig,
+    //     },
+    //   };
+    // }
 
     return baseScorer;
-  }, [
-    entity,
-    initialScorerRef,
-    project,
-    scorerQuery.data,
-    pendingSimplifiedConfig,
-  ]);
+  }, [entity, initialScorerRef, project, scorerQuery.data]);
 
   if (scorerQuery.loading) {
     // TODO: Show a loading indicator

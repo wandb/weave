@@ -28,3 +28,10 @@ export type EvaluationExplorationConfig = {
     originalSourceRef: string | null;
   }>;
 };
+
+export type SimplifiedLLMAsAJudgeScorer = {
+  name: string;
+  scoreType: 'boolean' | 'number';
+  llmModelId: string;
+  prompt: string;
+};
