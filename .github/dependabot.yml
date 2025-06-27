@@ -146,11 +146,7 @@ updates:
         patterns:
           - "llama-index*"
 
-      mistral0:
-        patterns:
-          - "mistralai*"
-
-      mistral1:
+      mistral:
         patterns:
           - "mistralai*"
 
@@ -231,3 +227,11 @@ updates:
     allow:
       - dependency-type: "direct"
       - dependency-type: "indirect"
+
+  # ignore all weave_query updates
+  - package-ecosystem: "pip"
+    directory: "/weave_query"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "*"

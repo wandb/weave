@@ -131,8 +131,7 @@ langchain_nvidia_ai_endpoints = [
 litellm = ["litellm>=1.36.1"]
 # temporary max pin b/c 0.12.0 changes call structure and therefor tests
 llamaindex = ["llama-index>=0.10.35,<0.12.0", "openai<1.92.0"]
-mistral0 = ["mistralai>=0.1.8,<1.0.0"]
-mistral1 = ["mistralai>=1.0.0"]
+mistral = ["mistralai>=1.0.0"]
 scorers = [
   "Levenshtein>=0.26.0",
   "litellm>=1.58",
@@ -254,6 +253,8 @@ select = [
   "F401",    # https://docs.astral.sh/ruff/rules/unused-import/
   "F402",    # https://docs.astral.sh/ruff/rules/import-shadowed-by-loop-var/
   "F6",      # https://docs.astral.sh/ruff/rules/multi-value-repeated-key-literal/
+  "F811",    # https://docs.astral.sh/ruff/rules/redefined-while-unused/
+  "F821",    # https://docs.astral.sh/ruff/rules/undefined-name/
   "TID252",  # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
   "UP",      # https://docs.astral.sh/ruff/rules/#pyupgrade-up
   "TRY002",  # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
