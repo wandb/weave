@@ -11,6 +11,7 @@ interface UseDatasetSavingOptions {
   entity: string;
   project: string;
   onSaveComplete?: (datasetRef?: string) => void;
+  showToast?: boolean;
 }
 
 interface DatasetSavingResult {
@@ -26,6 +27,7 @@ export const useDatasetSaving = ({
   entity,
   project,
   onSaveComplete,
+  showToast = true,
 }: UseDatasetSavingOptions): DatasetSavingResult => {
   const [isCreatingDataset, setIsCreatingDataset] = React.useState(false);
   const router = useWeaveflowCurrentRouteContext();
@@ -62,6 +64,7 @@ export const useDatasetSaving = ({
         );
 
         // Show success message with link to the new dataset
+        if (showToast) {
         toast(
           <DatasetPublishToast
             message={'Dataset created successfully!'}
@@ -71,10 +74,11 @@ export const useDatasetSaving = ({
             position: 'top-right',
             autoClose: 5000,
             hideProgressBar: true,
-            closeOnClick: true,
-            pauseOnHover: true,
-          }
-        );
+              closeOnClick: true,
+              pauseOnHover: true,
+            }
+          );
+        }
       } catch (error: any) {
         console.error('Failed to create dataset:', error);
         toast.error(`Failed to create dataset: ${error.message}`);
@@ -83,7 +87,7 @@ export const useDatasetSaving = ({
         onSaveComplete?.(datasetRef);
       }
     },
-    [entity, project, tableCreate, objCreate, router, onSaveComplete]
+    [entity, project, tableCreate, objCreate, router, onSaveComplete, showToast]
   );
 
   return {

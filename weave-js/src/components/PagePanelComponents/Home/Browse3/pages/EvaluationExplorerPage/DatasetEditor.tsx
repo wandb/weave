@@ -69,6 +69,7 @@ export const NewDatasetEditor = forwardRef<
   const {handleSaveDataset} = useDatasetSaving({
     entity,
     project,
+    showToast: false,
     onSaveComplete: datasetRef => {
       onSaveComplete?.(datasetRef);
       // Resolve the promise with the dataset ref
