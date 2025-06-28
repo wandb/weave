@@ -1164,7 +1164,12 @@ export const CallsTable: FC<{
         slots={{
           noRowsOverlay,
           columnMenu: CallsCustomColumnMenu,
-          pagination: () => <PaginationButtons hideControls={hideControls} />,
+          pagination: () => (
+            <PaginationButtons
+              hideControls={hideControls}
+              callsStatsLimit={calls.callsStatsLimit}
+            />
+          ),
           columnMenuSortDescendingIcon: IconSortDescending,
           columnMenuSortAscendingIcon: IconSortAscending,
           columnMenuHideIcon: IconNotVisible,
