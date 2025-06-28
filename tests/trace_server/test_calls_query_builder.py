@@ -2174,6 +2174,8 @@ def test_all_optimization_filters():
                 "weave-trace-internal:///111111111111",
             ],
             "parent_ids": ["111111111111", "222222222222"],
+            "thread_ids": ["thread_333", "thread_444"],
+            "turn_ids": ["turn_555", "turn_666"],
         }
     )
     assert_sql(
@@ -2182,37 +2184,47 @@ def test_all_optimization_filters():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_8:String}
-            AND (calls_merged.parent_id IN {pb_7:Array(String)}
+        WHERE calls_merged.project_id = {pb_12:String}
+            AND (calls_merged.parent_id IN {pb_11:Array(String)}
                 OR calls_merged.parent_id IS NULL)
-            AND ((calls_merged.op_name IN {pb_3:Array(String)})
+            AND ((calls_merged.op_name IN {pb_5:Array(String)})
                 OR (calls_merged.op_name IS NULL))
-            AND (calls_merged.trace_id IN {pb_4:Array(String)}
+            AND (calls_merged.trace_id IN {pb_6:Array(String)}
                 OR calls_merged.trace_id IS NULL)
-            AND (((hasAny(calls_merged.input_refs, {pb_5:Array(String)})
+            AND (calls_merged.thread_id IN {pb_7:Array(String)}
+                OR calls_merged.thread_id IS NULL)
+            AND (calls_merged.turn_id IN {pb_8:Array(String)}
+                OR calls_merged.turn_id IS NULL)
+            AND (((hasAny(calls_merged.input_refs, {pb_9:Array(String)})
                 OR length(calls_merged.input_refs) = 0)
-                AND (hasAny(calls_merged.output_refs, {pb_6:Array(String)})
+                AND (hasAny(calls_merged.output_refs, {pb_10:Array(String)})
                     OR length(calls_merged.output_refs) = 0)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
             AND (((hasAny(array_concat_agg(calls_merged.input_refs), {pb_0:Array(String)}))
                 AND (hasAny(array_concat_agg(calls_merged.output_refs), {pb_1:Array(String)}))
-            AND (any(calls_merged.parent_id) IN {pb_2:Array(String)}))))
+            AND (any(calls_merged.parent_id) IN {pb_2:Array(String)})
+              AND (any(calls_merged.thread_id) IN {pb_3:Array(String)})
+              AND (any(calls_merged.turn_id) IN {pb_4:Array(String)}))))
         """,
         {
             "pb_0": ["weave-trace-internal:///222222222222%"],
             "pb_1": ["weave-trace-internal:///111111111111%"],
             "pb_2": ["111111111111", "222222222222"],
-            "pb_3": [
+            "pb_3": ["thread_333", "thread_444"],
+            "pb_4": ["turn_555", "turn_666"],
+            "pb_5": [
                 "weave-trace-internal:///222222222222",
                 "weave-trace-internal:///111111111111",
             ],
-            "pb_4": ["111111111111", "222222222222"],
-            "pb_5": ["weave-trace-internal:///222222222222%"],
-            "pb_6": ["weave-trace-internal:///111111111111%"],
-            "pb_7": ["111111111111", "222222222222"],
-            "pb_8": "project",
+            "pb_6": ["111111111111", "222222222222"],
+            "pb_7": ["thread_333", "thread_444"],
+            "pb_8": ["turn_555", "turn_666"],
+            "pb_9": ["weave-trace-internal:///222222222222%"],
+            "pb_10": ["weave-trace-internal:///111111111111%"],
+            "pb_11": ["111111111111", "222222222222"],
+            "pb_12": "project",
         },
     )
 
@@ -2261,6 +2273,15 @@ def test_filter_length_validation():
     )
     with pytest.raises(ValueError):
         cq.as_sql(pb)
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(filter={"thread_ids": ["thread_123"] * 1001})
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123"] * 1001})
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
 
 
 def test_disallowed_fields():
@@ -2301,3 +2322,142 @@ def test_disallowed_fields():
             )
         )
         cq.as_sql(ParamBuilder())
+
+
+def test_thread_id_filter_eq():
+    """Test thread_id filter with single thread ID"""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"thread_ids": ["thread_123"]})
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.thread_id = {pb_1:String}
+                OR calls_merged.thread_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (any(calls_merged.thread_id) IN {pb_0:Array(String)}))
+        """,
+        {"pb_0": ["thread_123"], "pb_1": "thread_123", "pb_2": "project"},
+    )
+
+
+def test_thread_id_filter_in():
+    """Test thread_id filter with multiple thread IDs"""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={"thread_ids": ["thread_123", "thread_456"]}
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.thread_id IN {pb_1:Array(String)}
+                OR calls_merged.thread_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (any(calls_merged.thread_id) IN {pb_0:Array(String)}))
+        """,
+        {
+            "pb_0": ["thread_123", "thread_456"],
+            "pb_1": ["thread_123", "thread_456"],
+            "pb_2": "project",
+        },
+    )
+
+
+def test_turn_id_filter_eq():
+    """Test turn_id filter with single turn ID"""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123"]})
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.turn_id = {pb_1:String}
+                OR calls_merged.turn_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (any(calls_merged.turn_id) IN {pb_0:Array(String)}))
+        """,
+        {"pb_0": ["turn_123"], "pb_1": "turn_123", "pb_2": "project"},
+    )
+
+
+def test_turn_id_filter_in():
+    """Test turn_id filter with multiple turn IDs"""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123", "turn_456"]})
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.turn_id IN {pb_1:Array(String)}
+                OR calls_merged.turn_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (any(calls_merged.turn_id) IN {pb_0:Array(String)}))
+        """,
+        {
+            "pb_0": ["turn_123", "turn_456"],
+            "pb_1": ["turn_123", "turn_456"],
+            "pb_2": "project",
+        },
+    )
+
+
+def test_thread_id_and_turn_id_filter_combined():
+    """Test thread_id and turn_id filters together"""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(
+        filter={
+            "thread_ids": ["thread_123", "thread_456"],
+            "turn_ids": ["turn_789", "turn_abc"],
+        }
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_4:String}
+            AND (calls_merged.thread_id IN {pb_2:Array(String)}
+                OR calls_merged.thread_id IS NULL)
+            AND (calls_merged.turn_id IN {pb_3:Array(String)}
+                OR calls_merged.turn_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (((any(calls_merged.thread_id) IN {pb_0:Array(String)})
+              AND (any(calls_merged.turn_id) IN {pb_1:Array(String)}))))
+        """,
+        {
+            "pb_0": ["thread_123", "thread_456"],
+            "pb_1": ["turn_789", "turn_abc"],
+            "pb_2": ["thread_123", "thread_456"],
+            "pb_3": ["turn_789", "turn_abc"],
+            "pb_4": "project",
+        },
+    )
