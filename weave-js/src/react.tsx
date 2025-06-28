@@ -611,7 +611,7 @@ export const parseRef = (ref: string): ObjectRef => {
   throw new Error(`Unknown protocol: ${url.protocol}`);
 };
 
-const parseWeaveRef = (ref: string): WeaveObjectRef => {
+export const parseWeaveRef = (ref: string): WeaveObjectRef => {
   const trimmed = ref.slice(WEAVE_REF_PREFIX.length);
   const tableMatch = trimmed.match(RE_WEAVE_TABLE_REF_PATHNAME);
   if (tableMatch !== null) {

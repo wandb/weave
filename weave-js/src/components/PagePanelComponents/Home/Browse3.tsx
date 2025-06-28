@@ -42,6 +42,7 @@ import {EMPTY_NO_TRACE_SERVER} from './Browse3/pages/common/EmptyContent';
 import {SimplePageLayoutContext} from './Browse3/pages/common/SimplePageLayout';
 import {CompareEvaluationsPage} from './Browse3/pages/CompareEvaluationsPage/CompareEvaluationsPage';
 import {DatasetsPage} from './Browse3/pages/DatasetsPage/DatasetsPage';
+import {EvaluationExplorerPage} from './Browse3/pages/EvaluationExplorerPage/EvaluationExplorerPage';
 import {LeaderboardListingPage} from './Browse3/pages/LeaderboardPage/LeaderboardListingPage';
 import {LeaderboardPage} from './Browse3/pages/LeaderboardPage/LeaderboardPage';
 import {ModsPage} from './Browse3/pages/ModsPage';
@@ -457,6 +458,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/compare`}>
           <ComparePageBinding />
+        </Route>
+        <Route path={`${projectRoot}/evaluation-explorer`}>
+          <EvaluationExplorerPageBinding />
         </Route>
       </Switch>
     </Box>
@@ -1014,4 +1018,9 @@ const PlaygroundPageBinding = () => {
       modelIds={modelIds}
     />
   );
+};
+
+const EvaluationExplorerPageBinding = () => {
+  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  return <EvaluationExplorerPage entity={entity} project={project} />;
 };

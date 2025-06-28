@@ -41,7 +41,7 @@ interface CellProps extends GridRenderCellParams {
 }
 
 // Custom tooltip component to reduce repetition
-const CellTooltip: React.FC<{
+export const CellTooltip: React.FC<{
   title: string;
   children: React.ReactElement;
   placement?: TooltipProps['placement'];

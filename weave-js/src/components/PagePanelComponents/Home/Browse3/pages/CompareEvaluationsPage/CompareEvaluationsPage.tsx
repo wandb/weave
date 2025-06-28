@@ -6,7 +6,6 @@ import {Box} from '@material-ui/core';
 import {Alert} from '@mui/material';
 import {Icon} from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
 import React, {FC, useCallback, useContext, useMemo, useState} from 'react';
@@ -37,6 +36,8 @@ import {ExampleFilterSection} from './sections/ExampleFilterSection/ExampleFilte
 import {ScorecardSection} from './sections/ScorecardSection/ScorecardSection';
 import {SummaryPlots} from './sections/SummaryPlotsSection/SummaryPlotsSection';
 
+type TabType = 'summary' | 'results';
+
 type CompareEvaluationsPageProps = {
   entity: string;
   project: string;
@@ -44,6 +45,8 @@ type CompareEvaluationsPageProps = {
   onEvaluationCallIdsUpdate: (newEvaluationCallIds: string[]) => void;
   selectedMetrics: Record<string, boolean> | null;
   setSelectedMetrics: (newModel: Record<string, boolean>) => void;
+  initialTabValue?: TabType;
+  hideEvalPicker?: boolean;
 };
 
 export const CompareEvaluationsPage: React.FC<
@@ -68,6 +71,8 @@ export const CompareEvaluationsPage: React.FC<
               onEvaluationCallIdsUpdate={props.onEvaluationCallIdsUpdate}
               selectedMetrics={props.selectedMetrics}
               setSelectedMetrics={props.setSelectedMetrics}
+              initialTabValue={props.initialTabValue}
+              hideEvalPicker={props.hideEvalPicker}
             />
           ),
         },
@@ -125,6 +130,8 @@ export const CompareEvaluationsPageContent: React.FC<
         value={{entity: props.entity, project: props.project}}>
         <CompareEvaluationsPageInner
           evaluationCallIds={props.evaluationCallIds}
+          initialTabValue={props.initialTabValue}
+          hideEvalPicker={props.hideEvalPicker}
         />
       </CustomWeaveTypeProjectContext.Provider>
     </CompareEvaluationsProvider>
@@ -178,6 +185,8 @@ const ReturnToEvaluationsButton: FC<{entity: string; project: string}> = ({
 
 const CompareEvaluationsPageInner: React.FC<{
   evaluationCallIds: string[];
+  initialTabValue?: TabType;
+  hideEvalPicker?: boolean;
 }> = props => {
   const {state, setSelectedMetrics} = useCompareEvaluationsState();
   const {isPeeking} = useContext(WeaveflowPeekContext);
@@ -185,7 +194,9 @@ const CompareEvaluationsPageInner: React.FC<{
     Object.keys(state.loadableComparisonResults.result?.resultRows ?? {})
       .length > 0;
   const resultsLoading = state.loadableComparisonResults.loading;
-  const [tabValue, setTabValue] = useState('summary');
+  const [tabValue, setTabValue] = useState<TabType>(
+    props.initialTabValue ?? 'summary'
+  );
 
   return (
     <Box
@@ -200,7 +211,9 @@ const CompareEvaluationsPageInner: React.FC<{
             <InvalidEvaluationBanner
               evaluationCalls={Object.values(state.summary.evaluationCalls)}
             />
-            <ComparisonDefinitionSection state={state} />
+            {!props.hideEvalPicker && (
+              <ComparisonDefinitionSection state={state} />
+            )}
           </>
         }
         headerContainerSx={{
@@ -254,14 +267,7 @@ const CompareEvaluationsPageInner: React.FC<{
           },
           {
             value: 'results',
-            label: (
-              <>
-                Dataset results
-                <Tailwind>
-                  <Pill label="New" color="gold" className="ml-2" />
-                </Tailwind>
-              </>
-            ) as any,
+            label: 'Dataset results',
             loading: resultsLoading,
             content: (
               <VerticalBox
@@ -309,7 +315,7 @@ const CompareEvaluationsPageInner: React.FC<{
           },
         ]}
         tabValue={tabValue}
-        handleTabChange={setTabValue}
+        handleTabChange={newValue => setTabValue(newValue as TabType)}
       />
     </Box>
   );
