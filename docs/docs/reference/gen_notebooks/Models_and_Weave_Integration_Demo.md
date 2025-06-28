@@ -1,4 +1,6 @@
-
+---
+title: Use Weave with W&B Models
+---
 
 :::tip[This is a notebook]
 
@@ -7,9 +9,6 @@
 <a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/Models_and_Weave_Integration_Demo.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
-
-
-# Use Weave with W&B Models
 
 This notebook demonstrates how to use W&B Weave with [W&B Models](https://docs.wandb.ai/guides/) using the scenario of two different teams working on an end-to-end implementation of a Retrieval-Augmented Generation (RAG) application, from fine-tuning the model to building an app around the model. Specifically, the Model Team fine-tunes a new Chat Model (Llama 3.2),and saves it to the [W&B Models Registry](https://docs.wandb.ai/guides/registry/). Then, the App Team retrieves the fine-tuned Chat Model from the Registry, and uses Weave to create and evaluate a RAG chatbot application
 
