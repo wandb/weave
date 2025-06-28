@@ -72,6 +72,7 @@ def lint(session):
         "pandas-test",
         "huggingface",
         "smolagents",
+        "strands",
         "mcp",
     ],
 )
