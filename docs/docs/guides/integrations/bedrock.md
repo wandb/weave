@@ -142,6 +142,101 @@ print(result)
 
 This approach allows you to version your experiments and easily track different configurations of your Bedrock-based application.
 
+## Bedrock Invoke Agent
+
+Weave supports tracing Amazon Bedrock Agents through the `bedrock-agent-runtime` service. This allows you to monitor agent conversations, track token usage, and capture the full context of agent interactions.
+
+### Basic Usage
+
+```python
+import weave
+import boto3
+import uuid
+from weave.integrations.bedrock import patch_client
+
+# Initialize Weave
+weave.init("my_bedrock_agent_app")
+
+# Create and patch the Bedrock Agent Runtime client
+bedrock_agent_client = boto3.client('bedrock-agent-runtime')
+patch_client(bedrock_agent_client)
+
+# Generate a unique session ID
+session_id = str(uuid.uuid4())
+
+# Invoke the agent - this call will be automatically tracked by Weave
+response = bedrock_agent_client.invoke_agent(
+    agentId="YOUR_AGENT_ID",
+    agentAliasId="YOUR_AGENT_ALIAS_ID", 
+    sessionId=session_id,
+    inputText="What can you help me with?",
+    enableTrace=True  # Optional: enables detailed tracing
+)
+
+# Process the streaming response
+complete_response = ""
+for event in response["completion"]:
+    if 'chunk' in event and 'bytes' in event['chunk']:
+        chunk_text = event['chunk']['bytes'].decode('utf-8')
+        complete_response += chunk_text
+        print(chunk_text, end='')
+
+print(f"\nComplete response: {complete_response}")
+```
+
+### Creating Reusable Operations
+
+You can wrap agent calls in `@weave.op` decorated functions for better organization and reusability:
+
+```python
+@weave.op
+def invoke_bedrock_agent(
+    agent_id: str,
+    agent_alias_id: str,
+    user_input: str,
+    session_id: str = None
+) -> str:
+    """Invoke a Bedrock agent and return the complete response."""
+    
+    if session_id is None:
+        session_id = str(uuid.uuid4())
+    
+    response = bedrock_agent_client.invoke_agent(
+        agentId=agent_id,
+        agentAliasId=agent_alias_id,
+        sessionId=session_id,
+        inputText=user_input,
+        enableTrace=True
+    )
+    
+    # Collect the complete streaming response
+    complete_response = ""
+    for event in response["completion"]:
+        if 'chunk' in event and 'bytes' in event['chunk']:
+            chunk_text = event['chunk']['bytes'].decode('utf-8')
+            complete_response += chunk_text
+    
+    return complete_response
+
+# Use the operation
+result = invoke_bedrock_agent(
+    agent_id="YOUR_AGENT_ID",
+    agent_alias_id="YOUR_AGENT_ALIAS_ID",
+    user_input="Explain machine learning in simple terms"
+)
+print(result)
+```
+
+### Monitoring and Usage Tracking
+
+Weave automatically captures important metrics from Bedrock Agent calls:
+
+- **Token Usage**: Input and output tokens when available from the agent traces
+- **Foundation Model**: The underlying model used by the agent
+- **Session Information**: Session IDs for conversation tracking
+- **Timing**: Request duration and response times
+
+
 ## Learn more
 
 Learn more about using Amazon Bedrock with Weave
