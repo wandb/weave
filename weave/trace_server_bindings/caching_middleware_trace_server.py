@@ -5,7 +5,7 @@ import json
 import logging
 import os
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Awaitable, Iterator
 from typing import Any, Callable, TypedDict, TypeVar
 
 from pydantic import BaseModel
@@ -257,6 +257,43 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             lambda json_value: res_type.model_validate_json(json_value),
         )
 
+    async def _with_cache_pydantic_async(
+        self,
+        func: Callable[[TReq], Awaitable[TRes]],
+        req: TReq,
+        res_type: type[TRes],
+    ) -> TRes:
+        """Async version of _with_cache_pydantic for async functions."""
+        try:
+            cache_key = self._make_cache_key(
+                func.__name__, pydantic_bytes_safe_dump(req)
+            )
+        except Exception as e:
+            logger.exception(f"Error creating cache key: {e}")
+            return await func(req)
+
+        # Try to get from cache
+        cached_json_value = self._safe_cache_get(cache_key)
+        if cached_json_value is not None:
+            try:
+                return res_type.model_validate_json(cached_json_value)
+            except Exception as e:
+                logger.exception(f"Error deserializing cached value: {e}")
+                # Remove corrupted cache entry
+                self._safe_cache_delete(cache_key)
+
+        # Cache miss or deserialization error - get fresh result
+        res = await func(req)
+
+        # Cache the result
+        try:
+            json_value_to_cache = res.model_dump_json()
+            self._safe_cache_set(cache_key, json_value_to_cache)
+        except Exception as e:
+            logger.exception(f"Error serializing value for cache: {e}")
+
+        return res
+
     def reset_cache_recorder(self) -> None:
         self._cache_recorder = {
             "hits": 0,
@@ -386,11 +423,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return tsi.RefsReadBatchRes(vals=final_results)
 
     # File API
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         # All file_create requests are cacheable!
-        return self._with_cache_pydantic(
+        return await self._with_cache_pydantic_async(
             self._next_trace_server.file_create, req, tsi.FileCreateRes
-        )
+        )  # type: ignore
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         return self._with_cache(

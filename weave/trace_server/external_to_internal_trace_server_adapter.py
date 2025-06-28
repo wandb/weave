@@ -303,10 +303,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         return self._ref_apply(self._internal_trace_server.refs_read_batch, req)
 
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         # Special case where refs can never be part of the request
-        return self._internal_trace_server.file_create(req)
+        return await self._internal_trace_server.file_create(req)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
