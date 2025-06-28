@@ -571,7 +571,8 @@ const inputFields = (
   inputSubFields: string[],
   setSelectedInputDigest: (inputDigest: string) => void,
   onShowSplitView: () => void,
-  columnWidths: {[key: string]: number}
+  columnWidths: {[key: string]: number},
+  inputsCollapsed: boolean
 ): GridColDef<RowData>[] => [
   {
     field: 'inputDigest',
@@ -607,7 +608,32 @@ const inputFields = (
       );
     },
   },
-  ...inputSubFields.map(key => ({
+  ...(inputsCollapsed ? ([
+    {
+      field: 'collapsed_inputs',
+      headerName: '',
+      width: 50,
+      maxWidth: 50,
+      resizable: false,
+      disableColumnMenu: true,
+      disableReorder: true,
+      hideable: false,
+      sortable: false,
+      filterable: false,
+      headerAlign: 'center' as const,
+      renderCell: (params: GridRenderCellParams<RowData>) => {
+        return <div style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: '8px',
+          width: '100%',
+          height: '100%',
+          justifyContent: 'center',
+        }}><Icon name="document" /></div>;
+      },
+    }
+  ]) : (inputSubFields.map(key => ({
     field: `inputs.${key}`,
     headerName: key,
     sortable: false,
@@ -625,7 +651,7 @@ const inputFields = (
         />
       );
     },
-  })),
+  }))))
 ];
 
 const expansionField = (
@@ -722,7 +748,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView,
-        inputWidths
+        inputWidths,
+        true
       ),
       ...(onlyOneModel
         ? []
@@ -1062,7 +1089,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView,
-        inputWidths
+        inputWidths,
+        true
       ),
       ...(hasTrials
         ? [
@@ -1197,9 +1225,19 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
       {
         groupId: 'inputs',
         headerName: 'Inputs',
-        children: inputSubFields.inputSubFields.map(key => ({
+        renderHeaderGroup: () => {
+          return <div style={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: '8px',
+          }}><Icon name="table" /><span>Inputs</span><Icon name="chevron-down" /></div>;
+        },
+        children: [...inputSubFields.inputSubFields.map(key => ({
           field: `inputs.${key}`,
-        })),
+        })), {
+          field: 'collapsed_inputs',
+        }]
       },
       {
         groupId: 'output',
