@@ -18,7 +18,9 @@ import {
   TableCreateRes,
   TableUpdateReq,
   TableUpdateRes,
+  TraceCallSchema,
   TraceCallsDeleteReq,
+  TraceCallsQueryReq,
   TraceCallUpdateReq,
   TraceObjCreateReq,
   TraceObjCreateRes,
@@ -192,6 +194,16 @@ export class TraceServerClient extends CachingTraceServerClient {
     onChunk?: (chunk: any) => void
   ): Promise<CompletionsCreateStreamRes> {
     return super.completionsCreateStream(req, onChunk);
+  }
+
+  public callsStreamQueryProgressive(
+    req: TraceCallsQueryReq,
+    onPartialResults: (
+      partialResults: TraceCallSchema[],
+      isComplete: boolean
+    ) => void
+  ): Promise<void> {
+    return super.callsStreamQueryProgressive(req, onPartialResults);
   }
 
   public override tableQuery(
