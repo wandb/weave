@@ -40,6 +40,7 @@ class AutopatchSettings(BaseModel):
     cohere: IntegrationSettings = Field(default_factory=IntegrationSettings)
     crewai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     dspy: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    exa: IntegrationSettings = Field(default_factory=IntegrationSettings)
     google_generativeai: IntegrationSettings = Field(
         default_factory=IntegrationSettings
     )
@@ -70,6 +71,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
     from weave.integrations.crewai import get_crewai_patcher
     from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
+    from weave.integrations.exa.exa_sdk import get_exa_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         get_google_generativeai_patcher,
     )
@@ -106,6 +108,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_dspy_patcher(settings.dspy).attempt_patch()
     get_cerebras_patcher(settings.cerebras).attempt_patch()
     get_cohere_patcher(settings.cohere).attempt_patch()
+    get_exa_patcher(settings.exa).attempt_patch()
     get_google_generativeai_patcher(settings.google_generativeai).attempt_patch()
     get_google_genai_patcher(settings.google_genai_sdk).attempt_patch()
     get_crewai_patcher(settings.crewai).attempt_patch()
@@ -126,6 +129,7 @@ def reset_autopatch() -> None:
     from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
     from weave.integrations.crewai import get_crewai_patcher
     from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
+    from weave.integrations.exa.exa_sdk import get_exa_patcher
     from weave.integrations.google_ai_studio.google_ai_studio_sdk import (
         get_google_generativeai_patcher,
     )
@@ -162,9 +166,10 @@ def reset_autopatch() -> None:
     get_dspy_patcher().undo_patch()
     get_cerebras_patcher().undo_patch()
     get_cohere_patcher().undo_patch()
+    get_exa_patcher().undo_patch()
     get_google_generativeai_patcher().undo_patch()
-    get_crewai_patcher().undo_patch()
     get_google_genai_patcher().undo_patch()
+    get_crewai_patcher().undo_patch()
     get_notdiamond_patcher().undo_patch()
     get_vertexai_patcher().undo_patch()
     get_nvidia_ai_patcher().undo_patch()
