@@ -23,7 +23,7 @@ from weave.trace.vals import WeaveObject
 
 class Message(TypedDict):
     role: str
-    content: str | list[dict]
+    content: Union[str, list[dict]]
 
 
 def maybe_dedent(content: str, dedent: bool) -> str:
