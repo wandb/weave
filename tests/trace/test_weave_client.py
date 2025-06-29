@@ -34,6 +34,7 @@ from weave.trace.refs import (
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
     DeletedRef,
+    TableRef,
 )
 from weave.trace.serialization.serializer import (
     get_serializer_for_obj,
@@ -163,7 +164,7 @@ def test_new_val_with_list(server):
     ref = server.new_val({"a": [1, 2, 3]})
     server_val = server.get_val(ref)
     table_ref = server_val["a"]
-    assert isinstance(table_ref, chobj.TableRef)
+    assert isinstance(table_ref, TableRef)
     table_val = server.table_query(table_ref)
     assert [r.val for r in table_val] == [1, 2, 3]
 
