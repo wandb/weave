@@ -26,15 +26,13 @@ generate_notebooks_docs:
 generate_doc_images:
 	python scripts/generate_images.py
 
+generate_llms_docs:
+	python docs/scripts/generate_llmstxt.py
+
 # Per discussion with Tim, generate_doc_images is a little hacky and fragile still.
 # It will need to be run manually until it's stable enough to include in generate_all
-generate_all: generate_service_api_docs generate_python_sdk_docs generate_notebooks_docs
+generate_all: generate_service_api_docs generate_python_sdk_docs generate_notebooks_docs generate_llms_docs
 	yarn build
 
 update_playground_models:
 	python scripts/update_playground_models.py
-
-generate_llms_docs:
-	mkdir -p ./docs/static
-	python docs/scripts/generate_llmstxt.py
-	python docs/scripts/generate_llmstxt.py --categories
