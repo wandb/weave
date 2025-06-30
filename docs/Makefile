@@ -27,7 +27,7 @@ generate_doc_images:
 	python scripts/generate_images.py
 
 generate_llms_docs:
-	python docs/scripts/generate_llmstxt.py
+	python scripts/generate_llmstxt.py
 
 # Per discussion with Tim, generate_doc_images is a little hacky and fragile still.
 # It will need to be run manually until it's stable enough to include in generate_all
