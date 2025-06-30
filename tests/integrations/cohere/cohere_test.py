@@ -33,7 +33,8 @@ def test_cohere(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.Client.chat"
     output = call.output
@@ -80,7 +81,7 @@ def test_cohere_stream(
     )
 
     # they accumulate for us in the last message
-    for event in stream:
+    for event in stream:  # noqa: B007
         pass
 
     response = event.response  # the NonStreamedChatResponse
@@ -88,7 +89,8 @@ def test_cohere_stream(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.Client.chat_stream"
     output = call.output
@@ -145,7 +147,8 @@ async def test_cohere_async(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClient.chat"
     output = call.output
@@ -192,7 +195,7 @@ async def test_cohere_async_stream(
         max_tokens=1024,
     )
 
-    async for event in stream:
+    async for event in stream:  # noqa: B007
         pass
 
     response = event.response  # the NonStreamedChatResponse
@@ -200,7 +203,8 @@ async def test_cohere_async_stream(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClient.chat_stream"
     output = call.output
@@ -253,7 +257,8 @@ def test_cohere_v2(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.ClientV2.chat"
     output = call.output
@@ -300,7 +305,8 @@ async def test_cohere_async_v2(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClientV2.chat"
     output = call.output
@@ -358,7 +364,8 @@ def test_cohere_stream_v2(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.ClientV2.chat_stream"
     output = call.output
@@ -408,7 +415,8 @@ async def test_cohere_async_stream_v2(
     assert len(calls) == 1
     call = calls[0]
 
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClientV2.chat_stream"
     output = call.output

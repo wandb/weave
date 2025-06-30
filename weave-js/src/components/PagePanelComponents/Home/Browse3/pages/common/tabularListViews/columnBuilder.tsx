@@ -112,7 +112,7 @@ export function prepareFlattenedDataForTable<T>(
       cleaned[newKey] = flattened[key];
     });
 
-    return {...r, ...cleaned} as T & {[key: string]: string};
+    return cleaned as T & {[key: string]: string};
   });
 }
 /**
@@ -318,7 +318,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
               ) : (
                 <CustomWeaveTypeProjectContext.Provider
                   value={{entity, project}}>
-                  <CellValue value={val} />
+                  <CellValue value={val} field={key.split('.').pop() ?? ''} />
                 </CustomWeaveTypeProjectContext.Provider>
               )}
             </CellFilterWrapper>

@@ -19,6 +19,7 @@ interface DeleteModalProps {
   deleteTitleStr: string;
   deleteBodyStrs?: string[];
   onSuccess?: () => void;
+  actionWord?: string;
 }
 
 export const DeleteModal: React.FC<DeleteModalProps> = ({
@@ -28,6 +29,7 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
   deleteTitleStr,
   deleteBodyStrs,
   onSuccess,
+  actionWord,
 }) => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +50,7 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
   };
 
   const deleteBodyStrRes = deleteBodyStrs ? deleteBodyStrs : [deleteTitleStr];
+  const actionWordRes = actionWord ? actionWord : 'Delete';
 
   return (
     <Dialog
@@ -57,16 +60,18 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
         setError(null);
       }}>
       <Tailwind>
-        <DialogTitle>Delete {deleteTitleStr}</DialogTitle>
+        <DialogTitle>
+          {actionWordRes} {deleteTitleStr}
+        </DialogTitle>
         <DialogContent className="overflow-hidden">
           <div className="mb-16">
             {error != null ? (
               <p style={{color: 'red'}}>{error}</p>
             ) : (
-              <p>Are you sure you want to delete?</p>
+              <p>Are you sure you want to {actionWordRes.toLowerCase()}?</p>
             )}
           </div>
-          <span className="text-md mt-10 font-semibold">
+          <span className="text-md mb-4 font-semibold">
             {deleteBodyStrRes
               .slice(0, MAX_DELETE_ROWS_TO_SHOW)
               .map((str, i) => (
@@ -75,7 +80,7 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
                 </div>
               ))}
             {deleteBodyStrRes.length > MAX_DELETE_ROWS_TO_SHOW && (
-              <p className="mt-2">
+              <p className="mb-4">
                 and {deleteBodyStrRes.length - MAX_DELETE_ROWS_TO_SHOW} more...
               </p>
             )}
@@ -86,7 +91,7 @@ export const DeleteModal: React.FC<DeleteModalProps> = ({
             variant="destructive"
             disabled={error != null || deleteLoading}
             onClick={handleDelete}>
-            {`Delete ${deleteTitleStr}`}
+            {`${actionWordRes} ${deleteTitleStr}`}
           </Button>
           <Button
             variant="ghost"
@@ -121,6 +126,7 @@ const Dialog = styled(MaterialDialog)`
 Dialog.displayName = 'S.Dialog';
 
 const DialogContent = styled(MaterialDialogContent)`
+  overflow-y: auto !important;
   padding: 0 32px !important;
 `;
 DialogContent.displayName = 'S.DialogContent';
@@ -139,6 +145,6 @@ DialogTitle.displayName = 'S.DialogTitle';
 const DialogActions = styled(MaterialDialogActions)<{$align: string}>`
   justify-content: ${({$align}) =>
     $align === 'left' ? 'flex-start' : 'flex-end'} !important;
-  padding: 32px 32px 32px 32px !important;
+  padding: 16px 32px 32px 32px !important;
 `;
 DialogActions.displayName = 'S.DialogActions';

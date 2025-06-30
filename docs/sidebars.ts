@@ -107,6 +107,7 @@ const sidebars: SidebarsConfig = {
             "guides/evaluation/builtin_scorers",
             "guides/evaluation/weave_local_scorers",
             "guides/evaluation/evaluation_logger",
+            "guides/core-types/leaderboards"
           ]
         },
       ],
@@ -167,6 +168,7 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "LLM Providers",
           items: [
+            "guides/integrations/inference",
             "guides/integrations/bedrock",
             "guides/integrations/anthropic",
             "guides/integrations/cerebras",
@@ -197,7 +199,9 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/instructor",
             "guides/integrations/crewai",
             "guides/integrations/smolagents",
-            "guides/integrations/pydantic_ai"
+            "guides/integrations/pydantic_ai",
+            "guides/integrations/google_adk",
+            "guides/integrations/js"
           ],
         },
         {

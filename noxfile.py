@@ -15,17 +15,24 @@ PY313_INCOMPATIBLE_SHARDS = [
     "notdiamond",
     "crewai",
 ]
-PY39_INCOMPATIBLE_SHARDS = [
-    "crewai",
-    "google_genai",
-    "mcp",
-]
+PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents", "dspy"]
 
 
 @nox.session
 def lint(session):
     session.install("pre-commit", "jupyter")
-    session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
+    dry_run = session.posargs and "dry-run" in session.posargs
+    if dry_run:
+        session.run(
+            "pre-commit",
+            "run",
+            "--hook-stage",
+            "pre-push",
+            "--files",
+            "./weave/__init__.py",
+        )
+    else:
+        session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
@@ -41,6 +48,7 @@ def lint(session):
         "trace",
         "flow",
         "trace_server",
+        "trace_server_bindings",
         "anthropic",
         "cerebras",
         "cohere",
@@ -54,8 +62,7 @@ def lint(session):
         "langchain",
         "litellm",
         "llamaindex",
-        "mistral0",
-        "mistral1",
+        "mistral",
         "notdiamond",
         "openai",
         "openai_agents",
@@ -64,6 +71,7 @@ def lint(session):
         "scorers",
         "pandas-test",
         "huggingface",
+        "smolagents",
         "mcp",
     ],
 )
@@ -78,7 +86,7 @@ def tests(session, shard):
     session.chdir("tests")
 
     env = {
-        k: session.env.get(k)
+        k: session.env.get(k) or os.getenv(k)
         for k in [
             "WEAVE_SENTRY_ENV",
             "CI",
@@ -117,8 +125,8 @@ def tests(session, shard):
         "trace": ["trace/"],
         "flow": ["flow/"],
         "trace_server": ["trace_server/"],
-        "mistral0": ["integrations/mistral/v0/"],
-        "mistral1": ["integrations/mistral/v1/"],
+        "trace_server_bindings": ["trace_server_bindings"],
+        "mistral": ["integrations/mistral/"],
         "scorers": ["scorers/"],
     }
 

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import datetime
 import json
 import logging
+import numbers
 import os
 import platform
 import re
 import sys
 import time
+from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import lru_cache
@@ -29,6 +32,7 @@ from requests import HTTPError
 
 from weave import version
 from weave.trace import trace_sentry, urls
+from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -134,7 +138,6 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -229,9 +232,8 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative step not supported")
 
         # Apply limit if provided
-        if self.limit is not None:
-            if stop is None or stop > self.limit:
-                stop = self.limit
+        if self.limit is not None and (stop is None or stop > self.limit):
+            stop = self.limit
 
         # Apply offset if provided
         if self.offset is not None:
@@ -294,7 +296,7 @@ class PaginatedIterator(Generic[T, R]):
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         records = []
         for item in self:
@@ -438,6 +440,15 @@ def _get_direct_ref(obj: Any) -> Ref | None:
     return get_ref(obj)
 
 
+def _remove_empty_ref(obj: ObjectRecord) -> ObjectRecord:
+    if hasattr(obj, "ref"):
+        if obj.ref != None:
+            raise ValueError(f"Unexpected ref in object record: {obj}")
+        else:
+            del obj.__dict__["ref"]
+    return obj
+
+
 def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, Ref):
         return obj
@@ -445,12 +456,20 @@ def map_to_refs(obj: Any) -> Any:
         return ref
 
     if isinstance(obj, ObjectRecord):
-        return obj.map_values(map_to_refs)
+        # Here, we expect ref to be empty since it would have short circuited
+        # above with `_get_direct_ref`
+        return _remove_empty_ref(obj.map_values(map_to_refs))
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
         obj_record = pydantic_object_record(obj)
+        # Here, we expect ref to be empty since it would have short circuited
+        # above with `_get_direct_ref`
+        obj_record = _remove_empty_ref(obj_record)
         return obj_record.map_values(map_to_refs)
     elif dataclasses.is_dataclass(obj):
         obj_record = dataclass_object_record(obj)
+        # Here, we expect ref to be empty since it would have short circuited
+        # above with `_get_direct_ref`
+        obj_record = _remove_empty_ref(obj_record)
         return obj_record.map_values(map_to_refs)
     elif isinstance(obj, Table):
         return obj.ref
@@ -491,7 +510,15 @@ class CallDict(TypedDict):
 
 @dataclasses.dataclass
 class Call:
-    """A Call represents a single operation that was executed as part of a trace."""
+    """A Call represents a single operation executed as part of a trace.
+
+    ``attributes`` are frozen once the call is created. Use
+    :func:`weave.attributes` or ``create_call(..., attributes=...)`` to
+    populate metadata beforehand. The ``summary`` dictionary may be
+    modified while the call is running; its contents are deep-merged
+    with computed summary values when :meth:`WeaveClient.finish_call`
+    is invoked.
+    """
 
     _op_name: str | Future[str]
     trace_id: str
@@ -501,7 +528,7 @@ class Call:
     id: str | None = None
     output: Any = None
     exception: str | None = None
-    summary: dict | None = None
+    summary: dict | None = dataclasses.field(default_factory=dict)
     _display_name: str | Callable[[Call], str] | None = None
     attributes: dict | None = None
     started_at: datetime.datetime | None = None
@@ -556,7 +583,7 @@ class Call:
             try:
                 entity, project = self.project_id.split("/")
             except ValueError:
-                raise ValueError(f"Invalid project_id: {self.project_id}")
+                raise ValueError(f"Invalid project_id: {self.project_id}") from None
             weave_ref = CallRef(entity, project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
@@ -571,7 +598,7 @@ class Call:
         try:
             entity, project = self.project_id.split("/")
         except ValueError:
-            raise ValueError(f"Invalid project_id: {self.project_id}")
+            raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
 
     @property
@@ -595,7 +622,6 @@ class Call:
         Returns:
             An iterator of calls.
         """
-        client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError(
                 "Can't get children of call without ID, was `weave.init` called?"
@@ -687,14 +713,13 @@ class Call:
 
         wc = weave_client_context.get_weave_client()
         if wc:
-            scorer_ref_uri = None
+            scorer_ref = None
             if weave_isinstance(scorer, Scorer):
                 # Very important: if the score is generated from a Scorer subclass,
-                # then scorer_ref_uri will be None, and we will use the op_name from
+                # then scorer_ref will be None, and we will use the op_name from
                 # the score_call instead.
                 scorer_ref = get_ref(scorer)
-                scorer_ref_uri = scorer_ref.uri() if scorer_ref else None
-            wc._send_score_call(self, score_call, scorer_ref_uri)
+            wc._send_score_call(self, score_call, scorer_ref)
         return apply_scorer_result
 
     def to_dict(self) -> CallDict:
@@ -741,27 +766,73 @@ def make_client_call(
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=from_json(server_call.output, server_call.project_id, server),
         exception=server_call.exception,
-        summary=dict(server_call.summary) if server_call.summary is not None else None,
+        summary=dict(server_call.summary) if server_call.summary is not None else {},
         _display_name=server_call.display_name,
         attributes=server_call.attributes,
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
     )
+    if isinstance(call.attributes, AttributesDict):
+        call.attributes.freeze()
     ref = CallRef(entity, project, call_id)
     return WeaveObject(call, ref, server, None)
 
 
 def sum_dict_leaves(dicts: list[dict]) -> dict:
-    # dicts is a list of dictionaries, that may or may not
-    # have nested dictionaries. Sum all the leaves that match
-    result: dict = {}
+    """Recursively combines multiple dictionaries by summing their leaf values.
+
+    This function takes a list of dictionaries and combines them by:
+    1. For non-dict values: extending lists or summing numbers
+    2. For nested dictionaries: recursively combining them
+
+    Args:
+        dicts: A list of dictionaries to combine
+
+    Returns:
+        A single dictionary with combined values
+
+    Examples:
+        >>> # Combining status counts from multiple runs
+        >>> dicts = [
+        ...     {"status_counts": {"SUCCESS": 5, "FAILED": 1}},
+        ...     {"status_counts": {"SUCCESS": 3, "FAILED": 2, "PENDING": 1}}
+        ... ]
+        >>> sum_dict_leaves(dicts)
+        {'status_counts': {'SUCCESS': 8, 'FAILED': 3, 'PENDING': 1}}
+
+        >>> # Combining metrics with nested structure
+        >>> dicts = [
+        ...     {"metrics": {"accuracy": 0.95, "loss": 0.1, "details": {"precision": 0.9, "recall": 0.8}}},
+        ...     {"metrics": {"accuracy": 0.97, "loss": 0.08, "details": {"precision": 0.92, "f1": 0.85}}}
+        ... ]
+        >>> sum_dict_leaves(dicts)
+        {'metrics': {'accuracy': 1.92, 'loss': 0.18, 'details': {'precision': 1.82, 'recall': 0.8, 'f1': 0.85}}}
+    """
+    nested_dicts: dict[str, list[dict]] = defaultdict(list)
+    result: dict[str, Any] = defaultdict(list)
+
+    # First, collect all nested dictionaries by key
     for d in dicts:
         for k, v in d.items():
             if isinstance(v, dict):
-                result[k] = sum_dict_leaves([result.get(k, {}), v])
+                nested_dicts[k].append(v)
             elif v is not None:
-                result[k] = result.get(k, 0) + v
+                if isinstance(v, list):
+                    result[k].extend(v)
+                else:
+                    result[k].append(v)
+
+    # Sum those values that are numbers
+    for k, values in result.items():
+        # we only sum numbers if we are not going to combine nested dicts later
+        if k not in nested_dicts and all(isinstance(v, numbers.Number) for v in values):
+            result[k] = sum(values)
+
+    # Then recursively sum each collection of nested dictionaries
+    for k in nested_dicts.keys():
+        result[k] = sum_dict_leaves(nested_dicts[k])
+
     return result
 
 
@@ -782,12 +853,18 @@ class WeaveKeyDict(dict):
 class AttributesDict(dict):
     """A dict representing the attributes of a call.
 
-    The `weave` key is reserved for internal use and cannot be set directly.
+    The ``weave`` key is reserved for internal use and cannot be set directly.
+    Attributes become immutable once the call is created. Any attempt to modify
+    the dictionary after call start will raise :class:`TypeError`. Use the
+    :func:`weave.attributes` context manager or the ``attributes`` parameter of
+    :meth:`WeaveClient.create_call` to supply metadata before the call begins.
     """
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__()
         dict.__setitem__(self, "weave", WeaveKeyDict())
+
+        self._frozen = False
 
         if kwargs:
             for key, value in kwargs.items():
@@ -798,10 +875,26 @@ class AttributesDict(dict):
                 else:
                     self[key] = value
 
+    def freeze(self) -> None:
+        self._frozen = True
+
     def __setitem__(self, key: Any, value: Any) -> None:
+        if self.__dict__.get("_frozen", False):
+            raise TypeError("Cannot modify attributes after call start")
         if key == "weave":
             raise KeyError("Cannot set 'weave' directly -- for internal use only!")
         super().__setitem__(key, value)
+
+    def __delitem__(self, key: Any) -> None:
+        if self.__dict__.get("_frozen", False):
+            raise TypeError("Cannot modify attributes after call start")
+        super().__delitem__(key)
+
+    def update(self, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
+        if self.__dict__.get("_frozen", False):
+            raise TypeError("Cannot modify attributes after call start")
+        for k, v in dict(*args, **kwargs).items():
+            self[k] = v
 
     def _set_weave_item(self, subkey: Any, value: Any) -> None:
         """Internal method to set items in the 'weave' subdictionary."""
@@ -812,6 +905,9 @@ class AttributesDict(dict):
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
+# This size is correlated with the maximum single row insert size
+# in clickhouse, which is currently unavoidable.
+MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
@@ -852,10 +948,7 @@ class WeaveClient:
         self._anonymous_ops: dict[str, Op] = {}
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
-        if parallelism_upload:
-            self.future_executor_fastlane = FutureExecutor(
-                max_workers=parallelism_upload
-            )
+        self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
@@ -863,9 +956,16 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
-        self._server_is_flushable = False
-        if isinstance(self.server, RemoteHTTPTraceServer):
-            self._server_is_flushable = self.server.should_batch
+        self._server_call_processor = None
+        # This is a short-term hack to get around the fact that we are reaching into
+        # the underlying implementation of the specific server to get the call processor.
+        # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
+        # some client-side flushing mechanics. We should move this to the interface layer. However,
+        # we don't really want the server-side implementaitons to need to define no-ops as that is
+        # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
+        # to define no-ops.
+        if hasattr(self.server, "get_call_processor"):
+            self._server_call_processor = self.server.get_call_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
     ################ High Level Convenience Methods ################
@@ -915,11 +1015,13 @@ class WeaveClient:
                 if e.response.content:
                     try:
                         reason = json.loads(e.response.content).get("reason")
-                        raise ValueError(reason)
+                        raise ValueError(reason) from None
                     except json.JSONDecodeError:
-                        raise ValueError(e.response.content)
+                        raise ValueError(e.response.content) from None
                 if e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from e
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -941,7 +1043,9 @@ class WeaveClient:
                 )
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from None
                 raise
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
@@ -958,14 +1062,15 @@ class WeaveClient:
     ################ Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
     def get_calls(
         self,
         *,
-        filter: CallsFilter | None = None,
+        filter: CallsFilterLike | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        sort_by: list[SortBy] | None = None,
-        query: Query | None = None,
+        sort_by: list[SortByLike] | None = None,
+        query: QueryLike | None = None,
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
@@ -1148,9 +1253,7 @@ class WeaveClient:
 
         # First create an AttributesDict with global attributes, then update with local attributes
         # Local attributes take precedence over global ones
-        attributes_dict = AttributesDict()
-        attributes_dict.update(_global_attributes)
-        attributes_dict.update(attributes)
+        attributes_dict = AttributesDict(**zip_dicts(_global_attributes, attributes))
 
         if should_capture_client_info():
             attributes_dict._set_weave_item("client_version", version.VERSION)
@@ -1174,6 +1277,8 @@ class WeaveClient:
             inputs=inputs_with_refs,
             attributes=attributes_dict,
         )
+        # Disallow further modification of attributes after the call is created
+        attributes_dict.freeze()
         # feels like this should be in post init, but keping here
         # because the func needs to be resolved for schema insert below
         if callable(name_func := display_name):
@@ -1184,6 +1289,7 @@ class WeaveClient:
             parent._children.append(call)
 
         current_wb_run_id = safe_current_wb_run_id()
+        current_wb_run_step = safe_current_wb_run_step()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -1202,22 +1308,30 @@ class WeaveClient:
             inputs_json = to_json(
                 maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
             )
-            self.server.call_start(
-                CallStartReq(
-                    start=StartedCallSchemaForInsert(
-                        project_id=project_id,
-                        id=call_id,
-                        op_name=op_def_ref.uri(),
-                        display_name=call.display_name,
-                        trace_id=trace_id,
-                        started_at=started_at,
-                        parent_id=parent_id,
-                        inputs=inputs_json,
-                        attributes=attributes_dict,
-                        wb_run_id=current_wb_run_id,
-                    )
+            call_start_req = CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    op_name=op_def_ref.uri(),
+                    display_name=call.display_name,
+                    trace_id=trace_id,
+                    started_at=started_at,
+                    parent_id=parent_id,
+                    inputs=inputs_json,
+                    attributes=attributes_dict,
+                    wb_run_id=current_wb_run_id,
+                    wb_run_step=current_wb_run_step,
                 )
             )
+
+            bytes_size = len(call_start_req.model_dump_json())
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    f"Trace input size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes."
+                    "Inputs may be dropped."
+                )
+
+            self.server.call_start(call_start_req)
             return True
 
         def on_complete(f: Future) -> None:
@@ -1245,6 +1359,12 @@ class WeaveClient:
         *,
         op: Op | None = None,
     ) -> None:
+        """Finalize a call and persist its results.
+
+        Any values present in ``call.summary`` are deep-merged with computed
+        summary statistics (e.g. usage and status counts) before being written
+        to the database.
+        """
         if (
             is_tracing_setting_disabled()
             or (op is not None and should_skip_tracing_for_op(op))
@@ -1271,16 +1391,18 @@ class WeaveClient:
         call.output = postprocessed_output
 
         # Summary handling
-        summary = {}
+        computed_summary: dict = {}
         if call._children:
-            summary = sum_dict_leaves([child.summary or {} for child in call._children])
+            computed_summary = sum_dict_leaves(
+                [child.summary or {} for child in call._children]
+            )
         elif (
             isinstance(original_output, dict)
             and RESERVED_SUMMARY_USAGE_KEY in original_output
             and "model" in original_output
         ):
-            summary[RESERVED_SUMMARY_USAGE_KEY] = {}
-            summary[RESERVED_SUMMARY_USAGE_KEY][original_output["model"]] = {
+            computed_summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+            computed_summary[RESERVED_SUMMARY_USAGE_KEY][original_output["model"]] = {
                 "requests": 1,
                 **original_output[RESERVED_SUMMARY_USAGE_KEY],
             }
@@ -1294,11 +1416,14 @@ class WeaveClient:
             if isinstance(usage, pydantic.BaseModel):
                 usage = usage.model_dump(exclude_unset=True)
             if isinstance(usage, dict) and isinstance(model, str):
-                summary[RESERVED_SUMMARY_USAGE_KEY] = {}
-                summary[RESERVED_SUMMARY_USAGE_KEY][model] = {"requests": 1, **usage}
+                computed_summary[RESERVED_SUMMARY_USAGE_KEY] = {}
+                computed_summary[RESERVED_SUMMARY_USAGE_KEY][model] = {
+                    "requests": 1,
+                    **usage,
+                }
 
         # Create client-side rollup of status_counts_by_op
-        status_counts_dict = summary.setdefault(
+        status_counts_dict = computed_summary.setdefault(
             RESERVED_SUMMARY_STATUS_COUNTS_KEY,
             {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0},
         )
@@ -1307,7 +1432,18 @@ class WeaveClient:
         else:
             status_counts_dict[TraceStatus.SUCCESS] += 1
 
-        call.summary = summary
+        # Merge any user-provided summary values with computed values
+        merged_summary = copy.deepcopy(call.summary or {})
+
+        def _deep_update(dst: dict, src: dict) -> None:
+            for k, v in src.items():
+                if isinstance(v, dict) and isinstance(dst.get(k), dict):
+                    _deep_update(dst[k], v)
+                else:
+                    dst[k] = v
+
+        _deep_update(merged_summary, computed_summary)
+        call.summary = merged_summary
 
         # Exception Handling
         exception_str: str | None = None
@@ -1332,18 +1468,23 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
-            self.server.call_end(
-                CallEndReq(
-                    end=EndedCallSchemaForInsert(
-                        project_id=project_id,
-                        id=call.id,
-                        ended_at=ended_at,
-                        output=output_json,
-                        summary=summary,
-                        exception=exception_str,
-                    )
+            call_end_req = CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call.id,
+                    ended_at=ended_at,
+                    output=output_json,
+                    summary=merged_summary,
+                    exception=exception_str,
                 )
             )
+            bytes_size = len(call_end_req.model_dump_json())
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
+                    "Output may be dropped."
+                )
+            self.server.call_end(call_end_req)
 
         self.future_executor.defer(send_end_call)
 
@@ -1418,6 +1559,22 @@ class WeaveClient:
 
             # Find all feedback objects with a specific reaction.
             client.get_feedback(reaction="👍", limit=10)
+
+            # Find all feedback objects with a specific feedback type with
+            # mongo-style query.
+            from weave.trace_server.interface.query import Query
+
+            query = Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "feedback_type"},
+                            {"$literal": "wandb.reaction.1"},
+                        ],
+                    }
+                }
+            )
+            client.get_feedback(query=query)
             ```
 
         Args:
@@ -1443,7 +1600,7 @@ class WeaveClient:
                 ],
             }
         elif isinstance(query, Query):
-            expr = query.expr_.dict()
+            expr = query.expr_
 
         if reaction:
             expr = {
@@ -1492,9 +1649,7 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: datetime.datetime | None = datetime.datetime.now(
-            datetime.timezone.utc
-        ),
+        effective_date: datetime.datetime | None = None,
         prompt_token_cost_unit: str | None = "USD",
         completion_token_cost_unit: str | None = "USD",
         provider_id: str | None = "default",
@@ -1522,6 +1677,8 @@ class WeaveClient:
             Which has one field called a list of tuples called ids.
             Each tuple contains the llm_id and the id of the created cost object.
         """
+        if effective_date is None:
+            effective_date = datetime.datetime.now(datetime.timezone.utc)
         cost = CostCreateInput(
             prompt_token_cost=prompt_token_cost,
             completion_token_cost=completion_token_cost,
@@ -1634,7 +1791,7 @@ class WeaveClient:
         self,
         predict_call: Call,
         score_call: Call,
-        scorer_object_ref_uri: str | None = None,
+        scorer_object_ref: ObjectRef | None = None,
     ) -> Future[str]:
         """(Private) Adds a score to a call. This is particularly useful
         for adding evaluation metrics to a call.
@@ -1650,9 +1807,12 @@ class WeaveClient:
                 raise ValueError("Score call must have a ref")
             scorer_call_ref_uri = scorer_call_ref.uri()
 
-            # If scorer_object_ref_uri is provided, it is used as the runnable_ref_uri
+            # If scorer_object_ref is provided, it is used as the runnable_ref_uri
             # Otherwise, we use the op_name from the score_call. This should happen
             # when there is a Scorer subclass that is the source of the score call.
+            scorer_object_ref_uri = (
+                scorer_object_ref.uri() if scorer_object_ref else None
+            )
             runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
             score_results = score_call.output
 
@@ -2072,10 +2232,8 @@ class WeaveClient:
             total += self.future_executor_fastlane.num_outstanding_futures
 
         # Add call batch uploads if available
-        if self._server_is_flushable:
-            server = cast(RemoteHTTPTraceServer, self.server)
-            assert server.call_processor is not None
-            total += server.call_processor.num_outstanding_jobs
+        if self._server_call_processor:
+            total += self._server_call_processor.num_outstanding_jobs
         return total
 
     def finish(
@@ -2201,17 +2359,10 @@ class WeaveClient:
             self.future_executor.flush()
         if self.future_executor_fastlane:
             self.future_executor_fastlane.flush()
-        if self._server_is_flushable:
-            # We don't want to do an instance check here because it could
-            # be susceptible to shutdown race conditions. So we save a boolean
-            # _server_is_flushable and only call this if we know the server is
-            # flushable.
-            server = cast(RemoteHTTPTraceServer, self.server)
-            assert server.call_processor is not None
-            server.call_processor.stop_accepting_new_work_and_flush_queue()
-
+        if self._server_call_processor:
+            self._server_call_processor.stop_accepting_new_work_and_flush_queue()
             # Restart call processor processing thread after flushing
-            server.call_processor.accept_new_work()
+            self._server_call_processor.accept_new_work()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.
@@ -2228,10 +2379,8 @@ class WeaveClient:
         if self.future_executor_fastlane:
             fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
         call_processor_jobs = 0
-        if self._server_is_flushable:
-            server = cast(RemoteHTTPTraceServer, self.server)
-            assert server.call_processor is not None
-            call_processor_jobs = server.call_processor.num_outstanding_jobs
+        if self._server_call_processor:
+            call_processor_jobs = self._server_call_processor.num_outstanding_jobs
 
         return PendingJobCounts(
             main_jobs=main_jobs,
@@ -2305,6 +2454,22 @@ def safe_current_wb_run_id() -> str | None:
         return None
     else:
         return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
+
+
+def safe_current_wb_run_step() -> int | None:
+    try:
+        import wandb
+
+        wandb_run = wandb.run
+        if wandb_run is None:
+            return None
+    except ImportError:
+        return None
+    else:
+        try:
+            return int(wandb_run.step)
+        except Exception:
+            return None
 
 
 def check_wandb_run_matches(
@@ -2392,6 +2557,27 @@ def elide_display_name(name: str) -> str:
         )
         return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
     return name
+
+
+def zip_dicts(base_dict: dict, new_dict: dict) -> dict:
+    final_dict = {}
+    for key, value in base_dict.items():
+        if key in new_dict:
+            # Shared key (if both dicts, merge)
+            new_value = new_dict[key]
+            if isinstance(value, dict) and isinstance(new_value, dict):
+                final_dict[key] = zip_dicts(value, new_value)
+            else:
+                # base-only key
+                final_dict[key] = new_value
+        else:
+            final_dict[key] = value
+    for key, value in new_dict.items():
+        if key not in base_dict:
+            # new-only key
+            final_dict[key] = value
+
+    return final_dict
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

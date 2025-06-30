@@ -2,6 +2,7 @@ import {Box, Tooltip} from '@material-ui/core';
 import {WarningAmberOutlined} from '@mui/icons-material';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
+import {TailwindContents} from '@wandb/weave/components/Tailwind';
 import _ from 'lodash';
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import styled from 'styled-components';
@@ -26,6 +27,7 @@ import {CallLink} from '../../../common/Links';
 import {useCompareEvaluationsState} from '../../compareEvaluationsContext';
 import {
   buildCompositeMetricsMap,
+  CompositeScoreMetrics,
   CompositeSummaryMetricGroupForKeyPath,
   DERIVED_SCORER_REF_PLACEHOLDER,
   resolvePeerDimension,
@@ -199,6 +201,22 @@ const stickySidebarHeaderMixin: React.CSSProperties = {
  *    * Example. Go here and make the screen quite small - notice the 3rd eval's trials don't have sticky headers
  *      https://wandb.ai/shawn/humaneval6/weave/compare-evaluations?evaluationCallIds=%5B%2258c9db2c-c1f8-4643-a79d-7a13c55fbc72%22%2C%228563f89b-07e8-4042-9417-e22b4257bf95%22%2C%2232f3e6bc-5488-4dd4-b9c4-801929f2c541%22%2C%2234c0a20f-657f-407e-bb33-277abbb9997f%22%5D
  */
+export const ExampleCompareSectionDetailGuarded: typeof ExampleCompareSectionDetail =
+  props => {
+    const ctx = useCompareEvaluationsState();
+    const {filteredRows} = useFilteredAggregateRows(ctx.state);
+    if (_.isEmpty(filteredRows)) {
+      return (
+        <TailwindContents>
+          <div className="m-8">
+            These evaluations have no common rows between them, or the filter is
+            too restrictive.
+          </div>
+        </TailwindContents>
+      );
+    }
+    return <ExampleCompareSectionDetail {...props} />;
+  };
 
 export const ExampleCompareSectionDetail: React.FC<{
   // Not to future devs: `state` here can be derived from the context.
@@ -399,35 +417,12 @@ export const ExampleCompareSectionDetail: React.FC<{
     const targetTrial = lookupTargetTrial(evalIndex, trialIndex);
     const currEvalCallId = orderedCallIds[evalIndex];
     const dimension = lookupDimension(scorerIndex, metricIndex);
-    const resolvedScoreId = resolvePeerDimension(
-      compositeScoreMetrics,
+    return lookupMetricValueDirect(
+      targetTrial.scores,
       currEvalCallId,
-      dimension
+      dimension,
+      compositeScoreMetrics
     );
-    // If we get a valid resolution through the normal path, use that
-    if (resolvedScoreId != null) {
-      const metricId = metricDefinitionId(resolvedScoreId);
-      if (
-        targetTrial.scores &&
-        metricId in targetTrial.scores &&
-        currEvalCallId in targetTrial.scores[metricId]
-      ) {
-        return targetTrial.scores[metricId][currEvalCallId];
-      }
-    }
-
-    // Fallback: try direct lookup using the original dimension's metric ID
-    // This is needed for imperative evaluations that don't get properly resolved
-    const originalMetricId = metricDefinitionId(dimension);
-    if (
-      targetTrial.scores &&
-      originalMetricId in targetTrial.scores &&
-      currEvalCallId in targetTrial.scores[originalMetricId]
-    ) {
-      return targetTrial.scores[originalMetricId][currEvalCallId];
-    }
-
-    return undefined;
   };
 
   const lookupAggScorerMetricValue = (
@@ -725,11 +720,7 @@ export const ExampleCompareSectionDetail: React.FC<{
             onClick={() => {
               props.onExpandToggle();
             }}>
-            <Icon
-              name={
-                props.isExpanded ? 'expand-right' : 'full-screen-mode-expand'
-              }
-            />
+            <Icon name={props.isExpanded ? 'expand-right' : 'contract-left'} />
           </IconButton>
         </Tooltip>
         <Tooltip title="Close">
@@ -1131,4 +1122,41 @@ export const evalAggScorerMetricCompGeneric = (
       />
     </HorizontalBox>
   );
+};
+
+export const lookupMetricValueDirect = (
+  targetTrialScores: PivotedRow['scores'],
+  currEvalCallId: string,
+  dimension: MetricDefinition,
+  compositeScoreMetrics: CompositeScoreMetrics
+): MetricValueType | undefined => {
+  const resolvedScoreId = resolvePeerDimension(
+    compositeScoreMetrics,
+    currEvalCallId,
+    dimension
+  );
+  // If we get a valid resolution through the normal path, use that
+  if (resolvedScoreId != null) {
+    const metricId = metricDefinitionId(resolvedScoreId);
+    if (
+      targetTrialScores &&
+      metricId in targetTrialScores &&
+      currEvalCallId in targetTrialScores[metricId]
+    ) {
+      return targetTrialScores[metricId][currEvalCallId];
+    }
+  }
+
+  // Fallback: try direct lookup using the original dimension's metric ID
+  // This is needed for imperative evaluations that don't get properly resolved
+  const originalMetricId = metricDefinitionId(dimension);
+  if (
+    targetTrialScores &&
+    originalMetricId in targetTrialScores &&
+    currEvalCallId in targetTrialScores[originalMetricId]
+  ) {
+    return targetTrialScores[originalMetricId][currEvalCallId];
+  }
+
+  return undefined;
 };

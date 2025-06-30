@@ -95,6 +95,44 @@ This image is logged to Weave and automatically displayed in the UI.
 
 ![Screenshot of pumpkin cat trace view](imgs/cat-pumpkin-trace.png)
 
+### Resize large images before logging
+
+It can be helpful to resize images before logging to reduce UI rendering cost and storage impact. You can use `postprocess_output` in your `@weave.op` to resize an image.
+
+```python
+from dataclasses import dataclass
+from typing import Any
+from PIL import Image
+import weave
+
+weave.init('image-resize-example')
+
+# Custom output type
+@dataclass
+class ImageResult:
+    label: str
+    image: Image.Image
+
+# Resize helper
+def resize_image(image: Image.Image, max_size=(512, 512)) -> Image.Image:
+    image = image.copy()
+    image.thumbnail(max_size, Image.ANTIALIAS)
+    return image
+
+# Postprocess output to resize image before logging
+def postprocess_output(output: ImageResult) -> ImageResult:
+    resized = resize_image(output.image)
+    return ImageResult(label=output.label, image=resized)
+
+@weave.op(postprocess_output=postprocess_output)
+def generate_large_image() -> ImageResult:
+    # Create an example image to process (e.g., 2000x2000 red square)
+    img = Image.new("RGB", (2000, 2000), color="red")
+    return ImageResult(label="big red square", image=img)
+
+generate_large_image()
+```
+
 ## Audio
 
 Logging type: `wave.Wave_read`. 
