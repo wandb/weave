@@ -1,6 +1,25 @@
 import os
 
 import pytest
+from llama_index.core import (
+    SimpleDirectoryReader,
+    StorageContext,
+    VectorStoreIndex,
+    load_index_from_storage,
+)
+from llama_index.core.agent.workflow import FunctionAgent
+from llama_index.core.llms import ChatMessage
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.tools import FunctionTool
+from llama_index.core.workflow import (
+    Event,
+    StartEvent,
+    StopEvent,
+    Workflow,
+    step,
+)
+from llama_index.llms.openai import OpenAI
+from pydantic import BaseModel
 
 from weave.integrations.integration_utilities import (
     filter_body,
@@ -20,8 +39,6 @@ from weave.trace_server.trace_server_interface import CallsFilter
 )
 def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
     """Test synchronous LLM complete operation."""
-    from llama_index.llms.openai import OpenAI
-
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     response = llm.complete("William Shakespeare is ")
@@ -92,8 +109,6 @@ def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
 @pytest.mark.asyncio
 async def test_llamaindex_llm_complete_async(client: WeaveClient) -> None:
     """Test asynchronous LLM complete operation."""
-    from llama_index.llms.openai import OpenAI
-
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     response = await llm.acomplete("William Shakespeare is ")
@@ -158,8 +173,6 @@ async def test_llamaindex_llm_complete_async(client: WeaveClient) -> None:
 )
 def test_llamaindex_llm_stream_complete_sync(client: WeaveClient) -> None:
     """Test synchronous LLM streaming complete operation."""
-    from llama_index.llms.openai import OpenAI
-
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     handle = llm.stream_complete("William Shakespeare is ")
@@ -240,8 +253,6 @@ def test_llamaindex_llm_stream_complete_sync(client: WeaveClient) -> None:
 @pytest.mark.asyncio
 async def test_llamaindex_llm_stream_complete_async(client: WeaveClient) -> None:
     """Test asynchronous LLM streaming complete operation."""
-    from llama_index.llms.openai import OpenAI
-
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     handle = await llm.astream_complete("William Shakespeare is ")
@@ -314,9 +325,6 @@ async def test_llamaindex_llm_stream_complete_async(client: WeaveClient) -> None
 )
 def test_llamaindex_llm_chat_sync(client: WeaveClient) -> None:
     """Test synchronous LLM chat operation."""
-    from llama_index.core.llms import ChatMessage
-    from llama_index.llms.openai import OpenAI
-
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     messages = [
@@ -401,9 +409,6 @@ def test_llamaindex_llm_chat_sync(client: WeaveClient) -> None:
 @pytest.mark.asyncio
 async def test_llamaindex_llm_chat_async(client: WeaveClient) -> None:
     """Test asynchronous LLM chat operation."""
-    from llama_index.core.llms import ChatMessage
-    from llama_index.llms.openai import OpenAI
-
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     messages = [
@@ -487,9 +492,6 @@ async def test_llamaindex_llm_chat_async(client: WeaveClient) -> None:
 )
 def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
     """Test synchronous LLM streaming chat operation."""
-    from llama_index.core.llms import ChatMessage
-    from llama_index.llms.openai import OpenAI
-
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     messages = [
@@ -600,9 +602,6 @@ def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
 @pytest.mark.asyncio
 async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
     """Test asynchronous LLM streaming chat operation."""
-    from llama_index.core.llms import ChatMessage
-    from llama_index.llms.openai import OpenAI
-
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     messages = [
@@ -713,11 +712,6 @@ async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
 )
 def test_llamaindex_tool_calling_sync(client: WeaveClient) -> None:
     """Test synchronous LLM tool calling operation."""
-    import os
-
-    from llama_index.core.tools import FunctionTool
-    from llama_index.llms.openai import OpenAI
-    from pydantic import BaseModel
 
     class Song(BaseModel):
         name: str
@@ -791,13 +785,6 @@ def test_llamaindex_tool_calling_sync(client: WeaveClient) -> None:
 @pytest.mark.asyncio
 async def test_llamaindex_workflow(client: WeaveClient) -> None:
     """Test LlamaIndex workflow execution."""
-    from llama_index.core.workflow import (
-        Event,
-        StartEvent,
-        StopEvent,
-        Workflow,
-        step,
-    )
 
     class FirstEvent(Event):
         first_output: str
@@ -841,16 +828,6 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
 )
 @pytest.mark.asyncio
 async def test_llamaindex_quick_start(client: WeaveClient) -> None:
-    from llama_index.core import (
-        SimpleDirectoryReader,
-        StorageContext,
-        VectorStoreIndex,
-        load_index_from_storage,
-    )
-    from llama_index.core.agent.workflow import FunctionAgent
-    from llama_index.core.node_parser import SentenceSplitter
-    from llama_index.llms.openai import OpenAI
-
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
 
     documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
