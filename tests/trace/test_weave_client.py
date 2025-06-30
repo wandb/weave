@@ -3575,9 +3575,9 @@ def test_filter_calls_by_ref_properties(client):
     if client_is_sqlite(client):
         pytest.skip("Not implemented in SQLite")
 
-    nested1 = {"nested key with spaces": {"1": "1"}}
+    nested1 = {"nested key with spaces": {"one": "1"}}
     nested_ref = weave.publish(nested1, "nested")
-    nested2 = {"nested key with spaces": {"1": "2"}}
+    nested2 = {"nested key with spaces": {"one": "2"}}
     nested2_ref = weave.publish(nested2, "nested")
 
     # Create configuration objects to be referenced
@@ -3836,7 +3836,7 @@ def test_filter_calls_by_ref_properties(client):
                 "$expr": {
                     "$eq": [
                         {
-                            "$getField": "inputs.worker_config.config.nested.nested key with spaces.1"
+                            "$getField": "inputs.worker_config.config.nested.nested key with spaces.one"
                         },
                         {"$literal": "1"},
                     ]

@@ -315,11 +315,15 @@ class OrderField(BaseModel):
     field: QueryBuilderField
     direction: Literal["ASC", "DESC"]
 
-    def _get_order_options(
-        self, is_object_ref: bool = False
-    ) -> list[tuple[Optional[tsi_query.CastTo], str]]:
-        """Get the order options for this field."""
-        if is_object_ref or isinstance(
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        expand_columns: Optional[list[str]] = None,
+        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
+    ) -> str:
+        options: list[tuple[Optional[tsi_query.CastTo], str]]
+        if isinstance(
             self.field,
             (
                 QueryBuilderDynamicField,
@@ -328,35 +332,14 @@ class OrderField(BaseModel):
             ),
         ):
             # Prioritize existence, then cast to double, then str
-            return [
+            options = [
                 ("exists", "desc"),
                 ("double", self.direction),
                 ("string", self.direction),
             ]
         else:
-            return [(None, self.direction)]
+            options = [(None, self.direction)]
 
-    def _build_order_sql_from_options(
-        self,
-        pb: ParamBuilder,
-        base_sql: str,
-        options: list[tuple[Optional[tsi_query.CastTo], str]],
-    ) -> str:
-        """Build the order SQL from options."""
-        res = ""
-        for index, (cast_to, direction) in enumerate(options):
-            if index > 0:
-                res += ", "
-            res += f"{clickhouse_cast(base_sql, cast_to)} {direction}"
-        return res
-
-    def as_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-        expand_columns: Optional[list[str]] = None,
-        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
-    ) -> str:
         # Check if this is an object ref order field
         if (
             expand_columns
@@ -369,13 +352,26 @@ class OrderField(BaseModel):
             )
             cte_alias = field_to_object_join_alias_map.get(order_condition.unique_key)
             if cte_alias:
+                res = ""
                 base_sql = f"any({cte_alias}.object_val_dump)"
-                options = self._get_order_options(is_object_ref=True)
-                return self._build_order_sql_from_options(pb, base_sql, options)
+                for index, (cast_to, direction) in enumerate(options):
+                    if index > 0:
+                        res += ", "
+                    # For object refs, we use the base_sql directly with casting
+                    if cast_to:
+                        cast_sql = clickhouse_cast(base_sql, cast_to)
+                    else:
+                        cast_sql = base_sql
+                    res += f"{cast_sql} {direction}"
+                return res
 
-        options = self._get_order_options()
-        base_sql = self.field.as_sql(pb, table_alias)
-        return self._build_order_sql_from_options(pb, base_sql, options)
+        # Standard field ordering logic
+        res = ""
+        for index, (cast_to, direction) in enumerate(options):
+            if index > 0:
+                res += ", "
+            res += f"{self.field.as_sql(pb, table_alias, cast_to)} {direction}"
+        return res
 
     @property
     def raw_field_path(self) -> str:
