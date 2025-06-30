@@ -527,18 +527,6 @@ export const CallsTable: FC<{
     !!calls.storageSizeError
   );
 
-  // This contains columns which are suitable for selection and raw data
-  // entry. Notably, not children of expanded refs.
-  const filterFriendlyColumnInfo = useMemo(() => {
-    const filteredCols = columns.cols.filter(
-      col => !columnIsRefExpanded(col.field)
-    );
-    return {
-      cols: filteredCols,
-      colGroupingModel: columns.colGroupingModel,
-    };
-  }, [columnIsRefExpanded, columns.colGroupingModel, columns.cols]);
-
   // Now, there are 4 primary controls:
   // 1. Op Version
   // 2. Input Object Version
@@ -936,7 +924,7 @@ export const CallsTable: FC<{
                   entity={entity}
                   project={project}
                   filterModel={filterModel}
-                  columnInfo={filterFriendlyColumnInfo}
+                  columnInfo={columns}
                   setFilterModel={setFilterModel}
                   selectedCalls={selectedCalls}
                   clearSelectedCalls={clearSelectedCalls}
