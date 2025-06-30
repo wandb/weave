@@ -147,13 +147,11 @@ export const normalizeChatRequest = (request: any): ChatRequest => {
   if (isTraceCallChatFormatOAIResponsesRequest(request)) {
     return normalizeOAIResponsesRequest(request);
   }
-  if (isAnthropicCompletionFormat(request)) {
-    return normalizeAnthropicChatRequest(request);
-  }
   if (isTraceCallChatFormatOTEL(request)) {
     return normalizeOTELChatRequest(request);
   }
-  return request as ChatRequest;
+  // Anthropic is close but system and nested tool calls handled differently
+  return normalizeAnthropicChatRequest(request) as ChatRequest;
 };
 
 export const useCallAsChat = (
