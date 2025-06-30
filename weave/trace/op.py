@@ -867,6 +867,7 @@ def _call_sync_gen(
             # Re-raise the original exception if __should_raise is False
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
+                nonlocal e
                 raise e
             # This will never actually yield anything but is needed for typing
             yield from []
@@ -1081,6 +1082,7 @@ async def _call_async_gen(
             # Re-raise the original exception if __should_raise is False
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
+                nonlocal e
                 raise e
             # This will never actually yield anything but is needed for typing
             for _ in []:
