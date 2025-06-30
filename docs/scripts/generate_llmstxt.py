@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import subprocess
 import shutil
+import subprocess
 from pathlib import Path
 
 
@@ -12,7 +12,9 @@ def run_gitingest_on_docs_dir(docs_dir: Path) -> Path:
     subprocess.run(["gitingest", "."], cwd=docs_dir, check=True)
 
     if not digest_path.exists():
-        raise FileNotFoundError(f"Expected digest at {digest_path}, but it wasn't found.")
+        raise FileNotFoundError(
+            f"Expected digest at {digest_path}, but it wasn't found."
+        )
     return digest_path
 
 
