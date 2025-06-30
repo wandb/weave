@@ -169,7 +169,6 @@ export const MonitorFormDrawer = ({
     });
     setFilterModel(queryToGridFilterModel(monitor.val['query']) ?? {items: []});
     setSelectedOpVersionOption(monitor.val['op_names'] ?? []);
-    //setScorers(existingScorers ?? []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monitor]);
 
