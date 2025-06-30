@@ -944,21 +944,20 @@ class CallsQuery(BaseModel):
         if expand_columns and field_to_object_join_alias_map:
             for order_field in self.order_fields:
                 field_path = order_field.raw_field_path
-                if has_object_ref_field(field_path, expand_columns):
-                    order_condition = ObjectRefOrderCondition(
-                        field_path=field_path,
-                        expand_columns=expand_columns,
-                    )
-                    cte_alias = field_to_object_join_alias_map.get(
-                        order_condition.unique_key
-                    )
-                    if cte_alias:
-                        accessor_key = order_condition.get_accessor_key()
-                        root_field = order_condition.get_root_field()
-                        json_path_param = pb.add_param(f"$.{accessor_key}")
-                        object_ref_joins_sql += f"""
-            LEFT JOIN {cte_alias}
-                ON JSON_VALUE({table_alias}.{root_field}, {param_slot(json_path_param, "String")}) = {cte_alias}.full_ref"""
+                if not has_object_ref_field(field_path, expand_columns):
+                    continue
+                order_condition = ObjectRefOrderCondition(
+                    field_path=field_path,
+                    expand_columns=expand_columns,
+                )
+                join_condition_sql = order_condition.as_sql_condition(
+                    pb,
+                    table_alias,
+                    field_to_object_join_alias_map,
+                    is_order_join=True,
+                    use_agg_fn=False,
+                )
+                object_ref_joins_sql += join_condition_sql
 
         raw_sql = f"""
         SELECT {select_fields_sql}

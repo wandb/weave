@@ -202,6 +202,59 @@ class ObjectRefCondition:
         """
         raise NotImplementedError("Child classes must implement unique_key property")
 
+    def as_sql_condition(
+        self,
+        pb: "ParamBuilder",
+        table_alias: str,
+        field_to_object_join_alias_map: dict[str, str],
+        use_agg_fn: bool = True,
+        is_order_join: bool = False,
+    ) -> str:
+        """
+        Generate SQL condition for this object reference condition.
+
+        Args:
+            pb: Parameter builder for SQL parameters
+            table_alias: Table alias to use in the query
+            field_to_object_join_alias_map: Mapping from condition keys to CTE names
+
+        Returns:
+            str: SQL condition string
+
+        Examples:
+            >>> condition = ObjectRefFilterCondition(...)
+            >>> condition.as_sql_condition(pb, "calls_merged", {"field_eq_value": "obj_filter_0"})
+            'JSON_VALUE(any(calls_merged.inputs_dump), $.model) IN (SELECT ref FROM obj_filter_0)'
+        """
+        if self.unique_key not in field_to_object_join_alias_map:
+            raise ValueError(
+                f"Condition key {self.unique_key} not found in field_to_object_join_alias_map"
+            )
+
+        cte_alias = field_to_object_join_alias_map[self.unique_key]
+
+        # Extract the root field and accessor key from the condition
+        root_field = self.get_root_field()
+        key = self.get_accessor_key()
+
+        key_parts = key.split(".") if key else []
+        field_sql = f"{table_alias}.{root_field}"
+        if use_agg_fn:
+            field_sql = f"any({field_sql})"
+        json_extract_sql = json_dump_field_as_sql(
+            pb, table_alias, field_sql, key_parts, use_agg_fn=use_agg_fn
+        )
+        if self.is_table_rows_condition:
+            # If we dealing with table row refs, they are in the format:
+            # weave-trace-internal:///<project_id>/object/<object_id>:<digest>/attr/rows/id/<row_digest>
+            # we only want to join on <row_digest> so extract it
+            json_extract_sql = f"regexpExtract({json_extract_sql}, '/([^/]+)$', 1)"
+
+        if is_order_join:
+            return f"LEFT JOIN {cte_alias} ON {json_extract_sql} = {cte_alias}.ref"
+
+        return f"{json_extract_sql} IN (SELECT ref FROM {cte_alias})"
+
 
 class ObjectRefFilterCondition(ObjectRefCondition):
     """Represents a condition that filters on object references"""
@@ -437,8 +490,8 @@ class ObjectRefQueryProcessor:
                 raise ValueError(
                     f"Leaf operand {operand} has multiple object ref conditions: {object_ref_conditions}"
                 )
-            return self._handle_single_object_ref_condition(
-                operand, object_ref_conditions[0]
+            return object_ref_conditions[0].as_sql_condition(
+                self.pb, self.table_alias, self.field_to_object_join_alias_map
             )
         else:
             # Handle as normal condition
@@ -452,32 +505,6 @@ class ObjectRefQueryProcessor:
                 self.table_alias,
             )
             return combine_conditions(filter_conditions.conditions, "AND")
-
-    def _handle_single_object_ref_condition(
-        self,
-        operand: "tsi_query.Operand",
-        condition: ObjectRefCondition,
-    ) -> str:
-        """Handle a single object reference condition."""
-        if condition.unique_key not in self.field_to_object_join_alias_map:
-            raise ValueError(
-                f"Condition key {condition.unique_key} not found in field_to_object_join_alias_map"
-            )
-
-        correct_cte = self.field_to_object_join_alias_map[condition.unique_key]
-
-        # Extract the root field and accessor key from the condition
-        root_field = condition.get_root_field()
-        key = condition.get_accessor_key()
-
-        key_parts = key.split(".") if key else []
-        field_sql = f"any({self.table_alias}.{root_field})"
-        json_extract_sql = json_dump_field_as_sql(
-            self.pb, self.table_alias, field_sql, key_parts, use_agg_fn=False
-        )
-        if condition.is_table_rows_condition:
-            json_extract_sql = f"regexpExtract({json_extract_sql}, '/([^/]+)$', 1)"
-        return f"{json_extract_sql} IN (SELECT full_ref FROM {correct_cte})"
 
 
 class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
@@ -713,12 +740,13 @@ def build_object_ref_ctes(
         if condition.is_table_rows_condition:
             leaf_cte = f"""
             {leaf_cte_name} AS (
-                SELECT distinct(digest) as full_ref
+                SELECT {val_dump_select}
+                    any(digest) as ref
                 FROM table_rows
                 WHERE project_id = {param_slot(project_param, "String")}
                 {val_condition_sql}
-            )
-            """
+                GROUP BY project_id, digest
+            )"""
         else:
             leaf_cte = f"""
             {leaf_cte_name} AS (
@@ -726,7 +754,7 @@ def build_object_ref_ctes(
                     object_id,
                     digest,
                     {val_dump_select}
-                    concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                    concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
                 FROM object_versions
                 WHERE project_id = {param_slot(project_param, "String")}
                     {val_condition_sql}
@@ -754,7 +782,7 @@ def build_object_ref_ctes(
                     intermediate_val_dump_select = (
                         "any(prev.object_val_dump) AS object_val_dump,"
                     )
-                    join_clause_for_ordering = f"JOIN {current_cte_name} prev ON JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) = prev.full_ref"
+                    join_clause_for_ordering = f"JOIN {current_cte_name} prev ON JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) = prev.ref"
 
                 intermediate_cte = f"""
                 {intermediate_cte_name} AS (
@@ -762,12 +790,12 @@ def build_object_ref_ctes(
                         ov.object_id,
                         ov.digest,
                         {intermediate_val_dump_select}
-                        concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS full_ref
+                        concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
                     FROM object_versions ov
                     {join_clause_for_ordering}
                     WHERE ov.project_id = {param_slot(project_param, "String")}
                         AND JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) IN (
-                            SELECT full_ref FROM {current_cte_name}
+                            SELECT ref FROM {current_cte_name}
                         )
                     GROUP BY ov.project_id, ov.object_id, ov.digest
                 )"""
