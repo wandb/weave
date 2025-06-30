@@ -72,6 +72,7 @@ const SCORER_FORMS: Map<string, ScorerFormType | null> = new Map([
 export const MonitorDrawerRouter = (props: MonitorFormDrawerProps) => {
   // Empty props.monitor.val['scorers'] should not happen but some such monitors
   // were persisted in the DB due to an early bug.
+  // Fixed here: https://github.com/wandb/weave/pull/4945
   if (props.monitor && props.monitor.val['scorers'].length > 0) {
     return (
       <EditMonitorDrawerWithScorers {...props} monitor={props.monitor} /> // Repeating monitor to appease type checking
