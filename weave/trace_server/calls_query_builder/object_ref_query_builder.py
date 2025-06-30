@@ -52,6 +52,16 @@ class ObjectRefCondition:
         self.case_insensitive = case_insensitive
         self.conversion_type = conversion_type
 
+    @property
+    def is_table_rows_condition(self) -> bool:
+        # TODO: is this the only time this is an actual table join condition??
+        if (
+            self.field_path.startswith("inputs.example")
+            and "inputs.example" in self.expand_columns
+        ):
+            return True
+        return False
+
     def get_expand_column_match(self, shortest: bool = True) -> Optional[str]:
         """Find the matching expand column for this field path.
 
@@ -465,6 +475,8 @@ class ObjectRefQueryProcessor:
         json_extract_sql = json_dump_field_as_sql(
             self.pb, self.table_alias, field_sql, key_parts, use_agg_fn=False
         )
+        if condition.is_table_rows_condition:
+            json_extract_sql = f"regexpExtract({json_extract_sql}, '/([^/]+)$', 1)"
         return f"{json_extract_sql} IN (SELECT full_ref FROM {correct_cte})"
 
 
@@ -545,35 +557,8 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                     **condition_kwargs,
                 )
                 self.object_ref_conditions.append(obj_condition)
-                return self._create_cte_based_condition(obj_condition)
 
         return None
-
-    def _create_cte_based_condition(self, condition: ObjectRefCondition) -> str:
-        """Create a SQL condition that uses the CTE for this object ref"""
-        expand_match = condition.get_expand_column_match()
-        if not expand_match:
-            raise ValueError(f"No expand column match found for {condition.field_path}")
-
-        # Get the root field (e.g., 'inputs_dump')
-        root_field = condition.get_root_field()
-
-        # Get the JSON accessor key for this condition
-        key = condition.get_accessor_key()
-
-        # Parameterize the JSON path
-        json_path_param = self.pb.add_param(quote_json_path(key))
-
-        # Get the CTE name for this condition
-        index = self.object_ref_conditions.index(condition)
-        cte_name = _get_cte_name_for_condition(index)
-
-        key_parts = key.split(".") if key else []
-        field_sql = f"any({self.table_alias}.{root_field})"
-        json_extract_sql = json_dump_field_as_sql(
-            self.pb, self.table_alias, field_sql, key_parts, use_agg_fn=False
-        )
-        return f"{json_extract_sql} IN (SELECT full_ref FROM {cte_name})"
 
     def process_or(self, operation: tsi_query.OrOperation) -> Optional[str]:
         """Process OR operations to extract object reference conditions from all operands."""
@@ -603,7 +588,6 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                     case_insensitive=operation.contains_.case_insensitive or False,
                 )
                 self.object_ref_conditions.append(obj_condition)
-                return self._create_cte_based_condition(obj_condition)
 
         return None
 
@@ -635,10 +619,6 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                     expand_columns=self.expand_columns,
                 )
                 self.object_ref_conditions.append(obj_condition)
-
-                # Return the CTE-based condition
-                return self._create_cte_based_condition(obj_condition)
-
         return None
 
 
@@ -730,18 +710,28 @@ def build_object_ref_ctes(
         val_condition_sql = f"AND {val_condition}" if val_condition else ""
 
         # Build the leaf CTE
-        leaf_cte = f"""
-        {leaf_cte_name} AS (
-            SELECT
-                object_id,
-                digest,
-                {val_dump_select}
-                concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
-            FROM object_versions
-            WHERE project_id = {param_slot(project_param, "String")}
+        if condition.is_table_rows_condition:
+            leaf_cte = f"""
+            {leaf_cte_name} AS (
+                SELECT distinct(digest) as full_ref
+                FROM table_rows
+                WHERE project_id = {param_slot(project_param, "String")}
                 {val_condition_sql}
-            GROUP BY project_id, object_id, digest
-        )"""
+            )
+            """
+        else:
+            leaf_cte = f"""
+            {leaf_cte_name} AS (
+                SELECT
+                    object_id,
+                    digest,
+                    {val_dump_select}
+                    concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                FROM object_versions
+                WHERE project_id = {param_slot(project_param, "String")}
+                    {val_condition_sql}
+                GROUP BY project_id, object_id, digest
+            )"""
 
         cte_parts.append(leaf_cte)
         current_cte_name = leaf_cte_name
