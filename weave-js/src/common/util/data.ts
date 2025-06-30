@@ -117,10 +117,8 @@ export function expandRangeToNElements(
   } else {
     newBeginI = startI - frontHalf;
   }
-  console.log('newBeginI', newBeginI);
 
   newEndI = Math.min(newBeginI + n, collection.length) - 1;
-  console.log('newEndI', newEndI);
 
   return [collection[newBeginI], collection[newEndI]];
 }
