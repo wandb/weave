@@ -3,6 +3,8 @@ import json
 import types
 from typing import Any, Optional, Union
 
+from pydantic import BaseModel
+
 from weave.integrations.patcher import Patcher
 from weave.trace.context import weave_client_context
 from weave.trace.weave_client import Call, WeaveClient
@@ -23,8 +25,6 @@ except Exception:
 # Module-level shared state
 _weave_calls_map: dict[Union[str, tuple[Optional[str], str]], Call] = {}
 _weave_client_instance: Optional[WeaveClient] = None
-_global_root_call: Optional[Call] = None
-# dict of id_ to [call, is_first_progress_event, accumulated_text, event_payload, result, error]
 _accumulators: dict[str, list[Any]] = {}
 
 
@@ -37,7 +37,7 @@ def get_weave_client() -> WeaveClient:
 
 def _convert_instance_to_dict(obj: Any) -> Any:
     """Convert a class instance to a dict if possible."""
-    if hasattr(obj, "model_dump"):  # Handle pydantic models
+    if isinstance(obj, BaseModel):  # Handle pydantic models
         return obj.model_dump(exclude_none=True)
     elif hasattr(obj, "__dict__"):  # Handle regular class instances
         return {
@@ -115,7 +115,7 @@ if not _import_failed:
 
         def _map_args_to_params(
             self,
-            instance: Optional[Any],
+            instance: Any,
             bound_args: Any,
             id_: str,
         ) -> dict[str, Any]:
@@ -200,8 +200,6 @@ if not _import_failed:
             parent_call = None
             if parent_span_id and parent_span_id in _weave_calls_map:
                 parent_call = _weave_calls_map[parent_span_id]
-            elif _global_root_call:  # Default to global root call
-                parent_call = _global_root_call
 
             # we check if the span is streaming by checking if the op_name contains streaming indicators
             self._is_streaming = (
@@ -260,7 +258,7 @@ if not _import_failed:
 
                 if result is not None:
                     try:
-                        if hasattr(result, "model_dump"):
+                        if isinstance(result, BaseModel):
                             outputs = _process_inputs(
                                 result.model_dump(exclude_none=True)
                             )
@@ -412,7 +410,7 @@ if not _import_failed:
                     outputs = None
                     if deferred_result is not None:
                         try:
-                            if hasattr(deferred_result, "model_dump"):
+                            if isinstance(deferred_result, BaseModel):
                                 outputs = _process_inputs(
                                     deferred_result.model_dump(exclude_none=True)
                                 )
@@ -455,7 +453,7 @@ class LLamaIndexPatcher(Patcher):  # pyright: ignore[reportRedeclaration]
 
     def attempt_patch(self) -> bool:
         """Attempts to patch LlamaIndex instrumentation and set up Weave handlers."""
-        global _global_root_call, _import_failed
+        global _import_failed
         if _import_failed:
             return False
 
