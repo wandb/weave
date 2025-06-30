@@ -28,10 +28,15 @@ _weave_client_instance: Optional[WeaveClient] = None
 _accumulators: dict[str, list[Any]] = {}
 
 
-def get_weave_client() -> WeaveClient:
+def get_weave_client() -> Optional[WeaveClient]:
+    """Get the weave client, returning None if weave hasn't been initialized."""
     global _weave_client_instance
     if _weave_client_instance is None:
-        _weave_client_instance = weave_client_context.require_weave_client()
+        try:
+            _weave_client_instance = weave_client_context.require_weave_client()
+        except Exception:
+            # weave.init() hasn't been called
+            return None
     return _weave_client_instance
 
 
@@ -185,6 +190,9 @@ if not _import_failed:
         ) -> None:
             """Creates a Weave call when a LlamaIndex span starts."""
             gc = get_weave_client()
+            if gc is None:
+                print("Weave: Please call weave.init() to enable LlamaIndex tracing")
+                return
             op_name = _get_op_name_from_span(id_)
 
             # Map arguments to their parameter names
@@ -228,6 +236,8 @@ if not _import_failed:
         ) -> None:
             """Common logic for finishing a Weave call for a LlamaIndex span."""
             gc = get_weave_client()
+            if gc is None:
+                return
 
             # For streaming spans, defer finishing until EndEvent to keep span on call stack
             # for proper OpenAI autopatch parenting
@@ -316,6 +326,9 @@ if not _import_failed:
         def handle(self, event: BaseEvent) -> None:
             """Processes a LlamaIndex event, creating or finishing a Weave call."""
             gc = get_weave_client()
+            if gc is None:
+                print("Weave: Please call weave.init() to enable LlamaIndex tracing")
+                return
             event_class_name = event.class_name()
 
             # Get base event name (e.g., "Embedding" from "EmbeddingStartEvent")
