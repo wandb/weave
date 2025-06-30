@@ -83,6 +83,9 @@ class QueryBuilderField(BaseModel):
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
+    def is_heavy(self) -> bool:
+        return False
+
 
 class CallsMergedField(QueryBuilderField):
     def is_heavy(self) -> bool:
@@ -358,10 +361,10 @@ class OrderField(BaseModel):
                     if index > 0:
                         res += ", "
                     # For object refs, we use the base_sql directly with casting
-                    if cast_to:
-                        cast_sql = clickhouse_cast(base_sql, cast_to)
+                    if cast_to == "exists":
+                        cast_sql = f"(NOT (JSONType(any({cte_alias}.object_val_dump)) = 'Null' OR JSONType(any({cte_alias}.object_val_dump)) IS NULL))"
                     else:
-                        cast_sql = base_sql
+                        cast_sql = clickhouse_cast(base_sql, cast_to)
                     res += f"{cast_sql} {direction}"
                 return res
 

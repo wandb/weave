@@ -3850,3 +3850,202 @@ def test_filter_calls_by_ref_properties(client):
         )
     )
     assert len(calls) == 1
+
+    # now test that we can order by object ref fields too
+    calls = list(
+        client.get_calls(
+            sort_by=[
+                tsi.SortBy(
+                    field="inputs.worker_config.config.nested.nested key with spaces.one",
+                    direction="asc",
+                )
+            ],
+            expand_columns=[
+                "inputs.worker_config",
+                "inputs.worker_config.config",
+                "inputs.worker_config.config.nested",
+            ],
+        )
+    )
+    assert (
+        calls[0].inputs["worker_config"]["config"]["nested"]["nested key with spaces"][
+            "one"
+        ]
+        == "1"
+    )
+    assert (
+        calls[1].inputs["worker_config"]["config"]["nested"]["nested key with spaces"][
+            "one"
+        ]
+        == "2"
+    )
+
+    # desc
+    calls = list(
+        client.get_calls(
+            sort_by=[
+                tsi.SortBy(
+                    field="inputs.worker_config.config.nested.nested key with spaces.one",
+                    direction="desc",
+                )
+            ],
+            expand_columns=[
+                "inputs.worker_config",
+                "inputs.worker_config.config",
+                "inputs.worker_config.config.nested",
+            ],
+        )
+    )
+    assert (
+        calls[0].inputs["worker_config"]["config"]["nested"]["nested key with spaces"][
+            "one"
+        ]
+        == "2"
+    )
+    assert (
+        calls[1].inputs["worker_config"]["config"]["nested"]["nested key with spaces"][
+            "one"
+        ]
+        == "1"
+    )
+
+
+def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
+    """Test filtering calls by values within objects stored as refs in inputs/outputs."""
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    # run an evaluation, then delete the evaluation and its children
+    @weave.op()
+    async def model_predict(input) -> str:
+        return eval(input)
+
+    object_ref1 = weave.publish({"a": 1, "b": 2}, "object")
+    object_ref2 = weave.publish({"a": 3, "b": 4}, "object")
+    object_ref3 = weave.publish({"a": 5, "b": 6}, "object")
+    object_ref4 = weave.publish({"a": 7, "b": 8}, "object")
+    object_ref5 = weave.publish({"a": 9, "b": 10}, "object")
+
+    dataset_rows = [
+        {"input": "1+2", "target": 3, "object": object_ref1},
+        {"input": "2**4", "target": 15, "object": object_ref2},
+        {"input": "3**3", "target": 27, "object": object_ref3},
+        {"input": "4**2", "target": 16, "object": object_ref4},
+        {"input": "5**1", "target": 5, "object": object_ref5},
+    ]
+
+    @weave.op()
+    async def score(target, model_output, object):
+        return target == model_output
+
+    evaluation = Evaluation(
+        name="my-eval",
+        dataset=dataset_rows,
+        scorers=[score],
+    )
+    asyncio.run(evaluation.evaluate(model_predict))
+
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "inputs.dataset.rows.input"},
+                        {"$literal": "1 + 2"},
+                    ]
+                }
+            }
+        )
+    )
+    assert len(calls) == 1
+
+    # get all but the first call
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$gt": [
+                        {
+                            "$convert": {
+                                "input": {"$getField": "inputs.example.target"},
+                                "to": "double",
+                            }
+                        },
+                        {"$literal": 3},
+                    ]
+                }
+            }
+        )
+    )
+    assert len(calls) == 4
+
+    # now order by a table row ref field
+    calls = list(
+        client.get_calls(
+            sort_by=[tsi.SortBy(field="inputs.example.target", direction="asc")],
+            expand_columns=["inputs.example"],
+        )
+    )
+    assert calls[0].inputs["example"]["target"] == 3
+    assert calls[1].inputs["example"]["target"] == 15
+    assert calls[2].inputs["example"]["target"] == 27
+    assert calls[3].inputs["example"]["target"] == 16
+    assert calls[4].inputs["example"]["target"] == 5
+
+    # now order by a table row ref field desc
+    calls = list(
+        client.get_calls(
+            sort_by=[tsi.SortBy(field="inputs.example.target", direction="desc")],
+            expand_columns=["inputs.example"],
+        )
+    )
+    assert calls[0].inputs["example"]["target"] == 5
+    assert calls[1].inputs["example"]["target"] == 16
+    assert calls[2].inputs["example"]["target"] == 27
+    assert calls[3].inputs["example"]["target"] == 15
+    assert calls[4].inputs["example"]["target"] == 3
+
+    calls = list(
+        client.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$convert": {
+                                "input": {"$getField": "inputs.example.object.a"},
+                                "to": "double",
+                            }
+                        },
+                        {"$literal": 1},
+                    ]
+                }
+            }
+        )
+    )
+    assert len(calls) == 1
+
+    # now order by a table row ref field
+    calls = list(
+        client.get_calls(
+            sort_by=[tsi.SortBy(field="inputs.example.object.a", direction="asc")],
+            expand_columns=["inputs.example"],
+        )
+    )
+    assert calls[0].inputs["example"]["object"]["a"] == 1
+    assert calls[1].inputs["example"]["object"]["a"] == 3
+    assert calls[2].inputs["example"]["object"]["a"] == 5
+    assert calls[3].inputs["example"]["object"]["a"] == 7
+    assert calls[4].inputs["example"]["object"]["a"] == 9
+
+    # now order by a table row ref field desc
+    calls = list(
+        client.get_calls(
+            sort_by=[tsi.SortBy(field="inputs.example.object.a", direction="desc")],
+            expand_columns=["inputs.example"],
+        )
+    )
+    assert calls[0].inputs["example"]["object"]["a"] == 9
+    assert calls[1].inputs["example"]["object"]["a"] == 7
+    assert calls[2].inputs["example"]["object"]["a"] == 5
+    assert calls[3].inputs["example"]["object"]["a"] == 3
+    assert calls[4].inputs["example"]["object"]["a"] == 1

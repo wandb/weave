@@ -722,7 +722,7 @@ def build_object_ref_ctes(
                 "any(val_dump)",
                 leaf_property.split("."),
             )
-            val_dump_select = f"{json_extract_sql} AS object_val_dump,"
+            val_dump_select = f"nullIf({json_extract_sql}, '') AS object_val_dump,"
         elif isinstance(condition, ObjectRefFilterCondition):
             if condition.operation_type == "eq":
                 val_condition = handler.handle_comparison_operation(condition, "=")

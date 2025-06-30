@@ -2328,7 +2328,7 @@ def test_object_ref_filter_simple() -> None:
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) IN
-                      (SELECT full_ref
+                      (SELECT ref
                        FROM obj_filter_0))
                    AND ((any(calls_merged.deleted_at) IS NULL))
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
@@ -2336,7 +2336,7 @@ def test_object_ref_filter_simple() -> None:
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
@@ -2391,7 +2391,7 @@ def test_object_ref_filter_nested() -> None:
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}) IN
-                      (SELECT full_ref
+                      (SELECT ref
                        FROM obj_filter_2))
                    AND ((any(calls_merged.deleted_at) IS NULL))
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
@@ -2401,7 +2401,7 @@ def test_object_ref_filter_nested() -> None:
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
@@ -2409,25 +2409,25 @@ def test_object_ref_filter_nested() -> None:
                     object_id,
                     digest),
              obj_filter_1 AS
-          (SELECT object_id,
-                  digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
-           FROM object_versions
-           WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_3:String}) IN (SELECT full_ref FROM obj_filter_0)
-           GROUP BY project_id,
-                    object_id,
-                    digest),
+          (SELECT ov.object_id,
+                  ov.digest,
+                  concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
+           FROM object_versions ov
+           WHERE ov.project_id = {pb_0:String}
+             AND JSON_VALUE(ov.val_dump, {pb_3:String}) IN (SELECT ref FROM obj_filter_0)
+           GROUP BY ov.project_id,
+                    ov.object_id,
+                    ov.digest),
              obj_filter_2 AS
-          (SELECT object_id,
-                  digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
-           FROM object_versions
-           WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_4:String}) IN (SELECT full_ref FROM obj_filter_1)
-           GROUP BY project_id,
-                    object_id,
-                    digest)
+          (SELECT ov.object_id,
+                  ov.digest,
+                  concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
+           FROM object_versions ov
+           WHERE ov.project_id = {pb_0:String}
+             AND JSON_VALUE(ov.val_dump, {pb_4:String}) IN (SELECT ref FROM obj_filter_1)
+           GROUP BY ov.project_id,
+                    ov.object_id,
+                    ov.digest)
         SELECT calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_0:String}
@@ -2495,10 +2495,10 @@ def test_multiple_object_ref_filters() -> None:
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
-                      (SELECT full_ref
+                      (SELECT ref
                        FROM obj_filter_0))
                    AND ((NOT (JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
-                               (SELECT full_ref
+                               (SELECT ref
                                 FROM obj_filter_1))))
                    AND ((any(calls_merged.deleted_at) IS NULL))
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
@@ -2506,7 +2506,7 @@ def test_multiple_object_ref_filters() -> None:
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
@@ -2516,7 +2516,7 @@ def test_multiple_object_ref_filters() -> None:
             obj_filter_1 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND toFloat64OrNull(JSON_VALUE(val_dump, {pb_1:String})) > {pb_3:UInt64}
@@ -2601,26 +2601,26 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-              (SELECT full_ref
+              (SELECT ref
                FROM obj_filter_0))
            AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-              (SELECT full_ref
+              (SELECT ref
                FROM obj_filter_0))
            AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-              (SELECT full_ref
+              (SELECT ref
                FROM obj_filter_1))
            AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-               (SELECT full_ref
+               (SELECT ref
                FROM obj_filter_2))
            AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-              (SELECT full_ref
+              (SELECT ref
                FROM obj_filter_3))
            AND ((any(calls_merged.deleted_at) IS NULL))
            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))),
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
@@ -2630,7 +2630,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
              obj_filter_1 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_3:UInt64}
@@ -2640,7 +2640,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
              obj_filter_2 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_4:String}) = {pb_5:UInt64}
@@ -2650,7 +2650,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
              obj_filter_3 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_6:String}) = {pb_2:UInt64}
@@ -2742,14 +2742,14 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         HAVING ((((((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-                       (SELECT full_ref
+                       (SELECT ref
                         FROM obj_filter_0))
                     AND (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-                           (SELECT full_ref
+                           (SELECT ref
                             FROM obj_filter_1))))
                   OR ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}) = {pb_9:String}))
                   OR ((NOT (JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
-                              (SELECT full_ref
+                              (SELECT ref
                                FROM obj_filter_2))))))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
@@ -2757,7 +2757,7 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
                 LIMIT 10), obj_filter_0 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
@@ -2767,7 +2767,7 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
                            obj_filter_1 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_3:String}) > {pb_4:Float64}
@@ -2777,7 +2777,7 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
                            obj_filter_2 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_5:String}) = {pb_6:Bool}
@@ -2820,19 +2820,19 @@ def test_object_ref_order_by_simple() -> None:
         WITH filtered_calls AS
           (SELECT calls_merged.id AS id
            FROM calls_merged
-           LEFT JOIN obj_filter_0
-               ON JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}) = obj_filter_0.full_ref
+           LEFT JOIN obj_filter_0 ON JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}) = obj_filter_0.ref
            WHERE calls_merged.project_id = {pb_0:String}
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((any(calls_merged.deleted_at) IS NULL))
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
-           ORDER BY JSON_VALUE(any(obj_filter_0.object_val_dump), {pb_2:String}) DESC),
+           ORDER BY (NOT (JSONType(any(obj_filter_0.object_val_dump)) = 'Null'
+                          OR JSONType(any(obj_filter_0.object_val_dump)) IS NULL)) desc, toFloat64OrNull(any(obj_filter_0.object_val_dump)) DESC, toString(any(obj_filter_0.object_val_dump)) DESC) ,
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
-                  any(val_dump) AS object_val_dump,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  nullIf(JSON_VALUE(any(val_dump), {pb_1:String}), '') AS object_val_dump,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
            GROUP BY project_id,
@@ -2840,19 +2840,18 @@ def test_object_ref_order_by_simple() -> None:
                     digest)
         SELECT calls_merged.id AS id
         FROM calls_merged
-        LEFT JOIN obj_filter_0
-            ON JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}) = obj_filter_0.full_ref
+        LEFT JOIN obj_filter_0 ON JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}) = obj_filter_0.ref
         WHERE calls_merged.project_id = {pb_0:String}
-            AND (calls_merged.id IN filtered_calls)
+          AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
-        ORDER BY JSON_VALUE(any(obj_filter_0.object_val_dump), {pb_2:String}) DESC
+        ORDER BY (NOT (JSONType(any(obj_filter_0.object_val_dump)) = 'Null'
+                       OR JSONType(any(obj_filter_0.object_val_dump)) IS NULL)) desc, toFloat64OrNull(any(obj_filter_0.object_val_dump)) DESC, toString(any(obj_filter_0.object_val_dump)) DESC
         """,
         {
             "pb_0": "project",
             "pb_1": '$."temperature"',
-            "pb_2": "$.temperature",
-            "pb_3": "$.model",
+            "pb_2": '$."model"',
         },
     )
 
@@ -2882,7 +2881,7 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
-                      (SELECT full_ref
+                      (SELECT ref
                        FROM obj_filter_1))
                    AND ((any(calls_merged.deleted_at) IS NULL))
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
@@ -2890,7 +2889,7 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
@@ -2898,15 +2897,15 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
                     object_id,
                     digest),
              obj_filter_1 AS
-          (SELECT object_id,
-                  digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
-           FROM object_versions
-           WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_3:String}) IN (SELECT full_ref FROM obj_filter_0)
-           GROUP BY project_id,
-                    object_id,
-                    digest)
+          (SELECT ov.object_id,
+                  ov.digest,
+                  concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
+           FROM object_versions ov
+           WHERE ov.project_id = {pb_0:String}
+             AND JSON_VALUE(ov.val_dump, {pb_3:String}) IN (SELECT ref FROM obj_filter_0)
+           GROUP BY ov.project_id,
+                    ov.object_id,
+                    ov.digest)
         SELECT calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_0:String}
@@ -2953,7 +2952,7 @@ def test_object_ref_filter_complex_nested_path() -> None:
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
-                      (SELECT full_ref
+                      (SELECT ref
                        FROM obj_filter_1))
                    AND ((any(calls_merged.deleted_at) IS NULL))
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
@@ -2961,7 +2960,7 @@ def test_object_ref_filter_complex_nested_path() -> None:
              obj_filter_0 AS
           (SELECT object_id,
                   digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
@@ -2969,15 +2968,15 @@ def test_object_ref_filter_complex_nested_path() -> None:
                     object_id,
                     digest),
              obj_filter_1 AS
-          (SELECT object_id,
-                  digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS full_ref
-           FROM object_versions
-           WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_3:String}) IN (SELECT full_ref FROM obj_filter_0)
-           GROUP BY project_id,
-                    object_id,
-                    digest)
+          (SELECT ov.object_id,
+                  ov.digest,
+                  concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
+           FROM object_versions ov
+           WHERE ov.project_id = {pb_0:String}
+             AND JSON_VALUE(ov.val_dump, {pb_3:String}) IN (SELECT ref FROM obj_filter_0)
+           GROUP BY ov.project_id,
+                    ov.object_id,
+                    ov.digest)
         SELECT calls_merged.id AS id
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_0:String}
@@ -2988,9 +2987,9 @@ def test_object_ref_filter_complex_nested_path() -> None:
         """,
         {
             "pb_0": "project",
-            "pb_1": '$."e"',  # leaf property after longest expand column
-            "pb_2": "test_value",  # the filter value
-            "pb_3": '$."c"."d"',  # intermediate property path that points to the next object
-            "pb_4": '$."a"."b"',  # first expand column property path
+            "pb_1": '$."e"',
+            "pb_2": "test_value",
+            "pb_3": '$."c"."d"',
+            "pb_4": '$."a"."b"',
         },
     )
