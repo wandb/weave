@@ -359,6 +359,7 @@ const useCallsNoExpansion = (
       if (_.isEqual(expectedRequestRef.current, req)) {
         loadingRef.current = false;
         setCallRes(res);
+        setError(null);
       }
     };
     const onError = (e: any) => {
