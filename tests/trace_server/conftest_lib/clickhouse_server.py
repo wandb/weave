@@ -8,7 +8,7 @@ import typing
 
 import pytest
 
-from tests.conftest_lib.container_management import check_server_up
+from tests.trace_server.conftest_lib.container_management import check_server_up
 from weave.trace_server import environment as ts_env
 
 

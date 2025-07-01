@@ -208,7 +208,7 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-        "--weave-server",
+        "--trace-server",
         action="store",
         default="sqlite",
         help="Specify the client object to use: sqlite or clickhouse",
