@@ -838,6 +838,7 @@ class CallsQuery(BaseModel):
         ):
             query_settings["function_json_value_return_type_allow_complex"] = "1"
 
+        query_settings_sql = ""
         if len(query_settings) > 0:
             query_settings_sql = "SETTINGS " + " ".join(
                 [f"{key} = {value}" for key, value in query_settings.items()]
