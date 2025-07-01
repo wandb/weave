@@ -127,7 +127,7 @@ export const ObjectVersionPage: React.FC<{
     return <NotFoundPanel title="Object not found" />;
   }
   if (objectVersion.result.baseObjectClass === 'Monitor') {
-    return <MonitorPage {...props} />;
+    return <MonitorPage {...props} objectVersion={objectVersion.result} />;
   }
 
   return (
