@@ -147,6 +147,10 @@ When applying scorers:
 
 ## Using Scorers as monitors {#using-scorers-as-monitors}
 
+:::important
+This feature is only available in Multi-Tenant (MT) SaaS deployments.
+:::
+
 If you want to track quality metrics without writing scoring logic into your app, you can use _monitors_.
 
 A monitor is a background process that:
