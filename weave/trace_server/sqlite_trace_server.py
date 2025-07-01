@@ -1425,7 +1425,19 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         response = self.completions_create(req)
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
-    def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
+    async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
+        raise NotImplementedError(
+            "run_model is not implemented for SQLite trace server"
+        )
+
+    async def run_scorer(self, req: tsi.RunScorerReq) -> tsi.RunScorerRes:
+        raise NotImplementedError(
+            "run_model is not implemented for SQLite trace server"
+        )
+
+    async def queue_evaluation(
+        self, req: tsi.QueueEvaluationReq
+    ) -> tsi.QueueEvaluationRes:
         raise NotImplementedError(
             "run_evaluation is not implemented for SQLite trace server"
         )

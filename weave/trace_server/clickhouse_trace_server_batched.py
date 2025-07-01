@@ -2017,10 +2017,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "use_async_insert": self._use_async_insert,
         }
 
-    def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
+    async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
+        raise NotImplementedError(
+            "run_model is not implemented for ClickHouse trace server"
+        )
+
+    async def run_scorer(self, req: tsi.RunScorerReq) -> tsi.RunScorerRes:
+        raise NotImplementedError(
+            "run_model is not implemented for ClickHouse trace server"
+        )
+
+    async def queue_evaluation(
+        self, req: tsi.QueueEvaluationReq
+    ) -> tsi.QueueEvaluationRes:
         runner = RunAsUser(ch_server_dump=self.model_dump())
         eval_call_ids = runner.run_evaluation_evaluate(req)
-        return tsi.RunEvaluationRes(eval_call_ids=eval_call_ids)
+        return tsi.QueueEvaluationRes(eval_call_ids=eval_call_ids)
 
     # Private Methods
     @property

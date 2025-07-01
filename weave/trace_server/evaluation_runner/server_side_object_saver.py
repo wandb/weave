@@ -47,9 +47,9 @@ class RunAsUser:
     def __init__(self, ch_server_dump: dict[str, Any]):
         self.ch_server_dump = ch_server_dump
 
-    def run_evaluation_evaluate(
+    async def run_evaluation_evaluate(
         self,
-        req: tsi.RunEvaluationReq,
+        req: tsi.QueueEvaluationReq,
     ) -> list[str]:
         return self._evaluation_evaluate_direct(req)
 
@@ -76,7 +76,7 @@ class RunAsUser:
 
     # def _evaluation_evaluate(
     #     self,
-    #     req: tsi.RunEvaluationReq,
+    #     req: tsi.QueueEvaluationReq,
     #     result_queue: multiprocessing.Queue[tuple[str, list[str] | str]],
     # ) -> None:
     #     try:
@@ -87,7 +87,7 @@ class RunAsUser:
 
     def _evaluation_evaluate_direct(
         self,
-        req: tsi.RunEvaluationReq,
+        req: tsi.QueueEvaluationReq,
     ) -> list[str]:
         from weave.trace_server.clickhouse_trace_server_batched import (
             ClickHouseTraceServer,

@@ -625,9 +625,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
         )
 
-    def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
-        return self._generic_request(
-            "/eval/run", req, tsi.RunEvaluationReq, tsi.RunEvaluationRes
+    async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
+        raise NotImplementedError(
+            "run_model is not implemented for remote HTTP trace server"
+        )
+
+    async def run_scorer(self, req: tsi.RunScorerReq) -> tsi.RunScorerRes:
+        raise NotImplementedError(
+            "run_scorer is not implemented for remote HTTP trace server"
+        )
+
+    async def queue_evaluation(
+        self, req: tsi.QueueEvaluationReq
+    ) -> tsi.QueueEvaluationRes:
+        raise NotImplementedError(
+            "queue_evaluation is not implemented for remote HTTP trace server"
         )
 
 

@@ -1037,15 +1037,66 @@ class ProjectStatsRes(BaseModel):
     files_storage_size_bytes: int
 
 
-class RunEvaluationReq(BaseModel):
+class QueueEvaluationReq(BaseModel):
     project_id: str
     evaluation_ref: str
     model_refs: list[str]
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class RunEvaluationRes(BaseModel):
-    eval_call_ids: list[str]
+class QueueEvaluationRes(BaseModel):
+    call_ids: list[str]
+
+
+class DirectInputs(BaseModel):
+    input_type: Literal["direct"]
+    inputs: dict[str, Any]
+
+
+class RefInputs(BaseModel):
+    input_type: Literal["ref"]
+    ref: str
+
+
+DirectOrRefInputs = Union[DirectInputs, RefInputs]
+
+
+class RunModelReq(BaseModel):
+    project_id: str
+    model_ref: str
+    inputs: DirectOrRefInputs
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class RunModelRes(BaseModel):
+    call_id: str
+    output: Any
+
+
+class DirectOutputs(BaseModel):
+    output_type: Literal["direct"]
+    outputs: Any
+
+
+class RefOutputs(BaseModel):
+    output_type: Literal["call_id"]
+    call_id: str
+
+
+DirectOrRefOutputs = Union[DirectOutputs, RefOutputs]
+
+
+class RunScorerReq(BaseModel):
+    project_id: str
+    scorer_ref: str
+    model_output: DirectOrRefOutputs
+    additional_inputs: DirectOrRefInputs
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class RunScorerRes(BaseModel):
+    call_id: str
+    output: Any
 
 
 class TraceServerInterface(Protocol):
@@ -1127,4 +1178,7 @@ class TraceServerInterface(Protocol):
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
 
-    def run_evaluation(self, req: RunEvaluationReq) -> RunEvaluationRes: ...
+    # Evaluation Execution API
+    async def run_model(self, req: RunModelReq) -> RunModelRes: ...
+    async def run_scorer(self, req: RunScorerReq) -> RunScorerRes: ...
+    async def queue_evaluation(self, req: QueueEvaluationReq) -> QueueEvaluationRes: ...

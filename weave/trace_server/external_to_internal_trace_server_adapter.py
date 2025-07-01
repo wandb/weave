@@ -1,7 +1,7 @@
 import abc
 import typing
-from collections.abc import Iterator
-from typing import Callable, TypeVar
+from collections.abc import Coroutine, Iterator
+from typing import Any, Callable, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
@@ -68,6 +68,18 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             req, self._idc.ext_to_int_project_id
         )
         res = method(req_conv)
+        res_conv = universal_int_to_ext_ref_converter(
+            res, self._idc.int_to_ext_project_id
+        )
+        return res_conv
+
+    async def _async_ref_apply(
+        self, method: Callable[[A], Coroutine[Any, Any, B]], req: A
+    ) -> B:
+        req_conv = universal_ext_to_int_ref_converter(
+            req, self._idc.ext_to_int_project_id
+        )
+        res = await method(req_conv)
         res_conv = universal_int_to_ext_ref_converter(
             res, self._idc.int_to_ext_project_id
         )
@@ -415,8 +427,24 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.project_stats, req)
 
-    def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
+    async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.run_evaluation, req)
+        return await self._async_ref_apply(self._internal_trace_server.run_model, req)
+
+    async def run_scorer(self, req: tsi.RunScorerReq) -> tsi.RunScorerRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return await self._async_ref_apply(self._internal_trace_server.run_scorer, req)
+
+    async def queue_evaluation(
+        self, req: tsi.QueueEvaluationReq
+    ) -> tsi.QueueEvaluationRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return await self._async_ref_apply(
+            self._internal_trace_server.queue_evaluation, req
+        )
