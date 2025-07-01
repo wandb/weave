@@ -35,13 +35,6 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_collection_modifyitems(config, items):
-    # Add the trace_server marker to all tests that have a client fixture
-    for item in items:
-        if "trace_server" in item.fixturenames:
-            item.add_marker(pytest.mark.trace_server)
-
-
 def get_trace_server_flag(request):
     if request.config.getoption("--clickhouse"):
         return "clickhouse"
