@@ -347,6 +347,7 @@ def create_client(
     autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
     global_attributes: typing.Optional[dict[str, typing.Any]] = None,
 ) -> weave_init.InitializedClient:
+    project_name = request.node.name.split("::")[-1]
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "prod":
         # Note: this is only for local dev testing and should be removed
@@ -361,7 +362,7 @@ def create_client(
     # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
     caching_server = CachingMiddlewareTraceServer.from_env(server)
     client = TestOnlyFlushingWeaveClient(
-        TEST_ENTITY, "test-project", make_server_recorder(caching_server)
+        TEST_ENTITY, project_name, make_server_recorder(caching_server)
     )
     inited_client = weave_init.InitializedClient(client)
     autopatch.autopatch(autopatch_settings)
