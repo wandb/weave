@@ -138,6 +138,7 @@ def tests(session, shard):
 
     session.run(
         "pytest",
+        "-n auto",
         "--durations=20",
         "--strict-markers",
         "--cov=weave",
