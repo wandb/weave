@@ -16,6 +16,7 @@ import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/H
 import {SmallRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallRef';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
+import {newMonitorClicked} from '@wandb/weave/integrations/analytics/monitorEvents';
 import {parseRefMaybe} from '@wandb/weave/react';
 import React, {useMemo, useState} from 'react';
 
@@ -215,13 +216,18 @@ const CallCountCell = ({
 const MonitorsPageHeaderExtra: React.FC<{
   onCreateMonitor: () => void;
 }> = ({onCreateMonitor}) => {
+  const {entity, project} = useEntityProject();
+
   return (
     <Tailwind>
       <div className="mr-16 flex gap-8">
         <Button
           icon="add-new"
           variant="ghost"
-          onClick={onCreateMonitor}
+          onClick={() => {
+            newMonitorClicked({entity, project});
+            onCreateMonitor();
+          }}
           tooltip="Create a new monitor">
           New monitor
         </Button>

@@ -34,6 +34,8 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
+import {monitorGoToTableClicked} from '@wandb/weave/integrations/analytics/monitorEvents';
+import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -45,8 +47,15 @@ const MONITOR_VERSIONS_SORT_KEY: SortBy[] = [
 ];
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
-export const MonitorPage = (props: {objectName: string; version: string}) => {
+export const MonitorPage = (props: {
+  objectName: string;
+  version: string;
+  objectVersion: ObjectVersionSchema;
+}) => {
+  useObjectViewEvent(props.objectVersion);
+
   const {entity, project} = useEntityProject();
+
   const monitorVersionFilter = useMemo(
     () => ({
       objectIds: [props.objectName],
@@ -122,6 +131,11 @@ const MonitorPageInner = ({
   const history = useHistory();
 
   const onGoToTableClick = useCallback(() => {
+    monitorGoToTableClicked({
+      entity,
+      project,
+      monitorName: monitorVersions[0].val['name'],
+    });
     const url = baseRouter.callsUIUrl(
       entity,
       project,
@@ -129,7 +143,7 @@ const MonitorPageInner = ({
       callsFilterModel
     );
     history.push(url);
-  }, [baseRouter, history, callsFilterModel, entity, project]);
+  }, [baseRouter, history, callsFilterModel, entity, project, monitorVersions]);
 
   const callCountQuery: Query = useMemo(
     () => matchAllMonitorVersionsQuery(allVersionsRef),
