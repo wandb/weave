@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
+from tests.trace_server import conftest as ts_conftest  # noqa: F401
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import autopatch, weave_client, weave_init
 from weave.trace.context.call_context import set_call_stack
@@ -19,8 +20,6 @@ from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
-
-from tests.trace_server import conftest as ts_conftest # noqa: F401
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
