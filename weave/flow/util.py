@@ -4,9 +4,13 @@ import asyncio
 import logging
 import multiprocessing
 import random
+import warnings
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Iterable
 from typing import Any, Callable, TypeVar
+
+from rich.progress import Progress, ProgressColumn, Task, TaskID, Text
+from rich.text import Text
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +19,31 @@ U = TypeVar("U")
 ItemReturnType = tuple[int, T, U]
 
 _shown_warnings = set()
+
+
+def wrap_lambda(func: Callable) -> Callable:
+    """Convert a lambda function to a named function for better tracking and async handling."""
+    if func.__name__ == "<lambda>":
+        warnings.warn(
+            "We are converting your lambda function to a named function for better tracking "
+            "and async handling. For optimal performance and debugging, consider using named functions directly. "
+            "Example: `def process(x): return {'result': x*2}` instead of `lambda x: {'result': x*2}`",
+            UserWarning,
+            stacklevel=2,
+        )
+
+        # Create a named function wrapper for the lambda
+        def lambda_wrapper(*args: Any, **kwargs: Any) -> Any:
+            return func(*args, **kwargs)
+
+        # Copy the signature and other attributes
+        lambda_wrapper.__name__ = "lambda_func"
+        lambda_wrapper.__doc__ = getattr(func, "__doc__", None)
+        lambda_wrapper.__annotations__ = getattr(func, "__annotations__", {})
+
+        # Use the wrapper instead of the original lambda
+        return lambda_wrapper
+    return func
 
 
 def transpose(rows: list[dict]) -> dict[str, list]:
@@ -29,6 +58,8 @@ async def async_foreach(
     sequence: Iterable[T],
     func: Callable[[T], Awaitable[U]],
     max_concurrent_tasks: int,
+    progress: Progress | None = None,
+    progress_desc: str = "Processing items",
 ) -> AsyncIterator[ItemReturnType]:
     """Process items from a sequence concurrently with a maximum number of parallel tasks.
 
@@ -40,6 +71,8 @@ async def async_foreach(
         sequence: An iterable of items to process. Items are loaded lazily.
         func: An async function that processes each item from the sequence.
         max_concurrent_tasks: Maximum number of items to process concurrently.
+        progress: Optional rich Progress object to display progress.
+        progress_desc: Description to show in the progress bar.
 
     Yields:
         Tuples of (index, original_item, processed_result) where index is the index of the item
@@ -63,6 +96,17 @@ async def async_foreach(
     """
     semaphore: asyncio.Semaphore = asyncio.Semaphore(max_concurrent_tasks)
     active_tasks: list[asyncio.Task[ItemReturnType]] = []
+    task_id: TaskID | None = None
+    total: int | None = None
+    processed_count = 0
+
+    if progress:
+        try:
+            total = len(sequence)  # type: ignore
+        except TypeError:
+            # Sequence doesn't have a defined length (e.g., generator)
+            total = None
+        task_id = progress.add_task(progress_desc, total=total)
 
     async def process_item(index: int, item: T) -> ItemReturnType:
         """Process a single item using the provided function with semaphore control."""
@@ -99,6 +143,9 @@ async def async_foreach(
                 active_tasks = list(pending)
                 for task in done:
                     (index, item, result) = task.result()
+                    processed_count += 1
+                    if progress and task_id is not None:
+                        progress.update(task_id, advance=1, refresh=True)
                     yield index, item, result
                     # Add a new task if there are more items
                     maybe_queue_next_task()
@@ -115,6 +162,20 @@ async def async_foreach(
             task.cancel()
         await asyncio.gather(*active_tasks, return_exceptions=True)
         raise
+    finally:
+        if progress and task_id is not None:
+            # Ensure progress bar stops cleanly, even if total wasn't known
+            final_description = f"{progress_desc} (Completed)"
+            if progress.tasks[task_id].total is None:
+                progress.update(
+                    task_id,
+                    total=processed_count,
+                    completed=processed_count,
+                    description=final_description,
+                )
+            else:
+                progress.update(task_id, description=final_description)
+            progress.stop_task(task_id)
 
 
 def _subproc(
@@ -267,3 +328,13 @@ def short_str(obj: Any, limit: int = 25) -> str:
     if len(str_val) > limit:
         return str_val[:limit] + "..."
     return str_val
+
+
+class IterationSpeedColumn(ProgressColumn):
+    """Renders the iteration speed (iterations per second)."""
+
+    def render(self, task: Task) -> Text:
+        """Show iteration speed."""
+        if task.speed is None:
+            return Text("? iter/s", style="progress.data.speed")
+        return Text(f"{task.speed:.2f} iter/s", style="progress.data.speed")

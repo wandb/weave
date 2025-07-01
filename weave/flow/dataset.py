@@ -1,21 +1,39 @@
+import copy
+import inspect
+import traceback
 import warnings
 from collections.abc import Iterable, Iterator
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Callable, Union
 
 from pydantic import field_validator
+from rich.console import Console  # Added Console import
+
+# from weave.flow.eval import console # REMOVED due to circular import
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from typing_extensions import Self
 
 import weave
 from weave.flow.obj import Object
-from weave.flow.util import short_str
+from weave.flow.util import IterationSpeedColumn, async_foreach, short_str, wrap_lambda
 from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.env import get_weave_parallelism
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
+from weave.trace.op_caller import async_call
 from weave.trace.vals import WeaveObject, WeaveTable
 from weave.trace.weave_client import (
     Call,
 )
+
+console = Console()
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -236,3 +254,169 @@ class Dataset(Object):
 
         selected_rows = [self[i] for i in indices_list]
         return self.__class__(rows=selected_rows)
+
+    @weave.op
+    async def map(
+        self, func: Callable, num_procs: int = get_weave_parallelism()
+    ) -> "Dataset":
+        """
+        Apply a function to each row of the dataset in parallel and return a new dataset.
+
+        The `map` method transforms each row in the dataset by applying `func` to it, adding or
+        updating columns based on the dictionary returned by the function. This is the primary
+        way to transform or enrich datasets.
+
+        Parameter Mapping:
+            The function parameters are automatically matched with dataset columns by name.
+            For example, if `func` has parameters `(id, text)` and the dataset has columns
+            `id`, `text`, and `timestamp`, the function will be called with only the `id` and
+            `text` values for each row.
+
+        Dictionary Return Requirement:
+            Functions MUST return a dictionary mapping column names to values. Each key-value
+            pair in the returned dictionary will be added to or update the corresponding row.
+            Returning non-dictionary types (such as integers, strings, lists) will raise a TypeError.
+
+        Parallelism:
+            Processing happens in parallel across multiple processors, controlled by `num_procs`.
+            A rich progress bar is displayed during processing.
+
+        Immutability:
+            The original dataset remains unchanged. A new Dataset instance is returned with
+            the transformed rows.
+
+        Args:
+            func: A function that takes specific columns as parameters and returns a dictionary
+                 mapping new or updated column names to values. The function can be synchronous
+                 or asynchronous and can include type annotations.
+
+            num_procs: The number of parallel processes to use. Defaults to the value set by
+                     the `WEAVE_PARALLELISM` environment variable.
+
+        Returns:
+            A new `Dataset` object containing the processed rows with updates applied.
+
+        Raises:
+            TypeError: If the function does not return a dictionary.
+            ValueError: If the function requires parameters not present in the dataset.
+            Exception: Any exception raised by the function during processing is propagated.
+
+        Examples:
+            ```python
+            import weave
+
+            # Create a dataset
+            ds = weave.Dataset(rows=[
+                {"id": 1, "text": "Hello world", "lang": "en"},
+                {"id": 2, "text": "Bonjour monde", "lang": "fr"},
+                {"id": 3, "text": "Hola mundo", "lang": "es"}
+            ])
+
+            # Example 1: Simple transformation with a single parameter
+            def add_text_length(text):
+                return {"length": len(text)}
+
+            # Example 2: Multi-parameter function with type hints
+            def combine_fields(id: int, text: str, lang: str) -> dict:
+                return {
+                    "display": f"[{id}] {text} ({lang})",
+                    "uppercase": text.upper()
+                }
+
+            # Example 3: Function with default parameters
+            def classify_language(lang, default_category="other"):
+                categories = {"en": "english", "es": "spanish", "fr": "french"}
+                return {"category": categories.get(lang, default_category)}
+
+            # Apply the transformations
+            ds_with_length = ds.map(add_text_length)
+            ds_combined = ds.map(combine_fields)
+            ds_categorized = ds.map(classify_language)
+
+            # Example output for ds_with_length[0]:
+            # {
+            #     "id": 1,
+            #     "text": "Hello world",
+            #     "lang": "en",
+            #     "length": 11
+            # }
+            ```
+        """
+        processed_rows: list[tuple[int, dict]] = []
+
+        # Inspect the function signature
+        sig = inspect.signature(func)
+        param_names = list(sig.parameters.keys())
+
+        # Convert lambda to named function for better async handling
+        func = wrap_lambda(func)
+
+        # Store the function name before applying weave.op
+        func_name = getattr(func, "__name__", "unknown_function")
+
+        # Apply weave.op after lambda conversion
+        func = weave.op(func)
+
+        async def process_row(row: dict) -> dict:
+            try:
+                # Extract and pass specific parameters
+                kwargs = {}
+                for name in param_names:
+                    if name in row:
+                        kwargs[name] = row[name]
+                    else:
+                        # Skip this parameter or use a default if available
+                        if sig.parameters[name].default is not inspect.Parameter.empty:
+                            kwargs[name] = sig.parameters[name].default
+                        else:
+                            raise ValueError(
+                                f"Function expects parameter '{name}' but this column "
+                                f"is not in the dataset row: {short_str(row)}"
+                            )
+                # asyncify the function call
+                result = await async_call(func, **kwargs)
+
+                # Handle the result based on its type
+                if not isinstance(result, dict):
+                    # Raise error for non-dictionary returns
+                    raise TypeError(
+                        f"Function must return a dictionary, but got {type(result).__name__} "
+                        f"from function '{func_name}'. Use a dictionary to specify "
+                        f"which columns to add or update."
+                    )
+            except Exception as e:
+                # Log the error and propagate it to stop the map operation
+                print(f"Error processing row with map function: {short_str(row)}")
+                traceback.print_exc()
+                raise e
+            else:
+                row_copy = copy.deepcopy(row)
+                row_copy.update(result)
+                return row_copy
+
+        # Setup and run the progress bar and async processing
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            MofNCompleteColumn(),
+            TaskProgressColumn(),
+            BarColumn(),
+            IterationSpeedColumn(),
+            TimeElapsedColumn(),
+            console=console,  # Use the instantiated console
+            transient=True,  # Remove progress bar when done
+        ) as progress:
+            # Return the coroutine so the caller can await it
+            async for index, _, processed_row in async_foreach(
+                self.rows,
+                process_row,
+                num_procs,
+                progress=progress,
+                progress_desc="Mapping dataset",
+            ):
+                processed_rows.append((index, processed_row))
+
+        # Sort by index to maintain original order
+        processed_rows.sort(key=lambda x: x[0])
+        final_rows = [processed_row for _, processed_row in processed_rows]
+
+        return self.__class__(rows=final_rows)
