@@ -455,3 +455,4 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return await self._async_ref_apply(
             self._internal_trace_server.queue_evaluation, req
+        )
