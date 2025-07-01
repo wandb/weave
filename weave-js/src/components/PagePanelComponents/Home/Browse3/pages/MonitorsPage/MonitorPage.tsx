@@ -131,11 +131,6 @@ const MonitorPageInner = ({
   const history = useHistory();
 
   const onGoToTableClick = useCallback(() => {
-    monitorGoToTableClicked({
-      entity,
-      project,
-      monitorName: monitorVersions[0].val['name'],
-    });
     const url = baseRouter.callsUIUrl(
       entity,
       project,
@@ -143,7 +138,7 @@ const MonitorPageInner = ({
       callsFilterModel
     );
     history.push(url);
-  }, [baseRouter, history, callsFilterModel, entity, project, monitorVersions]);
+  }, [baseRouter, history, callsFilterModel, entity, project]);
 
   const callCountQuery: Query = useMemo(
     () => matchAllMonitorVersionsQuery(allVersionsRef),
