@@ -506,7 +506,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               The scoring prompt will be used to score the output of your ops.
               You can interpolate input and output values from your op. See{' '}
               <Link
-                to="https://weave-docs.wandb.ai/guides/evaluation/guardrails_and_monitors#prompt-variables"
+                to="https://wandb.me/prompt-variables"
                 target="_blank"
                 className="text-blue-500">
                 documentation
