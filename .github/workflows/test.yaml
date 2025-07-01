@@ -345,8 +345,8 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "not weave_client"
-      - name: Run nox (Weave Client + Clickhouse)
+            -m "not trace_server"
+      - name: Run nox (Clickhouse Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -356,8 +356,8 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "weave_client and not skip_clickhouse_client"
-      - name: Run nox (Weave Client + Sqlite)
+            -m "trace_server and not skip_clickhouse_client"
+      - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -373,7 +373,7 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "weave_client"
+            -m "trace_server"
             --trace-server=sqlite
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()

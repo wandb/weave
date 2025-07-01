@@ -86,13 +86,6 @@ def disable_datadog():
         del os.environ["DD_TRACE_ENABLED"]
 
 
-def pytest_collection_modifyitems(config, items):
-    # Add the weave_client marker to all tests that have a client fixture
-    for item in items:
-        if "client" in item.fixturenames or "client_creator" in item.fixturenames:
-            item.add_marker(pytest.mark.weave_client)
-
-
 def pytest_sessionfinish(session, exitstatus):
     if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
         session.exitstatus = 0
@@ -349,6 +342,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 
 def create_client(
     request,
+    trace_server,
     autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
     global_attributes: typing.Optional[dict[str, typing.Any]] = None,
 ) -> weave_init.InitializedClient:
@@ -356,22 +350,17 @@ def create_client(
     if trace_server_flag == "prod":
         # Note: this is only for local dev testing and should be removed
         return weave_init.init_weave("dev_testing")
-
-    server: tsi.TraceServerInterface
-
-    if trace_server_flag == "sqlite" or trace_server_flag == "clickhouse":
-        server = request.getfixturevalue("trace_server")
-    elif trace_server_flag.startswith("http"):
+    elif trace_server_flag == "http":
         server = remote_http_trace_server.RemoteHTTPTraceServer(trace_server_flag)
     else:
-        raise ValueError(f"Invalid trace server: {trace_server_flag}")
+        server = trace_server
 
     # Removing this as it lead to passing tests that were not passing in prod!
     # Keeping off for now until it is the default behavior.
     # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
-    server = CachingMiddlewareTraceServer.from_env(server)
+    caching_server = CachingMiddlewareTraceServer.from_env(server)
     client = TestOnlyFlushingWeaveClient(
-        TEST_ENTITY, "test-project", make_server_recorder(server)
+        TEST_ENTITY, "test-project", make_server_recorder(caching_server)
     )
     inited_client = weave_init.InitializedClient(client)
     autopatch.autopatch(autopatch_settings)
@@ -388,10 +377,10 @@ def zero_stack():
 
 
 @pytest.fixture
-def client(zero_stack, request):
+def client(zero_stack, request, trace_server):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
-    inited_client = create_client(request)
+    inited_client = create_client(request, trace_server)
     try:
         yield inited_client.client
     finally:
@@ -400,7 +389,7 @@ def client(zero_stack, request):
 
 
 @pytest.fixture
-def client_creator(zero_stack, request):
+def client_creator(zero_stack, request, trace_server):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
     @contextlib.contextmanager
@@ -411,7 +400,7 @@ def client_creator(zero_stack, request):
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        inited_client = create_client(request, autopatch_settings, global_attributes)
+        inited_client = create_client(request, trace_server, autopatch_settings, global_attributes)
         try:
             yield inited_client.client
         finally:

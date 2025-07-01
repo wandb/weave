@@ -18,7 +18,9 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
-from tests.conftest import DummyIdConverter
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    DummyIdConverter,
+)
 from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
