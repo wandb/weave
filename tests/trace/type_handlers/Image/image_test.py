@@ -1,8 +1,8 @@
 import io
 import random
 import subprocess
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 import pytest
 from PIL import Image
