@@ -20,6 +20,8 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 
+from tests.trace_server import conftest as ts_conftest # noqa: F401
+
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
 
