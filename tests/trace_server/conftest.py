@@ -13,6 +13,7 @@ from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 TEST_ENTITY = "shawn"
 
+
 def pytest_addoption(parser):
     try:
         parser.addoption(
