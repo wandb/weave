@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
-from tests.trace_server import conftest as ts_conftest  # noqa: F401
+from tests.trace_server.conftest import *  # noqa: F401
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import autopatch, weave_client, weave_init
 from weave.trace.context.call_context import set_call_stack

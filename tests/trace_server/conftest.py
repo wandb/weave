@@ -8,6 +8,7 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
 )
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import environment as ts_env
+from weave.trace_server.sqlite_trace_server import SqliteTraceServer  # noqa: F401
 
 TEST_ENTITY = "shawn"
 
@@ -47,8 +48,7 @@ def get_trace_server_flag(request):
     return weave_server_flag
 
 
-@pytest.fixture
-def ch_trace_server(
+def get_ch_trace_server(
     ensure_clickhouse_db,
 ) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
     def ch_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
@@ -69,12 +69,10 @@ def ch_trace_server(
     return ch_trace_server_inner
 
 
-@pytest.fixture
-def sqlite_trace_server() -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
+@pytest.fixture(scope="session")
+def get_sqlite_trace_server() -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
     def sqlite_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
-        sqlite_server = sqlite_trace_server.SqliteTraceServer(
-            "file::memory:?cache=shared"
-        )
+        sqlite_server = SqliteTraceServer("file::memory:?cache=shared")
         sqlite_server.drop_tables()
         sqlite_server.setup_tables()
         return externalize_trace_server(sqlite_server, TEST_ENTITY)
@@ -84,15 +82,15 @@ def sqlite_trace_server() -> Callable[[], TestOnlyUserInjectingExternalTraceServ
 
 @pytest.fixture(scope="session")
 def trace_server(
-    request, ch_trace_server, sqlite_trace_server
+    request, get_ch_trace_server, get_sqlite_trace_server
 ) -> TestOnlyUserInjectingExternalTraceServer:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
-        return ch_trace_server()
+        return get_ch_trace_server()
     elif trace_server_flag == "sqlite":
-        return sqlite_trace_server()
+        return get_sqlite_trace_server()
     else:
         # Once we split the trace server and client code, we can raise here.
         # For now, just return the sqlite trace server so we don't break existing tests.
         # raise ValueError(f"Invalid trace server: {trace_server_flag}")
-        return sqlite_trace_server()
+        return get_sqlite_trace_server()
