@@ -1,6 +1,7 @@
 import {Box, Typography} from '@mui/material';
 import {GridFilterItem} from '@mui/x-data-grid-pro';
-import {Button, ButtonVariants} from '@wandb/weave/components/Button';
+import {ButtonVariants} from '@wandb/weave/components/Button';
+import {TrackedButton} from '@wandb/weave/components/Button/TrackedButton';
 import {IconNames} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {BooleanIcon} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValueBoolean';
@@ -34,7 +35,6 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import {monitorGoToTableClicked} from '@wandb/weave/integrations/analytics/monitorEvents';
 import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useMemo, useState} from 'react';
@@ -194,14 +194,16 @@ const MonitorPageInner = ({
                 </div>
               )}
               <div className="ml-auto flex-shrink-0">
-                <Button
+                <TrackedButton
                   title="Edit monitor"
                   tooltip="Edit monitor"
                   variant="ghost"
                   size="medium"
                   icon="pencil-edit"
                   onClick={handleEditClick}
-                />
+                  trackedName="edit-monitor">
+                  Edit monitor
+                </TrackedButton>
                 <DeleteObjectButtonWithModal
                   overrideDisplayStr={monitorVersions[0].val['name']}
                   objVersionSchema={allVersionsSchema}
@@ -292,12 +294,13 @@ const MonitorPageInner = ({
                         </>
                       )}
                     </span>
-                    <Button
+                    <TrackedButton
                       variant={ButtonVariants.Secondary}
                       icon={IconNames.Table}
-                      onClick={onGoToTableClick}>
+                      onClick={onGoToTableClick}
+                      trackedName="go-to-table-from-monitor">
                       Go to table
-                    </Button>
+                    </TrackedButton>
                   </Box>
                   <CallsTable
                     hideControls

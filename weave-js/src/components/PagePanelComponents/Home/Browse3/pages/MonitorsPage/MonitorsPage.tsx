@@ -1,5 +1,5 @@
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
-import {Button} from '@wandb/weave/components/Button';
+import {TrackedButton} from '@wandb/weave/components/Button/TrackedButton';
 import {IconPencilEdit} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
@@ -16,7 +16,6 @@ import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/H
 import {SmallRef} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/smallRef/SmallRef';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
-import {newMonitorClicked} from '@wandb/weave/integrations/analytics/monitorEvents';
 import {parseRefMaybe} from '@wandb/weave/react';
 import React, {useMemo, useState} from 'react';
 
@@ -76,7 +75,11 @@ export const MonitorsPage = () => {
                       ],
                     ]}
                     trigger={
-                      <Button icon="overflow-horizontal" variant="ghost" />
+                      <TrackedButton
+                        icon="overflow-horizontal"
+                        variant="ghost"
+                        trackedName="monitor-overflow-menu-edit"
+                      />
                     }
                     offset="0px, -20px"
                     onOpen={() => setSelectedMonitor(obj)}
@@ -216,21 +219,17 @@ const CallCountCell = ({
 const MonitorsPageHeaderExtra: React.FC<{
   onCreateMonitor: () => void;
 }> = ({onCreateMonitor}) => {
-  const {entity, project} = useEntityProject();
-
   return (
     <Tailwind>
       <div className="mr-16 flex gap-8">
-        <Button
+        <TrackedButton
           icon="add-new"
           variant="ghost"
-          onClick={() => {
-            newMonitorClicked({entity, project});
-            onCreateMonitor();
-          }}
+          onClick={onCreateMonitor}
+          trackedName="new-monitor"
           tooltip="Create a new monitor">
           New monitor
-        </Button>
+        </TrackedButton>
       </div>
     </Tailwind>
   );
