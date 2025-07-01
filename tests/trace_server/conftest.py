@@ -2,13 +2,14 @@ from typing import Callable
 
 import pytest
 
+from tests.trace_server.conftest_lib.clickhouse_server import *  # noqa: F401
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
     externalize_trace_server,
 )
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import environment as ts_env
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer  # noqa: F401
+from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 TEST_ENTITY = "shawn"
 
@@ -48,6 +49,7 @@ def get_trace_server_flag(request):
     return weave_server_flag
 
 
+@pytest.fixture(scope="session")
 def get_ch_trace_server(
     ensure_clickhouse_db,
 ) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:

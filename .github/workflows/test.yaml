@@ -373,7 +373,7 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "trace_server"
+            -m "trace_server" \
             --trace-server=sqlite
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
