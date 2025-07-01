@@ -1,12 +1,11 @@
 import base64
 import typing
+
 from weave.trace_server import (
-
     external_to_internal_trace_server_adapter,
-
 )
-
 from weave.trace_server import trace_server_interface as tsi
+
 
 class TwoWayMapping:
     def __init__(self):
@@ -124,21 +123,23 @@ class TestOnlyUserInjectingExternalTraceServer(
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         req.obj.wb_user_id = self._user_id
         return super().obj_create(req)
-    
+
     def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
         req.wb_user_id = self._user_id
         return super().run_model(req)
-    
+
     def run_scorer(self, req: tsi.RunScorerReq) -> tsi.RunScorerRes:
         req.wb_user_id = self._user_id
         return super().run_scorer(req)
-    
+
     def queue_evaluation(self, req: tsi.QueueEvaluationReq) -> tsi.QueueEvaluationRes:
         req.wb_user_id = self._user_id
         return super().queue_evaluation(req)
-    
 
-def externalize_trace_server(trace_server: tsi.TraceServerInterface, user_id: str = "test_user") -> tsi.TraceServerInterface:
+
+def externalize_trace_server(
+    trace_server: tsi.TraceServerInterface, user_id: str = "test_user"
+) -> tsi.TraceServerInterface:
     return TestOnlyUserInjectingExternalTraceServer(
         trace_server,
         DummyIdConverter(),

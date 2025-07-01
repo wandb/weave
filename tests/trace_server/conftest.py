@@ -1,12 +1,15 @@
-from typing import Generator
 import pytest
+
 from tests.trace_server.conftest_lib.clickhouse_server import ensure_clickhouse_db
-from tests.trace_server.conftest_lib.trace_server_external_adapter import externalize_trace_server
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    externalize_trace_server,
+)
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import environment as ts_env
 from weave.trace_server import trace_server_interface as tsi
 
 TEST_ENTITY = "shawn"
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -28,11 +31,13 @@ def pytest_addoption(parser):
         help="Use a clickhouse process instead of a container",
     )
 
+
 def get_trace_server_flag(request):
     if request.config.getoption("--clickhouse"):
         return "clickhouse"
     weave_server_flag = request.config.getoption("--trace-server")
     return weave_server_flag
+
 
 @pytest.fixture
 def ch_internal_trace_server(request) -> tsi.TraceServerInterface:
@@ -53,24 +58,24 @@ def ch_internal_trace_server(request) -> tsi.TraceServerInterface:
 
 
 @pytest.fixture
-def ch_trace_server(request) -> Generator[tsi.TraceServerInterface, None, None]:
+def ch_trace_server(request) -> tsi.TraceServerInterface:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag != "clickhouse":
         pytest.skip("Clickhouse trace server is not available")
     server = request.getfixturevalue("ch_internal_trace_server")
-    yield externalize_trace_server(server, TEST_ENTITY)
+    return externalize_trace_server(server, TEST_ENTITY)
+
 
 @pytest.fixture
-def sqlite_trace_server(request) -> Generator[tsi.TraceServerInterface, None, None]:
+def sqlite_trace_server(request) -> tsi.TraceServerInterface:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag != "sqlite":
         pytest.skip("Sqlite trace server is not available")
-    sqlite_server = sqlite_trace_server.SqliteTraceServer(
-        "file::memory:?cache=shared"
-    )
+    sqlite_server = sqlite_trace_server.SqliteTraceServer("file::memory:?cache=shared")
     sqlite_server.drop_tables()
     sqlite_server.setup_tables()
-    yield externalize_trace_server(sqlite_server, TEST_ENTITY)
+    return externalize_trace_server(sqlite_server, TEST_ENTITY)
+
 
 @pytest.fixture
 def trace_server(request) -> tsi.TraceServerInterface:
