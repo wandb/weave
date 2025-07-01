@@ -146,7 +146,7 @@ export const useCallsForQuery = (
     limit: effectiveLimit,
     columns: storageSizeCols,
     expandedRefColumns: expandedColumns,
-    skip: calls.loading || noCalls,
+    skip: calls.loading || noCalls || !options?.includeTotalStorageSize,
     includeTotalStorageSize: true,
   });
 

@@ -14,7 +14,10 @@ Key components:
 - CTE building functions for efficient object reference filtering
 """
 
+from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+
+from pydantic import BaseModel
 
 from weave.trace_server.calls_query_builder.optimization_builder import (
     QueryOptimizationProcessor,
@@ -35,22 +38,15 @@ if TYPE_CHECKING:
     )
 
 
-class ObjectRefCondition:
+class ObjectRefCondition(BaseModel):
     """Base class for object reference conditions"""
 
-    def __init__(
-        self,
-        field_path: str,
-        expand_columns: list[str],
-        case_insensitive: bool = False,
-        conversion_type: Optional[
-            Literal["double", "string", "int", "bool", "exists"]
-        ] = None,
-    ):
-        self.field_path = field_path
-        self.expand_columns = expand_columns
-        self.case_insensitive = case_insensitive
-        self.conversion_type = conversion_type
+    field_path: str
+    expand_columns: list[str]
+    case_insensitive: bool = False
+    conversion_type: Optional[Literal["double", "string", "int", "bool", "exists"]] = (
+        None
+    )
 
     @property
     def is_table_rows_condition(self) -> bool:
@@ -192,6 +188,7 @@ class ObjectRefCondition:
         return property_parts[0]
 
     @property
+    @abstractmethod
     def unique_key(self) -> str:
         """
         Map a unique condition key to the final CTE name.
@@ -200,7 +197,7 @@ class ObjectRefCondition:
         Returns:
             str: A unique key identifying this condition
         """
-        raise NotImplementedError("Child classes must implement unique_key property")
+        pass
 
     def as_sql_condition(
         self,
@@ -259,20 +256,8 @@ class ObjectRefCondition:
 class ObjectRefFilterCondition(ObjectRefCondition):
     """Represents a condition that filters on object references"""
 
-    def __init__(
-        self,
-        field_path: str,
-        operation_type: str,
-        value: Union[str, int, float, bool, list, dict, None],
-        expand_columns: list[str],
-        case_insensitive: bool = False,
-        conversion_type: Optional[
-            Literal["double", "string", "int", "bool", "exists"]
-        ] = None,
-    ):
-        super().__init__(field_path, expand_columns, case_insensitive, conversion_type)
-        self.operation_type = operation_type
-        self.value = value
+    operation_type: str
+    value: Union[str, int, float, bool, list, dict, None]
 
     @property
     def unique_key(self) -> str:
@@ -288,17 +273,6 @@ class ObjectRefFilterCondition(ObjectRefCondition):
 
 class ObjectRefOrderCondition(ObjectRefCondition):
     """Represents an order condition on object references"""
-
-    def __init__(
-        self,
-        field_path: str,
-        expand_columns: list[str],
-        case_insensitive: bool = False,
-        conversion_type: Optional[
-            Literal["double", "string", "int", "bool", "exists"]
-        ] = None,
-    ):
-        super().__init__(field_path, expand_columns, case_insensitive, conversion_type)
 
     @property
     def unique_key(self) -> str:

@@ -422,7 +422,7 @@ export const CallsTable: FC<{
             field,
             rowId
           );
-          const op = operator ? operator : getDefaultOperatorForValue(value);
+          const op = operator ?? getDefaultOperatorForValue(value);
           if (expandedRef != null) {
             // special case, we need to add TWO values to the filter
             // 1. the ref
@@ -434,7 +434,6 @@ export const CallsTable: FC<{
             //   operator: op,
             //   value: expandedRef.value,
             // });
-            console.log('setting expanded ref cols', expandedRef.field);
             setExpandedRefCols(prevState => {
               const newSet = new Set(prevState);
               newSet.delete('inputs.example');
