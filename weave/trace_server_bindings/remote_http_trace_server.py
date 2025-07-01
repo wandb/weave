@@ -649,6 +649,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "queue_evaluation is not implemented for remote HTTP trace server"
         )
 
+
 __docspec__ = [
     RemoteHTTPTraceServer,
     ServerInfoRes,
