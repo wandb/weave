@@ -174,7 +174,8 @@ export const isTraceCallChatFormatOAIResponses = (
 ): boolean => {
   return (
     isTraceCallChatFormatOAIResponsesRequest(call.inputs) &&
-    isTraceCallChatFormatOAIResponsesResult(call.output)
+    (call.output == null ||
+      isTraceCallChatFormatOAIResponsesResult(call.output))
   );
 };
 
