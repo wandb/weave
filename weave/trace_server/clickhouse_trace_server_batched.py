@@ -123,6 +123,7 @@ from weave.trace_server.table_query_builder import (
     make_standard_table_query,
     make_table_stats_query_with_storage_size,
 )
+from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
     validate_cost_purge_req,
@@ -1178,6 +1179,64 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise RuntimeError("Unexpected number of results", query_result)
 
         return tsi.ProjectStatsRes(**dict(zip(columns, query_result.result_rows[0])))
+
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        """Stream threads with aggregated statistics sorted by last activity."""
+        pb = ParamBuilder()
+
+        # Extract filter values
+        after_datetime = None
+        before_datetime = None
+        if req.filter is not None:
+            after_datetime = req.filter.after_datetime
+            before_datetime = req.filter.before_datetime
+
+        # Use the dedicated query builder
+        query = make_threads_query(
+            project_id=req.project_id,
+            pb=pb,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
+            sortable_datetime_after=after_datetime,
+            sortable_datetime_before=before_datetime,
+        )
+
+        # Stream the results using _query_stream
+        raw_res = self._query_stream(query, pb.get_params())
+
+        for row in raw_res:
+            (
+                thread_id,
+                turn_count,
+                start_time,
+                last_updated,
+                first_turn_id,
+                last_turn_id,
+                p50_turn_duration_ms,
+                p99_turn_duration_ms,
+            ) = row
+
+            # Ensure datetimes have timezone info
+            start_time_with_tz = _ensure_datetimes_have_tz(start_time)
+            last_updated_with_tz = _ensure_datetimes_have_tz(last_updated)
+
+            if start_time_with_tz is None or last_updated_with_tz is None:
+                # Skip threads without valid timestamps
+                continue
+
+            yield tsi.ThreadSchema(
+                thread_id=thread_id,
+                turn_count=turn_count,
+                start_time=start_time_with_tz,
+                last_updated=last_updated_with_tz,
+                first_turn_id=first_turn_id,
+                last_turn_id=last_turn_id,
+                p50_turn_duration_ms=p50_turn_duration_ms,
+                p99_turn_duration_ms=p99_turn_duration_ms,
+            )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
     def _parsed_refs_read_batch(

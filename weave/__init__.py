@@ -41,6 +41,7 @@ __docspec__ = [
     finish,
     op,
     attributes,
+    thread,
     # Re-exported from flow module
     Object,
     Dataset,
@@ -87,4 +88,5 @@ __all__ = [
     "SavedView",
     "Scorer",
     "StringPrompt",
+    "thread",
 ]
