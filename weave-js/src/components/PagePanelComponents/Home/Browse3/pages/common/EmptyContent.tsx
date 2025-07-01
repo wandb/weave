@@ -267,7 +267,7 @@ export const EMPTY_PROPS_MONITORS: EmptyProps = {
   moreInformation: (
     <>
       Learn{' '}
-      <TargetBlank href="https://weave-docs.wandb.ai/guides/evaluation/guardrails_and_monitors#using-scorers-as-monitors">
+      <TargetBlank href="https://wandb.me/docs-monitors">
         monitor basics
       </TargetBlank>
       .
