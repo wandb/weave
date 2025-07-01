@@ -1037,6 +1037,17 @@ class ProjectStatsRes(BaseModel):
     files_storage_size_bytes: int
 
 
+class RunEvaluationReq(BaseModel):
+    project_id: str
+    evaluation_ref: str
+    model_refs: list[str]
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class RunEvaluationRes(BaseModel):
+    eval_call_ids: list[str]
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1115,3 +1126,5 @@ class TraceServerInterface(Protocol):
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
+
+    def run_evaluation(self, req: RunEvaluationReq) -> RunEvaluationRes: ...
