@@ -400,7 +400,9 @@ def client_creator(zero_stack, request, trace_server):
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        inited_client = create_client(request, trace_server, autopatch_settings, global_attributes)
+        inited_client = create_client(
+            request, trace_server, autopatch_settings, global_attributes
+        )
         try:
             yield inited_client.client
         finally:

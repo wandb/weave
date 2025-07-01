@@ -1,15 +1,16 @@
 from typing import Callable
+
 import pytest
 
-from tests.trace_server.conftest_lib.clickhouse_server import ensure_clickhouse_db
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
-    externalize_trace_server,TestOnlyUserInjectingExternalTraceServer
+    TestOnlyUserInjectingExternalTraceServer,
+    externalize_trace_server,
 )
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import environment as ts_env
-from weave.trace_server import trace_server_interface as tsi
 
 TEST_ENTITY = "shawn"
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -46,9 +47,10 @@ def get_trace_server_flag(request):
     return weave_server_flag
 
 
-
 @pytest.fixture
-def ch_trace_server(ensure_clickhouse_db) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
+def ch_trace_server(
+    ensure_clickhouse_db,
+) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
     def ch_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
         host, port = next(ensure_clickhouse_db())
 
@@ -63,21 +65,27 @@ def ch_trace_server(ensure_clickhouse_db) -> Callable[[], TestOnlyUserInjectingE
         ch_server._run_migrations()
 
         return externalize_trace_server(ch_server, TEST_ENTITY)
+
     return ch_trace_server_inner
 
 
 @pytest.fixture
 def sqlite_trace_server() -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
     def sqlite_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
-        sqlite_server = sqlite_trace_server.SqliteTraceServer("file::memory:?cache=shared")
+        sqlite_server = sqlite_trace_server.SqliteTraceServer(
+            "file::memory:?cache=shared"
+        )
         sqlite_server.drop_tables()
         sqlite_server.setup_tables()
         return externalize_trace_server(sqlite_server, TEST_ENTITY)
+
     return sqlite_trace_server_inner
 
 
 @pytest.fixture
-def trace_server(request, ch_trace_server, sqlite_trace_server) -> TestOnlyUserInjectingExternalTraceServer:
+def trace_server(
+    request, ch_trace_server, sqlite_trace_server
+) -> TestOnlyUserInjectingExternalTraceServer:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
         return ch_trace_server()

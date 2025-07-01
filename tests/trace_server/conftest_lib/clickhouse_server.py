@@ -186,7 +186,9 @@ def ensure_clickhouse_db_process_running(
 
 
 @pytest.fixture(scope="session")
-def ensure_clickhouse_db(request) -> typing.Callable[[], typing.Generator[tuple[str, int], None, None]]:
+def ensure_clickhouse_db(
+    request,
+) -> typing.Callable[[], typing.Generator[tuple[str, int], None, None]]:
     def ensure_clickhouse_db_inner() -> typing.Generator[tuple[str, int], None, None]:
         host, port = ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
         if os.environ.get("CI"):
@@ -204,4 +206,5 @@ def ensure_clickhouse_db(request) -> typing.Callable[[], typing.Generator[tuple[
             )
         yield host, port
         cleanup()
+
     return ensure_clickhouse_db_inner
