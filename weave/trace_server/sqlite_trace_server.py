@@ -1425,6 +1425,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         response = self.completions_create(req)
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
+    def run_evaluation(self, req: tsi.RunEvaluationReq) -> tsi.RunEvaluationRes:
+        raise NotImplementedError(
+            "run_evaluation is not implemented for SQLite trace server"
+        )
+
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
             raise TypeError(
