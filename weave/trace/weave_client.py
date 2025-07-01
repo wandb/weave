@@ -2304,6 +2304,17 @@ class WeaveClient:
         """Flushes background asynchronous tasks, safe to call multiple times."""
         self._flush()
 
+    def object_ref(
+        self, object_id: str, digest: str, _extra: tuple[str, ...] | None = None
+    ) -> ObjectRef:
+        return ObjectRef(
+            entity=self.entity,
+            project=self.project,
+            name=object_id,
+            _digest=digest,
+            _extra=_extra or (),
+        )
+
     def _flush_with_callback(
         self,
         callback: Callable[[FlushStatus], None],

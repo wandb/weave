@@ -2077,9 +2077,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         }
 
     async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
-        raise NotImplementedError(
-            "run_model is not implemented for ClickHouse trace server"
-        )
+        runner = RunAsUser(ch_server_dump=self.model_dump())
+        return await runner.run_model(req)
 
     async def run_scorer(self, req: tsi.RunScorerReq) -> tsi.RunScorerRes:
         raise NotImplementedError(

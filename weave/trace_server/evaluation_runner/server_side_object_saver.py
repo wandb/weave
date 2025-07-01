@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Any, TypedDict
 
 import weave
@@ -10,10 +12,15 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 from weave.trace_server import external_to_internal_trace_server_adapter
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
+    LLMStructuredCompletionModel,
+)
 from weave.trace_server.refs_internal import (
     InternalObjectRef,
     parse_internal_uri,
 )
+
+SERVER_SIDE_ENTITY_PLACEHOLDER = "__SERVER__"
 
 
 class ScoreCallResult(TypedDict):
@@ -37,6 +44,14 @@ class RunEvaluationException(Exception):
     pass
 
 
+def convert_internal_uri_to_external_ref(client: WeaveClient, ref: str) -> ObjectRef:
+    internal_ref = parse_internal_uri(ref)
+    assert isinstance(internal_ref, InternalObjectRef)
+    return client.object_ref(
+        internal_ref.name, internal_ref.version, tuple(internal_ref.extra)
+    )
+
+
 class RunAsUser:
     """Executes a function in a separate process for memory isolation.
     This class provides a way to run functions in an isolated memory space using
@@ -46,6 +61,64 @@ class RunAsUser:
 
     def __init__(self, ch_server_dump: dict[str, Any]):
         self.ch_server_dump = ch_server_dump
+
+    @contextmanager
+    def user_scoped_client(
+        self, project_id: str, wb_user_id: str
+    ) -> Generator[WeaveClient, None, None]:
+        from weave.trace_server.clickhouse_trace_server_batched import (
+            ClickHouseTraceServer,
+        )
+
+        client = WeaveClient(
+            SERVER_SIDE_ENTITY_PLACEHOLDER,
+            project_id,
+            UserInjectingExternalTraceServer(
+                ClickHouseTraceServer(**self.ch_server_dump),
+                id_converter=IdConverter(),
+                user_id=wb_user_id,
+            ),
+            False,
+        )
+
+        ic = InitializedClient(client)
+
+        yield client
+
+        client._flush()
+        ic.reset()
+
+    async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
+        wb_user_id = req.wb_user_id
+        if wb_user_id is None:
+            raise ValueError("wb_user_id is required")
+
+        with self.user_scoped_client(req.project_id, wb_user_id) as client:
+            loaded_model = client.get(
+                convert_internal_uri_to_external_ref(client, req.model_ref)
+            )
+            if not isinstance(loaded_model, LLMStructuredCompletionModel):
+                raise TypeError("Invalid model reference")
+
+            inputs_value: dict
+            if req.inputs.input_type == "value":
+                inputs_value = req.inputs.value
+
+            elif req.inputs.input_type == "ref":
+                inputs_value = client.get(
+                    convert_internal_uri_to_external_ref(client, req.inputs.value)
+                )
+
+            else:
+                raise ValueError("Invalid input type")
+
+            if not isinstance(inputs_value, dict):
+                raise TypeError("Inputs value must be a dictionary")
+
+            # Sad - this should be async, but we can't do that because the model is not async
+            result, call = loaded_model.predict.call(loaded_model, **inputs_value)
+
+            return tsi.RunModelRes(output=result, call_id=call.id)
 
     async def run_evaluation_evaluate(
         self,
@@ -94,7 +167,7 @@ class RunAsUser:
         )
 
         client = WeaveClient(
-            "_SERVER_",
+            SERVER_SIDE_ENTITY_PLACEHOLDER,
             req.project_id,
             UserInjectingExternalTraceServer(
                 ClickHouseTraceServer(**self.ch_server_dump),
@@ -111,7 +184,7 @@ class RunAsUser:
         eval_ref = parse_internal_uri(req.evaluation_ref)
         assert isinstance(eval_ref, InternalObjectRef)
         ref = ObjectRef(
-            entity="_SERVER_",
+            entity=SERVER_SIDE_ENTITY_PLACEHOLDER,
             project=eval_ref.project_id,
             name=eval_ref.name,
             _digest=eval_ref.version,
@@ -129,7 +202,7 @@ class RunAsUser:
             model_ref_internal = parse_internal_uri(model_ref_str)
             assert isinstance(model_ref_internal, InternalObjectRef)
             model_ref = ObjectRef(
-                entity="_SERVER_",
+                entity=SERVER_SIDE_ENTITY_PLACEHOLDER,
                 project=model_ref_internal.project_id,
                 name=model_ref_internal.name,
                 _digest=model_ref_internal.version,
@@ -147,13 +220,16 @@ class RunAsUser:
         return eval_call_ids
 
 
+SERVER_SIDE_PROJECT_ID_PREFIX = SERVER_SIDE_ENTITY_PLACEHOLDER + "/"
+
+
 class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
     def ext_to_int_project_id(self, project_id: str) -> str:
-        assert project_id.startswith("_SERVER_/")
-        return project_id[len("_SERVER_/") :]
+        assert project_id.startswith(SERVER_SIDE_PROJECT_ID_PREFIX)
+        return project_id[len(SERVER_SIDE_PROJECT_ID_PREFIX) :]
 
     def int_to_ext_project_id(self, project_id: str) -> str | None:
-        return "_SERVER_/" + project_id
+        return SERVER_SIDE_PROJECT_ID_PREFIX + project_id
 
     def ext_to_int_run_id(self, run_id: str) -> str:
         return run_id

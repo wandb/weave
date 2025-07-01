@@ -1119,23 +1119,23 @@ class QueueEvaluationRes(BaseModel):
     call_ids: list[str]
 
 
-class DirectInputs(BaseModel):
-    input_type: Literal["direct"]
-    inputs: dict[str, Any]
+class InputsAsValue(BaseModel):
+    input_type: Literal["value"]
+    value: dict[str, Any]
 
 
-class RefInputs(BaseModel):
+class InputsAsRef(BaseModel):
     input_type: Literal["ref"]
     ref: str
 
 
-DirectOrRefInputs = Union[DirectInputs, RefInputs]
+InputsAsValueOrRef = Union[InputsAsValue, InputsAsRef]
 
 
 class RunModelReq(BaseModel):
     project_id: str
     model_ref: str
-    inputs: DirectOrRefInputs
+    inputs: InputsAsValueOrRef
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
@@ -1144,24 +1144,24 @@ class RunModelRes(BaseModel):
     output: Any
 
 
-class DirectOutputs(BaseModel):
-    output_type: Literal["direct"]
-    outputs: Any
+class OutputAsValue(BaseModel):
+    output_type: Literal["value"]
+    value: Any
 
 
-class RefOutputs(BaseModel):
+class OutputAsCallId(BaseModel):
     output_type: Literal["call_id"]
     call_id: str
 
 
-DirectOrRefOutputs = Union[DirectOutputs, RefOutputs]
+OutputAsValueOrRef = Union[OutputAsValue, OutputAsCallId]
 
 
 class RunScorerReq(BaseModel):
     project_id: str
     scorer_ref: str
-    model_output: DirectOrRefOutputs
-    additional_inputs: DirectOrRefInputs
+    model_output: OutputAsValueOrRef
+    additional_inputs: InputsAsValueOrRef
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
