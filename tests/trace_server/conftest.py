@@ -13,26 +13,28 @@ from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 TEST_ENTITY = "shawn"
 
-
 def pytest_addoption(parser):
-    parser.addoption(
-        "--trace-server",
-        action="store",
-        default="clickhouse",
-        help="Specify the client object to use: sqlite or clickhouse",
-    )
-    parser.addoption(
-        "--ch",
-        "--clickhouse",
-        action="store_true",
-        help="Use clickhouse server (shorthand for --trace-server=clickhouse)",
-    )
-    parser.addoption(
-        "--clickhouse-process",
-        action="store",
-        default="false",
-        help="Use a clickhouse process instead of a container",
-    )
+    try:
+        parser.addoption(
+            "--trace-server",
+            action="store",
+            default="clickhouse",
+            help="Specify the client object to use: sqlite or clickhouse",
+        )
+        parser.addoption(
+            "--ch",
+            "--clickhouse",
+            action="store_true",
+            help="Use clickhouse server (shorthand for --trace-server=clickhouse)",
+        )
+        parser.addoption(
+            "--clickhouse-process",
+            action="store",
+            default="false",
+            help="Use a clickhouse process instead of a container",
+        )
+    except ValueError:
+        pass
 
 
 def pytest_collection_modifyitems(config, items):
