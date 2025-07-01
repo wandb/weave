@@ -82,7 +82,7 @@ def sqlite_trace_server() -> Callable[[], TestOnlyUserInjectingExternalTraceServ
     return sqlite_trace_server_inner
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def trace_server(
     request, ch_trace_server, sqlite_trace_server
 ) -> TestOnlyUserInjectingExternalTraceServer:
