@@ -456,6 +456,7 @@ const ObjectVersionPageInner: React.FC<{
                     entityName={entityName}
                     projectName={projectName}
                     data={viewerDataAsObject}
+                    versionIndex={objectVersionIndex}
                   />
                 ) : baseObjectClass === 'Model' ? (
                   <TabUseModel
