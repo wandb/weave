@@ -18,7 +18,7 @@ def test_dictify_simple() -> None:
         y: int
 
         # This should be ignored
-        def sum() -> int:
+        def sum(self) -> int:
             return self.x + self.y
 
     pt = Point()
