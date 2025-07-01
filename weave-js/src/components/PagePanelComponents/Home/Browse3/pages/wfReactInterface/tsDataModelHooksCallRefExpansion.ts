@@ -272,11 +272,7 @@ const doExpansionIteration = async (
       ...Array.from(expandedRefColumns).map(column => column.split('.').length)
     );
 
-    if (
-      nextDepth > 0 ||
-      iterationCount === 0 ||
-      iterationCount < maxNeededDepth
-    ) {
+    if (nextDepth > 0 || iterationCount < maxNeededDepth) {
       return doExpansionIteration(
         expandedTraceCalls,
         expandedRefColumns,
