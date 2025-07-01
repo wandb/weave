@@ -831,6 +831,15 @@ class CallsQuery(BaseModel):
             on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
 
+        session_settings_sql = ""
+        if any(
+            isinstance(field, CallsMergedAggField) and field.is_heavy()
+            for field in self.select_fields
+        ):
+            session_settings_sql = (
+                "SETTINGS function_json_value_return_type_allow_complex = 1"
+            )
+
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
@@ -854,7 +863,10 @@ class CallsQuery(BaseModel):
         {order_by_sql}
         {limit_sql}
         {offset_sql}
+        {session_settings_sql}
         """
+
+        print(safely_format_sql(raw_sql, logger))
 
         return safely_format_sql(raw_sql, logger)
 

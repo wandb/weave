@@ -479,6 +479,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             pb.get_params(),
         )
 
+        print("parameters", pb.get_params())
+
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
         include_feedback = req.include_feedback or False

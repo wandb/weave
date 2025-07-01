@@ -4580,3 +4580,79 @@ def test_calls_query_with_descendant_error(client):
         )
 
         assert len(calls) == count
+
+
+def test_calls_query_filter_contains_in_message_array(client):
+    @weave.op
+    def op1(extra_message: str = None):
+        messages = ["hello", "world"]
+        if extra_message:
+            messages.append(extra_message)
+        return {"messages": messages}
+
+    op1()
+    op1("extra")
+    op1("extra2")
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(project_id=get_client_project_id(client))
+        )
+    )
+    assert len(calls) == 3
+
+    # Test $contains with substring search in the JSON-serialized output
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "output.messages"},
+                            "substr": {"$literal": "hello"},
+                        }
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 3
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "output.messages"},
+                            "substr": {"$literal": "extra2"},
+                        }
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 1
+
+    # Test exact match with $eq
+    # TODO: this test breaks due to string optimization and how JSON is stored
+    # on disk with spaces after items in a list. When we remove pre-where string
+    # optimization, this test should be able to pass!
+    # calls = list(
+    #     client.server.calls_query_stream(
+    #         tsi.CallsQueryReq(
+    #             project_id=get_client_project_id(client),
+    #             query={
+    #                 "$expr": {
+    #                     "$eq": [
+    #                         {"$getField": "output.messages"},
+    #                         {"$literal": '["hello","world"]'},
+    #                     ]
+    #                 }
+    #             },
+    #         )
+    #     )
+    # )
+    # assert len(calls) == 1
