@@ -49,6 +49,7 @@ def get_trace_server_flag(request):
     return weave_server_flag
 
 
+@pytest.fixture
 def get_ch_trace_server(
     ensure_clickhouse_db,
 ) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
@@ -70,6 +71,7 @@ def get_ch_trace_server(
     return ch_trace_server_inner
 
 
+@pytest.fixture
 def get_sqlite_trace_server() -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
     def sqlite_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
         sqlite_server = SqliteTraceServer("file::memory:?cache=shared")
@@ -80,6 +82,7 @@ def get_sqlite_trace_server() -> Callable[[], TestOnlyUserInjectingExternalTrace
     return sqlite_trace_server_inner
 
 
+@pytest.fixture
 def trace_server(
     request, get_ch_trace_server, get_sqlite_trace_server
 ) -> TestOnlyUserInjectingExternalTraceServer:
