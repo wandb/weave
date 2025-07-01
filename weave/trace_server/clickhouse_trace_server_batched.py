@@ -2254,6 +2254,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
             raise
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_async")
+    async def _insert_async(
+        self,
+        table: str,
+        data: Sequence[Sequence[Any]],
+        column_names: list[str],
+        settings: Optional[dict[str, Any]] = None,
+    ) -> QuerySummary:
+        if not settings:
+            settings = {}
+        settings.update({"async_insert": 1})
+        return self._insert(table, data, column_names, settings)
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         parameters = ch_call.model_dump()

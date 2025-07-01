@@ -91,6 +91,8 @@ from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
+from weave.trace_server.adapters.async_to_sync_adapter import AsyncToSyncAdapter
+from weave.trace_server.async_trace_server_interface import AsyncTraceServerInterface
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
@@ -939,12 +941,14 @@ class WeaveClient:
         self,
         entity: str,
         project: str,
-        server: TraceServerInterface,
+        server: TraceServerInterface | AsyncTraceServerInterface,
         ensure_project_exists: bool = True,
     ):
         self.entity = entity
         self.project = project
-        self.server = server
+
+        self.server = AsyncToSyncAdapter(cast(AsyncTraceServerInterface, server))
+
         self._anonymous_ops: dict[str, Op] = {}
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)

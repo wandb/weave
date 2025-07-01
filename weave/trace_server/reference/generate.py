@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 
 import weave.trace_server.trace_service
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.async_trace_server_interface import AsyncTraceServerInterface
 
 SERVICE_TAG_NAME = "Service"
 CALLS_TAG_NAME = "Calls"
@@ -425,5 +426,361 @@ def generate_routes(
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.CompletionsCreateRes:
         return service.trace_server_interface.completions_create(req)
+
+    return router
+
+
+class AsyncTraceService:
+    """Async version of TraceService that wraps an AsyncTraceServerInterface."""
+
+    def __init__(self, async_trace_server_interface: AsyncTraceServerInterface):
+        self.async_trace_server_interface = async_trace_server_interface
+
+    async def server_info(self) -> weave.trace_server.trace_service.ServerInfoRes:
+        # For now, return a default server info. In a real implementation,
+        # this could be made async as well
+        return weave.trace_server.trace_service.ServerInfoRes(
+            min_required_weave_python_version="0.0.1",
+        )
+
+    async def read_root(self) -> dict[str, str]:
+        return {"status": "ok"}
+
+
+class AsyncServiceDependency:
+    """Factory for creating async server dependencies with proper authorization."""
+
+    def __init__(
+        self,
+        service_factory: Callable[[AuthParams], AsyncTraceService],
+        auth_dependency: Callable[[], AuthParams] = lambda: AuthParams(),
+    ):
+        """
+        Initialize with auth dependencies and async server factory.
+
+        Args:
+            service_factory: Function that creates an async server from auth params
+            auth_dependency: Function that provides auth parameters
+        """
+        self.auth_dependency = auth_dependency
+        self.service_factory = service_factory
+
+    def get_service(
+        self,
+    ) -> Callable[[AuthParams], AsyncTraceService]:
+        """Get an async server dependency with the appropriate auth for the operation."""
+
+        def _get_server(
+            auth_params: AuthParams = Depends(self.auth_dependency),  # noqa: B008
+        ) -> AsyncTraceService:
+            return self.service_factory(auth_params)
+
+        return _get_server
+
+
+def generate_async_routes(
+    router: APIRouter, async_service_dependency: AsyncServiceDependency
+) -> APIRouter:
+    """Generate async FastAPI routes from an AsyncTraceServerInterface implementation.
+
+    Args:
+        router: The router to add routes to
+        async_service_dependency: The factory function to create an AsyncServiceDependency
+
+    Returns:
+        The router with all async routes implemented
+    """
+    get_service = async_service_dependency.get_service()
+
+    @router.get("/server_info", tags=[SERVICE_TAG_NAME])
+    async def server_info(
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> weave.trace_server.trace_service.ServerInfoRes:
+        return await service.server_info()
+
+    @router.get("/health", tags=[SERVICE_TAG_NAME])
+    async def read_root(
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> dict[str, str]:
+        return await service.read_root()
+
+    @router.post("/call/start", tags=[CALLS_TAG_NAME])
+    async def call_start(
+        req: tsi.CallStartReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CallStartRes:
+        return await service.async_trace_server_interface.call_start(req)
+
+    @router.post("/call/end", tags=[CALLS_TAG_NAME])
+    async def call_end(
+        req: tsi.CallEndReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CallEndRes:
+        return await service.async_trace_server_interface.call_end(req)
+
+    @router.post("/call/upsert_batch", tags=[CALLS_TAG_NAME])
+    async def call_start_batch(
+        req: tsi.CallCreateBatchReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CallCreateBatchRes:
+        return await service.async_trace_server_interface.call_start_batch(req)
+
+    @router.post("/calls/delete", tags=[CALLS_TAG_NAME])
+    async def calls_delete(
+        req: tsi.CallsDeleteReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CallsDeleteRes:
+        return await service.async_trace_server_interface.calls_delete(req)
+
+    @router.post("/call/update", tags=[CALLS_TAG_NAME])
+    async def call_update(
+        req: tsi.CallUpdateReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CallUpdateRes:
+        return await service.async_trace_server_interface.call_update(req)
+
+    @router.post("/call/read", tags=[CALLS_TAG_NAME])
+    async def call_read(
+        req: tsi.CallReadReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CallReadRes:
+        return await service.async_trace_server_interface.call_read(req)
+
+    @router.post("/calls/query_stats", tags=[CALLS_TAG_NAME])
+    async def calls_query_stats(
+        req: tsi.CallsQueryStatsReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CallsQueryStatsRes:
+        return await service.async_trace_server_interface.calls_query_stats(req)
+
+    @router.post(
+        "/calls/stream_query",
+        tags=[CALLS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    async def calls_query_stream(
+        req: tsi.CallsQueryReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+        accept: Annotated[str, Header()] = "application/jsonl",
+    ) -> StreamingResponse:
+        stream_iterator = await service.async_trace_server_interface.calls_query_stream(
+            req
+        )
+        return StreamingResponse(stream_iterator, media_type=accept)
+
+    @router.post("/calls/query", tags=[CALLS_TAG_NAME], include_in_schema=False)
+    async def calls_query(
+        req: tsi.CallsQueryReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CallsQueryRes:
+        return await service.async_trace_server_interface.calls_query(req)
+
+    @router.post("/obj/create", tags=[OBJECTS_TAG_NAME])
+    async def obj_create(
+        req: tsi.ObjCreateReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ObjCreateRes:
+        return await service.async_trace_server_interface.obj_create(req)
+
+    @router.post("/obj/read", tags=[OBJECTS_TAG_NAME])
+    async def obj_read(
+        req: tsi.ObjReadReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ObjReadRes:
+        return await service.async_trace_server_interface.obj_read(req)
+
+    @router.post("/objs/query", tags=[OBJECTS_TAG_NAME])
+    async def objs_query(
+        req: tsi.ObjQueryReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ObjQueryRes:
+        return await service.async_trace_server_interface.objs_query(req)
+
+    @router.post("/obj/delete", tags=[OBJECTS_TAG_NAME])
+    async def obj_delete(
+        req: tsi.ObjDeleteReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ObjDeleteRes:
+        return await service.async_trace_server_interface.obj_delete(req)
+
+    @router.post("/table/create", tags=[TABLES_TAG_NAME])
+    async def table_create(
+        req: tsi.TableCreateReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.TableCreateRes:
+        return await service.async_trace_server_interface.table_create(req)
+
+    @router.post("/table/update", tags=[TABLES_TAG_NAME])
+    async def table_update(
+        req: tsi.TableUpdateReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.TableUpdateRes:
+        return await service.async_trace_server_interface.table_update(req)
+
+    @router.post("/table/query", tags=[TABLES_TAG_NAME])
+    async def table_query(
+        req: tsi.TableQueryReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.TableQueryRes:
+        return await service.async_trace_server_interface.table_query(req)
+
+    @router.post(
+        "/table/query_stream",
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    async def table_query_stream(
+        req: tsi.TableQueryReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+        accept: Annotated[str, Header()] = "application/jsonl",
+    ) -> StreamingResponse:
+        stream_iterator = await service.async_trace_server_interface.table_query_stream(
+            req
+        )
+        return StreamingResponse(stream_iterator, media_type=accept)
+
+    @router.post("/table/query_stats", tags=[TABLES_TAG_NAME])
+    async def table_query_stats(
+        req: tsi.TableQueryStatsReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.TableQueryStatsRes:
+        return await service.async_trace_server_interface.table_query_stats(req)
+
+    @router.post("/refs/read_batch", tags=[REFS_TAG_NAME])
+    async def refs_read_batch(
+        req: tsi.RefsReadBatchReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.RefsReadBatchRes:
+        return await service.async_trace_server_interface.refs_read_batch(req)
+
+    @router.post("/file/create", tags=[FILES_TAG_NAME])
+    @router.post("/files/create", tags=[FILES_TAG_NAME], include_in_schema=False)
+    async def file_create(
+        project_id: Annotated[str, Form()],
+        file: UploadFile,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.FileCreateRes:
+        req = tsi.FileCreateReq(
+            project_id=project_id,
+            name=file.filename or "<unnamed_file>",
+            content=await file.read(),
+        )
+        return await service.async_trace_server_interface.file_create(req)
+
+    @router.post(
+        "/file/content",
+        tags=[FILES_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "content": {"application/octet-stream": {}},
+                "description": "Binary file content stream",
+            }
+        },
+    )
+    @router.post("/files/content", tags=[FILES_TAG_NAME], include_in_schema=False)
+    async def file_content(
+        req: tsi.FileContentReadReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        res = await service.async_trace_server_interface.file_content_read(req)
+        return StreamingResponse(
+            iter([res.content]), media_type="application/octet-stream"
+        )
+
+    @router.post("/cost/create", tags=[COST_TAG_NAME])
+    async def cost_create(
+        req: tsi.CostCreateReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CostCreateRes:
+        return await service.async_trace_server_interface.cost_create(req)
+
+    @router.post("/cost/query", tags=[COST_TAG_NAME])
+    async def cost_query(
+        req: tsi.CostQueryReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CostQueryRes:
+        return await service.async_trace_server_interface.cost_query(req)
+
+    @router.post("/cost/purge", tags=[COST_TAG_NAME])
+    async def cost_purge(
+        req: tsi.CostPurgeReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CostPurgeRes:
+        return await service.async_trace_server_interface.cost_purge(req)
+
+    @router.post("/feedback/create", tags=[FEEDBACK_TAG_NAME])
+    async def feedback_create(
+        req: tsi.FeedbackCreateReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.FeedbackCreateRes:
+        """Add feedback to a call or object."""
+        return await service.async_trace_server_interface.feedback_create(req)
+
+    @router.post("/feedback/query", tags=[FEEDBACK_TAG_NAME])
+    async def feedback_query(
+        req: tsi.FeedbackQueryReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.FeedbackQueryRes:
+        """Query for feedback."""
+        return await service.async_trace_server_interface.feedback_query(req)
+
+    @router.post("/feedback/purge", tags=[FEEDBACK_TAG_NAME])
+    async def feedback_purge(
+        req: tsi.FeedbackPurgeReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.FeedbackPurgeRes:
+        """Permanently delete feedback."""
+        return await service.async_trace_server_interface.feedback_purge(req)
+
+    @router.post("/feedback/replace", tags=[FEEDBACK_TAG_NAME])
+    async def feedback_replace(
+        req: tsi.FeedbackReplaceReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.FeedbackReplaceRes:
+        return await service.async_trace_server_interface.feedback_replace(req)
+
+    @router.post(
+        "/actions/execute_batch", tags=[ACTIONS_TAG_NAME], include_in_schema=False
+    )
+    async def actions_execute_batch(
+        req: tsi.ActionsExecuteBatchReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ActionsExecuteBatchRes:
+        return await service.async_trace_server_interface.actions_execute_batch(req)
+
+    @router.post(
+        "/completions/create", tags=[COMPLETIONS_TAG_NAME], include_in_schema=False
+    )
+    async def completions_create(
+        req: tsi.CompletionsCreateReq,
+        service: AsyncTraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.CompletionsCreateRes:
+        return await service.async_trace_server_interface.completions_create(req)
 
     return router
