@@ -231,6 +231,7 @@ filterwarnings = [
 addopts = "-v"
 markers = [
   "skip_clickhouse_client: marks tests as requiring clickhouse client to be skipped",
+  "trace_server: alias for `trace_server` fixture used for CI dispatching. Do not use directly in code.",
   "disable_logging_error_check: means that the test expects logging errors (and the default assertion for no logging errors will fail)",
 ]
 
