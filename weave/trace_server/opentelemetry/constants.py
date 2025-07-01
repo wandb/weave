@@ -44,7 +44,6 @@ This would be the resulting dict dumped to clickhouse:
 # INPUT_KEYS: Maps attribute keys that represent user prompts or inputs to LLMs
 # Priority is given to standards in this order:
 # This is used to populate the `inputs_dump` column in clickhouse
-from weave.trace_server.opentelemetry.helpers import try_parse_int
 
 INPUT_KEYS = [
     "ai.prompt",  # Vercel

@@ -62,8 +62,7 @@ def lint(session):
         "langchain",
         "litellm",
         "llamaindex",
-        "mistral0",
-        "mistral1",
+        "mistral",
         "notdiamond",
         "openai",
         "openai_agents",
@@ -127,8 +126,7 @@ def tests(session, shard):
         "flow": ["flow/"],
         "trace_server": ["trace_server/"],
         "trace_server_bindings": ["trace_server_bindings"],
-        "mistral0": ["integrations/mistral/v0/"],
-        "mistral1": ["integrations/mistral/v1/"],
+        "mistral": ["integrations/mistral/"],
         "scorers": ["scorers/"],
     }
 
