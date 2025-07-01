@@ -18,7 +18,6 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
-from tests.conftest import DummyIdConverter
 from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
@@ -26,6 +25,9 @@ from tests.trace.util import (
     MaybeStringMatcher,
     client_is_sqlite,
     get_info_loglines,
+)
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    DummyIdConverter,
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
@@ -202,6 +204,7 @@ def test_trace_server_call_start_and_end(client):
         "storage_size_bytes": None,
         "total_storage_size_bytes": None,
         "thread_id": None,
+        "turn_id": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -252,6 +255,7 @@ def test_trace_server_call_start_and_end(client):
         "storage_size_bytes": None,
         "total_storage_size_bytes": None,
         "thread_id": None,
+        "turn_id": None,
     }
 
 
@@ -4578,3 +4582,556 @@ def test_calls_query_with_descendant_error(client):
         )
 
         assert len(calls) == count
+
+
+def test_thread_context_with_weave_api(client):
+    """Test thread context using the weave.thread() API with ThreadContext."""
+    import weave
+    from weave.trace.context import call_context
+
+    # Test default thread_id is None (using internal context for verification)
+    assert call_context.get_thread_id() is None
+
+    # Test using weave.thread context manager with ThreadContext
+    with weave.thread("api_thread_1") as t:
+        # Use ThreadContext object to access thread_id
+        assert t.thread_id == "api_thread_1"
+        assert (
+            call_context.get_thread_id() == "api_thread_1"
+        )  # Verify internal consistency
+
+        # Test nested context with ThreadContext
+        with weave.thread("api_thread_2") as inner_t:
+            assert inner_t.thread_id == "api_thread_2"
+            assert t.thread_id == "api_thread_1"  # Outer context unchanged
+            assert call_context.get_thread_id() == "api_thread_2"
+
+        # Should revert to parent context
+        assert t.thread_id == "api_thread_1"
+        assert call_context.get_thread_id() == "api_thread_1"
+
+    # Should revert to None
+    assert call_context.get_thread_id() is None
+
+
+def test_thread_id_in_calls(client):
+    """Test that thread_id is properly captured in call records, including auto-generation."""
+    import weave
+
+    @weave.op
+    def test_op_with_thread(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def test_op_without_thread(x: int) -> int:
+        return x * 3
+
+    @weave.op
+    def test_op_auto_thread(x: int) -> int:
+        return x * 4
+
+    # Call without thread context
+    result1 = test_op_without_thread(5)
+    assert result1 == 15
+
+    # Call with explicit thread context
+    with weave.thread("test_thread_id") as t:
+        assert t.thread_id == "test_thread_id"
+        result2 = test_op_with_thread(5)
+        assert result2 == 10
+
+    # Call with auto-generated thread_id
+    auto_thread_id = None
+    with weave.thread() as t:
+        auto_thread_id = t.thread_id
+        assert auto_thread_id is not None
+        assert isinstance(auto_thread_id, str)
+        assert len(auto_thread_id) > 20  # Should be UUID v7
+        result3 = test_op_auto_thread(5)
+        assert result3 == 20
+
+    # Get the calls to verify thread_id
+    calls = client.get_calls()
+
+    # Find our calls (most recent first)
+    auto_call = None
+    thread_call = None
+    no_thread_call = None
+
+    for call in calls:
+        if "test_op_auto_thread" in call.op_name:
+            auto_call = call
+        elif "test_op_with_thread" in call.op_name:
+            thread_call = call
+        elif "test_op_without_thread" in call.op_name:
+            no_thread_call = call
+
+    assert auto_call is not None
+    assert thread_call is not None
+    assert no_thread_call is not None
+
+    # Verify thread_id values
+    assert auto_call.thread_id == auto_thread_id  # Should match auto-generated ID
+    assert thread_call.thread_id == "test_thread_id"
+    assert no_thread_call.thread_id is None
+
+
+def test_thread_id_inheritance(client):
+    """Test that thread_id is inherited by child calls, demonstrated via ThreadContext."""
+    import weave
+
+    @weave.op
+    def child_op(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def parent_op(x: int) -> int:
+        return child_op(x) * 2
+
+    # Call with thread context, using ThreadContext to demonstrate inheritance
+    inherited_thread_id = None
+    with weave.thread("inherited_thread") as t:
+        inherited_thread_id = t.thread_id
+        assert inherited_thread_id == "inherited_thread"
+
+        # Both parent and child calls should inherit this thread_id
+        result = parent_op(10)
+        assert result == 22  # (10 + 1) * 2
+
+        # ThreadContext shows the current thread_id throughout execution
+        assert t.thread_id == "inherited_thread"
+
+    # Get the calls to verify thread_id inheritance
+    calls = client.get_calls()
+
+    # Find our calls
+    parent_call = None
+    child_call = None
+
+    for call in calls:
+        if "parent_op" in call.op_name:
+            parent_call = call
+        elif "child_op" in call.op_name:
+            child_call = call
+
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Both should have the same thread_id that was shown in ThreadContext
+    assert parent_call.thread_id == inherited_thread_id
+    assert child_call.thread_id == inherited_thread_id
+    assert parent_call.thread_id == "inherited_thread"
+    assert child_call.thread_id == "inherited_thread"
+
+
+def test_thread_context_error_handling(client):
+    """Test that ThreadContext is properly managed even when exceptions occur."""
+    import weave
+    from weave.trace.context import call_context
+
+    @weave.op
+    def failing_op(should_fail: bool) -> str:
+        if should_fail:
+            raise ValueError("Test exception")
+        return "success"
+
+    # Test that thread context is properly restored after exception
+    assert call_context.get_thread_id() is None
+
+    # Test ThreadContext behavior during exception
+    exception_thread_context = None
+    try:
+        with weave.thread("exception_thread") as t:
+            exception_thread_context = t
+            assert t.thread_id == "exception_thread"
+            assert call_context.get_thread_id() == "exception_thread"
+            failing_op(True)  # This will raise an exception
+    except ValueError:
+        pass  # Expected
+
+    # Verify ThreadContext maintained its state even after exception
+    assert exception_thread_context.thread_id == "exception_thread"
+
+    # Thread context should be restored to None after exiting context
+    assert call_context.get_thread_id() is None
+
+    # Test successful call after exception with auto-generated thread
+    recovery_thread_id = None
+    with weave.thread() as t:  # Use auto-generation
+        recovery_thread_id = t.thread_id
+        assert recovery_thread_id is not None
+        assert len(recovery_thread_id) > 20  # Should be auto-generated UUID v7
+
+        result = failing_op(False)
+        assert result == "success"
+        assert t.thread_id == recovery_thread_id  # ThreadContext consistent
+
+    assert call_context.get_thread_id() is None
+
+
+def test_turn_id_functionality(client):
+    """Test that turn_id is properly assigned for turn calls and descendants."""
+    import weave
+
+    @weave.op
+    def child_op(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def turn_op_A(x: int) -> int:
+        return child_op(x) * 2
+
+    @weave.op
+    def turn_op_B(x: int) -> int:
+        return x * 3
+
+    @weave.op
+    def turn_op_C(x: int) -> int:
+        return child_op(x) * 4
+
+    # Test with thread context - sibling turns
+    with weave.thread("test_turns"):
+        result_a = turn_op_A(10)  # Should be a turn
+        result_b = turn_op_B(5)  # Should be a turn
+        result_c = turn_op_C(3)  # Should be a turn
+
+    assert result_a == 22  # (10 + 1) * 2
+    assert result_b == 15  # 5 * 3
+    assert result_c == 16  # (3 + 1) * 4
+
+    # Get calls and verify turn_id assignments
+    calls = client.get_calls()
+
+    turn_a_call = None
+    turn_b_call = None
+    turn_c_call = None
+    child_calls = []
+
+    for call in calls:
+        if "turn_op_A" in call.op_name:
+            turn_a_call = call
+        elif "turn_op_B" in call.op_name:
+            turn_b_call = call
+        elif "turn_op_C" in call.op_name:
+            turn_c_call = call
+        elif "child_op" in call.op_name:
+            child_calls.append(call)
+
+    # Verify turn calls have their own ID as turn_id
+    assert turn_a_call.turn_id == turn_a_call.id
+    assert turn_b_call.turn_id == turn_b_call.id
+    assert turn_c_call.turn_id == turn_c_call.id
+
+    # Verify all have the same thread_id
+    assert turn_a_call.thread_id == "test_turns"
+    assert turn_b_call.thread_id == "test_turns"
+    assert turn_c_call.thread_id == "test_turns"
+
+    # Verify child calls inherit turn_id from their parents
+    for child_call in child_calls:
+        assert child_call.thread_id == "test_turns"
+        # Child should inherit turn_id from its parent turn
+        parent_turn_id = None
+        for call in calls:
+            if call.id == child_call.parent_id:
+                parent_turn_id = call.turn_id
+                break
+        assert child_call.turn_id == parent_turn_id
+
+
+def test_nested_thread_contexts_turn_lineage(client):
+    """Test that nested thread contexts properly cut off turn lineage."""
+    import weave
+
+    @weave.op
+    def child_op(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def outer_turn_A(x: int) -> int:
+        return child_op(x) * 2
+
+    @weave.op
+    def inner_turn_B(x: int) -> int:
+        return x * 3
+
+    @weave.op
+    def inner_turn_C(x: int) -> int:
+        return child_op(x) * 4
+
+    @weave.op
+    def outer_turn_D(x: int) -> int:
+        return x * 5
+
+    # Test nested thread contexts
+    with weave.thread("outer_thread"):
+        result_a = outer_turn_A(10)  # Should be turn in outer_thread
+
+        with weave.thread("inner_thread"):
+            result_b = inner_turn_B(5)  # Should be turn in inner_thread
+            result_c = inner_turn_C(3)  # Should be turn in inner_thread
+
+        result_d = outer_turn_D(2)  # Should be turn in outer_thread again
+
+    assert result_a == 22  # (10 + 1) * 2
+    assert result_b == 15  # 5 * 3
+    assert result_c == 16  # (3 + 1) * 4
+    assert result_d == 10  # 2 * 5
+
+    # Get calls and verify turn_id assignments
+    calls = client.get_calls()
+
+    outer_a_call = None
+    inner_b_call = None
+    inner_c_call = None
+    outer_d_call = None
+    child_calls = []
+
+    for call in calls:
+        if "outer_turn_A" in call.op_name:
+            outer_a_call = call
+        elif "inner_turn_B" in call.op_name:
+            inner_b_call = call
+        elif "inner_turn_C" in call.op_name:
+            inner_c_call = call
+        elif "outer_turn_D" in call.op_name:
+            outer_d_call = call
+        elif "child_op" in call.op_name:
+            child_calls.append(call)
+
+    # Verify all turn calls have their own ID as turn_id
+    assert outer_a_call.turn_id == outer_a_call.id
+    assert inner_b_call.turn_id == inner_b_call.id
+    assert inner_c_call.turn_id == inner_c_call.id
+    assert outer_d_call.turn_id == outer_d_call.id
+
+    # Verify thread_id assignments
+    assert outer_a_call.thread_id == "outer_thread"
+    assert inner_b_call.thread_id == "inner_thread"
+    assert inner_c_call.thread_id == "inner_thread"
+    assert outer_d_call.thread_id == "outer_thread"
+
+    # Verify turn lineage is properly cut off - each thread creates new turns
+    # outer_turn_A and outer_turn_D should have different turn_ids
+    assert outer_a_call.turn_id != outer_d_call.turn_id
+    # inner_turn_B and inner_turn_C should have different turn_ids
+    assert inner_b_call.turn_id != inner_c_call.turn_id
+
+    # Verify child calls inherit turn_id from their parent turns
+    for child_call in child_calls:
+        parent_turn_id = None
+        for call in calls:
+            if call.id == child_call.parent_id:
+                parent_turn_id = call.turn_id
+                break
+        assert child_call.turn_id == parent_turn_id
+
+
+def test_thread_id_none_turn_id_none(client):
+    """Test that when thread_id is None, turn_id is also None."""
+    import weave
+    from weave.trace.context import call_context
+
+    @weave.op
+    def child_op(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def turn_op_A(x: int) -> int:
+        return child_op(x) * 2
+
+    @weave.op
+    def op_outside_thread(x: int) -> int:
+        return x * 3
+
+    # First, create a call within a thread context to set up turn context
+    with weave.thread("test_thread"):
+        result_a = turn_op_A(10)  # Should be a turn with turn_id
+
+    # After exiting thread context, both thread_id and turn_id should be None
+    assert call_context.get_thread_id() is None
+    assert call_context.get_turn_id() is None
+
+    # Now make a call outside any thread context
+    # This should have thread_id = None and turn_id = None
+    result_outside = op_outside_thread(5)
+
+    assert result_a == 22  # (10 + 1) * 2
+    assert result_outside == 15  # 5 * 3
+
+    # Get calls and verify turn_id/thread_id assignments
+    calls = client.get_calls()
+
+    turn_a_call = None
+    outside_call = None
+    child_call = None
+
+    for call in calls:
+        if "turn_op_A" in call.op_name:
+            turn_a_call = call
+        elif "op_outside_thread" in call.op_name:
+            outside_call = call
+        elif "child_op" in call.op_name:
+            child_call = call
+
+    # Verify the turn call has proper thread_id and turn_id
+    assert turn_a_call.thread_id == "test_thread"
+    assert turn_a_call.turn_id == turn_a_call.id
+
+    # Verify the child call inherits from its parent turn
+    assert child_call.thread_id == "test_thread"
+    assert child_call.turn_id == turn_a_call.turn_id
+
+    # Verify the call outside thread context has both None
+    assert outside_call.thread_id is None
+    assert outside_call.turn_id is None
+
+
+def test_nested_thread_disable_with_none(client):
+    """Test that ThreadContext properly shows thread_id=None when threading is disabled."""
+    import weave
+    from weave.trace.context import call_context
+
+    @weave.op
+    def turn_A(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def op_disabled_threading(x: int) -> int:
+        return x * 3
+
+    @weave.op
+    def turn_C(x: int) -> int:
+        return x * 4
+
+    # Test the realistic edge case: nested thread with thread_id=None
+    main_thread_context = None
+    disabled_thread_context = None
+
+    with weave.thread("main_thread") as t:
+        main_thread_context = t
+        assert t.thread_id == "main_thread"
+        result_a = turn_A(10)  # Should be a turn with turn_id
+
+        # Verify we're in thread context (turn_id is reset after call finishes)
+        assert call_context.get_thread_id() == "main_thread"
+
+        with weave.thread(None) as disabled_t:  # Explicitly disable thread tracking
+            disabled_thread_context = disabled_t
+            # ThreadContext shows None for disabled threading
+            assert disabled_t.thread_id is None
+            assert disabled_t.turn_id is None
+
+            # Verify thread context is disabled
+            assert call_context.get_thread_id() is None
+            assert call_context.get_turn_id() is None
+
+            result_b = op_disabled_threading(5)  # Should have no thread_id or turn_id
+
+        # Back in main thread - should create a new turn
+        # ThreadContext shows we're back in main thread
+        assert t.thread_id == "main_thread"
+        result_c = turn_C(3)  # Should be a new turn
+
+    # Verify ThreadContext objects maintained correct state throughout
+    assert main_thread_context.thread_id == "main_thread"
+    assert disabled_thread_context.thread_id is None
+
+    assert result_a == 20  # 10 * 2
+    assert result_b == 15  # 5 * 3
+    assert result_c == 12  # 3 * 4
+
+    # Get calls and verify assignments
+    calls = client.get_calls()
+
+    turn_a_call = None
+    disabled_call = None
+    turn_c_call = None
+
+    for call in calls:
+        if "turn_A" in call.op_name:
+            turn_a_call = call
+        elif "op_disabled_threading" in call.op_name:
+            disabled_call = call
+        elif "turn_C" in call.op_name:
+            turn_c_call = call
+
+    # Verify first turn has proper thread_id and turn_id
+    assert turn_a_call.thread_id == "main_thread"
+    assert turn_a_call.turn_id == turn_a_call.id
+
+    # Verify disabled call has both None (the edge case shown via ThreadContext)
+    assert disabled_call.thread_id is None
+    assert disabled_call.turn_id is None
+
+    # Verify third turn is a new turn in the main thread
+    assert turn_c_call.thread_id == "main_thread"
+    assert turn_c_call.turn_id == turn_c_call.id
+
+    # Verify the two turns in main_thread have different turn_ids
+    assert turn_a_call.turn_id != turn_c_call.turn_id
+
+
+def test_thread_api_with_auto_generation(client):
+    """Test the thread API with ThreadContext and auto-generation."""
+    import weave
+
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 2
+
+    # Test 1: Auto-generated thread_id
+    with weave.thread() as t:
+        assert t.thread_id is not None
+        assert isinstance(t.thread_id, str)
+        # Should be a valid UUID v7 format (starts with time-based prefix)
+        assert len(t.thread_id) > 20  # UUID v7 should be longer than 20 chars
+
+        result1 = test_op(10)
+        # turn_id is reset after turn call finishes, so it will be None here
+        # We'll verify turn assignment by checking the call data later
+
+    # Test 2: Explicit thread_id
+    with weave.thread("custom_thread_123") as t:
+        assert t.thread_id == "custom_thread_123"
+        result2 = test_op(20)
+        # turn_id is reset after turn call finishes
+
+    # Test 3: Disabled threading (explicit None)
+    with weave.thread(None) as t:
+        assert t.thread_id is None
+        result3 = test_op(30)
+        assert t.turn_id is None  # Should always be None when threading disabled
+
+    # Verify results
+    assert result1 == 20
+    assert result2 == 40
+    assert result3 == 60
+
+    # Get calls and verify thread assignments
+    calls = client.get_calls()
+
+    auto_call = None
+    custom_call = None
+    disabled_call = None
+
+    for call in calls:
+        if call.inputs.get("x") == 10:
+            auto_call = call
+        elif call.inputs.get("x") == 20:
+            custom_call = call
+        elif call.inputs.get("x") == 30:
+            disabled_call = call
+
+    # Verify auto-generated thread call
+    assert auto_call.thread_id is not None
+    assert len(auto_call.thread_id) > 20  # Should be UUID v7
+    assert auto_call.turn_id == auto_call.id  # Should be a turn
+
+    # Verify custom thread call
+    assert custom_call.thread_id == "custom_thread_123"
+    assert custom_call.turn_id == custom_call.id  # Should be a turn
+
+    # Verify disabled thread call
+    assert disabled_call.thread_id is None
+    assert disabled_call.turn_id is None

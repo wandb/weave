@@ -625,6 +625,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
         )
 
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        return self._generic_stream_request(
+            "/threads/stream_query", req, tsi.ThreadsQueryReq, tsi.ThreadSchema
+        )
+
     async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
         raise NotImplementedError(
             "run_model is not implemented for remote HTTP trace server"
@@ -641,7 +648,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError(
             "queue_evaluation is not implemented for remote HTTP trace server"
         )
-
 
 __docspec__ = [
     RemoteHTTPTraceServer,

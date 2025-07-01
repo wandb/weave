@@ -502,6 +502,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         return self._next_trace_server.project_stats(req)
 
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        return self._next_trace_server.threads_query_stream(req)
+
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
     raw_dict = obj.model_dump()
