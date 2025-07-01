@@ -423,7 +423,12 @@ def _create_like_optimized_eq_condition(
         # Empty string is not a valid value for LIKE optimization
         return None
 
-    like_pattern = f"%{literal_value}%"
+    # Boolean literals are not wrapped in quotes in JSON payloads
+    if literal_value in ("true", "false"):
+        like_pattern = f"%{literal_value}%"
+    else:
+        like_pattern = f'%"{literal_value}"%'
+
     like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
     if _field_requires_null_check(field):
         return f"({like_condition} OR {table_alias}.{field} IS NULL)"
@@ -459,7 +464,7 @@ def _create_like_optimized_contains_condition(
         return None
 
     case_insensitive = operation.contains_.case_insensitive or False
-    like_pattern = f"%{substr_value}%"
+    like_pattern = f'%"%{substr_value}%"%'
 
     like_condition = _create_like_condition(
         field, like_pattern, pb, table_alias, case_insensitive
@@ -505,7 +510,7 @@ def _create_like_optimized_in_condition(
         ):
             return None
 
-        like_pattern = f"%{value_operand.literal_}%"
+        like_pattern = f'%"{value_operand.literal_}"%'
         like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
         like_conditions.append(like_condition)
 
