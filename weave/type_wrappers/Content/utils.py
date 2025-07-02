@@ -27,6 +27,7 @@ class ContentArgs(TypedDict):
     filename: str | None
     path: str | None
     size: int | None
+    encoding: str | None
     extra: dict[str, Any]
 
 
@@ -36,6 +37,7 @@ class ContentKeywordArgs(TypedDict, total=False):
     filename: str
     path: str
     size: int
+    encoding: str
     extra: dict[str, Any]
 
 
