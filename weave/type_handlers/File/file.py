@@ -11,14 +11,21 @@ import subprocess
 import sys
 from pathlib import Path
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 from typing_extensions import deprecated
 from weave.type_wrappers.Content.content import Content
 from weave.type_handlers.Content.content import save as save_content
 >>>>>>> 44250b63b8 (Add back File with deprecation)
+=======
+
+from typing_extensions import deprecated
+>>>>>>> 86dbfba62b (lint)
 
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
+from weave.type_handlers.Content.content import save as save_content
+from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +38,7 @@ Use the new Content API which supports all File methods instead:\n
 File(path) -> Content.from_path(path)\n
 File(path, mimetype) -> Content.from_path(path, mimetype)\n
 """
+
 
 @deprecated(DEPRECATION_MESSAGE)
 >>>>>>> 44250b63b8 (Add back File with deprecation)
