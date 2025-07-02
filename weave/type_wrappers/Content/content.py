@@ -47,14 +47,12 @@ def create_bytes_content(
     input: bytes, /, **values: Unpack[ContentArgs]
 ) -> BaseContentHandler:
     values["size"] = values["size"] or len(input)
-    values["extra"]["input_type"] = values["extra"].get("input_type") or str(
-        type(input)
-    )
-    values["extra"]["input_category"] = values["extra"].get("input_category") or "data"
+    values["extra"]["input_type"] = values["extra"].get("input_type", type(input))
+    values["extra"]["input_category"] = values["extra"].get("input_category", "data")
     # Raw binary data has no encoding unless explicitly provided
     if values["mimetype"] is None or values["extension"] is None:
         mimetype, extension = get_mime_and_extension(
-            buffer=input[:2048],
+            buffer=input,
             filename=values["filename"],
             extension=values["extension"],
             mimetype=values["mimetype"],
@@ -79,11 +77,9 @@ def create_file_content(
     values["path"] = str(path)
     values["size"] = path.stat().st_size
     values["filename"] = path.name
-    values["extra"]["original_path"] = values["extra"].get("original_path") or str(path)
-    values["extra"]["input_type"] = values["extra"].get("input_type") or str(
-        type(input)
-    )
-    values["extra"]["input_category"] = values["extra"].get("input_category") or "path"
+    values["extra"]["original_path"] = values["extra"].get("original_path", str(path))
+    values["extra"]["input_type"] = values["extra"].get("input_type", str(type(input)))
+    values["extra"]["input_category"] = values["extra"].get("input_category", "path")
     data = path.read_bytes()
     return create_bytes_content(data, **values)
 
@@ -93,11 +89,11 @@ def create_b64_content(
 ) -> BaseContentHandler:
     try:
         data = base64.b64decode(input, validate=True)
-        values["extra"]["input_type"] = values["extra"].get("input_type") or str(
-            type(input)
+        values["extra"]["input_type"] = values["extra"].get(
+            "input_type", str(type(input))
         )
-        values["extra"]["input_category"] = (
-            values["extra"].get("input_category") or "base64"
+        values["extra"]["input_category"] = values["extra"].get(
+            "input_category", "base64"
         )
         # Set encoding to 'base64' for base64 encoded data
         values["encoding"] = "base64"
@@ -150,8 +146,8 @@ class Content(Generic[T]):
             content_args["extra"]["input_type"] = content_args["extra"].get(
                 "input_type"
             ) or str(input.__class__)
-            content_args["extra"]["input_category"] = (
-                content_args["extra"].get("input_category") or "object"
+            content_args["extra"]["input_category"] = content_args["extra"].get(
+                "input_category", "object"
             )
             self.content_handler = create_file_content(str(input), **content_args)
 
