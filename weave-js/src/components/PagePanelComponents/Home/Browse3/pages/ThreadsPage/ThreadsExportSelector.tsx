@@ -1,5 +1,5 @@
 import {Popover} from '@mui/material';
-import {Button} from '@wandb/weave/components/Button';
+import {TrackedButton} from '@wandb/weave/components/Button/TrackedButton';
 import {
   DraggableGrow,
   DraggableHandle,
@@ -35,11 +35,12 @@ export const ThreadsExportSelector = ({
   return (
     <>
       <span ref={ref}>
-        <Button
+        <TrackedButton
           icon="export-share-upload"
           variant="ghost"
           onClick={onClick}
           disabled={disabled}
+          trackedName="export-threads"
           tooltip={open ? undefined : 'Export threads data'}
         />
       </span>

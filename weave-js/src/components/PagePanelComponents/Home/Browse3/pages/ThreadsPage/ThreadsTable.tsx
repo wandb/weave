@@ -303,6 +303,7 @@ export const ThreadsTable: FC<{
             setFilterModel={setFilterModel}
             selectedCalls={[]}
             clearSelectedCalls={() => {}}
+            isGrouped={true}
           />
           <div className="ml-auto flex min-w-0 items-center gap-8 overflow-hidden">
             <div className="flex-none">
@@ -356,7 +357,6 @@ export const ThreadsTable: FC<{
         // Styling
         sx={{
           borderRadius: 0,
-          // Move pagination controls to the left like CallsTable
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
           },

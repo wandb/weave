@@ -1,7 +1,6 @@
 import {Box, Drawer, Typography} from '@mui/material';
 import {GridFilterModel} from '@mui/x-data-grid-pro';
 import SliderInput from '@wandb/weave/common/components/elements/SliderInput';
-import {useViewerInfo} from '@wandb/weave/common/hooks/useViewerInfo';
 import {Button} from '@wandb/weave/components/Button';
 import {StyledSliderInput} from '@wandb/weave/components/Form/StyledSliderInput';
 import {TextArea} from '@wandb/weave/components/Form/TextArea';
@@ -117,7 +116,6 @@ export const MonitorFormDrawer = ({
   scorers: existingScorers,
 }: MonitorFormDrawerProps) => {
   const {entity, project} = useEntityProject();
-  const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [description, setDescription] = useState<string>('');
@@ -257,24 +255,6 @@ export const MonitorFormDrawer = ({
         .filter(f => !!f) as ScorerFormType[],
     [scorers]
   );
-
-  const alwaysPresentFilterOptions = useMemo(() => {
-    return [
-      {
-        value: 'id',
-        label: 'Call ID',
-      },
-      ...(!loadingUserInfo && userInfo && 'admin' in userInfo && userInfo.admin
-        ? [
-            {
-              value: 'feedback.[*].trigger_ref',
-              label: 'Monitored',
-              description: 'Find all calls scored by a particular monitor',
-            },
-          ]
-        : []),
-    ];
-  }, [loadingUserInfo, userInfo]);
 
   const scorerFormRefs = useRef<ScorerFormRef[]>([]);
 
@@ -492,9 +472,6 @@ export const MonitorFormDrawer = ({
                             columnInfo={columns}
                             selectedCalls={[]}
                             clearSelectedCalls={() => {}}
-                            alwaysPresentFilterOptions={
-                              alwaysPresentFilterOptions
-                            }
                           />
                         </Box>
                       ) : (

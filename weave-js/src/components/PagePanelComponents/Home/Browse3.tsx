@@ -1023,10 +1023,5 @@ const PlaygroundPageBinding = () => {
 
 const ThreadsPageBinding = () => {
   const query = useURLSearchParamsDict();
-  const loadLastView = Object.keys(query).length === 0;
-  if (loadLastView) {
-    // For now, just load the default threads view
-    return <ThreadsPageLoadView />;
-  }
   return <ThreadsPageLoadView view={query.view} />;
 };

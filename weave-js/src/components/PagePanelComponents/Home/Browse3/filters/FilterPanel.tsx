@@ -9,7 +9,7 @@ import React from 'react';
 import {AutoSizer} from 'react-virtualized';
 
 import {ColumnInfo} from '../types';
-import {FieldOption, FilterBar} from './FilterBar';
+import {FilterBar} from './FilterBar';
 
 type FilterPanelProps = {
   entity: string;
@@ -19,7 +19,7 @@ type FilterPanelProps = {
   columnInfo: ColumnInfo;
   selectedCalls: string[];
   clearSelectedCalls: () => void;
-  alwaysPresentFilterOptions?: FieldOption[];
+  isGrouped?: boolean;
 };
 
 export const FilterPanel = (props: FilterPanelProps) => {

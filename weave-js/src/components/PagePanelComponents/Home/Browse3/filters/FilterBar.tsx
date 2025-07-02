@@ -49,10 +49,9 @@ type FilterBarProps = {
   columnInfo: ColumnInfo;
   selectedCalls: string[];
   clearSelectedCalls: () => void;
-  alwaysPresentFilterOptions?: FieldOption[];
-
   width: number;
   height: number;
+  isGrouped?: boolean;
 };
 
 const isFilterIncomplete = (filter: GridFilterItem): boolean => {
@@ -72,8 +71,8 @@ export const FilterBar = ({
   columnInfo,
   selectedCalls,
   clearSelectedCalls,
-  alwaysPresentFilterOptions = [],
   width,
+  isGrouped = false,
 }: FilterBarProps) => {
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
@@ -182,10 +181,18 @@ export const FilterBar = ({
     }
   }
 
-  // Add always present filter options to the Metadata group
-  alwaysPresentFilterOptions.forEach(option => {
-    (options[0] as GroupedOption).options.push(option);
-  });
+  if (!isGrouped) {
+    // Add the default filters if the calls are not grouped
+    (options[0] as GroupedOption).options.push({
+      value: 'id',
+      label: 'Call ID',
+    });
+    (options[0] as GroupedOption).options.push({
+      value: MONITORED_FILTER_VALUE,
+      label: 'Monitored',
+      description: 'Find all calls scored by a particular monitor',
+    });
+  }
 
   const onRemoveAll = () => {
     // Check if there's only one filter and it's a datetime filter

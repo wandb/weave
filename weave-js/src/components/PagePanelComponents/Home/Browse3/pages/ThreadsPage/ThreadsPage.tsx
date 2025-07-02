@@ -44,7 +44,7 @@ export const ThreadsPage: FC<{
   paginationModel: GridPaginationModel;
   setPaginationModel: (newModel: GridPaginationModel) => void;
 }> = props => {
-  const {baseView, views, fetchViews, onRecordLastView} = props;
+  const {baseView, views} = props;
 
   const table = 'threads';
   const view = baseView.object_id;

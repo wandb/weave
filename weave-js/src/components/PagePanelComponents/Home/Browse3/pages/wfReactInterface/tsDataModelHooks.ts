@@ -34,7 +34,10 @@ import {
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import * as traceServerTypes from './traceServerClientTypes';
-import {ComputedCallStatuses} from './traceServerClientTypes';
+import {
+  ComputedCallStatuses,
+  ComputedCallStatusType,
+} from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
@@ -2238,7 +2241,7 @@ const processFirstTurnInputs = async (
   getTsClient: () => traceServerClient.TraceServerClient,
   projectId: string,
   groupedCalls: {[turnId: string]: traceServerTypes.TraceCallSchema[]}
-): Promise<Map<string, any>> => {
+): Promise<Map<string, traceServerTypes.TraceCallSchema['inputs']>> => {
   const firstTurnsInputs = new Map();
   const firstCallsPerTurn = Object.entries(groupedCalls)
     .map(([turnId, calls]) => {
@@ -2291,7 +2294,10 @@ const processLastTurnData = async (
   getTsClient: () => traceServerClient.TraceServerClient,
   projectId: string,
   groupedCalls: {[turnId: string]: traceServerTypes.TraceCallSchema[]}
-): Promise<{outputs: Map<string, any>; statuses: Map<string, string>}> => {
+): Promise<{
+  outputs: Map<string, traceServerTypes.TraceCallSchema['output']>;
+  statuses: Map<string, string>;
+}> => {
   const lastTurnsOutputs = new Map();
   const lastTurnsStatuses = new Map();
 
@@ -2364,7 +2370,17 @@ const useTurnCallsData = (
   projectId: string,
   firstTurnIds: string[],
   lastTurnIds: string[]
-) => {
+): {
+  dataLoading: boolean;
+  dataError: Error | undefined;
+  firstTurnsLoading: boolean;
+  firstTurnsError: Error | undefined;
+  firstTurnsInputs: Map<string, traceServerTypes.TraceCallSchema['inputs']>;
+  lastTurnsLoading: boolean;
+  lastTurnsError: Error | undefined;
+  lastTurnsOutputs: Map<string, traceServerTypes.TraceCallSchema['output']>;
+  lastTurnsStatuses: Map<string, ComputedCallStatusType>;
+} => {
   const getTsClient = useGetTraceServerClientContext();
 
   // Union of all turn IDs to make a single request
@@ -2491,7 +2507,14 @@ const useTurnCallsData = (
   ]);
 };
 
-export const useThreadsQuery = (params: traceServerTypes.ThreadsQueryReq) => {
+export const useThreadsQuery = (
+  params: traceServerTypes.ThreadsQueryReq
+): {
+  threadsState: ReturnType<
+    typeof useAsyncRetry<traceServerTypes.ThreadsQueryRes>
+  >;
+  turnCallsDataResult: ReturnType<typeof useTurnCallsData>;
+} => {
   const getTsClient = useGetTraceServerClientContext();
   const deepParams = useDeepMemo(params);
 
@@ -2499,7 +2522,6 @@ export const useThreadsQuery = (params: traceServerTypes.ThreadsQueryReq) => {
     firstTurnIds: string[];
     lastTurnIds: string[];
   }>({firstTurnIds: [], lastTurnIds: []});
-  // const [lastTurnIds, setLastTurnIds] = useState<string[]>([]);
 
   const threadsState = useAsyncRetry(async () => {
     const result = await getTsClient().threadsStreamQuery(deepParams);
