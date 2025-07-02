@@ -29,10 +29,13 @@ class BaseContentHandler(BaseModel):
     extension: str
     data: bytes
     extra: dict
+    encoding: str
     path: str | None = None
     model_config = ConfigDict(extra="allow")
 
     def __init__(self, data: bytes, /, **values: Any):
+        if 'encoding' not in values:
+            values['encoding'] = 'utf-8'
         super().__init__(data=data, **values)
 
     @property
@@ -46,6 +49,7 @@ def create_bytes_content(
     values["size"] = values["size"] or len(input)
     values["extra"]["input_type"] = values["extra"].get("input_type") or "bytes"
     values["extra"]["input_category"] = values["extra"].get("input_category") or "data"
+    # Raw binary data has no encoding unless explicitly provided
     if values["mimetype"] is None or values["extension"] is None:
         mimetype, extension = get_mime_and_extension(
             buffer=input[:2048],
@@ -91,7 +95,12 @@ def create_b64_content(
         values["extra"]["input_category"] = (
             values["extra"].get("input_category") or "base64"
         )
-        return create_bytes_content(data, **values)
+        # Set encoding to 'base64' for base64 encoded data
+        values["encoding"] = "base64"
+        result = create_bytes_content(data, **values)
+        # Ensure encoding is set to base64
+        result.encoding = "base64"
+        return result
     except Exception as e:
         raise ValueError(f"Invalid base64 string: {e}") from e
 
@@ -130,6 +139,7 @@ class Content(Generic[T]):
             "extension": values.get("extension", None),
             "mimetype": values.get("mimetype", None),
             "size": values.get("size", None),
+            "encoding": values.get("encoding", None),
             "extra": extra,
         }
 
@@ -158,6 +168,24 @@ class Content(Generic[T]):
             self.content_handler = create_bytes_content(input, **content_args)
         else:
             raise TypeError(f"Unsupported input type: {type(input)}")
+
+    @classmethod
+    def from_path(
+        cls,
+        path: str | Path,
+        /,
+        **values: Unpack[ContentKeywordArgs],
+    ) -> 'Content':
+        return cls(path, **values)
+
+    @classmethod
+    def from_bytes(
+        cls,
+        data: bytes,
+        /,
+        **values: Unpack[ContentKeywordArgs],
+    ) -> 'Content':
+        return cls(data, **values)
 
     @property
     def metadata(self) -> dict[str, Any]:
@@ -198,8 +226,16 @@ class Content(Generic[T]):
         return self.content_handler.mimetype
 
     @property
+    def encoding(self) -> str:
+        return self.content_handler.encoding or 'utf-8'
+
+    @property
     def path(self) -> str | None:
         return self.content_handler.path
+
+
+    def as_string(self) -> str:
+        return self.data.decode(self.encoding)
 
     def open(self) -> bool:
         """Open the file using the operating system's default application.
