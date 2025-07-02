@@ -37,7 +37,7 @@ def parse_data_annotation(annotation_string: str) -> ContentAnnotation | None:
     # - r",\s*": Matches a comma followed by optional whitespace (this comma separates base_type from the Content annotation).
     # - fr"{re.escape(content_class_name)}\[": Matches the content class name followed by "[".
     # - r"typing\.Literal\[": Matches "typing.Literal[".
-    # - r"['\"](mp3|wav)['\"]": Group 2. Captures 'mp3' or 'wav' (allowing single or double quotes).
+    # - r"['\"](.+?)['\"]": Group 2. Captures any literal (non-greedy).
     # - r"\]\]": Matches the two closing square brackets for Literal and Content.
     # - r"\]": Matches the final closing square bracket for Annotated.
 
@@ -124,7 +124,7 @@ def parse_content_annotation(
         A dictionary containing:
         - "base_type": The underlying type being annotated (e.g., "SomeType", "str", "typing.Union[str, bytes]").
         - "content_class": The name of the content handler class.
-        - "content_format": The content format ("mp3", "wav") if specified, otherwise None.
+        - "content_format": The content extension or mimetype (e.g. "mp3", "audio/mpeg") if specified, otherwise None.
         - "raw_annotation": The original input string.
         If parsing fails, it returns a dictionary with an "error" key and "raw_annotation".
     """
