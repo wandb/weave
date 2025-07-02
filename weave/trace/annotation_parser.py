@@ -7,6 +7,42 @@ from pydantic import BaseModel
 
 CONTENT_CLASS_NAME = "weave.type_wrappers.Content.content.Content"
 
+# Content annotation with a format specifier
+# Example: "typing.Annotated[typing.Union[str, bytes], weave.type_wrappers.Content.Content.Content[typing.Literal['mp3']]]"
+# Explanation:
+# - r"typing\.Annotated\[": Matches the literal "typing.Annotated["
+# - r"(.+?)": Group 1. Captures the base type (non-greedy match for any characters).
+#            This allows capturing complex types like `typing.Union[str, bytes]`.
+# - r",\s*": Matches a comma followed by optional whitespace (this comma separates base_type from the Content annotation).
+# - fr"{re.escape(content_class_name)}\[": Matches the content class name followed by "[".
+# - r"typing\.Literal\[": Matches "typing.Literal[".
+# - r"['\"](.+?)['\"]": Group 2. Captures any literal (non-greedy).
+# - r"\]\]": Matches the two closing square brackets for Literal and Content.
+# - r"\]": Matches the final closing square bracket for Annotated.
+
+PATTERN_WITH_TYPE_HINT = re.compile(
+    r"typing\.Annotated\["
+    r"(.+?),\s*"  # Group 1: Base type (non-greedy)
+    rf"{re.escape(CONTENT_CLASS_NAME)}\["
+    r"typing\.Literal\[['\"](.+?)['\"]\]"  # Group 2: Any literal, non-greedy
+    r"\]"  # Closing bracket for Content[...]
+    r"\]"  # Closing bracket for Annotated[...]
+)
+
+# Content annotation without a format specifier
+# Example: "typing.Annotated[SomePathLikeType, <class 'weave.type_handlers.Content.content.Content'>]"
+# Explanation:
+# - r"typing\.Annotated\[": Matches the literal "typing.Annotated["
+# - r"(.+?)": Group 1. Captures the base type (non-greedy).
+# - r",\s*": Matches a comma followed by optional whitespace.
+# - fr"<class '{re.escape(content_class_name)}'>": Matches the class representation.
+# - r"\]": Matches the closing square bracket for Annotated.
+PATTERN_WITHOUT_TYPE_HINT = re.compile(
+    r"typing\.Annotated\["
+    r"(.+?),\s*"  # Group 1: Base type (non-greedy)
+    rf"<class '{re.escape(CONTENT_CLASS_NAME)}'>"
+    r"\]"  # Closing bracket for Annotated[...]
+)
 
 class ContentAnnotation(BaseModel):
     base_type: str
@@ -28,28 +64,7 @@ def parse_data_annotation(annotation_string: str) -> ContentAnnotation | None:
     Returns:
         ContentAnnotation | None: An instance of ContentAnnotation if the parsing is successful,
     """
-    # Content annotation with a format specifier
-    # Example: "typing.Annotated[typing.Union[str, bytes], weave.type_wrappers.Content.Content.Content[typing.Literal['mp3']]]"
-    # Explanation:
-    # - r"typing\.Annotated\[": Matches the literal "typing.Annotated["
-    # - r"(.+?)": Group 1. Captures the base type (non-greedy match for any characters).
-    #            This allows capturing complex types like `typing.Union[str, bytes]`.
-    # - r",\s*": Matches a comma followed by optional whitespace (this comma separates base_type from the Content annotation).
-    # - fr"{re.escape(content_class_name)}\[": Matches the content class name followed by "[".
-    # - r"typing\.Literal\[": Matches "typing.Literal[".
-    # - r"['\"](.+?)['\"]": Group 2. Captures any literal (non-greedy).
-    # - r"\]\]": Matches the two closing square brackets for Literal and Content.
-    # - r"\]": Matches the final closing square bracket for Annotated.
-
-    pattern_with_format = re.compile(
-        r"typing\.Annotated\["
-        r"(.+?),\s*"  # Group 1: Base type (non-greedy)
-        rf"{re.escape(CONTENT_CLASS_NAME)}\["
-        r"typing\.Literal\[['\"](.+?)['\"]\]"  # Group 2: Any literal, non-greedy
-        r"\]"  # Closing bracket for Content[...]
-        r"\]"  # Closing bracket for Annotated[...]
-    )
-    match_with_format = pattern_with_format.fullmatch(annotation_string)
+    match_with_format = PATTERN_WITH_TYPE_HINT.fullmatch(annotation_string)
 
     if not match_with_format:
         return None
@@ -77,22 +92,7 @@ def parse_file_annotation(annotation_string: str) -> ContentAnnotation | None:
     Returns:
         ContentFileAnnotation | None: An instance of ContentFileAnnotation if the parsing is successful,
     """
-    # Content annotation without a format specifier
-    # Example: "typing.Annotated[SomePathLikeType, <class 'weave.type_handlers.Content.content.Content'>]"
-    # Explanation:
-    # - r"typing\.Annotated\[": Matches the literal "typing.Annotated["
-    # - r"(.+?)": Group 1. Captures the base type (non-greedy).
-    # - r",\s*": Matches a comma followed by optional whitespace.
-    # - fr"<class '{re.escape(content_class_name)}'>": Matches the class representation.
-    # - r"\]": Matches the closing square bracket for Annotated.
-    pattern_without_format = re.compile(
-        r"typing\.Annotated\["
-        r"(.+?),\s*"  # Group 1: Base type (non-greedy)
-        rf"<class '{re.escape(CONTENT_CLASS_NAME)}'>"
-        r"\]"  # Closing bracket for Annotated[...]
-    )
-
-    match_without_format = pattern_without_format.fullmatch(annotation_string)
+    match_without_format = PATTERN_WITHOUT_TYPE_HINT.fullmatch(annotation_string)
 
     if not match_without_format:
         return None
@@ -141,11 +141,7 @@ def parse_from_signature(sig: Signature) -> dict[str, ContentAnnotation]:
         if not param.annotation:
             continue
 
-        parse_result = parse_content_annotation(str(param.annotation))
-
-        if not parse_result:
-            continue
-
-        parsed_annotations[param_name] = parse_result
+        if parse_result := param.annotation and parse_content_annotation(str(param.annotation)):
+            parsed_annotations[param_name] = parse_result
 
     return parsed_annotations
