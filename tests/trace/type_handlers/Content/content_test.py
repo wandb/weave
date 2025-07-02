@@ -24,9 +24,7 @@ TEST_FILES = [
 
 class TestWeaveContent:
     @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
-    def test_content_from_path(
-        self, _: WeaveClient, file: str, extension: str, mimetype: str
-    ):
+    def test_content_from_path(self, file: str, extension: str, mimetype: str):
         """Test creating Content from file path."""
         file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
 
@@ -39,13 +37,11 @@ class TestWeaveContent:
         assert content.size > 0
         assert isinstance(content.data, bytes)
         assert content.path == file_path
-        assert content.input_type == "str"
+        assert content.input_type == "<class 'str'>"
         assert content.input_category == "path"
 
     @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
-    def test_content_from_bytes(
-        self, _: WeaveClient, file: str, extension: str, mimetype: str
-    ):
+    def test_content_from_bytes(self, file: str, extension: str, mimetype: str):
         """Test creating Content from bytes."""
         file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
         with open(file_path, "rb") as f:
@@ -58,7 +54,7 @@ class TestWeaveContent:
         assert content.mimetype == mimetype
         assert content.size == len(file_bytes)
         assert content.data == file_bytes
-        assert content.input_type == "bytes"
+        assert content.input_type == "<class 'bytes'>"
         assert content.input_category == "data"
 
         # Test with mimetype as type hint
@@ -66,9 +62,7 @@ class TestWeaveContent:
         assert content2.mimetype == mimetype
 
     @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
-    def test_content_from_base64(
-        self, _: WeaveClient, file: str, extension: str, mimetype: str
-    ):
+    def test_content_from_base64(self, file: str, extension: str, mimetype: str):
         """Test creating Content from base64 encoded string."""
         file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
         with open(file_path, "rb") as f:
@@ -84,13 +78,11 @@ class TestWeaveContent:
         assert content.mimetype == mimetype
         assert content.data == file_bytes
         assert content.encoding == "base64"
-        assert content.input_type == "str"
+        assert content.input_type == "<class 'str'>"
         assert content.input_category == "base64"
 
     @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
-    def test_content_from_pathlib(
-        self, _: WeaveClient, file: str, extension: str, mimetype: str
-    ):
+    def test_content_from_pathlib(self, file: str, extension: str, mimetype: str):
         """Test creating Content from pathlib.Path object."""
         file_path = Path(TEST_FILE_DIR) / f"{file}.{extension}"
 
@@ -101,12 +93,12 @@ class TestWeaveContent:
         assert content.mimetype == mimetype
         assert content.filename == f"{file}.{extension}"
         assert content.path == str(file_path)
-        assert content.input_type == "Path"
-        assert content.input_category == "path"
+        assert content.input_type == "<class 'pathlib.PosixPath'>"
+        assert content.input_category == "object"
 
     @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
     def test_content_publish_and_retrieve(
-        self, _: WeaveClient, file: str, extension: str, mimetype: str
+        self, client: WeaveClient, file: str, extension: str, mimetype: str
     ):
         """Test publishing and retrieving Content objects."""
         file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
@@ -124,7 +116,7 @@ class TestWeaveContent:
         assert retrieved.mimetype == mimetype
         assert retrieved.size == content.size
 
-    def test_content_in_dataset(self, _: WeaveClient):
+    def test_content_in_dataset(self, client: WeaveClient):
         """Test Content objects as dataset values."""
         # Create Content objects for each test file
         rows = []
@@ -157,9 +149,7 @@ class TestWeaveContent:
             assert row["content"].data == original_data
 
     @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
-    def test_content_in_ops(
-        self, _: WeaveClient, file: str, extension: str, mimetype: str
-    ):
+    def test_content_in_ops(self, file: str, extension: str, mimetype: str):
         """Test Content as input/output of weave ops."""
         file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
 
@@ -205,7 +195,7 @@ class TestWeaveContent:
         assert result["extension"] == extension
         assert result["mimetype"] == mimetype
 
-    def test_content_save_method(self, _: WeaveClient):
+    def test_content_save_method(self, client: WeaveClient):
         """Test saving Content to a file."""
         # Use a small test file
         original_path = os.path.join(TEST_FILE_DIR, "file.png")
@@ -228,20 +218,19 @@ class TestWeaveContent:
             expected_path = os.path.join(tmpdir, "file.png")
             assert os.path.exists(expected_path)
 
-    def test_content_as_string(self, _: WeaveClient):
+    def test_content_as_string(self):
         """Test converting Content to string for text files."""
         # Create a text content
         text_data = "Hello, this is a test file!\nWith multiple lines."
-        text_bytes = text_data.encode("utf-8")
 
-        content = Content.from_bytes(text_bytes, "txt")
+        content = Content.from_bytes(text_data.encode("utf-8"), "txt")
         assert content.as_string() == text_data
 
         # Test with different encoding
-        content_utf16 = Content(text_bytes, encoding="utf-8")
+        content_utf16 = Content(text_data.encode("utf-16"), encoding="utf-16")
         assert content_utf16.as_string() == text_data
 
-    def test_content_metadata(self, _: WeaveClient):
+    def test_content_metadata(self):
         """Test Content metadata property."""
         file_path = os.path.join(TEST_FILE_DIR, "file.png")
         content = Content.from_path(file_path)
@@ -256,7 +245,7 @@ class TestWeaveContent:
         assert metadata["encoding"] == "utf-8"
         assert metadata["path"] == file_path
 
-    def test_content_type_hint_variations(self, _: WeaveClient):
+    def test_content_type_hint_variations(self):
         """Test different type hint formats."""
         file_path = os.path.join(TEST_FILE_DIR, "file.png")
         with open(file_path, "rb") as f:
@@ -277,7 +266,7 @@ class TestWeaveContent:
         assert content3.extension == "png"
         assert content3.mimetype == "image/png"
 
-    def test_content_error_handling(self, _: WeaveClient):
+    def test_content_error_handling(self):
         """Test error handling in Content class."""
         # Test with non-existent file
         with pytest.raises(FileNotFoundError):
@@ -291,7 +280,7 @@ class TestWeaveContent:
         with pytest.raises(TypeError):
             Content(12345)  # Integer not supported
 
-    def test_content_with_kwargs(self, _: WeaveClient):
+    def test_content_with_kwargs(self):
         """Test Content initialization with additional kwargs."""
         file_bytes = b"Test content"
 
@@ -303,7 +292,7 @@ class TestWeaveContent:
         content2 = Content(file_bytes, "txt", encoding="latin-1")
         assert content2.encoding == "latin-1"
 
-    def test_content_postprocessing(self, _: WeaveClient):
+    def test_content_postprocessing(self, client: WeaveClient):
         """Test that Content postprocessing works correctly in ops."""
 
         @weave.op

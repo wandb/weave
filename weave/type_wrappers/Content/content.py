@@ -34,8 +34,8 @@ class BaseContentHandler(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     def __init__(self, data: bytes, /, **values: Any):
-        if "encoding" not in values:
-            values["encoding"] = "utf-8"
+        # Default here so when a factory calls a factory we can safely do the existence check
+        values["encoding"] = values["encoding"] or "utf-8"
         super().__init__(data=data, **values)
 
     @property
@@ -47,7 +47,9 @@ def create_bytes_content(
     input: bytes, /, **values: Unpack[ContentArgs]
 ) -> BaseContentHandler:
     values["size"] = values["size"] or len(input)
-    values["extra"]["input_type"] = values["extra"].get("input_type") or "bytes"
+    values["extra"]["input_type"] = values["extra"].get("input_type") or str(
+        type(input)
+    )
     values["extra"]["input_category"] = values["extra"].get("input_category") or "data"
     # Raw binary data has no encoding unless explicitly provided
     if values["mimetype"] is None or values["extension"] is None:
@@ -78,7 +80,9 @@ def create_file_content(
     values["size"] = path.stat().st_size
     values["filename"] = path.name
     values["extra"]["original_path"] = values["extra"].get("original_path") or str(path)
-    values["extra"]["input_type"] = values["extra"].get("input_type") or "str"
+    values["extra"]["input_type"] = values["extra"].get("input_type") or str(
+        type(input)
+    )
     values["extra"]["input_category"] = values["extra"].get("input_category") or "path"
     data = path.read_bytes()
     return create_bytes_content(data, **values)
@@ -176,6 +180,8 @@ class Content(Generic[T]):
         /,
         **values: Unpack[ContentKeywordArgs],
     ) -> Content:
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"File not found - {path}")
         return cls(path, type_hint, **values)
 
     @classmethod
@@ -277,6 +283,10 @@ class Content(Generic[T]):
         """
         path = Path(dest) if isinstance(dest, str) else dest
         os.makedirs(path.parent, exist_ok=True)
+
+        # If we get a directory, save it to the previously provided or generated filename
+        if os.path.isdir(path):
+            path = path.joinpath(self.filename)
 
         # Otherwise write the data to the path
         with open(path, "wb") as f:
