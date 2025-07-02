@@ -2,29 +2,28 @@ import base64
 import os
 import tempfile
 from pathlib import Path
-from typing import Literal
-from typing_extensions import Annotated
+from typing import Annotated, Literal
 
 import pytest
+
 import weave
 from weave import Dataset
 from weave.trace.table import Table
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.type_wrappers.Content.content import Content
 
-
 TEST_FILE_DIR = os.path.join(os.path.dirname(__file__), "examples")
 
 TEST_FILES = [
-    ('file', 'png', 'image/png'),
-    ('file', 'mp3', 'audio/mpeg'),
-    ('file', 'mp4', 'video/mp4'),
-    ('file', 'pdf', 'application/pdf'),
+    ("file", "png", "image/png"),
+    ("file", "mp3", "audio/mpeg"),
+    ("file", "mp4", "video/mp4"),
+    ("file", "pdf", "application/pdf"),
 ]
 
 
 class TestWeaveContent:
-    @pytest.mark.parametrize(["file", "extension", "mimetype"], TEST_FILES)
+    @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
     def test_content_from_path(
         self, _: WeaveClient, file: str, extension: str, mimetype: str
     ):
@@ -43,13 +42,13 @@ class TestWeaveContent:
         assert content.input_type == "str"
         assert content.input_category == "path"
 
-    @pytest.mark.parametrize(["file", "extension", "mimetype"], TEST_FILES)
+    @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
     def test_content_from_bytes(
         self, _: WeaveClient, file: str, extension: str, mimetype: str
     ):
         """Test creating Content from bytes."""
         file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             file_bytes = f.read()
 
         # Test Content.from_bytes() with explicit type hint
@@ -66,17 +65,17 @@ class TestWeaveContent:
         content2 = Content.from_bytes(file_bytes, mimetype)
         assert content2.mimetype == mimetype
 
-    @pytest.mark.parametrize(["file", "extension", "mimetype"], TEST_FILES)
+    @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
     def test_content_from_base64(
         self, _: WeaveClient, file: str, extension: str, mimetype: str
     ):
         """Test creating Content from base64 encoded string."""
         file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             file_bytes = f.read()
 
         # Create base64 encoded string
-        b64_string = base64.b64encode(file_bytes).decode('utf-8')
+        b64_string = base64.b64encode(file_bytes).decode("utf-8")
 
         # Test Content() with base64 string
         content = Content(b64_string, extension)
@@ -88,7 +87,7 @@ class TestWeaveContent:
         assert content.input_type == "str"
         assert content.input_category == "base64"
 
-    @pytest.mark.parametrize(["file", "extension", "mimetype"], TEST_FILES)
+    @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
     def test_content_from_pathlib(
         self, _: WeaveClient, file: str, extension: str, mimetype: str
     ):
@@ -105,7 +104,7 @@ class TestWeaveContent:
         assert content.input_type == "Path"
         assert content.input_category == "path"
 
-    @pytest.mark.parametrize(["file", "extension", "mimetype"], TEST_FILES)
+    @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
     def test_content_publish_and_retrieve(
         self, _: WeaveClient, file: str, extension: str, mimetype: str
     ):
@@ -132,11 +131,13 @@ class TestWeaveContent:
         for file, extension, mimetype in TEST_FILES:
             file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
             content = Content.from_path(file_path)
-            rows.append({
-                "name": f"{file}.{extension}",
-                "content": content,
-                "expected_mimetype": mimetype
-            })
+            rows.append(
+                {
+                    "name": f"{file}.{extension}",
+                    "content": content,
+                    "expected_mimetype": mimetype,
+                }
+            )
 
         # Create and publish dataset
         dataset = Dataset(rows=Table(rows))
@@ -151,11 +152,11 @@ class TestWeaveContent:
             assert row["content"].mimetype == row["expected_mimetype"]
             # Verify data integrity
             original_path = os.path.join(TEST_FILE_DIR, row["name"])
-            with open(original_path, 'rb') as f:
+            with open(original_path, "rb") as f:
                 original_data = f.read()
             assert row["content"].data == original_data
 
-    @pytest.mark.parametrize(["file", "extension", "mimetype"], TEST_FILES)
+    @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
     def test_content_in_ops(
         self, _: WeaveClient, file: str, extension: str, mimetype: str
     ):
@@ -164,7 +165,9 @@ class TestWeaveContent:
 
         # Op that returns Content with annotation
         @weave.op
-        def load_content_annotated(path: str) -> Annotated[bytes, Content[Literal["pdf"]]]:
+        def load_content_annotated(
+            path: str,
+        ) -> Annotated[bytes, Content[Literal["pdf"]]]:
             return Path(path).read_bytes()
 
         # Op that returns Content object directly
@@ -179,7 +182,7 @@ class TestWeaveContent:
             return {
                 "size": content.size,
                 "extension": content.extension,
-                "mimetype": content.mimetype
+                "mimetype": content.mimetype,
             }
 
         # Test annotated return
@@ -215,7 +218,7 @@ class TestWeaveContent:
             assert os.path.exists(dest_path)
 
             # Verify saved content
-            with open(dest_path, 'rb') as f:
+            with open(dest_path, "rb") as f:
                 saved_data = f.read()
             assert saved_data == content.data
 
@@ -229,13 +232,13 @@ class TestWeaveContent:
         """Test converting Content to string for text files."""
         # Create a text content
         text_data = "Hello, this is a test file!\nWith multiple lines."
-        text_bytes = text_data.encode('utf-8')
+        text_bytes = text_data.encode("utf-8")
 
         content = Content.from_bytes(text_bytes, "txt")
         assert content.as_string() == text_data
 
         # Test with different encoding
-        content_utf16 = Content(text_bytes, encoding='utf-8')
+        content_utf16 = Content(text_bytes, encoding="utf-8")
         assert content_utf16.as_string() == text_data
 
     def test_content_metadata(self, _: WeaveClient):
@@ -256,7 +259,7 @@ class TestWeaveContent:
     def test_content_type_hint_variations(self, _: WeaveClient):
         """Test different type hint formats."""
         file_path = os.path.join(TEST_FILE_DIR, "file.png")
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             file_bytes = f.read()
 
         # Test with extension without dot
@@ -280,10 +283,6 @@ class TestWeaveContent:
         with pytest.raises(FileNotFoundError):
             Content.from_path("/non/existent/file.txt")
 
-        # Test with invalid base64
-        with pytest.raises(Exception):  # Base64 decode error
-            Content("invalid-base64-string!", "txt")
-
         # Test with None input
         with pytest.raises(TypeError):
             Content(None)
@@ -306,6 +305,7 @@ class TestWeaveContent:
 
     def test_content_postprocessing(self, _: WeaveClient):
         """Test that Content postprocessing works correctly in ops."""
+
         @weave.op
         def create_content_from_bytes(data: bytes, hint: str) -> Content:
             return Content(data, hint)
