@@ -24,10 +24,19 @@ from weave.trace_server.calls_query_builder.utils import (
     param_slot,
 )
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.orm import combine_conditions
+from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
+from weave.trace_server.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+)
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
+        CallsMergedAggField,
+        CallsMergedField,
         Condition,
+        HardCodedFilter,
+        OrderField,
         ParamBuilder,
     )
 
@@ -570,3 +579,471 @@ def _create_datetime_optimization_sql(
     return (
         f"{table_alias}.sortable_datetime {op_str} {param_slot(param_name, 'String')}"
     )
+
+
+def build_optimized_calls_subquery(
+    project_id: str,
+    hardcoded_filter: Optional["HardCodedFilter"],
+    query_conditions: list["Condition"],
+    pb: "ParamBuilder",
+    select_fields: list[str],
+) -> str:
+    """Build optimized calls subquery with pre-filtering for feedback join optimization."""
+    project_param = pb.add_param(project_id)
+
+    # Build the select clause
+    select_clause = ", ".join(select_fields)
+
+    # Build WHERE conditions
+    where_base = f"project_id = {param_slot(project_param, 'String')}"
+
+    # Add all other WHERE conditions using the comprehensive filter builder
+    additional_where = build_where_conditions_for_optimization(
+        hardcoded_filter, query_conditions, pb, "calls_merged"
+    )
+
+    where_clause = where_base + additional_where
+
+    return f"""(
+        SELECT {select_clause}
+        FROM calls_merged
+        WHERE {where_clause}
+    ) AS cm"""
+
+
+def build_optimized_feedback_subquery(
+    project_id: str,
+    pb: "ParamBuilder",
+) -> str:
+    """Build optimized feedback subquery with pre-filtering for feedback join optimization."""
+    project_param = pb.add_param(project_id)
+
+    return f"""(
+        SELECT weave_ref,
+               payload_dump,
+               feedback_type
+        FROM feedback
+        WHERE project_id = {param_slot(project_param, 'String')}
+    ) AS fb"""
+
+
+def build_optimized_feedback_join_sql(
+    project_id: str,
+    pb: "ParamBuilder",
+) -> str:
+    """Build the optimized feedback join SQL fragment."""
+    project_param = pb.add_param(project_id)
+
+    return f"""LEFT JOIN {build_optimized_feedback_subquery(project_id, pb)}
+    ON fb.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, 'String')}, '/call/', cm.id)"""
+
+
+def build_optimized_feedback_query(
+    project_id: str,
+    hardcoded_filter: Optional["HardCodedFilter"],
+    query_conditions: list["Condition"],
+    order_fields: list["OrderField"],
+    limit: Optional[int],
+    offset: Optional[int],
+    select_fields: list["CallsMergedField"],
+    pb: "ParamBuilder",
+) -> str:
+    """Build complete optimized query for feedback joins without CTE."""
+    from weave.trace_server.orm import combine_conditions
+
+    project_param = pb.add_param(project_id)
+
+    # Build select clause for final output
+    select_fields_sql = ", ".join(
+        field.as_select_sql(pb, "cm") for field in select_fields
+    )
+
+    # Build optimized calls subquery with all needed fields
+    calls_subquery = build_optimized_calls_subquery(
+        project_id, hardcoded_filter, query_conditions, pb, ["*"]
+    )
+
+    # Build optimized feedback join
+    feedback_join = build_optimized_feedback_join_sql(project_id, pb)
+
+    # Build HAVING conditions
+    having_conditions = []
+    for condition in query_conditions:
+        having_conditions.append(condition.as_sql(pb, "cm"))
+
+    # Add required conditions (these are automatically added by the main query builder)
+    # Note: deleted_at and started_at conditions are already added by the main CallsQuery.as_sql() method
+
+    having_clause = ""
+    if having_conditions:
+        having_clause = f"HAVING {combine_conditions(having_conditions, 'AND')}"
+
+    # Build ORDER BY clause
+    order_clause = ""
+    if order_fields:
+        order_parts = []
+        for order_field in order_fields:
+            order_parts.append(order_field.as_sql(pb, "cm"))
+        order_clause = f"ORDER BY {', '.join(order_parts)}"
+
+    # Build LIMIT clause
+    limit_clause = ""
+    if limit is not None:
+        limit_clause = f"LIMIT {limit}"
+
+    # Build OFFSET clause
+    offset_clause = ""
+    if offset is not None:
+        offset_clause = f"OFFSET {offset}"
+
+    return f"""SELECT {select_fields_sql}
+FROM {calls_subquery}
+{feedback_join}
+GROUP BY (cm.project_id, cm.id)
+{having_clause}
+{order_clause}
+{limit_clause}
+{offset_clause}"""
+
+
+def build_where_conditions_for_optimization(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    query_conditions: list["Condition"],
+    pb: "ParamBuilder",
+    table_alias: str = "calls_merged",
+) -> str:
+    """Build optimized WHERE conditions for calls subquery."""
+    where_conditions = []
+
+    # Add op_name filter
+    op_name_sql = _process_op_name_filter_to_sql_for_where(
+        hardcoded_filter, pb, table_alias
+    )
+    if op_name_sql:
+        where_conditions.append(op_name_sql.strip(" AND "))
+
+    # Add trace_id filter
+    trace_id_sql = _process_trace_id_filter_to_sql_for_where(
+        hardcoded_filter, pb, table_alias
+    )
+    if trace_id_sql:
+        where_conditions.append(trace_id_sql.strip(" AND "))
+
+    # Add thread_id filter
+    thread_id_sql = _process_thread_id_filter_to_sql_for_where(
+        hardcoded_filter, pb, table_alias
+    )
+    if thread_id_sql:
+        where_conditions.append(thread_id_sql.strip(" AND "))
+
+    # Add turn_id filter
+    turn_id_sql = _process_turn_id_filter_to_sql_for_where(
+        hardcoded_filter, pb, table_alias
+    )
+    if turn_id_sql:
+        where_conditions.append(turn_id_sql.strip(" AND "))
+
+    # Add trace_roots_only filter
+    trace_roots_only_sql = _process_trace_roots_only_filter_to_sql_for_where(
+        hardcoded_filter, pb, table_alias
+    )
+    if trace_roots_only_sql:
+        where_conditions.append(trace_roots_only_sql.strip(" AND "))
+
+    # Add parent_ids filter
+    parent_ids_sql = _process_parent_ids_filter_to_sql_for_where(
+        hardcoded_filter, pb, table_alias
+    )
+    if parent_ids_sql:
+        where_conditions.append(parent_ids_sql.strip(" AND "))
+
+    # Add ref filters
+    ref_filter_sql = _process_ref_filters_to_sql_for_where(
+        hardcoded_filter, pb, table_alias
+    )
+    if ref_filter_sql:
+        where_conditions.append(ref_filter_sql.strip(" AND "))
+
+    # Add optimization conditions from query
+    optimization_conditions = process_query_to_optimization_sql(
+        query_conditions, pb, table_alias
+    )
+
+    if optimization_conditions.sortable_datetime_filters_sql:
+        where_conditions.append(
+            optimization_conditions.sortable_datetime_filters_sql.strip(" AND ")
+        )
+
+    if optimization_conditions.str_filter_opt_sql:
+        where_conditions.append(
+            optimization_conditions.str_filter_opt_sql.strip(" AND ")
+        )
+
+    # Add id mask filter
+    if hardcoded_filter and hardcoded_filter.filter.call_ids:
+        id_mask_sql = f"id IN {param_slot(pb.add_param(hardcoded_filter.filter.call_ids), 'Array(String)')}"
+        where_conditions.append(id_mask_sql)
+
+    if where_conditions:
+        return " AND " + " AND ".join(where_conditions)
+    return ""
+
+
+def _process_op_name_filter_to_sql_for_where(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Process op_name filter for WHERE clause (non-aggregated)."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
+        return ""
+
+    op_names = hardcoded_filter.filter.op_names
+    assert_parameter_length_less_than_max("op_names", len(op_names))
+
+    or_conditions: list[str] = []
+    non_wildcarded_names: list[str] = []
+    wildcarded_names: list[str] = []
+
+    op_field_sql = f"{table_alias}.op_name"
+    for name in op_names:
+        if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
+            wildcarded_names.append(name)
+        else:
+            non_wildcarded_names.append(name)
+
+    if non_wildcarded_names:
+        or_conditions.append(
+            f"{op_field_sql} IN {param_slot(pb.add_param(non_wildcarded_names), 'Array(String)')}"
+        )
+
+    for name in wildcarded_names:
+        like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
+        or_conditions.append(
+            f"{op_field_sql} LIKE {param_slot(pb.add_param(like_name), 'String')}"
+        )
+
+    if not or_conditions:
+        return ""
+
+    # Account for unmerged call parts by including null op_name (call ends)
+    or_conditions += [f"{op_field_sql} IS NULL"]
+
+    return " AND " + combine_conditions(or_conditions, "OR")
+
+
+def _process_trace_id_filter_to_sql_for_where(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Process trace_id filter for WHERE clause (non-aggregated)."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
+        return ""
+
+    trace_ids = hardcoded_filter.filter.trace_ids
+    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
+
+    trace_id_field_sql = f"{table_alias}.trace_id"
+
+    # If there's only one trace_id, use an equality condition for performance
+    if len(trace_ids) == 1:
+        trace_cond = (
+            f"{trace_id_field_sql} = {param_slot(pb.add_param(trace_ids[0]), 'String')}"
+        )
+    elif len(trace_ids) > 1:
+        trace_cond = f"{trace_id_field_sql} IN {param_slot(pb.add_param(trace_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
+
+
+def _process_thread_id_filter_to_sql_for_where(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Process thread_id filter for WHERE clause (non-aggregated)."""
+    if (
+        hardcoded_filter is None
+        or hardcoded_filter.filter.thread_ids is None
+        or len(hardcoded_filter.filter.thread_ids) == 0
+    ):
+        return ""
+
+    thread_ids = hardcoded_filter.filter.thread_ids
+    assert_parameter_length_less_than_max("thread_ids", len(thread_ids))
+
+    thread_id_field_sql = f"{table_alias}.thread_id"
+
+    # If there's only one thread_id, use an equality condition for performance
+    if len(thread_ids) == 1:
+        thread_cond = f"{thread_id_field_sql} = {param_slot(pb.add_param(thread_ids[0]), 'String')}"
+    elif len(thread_ids) > 1:
+        thread_cond = f"{thread_id_field_sql} IN {param_slot(pb.add_param(thread_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({thread_cond} OR {thread_id_field_sql} IS NULL)"
+
+
+def _process_turn_id_filter_to_sql_for_where(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Process turn_id filter for WHERE clause (non-aggregated)."""
+    if (
+        hardcoded_filter is None
+        or hardcoded_filter.filter.turn_ids is None
+        or len(hardcoded_filter.filter.turn_ids) == 0
+    ):
+        return ""
+
+    turn_ids = hardcoded_filter.filter.turn_ids
+    assert_parameter_length_less_than_max("turn_ids", len(turn_ids))
+
+    turn_id_field_sql = f"{table_alias}.turn_id"
+
+    # If there's only one turn_id, use an equality condition for performance
+    if len(turn_ids) == 1:
+        turn_cond = (
+            f"{turn_id_field_sql} = {param_slot(pb.add_param(turn_ids[0]), 'String')}"
+        )
+    elif len(turn_ids) > 1:
+        turn_cond = f"{turn_id_field_sql} IN {param_slot(pb.add_param(turn_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({turn_cond} OR {turn_id_field_sql} IS NULL)"
+
+
+def _process_trace_roots_only_filter_to_sql_for_where(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Process trace_roots_only filter for WHERE clause (non-aggregated)."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.trace_roots_only:
+        return ""
+
+    parent_id_field_sql = f"{table_alias}.parent_id"
+    return f" AND ({parent_id_field_sql} IS NULL)"
+
+
+def _process_parent_ids_filter_to_sql_for_where(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Process parent_ids filter for WHERE clause (non-aggregated)."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.parent_ids:
+        return ""
+
+    parent_id_field_sql = f"{table_alias}.parent_id"
+    parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(pb.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
+
+    return f" AND ({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
+
+
+def _process_ref_filters_to_sql_for_where(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Process ref filters for WHERE clause (non-aggregated)."""
+    if hardcoded_filter is None or (
+        not hardcoded_filter.filter.output_refs
+        and not hardcoded_filter.filter.input_refs
+    ):
+        return ""
+
+    def process_ref_filter(field_name: str, refs: list[str]) -> str:
+        field_sql = f"{table_alias}.{field_name}"
+        param = pb.add_param(refs)
+        ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
+        return f"{ref_filter_sql} OR length({field_sql}) = 0"
+
+    ref_filters = []
+    if hardcoded_filter.filter.input_refs:
+        ref_filters.append(
+            process_ref_filter("input_refs", hardcoded_filter.filter.input_refs)
+        )
+    if hardcoded_filter.filter.output_refs:
+        ref_filters.append(
+            process_ref_filter("output_refs", hardcoded_filter.filter.output_refs)
+        )
+
+    if not ref_filters:
+        return ""
+
+    return " AND (" + combine_conditions(ref_filters, "AND") + ")"
+
+
+# Wrapper functions to maintain compatibility with the main query builder
+def process_op_name_filter_to_sql(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Wrapper for main query builder compatibility."""
+    return _process_op_name_filter_to_sql_for_where(hardcoded_filter, pb, table_alias)
+
+
+def process_trace_id_filter_to_sql(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Wrapper for main query builder compatibility."""
+    return _process_trace_id_filter_to_sql_for_where(hardcoded_filter, pb, table_alias)
+
+
+def process_thread_id_filter_to_sql(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Wrapper for main query builder compatibility."""
+    return _process_thread_id_filter_to_sql_for_where(hardcoded_filter, pb, table_alias)
+
+
+def process_turn_id_filter_to_sql(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Wrapper for main query builder compatibility."""
+    return _process_turn_id_filter_to_sql_for_where(hardcoded_filter, pb, table_alias)
+
+
+def process_trace_roots_only_filter_to_sql(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Wrapper for main query builder compatibility."""
+    return _process_trace_roots_only_filter_to_sql_for_where(
+        hardcoded_filter, pb, table_alias
+    )
+
+
+def process_parent_ids_filter_to_sql(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Wrapper for main query builder compatibility."""
+    return _process_parent_ids_filter_to_sql_for_where(
+        hardcoded_filter, pb, table_alias
+    )
+
+
+def process_ref_filters_to_sql(
+    hardcoded_filter: Optional["HardCodedFilter"],
+    pb: "ParamBuilder",
+    table_alias: str,
+) -> str:
+    """Wrapper for main query builder compatibility."""
+    return _process_ref_filters_to_sql_for_where(hardcoded_filter, pb, table_alias)
