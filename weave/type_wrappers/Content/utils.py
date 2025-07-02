@@ -18,6 +18,12 @@ try:
 except Exception as e:
     POLYFILE_LIB_AVAILABLE = False
 
+# See: https://mimesniff.spec.whatwg.org/
+# Buffer size should be >= 1445 for deterministic results in most cases
+# Most documentation uses 2048 to slightly exceed this requirement
+# If the data is smaller than 2048 just use the entire thing
+MIME_DETECTION_BUFFER_SIZE = 2048
+
 
 class ContentArgs(TypedDict):
     extension: str | None
@@ -105,7 +111,7 @@ def get_mime_and_extension(
     if not mimetype and extension is not None:
         mimetype = guess_from_extension(extension)
     if not mimetype and buffer is not None:
-        mimetype = guess_from_buffer(buffer)
+        mimetype = guess_from_buffer(buffer[:MIME_DETECTION_BUFFER_SIZE])
 
     if mimetype and extension:
         return mimetype, extension
