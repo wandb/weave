@@ -241,6 +241,8 @@ jobs:
           node-version: "20"
       - name: Setup docs
         run: make setup-docs-ci
+      - name: Install gitingest for generate_llmstxt.py
+        run: pip install gitingest
       - name: Run docs
         run: make docs
 
