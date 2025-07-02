@@ -1,6 +1,7 @@
 import io
 import random
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -128,8 +129,7 @@ def test_image_as_call_io_refs(client: WeaveClient, test_img: Image.Image) -> No
 
 
 def test_image_as_file(client: WeaveClient) -> None:
-    client.project = "test_image_as_file"
-    file_path = Path(__file__).parent.resolve() / "example.jpg"
+    file_path = tempfile.NamedTemporaryFile(suffix=".jpg")
 
     @weave.op()
     def return_image_jpg_pillow(path: str):
