@@ -44,6 +44,7 @@ PATTERN_WITHOUT_TYPE_HINT = re.compile(
     r"\]"  # Closing bracket for Annotated[...]
 )
 
+
 class ContentAnnotation(BaseModel):
     base_type: str
     media_class: str
@@ -141,7 +142,9 @@ def parse_from_signature(sig: Signature) -> dict[str, ContentAnnotation]:
         if not param.annotation:
             continue
 
-        if parse_result := param.annotation and parse_content_annotation(str(param.annotation)):
+        if parse_result := param.annotation and parse_content_annotation(
+            str(param.annotation)
+        ):
             parsed_annotations[param_name] = parse_result
 
     return parsed_annotations
