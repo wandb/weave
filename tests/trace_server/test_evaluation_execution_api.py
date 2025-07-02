@@ -3,6 +3,7 @@ import pytest
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface import (
+    CallsQueryReq,
     ObjCreateReq,
     RunModelReq,
     TraceServerInterface,
@@ -40,6 +41,7 @@ async def test_run_model(trace_server: TraceServerInterface):
     model_digest = model_create_res.digest
 
     expected_output = "Fantastic - how are you?"
+    user_input = "Hello, how are you?"
     with with_simple_mock_litellm_completion(expected_output):
         model_run_res = await trace_server.run_model(
             RunModelReq.model_validate(
@@ -53,10 +55,29 @@ async def test_run_model(trace_server: TraceServerInterface):
                     ).uri(),
                     "inputs": {
                         "input_type": "value",
-                        "value": {"user_input": "Hello, how are you?"},
+                        "value": {"user_input": user_input},
                     },
                 }
             )
         )
 
     assert model_run_res.output == expected_output
+
+    calls_res = trace_server.calls_query(
+        CallsQueryReq.model_validate(
+            {
+                "project_id": project_id,
+                "filter": {
+                    "call_ids": [model_run_res.call_id],
+                },
+            }
+        )
+    )
+
+    assert len(calls_res.calls) == 1
+    call = calls_res.calls[0]
+    assert call.output == expected_output
+    assert call.inputs["user_input"] == user_input
+    assert call.op_name.startswith(
+        f"weave:///{project_id}/op/LLMStructuredCompletionModel.predict:"
+    )
