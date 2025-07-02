@@ -46,7 +46,7 @@ dependencies = [
   "jsonschema>=4.23.0",       # Used by scorers for field validation
   "diskcache==5.6.3",         # Used for data caching
   "nest-asyncio==1.6.0",      # Used to support nested event loops in asyncio
-  "python-magic",            # Used for content type detection
+  "polyfile",                # Used for content type detection
 
   # This dependency will be updated each time we regenerate the trace server bindings.
   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
