@@ -28,7 +28,12 @@ from weave.trace_server.calls_query_builder.utils import (
     param_slot,
 )
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import clickhouse_cast, combine_conditions, quote_json_path
+from weave.trace_server.orm import (
+    clickhouse_cast,
+    combine_conditions,
+    python_value_to_ch_type,
+    quote_json_path,
+)
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -83,13 +88,13 @@ class ObjectRefCondition(BaseModel):
     def get_object_property_path(self) -> str:
         """Get the property path within the object (after the shortest expand column)
         this represents the path that contains object references that need to be expanded
-        e.g. "inputs.model.config.temperature" -> "config.temperature"
+        e.g. "inputs.model.config.temperature.val" -> "config.temperature.val"
 
         where expand_columns = ["inputs.model", "inputs.model.config"]
         """
         expand_match = self.get_expand_column_match()
         if expand_match:
-            return self.field_path[len(expand_match) + 1 :]  # +1 for the dot
+            return self.field_path[len(expand_match) + 1 :]
         return self.field_path
 
     def get_leaf_object_property_path(self) -> str:
@@ -101,7 +106,7 @@ class ObjectRefCondition(BaseModel):
         """
         expand_match = self.get_expand_column_match(shortest=False)
         if expand_match:
-            return self.field_path[len(expand_match) + 1 :]  # +1 for the dot
+            return self.field_path[len(expand_match) + 1 :]
         return self.field_path
 
     def get_root_field(self) -> str:
@@ -341,8 +346,6 @@ class ObjectRefConditionHandler:
             >>> handler._create_filter_param(42)
             ('param_2', 'Int64')
         """
-        from weave.trace_server.orm import python_value_to_ch_type
-
         filter_param = self.pb.add_param(value)
         filter_type = python_value_to_ch_type(value)
         return filter_param, filter_type
@@ -398,8 +401,6 @@ class ObjectRefConditionHandler:
 
         if not condition.value:
             return "1=0"  # Empty IN list matches nothing
-
-        from weave.trace_server.orm import python_value_to_ch_type
 
         filter_param = self.pb.add_param(condition.value)
         filter_type = f"Array({python_value_to_ch_type(condition.value[0])})"
@@ -558,7 +559,6 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                     **condition_kwargs,
                 )
                 self.object_ref_conditions.append(obj_condition)
-
         return None
 
     def process_or(self, operation: tsi_query.OrOperation) -> Optional[str]:
@@ -567,12 +567,12 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         # regardless of whether they can be "optimized" or not
         for op in operation.or_:
             self.process_operand(op)
-
         return None
 
     def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
         """Process equality operation for object refs"""
-        return self._process_binary_operation(operation.eq_, "eq")
+        self._process_binary_operation(operation.eq_, "eq")
+        return None
 
     def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
         """Process contains operation for object refs"""
@@ -589,29 +589,29 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                     case_insensitive=operation.contains_.case_insensitive or False,
                 )
                 self.object_ref_conditions.append(obj_condition)
-
         return None
 
     def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
         """Process greater than operation for object refs"""
-        return self._process_binary_operation(operation.gt_, "gt")
+        self._process_binary_operation(operation.gt_, "gt")
+        return None
 
     def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
         """Process greater than or equal operation for object refs"""
-        return self._process_binary_operation(operation.gte_, "gte")
+        self._process_binary_operation(operation.gte_, "gte")
+        return None
 
     def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
         """Process in operation for object refs"""
         if isinstance(operation.in_[0], tsi_query.GetFieldOperator):
             field_path = operation.in_[0].get_field_
             if self._is_object_ref_field(field_path):
-                # Extract literal values from the list
                 values = []
                 for operand in operation.in_[1]:
                     if isinstance(operand, tsi_query.LiteralOperation):
                         values.append(operand.literal_)
                     else:
-                        return None  # Can't handle non-literal values in IN
+                        return None
 
                 obj_condition = ObjectRefFilterCondition(
                     field_path=field_path,
@@ -623,9 +623,9 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         return None
 
 
-def _get_cte_name_for_condition(i: int) -> str:
+def _get_cte_name(i: int) -> tuple[str, int]:
     """Generate a unique CTE name for this condition"""
-    return f"obj_filter_{i}"
+    return f"obj_filter_{i}", i + 1
 
 
 def build_object_ref_ctes(
@@ -658,7 +658,7 @@ def build_object_ref_ctes(
 
     project_param = pb.add_param(project_id)
     cte_parts = []
-    field_to_cte_alias_map = {}
+    field_to_cte_alias_map: dict[str, str] = {}
     cte_counter = 0
 
     # Deduplicate conditions based on unique_key
@@ -669,14 +669,12 @@ def build_object_ref_ctes(
             unique_conditions[unique_key] = condition
 
     for condition in unique_conditions.values():
-        # Get the expand column match and property path
         expand_match = condition.get_expand_column_match()
         if not expand_match:
             continue
 
         # Build the leaf-level CTE (filters on the actual property value)
-        leaf_cte_name = f"obj_filter_{cte_counter}"
-        cte_counter += 1
+        leaf_cte_name, cte_counter = _get_cte_name(cte_counter)
 
         leaf_property = condition.get_leaf_object_property_path()
         json_path_param = pb.add_param(quote_json_path(leaf_property))
@@ -739,42 +737,44 @@ def build_object_ref_ctes(
         current_cte_name = leaf_cte_name
 
         intermediate_refs = condition.get_intermediate_object_refs()
-        # If we have intermediate object references, build CTEs for them
-        if intermediate_refs:
-            # Work backwards to build the chain
-            for ref_property in reversed(intermediate_refs):
-                intermediate_cte_name = f"obj_filter_{cte_counter}"
-                cte_counter += 1
+        # If we have intermediate object references (nested), build CTEs for them
+        if not intermediate_refs:
+            field_to_cte_alias_map[condition.unique_key] = current_cte_name
+            continue
 
-                prop_json_path_param = pb.add_param(quote_json_path(ref_property))
+        # Work backwards to build the chain of CTEs
+        for ref_property in reversed(intermediate_refs):
+            intermediate_cte_name, cte_counter = _get_cte_name(cte_counter)
 
-                # For intermediate CTEs, we need to propagate the object_val_dump from the previous CTE
-                # rather than selecting it from the current object's val_dump
-                intermediate_val_dump_select, join_clause_for_ordering = "", ""
-                if isinstance(condition, ObjectRefOrderCondition):
-                    # Select the object_val_dump from the previous CTE to propagate the leaf value
-                    intermediate_val_dump_select = (
-                        "any(prev.object_val_dump) AS object_val_dump,"
+            prop_json_path_param = pb.add_param(quote_json_path(ref_property))
+
+            # For intermediate CTEs, we need to propagate the object_val_dump from the previous CTE
+            # rather than selecting it from the current object's val_dump
+            intermediate_val_dump_select, join_clause_for_ordering = "", ""
+            if isinstance(condition, ObjectRefOrderCondition):
+                # Select the object_val_dump from the previous CTE to propagate the leaf value
+                intermediate_val_dump_select = (
+                    "any(prev.object_val_dump) AS object_val_dump,"
+                )
+                join_clause_for_ordering = f"JOIN {current_cte_name} prev ON JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) = prev.ref"
+
+            intermediate_cte = f"""
+            {intermediate_cte_name} AS (
+                SELECT
+                    ov.object_id,
+                    ov.digest,
+                    {intermediate_val_dump_select}
+                    concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
+                FROM object_versions ov
+                {join_clause_for_ordering}
+                WHERE ov.project_id = {param_slot(project_param, "String")}
+                    AND JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) IN (
+                        SELECT ref FROM {current_cte_name}
                     )
-                    join_clause_for_ordering = f"JOIN {current_cte_name} prev ON JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) = prev.ref"
-
-                intermediate_cte = f"""
-                {intermediate_cte_name} AS (
-                    SELECT
-                        ov.object_id,
-                        ov.digest,
-                        {intermediate_val_dump_select}
-                        concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
-                    FROM object_versions ov
-                    {join_clause_for_ordering}
-                    WHERE ov.project_id = {param_slot(project_param, "String")}
-                        AND JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) IN (
-                            SELECT ref FROM {current_cte_name}
-                        )
-                    GROUP BY ov.project_id, ov.object_id, ov.digest
-                )"""
-                cte_parts.append(intermediate_cte)
-                current_cte_name = intermediate_cte_name
+                GROUP BY ov.project_id, ov.object_id, ov.digest
+            )"""
+            cte_parts.append(intermediate_cte)
+            current_cte_name = intermediate_cte_name
 
         field_to_cte_alias_map[condition.unique_key] = current_cte_name
 
@@ -862,13 +862,12 @@ def process_query_for_object_refs(
         return []
 
     processor = ObjectRefFilterToCTEProcessor(pb, table_alias, expand_columns)
-    # We don't need the transformed SQL here, just the extracted conditions
     apply_processor(processor, query.expr_)
 
     return processor.object_ref_conditions
 
 
-def get_object_ref_conditions(
+def get_all_object_ref_conditions(
     conditions: list["Condition"],
     order_fields: list["OrderField"],
     expand_columns: list[str],

@@ -39,7 +39,7 @@ from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefOrderCondition,
     ObjectRefQueryProcessor,
     build_object_ref_ctes,
-    get_object_ref_conditions,
+    get_all_object_ref_conditions,
     has_object_ref_field,
     is_object_ref_operand,
     process_query_for_object_refs,
@@ -82,9 +82,6 @@ class QueryBuilderField(BaseModel):
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
-
-    def is_heavy(self) -> bool:
-        return False
 
 
 class CallsMergedField(QueryBuilderField):
@@ -379,8 +376,8 @@ class OrderField(BaseModel):
     @property
     def raw_field_path(self) -> str:
         """
-        Returns the raw field path, i.e. the field path without the _dump suffix and
-        includes the extra path.
+        Returns the raw field path as a user would see it, i.e. the field path
+        without the _dump suffix and includes the extra path dot separate.
 
         example:
             OrderField(field=CallsMergedField(field="inputs_dump", extra_path=["model", "temperature"])).raw_field_path
@@ -699,7 +696,7 @@ class CallsQuery(BaseModel):
             )
         )
 
-        object_ref_conditions = get_object_ref_conditions(
+        object_ref_conditions = get_all_object_ref_conditions(
             self.query_conditions, self.order_fields, self.expand_columns
         )
 
@@ -738,12 +735,12 @@ class CallsQuery(BaseModel):
         # SUPER IMPORTANT: still need to re-sort the final query
         select_query.order_fields = self.order_fields
 
-        raw_sql = f"""
-        WITH filtered_calls AS ({filter_query._as_sql_base_format(
+        raw_sql = "WITH "
+        if object_join_cte:
+            raw_sql += f"{object_join_cte},\n"
+        raw_sql += f"""filtered_calls AS ({filter_query._as_sql_base_format(
             pb, table_alias, field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)})
         """
-        if object_join_cte:
-            raw_sql += f",\n{object_join_cte}"
 
         if self.include_costs:
             # TODO: We should unify the calls query order by fields to be orm sort by fields
@@ -755,27 +752,23 @@ class CallsQuery(BaseModel):
                 for sort_by in self.order_fields
             ]
             select_fields = [field.field for field in self.select_fields]
+            inner_sql = cost_query(
+                pb, "all_calls", self.project_id, select_fields, order_by_fields
+            )
             raw_sql += f""",
             all_calls AS ({select_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}),
-            {cost_query(
-                pb,
-                "all_calls",
-                self.project_id,
-                select_fields,
-                order_by_fields,
-            )}
+            {inner_sql}
             """
 
         else:
-            raw_sql += f"""
-            {select_query._as_sql_base_format(
+            base_sql = select_query._as_sql_base_format(
                 pb,
                 table_alias,
                 id_subquery_name="filtered_calls",
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
-            )}
-            """
+            )
+            raw_sql += base_sql
 
         return safely_format_sql(raw_sql, logger)
 
@@ -874,14 +867,13 @@ class CallsQuery(BaseModel):
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
-            order_by_sql = "ORDER BY " + ", ".join(
-                [
-                    order_field.as_sql(
-                        pb, table_alias, expand_columns, field_to_object_join_alias_map
-                    )
-                    for order_field in self.order_fields
-                ]
-            )
+            order_by_sqls = [
+                order_field.as_sql(
+                    pb, table_alias, expand_columns, field_to_object_join_alias_map
+                )
+                for order_field in self.order_fields
+            ]
+            order_by_sql = "ORDER BY " + ", ".join(order_by_sqls)
             for order_field in self.order_fields:
                 if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
                     needs_feedback = True

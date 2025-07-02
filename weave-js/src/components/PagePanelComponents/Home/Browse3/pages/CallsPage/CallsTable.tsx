@@ -424,18 +424,9 @@ export const CallsTable: FC<{
           );
           const op = operator ?? getDefaultOperatorForValue(value);
           if (expandedRef != null) {
-            // special case, we need to add TWO values to the filter
-            // 1. the ref
-            // 2. the value of the ref
-            // This is because the ref is not a real column, and we need to filter by the
-            // value of the ref.
-            // filterModel.items.push({
-            //   field: expandedRef.field,
-            //   operator: op,
-            //   value: expandedRef.value,
-            // });
             setExpandedRefCols(prevState => {
               const newSet = new Set(prevState);
+              // Remove the default
               newSet.delete('inputs.example');
               newSet.add(expandedRef.field);
               return newSet;
