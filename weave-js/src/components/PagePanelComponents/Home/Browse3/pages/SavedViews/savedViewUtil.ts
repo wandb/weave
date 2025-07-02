@@ -223,6 +223,10 @@ const filterToClause = (item: Filter): Record<string, any> => {
     return {
       $not: [{$eq: [{$getField: item.field}, {$literal: ''}]}],
     };
+  } else if (item.operator === '(any): isNull') {
+    return {
+      $eq: [{$getField: item.field}, {$literal: 'null'}],
+    };
   } else if (item.operator === '(string): contains') {
     return {
       $contains: {
@@ -405,6 +409,11 @@ const operandToFilterEq = (operand: any): Filter => {
       const field = left.$getField;
       return {field, operator, value};
     }
+    if (value === 'null') {
+      const operator = '(any): isNull';
+      const field = left.$getField;
+      return {field, operator, value};
+    }
   }
   throw new Error(`Could not parse eq operand ${JSON.stringify(operand)}`);
 };
@@ -512,6 +521,8 @@ const operandToFilter = (operand: any): Filter => {
       filter.operator = '(any): isNotEmpty';
     } else if (filter.operator === '(any): isNotEmpty') {
       filter.operator = '(any): isEmpty';
+    } else if (filter.operator === '(any): isNull') {
+      filter.operator = '(any): isNotEmpty';
     } else {
       throw new Error(
         `Could not parse "not" operand: ${JSON.stringify(

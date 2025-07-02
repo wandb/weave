@@ -120,6 +120,7 @@ describe('roundtrip conversion', () => {
       // Can't round trip date, they get converted to number
       {field: 'test', operator: '(any): isEmpty', value: null},
       {field: 'test', operator: '(any): isNotEmpty', value: null},
+      {field: 'test', operator: '(any): isNull', value: null},
     ];
     for (const c of cases) {
       const filters = [c];

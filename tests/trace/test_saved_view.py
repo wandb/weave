@@ -109,6 +109,7 @@ def test_roundtrip_operators():
         # We can't round trip bool is operator, because it gets converted to a string equals
         Filter(field="test", operator="(any): isEmpty", value=None),
         Filter(field="test", operator="(any): isNotEmpty", value=None),
+        Filter(field="test", operator="(any): isNull", value=None),
         # There is special handling for started_at because we convert it to a numeric filter
         Filter(
             field="started_at", operator="(date): after", value="2025-01-01T00:00:00"

@@ -142,9 +142,10 @@ OPERATOR_MAP = {
     "before": "(date): before",
     "is empty": "(any): isEmpty",
     "is not empty": "(any): isNotEmpty",
+    "is null": "(any): isNull",
 }
 
-VALUELESS_OPERATORS = {"(any): isEmpty", "(any): isNotEmpty"}
+VALUELESS_OPERATORS = {"(any): isEmpty", "(any): isNotEmpty", "(any): isNull"}
 
 # We return a real float from the backend! do not convert to double!
 # When option clicking latency, because we are generating this field
@@ -182,6 +183,10 @@ def filter_to_clause(item: Filter) -> dict[str, Any]:
                     "$eq": [{"$getField": item.field}, {"$literal": ""}],
                 },
             ],
+        }
+    elif item.operator == "(any): isNull":
+        return {
+            "$eq": [{"$getField": item.field}, {"$literal": "null"}],
         }
     elif item.operator == "(string): contains":
         return {
@@ -751,7 +756,8 @@ class SavedView:
     def ui_url(self) -> str | None:
         """URL to show this saved view in the UI.
 
-        Note this is the "result" page with traces etc, not the URL for the view object."""
+        Note this is the "result" page with traces etc, not the URL for the view object.
+        """
         if self.ref and self.entity and self.project:
             weave_root = urls.project_weave_root_url(self.entity, self.project)
             return f"{weave_root}/{self.view_type}?view={self.ref.name}"

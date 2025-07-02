@@ -423,8 +423,8 @@ def _create_like_optimized_eq_condition(
         # Empty string is not a valid value for LIKE optimization
         return None
 
-    # Boolean literals are not wrapped in quotes in JSON payloads
-    if literal_value in ("true", "false"):
+    # Boolean literals and null are not wrapped in quotes in JSON payloads
+    if literal_value in ("true", "false", "null"):
         like_pattern = f"%{literal_value}%"
     else:
         like_pattern = f'%"{literal_value}"%'
