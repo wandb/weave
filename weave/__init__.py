@@ -23,6 +23,7 @@ from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 from weave.type_handlers.Audio.audio import Audio
 from weave.type_handlers.Markdown.markdown import Markdown
+from weave.type_handlers.File.file import File
 from weave.type_wrappers import Content
 
 # Alias for succinct code
@@ -53,6 +54,7 @@ __docspec__ = [
     EvaluationLogger,
     Scorer,
     AnnotationSpec,
+    File,
     Content,
     Markdown,
     Monitor,
