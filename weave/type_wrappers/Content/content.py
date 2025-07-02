@@ -34,8 +34,8 @@ class BaseContentHandler(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     def __init__(self, data: bytes, /, **values: Any):
-        if 'encoding' not in values:
-            values['encoding'] = 'utf-8'
+        if "encoding" not in values:
+            values["encoding"] = "utf-8"
         super().__init__(data=data, **values)
 
     @property
@@ -98,11 +98,10 @@ def create_b64_content(
         # Set encoding to 'base64' for base64 encoded data
         values["encoding"] = "base64"
         result = create_bytes_content(data, **values)
-        # Ensure encoding is set to base64
-        result.encoding = "base64"
-        return result
     except Exception as e:
         raise ValueError(f"Invalid base64 string: {e}") from e
+
+    return result
 
 
 T = TypeVar("T", bound=str)
@@ -160,10 +159,10 @@ class Content(Generic[T]):
                     self.content_handler = create_b64_content(
                         str(input), **content_args
                     )
-                except ValueError:
+                except ValueError as e:
                     raise ValueError(
-                        f"Could not parse string {input} as a valid path or base64 string"
-                    )
+                        f"Failed to parse string {input} as a valid path or base64 string"
+                    ) from e
         elif isinstance(input, bytes):
             self.content_handler = create_bytes_content(input, **content_args)
         else:
@@ -173,19 +172,21 @@ class Content(Generic[T]):
     def from_path(
         cls,
         path: str | Path,
+        type_hint: str | None = None,
         /,
         **values: Unpack[ContentKeywordArgs],
-    ) -> 'Content':
-        return cls(path, **values)
+    ) -> Content:
+        return cls(path, type_hint, **values)
 
     @classmethod
     def from_bytes(
         cls,
         data: bytes,
+        type_hint: str | None = None,
         /,
         **values: Unpack[ContentKeywordArgs],
-    ) -> 'Content':
-        return cls(data, **values)
+    ) -> Content:
+        return cls(data, type_hint, **values)
 
     @property
     def metadata(self) -> dict[str, Any]:
@@ -227,12 +228,11 @@ class Content(Generic[T]):
 
     @property
     def encoding(self) -> str:
-        return self.content_handler.encoding or 'utf-8'
+        return self.content_handler.encoding or "utf-8"
 
     @property
     def path(self) -> str | None:
         return self.content_handler.path
-
 
     def as_string(self) -> str:
         return self.data.decode(self.encoding)
