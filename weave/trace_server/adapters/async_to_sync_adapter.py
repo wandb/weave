@@ -6,6 +6,8 @@ from weave.trace_server.async_trace_server_interface import AsyncTraceServerInte
 from weave.trace_server.trace_server_interface import (
     ActionsExecuteBatchReq,
     ActionsExecuteBatchRes,
+    CallCreateBatchReq,
+    CallCreateBatchRes,
     CallEndReq,
     CallEndRes,
     CallReadReq,
@@ -21,8 +23,6 @@ from weave.trace_server.trace_server_interface import (
     CallStartRes,
     CallUpdateReq,
     CallUpdateRes,
-    CallCreateBatchReq,
-    CallCreateBatchRes,
     CompletionsCreateReq,
     CompletionsCreateRes,
     CostCreateReq,
@@ -70,47 +70,52 @@ from weave.trace_server.trace_server_interface import (
     TableCreateRes,
     TableQueryReq,
     TableQueryRes,
-    TableQueryStatsReq,
-    TableQueryStatsRes,
     TableQueryStatsBatchReq,
     TableQueryStatsBatchRes,
+    TableQueryStatsReq,
+    TableQueryStatsRes,
     TableRowSchema,
     TableUpdateReq,
     TableUpdateRes,
 )
 
 
-def _run_async(coro: Coroutine[Any, Any, Any]) -> Any:
+def _run_async(coro: Coroutine[Any, Any, Any] | Any) -> Any:
     """Helper to run async coroutine from sync context.
-    
+
     Handles both cases where there is an existing event loop and where there isn't.
+    Also handles cases where the method might return a result directly instead of a coroutine.
     """
+    # If it's not a coroutine, just return it directly
+    if not asyncio.iscoroutine(coro):
+        return coro
+
     try:
-        # If we're already in an async context, we need to run in a new thread
+        # Check if we're already in an async context
         loop = asyncio.get_running_loop()
-        import concurrent.futures
-        import threading
-        
-        # Run the coroutine in a new thread with its own event loop
-        def run_in_thread() -> Any:
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                return new_loop.run_until_complete(coro)
-            finally:
-                new_loop.close()
-        
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_in_thread)
-            return future.result()
     except RuntimeError:
         # No event loop running, we can use asyncio.run
         return asyncio.run(coro)
 
+    # We're in an async context, run in a new thread with its own event loop
+    import concurrent.futures
+
+    def run_in_thread() -> Any:
+        new_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(new_loop)
+        try:
+            return new_loop.run_until_complete(coro)
+        finally:
+            new_loop.close()
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future = executor.submit(run_in_thread)
+        return future.result()
+
 
 class AsyncToSyncAdapter:
     """Adapter that wraps an async AsyncTraceServerInterface to provide sync methods.
-    
+
     This allows async server implementations to be used in sync contexts
     like the existing WeaveClient.
     """

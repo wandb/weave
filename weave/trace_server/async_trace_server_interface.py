@@ -1,22 +1,12 @@
-import datetime
 from collections.abc import Iterator
-from enum import Enum
-from typing import Any, Literal, Optional, Protocol, Union
-
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    field_serializer,
-)
-from typing_extensions import TypedDict
-
-from weave.trace_server.interface.query import Query
+from typing import Any, Protocol
 
 # Import all the request/response types from the sync interface
 from weave.trace_server.trace_server_interface import (
     ActionsExecuteBatchReq,
     ActionsExecuteBatchRes,
+    CallCreateBatchReq,
+    CallCreateBatchRes,
     CallEndReq,
     CallEndRes,
     CallReadReq,
@@ -32,8 +22,6 @@ from weave.trace_server.trace_server_interface import (
     CallStartRes,
     CallUpdateReq,
     CallUpdateRes,
-    CallCreateBatchReq,
-    CallCreateBatchRes,
     CompletionsCreateReq,
     CompletionsCreateRes,
     CostCreateReq,
@@ -81,10 +69,10 @@ from weave.trace_server.trace_server_interface import (
     TableCreateRes,
     TableQueryReq,
     TableQueryRes,
-    TableQueryStatsReq,
-    TableQueryStatsRes,
     TableQueryStatsBatchReq,
     TableQueryStatsBatchRes,
+    TableQueryStatsReq,
+    TableQueryStatsRes,
     TableRowSchema,
     TableUpdateReq,
     TableUpdateRes,
@@ -93,7 +81,7 @@ from weave.trace_server.trace_server_interface import (
 
 class AsyncTraceServerInterface(Protocol):
     """Async version of TraceServerInterface.
-    
+
     This protocol defines the same interface as TraceServerInterface but with
     async methods. It can be used for FastAPI endpoints that need to be async
     for better performance.
@@ -113,7 +101,9 @@ class AsyncTraceServerInterface(Protocol):
     async def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
     async def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     async def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
-    async def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    async def calls_query_stats(
+        self, req: CallsQueryStatsReq
+    ) -> CallsQueryStatsRes: ...
     async def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     async def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 
@@ -137,8 +127,12 @@ class AsyncTraceServerInterface(Protocol):
     async def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
     async def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     async def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
-    async def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]: ...
-    async def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes: ...
+    async def table_query_stream(
+        self, req: TableQueryReq
+    ) -> Iterator[TableRowSchema]: ...
+    async def table_query_stats(
+        self, req: TableQueryStatsReq
+    ) -> TableQueryStatsRes: ...
     async def table_query_stats_batch(
         self, req: TableQueryStatsBatchReq
     ) -> TableQueryStatsBatchRes: ...
@@ -148,7 +142,9 @@ class AsyncTraceServerInterface(Protocol):
 
     # File API
     async def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
-    async def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
+    async def file_content_read(
+        self, req: FileContentReadReq
+    ) -> FileContentReadRes: ...
     async def files_stats(self, req: FilesStatsReq) -> FilesStatsRes: ...
 
     # Feedback API
@@ -163,7 +159,9 @@ class AsyncTraceServerInterface(Protocol):
     ) -> ActionsExecuteBatchRes: ...
 
     # Execute LLM API
-    async def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
+    async def completions_create(
+        self, req: CompletionsCreateReq
+    ) -> CompletionsCreateRes: ...
 
     # Execute LLM API (Streaming)
     # Returns an iterator of JSON-serializable chunks that together form the streamed

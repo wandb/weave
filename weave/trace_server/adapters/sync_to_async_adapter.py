@@ -2,10 +2,11 @@ import asyncio
 from collections.abc import Iterator
 from typing import Any
 
-from weave.trace_server.async_trace_server_interface import AsyncTraceServerInterface
 from weave.trace_server.trace_server_interface import (
     ActionsExecuteBatchReq,
     ActionsExecuteBatchRes,
+    CallCreateBatchReq,
+    CallCreateBatchRes,
     CallEndReq,
     CallEndRes,
     CallReadReq,
@@ -21,8 +22,6 @@ from weave.trace_server.trace_server_interface import (
     CallStartRes,
     CallUpdateReq,
     CallUpdateRes,
-    CallCreateBatchReq,
-    CallCreateBatchRes,
     CompletionsCreateReq,
     CompletionsCreateRes,
     CostCreateReq,
@@ -70,10 +69,10 @@ from weave.trace_server.trace_server_interface import (
     TableCreateRes,
     TableQueryReq,
     TableQueryRes,
-    TableQueryStatsReq,
-    TableQueryStatsRes,
     TableQueryStatsBatchReq,
     TableQueryStatsBatchRes,
+    TableQueryStatsReq,
+    TableQueryStatsRes,
     TableRowSchema,
     TableUpdateReq,
     TableUpdateRes,
@@ -83,7 +82,7 @@ from weave.trace_server.trace_server_interface import (
 
 class SyncToAsyncAdapter:
     """Adapter that wraps a sync TraceServerInterface to provide async methods.
-    
+
     This allows existing sync server implementations to be used in async contexts
     by running them in a thread pool executor.
     """
@@ -126,7 +125,9 @@ class SyncToAsyncAdapter:
         # and return the iterator. In a real implementation, you might want to
         # convert this to an async generator.
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.sync_server.calls_query_stream, req)
+        return await loop.run_in_executor(
+            None, self.sync_server.calls_query_stream, req
+        )
 
     async def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
         loop = asyncio.get_event_loop()
@@ -203,7 +204,9 @@ class SyncToAsyncAdapter:
     async def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]:
         # Note: Same caveat as calls_query_stream for streaming operations
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.sync_server.table_query_stream, req)
+        return await loop.run_in_executor(
+            None, self.sync_server.table_query_stream, req
+        )
 
     async def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes:
         loop = asyncio.get_event_loop()
@@ -213,7 +216,9 @@ class SyncToAsyncAdapter:
         self, req: TableQueryStatsBatchReq
     ) -> TableQueryStatsBatchRes:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.sync_server.table_query_stats_batch, req)
+        return await loop.run_in_executor(
+            None, self.sync_server.table_query_stats_batch, req
+        )
 
     # Ref API
     async def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
@@ -255,19 +260,27 @@ class SyncToAsyncAdapter:
         self, req: ActionsExecuteBatchReq
     ) -> ActionsExecuteBatchRes:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.sync_server.actions_execute_batch, req)
+        return await loop.run_in_executor(
+            None, self.sync_server.actions_execute_batch, req
+        )
 
     # Execute LLM API
-    async def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes:
+    async def completions_create(
+        self, req: CompletionsCreateReq
+    ) -> CompletionsCreateRes:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.sync_server.completions_create, req)
+        return await loop.run_in_executor(
+            None, self.sync_server.completions_create, req
+        )
 
     async def completions_create_stream(
         self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
         # Note: Same caveat as other streaming operations
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.sync_server.completions_create_stream, req)
+        return await loop.run_in_executor(
+            None, self.sync_server.completions_create_stream, req
+        )
 
     # Project statistics API
     async def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes:
