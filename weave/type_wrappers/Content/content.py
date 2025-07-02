@@ -280,15 +280,18 @@ class Content(Generic[T]):
         Args:
             dest: Destination path where the file will be copied to (string or pathlib.Path)
                   The destination path can be a file or a directory.
+                  If dest has no file extension (e.g. .txt), destination will be considered a directory.
         """
         path = Path(dest) if isinstance(dest, str) else dest
-        os.makedirs(path.parent, exist_ok=True)
 
-        # If we get a directory, save it to the previously provided or generated filename
-        if os.path.isdir(path):
+        if (path.exists and path.is_dir()) or not path.suffix:
             path = path.joinpath(self.filename)
 
-        # Otherwise write the data to the path
+        # Now we know path ends in a filename
+        if not path.parent.exists:
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write the data to the path
         with open(path, "wb") as f:
             f.write(self.data)
 
