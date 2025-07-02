@@ -62,6 +62,8 @@ class RunAsUser:
     def __init__(self, ch_server_dump: dict[str, Any]):
         self.ch_server_dump = ch_server_dump
 
+    # TODO: Write a test that validates multiple parallel executions of different projects do
+    # no clobber each other's refs.
     @contextmanager
     def user_scoped_client(
         self, project_id: str, wb_user_id: str
