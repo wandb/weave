@@ -18,7 +18,6 @@ import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
-from tests.conftest import DummyIdConverter
 from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
@@ -26,6 +25,9 @@ from tests.trace.util import (
     MaybeStringMatcher,
     client_is_sqlite,
     get_info_loglines,
+)
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    DummyIdConverter,
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client

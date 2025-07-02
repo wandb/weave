@@ -1,5 +1,5 @@
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
-import {Button} from '@wandb/weave/components/Button';
+import {TrackedButton} from '@wandb/weave/components/Button/TrackedButton';
 import {IconPencilEdit} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
@@ -75,7 +75,11 @@ export const MonitorsPage = () => {
                       ],
                     ]}
                     trigger={
-                      <Button icon="overflow-horizontal" variant="ghost" />
+                      <TrackedButton
+                        icon="overflow-horizontal"
+                        variant="ghost"
+                        trackedName="monitor-overflow-menu-edit"
+                      />
                     }
                     offset="0px, -20px"
                     onOpen={() => setSelectedMonitor(obj)}
@@ -218,13 +222,14 @@ const MonitorsPageHeaderExtra: React.FC<{
   return (
     <Tailwind>
       <div className="mr-16 flex gap-8">
-        <Button
+        <TrackedButton
           icon="add-new"
           variant="ghost"
           onClick={onCreateMonitor}
+          trackedName="new-monitor"
           tooltip="Create a new monitor">
           New monitor
-        </Button>
+        </TrackedButton>
       </div>
     </Tailwind>
   );
