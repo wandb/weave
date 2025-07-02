@@ -1,18 +1,27 @@
+from typing import TYPE_CHECKING
+
 import requests
 
-from weave.chat.common import INFERENCE_HOST
 from weave.chat.types.models import (
     ModelsResponse,
     ModelsResponseError,
     ModelsResponseSuccess,
 )
+from weave.trace_server.constants import INFERENCE_HOST
 from weave.wandb_interface.wandb_api import get_wandb_api_context
 
+if TYPE_CHECKING:
+    from weave.trace.weave_client import WeaveClient
 
-class Models:
-    def __init__(self, entity: str, project: str):
-        self.entity = entity
-        self.project = project
+
+class InferenceModels:
+    def __init__(self, client: "WeaveClient"):
+        """This class exists to mirror openai.resources.models.Models.
+
+        It is not a drop-in replacement because of the terminology conflict
+        with Weave's "Model".
+        """
+        self._client = client
 
     def list(self) -> ModelsResponse:
         cur_ctx = get_wandb_api_context()
@@ -22,14 +31,14 @@ class Models:
         api_key = cur_ctx.api_key
         headers = {
             "Authorization": f"Bearer {api_key}",
-            "OpenAI-Project": f"{self.entity}/{self.project}",
+            "OpenAI-Project": f"{self._client.entity}/{self._client.project}",
             "Content-Type": "application/json",
         }
         url = f"https://{INFERENCE_HOST}/v1/models"
         response = requests.post(url, headers=headers)
         d = response.json()
 
-        if "error" in d:
+        if response.status_code != 200:
             return ModelsResponseError.model_validate(d)
 
         validated = ModelsResponseSuccess.model_validate(d)

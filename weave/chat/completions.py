@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import requests
 from pydantic import ValidationError
 
-from weave.chat.common import COMPLETIONS_CREATE_OP_NAME, INFERENCE_HOST
 from weave.chat.stream import ChatCompletionChunkStream
 from weave.chat.types._models import (
     NOT_GIVEN,
@@ -18,7 +17,11 @@ from weave.chat.types.chat_completion_stream_options_param import (
 )
 from weave.trace.env import weave_trace_server_url
 from weave.trace.op import op
+from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME, INFERENCE_HOST
 from weave.wandb_interface.wandb_api import get_wandb_api_context
+
+if TYPE_CHECKING:
+    from weave.trace.weave_client import WeaveClient
 
 Endpoint = Literal["playground", "inference"]
 
@@ -36,9 +39,8 @@ def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 class Completions:
-    def __init__(self, entity: str, project: str):
-        self.entity = entity
-        self.project = project
+    def __init__(self, client: WeaveClient):
+        self._client = client
 
     def create(
         self,
@@ -193,7 +195,7 @@ class Completions:
         headers = {
             "Content-Type": "application/json",
         }
-        project_id = f"{self.entity}/{self.project}"
+        project_id = f"{self._client.entity}/{self._client.project}"
         data: dict[str, Any] = {
             "messages": messages,
         }
