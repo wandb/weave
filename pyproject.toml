@@ -97,7 +97,7 @@ cohere = ["cohere>=5.9.1,<5.9.3"]
 crewai = ["crewai>=0.100.1,<=0.108.0", "crewai-tools>=0.38.0"]
 dspy = ["dspy>=2.6.3", "litellm<=1.61.6"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
-google_genai = ["google-genai>=1.0.0", "pillow>=11.1.0"]
+google_genai = ["google-genai>=1.0.0,<=1.23.0", "pillow>=11.1.0"]
 groq = ["groq>=0.13.0"]
 huggingface = ["huggingface-hub>=0.28.1"]
 smolagents = [
@@ -231,7 +231,7 @@ filterwarnings = [
 addopts = "-v"
 markers = [
   "skip_clickhouse_client: marks tests as requiring clickhouse client to be skipped",
-  "weave_client: alias for `client` fixture used for CI dispatching. Do not use directly in code.",
+  "trace_server: alias for `trace_server` fixture used for CI dispatching. Do not use directly in code.",
   "disable_logging_error_check: means that the test expects logging errors (and the default assertion for no logging errors will fail)",
 ]
 
