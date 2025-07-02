@@ -68,8 +68,14 @@ export const ChartTypeSelectionDrawer: React.FC<
           fontWeight: 600,
           fontSize: '1.25rem',
         }}>
-        Create Chart
+        Create chart
       </Box>
+      <Button
+        onClick={onClose}
+        variant="ghost"
+        icon="close"
+        tooltip="Close"
+      />
     </Box>
   );
 
