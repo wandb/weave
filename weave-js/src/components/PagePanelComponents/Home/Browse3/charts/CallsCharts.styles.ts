@@ -35,32 +35,6 @@ export const callsChartsStyles = {
     color: '#79808A',
   },
 
-  dropdownContainer: {
-    position: 'relative' as const,
-  },
-
-  dropdownTrigger: {
-    fontSize: '14px',
-    fontWeight: 'bold' as const,
-    color: '#79808A',
-    cursor: 'pointer' as const,
-    transition: 'color 0.2s ease',
-  },
-
-  dropdownMenu: {
-    position: 'absolute' as const,
-    top: '100%',
-    left: 0,
-    zIndex: 1001,
-    marginTop: 4,
-    minWidth: 80,
-    backgroundColor: 'white',
-    border: '1px solid #e0e0e0',
-    borderRadius: '6px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    padding: '4px 0',
-  },
-
   chartsContainer: {
     display: 'flex' as const,
     flexDirection: 'column' as const,
@@ -84,21 +58,3 @@ export const callsChartsStyles = {
     padding: '40px 20px',
   },
 };
-
-export const createDropdownOptionStyle = (
-  isSelected: boolean,
-  isHovered: boolean
-) => ({
-  padding: '8px 12px',
-  cursor: 'pointer' as const,
-  fontSize: '14px',
-  backgroundColor: isSelected
-    ? '#f0f9ff'
-    : isHovered
-    ? '#f9fafb'
-    : 'transparent',
-  color: isSelected ? '#0891b2' : '#374151',
-});
-
-export const getDropdownTriggerHoverColor = (isHovered: boolean) =>
-  isHovered ? '#038194' : '#79808A';
