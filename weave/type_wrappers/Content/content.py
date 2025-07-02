@@ -180,7 +180,7 @@ class Content(Generic[T]):
         /,
         **values: Unpack[ContentKeywordArgs],
     ) -> Content:
-        if not os.path.exists(path):
+        if not Path(path).exists():
             raise FileNotFoundError(f"File not found - {path}")
         return cls(path, type_hint, **values)
 
@@ -284,11 +284,11 @@ class Content(Generic[T]):
         """
         path = Path(dest) if isinstance(dest, str) else dest
 
-        if (path.exists and path.is_dir()) or not path.suffix:
+        if (path.exists() and path.is_dir()) or not path.suffix:
             path = path.joinpath(self.filename)
 
         # Now we know path ends in a filename
-        if not path.parent.exists:
+        if not path.parent.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write the data to the path
