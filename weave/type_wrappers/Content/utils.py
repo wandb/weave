@@ -9,16 +9,13 @@ from typing import TYPE_CHECKING, Any, TypedDict
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    import magic
+    from polyfile.magic import MagicMatcher
 
 try:
-    import magic
-
-    _MAGIC_INSTANCE_FOR_CHECK = magic.Magic(mime=True)
-    MAGIC_LIB_AVAILABLE = True
-    del _MAGIC_INSTANCE_FOR_CHECK  # Clean up
+    from polyfile.magic import MagicMatcher
+    POLYFILE_LIB_AVAILABLE = True
 except Exception as e:
-    MAGIC_LIB_AVAILABLE = False
+    POLYFILE_LIB_AVAILABLE = False
 
 
 class ContentArgs(TypedDict):
@@ -68,9 +65,12 @@ def get_extension_from_mimetype(mimetype: str) -> str:
 
 
 def guess_from_buffer(buffer: bytes) -> str | None:
-    if not MAGIC_LIB_AVAILABLE:
+    if not POLYFILE_LIB_AVAILABLE:
         return None
-    return magic.Magic(mime=True).from_buffer(buffer)
+
+    # This should always default to application/octet-stream if it fails to resolve
+    return next(MagicMatcher.DEFAULT_INSTANCE.match(buffer)).mimetypes[0]
+
 
 
 def guess_from_filename(filename: str) -> str | None:
@@ -111,12 +111,12 @@ def get_mime_and_extension(
         return mimetype, extension
     elif mimetype and not extension:
         return mimetype, get_extension_from_mimetype(mimetype)
-    elif not MAGIC_LIB_AVAILABLE:
+    elif not POLYFILE_LIB_AVAILABLE:
         logger.warning(
-            "Failed to determine MIME type from file extension and cannot infer from data"
-            "MIME type detection from raw data requires a functional python-magic library "
-            "and its underlying libmagic dependency. Please install or configure them correctly."
-            "See: https://pypi.org/project/python-magic/ for detailed instructions"
+            "Failed to determine MIME type from file extension and cannot infer from data\n"
+            "MIME type detection from raw data requires the polyfile library\n"
+            "Install it by running: `pip install polyfile`\n"
+            "See: https://pypi.org/project/polyfile for detailed instructions"
         )
     if filename is not None:
         idx = filename.rfind(".")
