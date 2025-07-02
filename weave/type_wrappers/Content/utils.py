@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 try:
     from polyfile.magic import MagicMatcher
+
     POLYFILE_LIB_AVAILABLE = True
 except Exception as e:
     POLYFILE_LIB_AVAILABLE = False
@@ -70,7 +71,6 @@ def guess_from_buffer(buffer: bytes) -> str | None:
 
     # This should always default to application/octet-stream if it fails to resolve
     return next(MagicMatcher.DEFAULT_INSTANCE.match(buffer)).mimetypes[0]
-
 
 
 def guess_from_filename(filename: str) -> str | None:
