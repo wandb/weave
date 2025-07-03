@@ -180,7 +180,7 @@ export async function renderScreenshot(
 }
 
 export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
-  const {scene, context} = result;
+  const {scene, context, cleanup} = result;
   const {canvas, engine} = context;
 
   // canvas elements can't contain other html elements, so we create
@@ -208,6 +208,7 @@ export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
   });
 
   onNextExitFullscreen(() => {
+    cleanup?.();
     canvas.remove();
     fullScreenElement.remove();
     requestAnimationFrame(() => {
