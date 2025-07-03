@@ -2549,6 +2549,41 @@ export const useThreadsQuery = (
   };
 };
 
+export const useThreadTurns = (projectId: string, threadId: string) => {
+  const getTsClient = useGetTraceServerClientContext();
+  const turns = useAsync(async () => {
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      query: {
+        $expr: {
+          $and: [
+            {$eq: [{$getField: 'thread_id'}, {$literal: threadId}]},
+            {$eq: [{$getField: 'id'}, {$getField: 'turn_id'}]},
+          ],
+        },
+      },
+      sort_by: [{field: 'started_at', direction: 'asc'}],
+      limit: 1000,
+      columns: [
+        'id',
+        'turn_id',
+        'started_at',
+        'ended_at',
+        'exception',
+        'inputs',
+        'op_name',
+      ],
+    });
+
+    console.log({result});
+    return result.calls ?? [];
+  }, [getTsClient, threadId]);
+
+  return {
+    turnsState: turns,
+  };
+};
+
 /// Utility Functions ///
 
 export const convertISOToDate = (iso: string): Date => {
