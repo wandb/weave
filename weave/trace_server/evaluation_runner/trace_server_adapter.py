@@ -130,8 +130,8 @@ class UserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().actions_execute_batch(req)
 
-    def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
+    async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
         if self._user_id is None:
             raise ValueError("User ID is required")
         req.wb_user_id = self._user_id
-        return super().run_model(req)
+        return await super().run_model(req)

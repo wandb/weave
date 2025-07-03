@@ -90,6 +90,10 @@ class CrossProcessTraceServerArgs(TypedDict):
     response_queue: multiprocessing.Queue
 
 
+class SendRequestException(Exception):
+    pass
+
+
 class CrossProcessTraceServer(TraceServerInterface):
     """
     A trace server implementation that delegates operations via queues.
@@ -191,7 +195,7 @@ class CrossProcessTraceServer(TraceServerInterface):
             del self._pending_requests[request_id]
 
         if response["error"]:
-            raise Exception(f"Worker process error: {response['error']}")
+            raise SendRequestException(f"Worker process error: {response['error']}")
 
         return response["result"]
 
@@ -420,7 +424,7 @@ def generate_child_process_trace_server_args(
     response_queue = ctx.Queue()
 
     # Create the worker process that will run the trace server
-    worker_process = ctx.Process(
+    worker_process = ctx.Process(  # type: ignore[attr-defined]
         target=_trace_server_worker_loop,
         args=(request_queue, response_queue, trace_server),
     )

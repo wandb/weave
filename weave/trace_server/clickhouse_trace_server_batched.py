@@ -2066,19 +2066,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._insert_call, chunk_iter, start_call, model_name, req.project_id
         )
 
-    def model_dump(self) -> dict[str, Any]:
-        return {
-            "host": self._host,
-            "port": self._port,
-            "user": self._user,
-            "password": self._password,
-            "database": self._database,
-            "use_async_insert": self._use_async_insert,
-        }
+    # def model_dump(self) -> dict[str, Any]:
+    #     return {
+    #         "host": self._host,
+    #         "port": self._port,
+    #         "user": self._user,
+    #         "password": self._password,
+    #         "database": self._database,
+    #         "use_async_insert": self._use_async_insert,
+    #     }
 
     async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
-        runner = RunAsUser(ch_server_dump=self.model_dump())
-        return await runner.run_model(req)
+        return await RunAsUser().run_model(self, req)
 
     async def run_scorer(self, req: tsi.RunScorerReq) -> tsi.RunScorerRes:
         raise NotImplementedError(

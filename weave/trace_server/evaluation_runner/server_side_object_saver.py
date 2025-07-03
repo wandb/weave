@@ -9,6 +9,7 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.cross_process_trace_server import (
+    CrossProcessTraceServerArgs,
     build_child_process_trace_server,
     generate_child_process_trace_server_args,
 )
@@ -42,11 +43,11 @@ def user_scoped_client(
 
 
 def run_model_wrapped(
-    trace_server_args,
-    project_id,
+    trace_server_args: CrossProcessTraceServerArgs,
+    project_id: str,
     req: tsi.RunModelReq,
-    result_queue: multiprocessing.Queue,
-) -> tsi.RunModelRes:
+    result_queue: multiprocessing.Queue[tsi.RunModelRes],
+) -> None:
     safe_trace_server = build_child_process_trace_server(trace_server_args)
     with user_scoped_client(project_id, safe_trace_server) as client:
         res = _run_model(req, client)
@@ -83,6 +84,10 @@ def _run_model(req: tsi.RunModelReq, client: WeaveClient) -> tsi.RunModelRes:
     return tsi.RunModelRes(output=result, call_id=call.id)
 
 
+class RunModelException(Exception):
+    pass
+
+
 class RunAsUser:
     """Executes a function in a separate process for memory isolation.
     This class provides a way to run functions in an isolated memory space using
@@ -95,13 +100,15 @@ class RunAsUser:
     ) -> tsi.RunModelRes:
         project_id = req.project_id
         wb_user_id = req.wb_user_id
+        if wb_user_id is None:
+            raise ValueError("wb_user_id is required")
         wrapped_trace_server = externalize_trace_server(
             internal_trace_server, project_id, wb_user_id
         )
         child_trace_server_args = generate_child_process_trace_server_args(
             wrapped_trace_server
         )
-        result_queue = multiprocessing.Queue()
+        result_queue: multiprocessing.Queue[tsi.RunModelRes] = multiprocessing.Queue()
         process = multiprocessing.Process(
             target=run_model_wrapped,
             kwargs={
@@ -115,5 +122,5 @@ class RunAsUser:
         process.start()
         process.join()
         if process.exitcode != 0:
-            raise Exception(f"Process execution failed: {process.exitcode}")
+            raise RunModelException(f"Process execution failed: {process.exitcode}")
         return tsi.RunModelRes.model_validate(result_queue.get())
