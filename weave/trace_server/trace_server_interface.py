@@ -1120,6 +1120,19 @@ class RunModelRes(BaseModel):
     output: Any
 
 
+class ApplyScorerReq(BaseModel):
+    project_id: str
+    scorer_ref: str
+    target_call_id: str
+    additional_inputs: Optional[dict | str] = None
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ApplyScorerRes(BaseModel):
+    call_id: str
+    output: Any
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1204,4 +1217,5 @@ class TraceServerInterface(Protocol):
 
     # Evaluation Lifecycle Execution API
     async def run_model(self, req: RunModelReq) -> RunModelRes: ...
-    async def apply_scorer(self, req: ApplyScorerReq) -> ApplyScorerRes: ...
+
+    # async def apply_scorer(self, req: ApplyScorerReq) -> ApplyScorerRes: ...
