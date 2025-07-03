@@ -5,6 +5,7 @@
   its configuration options when a new chart is created or an existing chart is edited.
 */
 import {Box, Dialog, DialogContent, IconButton} from '@mui/material';
+import {MOON_50} from '@wandb/weave/common/css/color.styles';
 import React from 'react';
 
 import NumberInput from '../../../../../common/components/elements/NumberInput';
@@ -231,7 +232,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
       label: (
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
           <Icon name="chart-scatterplot" />
-          Scatter Plot
+          Scatter plot
         </Box>
       ),
     },
@@ -240,7 +241,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
       label: (
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
           <Icon name="line-plot-alt2" />
-          Line Plot
+          Line plot
         </Box>
       ),
     },
@@ -249,7 +250,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
       label: (
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
           <Icon name="chart-vertical-bars" />
-          Bar Chart
+          Bar chart
         </Box>
       ),
     },
@@ -335,9 +336,9 @@ export const ChartModal: React.FC<ChartModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               fontWeight: 600,
-              fontSize: '1.5rem',
+              fontSize: '1.25rem',
             }}>
-            Chart Settings
+            Chart settings
           </Box>
           <IconButton onClick={onClose} sx={{color: '#666'}}>
             <Icon name="close" />
@@ -401,7 +402,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
               display: 'flex',
               flexDirection: 'column',
               p: 3,
-              backgroundColor: '#fafafa',
+              backgroundColor: MOON_50,
             }}>
             <SectionHeader first>Plot Type</SectionHeader>
             <CustomSelect
@@ -427,7 +428,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                 }));
               }}
               options={plotTypeOptions}
-              size="small"
+              size="medium"
             />
 
             <SectionHeader>Y-Axis</SectionHeader>
@@ -440,7 +441,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                 }))
               }
               options={yAxisGroupedOptions}
-              size="small"
+              size="medium"
               groupDivider={true}
             />
 
@@ -459,7 +460,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                     }))
                   }
                   options={xAxisGroupedOptions}
-                  size="small"
+                  size="medium"
                   groupDivider={true}
                 />
               </>
@@ -481,7 +482,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                     }))
                   }
                   options={xAxisGroupedOptions}
-                  size="small"
+                  size="medium"
                   groupDivider={true}
                   isDisabled={true}
                 />
@@ -518,7 +519,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                     }));
                   }}
                   options={colorGroupGroupedOptions}
-                  size="small"
+                  size="medium"
                   placeholder="No grouping"
                   groupDivider={true}
                   isClearable={true}
@@ -561,7 +562,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                     }))
                   }
                   options={aggregationOptions}
-                  size="small"
+                  size="medium"
                 />
               </>
             )}
@@ -572,19 +573,21 @@ export const ChartModal: React.FC<ChartModalProps> = ({
         <Box
           sx={{
             borderTop: '1px solid #e0e0e0',
-            p: 3,
+            backgroundColor: MOON_50,
+            py: 1.5,
+            px: 2,
             display: 'flex',
             justifyContent: 'flex-end',
             gap: 2,
           }}>
-          <Button onClick={onClose} variant="ghost" size="large">
+          <Button onClick={onClose} variant="secondary" size="large">
             Cancel
           </Button>
           <Button
             onClick={() => onConfirm(localConfig)}
             variant="primary"
             size="large">
-            Save Changes
+            Save chart
           </Button>
         </Box>
       </DialogContent>
