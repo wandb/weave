@@ -25,6 +25,12 @@ const sidebar: SidebarsConfig = {
         },
         {
           type: "doc",
+          id: "reference/service-api/get-caller-location-geolocate-get",
+          label: "Get Caller Location",
+          className: "api-method get",
+        },
+        {
+          type: "doc",
           id: "reference/service-api/server-info-server-info-get",
           label: "Server Info",
           className: "api-method get",
