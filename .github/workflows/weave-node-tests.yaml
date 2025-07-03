@@ -2,9 +2,13 @@ name: Node.js Tests
 
 on:
   push:
+    branches:
+      - [master]
+  pull_request:
+    types: [opened, edited, synchronize]
 
 jobs:
-  test:
+  node-sdk-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
