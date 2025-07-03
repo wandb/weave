@@ -255,6 +255,7 @@ select = [
   "F6",      # https://docs.astral.sh/ruff/rules/multi-value-repeated-key-literal/
   "F811",    # https://docs.astral.sh/ruff/rules/redefined-while-unused/
   "F821",    # https://docs.astral.sh/ruff/rules/undefined-name/
+  "F822",    # https://docs.astral.sh/ruff/rules/undefined-export/
   "TID252",  # https://docs.astral.sh/ruff/rules/relative-imports/#relative-imports-tid252
   "UP",      # https://docs.astral.sh/ruff/rules/#pyupgrade-up
   "TRY002",  # https://docs.astral.sh/ruff/rules/raise-vanilla-class/
