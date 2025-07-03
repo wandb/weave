@@ -41,6 +41,8 @@ from weave.trace_server.execution_runner.trace_server_adapter import (
 )
 from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 
+EXECUTION_TIMEOUT_SECONDS = 60
+
 
 @contextmanager
 def user_scoped_client(
@@ -216,9 +218,6 @@ class RunAsUser:
         project_id: str,
         wb_user_id: str,
         response_type: type[TRes],
-        runner_mode: Literal[
-            "child_process", "_dev_only_dangerous_in_process"
-        ] = "child_process",
     ) -> TRes:
         """
         Generic method to run any function in an isolated process with user-scoped client.
@@ -263,49 +262,36 @@ class RunAsUser:
         # Convert any internal references to external format for security
         externalize_refs = make_externalize_ref_converter(project_id)
         externalized_req = externalize_refs(req)
-        if runner_mode == "child_process":
-            # Create queue for receiving results from child process
-            result_queue: multiprocessing.Queue[dict] = multiprocessing.Queue()
 
-            # Spawn child process with isolated memory space
-            process = multiprocessing.Process(
-                target=_generic_child_process_wrapper,
-                kwargs={
-                    "wrapper_context": {
-                        "trace_server_args": generate_child_process_trace_server_args(
-                            wrapped_trace_server
-                        ),
-                        "project_id": project_id,
-                        "result_queue": result_queue,
-                    },
-                    "func": func,
-                    "req": externalized_req,
-                },
-            )
+        # Create queue for receiving results from child process
+        result_queue: multiprocessing.Queue[dict] = multiprocessing.Queue()
 
-            # Start the child process and wait for completion
-            process.start()
-            process.join()
-
-            # Check if the process completed successfully
-            if process.exitcode != 0:
-                raise RunAsUserException(
-                    f"Process execution failed: {process.exitcode}"
-                )
-
-            # Get the result and validate it matches the expected type
-            res = response_type.model_validate(result_queue.get())
-        elif runner_mode == "_dev_only_dangerous_in_process":
-            res = _generic_wrapper(
-                {
-                    "trace_server": wrapped_trace_server,
+        # Spawn child process with isolated memory space
+        process = multiprocessing.Process(
+            target=_generic_child_process_wrapper,
+            kwargs={
+                "wrapper_context": {
+                    "trace_server_args": generate_child_process_trace_server_args(
+                        wrapped_trace_server
+                    ),
                     "project_id": project_id,
+                    "result_queue": result_queue,
                 },
-                func,
-                externalized_req,
-            )
-        else:
-            raise ValueError(f"Invalid runner mode: {runner_mode}")
+                "func": func,
+                "req": externalized_req,
+            },
+        )
+
+        # Start the child process and wait for completion
+        process.start()
+        process.join(timeout=EXECUTION_TIMEOUT_SECONDS)
+
+        # Check if the process completed successfully
+        if process.exitcode != 0:
+            raise RunAsUserException(f"Process execution failed: {process.exitcode}")
+
+        # Get the result and validate it matches the expected type
+        res = response_type.model_validate(result_queue.get())
 
         return res
 
