@@ -127,7 +127,7 @@ export const ObjectVersionPage: React.FC<{
     return <NotFoundPanel title="Object not found" />;
   }
   if (objectVersion.result.baseObjectClass === 'Monitor') {
-    return <MonitorPage {...props} />;
+    return <MonitorPage {...props} objectVersion={objectVersion.result} />;
   }
 
   return (
@@ -462,7 +462,9 @@ const ObjectVersionPageInner: React.FC<{
                   <TabUseModel
                     name={objectName}
                     uri={refUri}
+                    entityName={entityName}
                     projectName={projectName}
+                    versionIndex={objectVersionIndex}
                   />
                 ) : baseObjectClass === 'AnnotationSpec' ? (
                   <TabUseAnnotationSpec
@@ -472,7 +474,13 @@ const ObjectVersionPageInner: React.FC<{
                     data={viewerDataAsObject}
                   />
                 ) : (
-                  <TabUseObject name={objectName} uri={refUri} />
+                  <TabUseObject
+                    name={objectName}
+                    uri={refUri}
+                    entityName={entityName}
+                    projectName={projectName}
+                    versionIndex={objectVersionIndex}
+                  />
                 )}
               </Tailwind>
             </ScrollableTabContent>

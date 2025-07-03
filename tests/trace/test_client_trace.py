@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 from unittest import mock
 
 import pytest
@@ -2951,7 +2951,7 @@ def test_calls_stream_column_expansion(client):
         )
     )
 
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output == nested_ref.uri()
 
     # output is dereffed
@@ -2963,7 +2963,7 @@ def test_calls_stream_column_expansion(client):
         )
     )
 
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output["b"] == simple_ref.uri()
 
     # expand 2 refs, should be {"b": {"a": ref}}
@@ -2974,7 +2974,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output", "output.b"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output["b"]["a"] == ref.uri()
 
     # expand 3 refs, should be {"b": {"a": {"id": 123}}}
@@ -2985,7 +2985,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output", "output.b", "output.b.a"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output["b"]["a"]["id"] == "123"
 
     # incomplete expansion columns, output should be un expanded
@@ -2996,7 +2996,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output.b"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output == nested_ref.uri()
 
     # non-existent column, should be un expanded
@@ -3007,7 +3007,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output.b", "output.zzzz"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output == nested_ref.uri()
 
 
@@ -4724,6 +4724,71 @@ def test_thread_id_inheritance(client):
     assert child_call.thread_id == "inherited_thread"
 
 
+def test_thread_id_query_filtering(client):
+    """Test that calls can be filtered by thread_id."""
+    import weave
+
+    @weave.op
+    def query_test_op(value: str) -> str:
+        return f"processed_{value}"
+
+    # Create calls with different thread_ids
+    with weave.thread("filter_thread_1"):
+        query_test_op("value1")
+
+    with weave.thread("filter_thread_2"):
+        query_test_op("value2")
+
+    query_test_op("value3")  # No thread context
+
+    # Query calls by thread_id using the server interface
+    if hasattr(client.server, "calls_query"):
+        # Test filtering by thread_id
+        res1 = client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "thread_id"},
+                            {"$literal": "filter_thread_1"},
+                        ]
+                    }
+                },
+            )
+        )
+
+        # Should find the call with filter_thread_1
+        thread1_calls = [
+            call for call in res1.calls if call.thread_id == "filter_thread_1"
+        ]
+        assert len(thread1_calls) >= 1
+
+        # Query all calls and verify thread_id values
+        all_calls_res = client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+            )
+        )
+
+        # Find our test calls by op_name pattern
+        our_test_calls = [
+            call for call in all_calls_res.calls if "query_test_op" in call.op_name
+        ]
+
+        # Verify we have calls with both thread_ids and None
+        thread_ids_found = {call.thread_id for call in our_test_calls}
+        assert (
+            "filter_thread_1" in thread_ids_found
+        ), f"Should find filter_thread_1, got: {thread_ids_found}"
+        assert (
+            "filter_thread_2" in thread_ids_found
+        ), f"Should find filter_thread_2, got: {thread_ids_found}"
+        assert (
+            None in thread_ids_found
+        ), f"Should find None thread_id, got: {thread_ids_found}"
+
+
 def test_thread_context_error_handling(client):
     """Test that ThreadContext is properly managed even when exceptions occur."""
     import weave
@@ -4767,6 +4832,355 @@ def test_thread_context_error_handling(client):
         assert t.thread_id == recovery_thread_id  # ThreadContext consistent
 
     assert call_context.get_thread_id() is None
+
+
+def test_threads_query_endpoint(client):
+    """Test the threads_query endpoint (/threads/query) functionality."""
+    import datetime
+
+    import weave
+    from weave.trace_server import trace_server_interface as tsi
+
+    # Create some test operations
+    @weave.op
+    def thread_test_op(value: str) -> str:
+        return f"processed_{value}"
+
+    @weave.op
+    def multi_call_op(thread_name: str) -> list[str]:
+        results = []
+        for i in range(3):
+            results.append(thread_test_op(f"{thread_name}_call_{i}"))
+        return results
+
+    # Test that we start with no threads (if this is a fresh client)
+    initial_threads = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+        )
+    )
+    initial_count = len(initial_threads)
+
+    assert initial_count == 0, f"Expected 0 threads, got {initial_count}"
+
+    # Create calls with different thread_ids
+    thread_ids = ["analytics_thread", "processing_thread", "validation_thread"]
+
+    for i, thread_id in enumerate(thread_ids):
+        with weave.thread(thread_id):
+            # Create multiple calls per thread to test turn_count
+            multi_call_op(f"thread_{i}")
+            thread_test_op(f"single_call_{i}")
+
+    # Create some calls without thread_ids
+    thread_test_op("no_thread_1")
+    thread_test_op("no_thread_2")
+
+    # Test basic threads query
+    threads_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+        )
+    )
+
+    # Should have found our new threads
+    assert len(threads_res) >= 3  # At least our 3 threads
+
+    # Find our specific threads
+    our_threads = {
+        thread.thread_id: thread
+        for thread in threads_res
+        if thread.thread_id in thread_ids
+    }
+    assert len(our_threads) == 3, f"Expected 3 threads, got {len(our_threads)}"
+
+    # Test that each thread has the correct turn_count
+    # Each thread should have 2 distinct turns:
+    # 1) multi_call_op() turn (with 3 nested calls)
+    # 2) thread_test_op("single_call_i") turn
+    for thread_id, thread in our_threads.items():
+        assert thread.thread_id == thread_id
+        assert (
+            thread.turn_count >= 2
+        ), f"Thread {thread_id} should have at least 2 turns, got {thread.turn_count}"
+        assert thread.start_time is not None
+        assert thread.last_updated is not None
+        assert isinstance(thread.start_time, datetime.datetime)
+        assert isinstance(thread.last_updated, datetime.datetime)
+
+    # Test limit parameter
+    limited_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(project_id=get_client_project_id(client), limit=2)
+        )
+    )
+    assert len(limited_res) == 2
+
+    # Test offset parameter
+    offset_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client), limit=1, offset=1
+            )
+        )
+    )
+    assert len(offset_res) == 1
+
+    # Test sorting by thread_id
+    sorted_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="thread_id", direction="asc")],
+            )
+        )
+    )
+    thread_ids_sorted = [t.thread_id for t in sorted_res]
+    assert thread_ids_sorted == sorted(thread_ids_sorted)
+
+    # Test sorting by turn_count descending
+    count_sorted_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="turn_count", direction="desc")],
+            )
+        )
+    )
+    turn_counts = [t.turn_count for t in count_sorted_res]
+    assert turn_counts == sorted(turn_counts, reverse=True)
+
+    # Test sorting by last_updated descending (most recent first)
+    time_sorted_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="last_updated", direction="desc")],
+            )
+        )
+    )
+    last_updated_times = [t.last_updated for t in time_sorted_res]
+    # Verify times are in descending order
+    for i in range(len(last_updated_times) - 1):
+        assert last_updated_times[i] >= last_updated_times[i + 1]
+
+    # Test datetime filtering
+    # Get a timestamp from the middle of our test
+    middle_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+        seconds=5
+    )
+
+    after_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.ThreadsQueryFilter(after_datetime=middle_time),
+            )
+        )
+    )
+    # Should still include our recent threads
+    recent_thread_ids = {t.thread_id for t in after_filter_res}
+    assert any(tid in recent_thread_ids for tid in thread_ids)
+
+    # Test filtering for very recent data (should include our threads)
+    very_recent_time = datetime.datetime.now(
+        datetime.timezone.utc
+    ) + datetime.timedelta(minutes=1)
+    before_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.ThreadsQueryFilter(before_datetime=very_recent_time),
+            )
+        )
+    )
+    # Should include our threads since they're before this future time
+    assert len(before_filter_res) >= 3
+
+    # Test combination of parameters
+    combo_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                limit=5,
+                offset=0,
+                sort_by=[tsi.SortBy(field="turn_count", direction="desc")],
+                filter=tsi.ThreadsQueryFilter(after_datetime=middle_time),
+            )
+        )
+    )
+    assert len(combo_res) <= 5
+
+    # Verify that the ThreadSchema fields are properly populated
+    for thread in combo_res:
+        assert isinstance(thread.thread_id, str)
+        assert isinstance(thread.turn_count, int)
+        assert thread.turn_count > 0
+        assert isinstance(thread.start_time, datetime.datetime)
+        assert isinstance(thread.last_updated, datetime.datetime)
+        assert thread.start_time <= thread.last_updated
+
+
+def test_threads_query_aggregation_fields(client):
+    """Test the new aggregation fields in threads query: first_turn_id, last_turn_id, and duration percentiles."""
+    is_sqlite = client_is_sqlite(client)
+    if is_sqlite:
+        # SQLite does not support sorting over mixed types in a column, so we skip this test
+        return
+
+    import time
+
+    import weave
+    from weave.trace_server import trace_server_interface as tsi
+
+    @weave.op
+    def quick_op(value: str) -> str:
+        """Fast operation for testing timing."""
+        time.sleep(0.01)  # 10ms
+        return f"quick_{value}"
+
+    @weave.op
+    def medium_op(value: str) -> str:
+        """Medium speed operation for testing timing."""
+        time.sleep(0.05)  # 50ms
+        return f"medium_{value}"
+
+    @weave.op
+    def slow_op(value: str) -> str:
+        """Slow operation for testing timing."""
+        time.sleep(0.1)  # 100ms
+        return f"slow_{value}"
+
+    # Create a thread with multiple calls having different durations
+    # This will give us a good distribution for percentile testing
+    test_thread_id = "timing_test_thread"
+    call_results = []
+
+    with weave.thread(test_thread_id):
+        # Create calls with varying durations to test percentiles
+        # Order: quick, medium, slow, quick, medium to create a distribution
+        call_results.append(quick_op("1"))  # ~10ms - first chronologically
+        time.sleep(0.01)  # Small gap between calls to ensure different timestamps
+        call_results.append(medium_op("2"))  # ~50ms
+        time.sleep(0.01)
+        call_results.append(slow_op("3"))  # ~100ms
+        time.sleep(0.01)
+        call_results.append(quick_op("4"))  # ~10ms
+        time.sleep(0.01)
+        call_results.append(medium_op("5"))  # ~50ms - last chronologically
+
+    # Verify our operations executed correctly
+    assert call_results == ["quick_1", "medium_2", "slow_3", "quick_4", "medium_5"]
+
+    # Query threads to get the aggregation data
+    threads_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+        )
+    )
+
+    # Find our test thread
+    test_thread = None
+    for thread in threads_res:
+        if thread.thread_id == test_thread_id:
+            test_thread = thread
+            break
+
+    assert test_thread is not None, f"Could not find thread {test_thread_id}"
+
+    # Test basic aggregation fields exist
+    assert hasattr(test_thread, "first_turn_id")
+    assert hasattr(test_thread, "last_turn_id")
+    assert hasattr(test_thread, "p50_turn_duration_ms")
+    assert hasattr(test_thread, "p99_turn_duration_ms")
+
+    # Test that aggregation fields have valid values
+    assert test_thread.first_turn_id is not None
+    assert test_thread.last_turn_id is not None
+    assert isinstance(test_thread.first_turn_id, str)
+    assert isinstance(test_thread.last_turn_id, str)
+
+    # Duration percentiles should be numeric and reasonable
+    assert test_thread.p50_turn_duration_ms is not None
+    assert test_thread.p99_turn_duration_ms is not None
+    assert isinstance(test_thread.p50_turn_duration_ms, (int, float))
+    assert isinstance(test_thread.p99_turn_duration_ms, (int, float))
+
+    # Test duration percentile ranges (should be between our min and max expected durations)
+    # We expect roughly: quick_op ~10ms, medium_op ~50ms, slow_op ~100ms
+    assert 5 <= test_thread.p50_turn_duration_ms <= 200  # Reasonable range for P50
+    assert 5 <= test_thread.p99_turn_duration_ms <= 200  # Reasonable range for P99
+    assert (
+        test_thread.p50_turn_duration_ms <= test_thread.p99_turn_duration_ms
+    )  # P99 >= P50
+
+    # Verify first_turn_id and last_turn_id point to actual calls
+    all_calls = client.get_calls()
+
+    first_call = None
+    latest_call = None
+    thread_calls = []
+
+    for call in all_calls:
+        if call.thread_id == test_thread_id:
+            thread_calls.append(call)
+            if call.id == test_thread.first_turn_id:
+                first_call = call
+            if call.id == test_thread.last_turn_id:
+                latest_call = call
+
+    assert (
+        first_call is not None
+    ), f"Could not find first_turn_id {test_thread.first_turn_id}"
+    assert (
+        latest_call is not None
+    ), f"Could not find last_turn_id {test_thread.last_turn_id}"
+
+    # Test that first_turn_id has the earliest start_time
+    earliest_start = min(call.started_at for call in thread_calls)
+    assert first_call.started_at == earliest_start
+
+    # Test that last_turn_id has the latest end_time (last_updated)
+    latest_end = max(call.ended_at for call in thread_calls if call.ended_at)
+    assert latest_call.ended_at == latest_end
+
+    # Test that we have the expected number of turn calls (5 operations)
+    assert (
+        test_thread.turn_count == 5
+    ), f"Expected 5 turns, got {test_thread.turn_count}"
+
+    # Test sorting by the new duration percentile fields
+    # Test sorting by p50_turn_duration_ms
+    sorted_by_p50 = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="p50_turn_duration_ms", direction="desc")],
+            )
+        )
+    )
+    assert len(sorted_by_p50) >= 1
+
+    # Test sorting by p99_turn_duration_ms
+    sorted_by_p99 = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="p99_turn_duration_ms", direction="asc")],
+            )
+        )
+    )
+    assert len(sorted_by_p99) >= 1
+
+    # Verify our test thread appears in sorting results
+    def find_test_thread_in_results(results):
+        for thread in results:
+            if thread.thread_id == test_thread_id:
+                return thread
+        return None
+
+    assert find_test_thread_in_results(sorted_by_p50) is not None
+    assert find_test_thread_in_results(sorted_by_p99) is not None
 
 
 def test_turn_id_functionality(client):
@@ -5135,3 +5549,79 @@ def test_thread_api_with_auto_generation(client):
     # Verify disabled thread call
     assert disabled_call.thread_id is None
     assert disabled_call.turn_id is None
+
+
+def test_calls_query_filter_contains_in_message_array(client):
+    @weave.op
+    def op1(extra_message: Optional[str] = None):
+        messages = ["hello", "world"]
+        if extra_message:
+            messages.append(extra_message)
+        return {"messages": messages}
+
+    op1()
+    op1("extra")
+    op1("extra2")
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(project_id=get_client_project_id(client))
+        )
+    )
+    assert len(calls) == 3
+
+    # Test $contains with substring search in the JSON-serialized output
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "output.messages"},
+                            "substr": {"$literal": "hello"},
+                        }
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 3
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "output.messages"},
+                            "substr": {"$literal": "extra2"},
+                        }
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 1
+
+    # Test exact match with $eq
+    # TODO: this test breaks due to string optimization and how JSON is stored
+    # on disk with spaces after items in a list. When we remove pre-where string
+    # optimization, this test should be able to pass!
+    # calls = list(
+    #     client.server.calls_query_stream(
+    #         tsi.CallsQueryReq(
+    #             project_id=get_client_project_id(client),
+    #             query={
+    #                 "$expr": {
+    #                     "$eq": [
+    #                         {"$getField": "output.messages"},
+    #                         {"$literal": '["hello","world"]'},
+    #                     ]
+    #                 }
+    #             },
+    #         )
+    #     )
+    # )
+    # assert len(calls) == 1

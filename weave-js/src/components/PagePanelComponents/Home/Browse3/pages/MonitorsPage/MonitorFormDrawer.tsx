@@ -41,6 +41,7 @@ import {
   Thumb as SwitchThumb,
 } from '@wandb/weave/components/Switch';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {newMonitorCreated} from '@wandb/weave/integrations/analytics/monitorEvents';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
 import {useList} from 'react-use';
@@ -312,6 +313,10 @@ export const MonitorFormDrawer = ({
       });
 
       setIsCreating(false);
+
+      if (!monitor) {
+        newMonitorCreated({entity, project, monitorName});
+      }
 
       toast.success(
         `Monitor ${monitorName} ${monitor ? 'updated' : 'created'}`,
