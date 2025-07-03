@@ -64,7 +64,7 @@ def context_relevancy_scorer(mock_acompletion):
 async def test_context_entity_recall_scorer_score(context_entity_recall_scorer):
     output = "Paris is the capital of France."
     context = "The capital city of France is Paris."
-    result = await context_entity_recall_scorer.score(output, context)
+    result = await context_entity_recall_scorer.score(output=output, context=context)
     assert isinstance(result, dict)
     assert "recall" in result
     assert result["recall"] == 1.0  # Assuming full recall in mock response
@@ -74,7 +74,7 @@ async def test_context_entity_recall_scorer_score(context_entity_recall_scorer):
 async def test_context_relevancy_scorer_score(context_relevancy_scorer):
     output = "What is the capital of France?"
     context = "Paris is the capital city of France."
-    result = await context_relevancy_scorer.score(output, context)
+    result = await context_relevancy_scorer.score(output=output, context=context)
     assert isinstance(result, dict)
     assert "relevancy_score" in result
     assert result["relevancy_score"] == 1  # Assuming relevancy in mock response
