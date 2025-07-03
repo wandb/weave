@@ -2,6 +2,8 @@ import pytest
 
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
+from weave.trace_server.execution_runner.run_as_user import with_client_bound_to_project
+from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     ObjCreateReq,
@@ -13,7 +15,7 @@ from weave.trace_server.trace_server_interface import (
 
 
 @pytest.mark.asyncio
-async def test_run_model(ch_only_trace_server: TraceServerInterface):
+async def test_run_model(ch_only_trace_server: TraceServerInterface, client_creator):
     """
     Test the run_model API endpoint with isolated execution.
 
@@ -59,31 +61,43 @@ async def test_run_model(ch_only_trace_server: TraceServerInterface):
             _digest=model_digest,
         ).uri()
 
-    async def run_model(
+    async def run_model_harness(
         entity: str,
         project: str,
         model_ref_uri: str,
         user_input: str,
         expected_output: str,
+        # Running with local mode true directly calls the underlying user script
+        # allowing for easier debugging of the user script
+        run_mode_local: bool = False,
     ) -> RunModelRes:
         project_id = f"{entity}/{project}"
+        req = RunModelReq.model_validate(
+            {
+                "project_id": project_id,
+                "model_ref": model_ref_uri,
+                "inputs": {"user_input": user_input},
+            }
+        )
         with with_simple_mock_litellm_completion(expected_output):
-            model_run_res = await ch_only_trace_server.run_model(
-                RunModelReq.model_validate(
-                    {
-                        "project_id": project_id,
-                        "model_ref": model_ref_uri,
-                        "inputs": {"user_input": user_input},
-                    }
-                )
-            )
+            if run_mode_local:
+                with with_client_bound_to_project(entity, project, ch_only_trace_server):
+                    model_run_res = run_model(req)
+            else:
+                model_run_res = await ch_only_trace_server.run_model(req)
         return model_run_res
 
-    async def do_test(entity: str, project: str, expected_output: str, user_input: str):
+    async def do_test(
+        entity: str,
+        project: str,
+        expected_output: str,
+        user_input: str,
+        run_mode_local: bool = False,
+    ):
         project_id = f"{entity}/{project}"
         model_ref_uri = create_model(entity, project)
-        model_run_res = await run_model(
-            entity, project, model_ref_uri, user_input, expected_output
+        model_run_res = await run_model_harness(
+            entity, project, model_ref_uri, user_input, expected_output, run_mode_local
         )
 
         assert model_run_res.output == expected_output
@@ -129,19 +143,23 @@ async def test_run_model(ch_only_trace_server: TraceServerInterface):
             f"weave:///{project_id}/op/LLMStructuredCompletionModel.predict:"
         )
 
-    # First, do the test with the first project
-    await do_test(
-        entity=entity,
-        project="test_run_model_1",
-        expected_output="Fantastic - how are you?",
-        user_input="Hello, how are you?",
-    )
+    for run_mode_local in [False, True]:
+        local_suffix = "_local" if run_mode_local else ""
+        # First, do the test with the first project
+        await do_test(
+            entity=entity,
+            project="test_run_model_1" + local_suffix,
+            expected_output="Fantastic - how are you?",
+            user_input="Hello, how are you?",
+            run_mode_local=run_mode_local,
+        )
 
-    # Perform the test with a different project
-    # Internal assertions ensure that the calls and objects are isolated
-    await do_test(
-        entity=entity,
-        project="test_run_model_2",
-        expected_output="Hi friend",
-        user_input="Hey there!",
-    )
+        # Perform the test with a different project
+        # Internal assertions ensure that the calls and objects are isolated
+        await do_test(
+            entity=entity,
+            project="test_run_model_2" + local_suffix,
+            expected_output="Hi friend",
+            user_input="Hey there!",
+            run_mode_local=run_mode_local,
+        )

@@ -48,6 +48,29 @@ EXECUTION_TIMEOUT_SECONDS = 60
 
 
 @contextmanager
+def with_client(
+    client: WeaveClient,
+) -> Generator[WeaveClient, None, None]:
+    # Initialize the client context
+    ic = InitializedClient(client)
+
+    yield client
+
+    # Ensure all pending operations are flushed
+    client._flush()
+    # Reset the initialized client context
+    ic.reset()
+
+
+@contextmanager
+def with_client_bound_to_project(
+    entity: str, project: str, trace_server: tsi.TraceServerInterface
+) -> Generator[WeaveClient, None, None]:
+    with with_client(WeaveClient(entity, project, trace_server, False)):
+        yield
+
+
+@contextmanager
 def user_scoped_client(
     project_id: str, trace_server: tsi.TraceServerInterface
 ) -> Generator[WeaveClient, None, None]:
@@ -66,19 +89,10 @@ def user_scoped_client(
         WeaveClient: A properly initialized and scoped client
     """
     # Create client with server-side entity placeholder
-    client = WeaveClient(
-        SERVER_SIDE_ENTITY_PLACEHOLDER, project_id, trace_server, False
-    )
-
-    # Initialize the client context
-    ic = InitializedClient(client)
-
-    yield client
-
-    # Ensure all pending operations are flushed
-    client._flush()
-    # Reset the initialized client context
-    ic.reset()
+    with with_client_bound_to_project(
+        SERVER_SIDE_ENTITY_PLACEHOLDER, project_id, trace_server
+    ):
+        yield
 
 
 # Generic type variables for request/response typing
