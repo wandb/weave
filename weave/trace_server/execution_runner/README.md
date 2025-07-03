@@ -9,6 +9,14 @@ The execution runner is designed to safely execute user-provided code (like ML m
 - Unauthorized access to other users' or projects' data
 - Resource exhaustion affecting other users
 
+### Key Features
+
+- **Process Isolation**: Each execution runs in a separate OS process
+- **User Context Preservation**: All operations maintain proper user authentication
+- **Reference Safety**: Prevents cross-project reference contamination
+
+> **Note**: The `run_model` API is currently only available as an internal server API and is not yet exposed via HTTP endpoints.
+
 ### Why Process Isolation?
 
 The WeaveClient mutates local objects with refs during execution, which is not thread-safe or memory-safe when multiple differently authenticated clients operate in the same process space. Specifically:
@@ -232,7 +240,29 @@ execution_runner/
 
 ## Usage
 
-The execution runner is typically used internally by the trace server:
+### Server API Usage
+
+The `run_model` API can be called directly on the trace server:
+
+```python
+# Direct server API call (not yet exposed via HTTP)
+await trace_server.run_model(
+    RunModelReq.model_validate(
+        {
+            "project_id": project_id,
+            "model_ref": model_ref_uri,  # Reference to LLMStructuredCompletionModel
+            "inputs": {
+                "input_type": "value",
+                "value": {"user_input": user_input},
+            },
+        }
+    )
+)
+```
+
+### Internal Implementation
+
+The execution runner is used internally by the trace server:
 
 ```python
 # In ClickHouse Trace Server
@@ -247,6 +277,10 @@ async def run_model(self, req: RunModelReq) -> RunModelRes:
 
 ## Future Improvements
 
+- **Expanded Model Support**: Currently limited to `LLMStructuredCompletionModel`, will expand to other model types
+- **Scorer Execution**: Will support running scoring functions in isolated processes
+- **Eval Execution**: Will enable backend workers to execute evaluations safely
+- **HTTP API**: Expose `run_model` and related APIs via HTTP endpoints
 - **Streaming Support**: Currently, streaming operations fall back to batch mode
 - **Async Support**: Model execution is synchronous due to current interface limitations
 - **Resource Limits**: Add CPU/memory limits per child process
