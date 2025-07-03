@@ -440,19 +440,3 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return await self._async_ref_apply(self._internal_trace_server.run_model, req)
-
-    async def run_scorer(self, req: tsi.RunScorerReq) -> tsi.RunScorerRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        if req.wb_user_id is not None:
-            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return await self._async_ref_apply(self._internal_trace_server.run_scorer, req)
-
-    async def queue_evaluation(
-        self, req: tsi.QueueEvaluationReq
-    ) -> tsi.QueueEvaluationRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        if req.wb_user_id is not None:
-            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return await self._async_ref_apply(
-            self._internal_trace_server.queue_evaluation, req
-        )

@@ -124,17 +124,9 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.obj.wb_user_id = self._user_id
         return super().obj_create(req)
 
-    def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
+    async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
         req.wb_user_id = self._user_id
-        return super().run_model(req)
-
-    def run_scorer(self, req: tsi.RunScorerReq) -> tsi.RunScorerRes:
-        req.wb_user_id = self._user_id
-        return super().run_scorer(req)
-
-    def queue_evaluation(self, req: tsi.QueueEvaluationReq) -> tsi.QueueEvaluationRes:
-        req.wb_user_id = self._user_id
-        return super().queue_evaluation(req)
+        return await super().run_model(req)
 
 
 def externalize_trace_server(

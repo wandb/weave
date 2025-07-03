@@ -378,16 +378,6 @@ class CrossProcessTraceServer(TraceServerInterface):
         # For now, we'll run synchronously
         return self._send_request("run_model", req)
 
-    async def run_scorer(self, req: RunScorerReq) -> RunScorerRes:
-        # Note: Async methods require special handling
-        # For now, we'll run synchronously
-        return self._send_request("run_scorer", req)
-
-    async def queue_evaluation(self, req: QueueEvaluationReq) -> QueueEvaluationRes:
-        # Note: Async methods require special handling
-        # For now, we'll run synchronously
-        return self._send_request("queue_evaluation", req)
-
 
 def generate_child_process_trace_server_args(
     trace_server: TraceServerInterface,

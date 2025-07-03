@@ -1434,18 +1434,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             "run_model is not implemented for SQLite trace server"
         )
 
-    async def run_scorer(self, req: tsi.RunScorerReq) -> tsi.RunScorerRes:
-        raise NotImplementedError(
-            "run_model is not implemented for SQLite trace server"
-        )
-
-    async def queue_evaluation(
-        self, req: tsi.QueueEvaluationReq
-    ) -> tsi.QueueEvaluationRes:
-        raise NotImplementedError(
-            "run_evaluation is not implemented for SQLite trace server"
-        )
-
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
             raise TypeError(

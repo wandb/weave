@@ -1108,17 +1108,6 @@ class ThreadsQueryReq(BaseModel):
     )
 
 
-class QueueEvaluationReq(BaseModel):
-    project_id: str
-    evaluation_ref: str
-    model_refs: list[str]
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-
-
-class QueueEvaluationRes(BaseModel):
-    call_ids: list[str]
-
-
 class InputsAsValue(BaseModel):
     input_type: Literal["value"]
     value: dict[str, Any]
@@ -1140,32 +1129,6 @@ class RunModelReq(BaseModel):
 
 
 class RunModelRes(BaseModel):
-    call_id: str
-    output: Any
-
-
-class OutputAsValue(BaseModel):
-    output_type: Literal["value"]
-    value: Any
-
-
-class OutputAsCallId(BaseModel):
-    output_type: Literal["call_id"]
-    call_id: str
-
-
-OutputAsValueOrRef = Union[OutputAsValue, OutputAsCallId]
-
-
-class RunScorerReq(BaseModel):
-    project_id: str
-    scorer_ref: str
-    model_output: OutputAsValueOrRef
-    additional_inputs: InputsAsValueOrRef
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-
-
-class RunScorerRes(BaseModel):
     call_id: str
     output: Any
 
@@ -1252,7 +1215,5 @@ class TraceServerInterface(Protocol):
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...
 
-    # Evaluation Execution API
+    # Evaluation Lifecycle Execution API
     async def run_model(self, req: RunModelReq) -> RunModelRes: ...
-    async def run_scorer(self, req: RunScorerReq) -> RunScorerRes: ...
-    async def queue_evaluation(self, req: QueueEvaluationReq) -> QueueEvaluationRes: ...
