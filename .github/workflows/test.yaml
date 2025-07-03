@@ -10,6 +10,10 @@ name: test
 
 on:
   push:
+    branches:
+      - [master]
+  pull_request:
+    types: [opened, edited, synchronize]
 
 jobs:
   check-which-tests-to-run:
@@ -25,6 +29,8 @@ jobs:
     env:
       REGISTRY: us-east4-docker.pkg.dev/weave-support-367421/weave-images
     needs: check-which-tests-to-run
+    # skip on forks
+    if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
 
     # if: github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_query_tests
     steps:
