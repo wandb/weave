@@ -22,7 +22,7 @@ from __future__ import annotations
 import multiprocessing
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from typing import Any, Generic, TypedDict, TypeVar
+from typing import Any, Generic, Literal, TypedDict, TypeVar
 
 from pydantic import BaseModel
 
@@ -83,6 +83,23 @@ TRes = TypeVar("TRes", bound=BaseModel)  # Response types must be Pydantic model
 
 
 class RunAsUserContext(TypedDict, Generic[T]):
+    trace_server: tsi.TraceServerInterface
+    project_id: str
+
+
+def _generic_wrapper(
+    wrapper_context: RunAsUserContext[dict],
+    func: Callable[[TReq], TRes],
+    req: Any,
+) -> TRes:
+    # Execute the function within a user-scoped client context
+    with user_scoped_client(
+        wrapper_context["project_id"], wrapper_context["trace_server"]
+    ):
+        return func(req)
+
+
+class RunAsUserChildProcessContext(TypedDict, Generic[T]):
     """
     Context data passed to the child process for execution.
 
@@ -97,10 +114,10 @@ class RunAsUserContext(TypedDict, Generic[T]):
     result_queue: multiprocessing.Queue[T]
 
 
-def _generic_wrapper(
-    wrapper_context: RunAsUserContext[dict],
-    func: Callable[[Any], Any],
-    req: Any,
+def _generic_child_process_wrapper(
+    wrapper_context: RunAsUserChildProcessContext[dict],
+    func: Callable[[TReq], TRes],
+    req: TReq,
 ) -> None:
     """
     Generic wrapper that executes any function in the child process with user-scoped client.
@@ -126,11 +143,17 @@ def _generic_wrapper(
         wrapper_context["trace_server_args"]
     )
 
-    # Execute the function within a user-scoped client context
-    with user_scoped_client(wrapper_context["project_id"], safe_trace_server):
-        res = func(req)
-        # Convert the Pydantic response to a dict and send back
-        wrapper_context["result_queue"].put(res.model_dump())
+    res = _generic_wrapper(
+        {
+            "trace_server": safe_trace_server,
+            "project_id": wrapper_context["project_id"],
+        },
+        func,
+        req,
+    )
+
+    # Convert the Pydantic response to a dict and send back
+    wrapper_context["result_queue"].put(res.model_dump())
 
 
 class RunAsUserException(Exception):
@@ -142,6 +165,9 @@ class RunAsUserException(Exception):
     """
 
     pass
+
+
+RunnerMode = Literal["child_process", "_dev_only_dangerous_in_process"]
 
 
 class RunAsUser:
@@ -168,6 +194,9 @@ class RunAsUser:
         project_id: str,
         wb_user_id: str | None,
         response_type: type[TRes],
+        runner_mode: Literal[
+            "child_process", "_dev_only_dangerous_in_process"
+        ] = "child_process",
     ) -> TRes:
         """
         Generic method to run any function in an isolated process with user-scoped client.
@@ -202,42 +231,54 @@ class RunAsUser:
             internal_trace_server, project_id, wb_user_id
         )
 
-        # Generate args in parent process (starts worker thread here)
-        trace_server_args = generate_child_process_trace_server_args(
-            wrapped_trace_server
-        )
-
         # Convert any internal references to external format for security
         externalize_refs = make_externalize_ref_converter(project_id)
         externalized_req = externalize_refs(req)
+        if runner_mode == "child_process":
+            # Create queue for receiving results from child process
+            result_queue: multiprocessing.Queue[dict] = multiprocessing.Queue()
 
-        # Create queue for receiving results from child process
-        result_queue: multiprocessing.Queue[dict] = multiprocessing.Queue()
-
-        # Spawn child process with isolated memory space
-        process = multiprocessing.Process(
-            target=_generic_wrapper,
-            kwargs={
-                "wrapper_context": {
-                    "trace_server_args": trace_server_args,
-                    "project_id": project_id,
-                    "result_queue": result_queue,
+            # Spawn child process with isolated memory space
+            process = multiprocessing.Process(
+                target=_generic_child_process_wrapper,
+                kwargs={
+                    "wrapper_context": {
+                        "trace_server_args": generate_child_process_trace_server_args(
+                            wrapped_trace_server
+                        ),
+                        "project_id": project_id,
+                        "result_queue": result_queue,
+                    },
+                    "func": func,
+                    "req": externalized_req,
                 },
-                "func": func,
-                "req": externalized_req,
-            },
-        )
+            )
 
-        # Start the child process and wait for completion
-        process.start()
-        process.join()
+            # Start the child process and wait for completion
+            process.start()
+            process.join()
 
-        # Check if the process completed successfully
-        if process.exitcode != 0:
-            raise RunAsUserException(f"Process execution failed: {process.exitcode}")
+            # Check if the process completed successfully
+            if process.exitcode != 0:
+                raise RunAsUserException(
+                    f"Process execution failed: {process.exitcode}"
+                )
 
-        # Get the result and validate it matches the expected type
-        return response_type.model_validate(result_queue.get())
+            # Get the result and validate it matches the expected type
+            res = response_type.model_validate(result_queue.get())
+        elif runner_mode == "_dev_only_dangerous_in_process":
+            res = _generic_wrapper(
+                {
+                    "trace_server": wrapped_trace_server,
+                    "project_id": project_id,
+                },
+                func,
+                externalized_req,
+            )
+        else:
+            raise ValueError(f"Invalid runner mode: {runner_mode}")
+
+        return res
 
     async def run_model(
         self, internal_trace_server: tsi.TraceServerInterface, req: tsi.RunModelReq
