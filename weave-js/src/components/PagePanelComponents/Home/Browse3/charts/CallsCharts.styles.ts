@@ -1,4 +1,4 @@
-import {MOON_50} from '@wandb/weave/common/css/color.styles';
+import {MOON_50, MOON_100} from '@wandb/weave/common/css/color.styles';
 
 export const callsChartsStyles = {
   container: {
@@ -7,6 +7,7 @@ export const callsChartsStyles = {
     height: '100%',
     width: '100%',
     position: 'relative' as const,
+    backgroundColor: MOON_100,
   },
 
   header: {
