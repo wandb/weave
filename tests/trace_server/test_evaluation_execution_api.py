@@ -81,8 +81,10 @@ async def test_run_model(ch_only_trace_server: TraceServerInterface, client_crea
         )
         with with_simple_mock_litellm_completion(expected_output):
             if run_mode_local:
-                with with_client_bound_to_project(entity, project, ch_only_trace_server):
-                    model_run_res = run_model(req)
+                with with_client_bound_to_project(
+                    entity, project, ch_only_trace_server
+                ):
+                    model_run_res = await run_model(req)
             else:
                 model_run_res = await ch_only_trace_server.run_model(req)
         return model_run_res
