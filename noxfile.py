@@ -73,6 +73,7 @@ def lint(session):
         "huggingface",
         "smolagents",
         "mcp",
+        "verdict",
     ],
 )
 def tests(session, shard):
