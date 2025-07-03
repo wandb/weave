@@ -428,7 +428,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                 }));
               }}
               options={plotTypeOptions}
-              size="small"
+              size="medium"
             />
 
             <SectionHeader>Y-Axis</SectionHeader>
@@ -441,7 +441,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                 }))
               }
               options={yAxisGroupedOptions}
-              size="small"
+              size="medium"
               groupDivider={true}
             />
 
@@ -460,7 +460,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                     }))
                   }
                   options={xAxisGroupedOptions}
-                  size="small"
+                  size="medium"
                   groupDivider={true}
                 />
               </>
@@ -482,7 +482,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                     }))
                   }
                   options={xAxisGroupedOptions}
-                  size="small"
+                  size="medium"
                   groupDivider={true}
                   isDisabled={true}
                 />
@@ -519,7 +519,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                     }));
                   }}
                   options={colorGroupGroupedOptions}
-                  size="small"
+                  size="medium"
                   placeholder="No grouping"
                   groupDivider={true}
                   isClearable={true}
@@ -562,7 +562,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                     }))
                   }
                   options={aggregationOptions}
-                  size="small"
+                  size="medium"
                 />
               </>
             )}
