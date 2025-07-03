@@ -249,6 +249,13 @@ class Completions:
             json=data,
             stream=request_stream,
         )
+
+        if response.status_code == 401:
+            raise requests.HTTPError(
+                f"{response.reason} - please make sure inference is enabled for entity {self._client.entity}",
+                response=response,
+            )
+
         response.raise_for_status()  # Raise exception on HTTP error
 
         if request_stream:

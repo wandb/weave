@@ -12,8 +12,9 @@ class Model(BaseModel):
     id: str
     """The model identifier, which can be referenced in the API endpoints."""
 
-    # W&B NOTE: We have an inconsistency with OpenAI, it is under investigation.
-    created: int | str
+    # W&B NOTE: We have an inconsistency with OpenAI.
+    # It should be a required int, but Inference no longer returns it.
+    created: int | None = None
     """The Unix timestamp (in seconds) when the model was created."""
 
     object: Literal["model"]

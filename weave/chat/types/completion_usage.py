@@ -4,7 +4,7 @@ from typing import Optional
 
 from weave.chat.types._models import BaseModel
 
-__all__ = ["CompletionUsage", "CompletionTokensDetails", "PromptTokensDetails"]
+__all__ = ["CompletionTokensDetails", "CompletionUsage", "PromptTokensDetails"]
 
 
 class CompletionTokensDetails(BaseModel):

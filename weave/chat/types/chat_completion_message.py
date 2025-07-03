@@ -5,9 +5,9 @@ from typing import Literal, Optional
 from weave.chat.types._models import BaseModel
 
 __all__ = [
-    "ChatCompletionMessage",
     "Annotation",
     "AnnotationURLCitation",
+    "ChatCompletionMessage",
     "FunctionCall",
 ]
 

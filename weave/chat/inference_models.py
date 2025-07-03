@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 import requests
+from pydantic import ValidationError
 
 from weave.chat.types.models import (
     ModelsResponse,
@@ -36,12 +37,21 @@ class InferenceModels:
         }
         url = f"https://{INFERENCE_HOST}/v1/models"
         response = requests.post(url, headers=headers)
-        d = response.json()
+        if response.status_code == 401:
+            raise requests.HTTPError(
+                f"{response.reason} - please make sure inference is enabled for entity {self._client.entity}",
+                response=response,
+            )
 
+        d = response.json()
         if response.status_code != 200:
             return ModelsResponseError.model_validate(d)
 
-        validated = ModelsResponseSuccess.model_validate(d)
+        try:
+            validated = ModelsResponseSuccess.model_validate(d)
+        except ValidationError as e:
+            print(d)
+            raise e
 
         # Our API returns models in a non-deterministic order.
         # The order returned by OpenAI's API is unclear, but appears to be
