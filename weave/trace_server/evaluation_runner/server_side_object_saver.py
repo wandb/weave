@@ -11,6 +11,10 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 from weave.trace_server import external_to_internal_trace_server_adapter
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.cross_process_trace_server import (
+    build_child_process_trace_server,
+    generate_child_process_trace_server_args,
+)
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
@@ -20,7 +24,6 @@ from weave.trace_server.refs_internal import (
 )
 from weave.trace_server.secret_fetcher_context import (
     SecretFetcher,
-    _secret_fetcher_context,
     secret_fetcher_context,
 )
 
@@ -55,11 +58,14 @@ def convert_internal_uri_to_external_ref(client: WeaveClient, ref: str) -> Objec
         internal_ref.name, internal_ref.version, tuple(internal_ref.extra)
     )
 
+
 SHARED_CHILD_PROCESS_CTX_MANAGERS: list[Callable[[], None]] = []
+
 
 def register_child_process_ctx_manager(cb: Callable[[], None]):
     def unregister():
         SHARED_CHILD_PROCESS_CTX_MANAGERS.remove(cb)
+
     SHARED_CHILD_PROCESS_CTX_MANAGERS.append(cb)
     return unregister
 
@@ -76,11 +82,11 @@ def _process_wrapper(
     **kwargs,
 ) -> None:
     """Module-level wrapper function that can be pickled for multiprocessing.
-    
+
     This function wraps the actual function to be executed in a subprocess,
     setting up the necessary context (secret fetcher, user-scoped client, etc.)
     before executing the function and returning the result via a queue.
-    
+
     Args:
         fn: The function to execute in the subprocess.
         *args: Positional arguments to pass to fn.
@@ -94,7 +100,9 @@ def _process_wrapper(
     with secret_fetcher_context(secret_fetcher):
         with user_scoped_client(project_id, wb_user_id, ch_server_dump) as client:
             enter_cbs = []
-            for cb in SHARED_CHILD_PROCESS_CTX_MANAGERS + (child_process_ctx_managers or []):
+            for cb in SHARED_CHILD_PROCESS_CTX_MANAGERS + (
+                child_process_ctx_managers or []
+            ):
                 ctx = cb()
                 ctx.enter()
                 enter_cbs.append(ctx)
@@ -103,24 +111,25 @@ def _process_wrapper(
                 cb.exit()
             result_queue.put(res.model_dump())
 
-def externalize_trace_server(trace_server: tsi.TraceServerInterface, project_id: str, wb_user_id: str) -> tsi.TraceServerInterface:
+
+def externalize_trace_server(
+    trace_server: tsi.TraceServerInterface, project_id: str, wb_user_id: str
+) -> tsi.TraceServerInterface:
     return UserInjectingExternalTraceServer(
         trace_server,
         id_converter=IdConverter(project_id, wb_user_id),
         user_id=wb_user_id,
     )
 
+
 @contextmanager
 def user_scoped_client(
     project_id: str, trace_server: tsi.TraceServerInterface
 ) -> Generator[WeaveClient, None, None]:
-    from weave.trace_server.clickhouse_trace_server_batched import (
-        ClickHouseTraceServer,
-    )
-
     client = WeaveClient(
         SERVER_SIDE_ENTITY_PLACEHOLDER,
-        project_id,trace_server,
+        project_id,
+        trace_server,
         False,
     )
 
@@ -132,9 +141,13 @@ def user_scoped_client(
     ic.reset()
 
 
-def run_model_wrapped(trace_server_args, project_id, req: tsi.RunModelReq, result_queue: multiprocessing.Queue) -> tsi.RunModelRes:
+def run_model_wrapped(
+    trace_server_args,
+    project_id,
+    req: tsi.RunModelReq,
+    result_queue: multiprocessing.Queue,
+) -> tsi.RunModelRes:
     safe_trace_server = build_child_process_trace_server(trace_server_args)
-    ):
     with user_scoped_client(project_id, safe_trace_server) as client:
         res = _run_model(req, client)
         result_queue.put(res.model_dump())
@@ -177,27 +190,35 @@ class RunAsUser:
     ensuring complete memory isolation from the parent process.
     """
 
-    async def run_model(self, internal_trace_server: tsi.TraceServerInterface, req: tsi.RunModelReq) -> tsi.RunModelRes:
+    async def run_model(
+        self, internal_trace_server: tsi.TraceServerInterface, req: tsi.RunModelReq
+    ) -> tsi.RunModelRes:
         project_id = req.project_id
         wb_user_id = req.wb_user_id
-        wrapped_trace_server = externalize_trace_server(internal_trace_server, project_id, wb_user_id)
-        child_trace_server_args = build_child_process_trace_server_args(wrapped_trace_server)
+        wrapped_trace_server = externalize_trace_server(
+            internal_trace_server, project_id, wb_user_id
+        )
+        child_trace_server_args = generate_child_process_trace_server_args(
+            wrapped_trace_server
+        )
         result_queue = multiprocessing.Queue()
-        process = multiprocessing.Process(target=run_model_wrapped, kwargs={
-            "trace_server_args": child_trace_server_args,
-            "project_id": project_id,
-            "wb_user_id": wb_user_id,
-            "req": req,
-            "result_queue": result_queue,
-        })
+        process = multiprocessing.Process(
+            target=run_model_wrapped,
+            kwargs={
+                "trace_server_args": child_trace_server_args,
+                "project_id": project_id,
+                "wb_user_id": wb_user_id,
+                "req": req,
+                "result_queue": result_queue,
+            },
+        )
         process.start()
         process.join()
         if process.exitcode != 0:
-            raise RunEvaluationException(f"Process execution failed: {process.exitcode}")
+            raise RunEvaluationException(
+                f"Process execution failed: {process.exitcode}"
+            )
         return tsi.RunModelRes.model_validate(result_queue.get())
-
-
-
 
     # def run_in_child_process(
     #     self, fn: Callable, project_id: str, wb_user_id: str, **kwargs
@@ -446,7 +467,3 @@ class UserInjectingExternalTraceServer(
     #         raise ValueError("User ID is required")
     #     req.wb_user_id = self._user_id
     #     return super().score_call(req)
-
-
-
-
