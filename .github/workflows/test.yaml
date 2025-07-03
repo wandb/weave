@@ -260,7 +260,10 @@ jobs:
             #
           ]
         nox-shard: [
-            "trace",
+            "trace1",
+            "trace2",
+            "trace3",
+            "trace4",
             "flow",
             "trace_server",
             "trace_server_bindings",
