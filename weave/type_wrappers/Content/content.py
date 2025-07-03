@@ -230,7 +230,7 @@ class Content(Generic[T]):
 
     @property
     def encoding(self) -> str:
-        return self.content_handler.encoding or "utf-8"
+        return self.content_handler.encoding
 
     @property
     def path(self) -> str | None:
