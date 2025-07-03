@@ -40,7 +40,7 @@ from weave.trace.refs import parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import (
+from weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched import (
     ENTITY_TOO_LARGE_PAYLOAD,
 )
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
@@ -322,7 +322,9 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
     @weave.op
     def multiplier(
         a: Number, b
-    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> (
+        int
+    ):  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op
@@ -2402,7 +2404,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are returned if we include the summary field
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=get_client_project_id(client),
             columns=["id", "summary"],
             include_costs=True,
         )
@@ -2422,7 +2424,7 @@ def test_call_query_stream_columns_with_costs(client):
 
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=get_client_project_id(client),
             columns=["id", "summary"],
             include_costs=True,
         )
@@ -2441,7 +2443,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are returned if we include the summary_dump field
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=get_client_project_id(client),
             columns=["id", "summary_dump"],
             include_costs=True,
         )
@@ -2454,7 +2456,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are returned if we don't include the summary field
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=get_client_project_id(client),
             columns=["id"],
             include_costs=True,
         )
@@ -2468,7 +2470,7 @@ def test_call_query_stream_columns_with_costs(client):
     # Test that costs are not returned if we include the summary field, but don't include costs
     calls = client.server.calls_query_stream(
         tsi.CallsQueryReq(
-            project_id=client._project_id(),
+            project_id=get_client_project_id(client),
             columns=["id", "summary"],
         )
     )
@@ -2545,8 +2547,8 @@ def test_read_call_start_with_cost(client):
         pass
     elif isinstance(summary, dict):
         # Check that the costs object was NOT added
-        assert (
-            COST_OBJECT_NAME not in summary.get("weave", {})
+        assert COST_OBJECT_NAME not in summary.get(
+            "weave", {}
         ), f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
     else:
         pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
@@ -3331,7 +3333,9 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         # no need to strip in sqlite
         return
 
-    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    original_insert_call_batch = (
+        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    )
 
     # Patch _insert_call_batch to raise InsertTooLarge
     def mock_insert_call_batch(self, batch):

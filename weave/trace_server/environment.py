@@ -4,6 +4,22 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+
+def _load_int_env_var(name: str, raise_on_error: bool = False) -> Optional[int]:
+    """Load an integer environment variable."""
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError as e:
+        if raise_on_error:
+            raise ValueError(
+                f"Invalid value for {name}: {value}. Error: {str(e)}"
+            ) from e
+        return None
+
+
 # Kafka Settings
 
 
@@ -65,30 +81,22 @@ def wf_clickhouse_database() -> str:
 
 def wf_clickhouse_max_memory_usage() -> Optional[int]:
     """The maximum memory usage for the clickhouse server."""
-    mem = os.environ.get("WF_CLICKHOUSE_MAX_MEMORY_USAGE")
-    if mem is None:
-        return None
-    try:
-        return int(mem)
-    except ValueError as e:
-        logger.exception(
-            f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not a valid. Error: {str(e)}"
-        )
-        return None
+    return _load_int_env_var("WF_CLICKHOUSE_MAX_MEMORY_USAGE")
 
 
 def wf_clickhouse_max_execution_time() -> Optional[int]:
     """The maximum execution time for the clickhouse server."""
-    time = os.environ.get("WF_CLICKHOUSE_MAX_EXECUTION_TIME")
-    if time is None:
-        return None
-    try:
-        return int(time)
-    except ValueError as e:
-        logger.exception(
-            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not a valid. Error: {str(e)}"
-        )
-        return None
+    return _load_int_env_var("WF_CLICKHOUSE_MAX_EXECUTION_TIME")
+
+
+def wf_clickhouse_min_os_cpu_wait_time_ratio_to_throw() -> Optional[int]:
+    """The minimum OS CPU wait time ratio to throw."""
+    return _load_int_env_var("WF_CLICKHOUSE_MIN_OS_CPU_WAIT_TIME_RATIO_TO_THROW")
+
+
+def wf_clickhouse_max_os_cpu_wait_time_ratio_to_throw() -> Optional[int]:
+    """The maximum OS CPU wait time ratio to throw."""
+    return _load_int_env_var("WF_CLICKHOUSE_MAX_OS_CPU_WAIT_TIME_RATIO_TO_THROW")
 
 
 # BYOB Settings
