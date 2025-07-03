@@ -29,6 +29,7 @@ __all__ = [
     "ContextRelevancyScorer",
     "EmbeddingSimilarityScorer",
     "HallucinationFreeScorer",
+    "LevenshteinScorer",
     "LLMAsAJudgeScorer",
     "LLMScorer",
     "LevenshteinScorer",
