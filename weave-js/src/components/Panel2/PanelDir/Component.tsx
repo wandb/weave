@@ -153,12 +153,13 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
   const newPath = path?.concat([fileName]) ?? [fileName];
   const iconName = iconFromFileName(fileName);
   // const iconName = fileInfo.iconName;
-  const isDownloadable = config ? config?.isDownloadable : true;
+  const hasDownloadAccess = config ? config?.isDownloadable : true;
+  const isExternalRef = file.ref != null;
 
   return (
     <Table.Row
       style={
-        !isDownloadable
+        !hasDownloadAccess
           ? {
               pointerEvents: 'none',
             }
@@ -169,7 +170,7 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
           if (file.ref.startsWith('http://')) {
             window.open(file.ref);
           }
-        } else if (isDownloadable) {
+        } else if (hasDownloadAccess) {
           setFilePath(newPath);
         }
       }}>
@@ -185,7 +186,7 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
           )}
           <span
             className="file-browser-file-name"
-            style={!isDownloadable ? {color: 'inherit'} : undefined}>
+            style={!hasDownloadAccess ? {color: 'inherit'} : undefined}>
             {fileName.split('/').pop()}
           </span>
         </div>
@@ -195,8 +196,8 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
         {numeral(file.size).format('0.0b')}
       </Table.Cell>
       <Table.Cell className="file-download-cell">
-        {isDownloadable &&
-          (file.ref ? (
+        {hasDownloadAccess &&
+          (isExternalRef ? (
             <Tooltip
               content={
                 <>
@@ -206,7 +207,7 @@ const SubfileRow: React.FC<SubfileRowProps> = props => {
                   be downloaded via the UI.
                 </>
               }
-              trigger={<Tag label="Referenced" color={'moon'} />}
+              trigger={<Tag label="Referenced" color="moon" />}
             />
           ) : (
             <a
