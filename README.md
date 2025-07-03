@@ -1,4 +1,4 @@
-# **Weave by Weights & Biases**
+# **Weave by ME!**
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](http://wandb.me/weave_colab)
 [![Stable Version](https://img.shields.io/pypi/v/weave?color=green)](https://pypi.org/project/weave)
