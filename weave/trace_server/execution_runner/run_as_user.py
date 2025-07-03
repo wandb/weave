@@ -22,7 +22,8 @@ from __future__ import annotations
 import multiprocessing
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from typing import Any, Generic, Literal, TypedDict, TypeVar
+from dataclasses import dataclass
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel
 
@@ -84,24 +85,8 @@ TReq = TypeVar("TReq", bound=BaseModel)  # Request types must be Pydantic models
 TRes = TypeVar("TRes", bound=BaseModel)  # Response types must be Pydantic models
 
 
-class RunAsUserContext(TypedDict, Generic[T]):
-    trace_server: tsi.TraceServerInterface
-    project_id: str
-
-
-def _generic_wrapper(
-    wrapper_context: RunAsUserContext[dict],
-    func: Callable[[TReq], TRes],
-    req: Any,
-) -> TRes:
-    # Execute the function within a user-scoped client context
-    with user_scoped_client(
-        wrapper_context["project_id"], wrapper_context["trace_server"]
-    ):
-        return func(req)
-
-
-class RunAsUserChildProcessContext(TypedDict, Generic[T]):
+@dataclass
+class RunAsUserChildProcessContext(Generic[T]):
     """
     Context data passed to the child process for execution.
 
@@ -142,20 +127,15 @@ def _generic_child_process_wrapper(
     """
     # Build the trace server client in the child process
     safe_trace_server = build_child_process_trace_server(
-        wrapper_context["trace_server_args"]
+        wrapper_context.trace_server_args
     )
 
-    res = _generic_wrapper(
-        {
-            "trace_server": safe_trace_server,
-            "project_id": wrapper_context["project_id"],
-        },
-        func,
-        req,
-    )
+    # Execute the function within a user-scoped client context
+    with user_scoped_client(wrapper_context.project_id, safe_trace_server):
+        res = func(req)
 
-    # Convert the Pydantic response to a dict and send back
-    wrapper_context["result_queue"].put(res.model_dump())
+        # Convert the Pydantic response to a dict and send back
+        wrapper_context.result_queue.put(res.model_dump())
 
 
 class RunAsUserException(Exception):
@@ -270,13 +250,13 @@ class RunAsUser:
         process = multiprocessing.Process(
             target=_generic_child_process_wrapper,
             kwargs={
-                "wrapper_context": {
-                    "trace_server_args": generate_child_process_trace_server_args(
+                "wrapper_context": RunAsUserChildProcessContext(
+                    trace_server_args=generate_child_process_trace_server_args(
                         wrapped_trace_server
                     ),
-                    "project_id": project_id,
-                    "result_queue": result_queue,
-                },
+                    project_id=project_id,
+                    result_queue=result_queue,
+                ),
                 "func": func,
                 "req": externalized_req,
             },
