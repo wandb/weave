@@ -2088,9 +2088,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     async def queue_evaluation(
         self, req: tsi.QueueEvaluationReq
     ) -> tsi.QueueEvaluationRes:
-        runner = RunAsUser(ch_server_dump=self.model_dump())
-        eval_call_ids = runner.run_evaluation_evaluate(req)
-        return tsi.QueueEvaluationRes(eval_call_ids=eval_call_ids)
+        raise NotImplementedError(
+            "queue_evaluation is not implemented for ClickHouse trace server"
+        )
 
     # Private Methods
     @property
