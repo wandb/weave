@@ -1,83 +1,283 @@
 # LlamaIndex
 
-Weave is designed to simplify the tracking and logging of all calls made through the [LlamaIndex Python library](https://github.com/run-llama/llama_index).
+Weave provides seamless integration with [LlamaIndex](https://docs.llamaindex.ai/en/stable/), a powerful framework for building LLM-powered applications such as retrieval-augmented generation (RAG), chatbots, and autonomous agents. The integration automatically captures detailed traces of all LlamaIndex operations, making it easy to monitor, debug, and optimize your LLM workflows.
 
-When working with LLMs, debugging is inevitable. Whether a model call fails, an output is misformatted, or nested model calls create confusion, pinpointing issues can be challenging. [LlamaIndex](https://docs.llamaindex.ai/en/stable/) applications often consist of multiple steps and LLM call invocations, making it crucial to understand the inner workings of your chains and agents.
+When working with LLMs, debugging is inevitable. Whether a model call fails, an output is misformatted, or nested model calls create confusion, pinpointing issues can be challenging. LlamaIndex applications often consist of multiple steps and LLM call invocations, making it crucial to understand the inner workings of your chains and agents.
 
-Weave simplifies this process by automatically capturing traces for your LlamaIndex applications. This enables you to monitor and analyze your application's performance, making it easier to debug and optimize your LLM workflows. Weave also helps with your evaluation workflows.
+Weave simplifies this process by automatically capturing traces for your LlamaIndex applications through LlamaIndex's built-in instrumentation system. This enables you to monitor and analyze your application's performance, making it easier to debug and optimize your LLM workflows.
 
 ## Getting Started
 
-To get started, simply call `weave.init()` at the beginning of your script. The argument in `weave.init()` is a project name that will help you organize your traces.
+To get started, simply call `weave.init()` at the beginning of your script. The integration will automatically start tracing all LlamaIndex operations.
 
 ```python
 import weave
-from llama_index.core.chat_engine import SimpleChatEngine
+from llama_index.llms.openai import OpenAI
 
 # Initialize Weave with your project name
-# highlight-next-line
-weave.init("llamaindex_demo")
+weave.init("llamaindex-demo")
 
-chat_engine = SimpleChatEngine.from_defaults()
-response = chat_engine.chat(
-    "Say something profound and romantic about fourth of July"
-)
+# All LlamaIndex operations are now automatically traced
+llm = OpenAI(model="gpt-4o-mini")
+response = llm.complete("William Shakespeare is ")
 print(response)
 ```
 
-In the example above, we are creating a simple LlamaIndex chat engine which under the hood is making an OpenAI call. Check out the trace below:
+That's it! The integration leverages LlamaIndex's instrumentation system to automatically capture traces for all operations including LLM calls, embeddings, retrievals, and agent steps.
 
-[![simple_llamaindex.png](imgs/simple_llamaindex.png)](https://wandb.ai/wandbot/test-llamaindex-weave/weave/calls/b6b5d898-2df8-4e14-b553-66ce84661e74)
+## Core LlamaIndex Components
 
-## Tracing
+The Weave integration supports all major LlamaIndex components with automatic tracing:
 
-LlamaIndex is known for its ease of connecting data with LLM. A simple RAG application requires an embedding step, retrieval step and a response synthesis step. With the increasing complexity, it becomes important to store traces of individual steps in a central database during both development and production.
+### LLM Operations
 
-These traces are essential for debugging and improving your application. Weave automatically tracks all calls made through the LlamaIndex library, including prompt templates, LLM calls, tools, and agent steps. You can view the traces in the Weave web interface.
+#### Synchronous and Asynchronous Completions
 
-Below is an example of a simple RAG pipeline from LlamaIndex's [Starter Tutorial (OpenAI)](https://docs.llamaindex.ai/en/stable/getting_started/starter_example/):
+```python
+import weave
+from llama_index.llms.openai import OpenAI
+
+weave.init("llamaindex-demo")
+
+llm = OpenAI(model="gpt-4o-mini")
+
+# Synchronous completion
+response = llm.complete("William Shakespeare is ")
+print(response)
+
+# Asynchronous completion
+response = await llm.acomplete("William Shakespeare is ")
+print(response)
+```
+
+#### Streaming Operations
+
+```python
+import weave
+from llama_index.llms.openai import OpenAI
+
+weave.init("llamaindex-demo")
+
+llm = OpenAI(model="gpt-4o-mini")
+
+# Synchronous streaming
+handle = llm.stream_complete("William Shakespeare is ")
+for token in handle:
+    print(token.delta, end="", flush=True)
+
+# Asynchronous streaming
+handle = await llm.astream_complete("William Shakespeare is ")
+async for token in handle:
+    print(token.delta, end="", flush=True)
+```
+
+### Chat Interface
+
+```python
+import weave
+from llama_index.llms.openai import OpenAI
+from llama_index.core.llms import ChatMessage
+
+weave.init("llamaindex-demo")
+
+llm = OpenAI(model="gpt-4o-mini")
+messages = [
+    ChatMessage(role="system", content="You are a helpful assistant."),
+    ChatMessage(role="user", content="Tell me a joke."),
+]
+
+# Synchronous chat
+response = llm.chat(messages)
+print(response)
+
+# Asynchronous chat
+response = await llm.achat(messages)
+print(response)
+
+# Streaming chat
+handle = llm.stream_chat(messages)
+for token in handle:
+    print(token.delta, end="", flush=True)
+```
+
+### Tool Calling
+
+```python
+import weave
+from pydantic import BaseModel
+from llama_index.core.tools import FunctionTool
+from llama_index.llms.openai import OpenAI
+
+weave.init("llamaindex-demo")
+
+class Song(BaseModel):
+    name: str
+    artist: str
+
+def generate_song(name: str, artist: str) -> Song:
+    """Generates a song with provided name and artist."""
+    return Song(name=name, artist=artist)
+
+tool = FunctionTool.from_defaults(fn=generate_song)
+llm = OpenAI(model="gpt-4o-mini")
+
+response = llm.predict_and_call([tool], "Pick a random song for me")
+print(response)
+```
+
+### Agents
+
+```python
+import weave
+from llama_index.core.agent.workflow import FunctionAgent
+from llama_index.llms.openai import OpenAI
+from llama_index.core.memory import ChatMemoryBuffer
+
+weave.init("llamaindex-demo")
+
+def multiply(a: float, b: float) -> float:
+    """Useful for multiplying two numbers."""
+    return a * b
+
+agent = FunctionAgent(
+    tools=[multiply],
+    llm=OpenAI(model="gpt-4o-mini"),
+    system_prompt="You are a helpful assistant that can multiply two numbers.",
+)
+
+memory = ChatMemoryBuffer.from_defaults(token_limit=40000)
+response = await agent.run("What is 1234 * 4567?", memory=memory)
+print(response)
+```
+
+### Workflows
+
+```python
+import weave
+from llama_index.core.workflow import (
+    StartEvent,
+    StopEvent,
+    Workflow,
+    step,
+    Event,
+)
+
+weave.init("llamaindex-demo")
+
+class FirstEvent(Event):
+    payload: str
+
+class SecondEvent(Event):
+    payload: str
+
+class SimpleWorkflow(Workflow):
+    @step
+    async def step_one(self, ev: StartEvent) -> FirstEvent:
+        return FirstEvent(payload="First step complete")
+
+    @step
+    async def step_two(self, ev: FirstEvent) -> SecondEvent:
+        return SecondEvent(payload="Second step complete")
+
+    @step
+    async def step_three(self, ev: SecondEvent) -> StopEvent:
+        return StopEvent(result="Workflow complete")
+
+workflow = SimpleWorkflow(timeout=10, verbose=False)
+result = await workflow.run(first_input="Start the workflow")
+print(result)
+```
+
+### RAG Pipelines
 
 ```python
 import weave
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.llms.openai import OpenAI
 
-# Initialize Weave with your project name
-# highlight-next-line
-weave.init("llamaindex_demo")
+weave.init("llamaindex-demo")
 
-# Assuming you have a `.txt` file in the `data` directory
+# Load and process documents
 documents = SimpleDirectoryReader("data").load_data()
-index = VectorStoreIndex.from_documents(documents)
+parser = SentenceSplitter()
+nodes = parser.get_nodes_from_documents(documents)
 
+# Create index and query engine
+index = VectorStoreIndex(nodes)
 query_engine = index.as_query_engine()
+
+# Query the documents
 response = query_engine.query("What did the author do growing up?")
 print(response)
 ```
 
-The trace timeline not only captures the "events" but it also capture the execution time, cost and token counts where applicable. Drill down the trace to see the inputs and outputs of each step.
+## Comprehensive Agent Example
 
-[![llamaindex_rag.png](imgs/llamaindex_rag.png)](https://wandb.ai/wandbot/test-llamaindex-weave/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fwandbot%2Ftest-llamaindex-weave%2Fcalls%2F6ac53407-1bb7-4c38-b5a3-c302bd877a11%3Ftracetree%3D1)
-
-## One-click observability 🔭
-
-LlamaIndex provides [one-click observability 🔭](https://docs.llamaindex.ai/en/stable/module_guides/observability/) to allow you to build principled LLM applications in a production setting.
-
-Our integration leverages this capability of LlamaIndex and automatically sets [`WeaveCallbackHandler()`](https://github.com/wandb/weave/blob/master/weave/integrations/llamaindex/llamaindex.py) to `llama_index.core.global_handler`. Thus as a user of LlamaIndex and Weave all you need to do is initialize a Weave run - `weave.init(<name-of-project>)`
-
-## Create a `Model` for easier experimentation
-
-Organizing and evaluating LLMs in applications for various use cases is challenging with multiple components, such as prompts, model configurations, and inference parameters. Using the [`weave.Model`](/guides/core-types/models), you can capture and organize experimental details like system prompts or the models you use, making it easier to compare different iterations.
-
-The following example demonstrates building a LlamaIndex query engine in a `WeaveModel`, using data that can be found in the [weave/data](https://github.com/wandb/weave/tree/master/data) folder:
+Here's a complete example combining multiple components:
 
 ```python
 import weave
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+from llama_index.core.agent.workflow import FunctionAgent
+from llama_index.llms.openai import OpenAI
 
+weave.init("llamaindex-demo")
+
+# Create a RAG tool
+documents = SimpleDirectoryReader("data").load_data()
+index = VectorStoreIndex.from_documents(documents)
+query_engine = index.as_query_engine()
+
+def multiply(a: float, b: float) -> float:
+    """Useful for multiplying two numbers."""
+    return a * b
+
+async def search_documents(query: str) -> str:
+    """Useful for answering questions about documents."""
+    response = await query_engine.aquery(query)
+    return str(response)
+
+# Create an agent with both tools
+agent = FunctionAgent(
+    tools=[multiply, search_documents],
+    llm=OpenAI(model="gpt-4o-mini"),
+    system_prompt="""You are a helpful assistant that can perform calculations
+    and search through documents to answer questions.""",
+)
+
+response = await agent.run(
+    "What did the author do in college? Also, what's 7 * 8?"
+)
+print(response)
+```
+
+## Automatic Tracing Features
+
+The Weave integration automatically captures:
+
+- **Execution Time**: Duration of each operation
+- **Token Usage**: Input and output token counts
+- **Cost Tracking**: Estimated costs for API calls
+- **Inputs and Outputs**: Full request and response data
+- **Error Handling**: Detailed error traces and stack traces
+- **Nested Operations**: Complete trace hierarchy showing parent-child relationships
+- **Streaming Data**: Accumulated streaming responses
+
+All trace data is viewable in the Weave web interface, making it easy to debug and optimize your LlamaIndex applications.
+
+## Using `weave.Model` for Experimentation
+
+Organizing and evaluating LLMs in applications for various use cases is challenging with multiple components, such as prompts, model configurations, and inference parameters. Using the [`weave.Model`](/guides/core-types/models), you can capture and organize experimental details like system prompts or the models you use, making it easier to compare different iterations.
+
+```python
+import weave
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.llms.openai import OpenAI
 from llama_index.core import PromptTemplate
 
+weave.init("llamaindex-demo")
 
 PROMPT_TEMPLATE = """
 You are given with relevant information about Paul Graham. Answer the user query only based on the information provided. Don't make up stuff.
@@ -87,9 +287,8 @@ Context: {context_str}
 Answer:
 """
 
-# highlight-next-line
 class SimpleRAGPipeline(weave.Model):
-    chat_llm: str = "gpt-4"
+    chat_llm: str = "gpt-4o-mini"
     temperature: float = 0.1
     similarity_top_k: int = 2
     chunk_size: int = 256
@@ -127,32 +326,26 @@ class SimpleRAGPipeline(weave.Model):
 # highlight-next-line
     @weave.op()
     def predict(self, query: str):
-        query_engine = self.get_query_engine(
-            # This data can be found in the weave repo under data/paul_graham
-            "data/paul_graham",
-        )
+        query_engine = self.get_query_engine("data")
         response = query_engine.query(query)
         return {"response": response.response}
-
-# highlight-next-line
-weave.init("test-llamaindex-weave")
 
 rag_pipeline = SimpleRAGPipeline()
 response = rag_pipeline.predict("What did the author do growing up?")
 print(response)
 ```
 
-This `SimpleRAGPipeline` class subclassed from `weave.Model` organizes the important parameters for this RAG pipeline. Decorating the `query` method with `weave.op()` allows for tracing.
+## Evaluation with `weave.Evaluation`
 
-[![llamaindex_model.png](imgs/llamaindex_model.png)](https://wandb.ai/wandbot/test-llamaindex-weave/weave/calls?filter=%7B%22traceRootsOnly%22%3Atrue%7D&peekPath=%2Fwandbot%2Ftest-llamaindex-weave%2Fcalls%2Fa82afbf4-29a5-43cd-8c51-603350abeafd%3Ftracetree%3D1)
-
-## Doing Evaluation with `weave.Evaluation`
-
-Evaluations help you measure the performance of your applications. By using the [`weave.Evaluation`](/guides/core-types/evaluations) class, you can capture how well your model performs on specific tasks or datasets, making it easier to compare different models and iterations of your application. The following example demonstrates how to evaluate the model we created:
+Evaluations help you measure the performance of your applications. By using the [`weave.Evaluation`](/guides/core-types/evaluations) class, you can capture how well your model performs on specific tasks or datasets, making it easier to compare different models and iterations of your application.
 
 ```python
+import weave
 import asyncio
 from llama_index.core.evaluation import CorrectnessEvaluator
+from llama_index.llms.openai import OpenAI
+
+weave.init("llamaindex-demo")
 
 eval_examples = [
     {
@@ -175,7 +368,6 @@ eval_examples = [
 llm_judge = OpenAI(model="gpt-4", temperature=0.0)
 evaluator = CorrectnessEvaluator(llm=llm_judge)
 
-# highlight-next-line
 @weave.op()
 def correctness_evaluator(query: str, ground_truth: str, output: dict):
     result = evaluator.evaluate(
@@ -185,19 +377,22 @@ def correctness_evaluator(query: str, ground_truth: str, output: dict):
 
 # highlight-next-line
 evaluation = weave.Evaluation(dataset=eval_examples, scorers=[correctness_evaluator])
-
 rag_pipeline = SimpleRAGPipeline()
 
-# highlight-next-line
-asyncio.run(evaluation.evaluate(rag_pipeline))
+# Run the evaluation
+await evaluation.evaluate(rag_pipeline)
 ```
 
-This evaluation builds on the example in the earlier section. Evaluating using `weave.Evaluation` requires an evaluation dataset, a scorer function and a `weave.Model`. Here are a few nuances about the three key components:
+## Best Practices
 
-- Make sure that the keys of the evaluation sample dicts matches the arguments of the scorer function and of the `weave.Model`'s `predict` method.
-- The `weave.Model` should have a method with the name `predict` or `infer` or `forward`. Decorate this method with `weave.op()` for tracing.
-- The scorer function should be decorated with `weave.op()` and should have `output` as named argument.
+1. **Initialize Early**: Call `weave.init()` at the beginning of your script to ensure all operations are traced.
 
-[![llamaindex_evaluation.png](imgs/llamaindex_evaluation.png)](https://wandb.ai/wandbot/llamaindex-weave/weave/calls?filter=%7B%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fwandbot%2Fllamaindex-weave%2Fop%2FEvaluation.predict_and_score%3ANmwfShfFmgAhDGLXrF6Xn02T9MIAsCXBUcifCjyKpOM%22%5D%2C%22parentId%22%3A%2233491e66-b580-47fa-9d43-0cd6f1dc572a%22%7D&peekPath=%2Fwandbot%2Fllamaindex-weave%2Fcalls%2F33491e66-b580-47fa-9d43-0cd6f1dc572a%3Ftracetree%3D1)
+2. **Use Descriptive Project Names**: Choose meaningful project names to organize your traces effectively.
 
-By integrating Weave with LlamaIndex, you can ensure comprehensive logging and monitoring of your LLM applications, facilitating easier debugging and performance optimization using evaluation.
+3. **Combine with `weave.Model`**: Use `weave.Model` for complex applications to organize parameters and make comparisons easier.
+
+4. **Leverage Evaluations**: Use `weave.Evaluation` to systematically measure and improve your application's performance.
+
+5. **Monitor Streaming Operations**: The integration automatically handles streaming operations, accumulating responses for complete trace capture.
+
+By integrating Weave with LlamaIndex, you get comprehensive observability into your LLM applications with zero additional configuration, making it easier to debug, optimize, and evaluate your workflows.
