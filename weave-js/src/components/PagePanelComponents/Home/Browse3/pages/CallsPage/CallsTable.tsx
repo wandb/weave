@@ -955,111 +955,84 @@ export const CallsTable: FC<{
     project,
   ]);
 
-  // Memoized DataGrid component with common configuration
-  const CallsDataGrid = useMemo(() => {
-    return React.memo<{sx?: any}>(({sx}) => (
-      <StyledDataGrid
-        // Start Column Menu
-        // ColumnMenu is needed to support pinning and column visibility
-        disableColumnMenu={false}
-        // ColumnFilter is definitely useful
-        disableColumnFilter={true}
-        disableMultipleColumnsFiltering={false}
-        // ColumnPinning seems to be required in DataGridPro, else it crashes.
-        // However, in this case it is also useful.
-        disableColumnPinning={false}
-        // ColumnReorder is definitely useful
-        // TODO (Tim): This needs to be managed externally (making column
-        // ordering a controlled property) This is a "regression" from the calls
-        // table refactor
-        disableColumnReorder={true}
-        // ColumnResize is definitely useful
-        disableColumnResize={false}
-        // ColumnSelector is definitely useful
-        disableColumnSelector={false}
-        disableMultipleColumnsSorting={true}
-        // End Column Menu
-        columnHeaderHeight={40}
-        apiRef={apiRef}
-        loading={callsLoading}
-        rows={tableData}
-        // initialState={initialState}
-        onColumnVisibilityModelChange={
-          setColumnVisibilityModel
-            ? (newModel: GridColumnVisibilityModel) => {
-                setColumnVisibilityModel(newModel);
-              }
-            : undefined
-        }
-        columnVisibilityModel={columnVisibilityModel}
-        // SORT SECTION START
-        sortingMode="server"
-        sortModel={sortModelFiltered}
-        onSortModelChange={onSortModelChange}
-        // SORT SECTION END
-        // PAGINATION SECTION START
-        pagination
-        rowCount={calls.primaryError ? 0 : callsTotal}
-        paginationMode="server"
-        paginationModel={paginationModel}
-        onPaginationModelChange={onPaginationModelChange}
-        // PAGINATION SECTION END
-        rowHeight={38}
-        columns={muiColumns}
-        disableRowSelectionOnClick
-        rowSelectionModel={rowSelectionModel}
-        // columnGroupingModel={groupingModel}
-        columnGroupingModel={columns.colGroupingModel}
-        hideFooter={!callsLoading && callsTotal === 0}
-        hideFooterSelectedRowCount
-        onColumnWidthChange={newCol => {
-          setUserDefinedColumnWidths(curr => {
-            return {
-              ...curr,
-              [newCol.colDef.field]: newCol.colDef.computedWidth,
-            };
-          });
-        }}
-        pinnedColumns={pinModelResolved}
-        onPinnedColumnsChange={onPinnedColumnsChange}
-        sx={sx}
-        slots={{
-          noRowsOverlay,
-          columnMenu: CallsCustomColumnMenu,
-          pagination: () => <PaginationButtons hideControls={hideControls} />,
-          columnMenuSortDescendingIcon: IconSortDescending,
-          columnMenuSortAscendingIcon: IconSortAscending,
-          columnMenuHideIcon: IconNotVisible,
-          columnMenuPinLeftIcon: () => (
-            <IconPinToRight style={{transform: 'scaleX(-1)'}} />
-          ),
-          columnMenuPinRightIcon: IconPinToRight,
-          loadingOverlay: CustomLoadingOverlay,
-        }}
-        className="tw-style"
-      />
-    ));
-  }, [
+  // Common StyledDataGrid configuration
+  const dataGridProps = {
+    // Start Column Menu
+    // ColumnMenu is needed to support pinning and column visibility
+    disableColumnMenu: false,
+    // ColumnFilter is definitely useful
+    disableColumnFilter: true,
+    disableMultipleColumnsFiltering: false,
+    // ColumnPinning seems to be required in DataGridPro, else it crashes.
+    // However, in this case it is also useful.
+    disableColumnPinning: false,
+    // ColumnReorder is definitely useful
+    // TODO (Tim): This needs to be managed externally (making column
+    // ordering a controlled property) This is a "regression" from the calls
+    // table refactor
+    disableColumnReorder: true,
+    // ColumnResize is definitely useful
+    disableColumnResize: false,
+    // ColumnSelector is definitely useful
+    disableColumnSelector: false,
+    disableMultipleColumnsSorting: true,
+    // End Column Menu
+    columnHeaderHeight: 40,
     apiRef,
-    callsLoading,
-    tableData,
-    setColumnVisibilityModel,
+    loading: callsLoading,
+    rows: tableData,
+    // initialState={initialState}
+    onColumnVisibilityModelChange: setColumnVisibilityModel
+      ? (newModel: GridColumnVisibilityModel) => {
+          setColumnVisibilityModel(newModel);
+        }
+      : undefined,
     columnVisibilityModel,
-    sortModelFiltered,
+    // SORT SECTION START
+    sortingMode: 'server' as const,
+    sortModel: sortModelFiltered,
     onSortModelChange,
-    calls.primaryError,
-    callsTotal,
+    // SORT SECTION END
+    // PAGINATION SECTION START
+    pagination: true,
+    rowCount: calls.primaryError ? 0 : callsTotal,
+    paginationMode: 'server' as const,
     paginationModel,
     onPaginationModelChange,
-    muiColumns,
+    // PAGINATION SECTION END
+    rowHeight: 38,
+    columns: muiColumns,
+    disableRowSelectionOnClick: true,
     rowSelectionModel,
-    columns.colGroupingModel,
-    setUserDefinedColumnWidths,
-    pinModelResolved,
+    // columnGroupingModel={groupingModel}
+    columnGroupingModel: columns.colGroupingModel,
+    hideFooter: !callsLoading && callsTotal === 0,
+    hideFooterSelectedRowCount: true,
+    onColumnWidthChange: (newCol: any) => {
+      setUserDefinedColumnWidths(curr => {
+        return {
+          ...curr,
+          [newCol.colDef.field]: newCol.colDef.computedWidth,
+        };
+      });
+    },
+    pinnedColumns: pinModelResolved,
     onPinnedColumnsChange,
-    noRowsOverlay,
-    hideControls,
-  ]);
+    slots: {
+      noRowsOverlay,
+      columnMenu: CallsCustomColumnMenu,
+      pagination: () => <PaginationButtons hideControls={hideControls} />,
+      columnMenuSortDescendingIcon: IconSortDescending,
+      columnMenuSortAscendingIcon: IconSortAscending,
+      columnMenuHideIcon: IconNotVisible,
+      columnMenuPinLeftIcon: () => (
+        <IconPinToRight style={{transform: 'scaleX(-1)'}} />
+      ),
+      columnMenuPinRightIcon: IconPinToRight,
+      loadingOverlay: CustomLoadingOverlay,
+    },
+    className: 'tw-style',
+  };
 
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
@@ -1291,7 +1264,8 @@ export const CallsTable: FC<{
               flexGrow: 0,
               boxSizing: 'border-box',
             }}>
-            <CallsDataGrid
+            <StyledDataGrid
+              {...dataGridProps}
               sx={{
                 borderRadius: 0,
                 height: '100%',
@@ -1337,7 +1311,8 @@ export const CallsTable: FC<{
           </div>
         </div>
       ) : (
-        <CallsDataGrid
+        <StyledDataGrid
+          {...dataGridProps}
           sx={{
             borderRadius: 0,
             // This moves the pagination controls to the left
