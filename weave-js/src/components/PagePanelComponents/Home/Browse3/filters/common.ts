@@ -185,6 +185,11 @@ const anyOperators: SelectOperatorOption[] = [
     label: 'is not empty',
     group: 'any',
   },
+  {
+    value: '(any): isNull',
+    label: 'is null',
+    group: 'any',
+  },
 ];
 const allOperators: SelectOperatorOption[] = [
   ...stringOperators,
@@ -224,7 +229,11 @@ const operatorLabels: Record<string, string> = allOperators.reduce(
   {} as Record<string, string>
 );
 
-const VALUELESS_OPERATORS = new Set(['(any): isEmpty', '(any): isNotEmpty']);
+const VALUELESS_OPERATORS = new Set([
+  '(any): isEmpty',
+  '(any): isNotEmpty',
+  '(any): isNull',
+]);
 
 export const isValuelessOperator = (operator: string) => {
   return VALUELESS_OPERATORS.has(operator);
