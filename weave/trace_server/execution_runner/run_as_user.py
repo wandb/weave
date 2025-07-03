@@ -170,6 +170,7 @@ class RunAsUser:
         internal_trace_server: The trace server interface for this instance
         project_id: The project ID this runner is scoped to
         wb_user_id: The user ID this runner is scoped to
+        timeout_seconds: Maximum time to wait for process execution
     """
 
     def __init__(
@@ -177,6 +178,7 @@ class RunAsUser:
         internal_trace_server: tsi.TraceServerInterface,
         project_id: str,
         wb_user_id: str,
+        timeout_seconds: float = EXECUTION_TIMEOUT_SECONDS,
     ) -> None:
         """
         Initialize a RunAsUser instance with specific trace server and user context.
@@ -185,10 +187,12 @@ class RunAsUser:
             internal_trace_server: The trace server interface to use for all executions
             project_id: The project ID to scope all executions to
             wb_user_id: The user ID to scope all executions to
+            timeout_seconds: Maximum time to wait for process execution (default: 60s)
         """
         self.internal_trace_server = internal_trace_server
         self.project_id = project_id
         self.wb_user_id = wb_user_id
+        self.timeout_seconds = timeout_seconds
 
     async def _run_user_scoped_function(
         self,
@@ -262,7 +266,7 @@ class RunAsUser:
 
         # Start the child process and wait for completion
         process.start()
-        process.join(timeout=EXECUTION_TIMEOUT_SECONDS)
+        process.join(timeout=self.timeout_seconds)
 
         # Check if process is still alive (timeout occurred)
         if process.is_alive():
@@ -275,7 +279,7 @@ class RunAsUser:
                 process.kill()
                 process.join()
             raise RunAsUserException(
-                f"Process execution timed out after {EXECUTION_TIMEOUT_SECONDS} seconds"
+                f"Process execution timed out after {self.timeout_seconds} seconds"
             )
 
         # Check if the process completed successfully
