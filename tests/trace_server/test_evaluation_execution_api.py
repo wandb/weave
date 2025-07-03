@@ -73,10 +73,7 @@ async def test_run_model(ch_only_trace_server: TraceServerInterface):
                     {
                         "project_id": project_id,
                         "model_ref": model_ref_uri,
-                        "inputs": {
-                            "input_type": "value",
-                            "value": {"user_input": user_input},
-                        },
+                        "inputs": {"user_input": user_input},
                     }
                 )
             )

@@ -60,13 +60,13 @@ def run_model(req: tsi.RunModelReq) -> tsi.RunModelRes:
 
     # Process inputs based on their type
     inputs_value: dict
-    if req.inputs.input_type == "value":
+    if isinstance(req.inputs, dict):
         # Direct value provided
-        inputs_value = req.inputs.value
+        inputs_value = req.inputs
 
-    elif req.inputs.input_type == "ref":
+    elif isinstance(req.inputs, str):
         # Reference to inputs - load from Weave
-        inputs_value = client.get(parse_uri(req.inputs.value))
+        inputs_value = client.get(parse_uri(req.inputs))
 
     else:
         raise ValueError(

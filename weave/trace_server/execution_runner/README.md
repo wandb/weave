@@ -251,10 +251,7 @@ await trace_server.run_model(
         {
             "project_id": project_id,
             "model_ref": model_ref_uri,  # Reference to LLMStructuredCompletionModel
-            "inputs": {
-                "input_type": "value",
-                "value": {"user_input": user_input},
-            },
+            "inputs": {"user_input": user_input},
         }
     )
 )

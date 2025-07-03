@@ -1108,23 +1108,10 @@ class ThreadsQueryReq(BaseModel):
     )
 
 
-class InputsAsValue(BaseModel):
-    input_type: Literal["value"]
-    value: dict[str, Any]
-
-
-class InputsAsRef(BaseModel):
-    input_type: Literal["ref"]
-    ref: str
-
-
-InputsAsValueOrRef = Union[InputsAsValue, InputsAsRef]
-
-
 class RunModelReq(BaseModel):
     project_id: str
     model_ref: str
-    inputs: InputsAsValueOrRef
+    inputs: dict | str
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
