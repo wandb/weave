@@ -103,7 +103,6 @@ class CrossProcessTraceServer(TraceServerInterface):
         self,
         request_queue: multiprocessing.Queue,
         response_queue: multiprocessing.Queue,
-        shutdown_callback: Optional[callable] = None,
     ):
         """
         Initialize the cross-process trace server.
@@ -111,11 +110,9 @@ class CrossProcessTraceServer(TraceServerInterface):
         Args:
             request_queue: Queue for sending requests to the worker process
             response_queue: Queue for receiving responses from the worker process
-            shutdown_callback: Optional callback to call when shutting down
         """
         self._request_queue = request_queue
         self._response_queue = response_queue
-        self._shutdown_callback = shutdown_callback
 
         # Track ongoing requests for matching responses
         self._pending_requests: dict[str, threading.Event] = {}
@@ -203,14 +200,10 @@ class CrossProcessTraceServer(TraceServerInterface):
         if not self._shutdown:
             self._shutdown = True
 
-            # Send shutdown signal
+            # Send shutdown signal to the worker process
             self._request_queue.put(
                 {"method": "_shutdown", "request": None, "request_id": "shutdown"}
             )
-
-            # Call shutdown callback if provided
-            if self._shutdown_callback:
-                self._shutdown_callback()
 
     # OTEL API
     def otel_export(self, req: OtelExportReq) -> OtelExportRes:
