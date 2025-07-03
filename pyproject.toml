@@ -286,6 +286,7 @@ select = [
   "PT022",   # https://docs.astral.sh/ruff/rules/pytest-useless-yield-fixture/
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
+  "RUF013",  # https://docs.astral.sh/ruff/rules/implicit-optional/
 ]
 ignore = [
   # we use Google style
