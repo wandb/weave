@@ -13,7 +13,7 @@ from weave.trace_server.trace_server_interface import (
 
 
 @pytest.mark.asyncio
-async def test_run_model(trace_server: TraceServerInterface):
+async def test_run_model(ch_only_trace_server: TraceServerInterface):
     """
     Test the run_model API endpoint with isolated execution.
 
@@ -39,7 +39,7 @@ async def test_run_model(trace_server: TraceServerInterface):
                 "response_format": "text",
             },
         }
-        model_create_res = trace_server.obj_create(
+        model_create_res = ch_only_trace_server.obj_create(
             ObjCreateReq.model_validate(
                 {
                     "obj": {
@@ -68,7 +68,7 @@ async def test_run_model(trace_server: TraceServerInterface):
     ) -> RunModelRes:
         project_id = f"{entity}/{project}"
         with with_simple_mock_litellm_completion(expected_output):
-            model_run_res = await trace_server.run_model(
+            model_run_res = await ch_only_trace_server.run_model(
                 RunModelReq.model_validate(
                     {
                         "project_id": project_id,
@@ -91,7 +91,7 @@ async def test_run_model(trace_server: TraceServerInterface):
 
         assert model_run_res.output == expected_output
 
-        calls_res = trace_server.calls_query(
+        calls_res = ch_only_trace_server.calls_query(
             CallsQueryReq.model_validate(
                 {
                     "project_id": project_id,
@@ -102,7 +102,7 @@ async def test_run_model(trace_server: TraceServerInterface):
         # Completion call and predict call
         assert len(calls_res.calls) == 2
 
-        objs_res = trace_server.objs_query(
+        objs_res = ch_only_trace_server.objs_query(
             ObjQueryReq.model_validate(
                 {
                     "project_id": project_id,
@@ -113,7 +113,7 @@ async def test_run_model(trace_server: TraceServerInterface):
         # Model definition & predict object
         assert len(objs_res.objs) == 2
 
-        calls_res = trace_server.calls_query(
+        calls_res = ch_only_trace_server.calls_query(
             CallsQueryReq.model_validate(
                 {
                     "project_id": project_id,

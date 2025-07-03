@@ -111,3 +111,13 @@ def trace_server(
         # For now, just return the sqlite trace server so we don't break existing tests.
         # raise ValueError(f"Invalid trace server: {trace_server_flag}")
         return get_sqlite_trace_server()
+
+
+@pytest.fixture
+def ch_only_trace_server(
+    request, trace_server
+) -> TestOnlyUserInjectingExternalTraceServer:
+    if request.config.getoption("--clickhouse"):
+        return trace_server
+    else:
+        pytest.skip("Clickhouse trace server is not enabled")

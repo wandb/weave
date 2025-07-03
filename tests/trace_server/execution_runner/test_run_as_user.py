@@ -11,6 +11,10 @@ ensuring the system can handle stuck processes.
 
 import pytest
 
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    TestOnlyUserInjectingExternalTraceServer,
+)
+
 # Import test functions from separate module to ensure they're picklable
 from tests.trace_server.execution_runner.test_functions import (
     TestRequest,
@@ -32,17 +36,22 @@ from weave.trace_server.external_to_internal_trace_server_adapter import (
 )
 
 
+def get_internal_trace_server(
+    trace_server: TestOnlyUserInjectingExternalTraceServer,
+) -> tsi.TraceServerInterface:
+    if isinstance(trace_server, ExternalTraceServer):
+        return trace_server._internal_trace_server
+    else:
+        return trace_server
+
+
 class TestRunAsUser:
     """Test cases for RunAsUser class."""
 
     @pytest.mark.asyncio
-    async def test_successful_execution(self, trace_server):
+    async def test_successful_execution(self, ch_only_trace_server):
         """Test successful function execution in isolated process."""
-        # Get the internal trace server from the fixture
-        if isinstance(trace_server, ExternalTraceServer):
-            internal_trace_server = trace_server._internal_trace_server
-        else:
-            internal_trace_server = trace_server
+        internal_trace_server = get_internal_trace_server(ch_only_trace_server)
 
         runner = RunAsUser(
             internal_trace_server=internal_trace_server,
@@ -67,12 +76,9 @@ class TestRunAsUser:
         assert result.process_id != os.getpid()
 
     @pytest.mark.asyncio
-    async def test_exception_in_child_process(self, trace_server):
+    async def test_exception_in_child_process(self, ch_only_trace_server):
         """Test handling of exceptions thrown in child process."""
-        if isinstance(trace_server, ExternalTraceServer):
-            internal_trace_server = trace_server._internal_trace_server
-        else:
-            internal_trace_server = trace_server
+        internal_trace_server = get_internal_trace_server(ch_only_trace_server)
 
         runner = RunAsUser(
             internal_trace_server=internal_trace_server,
@@ -92,12 +98,9 @@ class TestRunAsUser:
             )
 
     @pytest.mark.asyncio
-    async def test_process_timeout(self, trace_server):
+    async def test_process_timeout(self, ch_only_trace_server):
         """Test handling of process timeout."""
-        if isinstance(trace_server, ExternalTraceServer):
-            internal_trace_server = trace_server._internal_trace_server
-        else:
-            internal_trace_server = trace_server
+        internal_trace_server = get_internal_trace_server(ch_only_trace_server)
 
         # Create runner with very short timeout
         runner = RunAsUser(
@@ -118,12 +121,9 @@ class TestRunAsUser:
             )
 
     @pytest.mark.asyncio
-    async def test_process_exit_code(self, trace_server):
+    async def test_process_exit_code(self, ch_only_trace_server):
         """Test handling of process that exits with specific code."""
-        if isinstance(trace_server, ExternalTraceServer):
-            internal_trace_server = trace_server._internal_trace_server
-        else:
-            internal_trace_server = trace_server
+        internal_trace_server = get_internal_trace_server(ch_only_trace_server)
 
         runner = RunAsUser(
             internal_trace_server=internal_trace_server,
@@ -142,12 +142,9 @@ class TestRunAsUser:
             )
 
     @pytest.mark.asyncio
-    async def test_project_isolation(self, trace_server):
+    async def test_project_isolation(self, ch_only_trace_server):
         """Test that different projects are properly isolated."""
-        if isinstance(trace_server, ExternalTraceServer):
-            internal_trace_server = trace_server._internal_trace_server
-        else:
-            internal_trace_server = trace_server
+        internal_trace_server = get_internal_trace_server(ch_only_trace_server)
 
         # Create two runners for different projects
         runner1 = RunAsUser(
@@ -187,12 +184,9 @@ class TestRunAsUser:
         assert "Isolation verified" in result2.result
 
     @pytest.mark.asyncio
-    async def test_user_isolation(self, trace_server):
+    async def test_user_isolation(self, ch_only_trace_server):
         """Test that different users are properly isolated."""
-        if isinstance(trace_server, ExternalTraceServer):
-            internal_trace_server = trace_server._internal_trace_server
-        else:
-            internal_trace_server = trace_server
+        internal_trace_server = get_internal_trace_server(ch_only_trace_server)
 
         # Create two runners for different users
         runner1 = RunAsUser(
@@ -232,12 +226,9 @@ class TestRunAsUser:
         assert "Isolation verified" in result2.result
 
     @pytest.mark.asyncio
-    async def test_project_id_mismatch(self, trace_server):
+    async def test_project_id_mismatch(self, ch_only_trace_server):
         """Test that mismatched project IDs are rejected."""
-        if isinstance(trace_server, ExternalTraceServer):
-            internal_trace_server = trace_server._internal_trace_server
-        else:
-            internal_trace_server = trace_server
+        internal_trace_server = get_internal_trace_server(ch_only_trace_server)
 
         runner = RunAsUser(
             internal_trace_server=internal_trace_server,
@@ -256,12 +247,9 @@ class TestRunAsUser:
             )
 
     @pytest.mark.asyncio
-    async def test_user_id_mismatch(self, trace_server):
+    async def test_user_id_mismatch(self, ch_only_trace_server):
         """Test that mismatched user IDs are rejected."""
-        if isinstance(trace_server, ExternalTraceServer):
-            internal_trace_server = trace_server._internal_trace_server
-        else:
-            internal_trace_server = trace_server
+        internal_trace_server = get_internal_trace_server(ch_only_trace_server)
 
         runner = RunAsUser(
             internal_trace_server=internal_trace_server,
@@ -280,12 +268,9 @@ class TestRunAsUser:
             )
 
     @pytest.mark.asyncio
-    async def test_run_model_api(self, trace_server):
+    async def test_run_model_api(self, ch_only_trace_server):
         """Test the run_model API specifically."""
-        if isinstance(trace_server, ExternalTraceServer):
-            internal_trace_server = trace_server._internal_trace_server
-        else:
-            internal_trace_server = trace_server
+        internal_trace_server = get_internal_trace_server(ch_only_trace_server)
 
         runner = RunAsUser(
             internal_trace_server=internal_trace_server,
@@ -305,12 +290,9 @@ class TestRunAsUser:
             await runner.run_model(req)
 
     @pytest.mark.asyncio
-    async def test_multiple_args(self, trace_server):
+    async def test_multiple_args(self, ch_only_trace_server):
         """Test passing multiple arguments via request object."""
-        if isinstance(trace_server, ExternalTraceServer):
-            internal_trace_server = trace_server._internal_trace_server
-        else:
-            internal_trace_server = trace_server
+        internal_trace_server = get_internal_trace_server(ch_only_trace_server)
 
         runner = RunAsUser(
             internal_trace_server=internal_trace_server,
