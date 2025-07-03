@@ -35,6 +35,8 @@ from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.optimization_builder import (
+    build_optimized_feedback_query,
+    build_where_conditions_for_optimization,
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
@@ -610,6 +612,20 @@ class CallsQuery(BaseModel):
         # Determine if we should optimize!
         should_optimize = has_heavy_fields and predicate_pushdown_possible
 
+        # Check if this query needs feedback optimization
+        needs_feedback_in_conditions = any(
+            condition.is_feedback() for condition in self.query_conditions
+        )
+        needs_feedback_in_order = any(
+            isinstance(order_field.field, CallsMergedFeedbackPayloadField)
+            for order_field in self.order_fields
+        )
+        needs_feedback_optimization = (
+            (needs_feedback_in_conditions or needs_feedback_in_order)
+            and self.order_fields
+            and self.limit
+        )
+
         # Important: Always inject deleted_at into the query.
         # Note: it might be better to make this configurable.
         self.add_condition(
@@ -629,9 +645,27 @@ class CallsQuery(BaseModel):
             )
         )
 
-        # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs:
+        # If we should not optimize and don't need feedback optimization, then just build the base query
+        if (
+            not should_optimize
+            and not needs_feedback_optimization
+            and not self.include_costs
+        ):
             return self._as_sql_base_format(pb, table_alias)
+
+        # Use feedback optimization if needed
+        if needs_feedback_optimization:
+            optimized_sql = build_optimized_feedback_query(
+                self.project_id,
+                self.hardcoded_filter,
+                self.query_conditions,
+                self.order_fields,
+                self.limit,
+                self.offset,
+                self.select_fields,
+                pb,
+            )
+            return safely_format_sql(optimized_sql, logger)
 
         # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(project_id=self.project_id)
@@ -737,8 +771,6 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
-        # ref filters also have group by filters, because output_refs exist on the
-        # call end parts.
         ref_filter_opt_sql = process_ref_filters_to_sql(
             self.hardcoded_filter,
             pb,
@@ -749,8 +781,6 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
-        # parent_id is valid as null, so we must always include the HAVING filter
-        # in addition to this optimization
         parent_ids_filter_sql = process_parent_ids_filter_to_sql(
             self.hardcoded_filter,
             pb,
@@ -1113,243 +1143,6 @@ def process_query_to_conditions(
     return FilterToConditions(
         conditions=conditions, fields_used=list(raw_fields_used.values())
     )
-
-
-def process_op_name_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
-    param_builder: ParamBuilder,
-    table_alias: str,
-) -> str:
-    """Pulls out the op_name and returns a sql string if there are any op_names."""
-    if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
-        return ""
-
-    op_names = hardcoded_filter.filter.op_names
-
-    assert_parameter_length_less_than_max("op_names", len(op_names))
-
-    # We will build up (0 or 1) + N conditions for the op_version_refs
-    # If there are any non-wildcarded names, then we at least have an IN condition
-    # If there are any wildcarded names, then we have a LIKE condition for each
-    or_conditions: list[str] = []
-    non_wildcarded_names: list[str] = []
-    wildcarded_names: list[str] = []
-
-    op_field = get_field_by_name("op_name")
-    if not isinstance(op_field, CallsMergedAggField):
-        raise TypeError("op_name is not an aggregate field")
-
-    op_field_sql = op_field.as_sql(param_builder, table_alias, use_agg_fn=False)
-    for name in op_names:
-        if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
-            wildcarded_names.append(name)
-        else:
-            non_wildcarded_names.append(name)
-
-    if non_wildcarded_names:
-        or_conditions.append(
-            f"{op_field_sql} IN {param_slot(param_builder.add_param(non_wildcarded_names), 'Array(String)')}"
-        )
-
-    for name in wildcarded_names:
-        like_name = name[: -len(WILDCARD_ARTIFACT_VERSION_AND_PATH)] + ":%"
-        or_conditions.append(
-            f"{op_field_sql} LIKE {param_slot(param_builder.add_param(like_name), 'String')}"
-        )
-
-    if not or_conditions:
-        return ""
-
-    # Account for unmerged call parts by including null op_name (call ends)
-    or_conditions += [f"{op_field_sql} IS NULL"]
-
-    return " AND " + combine_conditions(or_conditions, "OR")
-
-
-def process_trace_id_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
-    param_builder: ParamBuilder,
-    table_alias: str,
-) -> str:
-    """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
-    if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
-        return ""
-
-    trace_ids = hardcoded_filter.filter.trace_ids
-
-    assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
-
-    trace_id_field = get_field_by_name("trace_id")
-    if not isinstance(trace_id_field, CallsMergedAggField):
-        raise TypeError("trace_id is not an aggregate field")
-    trace_id_field_sql = trace_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
-
-    # If there's only one trace_id, use an equality condition for performance
-    if len(trace_ids) == 1:
-        trace_cond = f"{trace_id_field_sql} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
-    elif len(trace_ids) > 1:
-        trace_cond = f"{trace_id_field_sql} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
-    else:
-        return ""
-
-    return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
-
-
-def process_thread_id_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
-    param_builder: ParamBuilder,
-    table_alias: str,
-) -> str:
-    """Pulls out the thread_id and returns a sql string if there are any thread_ids."""
-    if (
-        hardcoded_filter is None
-        or hardcoded_filter.filter.thread_ids is None
-        or len(hardcoded_filter.filter.thread_ids) == 0
-    ):
-        return ""
-
-    thread_ids = hardcoded_filter.filter.thread_ids
-
-    assert_parameter_length_less_than_max("thread_ids", len(thread_ids))
-
-    thread_id_field = get_field_by_name("thread_id")
-    if not isinstance(thread_id_field, CallsMergedAggField):
-        raise TypeError("thread_id is not an aggregate field")
-    thread_id_field_sql = thread_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
-
-    # If there's only one thread_id, use an equality condition for performance
-    if len(thread_ids) == 1:
-        thread_cond = f"{thread_id_field_sql} = {param_slot(param_builder.add_param(thread_ids[0]), 'String')}"
-    elif len(thread_ids) > 1:
-        thread_cond = f"{thread_id_field_sql} IN {param_slot(param_builder.add_param(thread_ids), 'Array(String)')}"
-    else:
-        return ""
-
-    return f" AND ({thread_cond} OR {thread_id_field_sql} IS NULL)"
-
-
-def process_turn_id_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
-    param_builder: ParamBuilder,
-    table_alias: str,
-) -> str:
-    """Pulls out the turn_id and returns a sql string if there are any turn_ids."""
-    if (
-        hardcoded_filter is None
-        or hardcoded_filter.filter.turn_ids is None
-        or len(hardcoded_filter.filter.turn_ids) == 0
-    ):
-        return ""
-
-    turn_ids = hardcoded_filter.filter.turn_ids
-
-    assert_parameter_length_less_than_max("turn_ids", len(turn_ids))
-
-    turn_id_field = get_field_by_name("turn_id")
-    if not isinstance(turn_id_field, CallsMergedAggField):
-        raise TypeError("turn_id is not an aggregate field")
-    turn_id_field_sql = turn_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
-
-    # If there's only one turn_id, use an equality condition for performance
-    if len(turn_ids) == 1:
-        turn_cond = f"{turn_id_field_sql} = {param_slot(param_builder.add_param(turn_ids[0]), 'String')}"
-    elif len(turn_ids) > 1:
-        turn_cond = f"{turn_id_field_sql} IN {param_slot(param_builder.add_param(turn_ids), 'Array(String)')}"
-    else:
-        return ""
-
-    return f" AND ({turn_cond} OR {turn_id_field_sql} IS NULL)"
-
-
-def process_trace_roots_only_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
-    param_builder: ParamBuilder,
-    table_alias: str,
-) -> str:
-    """Pulls out the trace_roots_only and returns a sql string if there are any trace_roots_only."""
-    if hardcoded_filter is None or not hardcoded_filter.filter.trace_roots_only:
-        return ""
-
-    parent_id_field = get_field_by_name("parent_id")
-    if not isinstance(parent_id_field, CallsMergedAggField):
-        raise TypeError("parent_id is not an aggregate field")
-
-    parent_id_field_sql = parent_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
-
-    return f"AND ({parent_id_field_sql} IS NULL)"
-
-
-def process_parent_ids_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
-    param_builder: ParamBuilder,
-    table_alias: str,
-) -> str:
-    """Pulls out the parent_id and returns a sql string if there are any parent_ids."""
-    if hardcoded_filter is None or not hardcoded_filter.filter.parent_ids:
-        return ""
-
-    parent_id_field = get_field_by_name("parent_id")
-    if not isinstance(parent_id_field, CallsMergedAggField):
-        raise TypeError("parent_id is not an aggregate field")
-
-    parent_id_field_sql = parent_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
-
-    parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
-
-    return f"AND ({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
-
-
-def process_ref_filters_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
-    param_builder: ParamBuilder,
-    table_alias: str,
-) -> str:
-    """Adds a ref filter optimization to the query.
-
-    To be used before group by. This filter is NOT guaranteed to return
-    the correct results, as it can operate on call ends (output_refs) so it
-    should be used in addition to the existing ref filters after group by
-    generated in process_calls_filter_to_conditions."""
-    if hardcoded_filter is None or (
-        not hardcoded_filter.filter.output_refs
-        and not hardcoded_filter.filter.input_refs
-    ):
-        return ""
-
-    def process_ref_filter(field_name: str, refs: list[str]) -> str:
-        field = get_field_by_name(field_name)
-        if not isinstance(field, CallsMergedAggField):
-            raise TypeError(f"{field_name} is not an aggregate field")
-
-        field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
-        param = param_builder.add_param(refs)
-        ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
-        return f"{ref_filter_sql} OR length({field_sql}) = 0"
-
-    ref_filters = []
-    if hardcoded_filter.filter.input_refs:
-        ref_filters.append(
-            process_ref_filter("input_refs", hardcoded_filter.filter.input_refs)
-        )
-    if hardcoded_filter.filter.output_refs:
-        ref_filters.append(
-            process_ref_filter("output_refs", hardcoded_filter.filter.output_refs)
-        )
-
-    if not ref_filters:
-        return ""
-
-    return " AND (" + combine_conditions(ref_filters, "AND") + ")"
 
 
 def process_calls_filter_to_conditions(
