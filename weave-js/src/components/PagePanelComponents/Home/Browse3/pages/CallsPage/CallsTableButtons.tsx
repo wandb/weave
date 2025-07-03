@@ -185,6 +185,11 @@ export const ExportSelector = ({
     setSelectionState('all');
   };
 
+  const usedExpandColumns = getUsedExpandColumns(
+    refColumnsToExpand,
+    filterBy,
+    sortBy
+  );
   const pythonText = makeCodeText(
     callQueryParams.entity,
     callQueryParams.project,
@@ -193,7 +198,8 @@ export const ExportSelector = ({
     filterBy,
     sortBy,
     includeFeedback,
-    includeCosts
+    includeCosts,
+    usedExpandColumns
   );
   const curlText = makeCurlText(
     callQueryParams.entity,
@@ -201,7 +207,7 @@ export const ExportSelector = ({
     selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
     filterBy,
-    refColumnsToExpand,
+    usedExpandColumns,
     sortBy,
     includeFeedback,
     includeCosts
@@ -287,6 +293,75 @@ export const ExportSelector = ({
     </>
   );
 };
+
+function getUsedExpandColumns(
+  refColumnsToExpand: string[],
+  filterBy: Query | undefined,
+  sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
+): string[] {
+  const usedColumns = new Set<string>();
+
+  // Helper function to find all matching expand columns for a field
+  const findMatchingExpandColumns = (field: string): string[] => {
+    const matches: string[] = [];
+
+    // Find the base expand column that matches
+    for (const expandCol of refColumnsToExpand) {
+      if (field.startsWith(expandCol + '.') || field === expandCol) {
+        matches.push(expandCol);
+
+        // If this field goes deeper than the expand column, add intermediate levels
+        if (field.startsWith(expandCol + '.')) {
+          const remainingPath = field.substring(expandCol.length + 1);
+          const remainingParts = remainingPath.split('.');
+
+          // Add intermediate levels (but not the final field)
+          for (let i = 1; i < remainingParts.length; i++) {
+            const intermediatePath =
+              expandCol + '.' + remainingParts.slice(0, i).join('.');
+            if (!matches.includes(intermediatePath)) {
+              matches.push(intermediatePath);
+            }
+          }
+        }
+      }
+    }
+
+    return matches;
+  };
+
+  // Check sortBy fields
+  for (const sort of sortBy) {
+    const matchingColumns = findMatchingExpandColumns(sort.field);
+    matchingColumns.forEach(col => usedColumns.add(col));
+  }
+
+  // Check filterBy for getField references
+  if (filterBy) {
+    const extractFieldsFromQuery = (query: any): void => {
+      if (!query || typeof query !== 'object') return;
+
+      // Check for getField operations
+      if (query.$getField && typeof query.$getField === 'string') {
+        const matchingColumns = findMatchingExpandColumns(query.$getField);
+        matchingColumns.forEach(col => usedColumns.add(col));
+      }
+
+      // Recursively check all properties
+      for (const value of Object.values(query)) {
+        if (Array.isArray(value)) {
+          value.forEach(extractFieldsFromQuery);
+        } else {
+          extractFieldsFromQuery(value);
+        }
+      }
+    };
+
+    extractFieldsFromQuery(filterBy);
+  }
+
+  return Array.from(usedColumns);
+}
 
 const SelectionCheckboxes: FC<{
   numSelectedCalls: number;
@@ -578,7 +653,8 @@ function makeCodeText(
   query: Query | undefined,
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
   includeFeedback: boolean,
-  includeCosts: boolean
+  includeCosts: boolean,
+  refColumnsToExpand: string[]
 ) {
   let codeStr = `import weave\n\nclient = weave.init("${entity}/${project}")`;
   codeStr += `\ncalls = client.get_calls(\n`;
@@ -630,6 +706,13 @@ function makeCodeText(
   }
   if (includeCosts) {
     codeStr += `    include_costs=True,\n`;
+  }
+  if (refColumnsToExpand.length > 0) {
+    codeStr += `    expand_columns=${JSON.stringify(
+      refColumnsToExpand,
+      null,
+      0
+    )},\n`;
   }
 
   codeStr += `)`;
