@@ -69,7 +69,7 @@ export const ChartTypeSelectionDrawer: React.FC<
           fontWeight: 600,
           fontSize: '1.25rem',
         }}>
-        Create chart
+        Add chart
       </Box>
       <Button
         onClick={onClose}
@@ -93,7 +93,7 @@ export const ChartTypeSelectionDrawer: React.FC<
           px: 2,
           display: 'flex',
           flexDirection: 'column',
-          gap: 1,
+          gap: 1.5,
         }}>
         <Box
           sx={{
@@ -102,33 +102,23 @@ export const ChartTypeSelectionDrawer: React.FC<
             color: MOON_500,
             letterSpacing: '0.02em',
             textTransform: 'uppercase',
-            mb: '4px',
           }}>
           Charts
         </Box>
         {chartTypes.map(({type, title, description, icon}) => (
           <Box
             key={type}
+            onClick={() => onSelectType(type)}
             sx={{
               marginLeft: '-8px',
               marginRight: '-8px',
+              padding: '4px 8px',
+              cursor: 'pointer',
+              borderRadius: '8px',
               '&:hover': {
                 backgroundColor: MOON_100,
-                borderRadius: '8px',
               },
             }}>
-            <Button
-              onClick={() => onSelectType(type)}
-              variant="ghost"
-              size="large"
-              style={{
-                justifyContent: 'flex-start',
-                padding: '4px 8px',
-                height: 'auto',
-                borderRadius: '8px',
-                width: '100%',
-                backgroundColor: 'transparent',
-              }}>
             <Box
               sx={{
                 display: 'flex',
@@ -173,7 +163,6 @@ export const ChartTypeSelectionDrawer: React.FC<
                 </Box>
               </Box>
             </Box>
-          </Button>
           </Box>
         ))}
       </Box>
