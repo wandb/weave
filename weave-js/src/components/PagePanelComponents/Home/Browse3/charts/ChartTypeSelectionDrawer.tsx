@@ -5,9 +5,10 @@
   buttons for the different chart types. Clicking a button will close the drawer and open a configuration
   modal for the selected chart type. The new chart will be added to the charts section.
 */
-import {Box} from '@mui/material';
+import {Box, alpha} from '@mui/material';
 import React from 'react';
 
+import {BLUE_300, BLUE_600, MOON_100, MOON_500} from '@wandb/weave/common/css/color.styles';
 import {Button} from '../../../../Button';
 import {Icon} from '../../../../Icon';
 import {ResizableDrawer} from '../pages/common/ResizableDrawer';
@@ -26,19 +27,19 @@ export const ChartTypeSelectionDrawer: React.FC<
       type: 'scatter' as const,
       title: 'Scatter Plot',
       description:
-        'Explore relationships between call metrics like latency vs cost',
+        'Explore relationships between call metrics like latency vs cost.',
       icon: 'chart-scatterplot' as const,
     },
     {
       type: 'line' as const,
       title: 'Line Chart',
-      description: 'Track metrics over time with aggregated data points',
+      description: 'Track metrics over time with aggregated data points.',
       icon: 'line-plot-alt2' as const,
     },
     {
       type: 'bar' as const,
       title: 'Bar Chart',
-      description: 'Compare aggregated metrics across time bins',
+      description: 'Compare aggregated metrics across time bins.',
       icon: 'chart-vertical-bars' as const,
     },
   ];
@@ -88,33 +89,64 @@ export const ChartTypeSelectionDrawer: React.FC<
       marginTop={60}>
       <Box
         sx={{
-          p: 3,
+          py: 2,
+          px: 2,
           display: 'flex',
           flexDirection: 'column',
-          gap: 2,
+          gap: 1,
         }}>
+        <Box
+          sx={{
+            fontWeight: 600,
+            fontSize: '14px',
+            color: MOON_500,
+            letterSpacing: '0.02em',
+            textTransform: 'uppercase',
+            mb: '4px',
+          }}>
+          Charts
+        </Box>
         {chartTypes.map(({type, title, description, icon}) => (
-          <Button
+          <Box
             key={type}
-            onClick={() => onSelectType(type)}
-            variant="ghost"
-            size="large"
-            style={{
-              justifyContent: 'flex-start',
-              padding: '16px',
-              height: 'auto',
-              border: '1px solid #e0e0e0',
-              borderRadius: '8px',
-              width: '100%',
+            sx={{
+              marginLeft: '-8px',
+              marginRight: '-8px',
+              '&:hover': {
+                backgroundColor: MOON_100,
+                borderRadius: '8px',
+              },
             }}>
+            <Button
+              onClick={() => onSelectType(type)}
+              variant="ghost"
+              size="large"
+              style={{
+                justifyContent: 'flex-start',
+                padding: '4px 8px',
+                height: 'auto',
+                borderRadius: '8px',
+                width: '100%',
+                backgroundColor: 'transparent',
+              }}>
             <Box
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 2,
+                gap: 1.5,
                 width: '100%',
               }}>
-              <Icon name={icon} />
+              <Box sx={{
+                backgroundColor: alpha(BLUE_300, 0.48),
+                minWidth: '40px',
+                minHeight: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '100px',
+              }}>
+                <Icon name={icon} color={BLUE_600} />
+              </Box>
               <Box
                 sx={{
                   display: 'flex',
@@ -133,15 +165,16 @@ export const ChartTypeSelectionDrawer: React.FC<
                 <Box
                   sx={{
                     fontSize: '14px',
-                    color: '#666',
-                    mt: 0.5,
+                    color: MOON_500,
                     width: '100%',
+                    fontWeight: 400,
                   }}>
                   {description}
                 </Box>
               </Box>
             </Box>
           </Button>
+          </Box>
         ))}
       </Box>
     </ResizableDrawer>
