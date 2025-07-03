@@ -24,6 +24,7 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
+import { callHasDocuments } from '../DocumentView/parser';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
@@ -177,6 +178,25 @@ const useCallTabs = (call: CallSchema) => {
                 <ScrollableTabContent>
                   <Tailwind>
                     <CallChat call={call.traceCall!} />
+                  </Tailwind>
+                </ScrollableTabContent>
+              </>
+            ),
+          },
+        ]
+      : []),
+    ...(call.traceCall && callHasDocuments(call.traceCall)
+      ? [
+          {
+            label: 'Documents',
+            content: (
+              <>
+                <ScrollableTabContent>
+                  <Tailwind>
+                    <div>
+                      <p>Trace ID: {call.traceCall.id}</p>
+                      {callHasDocuments(call.traceCall) && <span style={{ color: 'green' }}>Contains Documents</span>}
+                    </div>
                   </Tailwind>
                 </ScrollableTabContent>
               </>
