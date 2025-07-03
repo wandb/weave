@@ -157,25 +157,3 @@ class RunAsUser:
             tsi.RunModelRes,
         )
 
-
-# Example: Adding a new user-scoped function with minimal boilerplate:
-#
-# def _run_scorer(req: tsi.RunScorerReq) -> tsi.RunScorerRes:
-#     """Execute a scorer in the user-scoped context."""
-#     client = require_weave_client()
-#     # Your scorer implementation here
-#     return tsi.RunScorerRes(...)
-#
-# # Then add this method to RunAsUser class:
-# async def run_scorer(
-#     self, internal_trace_server: tsi.TraceServerInterface, req: tsi.RunScorerReq
-# ) -> tsi.RunScorerRes:
-#     """Execute a scorer in an isolated process."""
-#     return await self._run_user_scoped_function(
-#         internal_trace_server,
-#         _run_scorer,
-#         req,
-#         req.project_id,
-#         req.wb_user_id,
-#         tsi.RunScorerRes,
-#     )
