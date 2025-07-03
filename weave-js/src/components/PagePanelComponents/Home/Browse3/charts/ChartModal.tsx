@@ -7,6 +7,7 @@
 import {Box, Dialog, DialogContent, IconButton} from '@mui/material';
 import React from 'react';
 
+import {MOON_50} from '@wandb/weave/common/css/color.styles';
 import NumberInput from '../../../../../common/components/elements/NumberInput';
 import {Button} from '../../../../Button';
 import {Select as CustomSelect} from '../../../../Form/Select';
@@ -335,9 +336,9 @@ export const ChartModal: React.FC<ChartModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               fontWeight: 600,
-              fontSize: '1.5rem',
+              fontSize: '1.25rem',
             }}>
-            Chart Settings
+            Chart settings
           </Box>
           <IconButton onClick={onClose} sx={{color: '#666'}}>
             <Icon name="close" />
@@ -401,7 +402,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
               display: 'flex',
               flexDirection: 'column',
               p: 3,
-              backgroundColor: '#fafafa',
+              backgroundColor: MOON_50,
             }}>
             <SectionHeader first>Plot Type</SectionHeader>
             <CustomSelect
@@ -572,19 +573,21 @@ export const ChartModal: React.FC<ChartModalProps> = ({
         <Box
           sx={{
             borderTop: '1px solid #e0e0e0',
-            p: 3,
+            backgroundColor: MOON_50,
+            py: 1.5,
+            px: 2,
             display: 'flex',
             justifyContent: 'flex-end',
             gap: 2,
           }}>
-          <Button onClick={onClose} variant="ghost" size="large">
+          <Button onClick={onClose} variant="secondary" size="large">
             Cancel
           </Button>
           <Button
             onClick={() => onConfirm(localConfig)}
             variant="primary"
             size="large">
-            Save Changes
+            Save chart
           </Button>
         </Box>
       </DialogContent>
