@@ -5,6 +5,7 @@ from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     ObjCreateReq,
+    ObjQueryReq,
     RunModelReq,
     RunModelRes,
     TraceServerInterface,
@@ -83,6 +84,28 @@ async def test_run_model(trace_server: TraceServerInterface):
             CallsQueryReq.model_validate(
                 {
                     "project_id": project_id,
+                }
+            )
+        )
+
+        # Completion call and predict call
+        assert len(calls_res.calls) == 2
+
+        objs_res = trace_server.objs_query(
+            ObjQueryReq.model_validate(
+                {
+                    "project_id": project_id,
+                }
+            )
+        )
+
+        # Model definition & predict object
+        assert len(objs_res.objs) == 2
+
+        calls_res = trace_server.calls_query(
+            CallsQueryReq.model_validate(
+                {
+                    "project_id": project_id,
                     "filter": {
                         "call_ids": [model_run_res.call_id],
                     },
@@ -106,8 +129,8 @@ async def test_run_model(trace_server: TraceServerInterface):
         user_input="Hello, how are you?",
     )
 
-    # This next test verifies isolation of the client
-    # This is critical to show that the results are pinned to the new project
+    # Perform the test with a different project
+    # Internal assertions ensure that the calls and objects are isolated
     await do_test(
         entity=entity,
         project="test_run_model_2",
