@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import {uuidv7} from 'uuidv7';
 
 import {MAX_OBJECT_NAME_LENGTH} from './constants';
-import {Dataset} from './dataset';
 import {computeDigest} from './digest';
 import {
   CallSchema,
@@ -280,6 +279,7 @@ export class WeaveClient {
 
   public async get(ref: ObjectRef): Promise<any> {
     let val: any;
+    let dataObj: any;
     try {
       const res = await this.traceServerApi.obj.objReadObjReadPost({
         project_id: ref.projectId,
@@ -287,6 +287,7 @@ export class WeaveClient {
         digest: ref.digest,
       });
       val = res.data.obj.val;
+      dataObj = res.data.obj;
     } catch (error) {
       if (error instanceof Error && error.message.includes('404')) {
         throw new Error(`Unable to find object for ref uri: ${ref.uri()}`);
@@ -295,7 +296,38 @@ export class WeaveClient {
     }
 
     const t = val?._type;
+
+    if (t == 'StringPrompt') {
+      const {StringPrompt} = await import('./prompt');
+
+      let obj = new StringPrompt({
+        id: dataObj.id,
+        description: val.description,
+        content: val.content,
+      });
+
+      obj.__savedRef = ref;
+
+      return obj;
+    }
+
+    if (t == 'MessagesPrompt') {
+      const {MessagesPrompt} = await import('./prompt');
+
+      let obj = new MessagesPrompt({
+        id: dataObj.id,
+        description: val.description,
+        messages: val.messages,
+      });
+
+      obj.__savedRef = ref;
+
+      return obj;
+    }
+
     if (t == 'Dataset') {
+      // Avoid circular dependency
+      const {Dataset} = await import('./dataset');
       const {_baseParameters, rows} = val;
       let obj = new Dataset({
         id: _baseParameters.id,
