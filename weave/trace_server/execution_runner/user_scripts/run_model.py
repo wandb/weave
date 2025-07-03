@@ -69,7 +69,7 @@ def run_model(req: tsi.RunModelReq) -> tsi.RunModelRes:
         inputs_value = client.get(parse_uri(req.inputs))
 
     else:
-        raise ValueError(
+        raise TypeError(
             f"Invalid input type: {req.inputs.input_type}. "
             "Must be either 'value' or 'ref'"
         )
