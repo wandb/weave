@@ -5,10 +5,10 @@
   buttons for the different chart types. Clicking a button will close the drawer and open a configuration
   modal for the selected chart type. The new chart will be added to the charts section.
 */
-import {Box, alpha} from '@mui/material';
+import {alpha,Box} from '@mui/material';
+import {BLUE_300, BLUE_600, MOON_100, MOON_500} from '@wandb/weave/common/css/color.styles';
 import React from 'react';
 
-import {BLUE_300, BLUE_600, MOON_100, MOON_500} from '@wandb/weave/common/css/color.styles';
 import {Button} from '../../../../Button';
 import {Icon} from '../../../../Icon';
 import {ResizableDrawer} from '../pages/common/ResizableDrawer';

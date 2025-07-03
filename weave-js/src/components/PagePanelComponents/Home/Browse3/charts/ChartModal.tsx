@@ -5,9 +5,9 @@
   its configuration options when a new chart is created or an existing chart is edited.
 */
 import {Box, Dialog, DialogContent, IconButton} from '@mui/material';
+import {MOON_50} from '@wandb/weave/common/css/color.styles';
 import React from 'react';
 
-import {MOON_50} from '@wandb/weave/common/css/color.styles';
 import NumberInput from '../../../../../common/components/elements/NumberInput';
 import {Button} from '../../../../Button';
 import {Select as CustomSelect} from '../../../../Form/Select';
