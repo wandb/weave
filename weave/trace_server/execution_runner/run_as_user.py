@@ -5,6 +5,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 
 from weave.trace.ref_util import get_ref
+from weave.trace.refs import parse_uri
 from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 from weave.trace_server import trace_server_interface as tsi
@@ -15,8 +16,8 @@ from weave.trace_server.execution_runner.cross_process_trace_server import (
 )
 from weave.trace_server.execution_runner.trace_server_adapter import (
     SERVER_SIDE_ENTITY_PLACEHOLDER,
-    convert_internal_uri_to_external_ref,
     externalize_trace_server,
+    make_externalize_ref_converter,
 )
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
@@ -46,15 +47,14 @@ def run_model_wrapped(
     result_queue: multiprocessing.Queue[tsi.RunModelRes],
 ) -> None:
     safe_trace_server = build_child_process_trace_server(trace_server_args)
+    externalize_refs = make_externalize_ref_converter(project_id)
     with user_scoped_client(project_id, safe_trace_server) as client:
-        res = _run_model(req, client)
+        res = _run_model(externalize_refs(req), client)
         result_queue.put(res.model_dump())
 
 
 def _run_model(req: tsi.RunModelReq, client: WeaveClient) -> tsi.RunModelRes:
-    loaded_model = client.get(
-        convert_internal_uri_to_external_ref(client, req.model_ref)
-    )
+    loaded_model = client.get(parse_uri(req.model_ref))
     if not isinstance(loaded_model, LLMStructuredCompletionModel):
         raise TypeError("Invalid model reference")
 
@@ -63,9 +63,7 @@ def _run_model(req: tsi.RunModelReq, client: WeaveClient) -> tsi.RunModelRes:
         inputs_value = req.inputs.value
 
     elif req.inputs.input_type == "ref":
-        inputs_value = client.get(
-            convert_internal_uri_to_external_ref(client, req.inputs.value)
-        )
+        inputs_value = client.get(parse_uri(req.inputs.value))
 
     else:
         raise ValueError("Invalid input type")

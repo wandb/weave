@@ -1,24 +1,13 @@
 from __future__ import annotations
 
-from weave.trace.refs import ObjectRef
-from weave.trace.weave_client import WeaveClient
+from typing import Callable, TypeVar
+
 from weave.trace_server import external_to_internal_trace_server_adapter
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.refs_internal import (
-    InternalObjectRef,
-    parse_internal_uri,
-)
+from weave.trace_server.trace_server_converter import universal_int_to_ext_ref_converter
 
 SERVER_SIDE_ENTITY_PLACEHOLDER = "__SERVER__"
 SERVER_SIDE_PROJECT_ID_PREFIX = SERVER_SIDE_ENTITY_PLACEHOLDER + "/"
-
-
-def convert_internal_uri_to_external_ref(client: WeaveClient, ref: str) -> ObjectRef:
-    internal_ref = parse_internal_uri(ref)
-    assert isinstance(internal_ref, InternalObjectRef)
-    return client.object_ref(
-        internal_ref.name, internal_ref.version, tuple(internal_ref.extra)
-    )
 
 
 def externalize_trace_server(
@@ -29,6 +18,23 @@ def externalize_trace_server(
         id_converter=IdConverter(project_id, wb_user_id),
         user_id=wb_user_id,
     )
+
+
+T = TypeVar("T")
+
+
+def make_externalize_ref_converter(project_id: str) -> Callable[[T], T]:
+    def convert_project_id(internal_project_id: str) -> str:
+        if project_id != internal_project_id:
+            raise ValueError(
+                f"Project ID mismatch: {project_id} != {internal_project_id}. This is a security issue."
+            )
+        return SERVER_SIDE_PROJECT_ID_PREFIX + internal_project_id
+
+    def convert(obj: T) -> T:
+        return universal_int_to_ext_ref_converter(obj, convert_project_id)
+
+    return convert
 
 
 class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
