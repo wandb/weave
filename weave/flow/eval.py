@@ -29,7 +29,7 @@ from weave.flow.scorer import (
 )
 from weave.flow.util import make_memorable_name, transpose
 from weave.trace.env import get_weave_parallelism
-from weave.trace.objectify import maybe_objectify, register_object
+from weave.trace.objectify import register_object
 from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
@@ -118,16 +118,6 @@ class Evaluation(Object):
             if hasattr(obj, field_name):
                 field_values[field_name] = getattr(obj, field_name)
 
-        # special case for scorers
-        if "scorers" in field_values:
-            from weave import scorers as weave_scorers
-
-            assert weave_scorers
-            scorers = []
-            for scorer in field_values["scorers"]:
-                objectified = maybe_objectify(scorer)
-                scorers.append(objectified)
-            field_values["scorers"] = scorers
         return cls(**field_values)
 
     def model_post_init(self, __context: Any) -> None:
