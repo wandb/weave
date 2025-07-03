@@ -1,3 +1,22 @@
+"""
+User-scoped execution runner module.
+
+This module provides functionality to execute code in isolated processes
+with user-specific contexts. It's designed for security and memory isolation,
+ensuring that user code runs in a separate process with proper scoping.
+
+Key components:
+- RunAsUser: Main class for executing functions in isolated processes
+- user_scoped_client: Context manager for creating user-scoped WeaveClients
+- Generic wrapper functions for process execution
+
+Security model:
+- Each user's code runs in a separate process
+- User context is injected via externalized trace server
+- Project IDs are validated to prevent cross-project access
+- Memory isolation prevents data leakage between users
+"""
+
 from __future__ import annotations
 
 import multiprocessing
@@ -27,24 +46,57 @@ from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 def user_scoped_client(
     project_id: str, trace_server: tsi.TraceServerInterface
 ) -> Generator[WeaveClient, None, None]:
+    """
+    Create a user-scoped WeaveClient within a managed context.
+
+    This context manager creates a WeaveClient that's properly scoped to a
+    specific project and ensures proper cleanup when done. The client uses
+    a placeholder entity name since the actual entity is managed server-side.
+
+    Args:
+        project_id: The project ID to scope the client to
+        trace_server: The trace server interface to use
+
+    Yields:
+        WeaveClient: A properly initialized and scoped client
+
+    Example:
+        with user_scoped_client("project123", trace_server) as client:
+            # Use client for operations
+            pass
+    """
+    # Create client with server-side entity placeholder
     client = WeaveClient(
         SERVER_SIDE_ENTITY_PLACEHOLDER, project_id, trace_server, False
     )
 
+    # Initialize the client context
     ic = InitializedClient(client)
 
     yield client
 
+    # Ensure all pending operations are flushed
     client._flush()
+    # Reset the initialized client context
     ic.reset()
 
 
-T = TypeVar("T")
-TReq = TypeVar("TReq", bound=BaseModel)
-TRes = TypeVar("TRes", bound=BaseModel)
+# Generic type variables for request/response typing
+T = TypeVar("T")  # Generic type for any value
+TReq = TypeVar("TReq", bound=BaseModel)  # Request types must be Pydantic models
+TRes = TypeVar("TRes", bound=BaseModel)  # Response types must be Pydantic models
 
 
 class RunAsUserContext(TypedDict, Generic[T]):
+    """
+    Context data passed to the child process for execution.
+
+    Attributes:
+        trace_server_args: Arguments for building the cross-process trace server
+        project_id: The project ID for scoping operations
+        result_queue: Queue for returning results from child to parent process
+    """
+
     trace_server_args: CrossProcessTraceServerArgs
     project_id: str
     result_queue: multiprocessing.Queue[T]
@@ -55,28 +107,62 @@ def _generic_wrapper(
     func: Callable[[Any], Any],
     req: Any,
 ) -> None:
-    """Generic wrapper that executes any function in the child process with user-scoped client."""
+    """
+    Generic wrapper that executes any function in the child process with user-scoped client.
+
+    This function runs in the child process and:
+    1. Builds a trace server client from the provided args
+    2. Creates a user-scoped client context
+    3. Executes the provided function
+    4. Sends the result back via the result queue
+
+    Args:
+        wrapper_context: Context containing trace server args, project ID, and result queue
+        func: The function to execute in the child process
+        req: The request object to pass to the function
+
+    Note:
+        This function assumes the result has a model_dump() method (Pydantic model).
+        Any exceptions in the child process will cause the process to exit with
+        a non-zero code, which is handled by the parent.
+    """
+    # Build the trace server client in the child process
     safe_trace_server = build_child_process_trace_server(
         wrapper_context["trace_server_args"]
     )
+
+    # Execute the function within a user-scoped client context
     with user_scoped_client(wrapper_context["project_id"], safe_trace_server):
         res = func(req)
-        # Assume the result has a model_dump method (Pydantic model)
+        # Convert the Pydantic response to a dict and send back
         wrapper_context["result_queue"].put(res.model_dump())
 
 
 class RunAsUserException(Exception):
-    """Exception raised when a user-scoped function execution fails."""
+    """
+    Exception raised when a user-scoped function execution fails.
+
+    This exception is raised in the parent process when the child process
+    exits with a non-zero exit code, indicating a failure in execution.
+    """
 
     pass
 
 
 class RunAsUser:
-    """Executes functions in a separate process for memory isolation.
+    """
+    Executes functions in a separate process for memory isolation.
 
-    This class provides a way to run functions in an isolated memory space using
-    multiprocessing. The function and its arguments are executed in a new Process,
-    ensuring complete memory isolation from the parent process.
+    This class provides a secure way to run user-provided code in an isolated
+    memory space using multiprocessing. The function and its arguments are
+    executed in a new Process, ensuring complete memory isolation from the
+    parent process.
+
+    Security features:
+    - Process isolation prevents memory access between users
+    - Project scoping ensures users can only access their own data
+    - User ID validation prevents unauthorized access
+    - Reference externalization prevents cross-project references
     """
 
     async def _run_user_scoped_function(
@@ -88,36 +174,52 @@ class RunAsUser:
         wb_user_id: str | None,
         response_type: type[TRes],
     ) -> TRes:
-        """Generic method to run any function in an isolated process with user-scoped client.
+        """
+        Generic method to run any function in an isolated process with user-scoped client.
+
+        This method:
+        1. Validates the user ID
+        2. Wraps the trace server with user context
+        3. Starts a worker thread in the parent process
+        4. Spawns a child process for execution
+        5. Waits for completion and returns the result
 
         Args:
-            internal_trace_server: The trace server interface.
-            func: Function to execute in the isolated context.
-            req: Request object to pass to the function.
-            project_id: Project ID for the execution context.
-            wb_user_id: User ID for the execution context.
-            response_type: Type of the response for validation.
+            internal_trace_server: The trace server interface to wrap
+            func: Function to execute in the isolated context
+            req: Request object to pass to the function
+            project_id: Project ID for the execution context
+            wb_user_id: User ID for the execution context
+            response_type: Type of the response for validation
 
         Returns:
-            The response from the executed function.
+            The response from the executed function
 
         Raises:
-            ValueError: If wb_user_id is None.
-            RunAsUserException: If process execution fails.
+            ValueError: If wb_user_id is None
+            RunAsUserException: If process execution fails
         """
         if wb_user_id is None:
             raise ValueError("wb_user_id is required")
 
+        # Wrap the trace server with user context and project validation
         wrapped_trace_server = externalize_trace_server(
             internal_trace_server, project_id, wb_user_id
         )
+
         # Generate args in parent process (starts worker thread here)
         trace_server_args = generate_child_process_trace_server_args(
             wrapped_trace_server
         )
+
+        # Convert any internal references to external format for security
         externalize_refs = make_externalize_ref_converter(project_id)
         externalized_req = externalize_refs(req)
+
+        # Create queue for receiving results from child process
         result_queue: multiprocessing.Queue[dict] = multiprocessing.Queue()
+
+        # Spawn child process with isolated memory space
         process = multiprocessing.Process(
             target=_generic_wrapper,
             kwargs={
@@ -130,23 +232,38 @@ class RunAsUser:
                 "req": externalized_req,
             },
         )
+
+        # Start the child process and wait for completion
         process.start()
         process.join()
+
+        # Check if the process completed successfully
         if process.exitcode != 0:
             raise RunAsUserException(f"Process execution failed: {process.exitcode}")
+
+        # Get the result and validate it matches the expected type
         return response_type.model_validate(result_queue.get())
 
     async def run_model(
         self, internal_trace_server: tsi.TraceServerInterface, req: tsi.RunModelReq
     ) -> tsi.RunModelRes:
-        """Execute a model in an isolated process.
+        """
+        Execute a model in an isolated process.
+
+        This is a specialized method for running ML models with proper isolation.
+        The model execution happens in a separate process to prevent memory
+        contamination and ensure security.
 
         Args:
-            internal_trace_server: The trace server interface.
-            req: Model execution request.
+            internal_trace_server: The trace server interface
+            req: Model execution request containing model reference and inputs
 
         Returns:
-            Model execution response.
+            Model execution response with output and call ID
+
+        Raises:
+            ValueError: If wb_user_id is missing from the request
+            RunAsUserException: If model execution fails
         """
         return await self._run_user_scoped_function(
             internal_trace_server,
@@ -156,4 +273,3 @@ class RunAsUser:
             req.wb_user_id,
             tsi.RunModelRes,
         )
-

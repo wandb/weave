@@ -8,45 +8,6 @@ The main functions are:
 - generate_child_process_trace_server_args:
   Called in parent process to start a worker thread and get args
 - build_child_process_trace_server: Called to build a client that communicates with the worker
-
-Example usage:
-    >>> # In parent process:
-    >>> from weave.trace_server.sqlite_trace_server import SqliteTraceServer
-    >>> from weave.trace_server.cross_process_trace_server import (
-    ...     generate_child_process_trace_server_args,
-    ...     build_child_process_trace_server
-    ... )
-    >>>
-    >>> # Create any trace server implementation
-    >>> sqlite_server = SqliteTraceServer("/tmp/traces.db")
-    >>>
-    >>> # Start a worker thread and get args
-    >>> args = generate_child_process_trace_server_args(sqlite_server)
-    >>>
-    >>> # Build a client that communicates with the worker
-    >>> client = build_child_process_trace_server(args)
-    >>>
-    >>> # Use it like any other trace server
-    >>> from weave.trace_server.trace_server_interface import CallStartReq, StartedCallSchemaForInsert
-    >>> import datetime
-    >>>
-    >>> req = CallStartReq(
-    ...     start=StartedCallSchemaForInsert(
-    ...         project_id="my_project",
-    ...         id="call_123",
-    ...         trace_id="trace_123",
-    ...         op_name="my_operation",
-    ...         started_at=datetime.datetime.now(),
-    ...         attributes={},
-    ...         inputs={"x": 1}
-    ...     )
-    ... )
-    >>>
-    >>> response = client.call_start(req)
-    >>> print(f"Started call: {response.id}")
-    >>>
-    >>> # Don't forget to shutdown when done
-    >>> client.shutdown()
 """
 
 import contextvars
@@ -68,6 +29,7 @@ CONTEXT_VARS_TO_PROPAGATE: list[contextvars.ContextVar] = [
     _secret_fetcher_context,
 ]
 
+# Default timeout for request/response cycles
 TIMEOUT_SECONDS = 60.0
 
 
@@ -95,6 +57,8 @@ class CrossProcessTraceServerArgs(TypedDict):
 
 
 class SendRequestException(Exception):
+    """Raised when an error occurs while processing a request in the worker thread."""
+
     pass
 
 
@@ -102,9 +66,13 @@ class CrossProcessTraceServer(TraceServerInterface):
     """
     A trace server implementation that delegates operations via queues.
 
-    This class doesn't know anything about the actual trace server implementation.
-    It just sends requests through a request queue and receives responses through
-    a response queue.
+    This class acts as a proxy that sends requests through a request queue
+    and receives responses through a response queue. It doesn't know about
+    the actual trace server implementation - it just handles the
+    communication protocol.
+
+    The actual trace server runs in a separate thread (in the parent process)
+    and this class can be used from child processes to communicate with it.
     """
 
     def __init__(
@@ -144,7 +112,13 @@ class CrossProcessTraceServer(TraceServerInterface):
             return f"req_{self._request_counter}"
 
     def _handle_responses(self) -> None:
-        """Handle responses from the worker thread."""
+        """
+        Handle responses from the worker thread.
+
+        This method runs in a separate thread and continuously polls the
+        response queue for incoming responses, matching them with pending
+        requests.
+        """
         while not self._shutdown:
             try:
                 response = self._response_queue.get(timeout=0.1)
@@ -172,6 +146,8 @@ class CrossProcessTraceServer(TraceServerInterface):
             The response from the worker thread
 
         Raises:
+            RuntimeError: If the server has been shut down
+            TimeoutError: If the request times out
             SendRequestException: If an error occurs in the worker thread
         """
         if self._shutdown:
@@ -213,11 +189,12 @@ class CrossProcessTraceServer(TraceServerInterface):
                 {"method": "_shutdown", "request": None, "request_id": "shutdown"}
             )
 
-    # OTEL API
+    # === OTEL API ===
     def otel_export(self, req: OtelExportReq) -> OtelExportRes:
+        """Export OpenTelemetry data."""
         return self._send_request("otel_export", req)
 
-    # Call API
+    # === Call API ===
     def call_start(self, req: CallStartReq) -> CallStartRes:
         """
         Start a new call by delegating to the worker thread.
@@ -231,151 +208,207 @@ class CrossProcessTraceServer(TraceServerInterface):
         return self._send_request("call_start", req)
 
     def call_end(self, req: CallEndReq) -> CallEndRes:
+        """End an existing call."""
         return self._send_request("call_end", req)
 
     def call_read(self, req: CallReadReq) -> CallReadRes:
+        """Read call data."""
         return self._send_request("call_read", req)
 
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
+        """Query multiple calls."""
         return self._send_request("calls_query", req)
 
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]:
-        # Note: Streaming is more complex across threads
-        # For now, we'll convert the full query to a list
+        """
+        Query calls as a stream.
+
+        Note: Streaming is complex across threads. Currently converts
+        the full query to a list.
+        """
+        # TODO: Implement proper streaming support
         result = self.calls_query(req)
         return iter(result.calls)
 
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
+        """Delete calls."""
         return self._send_request("calls_delete", req)
 
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
+        """Query call statistics."""
         return self._send_request("calls_query_stats", req)
 
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
+        """Update call data."""
         return self._send_request("call_update", req)
 
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes:
+        """Start multiple calls in a batch."""
         return self._send_request("call_start_batch", req)
 
-    # Op API
+    # === Op API ===
     def op_create(self, req: OpCreateReq) -> OpCreateRes:
+        """Create an operation."""
         return self._send_request("op_create", req)
 
     def op_read(self, req: OpReadReq) -> OpReadRes:
+        """Read operation data."""
         return self._send_request("op_read", req)
 
     def ops_query(self, req: OpQueryReq) -> OpQueryRes:
+        """Query operations."""
         return self._send_request("ops_query", req)
 
-    # Cost API
+    # === Cost API ===
     def cost_create(self, req: CostCreateReq) -> CostCreateRes:
+        """Create cost data."""
         return self._send_request("cost_create", req)
 
     def cost_query(self, req: CostQueryReq) -> CostQueryRes:
+        """Query cost data."""
         return self._send_request("cost_query", req)
 
     def cost_purge(self, req: CostPurgeReq) -> CostPurgeRes:
+        """Purge cost data."""
         return self._send_request("cost_purge", req)
 
-    # Obj API
+    # === Obj API ===
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
+        """Create an object."""
         return self._send_request("obj_create", req)
 
     def obj_read(self, req: ObjReadReq) -> ObjReadRes:
+        """Read object data."""
         return self._send_request("obj_read", req)
 
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
+        """Query objects."""
         return self._send_request("objs_query", req)
 
     def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes:
+        """Delete an object."""
         return self._send_request("obj_delete", req)
 
-    # Table API
+    # === Table API ===
     def table_create(self, req: TableCreateReq) -> TableCreateRes:
+        """Create a table."""
         return self._send_request("table_create", req)
 
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes:
+        """Update table data."""
         return self._send_request("table_update", req)
 
     def table_query(self, req: TableQueryReq) -> TableQueryRes:
+        """Query table data."""
         return self._send_request("table_query", req)
 
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]:
-        # Note: Streaming is more complex across threads
-        # For now, we'll convert the full query to a list
+        """
+        Query table rows as a stream.
+
+        Note: Streaming is complex across threads. Currently converts
+        the full query to a list.
+        """
+        # TODO: Implement proper streaming support
         result = self.table_query(req)
         return iter(result.rows)
 
     def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes:
+        """Query table statistics."""
         return self._send_request("table_query_stats", req)
 
     def table_query_stats_batch(
         self, req: TableQueryStatsBatchReq
     ) -> TableQueryStatsBatchRes:
+        """Query table statistics in batch."""
         return self._send_request("table_query_stats_batch", req)
 
-    # Ref API
+    # === Ref API ===
     def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
+        """Read multiple references in batch."""
         return self._send_request("refs_read_batch", req)
 
-    # File API
+    # === File API ===
     def file_create(self, req: FileCreateReq) -> FileCreateRes:
+        """Create a file."""
         return self._send_request("file_create", req)
 
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
+        """Read file content."""
         return self._send_request("file_content_read", req)
 
     def files_stats(self, req: FilesStatsReq) -> FilesStatsRes:
+        """Get file statistics."""
         return self._send_request("files_stats", req)
 
-    # Feedback API
+    # === Feedback API ===
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes:
+        """Create feedback."""
         return self._send_request("feedback_create", req)
 
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes:
+        """Query feedback."""
         return self._send_request("feedback_query", req)
 
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes:
+        """Purge feedback."""
         return self._send_request("feedback_purge", req)
 
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes:
+        """Replace feedback."""
         return self._send_request("feedback_replace", req)
 
-    # Action API
+    # === Action API ===
     def actions_execute_batch(
         self, req: ActionsExecuteBatchReq
     ) -> ActionsExecuteBatchRes:
+        """Execute actions in batch."""
         return self._send_request("actions_execute_batch", req)
 
-    # Execute LLM API
+    # === Execute LLM API ===
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes:
+        """Create LLM completions."""
         return self._send_request("completions_create", req)
 
-    # Execute LLM API (Streaming)
     def completions_create_stream(
         self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
-        # Note: Streaming is more complex across threads
-        # For now, we'll fall back to non-streaming
+        """
+        Create LLM completions as a stream.
+
+        Note: Streaming is complex across threads. Currently falls back
+        to non-streaming version.
+        """
+        # TODO: Implement proper streaming support
         result = self.completions_create(req)
         yield result.response
 
-    # Project statistics API
+    # === Project statistics API ===
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes:
+        """Get project statistics."""
         return self._send_request("project_stats", req)
 
-    # Thread API
+    # === Thread API ===
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]:
-        # Note: This would need special handling for streaming
-        # For now, we'll implement a simple non-streaming version
+        """
+        Query threads as a stream.
+
+        Note: This would need special handling for streaming.
+        Currently not implemented.
+        """
+        # TODO: Implement streaming support
         raise NotImplementedError(
             "Streaming not yet implemented for cross-process server"
         )
 
-    # Evaluation Execution API
+    # === Evaluation Execution API ===
     async def run_model(self, req: RunModelReq) -> RunModelRes:
-        # Note: Async methods require special handling
-        # For now, we'll run synchronously
+        """
+        Run a model asynchronously.
+
+        Note: Async methods require special handling. Currently runs synchronously.
+        """
+        # TODO: Implement proper async support
         return self._send_request("run_model", req)
 
 
