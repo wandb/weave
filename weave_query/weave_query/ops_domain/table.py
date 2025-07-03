@@ -678,9 +678,7 @@ def _get_table_data_from_file(file: artifact_fs.FilesystemArtifactFile) -> dict:
         raise errors.WeaveInternalError("File is None or a directory")
     with file.open() as f:
         with tracer.trace("get_table:jsonload"):
-            import orjson
-
-            data = orjson.loads(f.read())
+            data = json.load(f)
     return data
 
 
