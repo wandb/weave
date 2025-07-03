@@ -25,20 +25,20 @@ export const ChartTypeSelectionDrawer: React.FC<
   const chartTypes = [
     {
       type: 'scatter' as const,
-      title: 'Scatter Plot',
+      title: 'Scatter plot',
       description:
         'Explore relationships between call metrics like latency vs cost.',
       icon: 'chart-scatterplot' as const,
     },
     {
       type: 'line' as const,
-      title: 'Line Chart',
+      title: 'Line chart',
       description: 'Track metrics over time with aggregated data points.',
       icon: 'line-plot-alt2' as const,
     },
     {
       type: 'bar' as const,
-      title: 'Bar Chart',
+      title: 'Bar chart',
       description: 'Compare aggregated metrics across time bins.',
       icon: 'chart-vertical-bars' as const,
     },
@@ -93,7 +93,7 @@ export const ChartTypeSelectionDrawer: React.FC<
           px: 2,
           display: 'flex',
           flexDirection: 'column',
-          gap: 1.5,
+          gap: 1,
         }}>
         <Box
           sx={{
@@ -112,7 +112,7 @@ export const ChartTypeSelectionDrawer: React.FC<
             sx={{
               marginLeft: '-8px',
               marginRight: '-8px',
-              padding: '4px 8px',
+              padding: '8px 8px',
               cursor: 'pointer',
               borderRadius: '8px',
               '&:hover': {

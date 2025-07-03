@@ -232,7 +232,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
       label: (
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
           <Icon name="chart-scatterplot" />
-          Scatter Plot
+          Scatter plot
         </Box>
       ),
     },
@@ -241,7 +241,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
       label: (
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
           <Icon name="line-plot-alt2" />
-          Line Plot
+          Line plot
         </Box>
       ),
     },
@@ -250,7 +250,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
       label: (
         <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
           <Icon name="chart-vertical-bars" />
-          Bar Chart
+          Bar chart
         </Box>
       ),
     },
