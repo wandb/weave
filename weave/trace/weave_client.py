@@ -31,6 +31,8 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
+from weave.chat.chat import Chat
+from weave.chat.models import Models
 from weave.trace import trace_sentry, urls
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
@@ -975,6 +977,8 @@ class WeaveClient:
         if hasattr(self.server, "get_call_processor"):
             self._server_call_processor = self.server.get_call_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+        self.models = Models(entity, project)
+        self.chat = Chat(entity, project)
 
     ################ High Level Convenience Methods ################
 
