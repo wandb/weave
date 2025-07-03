@@ -24,7 +24,7 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
-import { callHasDocuments } from '../DocumentView/parser';
+import {callHasDocuments} from '../DocumentView/parser';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
