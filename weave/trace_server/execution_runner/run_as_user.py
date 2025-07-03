@@ -8,12 +8,12 @@ from weave.trace.ref_util import get_ref
 from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.cross_process_trace_server import (
+from weave.trace_server.execution_runner.cross_process_trace_server import (
     CrossProcessTraceServerArgs,
     build_child_process_trace_server,
     generate_child_process_trace_server_args,
 )
-from weave.trace_server.evaluation_runner.trace_server_adapter import (
+from weave.trace_server.execution_runner.trace_server_adapter import (
     SERVER_SIDE_ENTITY_PLACEHOLDER,
     convert_internal_uri_to_external_ref,
     externalize_trace_server,

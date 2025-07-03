@@ -79,7 +79,7 @@ from weave.trace_server.errors import (
     ObjectDeletedError,
     RequestTooLarge,
 )
-from weave.trace_server.evaluation_runner.server_side_object_saver import RunAsUser
+from weave.trace_server.execution_runner.run_as_user import RunAsUser
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     validate_feedback_create_req,
