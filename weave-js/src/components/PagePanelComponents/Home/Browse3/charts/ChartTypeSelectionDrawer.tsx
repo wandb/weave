@@ -5,8 +5,13 @@
   buttons for the different chart types. Clicking a button will close the drawer and open a configuration
   modal for the selected chart type. The new chart will be added to the charts section.
 */
-import {alpha,Box} from '@mui/material';
-import {BLUE_300, BLUE_600, MOON_100, MOON_500} from '@wandb/weave/common/css/color.styles';
+import {alpha, Box} from '@mui/material';
+import {
+  BLUE_300,
+  BLUE_600,
+  MOON_100,
+  MOON_500,
+} from '@wandb/weave/common/css/color.styles';
 import React from 'react';
 
 import {Button} from '../../../../Button';
@@ -71,12 +76,7 @@ export const ChartTypeSelectionDrawer: React.FC<
         }}>
         Add chart
       </Box>
-      <Button
-        onClick={onClose}
-        variant="ghost"
-        icon="close"
-        tooltip="Close"
-      />
+      <Button onClick={onClose} variant="ghost" icon="close" tooltip="Close" />
     </Box>
   );
 
@@ -126,15 +126,16 @@ export const ChartTypeSelectionDrawer: React.FC<
                 gap: 1.5,
                 width: '100%',
               }}>
-              <Box sx={{
-                backgroundColor: alpha(BLUE_300, 0.48),
-                minWidth: '40px',
-                minHeight: '40px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '100px',
-              }}>
+              <Box
+                sx={{
+                  backgroundColor: alpha(BLUE_300, 0.48),
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '100px',
+                }}>
                 <Icon name={icon} color={BLUE_600} />
               </Box>
               <Box
