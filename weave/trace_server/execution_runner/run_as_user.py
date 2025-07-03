@@ -19,11 +19,12 @@ Security model:
 
 from __future__ import annotations
 
+import logging
 import multiprocessing
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Generic, Literal, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -42,6 +43,7 @@ from weave.trace_server.execution_runner.trace_server_adapter import (
 )
 from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 
+logger = logging.getLogger(__name__)
 EXECUTION_TIMEOUT_SECONDS = 60
 
 
@@ -278,13 +280,18 @@ class RunAsUser:
 
         # Check if the process completed successfully
         if process.exitcode != 0:
-            raise RunAsUserException(f"Process execution failed with exit code: {process.exitcode}")
+            raise RunAsUserException(
+                f"Process execution failed with exit code: {process.exitcode}"
+            )
 
         # Get the result and validate it matches the expected type
         try:
             result_dict = result_queue.get_nowait()
-        except Exception:
-            raise RunAsUserException("Process completed but no result was returned")
+        except Exception as e:
+            logger.exception(f"Error getting result: {e}")
+            raise RunAsUserException(
+                "Process completed but no result was returned"
+            ) from e
 
         res = response_type.model_validate(result_dict)
         return res

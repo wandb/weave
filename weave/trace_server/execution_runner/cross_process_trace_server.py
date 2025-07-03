@@ -136,7 +136,7 @@ class CrossProcessTraceServer(TraceServerInterface):
                 continue
             except Exception as e:
                 # Log error but continue handling responses
-                logger.error(f"Error handling response: {e}")
+                logger.exception(f"Error handling response: {e}")
 
     def _send_request(self, method: str, request: Any) -> Any:
         """
@@ -536,5 +536,5 @@ def _trace_server_worker_loop_with_context(
 
         except Exception as e:
             # Critical error in worker loop
-            logger.error(f"Critical error in worker loop: {e}")
+            logger.exception(f"Critical error in worker loop: {e}")
             break
