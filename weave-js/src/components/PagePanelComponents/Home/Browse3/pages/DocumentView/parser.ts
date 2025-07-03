@@ -1,5 +1,3 @@
-// src/parser.ts (Updated)
-
 import {
   SCHEMA_PARSERS,
   TraceCallSchema,
