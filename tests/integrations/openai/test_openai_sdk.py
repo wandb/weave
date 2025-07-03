@@ -6,7 +6,7 @@ import weave
 from weave.integrations.openai.openai_sdk import (
     create_wrapper_async,
     create_wrapper_sync,
-    openai_on_input_handler,
+    openai_on_input_handler_extended,
 )
 from weave.trace.autopatch import OpSettings
 
@@ -31,7 +31,7 @@ class NonCompletion:
 
 
 def test_openai_on_input_handler_with_completion_instance():
-    """Test that openai_on_input_handler processes completion instances correctly"""
+    """Test that openai_on_input_handler_extended processes completion instances correctly"""
     completion = DummyCompletion("https://api.openai.com", "1.2.3")
     mock_op = Mock()
     mock_op.name = "test_op"
@@ -39,7 +39,7 @@ def test_openai_on_input_handler_with_completion_instance():
     args = (completion, {"model": "gpt-4", "messages": []})
     kwargs = {"temperature": 0.7}
 
-    result = openai_on_input_handler(mock_op, args, kwargs)
+    result = openai_on_input_handler_extended(mock_op, args, kwargs)
 
     # Should return ProcessedInputs
     assert result is not None
@@ -66,7 +66,7 @@ def test_openai_on_input_handler_with_completion_instance():
 
 
 def test_openai_on_input_handler_with_non_completion_instance():
-    """Test that openai_on_input_handler handles non-completion instances correctly"""
+    """Test that openai_on_input_handler_extended handles non-completion instances correctly"""
     mock_op = Mock()
     mock_op.name = "test_op"
     non_completion = NonCompletion()
@@ -74,7 +74,7 @@ def test_openai_on_input_handler_with_non_completion_instance():
     args = (non_completion, {"model": "gpt-4"})
     kwargs = {"temperature": 0.7}
 
-    result = openai_on_input_handler(mock_op, args, kwargs)
+    result = openai_on_input_handler_extended(mock_op, args, kwargs)
 
     # Should still return ProcessedInputs
     assert result is not None
@@ -88,7 +88,7 @@ def test_openai_on_input_handler_with_non_completion_instance():
 
 
 def test_openai_on_input_handler_with_easy_prompt():
-    """Test that openai_on_input_handler handles EasyPrompt correctly"""
+    """Test that openai_on_input_handler_extended handles EasyPrompt correctly"""
     completion = DummyCompletion("https://api.openai.com")
     mock_op = Mock()
     mock_op.name = "test_op"
@@ -101,7 +101,7 @@ def test_openai_on_input_handler_with_easy_prompt():
     args = (completion, easy_prompt)
     kwargs = {"temperature": 0.5}
 
-    result = openai_on_input_handler(mock_op, args, kwargs)
+    result = openai_on_input_handler_extended(mock_op, args, kwargs)
 
     # Should return ProcessedInputs
     assert result is not None
@@ -130,7 +130,7 @@ def test_openai_on_input_handler_with_easy_prompt():
 
 
 def test_openai_on_input_handler_preserves_original_args_kwargs():
-    """Test that openai_on_input_handler preserves original args and kwargs"""
+    """Test that openai_on_input_handler_extended preserves original args and kwargs"""
     completion = DummyCompletion("https://api.mistral.ai", "0.9.0")
     mock_op = Mock()
     mock_op.name = "test_op"
@@ -138,7 +138,7 @@ def test_openai_on_input_handler_preserves_original_args_kwargs():
     original_args = (completion, {"model": "mistral-7b"})
     original_kwargs = {"max_tokens": 100}
 
-    result = openai_on_input_handler(mock_op, original_args, original_kwargs)
+    result = openai_on_input_handler_extended(mock_op, original_args, original_kwargs)
 
     # Should preserve original values
     assert result.original_args == original_args
@@ -146,11 +146,11 @@ def test_openai_on_input_handler_preserves_original_args_kwargs():
 
 
 def test_openai_on_input_handler_with_no_args():
-    """Test openai_on_input_handler behavior with no arguments"""
+    """Test openai_on_input_handler_extended behavior with no arguments"""
     mock_op = Mock()
     mock_op.name = "test_op"
 
-    result = openai_on_input_handler(mock_op, (), {})
+    result = openai_on_input_handler_extended(mock_op, (), {})
 
     assert result is not None
     assert result.args == ()
