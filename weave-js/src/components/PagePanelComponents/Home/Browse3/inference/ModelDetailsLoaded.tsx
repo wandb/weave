@@ -45,6 +45,10 @@ const BASE_URL =
 const CODE_EXAMPLES_CHAT: Record<string, string> = {
   Python: `
 import openai
+import weave
+
+# Weave autopatches OpenAI to log LLM calls to W&B
+weave.init("<team>/<project>")
 
 client = openai.OpenAI(
     # The custom base URL points to W&B Inference
@@ -154,12 +158,11 @@ export const ModelDetailsLoaded = ({
   const onOpenPlayground = () => {
     navigateToPlayground(history, model.id, inferenceContext);
   };
-  const hasPlayground = !!model.idPlayground && inferenceContext.isLoggedIn;
+  const hasPlayground =
+    !!model.idPlayground && inferenceContext.isInferenceEnabled;
   const tooltipPlayground = hasPlayground
     ? undefined
-    : inferenceContext.isLoggedIn
-    ? 'This model is not available in the playground'
-    : 'You must be logged in to use the playground';
+    : inferenceContext.availabilityMessage;
 
   const hasPrice =
     (model.priceCentsPerBillionTokensInput ?? 0) > 0 ||
@@ -319,7 +322,7 @@ export const ModelDetailsLoaded = ({
         </div>
       </div>
 
-      {model.idPlayground && (
+      {hasPlayground && (
         <>
           <div className="mt-16 text-lg font-semibold leading-8">
             Use this model

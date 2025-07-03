@@ -33,7 +33,7 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
     # For some reason pytest's import procedure causes the patching
     # to fail in prod mode. Specifically, the patches get run twice
     # despite the fact that the patcher is a singleton.
-    weave_server_flag = request.config.getoption("--weave-server")
+    weave_server_flag = request.config.getoption("--trace-server")
     if weave_server_flag == ("prod"):
         yield
         return
@@ -64,7 +64,8 @@ def test_litellm_quickstart(
     calls = list(client.calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -105,7 +106,8 @@ async def test_litellm_quickstart_async(
     calls = list(client.calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -151,7 +153,8 @@ def test_litellm_quickstart_stream(
     calls = list(client.calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -199,7 +202,8 @@ async def test_litellm_quickstart_stream_async(
     calls = list(client.calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"

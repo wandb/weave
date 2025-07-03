@@ -325,6 +325,7 @@ const useCallsNoExpansion = (
       columns: params.columns,
       include_costs: params.includeCosts,
       include_feedback: params.includeFeedback,
+      ...(params.includeStorageSize ? {include_storage_size: true} : null),
       ...(params.includeTotalStorageSize
         ? {include_total_storage_size: true}
         : null),
@@ -340,6 +341,7 @@ const useCallsNoExpansion = (
     params.columns,
     params.includeCosts,
     params.includeFeedback,
+    params.includeStorageSize,
     params.includeTotalStorageSize,
   ]);
 
@@ -357,6 +359,7 @@ const useCallsNoExpansion = (
       if (_.isEqual(expectedRequestRef.current, req)) {
         loadingRef.current = false;
         setCallRes(res);
+        setError(null);
       }
     };
     const onError = (e: any) => {

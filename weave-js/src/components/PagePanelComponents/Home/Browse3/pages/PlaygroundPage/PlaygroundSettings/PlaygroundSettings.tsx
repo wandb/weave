@@ -127,6 +127,10 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                   setResponseFormat={value =>
                     setPlaygroundStateField(idx, 'responseFormat', value)
                   }
+                  jsonSchema={playgroundState.jsonSchema}
+                  setJsonSchema={value =>
+                    setPlaygroundStateField(idx, 'jsonSchema', value)
+                  }
                 />
                 <FunctionEditor
                   playgroundState={playgroundState}

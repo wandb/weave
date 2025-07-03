@@ -6,7 +6,6 @@ import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
-import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
 import {IconFilterAlt} from '../../../../Icon';
@@ -83,9 +82,6 @@ export const FilterBar = ({
   const [incompleteFilters, setIncompleteFilters] = useState<GridFilterItem[]>(
     []
   );
-
-  const {loading, userInfo} = useViewerInfo();
-  const isWandbAdmin = (!loading && userInfo?.admin) ?? false;
 
   // Merge the parent filter model with our incomplete filters
   useEffect(() => {
@@ -181,13 +177,11 @@ export const FilterBar = ({
     value: 'id',
     label: 'Call ID',
   });
-  if (isWandbAdmin) {
-    (options[0] as GroupedOption).options.push({
-      value: MONITORED_FILTER_VALUE,
-      label: 'Monitored',
-      description: 'Find all calls scored by a particular monitor',
-    });
-  }
+  (options[0] as GroupedOption).options.push({
+    value: MONITORED_FILTER_VALUE,
+    label: 'Monitored',
+    description: 'Find all calls scored by a particular monitor',
+  });
 
   const onRemoveAll = () => {
     // Check if there's only one filter and it's a datetime filter
@@ -385,9 +379,9 @@ export const FilterBar = ({
     <>
       <div
         ref={refBar}
-        className={`border-box flex h-32 cursor-pointer items-center gap-4 rounded px-8 ${
+        className={`border-box flex h-[34px] cursor-pointer items-center gap-4 rounded-md px-8 ${
           hasBorder
-            ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-200 dark:outline dark:outline-[1.5px] dark:outline-transparent dark:hover:border-teal-400 dark:hover:outline-teal-400'
+            ? 'border border-moon-250 hover:border-teal-350 hover:ring-1 hover:ring-teal-350 dark:border-moon-200 dark:outline dark:outline-[1.5px] dark:outline-transparent dark:hover:border-teal-400 dark:hover:outline-teal-400'
             : ''
         } ${
           !hasBorder ? 'hover:bg-teal-300/[0.48] dark:hover:bg-moon-200' : ''
@@ -396,7 +390,7 @@ export const FilterBar = ({
         <div>
           <IconFilterAlt />
         </div>
-        <div ref={refLabel} className="select-none font-semibold">
+        <div ref={refLabel} className="mr-4 select-none font-semibold">
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>

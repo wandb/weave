@@ -29,6 +29,7 @@ const OpCodeViewerContainer = styled.div`
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 `;
 OpCodeViewerContainer.displayName = 'S.OpCodeViewerContainer';
 
@@ -41,6 +42,12 @@ const SelectVersionBar = styled.div`
   display: flex;
 `;
 SelectVersionBar.displayName = 'S.SelectVersionBar';
+
+const ContentArea = styled.div`
+  flex: 1;
+  overflow: auto;
+`;
+ContentArea.displayName = 'S.ContentArea';
 
 const VersionHeader = styled.div`
   display: flex;
@@ -155,7 +162,9 @@ export const OpCodeViewer = ({
     <OpCodeViewerContainer>
       {diffBar}
       {diffState.left == null || diffState.right == null ? (
-        <OpDefCode uri={currentVersionURI} />
+        <ContentArea>
+          <OpDefCode uri={currentVersionURI} />
+        </ContentArea>
       ) : (
         <>
           <SelectVersionBar>
@@ -190,11 +199,13 @@ export const OpCodeViewer = ({
               />
             </VersionHeader>
           </SelectVersionBar>
-          <OpCodeViewerDiff
-            left={diffState.left}
-            right={diffState.right}
-            onSplitResize={onSplitResize}
-          />
+          <ContentArea>
+            <OpCodeViewerDiff
+              left={diffState.left}
+              right={diffState.right}
+              onSplitResize={onSplitResize}
+            />
+          </ContentArea>
         </>
       )}
     </OpCodeViewerContainer>

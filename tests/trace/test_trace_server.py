@@ -3,6 +3,7 @@ import urllib
 import pytest
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.refs_internal import InvalidInternalRef
 
 
 def test_save_object(client):
@@ -61,7 +62,7 @@ def test_robust_to_url_sensitive_chars(client):
     assert read_res.vals[0] == bad_val
 
     # Key that contains reserved characters should be rejected.
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidInternalRef):
         read_res = client.server.refs_read_batch(
             tsi.RefsReadBatchReq(
                 refs=[

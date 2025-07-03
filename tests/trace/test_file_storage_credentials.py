@@ -135,7 +135,6 @@ def test_get_gcp_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": "invalid-json",
             "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
                 b"invalid-json"
             ).decode(),

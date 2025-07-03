@@ -10,6 +10,7 @@
 import {
   hexToRGB,
   MOON_100,
+  MOON_150,
   MOON_250,
   MOON_350,
   MOON_500,
@@ -84,13 +85,6 @@ const OUTWARD_MARGINS: Record<SelectSize, string> = {
   medium: '-12px',
   large: '-12px',
   variable: '-8px',
-} as const;
-
-const CLEAR_INDICATOR_PADDING: Record<SelectSize, number> = {
-  small: 2,
-  medium: 6,
-  large: 8,
-  variable: 2,
 } as const;
 
 export type AdditionalProps = {
@@ -194,7 +188,7 @@ const getStyles = <
     indicatorSeparator: baseStyles => ({...baseStyles, display: 'none'}),
     clearIndicator: baseStyles => ({
       ...baseStyles,
-      padding: CLEAR_INDICATOR_PADDING[size],
+      padding: '4px 12px 4px 4px',
       cursor: 'pointer',
     }),
     input: baseStyles => {
@@ -204,20 +198,44 @@ const getStyles = <
         margin: 0,
       };
     },
-    valueContainer: baseStyles => {
-      const padding = PADDING[size];
+    valueContainer: (baseStyles, state) => {
+      const padding = state.isMulti && state.hasValue ? '4px' : PADDING[size];
       return {...baseStyles, padding, gap: '2px'};
     },
+    multiValue: baseStyles => ({
+      ...baseStyles,
+      backgroundColor: hexToRGB(MOON_150),
+      borderRadius: '3px',
+      margin: '2px',
+      minHeight: '22px',
+      maxHeight: '22px',
+      display: 'flex',
+      alignItems: 'center',
+    }),
     multiValueLabel: baseStyles => {
       const fontSize = FONT_SIZES[size];
       return {
         ...baseStyles,
         fontSize,
+        color: MOON_800,
+        paddingLeft: '6px',
+        paddingRight: '6px',
+        paddingTop: '0',
+        paddingBottom: '0',
       };
     },
     multiValueRemove: baseStyles => ({
       ...baseStyles,
       cursor: 'pointer',
+      color: MOON_500,
+      paddingLeft: '1px',
+      paddingRight: '6px',
+      borderRadius: '0 3px 3px 0',
+      backgroundColor: 'transparent',
+      ':hover': {
+        backgroundColor: 'transparent',
+        color: MOON_800,
+      },
     }),
     dropdownIndicator: baseStyles => ({...baseStyles, padding: '0 8px 0 0'}),
     container: baseStyles => {
