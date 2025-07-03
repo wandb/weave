@@ -1111,7 +1111,7 @@ class ThreadsQueryReq(BaseModel):
 class RunModelReq(BaseModel):
     project_id: str
     model_ref: str
-    inputs: dict | str
+    inputs: Union[dict, str]
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
