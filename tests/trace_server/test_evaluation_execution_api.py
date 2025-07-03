@@ -14,6 +14,17 @@ from weave.trace_server.trace_server_interface import (
 
 @pytest.mark.asyncio
 async def test_run_model(trace_server: TraceServerInterface):
+    """
+    Test the run_model API endpoint with isolated execution.
+
+    This test verifies that:
+    1. Models can be created and executed through the run_model API
+    2. Model execution is properly traced (creates call records)
+    3. Different projects are properly isolated from each other
+
+    The test creates models in two different projects and executes them,
+    ensuring that calls and objects are properly scoped to each project.
+    """
     entity = "shawn"
 
     def create_model(entity: str, project: str) -> str:

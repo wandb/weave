@@ -2067,6 +2067,35 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
+        """
+        Execute a model in an isolated process with user-specific context.
+
+        This method delegates model execution to the RunAsUser class, which spawns
+        a separate process to ensure memory isolation between different users.
+        The model runs with a user-scoped WeaveClient that can only access data
+        belonging to the authenticated user.
+
+        Args:
+            req: Model execution request containing:
+                - model_ref: Reference to the model to execute
+                - inputs: Input data for the model
+                - project_id: Project scope for execution
+                - wb_user_id: User ID for authentication and scoping
+
+        Returns:
+            Model execution response containing:
+                - output: The model's prediction result
+                - call_id: Unique identifier for the traced execution
+
+        Raises:
+            ValueError: If wb_user_id is not provided in the request
+            RunAsUserException: If the model execution fails in the child process
+
+        Security:
+            - Runs in a separate process for memory isolation
+            - All references are validated to match the project scope
+            - User context is enforced throughout execution
+        """
         if not req.wb_user_id:
             raise ValueError("wb_user_id is required")
 

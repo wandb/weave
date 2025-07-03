@@ -11,6 +11,7 @@ The main functions are:
 """
 
 import contextvars
+import logging
 import multiprocessing
 import queue
 import threading
@@ -19,6 +20,9 @@ from typing import Any, Optional, TypedDict
 
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.trace_server_interface import *
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # List of context variables to propagate to worker threads
 # Add any context variables here that need to be available in the worker thread
@@ -132,7 +136,7 @@ class CrossProcessTraceServer(TraceServerInterface):
                 continue
             except Exception as e:
                 # Log error but continue handling responses
-                print(f"Error handling response: {e}")
+                logger.error(f"Error handling response: {e}")
 
     def _send_request(self, method: str, request: Any) -> Any:
         """
@@ -532,5 +536,5 @@ def _trace_server_worker_loop_with_context(
 
         except Exception as e:
             # Critical error in worker loop
-            print(f"Critical error in worker loop: {e}")
+            logger.error(f"Critical error in worker loop: {e}")
             break

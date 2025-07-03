@@ -149,9 +149,6 @@ class RunAsUserException(Exception):
     pass
 
 
-RunnerMode = Literal["child_process", "_dev_only_dangerous_in_process"]
-
-
 class RunAsUser:
     """
     Executes functions in a separate process for memory isolation.
@@ -211,7 +208,6 @@ class RunAsUser:
         6. Waits for completion and returns the result
 
         Args:
-            internal_trace_server: The trace server interface to wrap (must match instance value)
             func: Function to execute in the isolated context
             req: Request object to pass to the function
             project_id: Project ID for the execution context (must match instance value)
@@ -223,7 +219,7 @@ class RunAsUser:
 
         Raises:
             ValueError: If wb_user_id is None or if parameters don't match instance values
-            RunAsUserException: If process execution fails
+            RunAsUserException: If process execution fails or times out
         """
         if project_id != self.project_id:
             raise ValueError(
@@ -266,13 +262,31 @@ class RunAsUser:
         process.start()
         process.join(timeout=EXECUTION_TIMEOUT_SECONDS)
 
+        # Check if process is still alive (timeout occurred)
+        if process.is_alive():
+            # Terminate the process since it exceeded timeout
+            process.terminate()
+            # Give it a moment to terminate gracefully
+            process.join(timeout=1)
+            if process.is_alive():
+                # Force kill if still running
+                process.kill()
+                process.join()
+            raise RunAsUserException(
+                f"Process execution timed out after {EXECUTION_TIMEOUT_SECONDS} seconds"
+            )
+
         # Check if the process completed successfully
         if process.exitcode != 0:
-            raise RunAsUserException(f"Process execution failed: {process.exitcode}")
+            raise RunAsUserException(f"Process execution failed with exit code: {process.exitcode}")
 
         # Get the result and validate it matches the expected type
-        res = response_type.model_validate(result_queue.get())
+        try:
+            result_dict = result_queue.get_nowait()
+        except Exception:
+            raise RunAsUserException("Process completed but no result was returned")
 
+        res = response_type.model_validate(result_dict)
         return res
 
     async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
@@ -284,14 +298,13 @@ class RunAsUser:
         contamination and ensure security.
 
         Args:
-            internal_trace_server: The trace server interface (must match instance value)
             req: Model execution request containing model reference and inputs
 
         Returns:
             Model execution response with output and call ID
 
         Raises:
-            ValueError: If request parameters don't match instance values
+            ValueError: If request parameters don't match instance values or wb_user_id is missing
             RunAsUserException: If model execution fails
         """
         if not req.wb_user_id:
