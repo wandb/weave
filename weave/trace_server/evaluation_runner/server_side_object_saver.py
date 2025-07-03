@@ -28,10 +28,7 @@ def user_scoped_client(
     project_id: str, trace_server: tsi.TraceServerInterface
 ) -> Generator[WeaveClient, None, None]:
     client = WeaveClient(
-        SERVER_SIDE_ENTITY_PLACEHOLDER,
-        project_id,
-        trace_server,
-        False,
+        SERVER_SIDE_ENTITY_PLACEHOLDER, project_id, trace_server, False
     )
 
     ic = InitializedClient(client)
@@ -105,16 +102,16 @@ class RunAsUser:
         wrapped_trace_server = externalize_trace_server(
             internal_trace_server, project_id, wb_user_id
         )
-        child_trace_server_args = generate_child_process_trace_server_args(
+        # Generate args in parent process (starts worker thread here)
+        trace_server_args = generate_child_process_trace_server_args(
             wrapped_trace_server
         )
         result_queue: multiprocessing.Queue[tsi.RunModelRes] = multiprocessing.Queue()
         process = multiprocessing.Process(
             target=run_model_wrapped,
             kwargs={
-                "trace_server_args": child_trace_server_args,
+                "trace_server_args": trace_server_args,
                 "project_id": project_id,
-                "wb_user_id": wb_user_id,
                 "req": req,
                 "result_queue": result_queue,
             },

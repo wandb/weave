@@ -2,12 +2,12 @@
 Cross-process trace server implementation.
 
 This module provides a way to run any TraceServerInterface implementation in a
-separate process, providing isolation for security, resource management, or stability.
+separate thread, providing isolation for concurrent operations.
 
 The main functions are:
-- generate_child_process_trace_server_args (or build_child_process_trace_server_args):
-  Called in parent process to start a worker and get serializable args
-- build_child_process_trace_server: Called in child process to build a client
+- generate_child_process_trace_server_args:
+  Called in parent process to start a worker thread and get args
+- build_child_process_trace_server: Called to build a client that communicates with the worker
 
 Example usage:
     >>> # In parent process:
@@ -20,55 +20,59 @@ Example usage:
     >>> # Create any trace server implementation
     >>> sqlite_server = SqliteTraceServer("/tmp/traces.db")
     >>>
-    >>> # Start a worker process and get serializable args
+    >>> # Start a worker thread and get args
     >>> args = generate_child_process_trace_server_args(sqlite_server)
     >>>
-    >>> # Pass args to a child process (e.g., via multiprocessing)
-    >>> import multiprocessing
+    >>> # Build a client that communicates with the worker
+    >>> client = build_child_process_trace_server(args)
     >>>
-    >>> def child_process_func(trace_server_args):
-    ...     # In child process, build the client
-    ...     trace_server = build_child_process_trace_server(trace_server_args)
-    ...
-    ...     # Use it like any other trace server
-    ...     from weave.trace_server.trace_server_interface import CallStartReq, StartedCallSchemaForInsert
-    ...     import datetime
-    ...
-    ...     req = CallStartReq(
-    ...         start=StartedCallSchemaForInsert(
-    ...             project_id="my_project",
-    ...             id="call_123",
-    ...             trace_id="trace_123",
-    ...             op_name="my_operation",
-    ...             started_at=datetime.datetime.now(),
-    ...             attributes={},
-    ...             inputs={"x": 1}
-    ...         )
+    >>> # Use it like any other trace server
+    >>> from weave.trace_server.trace_server_interface import CallStartReq, StartedCallSchemaForInsert
+    >>> import datetime
+    >>>
+    >>> req = CallStartReq(
+    ...     start=StartedCallSchemaForInsert(
+    ...         project_id="my_project",
+    ...         id="call_123",
+    ...         trace_id="trace_123",
+    ...         op_name="my_operation",
+    ...         started_at=datetime.datetime.now(),
+    ...         attributes={},
+    ...         inputs={"x": 1}
     ...     )
-    ...
-    ...     response = trace_server.call_start(req)
-    ...     print(f"Started call: {response.id}")
-    ...
-    ...     # Don't forget to shutdown when done
-    ...     trace_server.shutdown()
+    ... )
     >>>
-    >>> # Start the child process
-    >>> p = multiprocessing.Process(target=child_process_func, args=(args,))
-    >>> p.start()
-    >>> p.join()
+    >>> response = client.call_start(req)
+    >>> print(f"Started call: {response.id}")
+    >>>
+    >>> # Don't forget to shutdown when done
+    >>> client.shutdown()
 """
 
+import contextvars
 import multiprocessing
 import queue
 import threading
 from collections.abc import Iterator
-from typing import Any, Literal, Optional, TypedDict
+from typing import Any, Optional, TypedDict
 
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.trace_server_interface import *
+
+# List of context variables to propagate to worker threads
+# Add any context variables here that need to be available in the worker thread
+# Example: If you have a custom context var, add it to this list:
+#   from mymodule import my_context_var
+#   CONTEXT_VARS_TO_PROPAGATE.append(my_context_var)
+CONTEXT_VARS_TO_PROPAGATE: list[contextvars.ContextVar] = [
+    _secret_fetcher_context,
+]
+
+TIMEOUT_SECONDS = 60.0
 
 
 class RequestWrapper(TypedDict):
-    """Wrapper for requests sent to the worker process."""
+    """Wrapper for requests sent to the worker thread."""
 
     method: str
     request: Any
@@ -76,7 +80,7 @@ class RequestWrapper(TypedDict):
 
 
 class ResponseWrapper(TypedDict):
-    """Wrapper for responses from the worker process."""
+    """Wrapper for responses from the worker thread."""
 
     request_id: str
     result: Optional[Any]
@@ -84,7 +88,7 @@ class ResponseWrapper(TypedDict):
 
 
 class CrossProcessTraceServerArgs(TypedDict):
-    """Serializable arguments for constructing a CrossProcessTraceServer."""
+    """Arguments for constructing a CrossProcessTraceServer."""
 
     request_queue: multiprocessing.Queue
     response_queue: multiprocessing.Queue
@@ -112,8 +116,8 @@ class CrossProcessTraceServer(TraceServerInterface):
         Initialize the cross-process trace server.
 
         Args:
-            request_queue: Queue for sending requests to the worker process
-            response_queue: Queue for receiving responses from the worker process
+            request_queue: Queue for sending requests to the worker thread
+            response_queue: Queue for receiving responses from the worker thread
         """
         self._request_queue = request_queue
         self._response_queue = response_queue
@@ -124,14 +128,14 @@ class CrossProcessTraceServer(TraceServerInterface):
         self._request_counter = 0
         self._lock = threading.Lock()
 
+        # Flag to track if we're shutting down - MUST be set before starting thread
+        self._shutdown = False
+
         # Start response handler thread
         self._response_handler_thread = threading.Thread(
             target=self._handle_responses, daemon=True
         )
         self._response_handler_thread.start()
-
-        # Flag to track if we're shutting down
-        self._shutdown = False
 
     def _generate_request_id(self) -> str:
         """Generate a unique request ID."""
@@ -140,7 +144,7 @@ class CrossProcessTraceServer(TraceServerInterface):
             return f"req_{self._request_counter}"
 
     def _handle_responses(self) -> None:
-        """Handle responses from the worker process in a separate thread."""
+        """Handle responses from the worker thread."""
         while not self._shutdown:
             try:
                 response = self._response_queue.get(timeout=0.1)
@@ -158,17 +162,17 @@ class CrossProcessTraceServer(TraceServerInterface):
 
     def _send_request(self, method: str, request: Any) -> Any:
         """
-        Send a request to the worker process and wait for the response.
+        Send a request to the worker thread and wait for the response.
 
         Args:
             method: The method name to call
             request: The request object
 
         Returns:
-            The response from the worker process
+            The response from the worker thread
 
         Raises:
-            Exception: If an error occurs in the worker process
+            SendRequestException: If an error occurs in the worker thread
         """
         if self._shutdown:
             raise RuntimeError("CrossProcessTraceServer has been shut down")
@@ -186,7 +190,7 @@ class CrossProcessTraceServer(TraceServerInterface):
         self._request_queue.put(wrapped_request)
 
         # Wait for the response
-        if not event.wait(timeout=30.0):  # 30 second timeout
+        if not event.wait(timeout=TIMEOUT_SECONDS):
             raise TimeoutError(f"Request {request_id} timed out")
 
         # Get the response
@@ -195,7 +199,7 @@ class CrossProcessTraceServer(TraceServerInterface):
             del self._pending_requests[request_id]
 
         if response["error"]:
-            raise SendRequestException(f"Worker process error: {response['error']}")
+            raise SendRequestException(f"Worker thread error: {response['error']}")
 
         return response["result"]
 
@@ -204,7 +208,7 @@ class CrossProcessTraceServer(TraceServerInterface):
         if not self._shutdown:
             self._shutdown = True
 
-            # Send shutdown signal to the worker process
+            # Send shutdown signal to the worker thread
             self._request_queue.put(
                 {"method": "_shutdown", "request": None, "request_id": "shutdown"}
             )
@@ -216,7 +220,7 @@ class CrossProcessTraceServer(TraceServerInterface):
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes:
         """
-        Start a new call by delegating to the worker process.
+        Start a new call by delegating to the worker thread.
 
         Args:
             req: The call start request
@@ -236,7 +240,7 @@ class CrossProcessTraceServer(TraceServerInterface):
         return self._send_request("calls_query", req)
 
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]:
-        # Note: Streaming is more complex across processes
+        # Note: Streaming is more complex across threads
         # For now, we'll convert the full query to a list
         result = self.calls_query(req)
         return iter(result.calls)
@@ -297,7 +301,7 @@ class CrossProcessTraceServer(TraceServerInterface):
         return self._send_request("table_query", req)
 
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]:
-        # Note: Streaming is more complex across processes
+        # Note: Streaming is more complex across threads
         # For now, we'll convert the full query to a list
         result = self.table_query(req)
         return iter(result.rows)
@@ -351,7 +355,7 @@ class CrossProcessTraceServer(TraceServerInterface):
     def completions_create_stream(
         self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
-        # Note: Streaming is more complex across processes
+        # Note: Streaming is more complex across threads
         # For now, we'll fall back to non-streaming
         result = self.completions_create(req)
         yield result.response
@@ -364,75 +368,84 @@ class CrossProcessTraceServer(TraceServerInterface):
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]:
         # Note: This would need special handling for streaming
         # For now, we'll implement a simple non-streaming version
-        # In a real implementation, you'd want to set up a separate
-        # communication channel for streaming responses
         raise NotImplementedError(
             "Streaming not yet implemented for cross-process server"
         )
 
     # Evaluation Execution API
     async def run_model(self, req: RunModelReq) -> RunModelRes:
-        # Note: Async methods require special handling in cross-process communication
+        # Note: Async methods require special handling
         # For now, we'll run synchronously
         return self._send_request("run_model", req)
 
     async def run_scorer(self, req: RunScorerReq) -> RunScorerRes:
-        # Note: Async methods require special handling in cross-process communication
+        # Note: Async methods require special handling
         # For now, we'll run synchronously
         return self._send_request("run_scorer", req)
 
     async def queue_evaluation(self, req: QueueEvaluationReq) -> QueueEvaluationRes:
-        # Note: Async methods require special handling in cross-process communication
+        # Note: Async methods require special handling
         # For now, we'll run synchronously
         return self._send_request("queue_evaluation", req)
 
 
 def generate_child_process_trace_server_args(
     trace_server: TraceServerInterface,
-    start_method: Literal["fork", "spawn", "forkserver"] = "fork",
 ) -> CrossProcessTraceServerArgs:
     """
-    Generate serializable arguments for constructing a CrossProcessTraceServer in a child process.
+    Start a worker thread with the trace server and return serializable args.
 
-    This function:
-    1. Creates the multiprocessing queues for communication
-    2. Starts a worker process that runs the given trace server
-    3. Returns the queues that can be passed to a child process
+    This function runs in the PARENT process and:
+    1. Creates multiprocessing queues for communication
+    2. Captures current context variables
+    3. Starts a worker thread that runs the given trace server with context
+    4. Returns ONLY the queues (which are serializable)
+
+    The trace server stays in the parent process, only the queues are passed to child.
 
     Args:
-        trace_server: The trace server instance to run in the worker process
-        start_method: The multiprocessing start method to use
+        trace_server: The trace server instance to run in the worker thread (stays in parent)
 
     Returns:
-        A dictionary containing the queues needed to construct a CrossProcessTraceServer
+        A dictionary containing the queues to pass to the child process
 
     Example:
         >>> # In parent process:
-        >>> wrapped_trace_server = externalize_trace_server(internal_trace_server, project_id, wb_user_id)
-        >>> args = generate_child_process_trace_server_args(wrapped_trace_server)
+        >>> internal_trace_server = get_trace_server()  # This is NOT serializable
+        >>> wrapped = externalize_trace_server(internal_trace_server, project_id, user_id)
+        >>> args = generate_child_process_trace_server_args(wrapped)
         >>>
-        >>> # Pass args to child process...
+        >>> # Pass args to child process (queues are serializable)...
         >>>
         >>> # In child process:
         >>> server = build_child_process_trace_server(args)
     """
-    # Set up multiprocessing context
-    ctx = multiprocessing.get_context(start_method)
+    # Get the multiprocessing context
+    ctx = multiprocessing.get_context()
 
-    # Create communication queues
+    # Create multiprocessing queues (these CAN be serialized)
     request_queue = ctx.Queue()
     response_queue = ctx.Queue()
 
-    # Create the worker process that will run the trace server
-    worker_process = ctx.Process(  # type: ignore[attr-defined]
-        target=_trace_server_worker_loop,
-        args=(request_queue, response_queue, trace_server),
+    # Capture current context variable values
+    context_values = {}
+    for var in CONTEXT_VARS_TO_PROPAGATE:
+        try:
+            value = var.get()
+            context_values[var] = value
+        except LookupError:
+            # Context var not set in current context, skip it
+            pass
+
+    # Start the worker thread IN THE PARENT PROCESS
+    worker_thread = threading.Thread(
+        target=_trace_server_worker_loop_with_context,
+        args=(request_queue, response_queue, trace_server, context_values),
+        daemon=True,
     )
-    worker_process.start()
+    worker_thread.start()
 
-    # Note: The worker process will run until it receives a shutdown signal
-    # The parent process is responsible for managing the worker's lifecycle
-
+    # Return ONLY the queues (not the trace server!)
     return CrossProcessTraceServerArgs(
         request_queue=request_queue, response_queue=response_queue
     )
@@ -444,40 +457,47 @@ def build_child_process_trace_server(
     """
     Build a CrossProcessTraceServer from serializable arguments.
 
-    This function is meant to be called inside a child process with arguments
-    generated by generate_child_process_trace_server_args().
+    This function runs in the CHILD process with queues created in the parent.
 
     Args:
-        args: The serializable arguments containing the communication queues
+        args: The arguments containing the communication queues from parent
 
     Returns:
-        A CrossProcessTraceServer instance that communicates with the worker process
+        A CrossProcessTraceServer instance that communicates with the parent's worker
 
     Example:
         >>> # In child process:
         >>> server = build_child_process_trace_server(args)
-        >>> # Now use server to communicate with the trace server in the worker process
+        >>> # Now use server to communicate with the trace server in the parent process
     """
     return CrossProcessTraceServer(
         request_queue=args["request_queue"], response_queue=args["response_queue"]
     )
 
 
-def _trace_server_worker_loop(
+def _trace_server_worker_loop_with_context(
     request_queue: multiprocessing.Queue,
     response_queue: multiprocessing.Queue,
     trace_server: TraceServerInterface,
+    context_values: dict[contextvars.ContextVar, Any],
 ) -> None:
     """
-    Worker loop that handles requests using the provided trace server.
+    Worker loop that handles requests using the provided trace server with context.
 
-    This function runs in a separate process started by generate_child_process_trace_server_args.
+    This function runs in a separate thread started by generate_child_process_trace_server_args.
 
     Args:
         request_queue: Queue to receive requests from
         response_queue: Queue to send responses to
         trace_server: The actual trace server instance to delegate to
+        context_values: The current context variable values to propagate
     """
+    # Set context variables in the worker thread
+    for var, value in context_values.items():
+        if value is not None:  # Only set if there was a value
+            var.set(value)
+
+    # Now run the normal worker loop
     while True:
         try:
             # Get the next request
