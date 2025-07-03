@@ -263,7 +263,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
       flex: 1,
       minWidth: 150,
       field: key,
-      sortable: true,
+      sortable: columnIsSortable?.(key) ?? false,
       headerName: key,
       display: 'flex',
       renderHeader: () => {
