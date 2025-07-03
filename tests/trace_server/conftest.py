@@ -117,7 +117,8 @@ def trace_server(
 def ch_only_trace_server(
     request, trace_server
 ) -> TestOnlyUserInjectingExternalTraceServer:
-    if request.config.getoption("--clickhouse"):
+    trace_server_flag = get_trace_server_flag(request)
+    if trace_server_flag == "clickhouse":
         return trace_server
     else:
         pytest.skip("Clickhouse trace server is not enabled")

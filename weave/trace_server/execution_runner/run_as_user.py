@@ -19,12 +19,13 @@ Security model:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import multiprocessing
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Coroutine, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -48,6 +49,30 @@ EXECUTION_TIMEOUT_SECONDS = 60
 
 
 @contextmanager
+def with_client(
+    client: WeaveClient,
+) -> Generator[WeaveClient, None, None]:
+    # Initialize the client context
+    ic = InitializedClient(client)
+
+    yield client
+
+    # Ensure all pending operations are flushed
+    client._flush()
+    # Reset the initialized client context
+    ic.reset()
+
+
+@contextmanager
+def with_client_bound_to_project(
+    entity: str, project: str, trace_server: tsi.TraceServerInterface
+) -> Generator[WeaveClient, None, None]:
+    client = WeaveClient(entity, project, trace_server, False)
+    with with_client(client):
+        yield client
+
+
+@contextmanager
 def user_scoped_client(
     project_id: str, trace_server: tsi.TraceServerInterface
 ) -> Generator[WeaveClient, None, None]:
@@ -66,19 +91,10 @@ def user_scoped_client(
         WeaveClient: A properly initialized and scoped client
     """
     # Create client with server-side entity placeholder
-    client = WeaveClient(
-        SERVER_SIDE_ENTITY_PLACEHOLDER, project_id, trace_server, False
-    )
-
-    # Initialize the client context
-    ic = InitializedClient(client)
-
-    yield client
-
-    # Ensure all pending operations are flushed
-    client._flush()
-    # Reset the initialized client context
-    ic.reset()
+    with with_client_bound_to_project(
+        SERVER_SIDE_ENTITY_PLACEHOLDER, project_id, trace_server
+    ) as client:
+        yield client
 
 
 # Generic type variables for request/response typing
@@ -105,7 +121,7 @@ class RunAsUserChildProcessContext(Generic[T]):
 
 def _generic_child_process_wrapper(
     wrapper_context: RunAsUserChildProcessContext[dict],
-    func: Callable[[TReq], TRes],
+    func: Callable[[TReq], Coroutine[Any, Any, TRes]],
     req: TReq,
 ) -> None:
     """
@@ -134,7 +150,7 @@ def _generic_child_process_wrapper(
 
     # Execute the function within a user-scoped client context
     with user_scoped_client(wrapper_context.project_id, safe_trace_server):
-        res = func(req)
+        res = asyncio.run(func(req))
 
         # Convert the Pydantic response to a dict and send back
         wrapper_context.result_queue.put(res.model_dump())
@@ -196,7 +212,7 @@ class RunAsUser:
 
     async def _run_user_scoped_function(
         self,
-        func: Callable[[TReq], TRes],
+        func: Callable[[TReq], Coroutine[Any, Any, TRes]],
         req: TReq,
         project_id: str,
         wb_user_id: str,

@@ -22,7 +22,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 )
 
 
-def run_model(req: tsi.RunModelReq) -> tsi.RunModelRes:
+async def run_model(req: tsi.RunModelReq) -> tsi.RunModelRes:
     """
     Execute a model with the given inputs in an isolated context.
 
