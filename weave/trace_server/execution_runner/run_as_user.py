@@ -59,11 +59,6 @@ def user_scoped_client(
 
     Yields:
         WeaveClient: A properly initialized and scoped client
-
-    Example:
-        with user_scoped_client("project123", trace_server) as client:
-            # Use client for operations
-            pass
     """
     # Create client with server-side entity placeholder
     client = WeaveClient(

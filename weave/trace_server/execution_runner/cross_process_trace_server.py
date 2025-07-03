@@ -431,17 +431,6 @@ def generate_child_process_trace_server_args(
 
     Returns:
         A dictionary containing the queues to pass to the child process
-
-    Example:
-        >>> # In parent process:
-        >>> internal_trace_server = get_trace_server()  # This is NOT serializable
-        >>> wrapped = externalize_trace_server(internal_trace_server, project_id, user_id)
-        >>> args = generate_child_process_trace_server_args(wrapped)
-        >>>
-        >>> # Pass args to child process (queues are serializable)...
-        >>>
-        >>> # In child process:
-        >>> server = build_child_process_trace_server(args)
     """
     # Get the multiprocessing context
     ctx = multiprocessing.get_context()
@@ -487,11 +476,6 @@ def build_child_process_trace_server(
 
     Returns:
         A CrossProcessTraceServer instance that communicates with the parent's worker
-
-    Example:
-        >>> # In child process:
-        >>> server = build_child_process_trace_server(args)
-        >>> # Now use server to communicate with the trace server in the parent process
     """
     return CrossProcessTraceServer(
         request_queue=args["request_queue"], response_queue=args["response_queue"]

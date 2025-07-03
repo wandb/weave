@@ -46,15 +46,6 @@ def run_model(req: tsi.RunModelReq) -> tsi.RunModelRes:
         TypeError: If the model reference doesn't point to a valid LLMStructuredCompletionModel
                   or if the inputs are not a dictionary when resolved
         ValueError: If the input type is neither 'value' nor 'ref'
-
-    Example:
-        >>> req = RunModelReq(
-        ...     model_ref="weave:///entity/project/model:hash",
-        ...     inputs={"input_type": "value", "value": {"prompt": "Hello"}}
-        ... )
-        >>> res = run_model(req)
-        >>> print(res.output)  # Model's response
-        >>> print(res.call_id)  # Trace ID for debugging
     """
     # Get the scoped client from context (set up by parent process)
     client = require_weave_client()
