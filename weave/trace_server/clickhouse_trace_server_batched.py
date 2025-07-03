@@ -2067,7 +2067,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
-        return await RunAsUser().run_model(self, req)
+        if not req.wb_user_id:
+            raise ValueError("wb_user_id is required")
+
+        res = await RunAsUser(
+            internal_trace_server=self,
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+        ).run_model(req)
+        return res
 
     # Private Methods
     @property

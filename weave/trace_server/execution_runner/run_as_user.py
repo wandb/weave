@@ -184,15 +184,37 @@ class RunAsUser:
     - Project scoping ensures users can only access their own data
     - User ID validation prevents unauthorized access
     - Reference externalization prevents cross-project references
+
+    Attributes:
+        internal_trace_server: The trace server interface for this instance
+        project_id: The project ID this runner is scoped to
+        wb_user_id: The user ID this runner is scoped to
     """
+
+    def __init__(
+        self,
+        internal_trace_server: tsi.TraceServerInterface,
+        project_id: str,
+        wb_user_id: str,
+    ) -> None:
+        """
+        Initialize a RunAsUser instance with specific trace server and user context.
+
+        Args:
+            internal_trace_server: The trace server interface to use for all executions
+            project_id: The project ID to scope all executions to
+            wb_user_id: The user ID to scope all executions to
+        """
+        self.internal_trace_server = internal_trace_server
+        self.project_id = project_id
+        self.wb_user_id = wb_user_id
 
     async def _run_user_scoped_function(
         self,
-        internal_trace_server: tsi.TraceServerInterface,
         func: Callable[[TReq], TRes],
         req: TReq,
         project_id: str,
-        wb_user_id: str | None,
+        wb_user_id: str,
         response_type: type[TRes],
         runner_mode: Literal[
             "child_process", "_dev_only_dangerous_in_process"
@@ -203,32 +225,39 @@ class RunAsUser:
 
         This method:
         1. Validates the user ID
-        2. Wraps the trace server with user context
-        3. Starts a worker thread in the parent process
-        4. Spawns a child process for execution
-        5. Waits for completion and returns the result
+        2. Verifies that provided parameters match instance values
+        3. Wraps the trace server with user context
+        4. Starts a worker thread in the parent process
+        5. Spawns a child process for execution
+        6. Waits for completion and returns the result
 
         Args:
-            internal_trace_server: The trace server interface to wrap
+            internal_trace_server: The trace server interface to wrap (must match instance value)
             func: Function to execute in the isolated context
             req: Request object to pass to the function
-            project_id: Project ID for the execution context
-            wb_user_id: User ID for the execution context
+            project_id: Project ID for the execution context (must match instance value)
+            wb_user_id: User ID for the execution context (must match instance value)
             response_type: Type of the response for validation
 
         Returns:
             The response from the executed function
 
         Raises:
-            ValueError: If wb_user_id is None
+            ValueError: If wb_user_id is None or if parameters don't match instance values
             RunAsUserException: If process execution fails
         """
-        if wb_user_id is None:
-            raise ValueError("wb_user_id is required")
+        if project_id != self.project_id:
+            raise ValueError(
+                f"Provided project_id '{project_id}' does not match instance value '{self.project_id}'"
+            )
+        if wb_user_id != self.wb_user_id:
+            raise ValueError(
+                f"Provided wb_user_id '{wb_user_id}' does not match instance value '{self.wb_user_id}'"
+            )
 
         # Wrap the trace server with user context and project validation
         wrapped_trace_server = externalize_trace_server(
-            internal_trace_server, project_id, wb_user_id
+            self.internal_trace_server, project_id, wb_user_id
         )
 
         # Convert any internal references to external format for security
@@ -280,9 +309,7 @@ class RunAsUser:
 
         return res
 
-    async def run_model(
-        self, internal_trace_server: tsi.TraceServerInterface, req: tsi.RunModelReq
-    ) -> tsi.RunModelRes:
+    async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
         """
         Execute a model in an isolated process.
 
@@ -291,18 +318,20 @@ class RunAsUser:
         contamination and ensure security.
 
         Args:
-            internal_trace_server: The trace server interface
+            internal_trace_server: The trace server interface (must match instance value)
             req: Model execution request containing model reference and inputs
 
         Returns:
             Model execution response with output and call ID
 
         Raises:
-            ValueError: If wb_user_id is missing from the request
+            ValueError: If request parameters don't match instance values
             RunAsUserException: If model execution fails
         """
+        if not req.wb_user_id:
+            raise ValueError("wb_user_id is required")
+
         return await self._run_user_scoped_function(
-            internal_trace_server,
             run_model,
             req,
             req.project_id,
