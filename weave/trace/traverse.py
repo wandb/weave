@@ -165,7 +165,7 @@ def get_paths(obj: Any, path: ObjectPath | None = None) -> ObjectPaths:
     paths = [path] if path else []
     if isinstance(obj, dict):
         for key, value in obj.items():
-            paths.extend(get_paths(value, path + [key]))
+            paths.extend(get_paths(value, path + [key]))  # noqa: RUF005
     elif isinstance(obj, list):
         for i, value in enumerate(obj):
             to_add: list[PathElement] = [i]  # Making pyright happy

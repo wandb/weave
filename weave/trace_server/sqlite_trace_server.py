@@ -705,7 +705,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 SELECT id FROM Descendants;
             """.format(", ".join("?" * len(req.call_ids)))
 
-            params = [req.project_id] + req.call_ids
+            params = [req.project_id, *req.call_ids]
             cursor.execute(recursive_query, params)
             all_ids = [x[0] for x in cursor.fetchall()] + req.call_ids
 
@@ -963,7 +963,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 object_id = ? AND
                 digest IN ({})
         """.format(", ".join("?" * len(found_digests)))
-        delete_parameters = [req.project_id, req.object_id] + list(found_digests)
+        delete_parameters = [req.project_id, req.object_id, *found_digests]
 
         with self.lock:
             cursor.execute("BEGIN TRANSACTION")
@@ -1143,7 +1143,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             query += f" OFFSET {req.offset}"
 
         conn, cursor = get_conn_cursor(self.db_path)
-        cursor.execute(query, [req.project_id, req.digest] + list(parameters))
+        cursor.execute(query, [req.project_id, req.digest, *parameters])
         query_result = cursor.fetchall()
 
         return tsi.TableQueryRes(
@@ -1174,9 +1174,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def table_query_stats_batch(
         self, req: tsi.TableQueryStatsBatchReq
     ) -> tsi.TableQueryStatsBatchRes:
-        parameters: list[Any] = [req.project_id] + list(req.digests or [])
+        digests = req.digests or []
+        parameters: list[Any] = [req.project_id, *digests]
 
-        placeholders = ",".join(["?" for _ in (req.digests or [])])
+        placeholders = ",".join(["?" for _ in digests])
 
         query = f"""
         SELECT digest, json_array_length(row_digests)
