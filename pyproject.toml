@@ -289,6 +289,7 @@ select = [
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
   "RUF013",  # https://docs.astral.sh/ruff/rules/implicit-optional/
   "RUF015",  # https://docs.astral.sh/ruff/rules/unnecessary-iterable-allocation-for-first-element/
+  "RUF018",  # https://docs.astral.sh/ruff/rules/assignment-in-assert/
 ]
 ignore = [
   # we use Google style
