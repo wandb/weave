@@ -282,7 +282,7 @@ class TestRunAsUser:
         req = tsi.RunModelReq(
             project_id="test_project",
             model_ref="test_ref",
-            inputs=tsi.InputsAsValue(input_type="value", value={}),
+            inputs={},
             # wb_user_id is intentionally missing
         )
 

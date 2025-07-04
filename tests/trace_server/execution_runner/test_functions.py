@@ -32,31 +32,31 @@ class TestRequest(BaseModel):
     arg_c: Optional[str] = "default"
 
 
-def successful_function(req: TestRequest) -> TestResponse:
+async def successful_function(req: TestRequest) -> TestResponse:
     """A function that executes successfully."""
     return TestResponse(result=f"Success: {req.value}", process_id=os.getpid())
 
 
-def failing_function(req: TestRequest) -> TestResponse:
+async def failing_function(req: TestRequest) -> TestResponse:
     """A function that raises an exception."""
     raise ValueError(f"Intentional test failure: {req.value}")
 
 
-def timeout_function(req: TestRequest) -> TestResponse:
+async def timeout_function(req: TestRequest) -> TestResponse:
     """A function that times out."""
     if req.sleep_time:
         time.sleep(req.sleep_time)
     return TestResponse(result="Should not reach here")
 
 
-def exit_code_function(req: TestRequest) -> TestResponse:
+async def exit_code_function(req: TestRequest) -> TestResponse:
     """A function that exits with a specific code."""
     import sys
 
     sys.exit(req.exit_code or 1)
 
 
-def check_isolation_function(req: TestRequest) -> TestResponse:
+async def check_isolation_function(req: TestRequest) -> TestResponse:
     """A function that checks the current context matches expectations."""
     from weave.trace.context.weave_client_context import get_weave_client
 
@@ -81,6 +81,6 @@ def check_isolation_function(req: TestRequest) -> TestResponse:
     )
 
 
-def multi_arg_function(req: TestRequest) -> TestResponse:
+async def multi_arg_function(req: TestRequest) -> TestResponse:
     """A function that uses multiple arguments."""
     return TestResponse(result=f"a={req.arg_a}, b={req.arg_b}, c={req.arg_c}")
