@@ -6,7 +6,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 import weave.wandb_thin as wandb
-from weave.wandb_interface.wandb_api import get_wandb_api_sync
 
 try:
     from wandb import errors as wandb_errors
@@ -14,6 +13,8 @@ try:
     from wandb.sdk.internal.internal_api import logger as wandb_logger
 except ImportError:
     WANDB_AVAILABLE = False
+
+    from weave.wandb_interface.wandb_api import get_wandb_api_sync
 
     class AuthenticationError(Exception): ...
 

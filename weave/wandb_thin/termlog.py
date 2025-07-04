@@ -1,3 +1,7 @@
+"""
+This file is largely copied from the wandb library, with a few changes to make
+the file more standalone."""
+
 import sys
 from typing import Any
 

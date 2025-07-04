@@ -313,41 +313,6 @@ class WandbApiAsync:
             and result.get("entity", {}).get("readOnly", True) == False
         )
 
-    UPSERT_PROJECT_MUTATION = gql.gql(
-        """
-    mutation UpsertModel($name: String!, $id: String, $entity: String!, $description: String, $repo: String)  {
-        upsertModel(input: { id: $id, name: $name, entityName: $entity, description: $description, repo: $repo }) {
-            model {
-                name
-                description
-            }
-        }
-    }
-    """
-    )
-
-    async def upsert_project(
-        self,
-        project: str,
-        id: Optional[str] = None,
-        description: Optional[str] = None,
-        entity: Optional[str] = None,
-    ) -> dict[str, Any]:
-        """Create a new project.
-
-        Args:
-            project (str): The project to create
-            description (str, optional): A description of this project
-            entity (str, optional): The entity to scope this project to.
-        """
-        return await self.query(
-            self.UPSERT_PROJECT_MUTATION,
-            name=project,
-            entity=entity,
-            description=description,
-            id=id,
-        )
-
 
 class WandbApi:
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
