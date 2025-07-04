@@ -123,8 +123,8 @@ Specification for the `$contains` operation.
 
 **Pydantic Fields:**
 
-- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
-- `substr`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
+- `input`: `ForwardRef('Operand')`
+- `substr`: `ForwardRef('Operand')`
 - `case_insensitive`: `typing.Optional[bool]`
 
 ---
@@ -149,7 +149,7 @@ Convert the input value to a specific type (e.g., `int`, `bool`, `string`).
 
 **Pydantic Fields:**
 
-- `$convert`: `<class 'ConvertSpec'>`
+- `$convert`: `ForwardRef('ConvertSpec')`
 
 ---
 
@@ -165,7 +165,7 @@ Specifies conversion details for `$convert`.
 
 **Pydantic Fields:**
 
-- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
+- `input`: `ForwardRef('Operand')`
 - `to`: `typing.Literal['double', 'string', 'int', 'bool', 'exists']`
 
 ---
