@@ -75,6 +75,7 @@ trace_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SHARDS + 1)]
         "pandas-test",
         "huggingface",
         "smolagents",
+        "strands",
         "mcp",
         "trace",
         *trace_shards,
