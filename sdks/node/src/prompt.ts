@@ -1,0 +1,73 @@
+import {WeaveObject, WeaveObjectParameters} from './weaveObject';
+
+export class Prompt extends WeaveObject {
+  constructor(parameters: WeaveObjectParameters) {
+    super(parameters);
+  }
+}
+
+interface StringPromptParameters extends WeaveObjectParameters {
+  content: string;
+}
+
+export class StringPrompt extends Prompt {
+  content: string;
+
+  constructor(parameters: StringPromptParameters) {
+    super(parameters);
+    this.content = parameters.content;
+  }
+
+  format(values: Record<string, any> = {}): string {
+    return formatString(this.content, values);
+  }
+}
+
+interface MessagesPromptParameters extends WeaveObjectParameters {
+  messages: Record<string, any>[];
+}
+
+export class MessagesPrompt extends Prompt {
+  messages: Record<string, any>[];
+
+  constructor(parameters: MessagesPromptParameters) {
+    super(parameters);
+    this.messages = parameters.messages;
+  }
+
+  formatMessage(
+    message: Record<string, any>,
+    values: Record<string, any> = {}
+  ): Record<string, any> {
+    const formattedMessage: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(message)) {
+      if (typeof value === 'string') {
+        formattedMessage[key] = formatString(value, values);
+      } else if (
+        Array.isArray(value) &&
+        value.every(item => typeof item === 'object' && item !== null)
+      ) {
+        formattedMessage[key] = value.map(item =>
+          this.formatMessage(item, values)
+        );
+      } else {
+        formattedMessage[key] = value;
+      }
+    }
+
+    return formattedMessage;
+  }
+
+  format(values: Record<string, any> = {}): Record<string, any>[] {
+    return this.messages.map(message => {
+      return this.formatMessage(message, values);
+    });
+  }
+}
+
+function formatString(str: string, kwargs: Record<string, any> = {}): string {
+  return str.replace(/\{(\w+)(:[^}]+)?\}/g, (match, key) => {
+    return kwargs[key] !== undefined ? kwargs[key] : match;
+  });
+}

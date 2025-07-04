@@ -57,25 +57,13 @@ export class WeaveObject {
   saveAttrs() {
     const attrs: {[key: string]: any} = {};
 
-    const nonUnderscoreKeys = Object.keys(this).filter(
-      key => !key.startsWith('_')
-    );
-
-    // Include values first (non-functions)
     for (const key of Object.keys(this)) {
-      // @ts-ignore
-      const value: any = this[key];
-      if (typeof value !== 'function') {
-        attrs[key] = value;
-      }
-    }
-
-    // Then ops
-    for (const key of nonUnderscoreKeys) {
-      // @ts-ignore
-      const value: any = this[key];
-      if (isOp(value)) {
-        attrs[key] = value;
+      if (!key.startsWith('_')) {
+        // @ts-ignore
+        const value: any = this[key];
+        if (isOp(value) || typeof value !== 'function') {
+          attrs[key] = value;
+        }
       }
     }
 
