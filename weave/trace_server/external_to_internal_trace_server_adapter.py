@@ -445,4 +445,6 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return await self._async_ref_apply(self._internal_trace_server.apply_scorer, req)
+        return await self._async_ref_apply(
+            self._internal_trace_server.apply_scorer, req
+        )

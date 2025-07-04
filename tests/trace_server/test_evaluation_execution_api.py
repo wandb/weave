@@ -1,7 +1,7 @@
 import pytest
 
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
-from weave.trace.refs import CallRef, ObjectRef
+from weave.trace.refs import ObjectRef
 from weave.trace_server.execution_runner.run_as_user import with_client_bound_to_project
 from weave.trace_server.execution_runner.user_scripts.apply_scorer import apply_scorer
 from weave.trace_server.execution_runner.user_scripts.run_model import run_model
@@ -221,14 +221,17 @@ async def test_apply_scorer(ch_only_trace_server: TraceServerInterface, client_c
     def create_scorer(entity: str, project: str) -> str:
         """Create a test scorer and return its reference URI."""
         project_id = f"{entity}/{project}"
-        
+
         # First create the model for the scorer
         scorer_model_object_id = "test_scorer_model"
         scorer_model_val = {
             "llm_model_id": "gpt-4o-mini",
             "default_params": {
                 "messages_template": [
-                    {"role": "system", "content": "You are an expert judge. Evaluate the response and return a score from 0 to 10."},
+                    {
+                        "role": "system",
+                        "content": "You are an expert judge. Evaluate the response and return a score from 0 to 10.",
+                    },
                 ],
                 "response_format": "text",
             },
@@ -251,7 +254,7 @@ async def test_apply_scorer(ch_only_trace_server: TraceServerInterface, client_c
             name=scorer_model_object_id,
             _digest=scorer_model_create_res.digest,
         ).uri()
-        
+
         # Then create the scorer
         scorer_object_id = "test_llm_judge_scorer"
         scorer_val = {
@@ -336,22 +339,22 @@ async def test_apply_scorer(ch_only_trace_server: TraceServerInterface, client_c
         run_mode_local: bool = False,
     ):
         project_id = f"{entity}/{project}"
-        
+
         # Create model and scorer
         model_ref_uri = create_model(entity, project)
         scorer_ref_uri = create_scorer(entity, project)
-        
+
         # Run the model to get a call to score
         call_id = await run_model_and_get_call_id(
             entity, project, model_ref_uri, user_input, model_output
         )
-        
+
         # Apply the scorer to the call
         scorer_res = await apply_scorer_harness(
             entity, project, scorer_ref_uri, call_id, expected_score, run_mode_local
         )
-        
-                # Verify the scorer output (convert to string since mock returns strings)
+
+        # Verify the scorer output (convert to string since mock returns strings)
         assert str(scorer_res.output) == expected_score
 
         # Query for calls
@@ -401,7 +404,7 @@ async def test_apply_scorer(ch_only_trace_server: TraceServerInterface, client_c
     # Test both local and non-local modes
     for run_mode_local in [False, True]:
         local_suffix = "_local" if run_mode_local else ""
-        
+
         # Test with first project
         await do_test(
             entity=entity,
@@ -411,7 +414,7 @@ async def test_apply_scorer(ch_only_trace_server: TraceServerInterface, client_c
             expected_score="8",
             run_mode_local=run_mode_local,
         )
-        
+
         # Test with second project to ensure isolation
         await do_test(
             entity=entity,
