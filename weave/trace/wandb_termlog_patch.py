@@ -12,9 +12,9 @@ import inspect
 from functools import wraps
 from typing import Any, Optional
 
-import wandb
+from weave.wandb_thin import termlog
 
-wandb_termlog = wandb.termlog
+wandb_termlog = termlog.termlog
 patched = False
 
 
@@ -54,7 +54,7 @@ def ensure_patched() -> None:
     global patched
     if patched:
         return
-    wandb.termlog = safe_termlog
+    termlog.termlog = safe_termlog
     patched = True
 
 
@@ -62,5 +62,5 @@ def ensure_unpatched() -> None:
     global patched
     if not patched:
         return
-    wandb.termlog = wandb_termlog
+    termlog.termlog = wandb_termlog
     patched = False
