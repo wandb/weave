@@ -432,11 +432,16 @@ export const CallsTable: FC<{
             field,
             rowId
           );
+          const op = operator ?? getDefaultOperatorForValue(value);
           if (expandedRef != null) {
-            value = expandedRef.value;
-            field = expandedRef.field;
+            setExpandedRefCols(prevState => {
+              const newSet = new Set(prevState);
+              // Remove the default
+              newSet.delete('inputs.example');
+              newSet.add(expandedRef.field);
+              return newSet;
+            });
           }
-          const op = operator ? operator : getDefaultOperatorForValue(value);
 
           // All values added to the filter model should be strings, we
           // only allow text-field input in the filter bar (even for numeric)
@@ -521,18 +526,6 @@ export const CallsTable: FC<{
     shouldIncludeTotalStorageSize && calls.storageSizeLoading,
     !!calls.storageSizeError
   );
-
-  // This contains columns which are suitable for selection and raw data
-  // entry. Notably, not children of expanded refs.
-  const filterFriendlyColumnInfo = useMemo(() => {
-    const filteredCols = columns.cols.filter(
-      col => !columnIsRefExpanded(col.field)
-    );
-    return {
-      cols: filteredCols,
-      colGroupingModel: columns.colGroupingModel,
-    };
-  }, [columnIsRefExpanded, columns.colGroupingModel, columns.cols]);
 
   // Now, there are 4 primary controls:
   // 1. Op Version
@@ -1077,7 +1070,7 @@ export const CallsTable: FC<{
                   entity={entity}
                   project={project}
                   filterModel={filterModel}
-                  columnInfo={filterFriendlyColumnInfo}
+                  columnInfo={columns}
                   setFilterModel={setFilterModel}
                   selectedCalls={selectedCalls}
                   clearSelectedCalls={clearSelectedCalls}

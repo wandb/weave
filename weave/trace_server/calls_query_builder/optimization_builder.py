@@ -24,6 +24,7 @@ from weave.trace_server.calls_query_builder.utils import (
     param_slot,
 )
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.orm import clickhouse_cast
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -80,7 +81,7 @@ class QueryOptimizationProcessor(ABC):
         """
         Process an operand and convert it to an optimized SQL condition if possible.
 
-        Ignores leaf operations like Literal, GetField, and Convert.
+        Ignores leaf operations like Literal and GetField.
 
         Args:
             operand: The operand to process
@@ -89,12 +90,27 @@ class QueryOptimizationProcessor(ABC):
             SQL condition string or None if optimization is not possible
         """
         if isinstance(operand, tsi_query.LiteralOperation):
-            return None
+            return self.process_literal(operand)
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            return None
+            return self.process_get_field(operand)
         elif isinstance(operand, tsi_query.ConvertOperation):
-            return None
+            return self.process_convert(operand)
         return apply_processor(self, operand)
+
+    def process_literal(self, operand: tsi_query.LiteralOperation) -> Optional[str]:
+        """Process literal operand"""
+        return None
+
+    def process_get_field(self, operand: tsi_query.GetFieldOperator) -> Optional[str]:
+        """Process get field operand"""
+        return None
+
+    def process_convert(self, operand: tsi_query.ConvertOperation) -> Optional[str]:
+        """Process convert operand"""
+        field = self.process_operand(operand.convert_.input)
+        if field is None:
+            return None
+        return clickhouse_cast(field, operand.convert_.to)
 
     def process_and(self, operation: tsi_query.AndOperation) -> Optional[str]:
         """Process AND operations into optimized SQL."""

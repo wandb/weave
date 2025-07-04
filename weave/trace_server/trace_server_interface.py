@@ -423,6 +423,13 @@ class CallsQueryReq(BaseModel):
         examples=[["inputs.self.message", "inputs.model.prompt"]],
         description="Columns to expand, i.e. refs to other objects",
     )
+    # Internal flag used for playing nice with the recursive object ref handling
+    # alreadly implemented in the frontend.
+    do_expand: Optional[bool] = Field(
+        default=True,
+        description="If true, the response will include the expanded columns. "
+        "If false, the response expand_columns will only be used for filtering and ordering. ",
+    )
 
 
 class CallsQueryRes(BaseModel):
@@ -435,6 +442,7 @@ class CallsQueryStatsReq(BaseModel):
     query: Optional[Query] = None
     limit: Optional[int] = None
     include_total_storage_size: Optional[bool] = False
+    expand_columns: Optional[list[str]] = None
 
 
 class CallsQueryStatsRes(BaseModel):
