@@ -5,18 +5,27 @@ import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-import wandb
-from wandb import errors as wandb_errors
-from wandb.sdk.internal.internal_api import Api as InternalApi
-from wandb.sdk.internal.internal_api import logger as wandb_logger
+import weave.wandb_thin as wandb
 
+try:
+    from wandb import errors as wandb_errors
+    from wandb.sdk.internal.internal_api import Api as InternalApi
+    from wandb.sdk.internal.internal_api import logger as wandb_logger
+except ImportError:
+    WANDB_AVAILABLE = False
 
-class AuthenticationError(wandb_errors.AuthenticationError):
-    pass
+    from weave.wandb_interface.wandb_api import get_wandb_api_sync
 
+    class AuthenticationError(Exception): ...
 
-class CommError(wandb_errors.CommError):
-    pass
+    class CommError(Exception): ...
+
+else:
+    WANDB_AVAILABLE = True
+
+    class AuthenticationError(wandb_errors.AuthenticationError): ...  # type: ignore[no-redef]
+
+    class CommError(wandb_errors.CommError): ...  # type: ignore[no-redef]
 
 
 class UnableToCreateProject(Exception):
@@ -30,10 +39,12 @@ logger = logging.getLogger(__name__)
 def wandb_logging_disabled() -> Iterator[None]:
     original_termerror = wandb.termerror
     wandb.termerror = lambda *args, **kwargs: None
-    original_log_level = wandb_logger.getEffectiveLevel()
-    wandb_logger.setLevel(logging.CRITICAL)
+    if WANDB_AVAILABLE:
+        original_log_level = wandb_logger.getEffectiveLevel()
+        wandb_logger.setLevel(logging.CRITICAL)
     yield None
-    wandb_logger.setLevel(original_log_level)
+    if WANDB_AVAILABLE:
+        wandb_logger.setLevel(original_log_level)
     wandb.termerror = original_termerror
 
 
@@ -48,6 +59,15 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
     which is not guaranteed to be the same if the provided project_name contains invalid
     characters. Adheres to trace_server_interface.EnsureProjectExistsRes
     """
+    if not WANDB_AVAILABLE:
+        alt_api = get_wandb_api_sync()
+        try:
+            alt_api.upsert_project(project_name, entity=entity_name)
+        except Exception as e:
+            logger.exception(f"Unable to access `{entity_name}/{project_name}`.")
+            raise e from None
+        return {"project_name": project_name}
+
     wandb_logging_disabled()
     api = InternalApi({"entity": entity_name, "project": project_name})
     # Since `UpsertProject` will fail if the user does not have permission to create a project

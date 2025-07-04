@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import warnings
 from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
@@ -129,9 +130,11 @@ class ContextAwareThread(_Thread):
 
 
 def is_colab():  # type: ignore
-    import importlib
+    try:
+        spec = importlib.util.find_spec("google.colab")
+    except (ImportError, ModuleNotFoundError):
+        return False
 
-    spec = importlib.util.find_spec("google.colab")
     return bool(spec)
 
 
