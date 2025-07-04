@@ -42,6 +42,7 @@ from weave.trace_server.execution_runner.trace_server_adapter import (
     externalize_trace_server,
     make_externalize_ref_converter,
 )
+from weave.trace_server.execution_runner.user_scripts.apply_scorer import apply_scorer
 from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 
 logger = logging.getLogger(__name__)
@@ -343,4 +344,33 @@ class RunAsUser:
             req.project_id,
             req.wb_user_id,
             tsi.RunModelRes,
+        )
+
+    async def apply_scorer(self, req: tsi.ApplyScorerReq) -> tsi.ApplyScorerRes:
+        """
+        Apply a scorer to a call in an isolated process.
+
+        This is a specialized method for running scorers with proper isolation.
+        The scorer execution happens in a separate process to prevent memory
+        contamination and ensure security.
+
+        Args:
+            req: Scorer execution request containing scorer reference and target call
+
+        Returns:
+            Scorer execution response with output and call ID
+
+        Raises:
+            ValueError: If request parameters don't match instance values or wb_user_id is missing
+            RunAsUserException: If scorer execution fails
+        """
+        if not req.wb_user_id:
+            raise ValueError("wb_user_id is required")
+
+        return await self._run_user_scoped_function(
+            apply_scorer,
+            req,
+            req.project_id,
+            req.wb_user_id,
+            tsi.ApplyScorerRes,
         )

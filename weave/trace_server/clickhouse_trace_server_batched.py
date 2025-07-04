@@ -2107,6 +2107,47 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ).run_model(req)
         return res
 
+    async def apply_scorer(self, req: tsi.ApplyScorerReq) -> tsi.ApplyScorerRes:
+        """
+        Apply a scorer to a call in an isolated process with user-specific context.
+
+        This method delegates scorer execution to the RunAsUser class, which spawns
+        a separate process to ensure memory isolation between different users.
+        The scorer runs with a user-scoped WeaveClient that can only access data
+        belonging to the authenticated user.
+
+        Args:
+            req: Scorer execution request containing:
+                - scorer_ref: Reference to the scorer to execute
+                - target_call_id: ID of the call to score
+                - additional_inputs: Optional additional inputs for the scorer
+                - project_id: Project scope for execution
+                - wb_user_id: User ID for authentication and scoping
+
+        Returns:
+            Scorer execution response containing:
+                - output: The scorer's result
+                - call_id: Unique identifier for the traced scoring
+
+        Raises:
+            ValueError: If wb_user_id is not provided in the request
+            RunAsUserException: If the scorer execution fails in the child process
+
+        Security:
+            - Runs in a separate process for memory isolation
+            - All references are validated to match the project scope
+            - User context is enforced throughout execution
+        """
+        if not req.wb_user_id:
+            raise ValueError("wb_user_id is required")
+
+        res = await RunAsUser(
+            internal_trace_server=self,
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+        ).apply_scorer(req)
+        return res
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
