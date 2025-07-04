@@ -5,8 +5,8 @@ import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+import weave.wandb_thin as wandb
 from weave.wandb_interface.wandb_api import get_wandb_api_sync
-from weave.wandb_thin import termlog
 
 try:
     from wandb import errors as wandb_errors
@@ -36,15 +36,15 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def wandb_logging_disabled() -> Iterator[None]:
-    original_termerror = termlog.termerror
-    termlog.termerror = lambda *args, **kwargs: None
+    original_termerror = wandb.termerror
+    wandb.termerror = lambda *args, **kwargs: None
     if WANDB_AVAILABLE:
         original_log_level = wandb_logger.getEffectiveLevel()
         wandb_logger.setLevel(logging.CRITICAL)
     yield None
     if WANDB_AVAILABLE:
         wandb_logger.setLevel(original_log_level)
-    termlog.termerror = original_termerror
+    wandb.termerror = original_termerror
 
 
 def ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]:
