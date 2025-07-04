@@ -1,10 +1,13 @@
 import pytest
 
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
-from weave.trace.refs import ObjectRef
+from weave.trace.refs import CallRef, ObjectRef
 from weave.trace_server.execution_runner.run_as_user import with_client_bound_to_project
+from weave.trace_server.execution_runner.user_scripts.apply_scorer import apply_scorer
 from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 from weave.trace_server.trace_server_interface import (
+    ApplyScorerReq,
+    ApplyScorerRes,
     CallsQueryReq,
     ObjCreateReq,
     ObjQueryReq,
@@ -163,5 +166,258 @@ async def test_run_model(ch_only_trace_server: TraceServerInterface, client_crea
             project="test_run_model_2" + local_suffix,
             expected_output="Hi friend",
             user_input="Hey there!",
+            run_mode_local=run_mode_local,
+        )
+
+
+@pytest.mark.asyncio
+async def test_apply_scorer(ch_only_trace_server: TraceServerInterface, client_creator):
+    """
+    Test the apply_scorer API endpoint with isolated execution.
+
+    This test verifies that:
+    1. Scorers can be created and executed through the apply_scorer API
+    2. Scorer execution is properly traced (creates call records)
+    3. Scorers can correctly score model outputs
+    4. Different projects are properly isolated from each other
+
+    The test creates a model, executes it to get a call to score,
+    then creates a scorer and applies it to the call.
+    """
+    entity = "shawn"
+
+    def create_model(entity: str, project: str) -> str:
+        """Create a test model and return its reference URI."""
+        project_id = f"{entity}/{project}"
+        model_object_id = "test_model_for_scorer"
+        llm_model_val = {
+            "llm_model_id": "gpt-4o-mini",
+            "default_params": {
+                "messages_template": [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                ],
+                "response_format": "text",
+            },
+        }
+        model_create_res = ch_only_trace_server.obj_create(
+            ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": project_id,
+                        "object_id": model_object_id,
+                        "val": llm_model_val,
+                        "builtin_object_class": "LLMStructuredCompletionModel",
+                    }
+                }
+            )
+        )
+        return ObjectRef(
+            entity=entity,
+            project=project,
+            name=model_object_id,
+            _digest=model_create_res.digest,
+        ).uri()
+
+    def create_scorer(entity: str, project: str) -> str:
+        """Create a test scorer and return its reference URI."""
+        project_id = f"{entity}/{project}"
+        
+        # First create the model for the scorer
+        scorer_model_object_id = "test_scorer_model"
+        scorer_model_val = {
+            "llm_model_id": "gpt-4o-mini",
+            "default_params": {
+                "messages_template": [
+                    {"role": "system", "content": "You are an expert judge. Evaluate the response and return a score from 0 to 10."},
+                ],
+                "response_format": "text",
+            },
+        }
+        scorer_model_create_res = ch_only_trace_server.obj_create(
+            ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": project_id,
+                        "object_id": scorer_model_object_id,
+                        "val": scorer_model_val,
+                        "builtin_object_class": "LLMStructuredCompletionModel",
+                    }
+                }
+            )
+        )
+        scorer_model_ref = ObjectRef(
+            entity=entity,
+            project=project,
+            name=scorer_model_object_id,
+            _digest=scorer_model_create_res.digest,
+        ).uri()
+        
+        # Then create the scorer
+        scorer_object_id = "test_llm_judge_scorer"
+        scorer_val = {
+            "_type": "LLMAsAJudgeScorer",
+            "_class_name": "LLMAsAJudgeScorer",
+            "_bases": ["BaseModel", "Scorer", "LLMAsAJudgeScorer"],
+            "model": scorer_model_ref,
+            "scoring_prompt": "User input: {user_input}\nModel output: {output}\n\nScore the quality of the response (0-10).",
+        }
+        scorer_create_res = ch_only_trace_server.obj_create(
+            ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": project_id,
+                        "object_id": scorer_object_id,
+                        "val": scorer_val,
+                    }
+                }
+            )
+        )
+        return ObjectRef(
+            entity=entity,
+            project=project,
+            name=scorer_object_id,
+            _digest=scorer_create_res.digest,
+        ).uri()
+
+    async def run_model_and_get_call_id(
+        entity: str,
+        project: str,
+        model_ref_uri: str,
+        user_input: str,
+        expected_output: str,
+    ) -> str:
+        """Run a model and return the call ID."""
+        project_id = f"{entity}/{project}"
+        req = RunModelReq.model_validate(
+            {
+                "project_id": project_id,
+                "model_ref": model_ref_uri,
+                "inputs": {"user_input": user_input},
+            }
+        )
+        with with_simple_mock_litellm_completion(expected_output):
+            model_run_res = await ch_only_trace_server.run_model(req)
+        return model_run_res.call_id
+
+    async def apply_scorer_harness(
+        entity: str,
+        project: str,
+        scorer_ref_uri: str,
+        target_call_id: str,
+        expected_score: str,
+        run_mode_local: bool = False,
+    ) -> ApplyScorerRes:
+        """Apply a scorer to a call."""
+        project_id = f"{entity}/{project}"
+        req = ApplyScorerReq.model_validate(
+            {
+                "project_id": project_id,
+                "scorer_ref": scorer_ref_uri,
+                "target_call_id": target_call_id,
+                "additional_inputs": None,
+            }
+        )
+        with with_simple_mock_litellm_completion(expected_score):
+            if run_mode_local:
+                with with_client_bound_to_project(
+                    entity, project, ch_only_trace_server
+                ):
+                    scorer_res = await apply_scorer(req)
+            else:
+                scorer_res = await ch_only_trace_server.apply_scorer(req)
+        return scorer_res
+
+    async def do_test(
+        entity: str,
+        project: str,
+        model_output: str,
+        user_input: str,
+        expected_score: str,
+        run_mode_local: bool = False,
+    ):
+        project_id = f"{entity}/{project}"
+        
+        # Create model and scorer
+        model_ref_uri = create_model(entity, project)
+        scorer_ref_uri = create_scorer(entity, project)
+        
+        # Run the model to get a call to score
+        call_id = await run_model_and_get_call_id(
+            entity, project, model_ref_uri, user_input, model_output
+        )
+        
+        # Apply the scorer to the call
+        scorer_res = await apply_scorer_harness(
+            entity, project, scorer_ref_uri, call_id, expected_score, run_mode_local
+        )
+        
+                # Verify the scorer output (convert to string since mock returns strings)
+        assert str(scorer_res.output) == expected_score
+
+        # Query for calls
+        calls_res = ch_only_trace_server.calls_query(
+            CallsQueryReq.model_validate(
+                {
+                    "project_id": project_id,
+                }
+            )
+        )
+
+        # Should have 5 calls: model predict, model completion, scorer score, scorer model predict, scorer completion
+        assert len(calls_res.calls) == 5
+
+        # Query for objects
+        objs_res = ch_only_trace_server.objs_query(
+            ObjQueryReq.model_validate(
+                {
+                    "project_id": project_id,
+                }
+            )
+        )
+
+        # Should have 5 objects: model, model predict op, scorer model, scorer, scorer score op
+        assert len(objs_res.objs) == 5
+
+        # Query for the specific scorer call
+        scorer_calls_res = ch_only_trace_server.calls_query(
+            CallsQueryReq.model_validate(
+                {
+                    "project_id": project_id,
+                    "filter": {
+                        "call_ids": [scorer_res.call_id],
+                    },
+                }
+            )
+        )
+
+        assert len(scorer_calls_res.calls) == 1
+        scorer_call = scorer_calls_res.calls[0]
+        assert str(scorer_call.output) == expected_score
+        # The scorer call should be for the LLMAsAJudgeScorer.score op
+        assert scorer_call.op_name.startswith(
+            f"weave:///{project_id}/op/LLMAsAJudgeScorer.score:"
+        )
+
+    # Test both local and non-local modes
+    for run_mode_local in [False, True]:
+        local_suffix = "_local" if run_mode_local else ""
+        
+        # Test with first project
+        await do_test(
+            entity=entity,
+            project="test_apply_scorer_1" + local_suffix,
+            model_output="I'm doing great, thanks for asking!",
+            user_input="How are you?",
+            expected_score="8",
+            run_mode_local=run_mode_local,
+        )
+        
+        # Test with second project to ensure isolation
+        await do_test(
+            entity=entity,
+            project="test_apply_scorer_2" + local_suffix,
+            model_output="The weather is nice today.",
+            user_input="What's the weather like?",
+            expected_score="7",
             run_mode_local=run_mode_local,
         )

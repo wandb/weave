@@ -248,3 +248,8 @@ class UserInjectingExternalTraceServer(
         """Run a model with user ID validation."""
         self._inject_user_id(req)
         return await super().run_model(req)
+
+    async def apply_scorer(self, req: tsi.ApplyScorerReq) -> tsi.ApplyScorerRes:
+        """Apply a scorer with user ID validation."""
+        self._inject_user_id(req)
+        return await super().apply_scorer(req)

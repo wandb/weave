@@ -415,6 +415,15 @@ class CrossProcessTraceServer(TraceServerInterface):
         # TODO: Implement proper async support
         return self._send_request("run_model", req)
 
+    async def apply_scorer(self, req: ApplyScorerReq) -> ApplyScorerRes:
+        """
+        Apply a scorer asynchronously.
+
+        Note: Async methods require special handling. Currently runs synchronously.
+        """
+        # TODO: Implement proper async support
+        return self._send_request("apply_scorer", req)
+
 
 def generate_child_process_trace_server_args(
     trace_server: TraceServerInterface,

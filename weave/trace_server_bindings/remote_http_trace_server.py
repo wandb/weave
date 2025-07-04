@@ -637,6 +637,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "run_model is not implemented for remote HTTP trace server"
         )
 
+    async def apply_scorer(self, req: tsi.ApplyScorerReq) -> tsi.ApplyScorerRes:
+        raise NotImplementedError(
+            "apply_scorer is not implemented for remote HTTP trace server"
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,

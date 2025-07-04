@@ -128,6 +128,10 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return await super().run_model(req)
 
+    async def apply_scorer(self, req: tsi.ApplyScorerReq) -> tsi.ApplyScorerRes:
+        req.wb_user_id = self._user_id
+        return await super().apply_scorer(req)
+
 
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface, user_id: str = "test_user"
