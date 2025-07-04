@@ -632,6 +632,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/threads/stream_query", req, tsi.ThreadsQueryReq, tsi.ThreadSchema
         )
 
+    async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
+        raise NotImplementedError(
+            "run_model is not implemented for remote HTTP trace server"
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,
