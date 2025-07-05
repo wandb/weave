@@ -11,12 +11,24 @@ import subprocess
 import sys
 from pathlib import Path
 
+from typing_extensions import deprecated
+
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
+from weave.type_handlers.Content.content import save as save_content
+from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
 
+DEPRECATION_MESSAGE = """
+File is deprecated and scheduled to be removed in the next release\n
+Use the new Content API which supports all File methods instead:\n
+File(path) -> Content.from_path(path)\n
+File(path, mimetype) -> Content.from_path(path, mimetype)\n
+"""
 
+
+@deprecated(DEPRECATION_MESSAGE)
 class File:
     """A class representing a file with path, mimetype, and size information."""
 
@@ -79,16 +91,11 @@ class File:
         shutil.copy2(self.path, path)
 
 
+@deprecated(DEPRECATION_MESSAGE)
 def save(obj: File, artifact: MemTraceFilesArtifact, name: str) -> None:
-    with artifact.new_file("file", binary=True) as f:
-        f.write(obj.path.read_bytes())
-    metadata = {
-        "original_path": str(obj.path),
-        "mimetype": obj.mimetype,
-        "size": obj.size,
-    }
-    with artifact.new_file("metadata.json", binary=False) as f:
-        json.dump(metadata, f)
+    logger.warning("Saving File as Content object")
+    content = Content.from_path(obj.path, obj.mimetype)
+    save_content(content, artifact, name)
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> File:
