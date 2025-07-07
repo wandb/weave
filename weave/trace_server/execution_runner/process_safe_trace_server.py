@@ -25,16 +25,16 @@ from weave.trace_server import trace_server_interface as tsi
 logger = logging.getLogger(__name__)
 
 
-class CallMethodException(Exception):
-    """Exception raised when a method call fails."""
+class CallMethodError(Exception):
+    """Error raised when a remote method call fails."""
 
     pass
 
 
 @dataclass
-class ProcessSafeTraceServerArgs:
+class ProcessSafeTraceServerHandle:
     """
-    Handle containing all process-safe primitives needed for communication.
+    Communication handle for cross-process trace server access.
 
     This is what gets passed to the child process - it contains only
     serializable primitives, no complex objects or global state.
@@ -56,6 +56,10 @@ class ProcessSafeTraceServerAdapter:
 
     The design is simple: worker threads read from request queue,
     process using the trace server, and write to response queue.
+
+    Performance note: Each request incurs IPC overhead through multiprocessing
+    queues. For high-throughput scenarios, consider batching requests or
+    using the max_workers parameter to increase concurrency.
     """
 
     def __init__(
@@ -100,7 +104,7 @@ class ProcessSafeTraceServerAdapter:
         self._started = True
         logger.info(f"Started process-safe adapter with {self.max_workers} workers")
 
-    def get_handle(self) -> ProcessSafeTraceServerArgs:
+    def get_handle(self) -> ProcessSafeTraceServerHandle:
         """
         Get a handle containing the process-safe primitives.
 
@@ -110,7 +114,7 @@ class ProcessSafeTraceServerAdapter:
         if not self._started:
             raise RuntimeError("Adapter must be started before getting handle")
 
-        return ProcessSafeTraceServerArgs(
+        return ProcessSafeTraceServerHandle(
             request_queue=self.request_queue,
             response_queue=self.response_queue,
         )
@@ -225,12 +229,12 @@ class ProcessSafeTraceServerClient(tsi.TraceServerInterface):
 
     This class:
     - Lives in the child process
-    - Uses the queues from ProcessSafeTraceServerArgs to communicate
+    - Uses the queues from ProcessSafeTraceServerHandle to communicate
     - Implements all TraceServerInterface methods
     - Handles request/response correlation
     """
 
-    def __init__(self, handle: ProcessSafeTraceServerArgs):
+    def __init__(self, handle: ProcessSafeTraceServerHandle):
         """
         Initialize client with a process-safe handle.
 
@@ -319,7 +323,7 @@ class ProcessSafeTraceServerClient(tsi.TraceServerInterface):
         if response["success"]:
             return response["result"]
         else:
-            raise CallMethodException(f"Remote error: {response['error']}")
+            raise CallMethodError(f"Remote error: {response['error']}")
 
     def shutdown(self) -> None:
         """Shutdown the client."""
@@ -475,7 +479,7 @@ def create_process_safe_trace_server(
     trace_server: tsi.TraceServerInterface,
     max_workers: int = 10,
     context_values: Optional[dict[contextvars.ContextVar, Any]] = None,
-) -> tuple[ProcessSafeTraceServerAdapter, ProcessSafeTraceServerArgs]:
+) -> tuple[ProcessSafeTraceServerAdapter, ProcessSafeTraceServerHandle]:
     """
     Create a process-safe trace server adapter and handle.
 
@@ -512,14 +516,14 @@ CONTEXT_VARS_TO_PROPAGATE: list[contextvars.ContextVar] = [
     _secret_fetcher_context,
 ]
 
-# Default number of concurrent workers
+# Default number of concurrent requests the trace server adapter can handle
 DEFAULT_MAX_WORKERS = 10
 
 
 def generate_child_process_trace_server_args(
     trace_server: tsi.TraceServerInterface,
     max_workers: int = DEFAULT_MAX_WORKERS,
-) -> tuple[ProcessSafeTraceServerAdapter, ProcessSafeTraceServerArgs]:
+) -> tuple[ProcessSafeTraceServerAdapter, ProcessSafeTraceServerHandle]:
     """
     Generate a handle for child process trace server.
 

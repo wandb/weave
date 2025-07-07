@@ -2,6 +2,35 @@
 
 Secure server-side execution framework for running user models and evaluations.
 
+## Quick Start
+
+```python
+# Initialize the execution runner
+runner = RunAsUser(
+    internal_trace_server=trace_server,
+    project_id="my-project", 
+    wb_user_id="user123",
+    timeout_seconds=60,  # Optional: execution timeout (default: 60s)
+    max_concurrent_requests=20  # Optional: max concurrent requests (default: 10)
+)
+
+# Execute a model
+response = await runner.run_model(
+    RunModelReq(
+        project_id="my-project",
+        model_ref="weave:///entity/my-project/object/model:digest",
+        inputs={"user_input": "Hello, world!"},
+        wb_user_id="user123"
+    )
+)
+
+# Response contains:
+# - call_id: The trace call ID for the execution
+# - output: The model's output
+print(f"Model output: {response.output}")
+print(f"Trace call ID: {response.call_id}")
+```
+
 ## Overview
 
 The execution runner provides a secure way to execute user code on the server while maintaining complete isolation between users. It achieves this through process isolation and careful management of security contexts.
@@ -16,20 +45,18 @@ The execution runner provides a secure way to execute user code on the server wh
 
 ## Architecture
 
-### Three-Layer Architecture
+The execution runner uses a clean separation of concerns:
 
-The execution runner follows a clean three-layer architecture:
+### Core Components
 
-#### Layer 1: Externalization
-- **Component**: `externalize_trace_server` (from trace_server_adapter.py)
+#### Security Wrapper (`secure_trace_server`)
 - **Purpose**: Wraps the internal trace server with user context and security
 - **Responsibilities**:
   - Injects user ID into all requests
   - Validates project access
   - Prefixes project IDs with `__SERVER__/`
 
-#### Layer 2: Process-Safe Adapter
-- **Component**: `ProcessSafeTraceServerAdapter` (from process_safe_trace_server.py)
+#### Process-Safe Adapter (`ProcessSafeTraceServerAdapter`)
 - **Purpose**: Exposes trace server through process-safe primitives
 - **Responsibilities**:
   - Manages a pool of worker threads
@@ -37,11 +64,10 @@ The execution runner follows a clean three-layer architecture:
   - Handles concurrent request processing (N parallel requests)
   - Lives in the parent process
 
-#### Layer 3: Client Proxy
-- **Component**: `ProcessSafeTraceServerClient` (from process_safe_trace_server.py)
+#### Process-Safe Client (`ProcessSafeTraceServerClient`)
 - **Purpose**: TraceServerInterface implementation for child process
 - **Responsibilities**:
-  - Uses queues from Layer 2 to communicate
+  - Uses queues to communicate with the adapter
   - Implements all TraceServerInterface methods
   - Handles request/response correlation
   - Lives in the child process
@@ -52,8 +78,8 @@ The execution runner follows a clean three-layer architecture:
 ┌─────────────────────────────────────────────────┐
 │              Parent Process                      │
 │                                                  │
-│  Internal      Layer 1         Layer 2          │
-│  TraceServer → Externalize → ProcessSafeAdapter │
+│  Internal      Security        Process-Safe      │
+│  TraceServer → Wrapper  →      Adapter          │
 │      ↑                              ↓            │
 │      └──────── Workers ─────────────┘            │
 │                   ↓                              │
@@ -65,8 +91,7 @@ The execution runner follows a clean three-layer architecture:
 │                   │                              │
 │              [Queues]                            │
 │                   ↓                              │
-│               Layer 3                            │
-│         ProcessSafeClient                        │
+│           Process-Safe Client                    │
 │                   ↓                              │
 │             User Code                            │
 └─────────────────────────────────────────────────┘
@@ -90,9 +115,9 @@ The `WeaveClient` design leads to in-memory mutations of refs when they're loade
 
 ## Execution Architecture
 
-### Layer Architecture (User Script Perspective)
+### Component Architecture (User Script Perspective)
 
-This diagram shows how the user script (`run_model`) operates within multiple layers of abstraction:
+This diagram shows how the user script (`run_model`) operates within multiple components:
 
 ```mermaid
 graph TB
@@ -100,17 +125,17 @@ graph TB
         subgraph "User Script Context"
             US[User Script<br/>run_model.py]
             
-            subgraph "Layer 3: Client Layer"
+            subgraph "Client Components"
                 USC[user_scoped_client]
                 USC_DESC["• Special project_id: __SERVER__/actual_project<br/>• Scoped to user context<br/>• Provides WeaveClient interface"]
             end
             
-            subgraph "Layer 2: Server Proxy Layer"
+            subgraph "Communication Layer"
                 CTS[ProcessSafeTraceServerClient]
                 CTS_DESC["• Proxy to parent process<br/>• Communicates via queues<br/>• Implements TraceServerInterface"]
             end
             
-            subgraph "Layer 1: Request Processing"
+            subgraph "Request Processing"
                 REQ[Externalized Request]
                 REQ_DESC["• Internal refs → External refs<br/>• weave:///entity/project → weave:///__SERVER__/project<br/>• Prevents cross-project access"]
             end
@@ -268,11 +293,11 @@ For a `run_model` request:
 ```
 execution_runner/
 ├── README.md                       # This file
-├── process_safe_trace_server.py    # Process-safe trace server implementation
-├── run_as_user.py                  # Main orchestrator for isolated execution
+├── process_safe_trace_server.py    # Process-safe communication implementation
+├── run_as_user.py                  # Main API for isolated execution
 ├── trace_server_adapter.py         # Security wrappers and ID conversion
 └── user_scripts/
-    └── run_model.py               # Actual model execution logic
+    └── run_model.py               # Model execution implementation
 ```
 
 ## Usage
@@ -341,16 +366,16 @@ runner = RunAsUser(
 ## Core Components
 
 ### process_safe_trace_server.py
-Complete implementation of the three-layer architecture for process-safe trace server communication:
-- `ProcessSafeTraceServerAdapter`: Exposes trace server via process-safe queues (Layer 2)
-- `ProcessSafeTraceServerClient`: Client proxy for child processes (Layer 3)
-- `ProcessSafeTraceServerArgs`: Serializable handle containing communication primitives
+Complete implementation of process-safe trace server communication:
+- `ProcessSafeTraceServerAdapter`: Exposes trace server via process-safe queues
+- `ProcessSafeTraceServerClient`: Client proxy for child processes
+- `ProcessSafeTraceServerHandle`: Serializable handle containing communication primitives
 - Helper functions for creating and using process-safe trace servers
 
 ### trace_server_adapter.py
 Security layer that wraps trace servers with user context:
-- `externalize_trace_server`: Wraps a trace server with user ID injection and project validation (Layer 1)
-- `TraceServerAdapterInternalOnly`: Validates and prefixes project IDs
+- `secure_trace_server`: Wraps a trace server with user ID injection and project validation
+- `IdConverter`: Validates and converts between internal/external IDs
 - Reference externalization to prevent cross-project access
 
 ### run_as_user.py

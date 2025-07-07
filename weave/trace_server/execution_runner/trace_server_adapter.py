@@ -6,7 +6,7 @@ scoping. It's a critical security component that ensures users can only access
 their own data by converting between internal and external references.
 
 Key components:
-- externalize_trace_server: Main function to wrap a trace server with security
+- secure_trace_server: Main function to wrap a trace server with security
 - IdConverter: Validates and converts project/user IDs
 - UserInjectingExternalTraceServer: Ensures user ID is injected into all requests
 
@@ -29,11 +29,13 @@ from weave.trace_server.trace_server_converter import universal_int_to_ext_ref_c
 
 # Special placeholder used to indicate server-managed entities
 # This prevents clients from specifying arbitrary entities
+# WARNING: This placeholder is a security boundary. Never allow clients
+# to specify this value directly.
 SERVER_SIDE_ENTITY_PLACEHOLDER = "__SERVER__"
 SERVER_SIDE_PROJECT_ID_PREFIX = SERVER_SIDE_ENTITY_PLACEHOLDER + "/"
 
 
-def with_externalized_id_handling_trace_server(
+def secure_trace_server(
     trace_server: tsi.TraceServerInterface, project_id: str, wb_user_id: str
 ) -> tsi.TraceServerInterface:
     """
@@ -83,8 +85,8 @@ def make_externalize_ref_converter(project_id: str) -> Callable[[T], T]:
     def convert_project_id(internal_project_id: str) -> str:
         if project_id != internal_project_id:
             raise ValueError(
-                f"Project ID mismatch: {project_id} != {internal_project_id}. "
-                "Stopping operation."
+                f"Security violation: Attempted to access project '{internal_project_id}' "
+                f"but this operation is scoped to project '{project_id}'"
             )
         return SERVER_SIDE_PROJECT_ID_PREFIX + internal_project_id
 
@@ -117,14 +119,14 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         """Convert external project ID to internal format with validation."""
         if not project_id.startswith(SERVER_SIDE_PROJECT_ID_PREFIX):
             raise ValueError(
-                f"Project ID does not start with {SERVER_SIDE_PROJECT_ID_PREFIX}: "
-                f"{project_id}"
+                f"Invalid project ID format: Expected prefix '{SERVER_SIDE_PROJECT_ID_PREFIX}' "
+                f"but got '{project_id}'"
             )
         found_project_id = project_id[len(SERVER_SIDE_PROJECT_ID_PREFIX) :]
         if found_project_id != self.project_id:
             raise ValueError(
-                f"Project ID mismatch: {found_project_id} != {self.project_id}. "
-                "Stopping operation."
+                f"Security violation: Attempted to access project '{found_project_id}' "
+                f"but this converter is scoped to project '{self.project_id}'"
             )
         return found_project_id
 
@@ -132,8 +134,8 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         """Convert internal project ID to external format with validation."""
         if project_id != self.project_id:
             raise ValueError(
-                f"Project ID mismatch: {project_id} != {self.project_id}. "
-                "Stopping operation."
+                f"Security violation: Attempted to externalize project '{project_id}' "
+                f"but this converter is scoped to project '{self.project_id}'"
             )
         return SERVER_SIDE_PROJECT_ID_PREFIX + project_id
 
@@ -153,7 +155,8 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         """Validate and return user ID (no conversion needed)."""
         if user_id != self.user_id:
             raise ValueError(
-                f"User ID mismatch: {user_id} != {self.user_id}. Stopping operation."
+                f"Security violation: Attempted operation with user ID '{user_id}' "
+                f"but this session is authenticated as user '{self.user_id}'"
             )
         return user_id
 
@@ -161,7 +164,8 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         """Validate and return user ID (no conversion needed)."""
         if user_id != self.user_id:
             raise ValueError(
-                f"User ID mismatch: {user_id} != {self.user_id}. Stopping operation."
+                f"Security violation: Attempted operation with user ID '{user_id}' "
+                f"but this session is authenticated as user '{self.user_id}'"
             )
         return user_id
 

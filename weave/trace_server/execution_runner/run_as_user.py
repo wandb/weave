@@ -34,18 +34,20 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.execution_runner.process_safe_trace_server import (
-    ProcessSafeTraceServerArgs,
     ProcessSafeTraceServerClient,
+    ProcessSafeTraceServerHandle,
     generate_child_process_trace_server_args,
 )
 from weave.trace_server.execution_runner.trace_server_adapter import (
     SERVER_SIDE_ENTITY_PLACEHOLDER,
     make_externalize_ref_converter,
-    with_externalized_id_handling_trace_server,
+    secure_trace_server,
 )
 from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 
 logger = logging.getLogger(__name__)
+
+# Maximum time (in seconds) to wait for a child process to complete execution
 EXECUTION_TIMEOUT_SECONDS = 60
 
 
@@ -115,7 +117,7 @@ class RunAsUserChildProcessContext(Generic[T]):
         result_queue: Queue for returning results from child to parent process
     """
 
-    trace_server_args: ProcessSafeTraceServerArgs
+    process_safe_trace_server_handle: ProcessSafeTraceServerHandle
     project_id: str
     result_queue: multiprocessing.Queue[T]
     trace_ctx: ddtrace.SpanContext | None = None
@@ -150,7 +152,7 @@ def _generic_child_process_wrapper(
     with ddtrace.tracer.trace("run_as_user._generic_child_process_wrapper.inner"):
         # Build the trace server client in the child process
         safe_trace_server = ProcessSafeTraceServerClient(
-            wrapper_context.trace_server_args
+            wrapper_context.process_safe_trace_server_handle
         )
 
         try:
@@ -267,7 +269,7 @@ class RunAsUser:
             )
 
         # Wrap the trace server with user context and project validation
-        wrapped_trace_server = with_externalized_id_handling_trace_server(
+        wrapped_trace_server = secure_trace_server(
             self.internal_trace_server, project_id, wb_user_id
         )
 
@@ -279,8 +281,10 @@ class RunAsUser:
         result_queue: multiprocessing.Queue[dict] = multiprocessing.Queue()
 
         # Create the process-safe adapter for communication
-        adapter, trace_server_args = generate_child_process_trace_server_args(
-            wrapped_trace_server, max_workers=self.max_concurrent_requests
+        adapter, process_safe_trace_server_handle = (
+            generate_child_process_trace_server_args(
+                wrapped_trace_server, max_workers=self.max_concurrent_requests
+            )
         )
 
         try:
@@ -289,7 +293,7 @@ class RunAsUser:
                 target=_generic_child_process_wrapper,
                 kwargs={
                     "wrapper_context": RunAsUserChildProcessContext(
-                        trace_server_args=trace_server_args,
+                        process_safe_trace_server_handle=process_safe_trace_server_handle,
                         project_id=project_id,
                         result_queue=result_queue,
                         trace_ctx=ddtrace.tracer.current_trace_context(),
