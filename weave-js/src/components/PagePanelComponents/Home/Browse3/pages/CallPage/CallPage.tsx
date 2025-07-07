@@ -5,6 +5,7 @@ import React, {FC, useCallback, useContext, useEffect, useRef} from 'react';
 
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
+import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {Tailwind} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
@@ -358,17 +359,19 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
       isLeftSidebarOpen={!hideTraceTreeActual}
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
-          <div className="h-full bg-moon-50">
-            <TraceNavigator
-              entity={focusedCall.entity}
-              project={focusedCall.project}
-              traceId={focusedCall.traceId}
-              focusedCallId={focusedCallId}
-              rootCallId={rootCallId}
-              setFocusedCallId={setFocusedCallId}
-              setRootCallId={setRootCallId}
-            />
-          </div>
+          <ErrorBoundary>
+            <div className="h-full bg-moon-50">
+              <TraceNavigator
+                entity={focusedCall.entity}
+                project={focusedCall.project}
+                traceId={focusedCall.traceId}
+                focusedCallId={focusedCallId}
+                rootCallId={rootCallId}
+                setFocusedCallId={setFocusedCallId}
+                setRootCallId={setRootCallId}
+              />
+            </div>
+          </ErrorBoundary>
         </Tailwind>
       }
       tabs={callTabs}
