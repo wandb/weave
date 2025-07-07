@@ -193,6 +193,7 @@ class RunAsUser:
         project_id: The project ID this runner is scoped to
         wb_user_id: The user ID this runner is scoped to
         timeout_seconds: Maximum time to wait for process execution
+        max_concurrent_requests: Maximum number of concurrent requests the trace server can handle
     """
 
     def __init__(
@@ -201,6 +202,7 @@ class RunAsUser:
         project_id: str,
         wb_user_id: str,
         timeout_seconds: float = EXECUTION_TIMEOUT_SECONDS,
+        max_concurrent_requests: int = 10,
     ) -> None:
         """
         Initialize a RunAsUser instance with specific trace server and user context.
@@ -210,11 +212,13 @@ class RunAsUser:
             project_id: The project ID to scope all executions to
             wb_user_id: The user ID to scope all executions to
             timeout_seconds: Maximum time to wait for process execution (default: 60s)
+            max_concurrent_requests: Maximum number of concurrent requests the trace server can handle (default: 10)
         """
         self.internal_trace_server = internal_trace_server
         self.project_id = project_id
         self.wb_user_id = wb_user_id
         self.timeout_seconds = timeout_seconds
+        self.max_concurrent_requests = max_concurrent_requests
 
     @ddtrace.tracer.wrap(name="run_as_user._run_user_scoped_function")
     async def _run_user_scoped_function(
@@ -277,7 +281,7 @@ class RunAsUser:
             kwargs={
                 "wrapper_context": RunAsUserChildProcessContext(
                     trace_server_args=generate_child_process_trace_server_args(
-                        wrapped_trace_server
+                        wrapped_trace_server, max_workers=self.max_concurrent_requests
                     ),
                     project_id=project_id,
                     result_queue=result_queue,

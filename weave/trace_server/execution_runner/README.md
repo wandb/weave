@@ -1,55 +1,94 @@
 # Execution Runner
 
-The execution runner provides secure, isolated execution of user code within the Weave trace server. It ensures memory isolation between users and enforces strict project/user scoping through a multi-process architecture.
+Secure server-side execution framework for running user models and evaluations.
 
 ## Overview
 
-The execution runner is designed to safely execute user-provided code (like ML model inference) in isolated processes. This prevents:
-- Memory contamination between different users
-- Unauthorized access to other users' or projects' data
-- Resource exhaustion affecting other users
+The execution runner provides a secure way to execute user code on the server while maintaining complete isolation between users. It achieves this through process isolation and careful management of security contexts.
 
 ### Key Features
 
+- **`run_model` Server API**: Allows direct execution of models on the server side (currently limited to `LLMStructuredCompletionModel` class)
 - **Process Isolation**: Each execution runs in a separate OS process
 - **User Context Preservation**: All operations maintain proper user authentication
-- **Reference Safety**: Prevents cross-project reference contamination
-
-> **Note**: The `run_model` API is currently only available as an internal server API and is not yet exposed via HTTP endpoints.
-
-### Why Process Isolation?
-
-The WeaveClient mutates local objects with refs during execution, which is not thread-safe or memory-safe when multiple differently authenticated clients operate in the same process space. Specifically:
-
-- When a client resolves a ref (e.g., `client.get(ref)`), it caches and potentially mutates the object locally
-- These mutations include updating internal ref pointers and object state
-- If two clients with different authentication contexts shared the same memory space, they could:
-  - Access each other's cached objects
-  - See mutations made by other users
-  - Potentially corrupt shared state
-
-Therefore, we use the more expensive but necessary approach of full process isolation to ensure complete memory separation between different user contexts. This guarantees that each user's operations are truly isolated, even at the cost of additional overhead from process creation and inter-process communication.
+- **Project Scoping**: User code can only access data within their project scope
+- **Concurrent Request Handling**: The trace server can handle multiple simultaneous requests using a thread pool
 
 ## Architecture
 
-The system uses a three-layer architecture:
+### Layer Architecture
 
-1. **Main Process** (ClickHouse Trace Server)
-   - Receives incoming requests
-   - Delegates to RunAsUser for isolated execution
-   - Maintains the actual trace server instance
+```
+┌──────────────────────────────────────────────┐
+│         ClickHouse Server Process            │
+│                                              │
+│  ┌────────────────────────────────────────┐  │
+│  │     TraceServerAdapter (Security)      │  │ Layer 1: Request Validation
+│  │  - Injects user ID                     │  │
+│  │  - Validates project access            │  │
+│  │  - Prefixes project IDs                │  │
+│  └────────────────────────────────────────┘  │
+│                     │                         │
+│  ┌────────────────────────────────────────┐  │
+│  │         RunAsUser (Executor)           │  │ Layer 2: Process Management
+│  │  - Manages child process lifecycle     │  │
+│  │  - Handles timeouts/errors             │  │
+│  │  - Passes wrapped trace server         │  │
+│  └────────────────────────────────────────┘  │
+└──────────────────────│───────────────────────┘
+                       │ Process Boundary
+┌──────────────────────│───────────────────────┐
+│         Child Process (Isolated)             │
+│                     │                        │
+│  ┌────────────────────────────────────────┐  │
+│  │   CrossProcessTraceServer (Proxy)      │  │ Layer 3: Communication
+│  │  - Sends requests via queues           │  │
+│  │  - Receives responses                  │  │
+│  └────────────────────────────────────────┘  │
+│                     │                         │
+│  ┌────────────────────────────────────────┐  │
+│  │        User Code Execution             │  │ Layer 4: User Code
+│  │  - WeaveClient with user context       │  │
+│  │  - Runs model/scorer/eval             │  │
+│  └────────────────────────────────────────┘  │
+└──────────────────────────────────────────────┘
+```
 
-2. **Worker Thread** (in Main Process)
-   - Created by `generate_child_process_trace_server_args()`
-   - Holds the wrapped trace server instance
-   - Processes requests from child via queues
-   - Returns responses back through queues
+### Multiprocessing Communication
 
-3. **Child Process** (Isolated User Context)
-   - Spawned by RunAsUser for each execution
-   - Has no direct access to parent's memory
-   - Communicates only through multiprocessing queues
-   - Runs with a user-scoped WeaveClient
+```
+Parent Process                           Child Process
+─────────────                           ─────────────
+                                       
+TraceServerAdapter                      User Code
+      │                                      │
+      │ wraps                               │ uses
+      ↓                                      ↓
+Internal TraceServer                    CrossProcessTraceServer
+      │                                      │
+      │ handles requests                    │ sends requests
+      ↓                                      ↓
+Worker Thread Pool ←─── queues ────→ Request Queue
+      │                                      
+      ↓                                      
+Concurrent Processing                        
+(ThreadPoolExecutor)                         
+```
+
+The system uses multiprocessing queues for communication:
+1. Child process sends requests through request queue
+2. Parent's worker thread pool processes requests concurrently
+3. Responses are sent back through response queue
+4. Up to N requests can be processed simultaneously (configurable)
+
+### Why Process Isolation?
+
+The `WeaveClient` design leads to in-memory mutations of refs when they're loaded. This creates potential security issues in a multi-user environment where different users' code might access shared memory. Process isolation ensures:
+
+1. **Memory Safety**: Each user's code runs in completely separate memory space
+2. **No Cross-Contamination**: One user's ref mutations cannot affect another user
+3. **Clean State**: Each execution starts with a fresh process and clean memory
+4. **Resource Limits**: OS-level process controls can enforce resource limits
 
 ## Execution Architecture
 
@@ -240,36 +279,54 @@ execution_runner/
 
 ## Usage
 
-### Server API Usage
+### Using the `run_model` API
 
-The `run_model` API can be called directly on the trace server:
+Currently, the `run_model` functionality is available as an internal server API:
 
 ```python
-# Direct server API call (not yet exposed via HTTP)
-await trace_server.run_model(
-    RunModelReq.model_validate(
-        {
-            "project_id": project_id,
-            "model_ref": model_ref_uri,  # Reference to LLMStructuredCompletionModel
-            "inputs": {"user_input": user_input},
-        }
+# Server-side usage (within trace server)
+runner = RunAsUser(
+    internal_trace_server=trace_server,
+    project_id="my-project", 
+    wb_user_id="user123",
+    timeout_seconds=60,  # Optional: execution timeout
+    max_concurrent_requests=20  # Optional: max concurrent requests (default: 10)
+)
+
+# Execute a model
+response = await runner.run_model(
+    RunModelReq(
+        project_id="my-project",
+        model_ref="weave:///entity/my-project/object/model:digest",
+        inputs={"user_input": user_input},
+        wb_user_id="user123"
     )
 )
+
+# Response contains:
+# - call_id: The trace call ID for the execution
+# - output: The model's output
 ```
 
-### Internal Implementation
+### Direct API Usage (Server Implementation)
 
-The execution runner is used internally by the trace server:
+For server implementations that need to execute models on behalf of users:
 
 ```python
-# In ClickHouse Trace Server
-async def run_model(self, req: RunModelReq) -> RunModelRes:
-    runner = RunAsUser(
-        internal_trace_server=self,
-        project_id=req.project_id,
-        wb_user_id=req.wb_user_id
-    )
-    return await runner.run_model(req)
+# Initialize the execution runner with concurrency control
+runner = RunAsUser(
+    internal_trace_server=clickhouse_trace_server,
+    project_id=project_id,
+    wb_user_id=wb_user_id,
+    timeout_seconds=30,  # 30 second timeout
+    max_concurrent_requests=50  # Handle up to 50 concurrent requests
+)
+
+# The runner will:
+# 1. Create a process pool for handling requests
+# 2. Process up to 50 requests simultaneously
+# 3. Queue additional requests if all workers are busy
+# 4. Maintain isolation between all concurrent executions
 ```
 
 ## Future Improvements

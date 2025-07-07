@@ -16,6 +16,7 @@ import multiprocessing
 import queue
 import threading
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, TypedDict
 
 import ddtrace
@@ -37,6 +38,12 @@ CONTEXT_VARS_TO_PROPAGATE: list[contextvars.ContextVar] = [
 
 # Default timeout for request/response cycles
 TIMEOUT_SECONDS = 10.0
+
+# Default number of concurrent workers for request processing
+DEFAULT_MAX_WORKERS = 10
+
+# Polling interval for response queue (not a request timeout)
+RESPONSE_POLL_TIMEOUT_SECONDS = 0.5
 
 
 class RequestWrapper(TypedDict):
@@ -133,10 +140,17 @@ class CrossProcessTraceServer(TraceServerInterface):
         This method runs in a separate thread and continuously polls the
         response queue for incoming responses, matching them with pending
         requests.
+
+        The 0.5s timeout is just a polling interval to check for shutdown,
+        not a request timeout. Under load, responses may take longer but
+        will still be processed when they arrive.
         """
         while not self._shutdown:
             try:
-                response = self._response_queue.get(timeout=0.5)
+                # Poll for responses with a short timeout to allow shutdown checks
+                response = self._response_queue.get(
+                    timeout=RESPONSE_POLL_TIMEOUT_SECONDS
+                )
                 request_id = response["request_id"]
 
                 with self._lock:
@@ -144,10 +158,11 @@ class CrossProcessTraceServer(TraceServerInterface):
                         self._responses[request_id] = response
                         self._pending_requests[request_id].set()
             except queue.Empty:
+                # Expected when no responses are available - just continue polling
                 continue
             except Exception as e:
-                # Log error but continue handling responses
-                logger.warning(f"Error handling response: {e}")
+                # Log actual errors but continue handling responses
+                logger.warning(f"Error handling response: {e}", exc_info=True)
 
     @ddtrace.tracer.wrap(name="cross_process_trace_server._send_request")
     def _send_request(self, method: str, request: Any) -> Any:
@@ -471,6 +486,7 @@ class CrossProcessTraceServer(TraceServerInterface):
 
 def generate_child_process_trace_server_args(
     trace_server: TraceServerInterface,
+    max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> CrossProcessTraceServerArgs:
     """
     Start a worker thread with the trace server and return serializable args.
@@ -485,6 +501,7 @@ def generate_child_process_trace_server_args(
 
     Args:
         trace_server: The trace server instance to run in the worker thread (stays in parent)
+        max_workers: Maximum number of concurrent requests to handle (default: 10)
 
     Returns:
         A dictionary containing the queues to pass to the child process
@@ -492,7 +509,11 @@ def generate_child_process_trace_server_args(
     # Get the multiprocessing context
     ctx = multiprocessing.get_context()
 
-    # Create multiprocessing queues (these CAN be serialized)
+    # Create multiprocessing queues
+    # These queues:
+    # - Can be serialized and passed to child processes
+    # - Are thread-safe and process-safe (no locks needed)
+    # - Handle all synchronization internally
     request_queue = ctx.Queue()
     response_queue = ctx.Queue()
 
@@ -509,7 +530,7 @@ def generate_child_process_trace_server_args(
     # Start the worker thread IN THE PARENT PROCESS
     worker_thread = threading.Thread(
         target=_trace_server_worker_loop_with_context,
-        args=(request_queue, response_queue, trace_server, context_values),
+        args=(request_queue, response_queue, trace_server, context_values, max_workers),
         daemon=True,
     )
     worker_thread.start()
@@ -544,54 +565,74 @@ def _trace_server_worker_loop_with_context(
     response_queue: multiprocessing.Queue,
     trace_server: TraceServerInterface,
     context_values: dict[contextvars.ContextVar, Any],
+    max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> None:
     """
     Worker loop that handles requests using the provided trace server with context.
 
     This function runs in a separate thread started by generate_child_process_trace_server_args.
+    It uses a thread pool to process multiple requests concurrently.
 
     Args:
         request_queue: Queue to receive requests from
         response_queue: Queue to send responses to
         trace_server: The actual trace server instance to delegate to
         context_values: The current context variable values to propagate
+        max_workers: Maximum number of concurrent requests to handle
     """
     # Set context variables in the worker thread
     for var, value in context_values.items():
         if value is not None:  # Only set if there was a value
             var.set(value)
 
-    # Now run the normal worker loop
-    while True:
+    def process_request(wrapped_request: RequestWrapper) -> None:
+        """Process a single request in a worker thread."""
         try:
-            # Get the next request
-            wrapped_request = request_queue.get()
+            # Set context variables in each worker thread
+            for var, value in context_values.items():
+                if value is not None:
+                    var.set(value)
 
-            # Handle shutdown signal
-            if wrapped_request["method"] == "_shutdown":
+            method = getattr(trace_server, wrapped_request["method"])
+            with ddtrace.tracer.trace(
+                f"cross_process_trace_server._trace_server_worker_loop_with_context.{wrapped_request['method']}",
+                service="cross_process_trace_server",
+            ):
+                result = method(wrapped_request["request"])
+
+            response = ResponseWrapper(
+                request_id=wrapped_request["request_id"], result=result, error=None
+            )
+        except Exception as e:
+            response = ResponseWrapper(
+                request_id=wrapped_request["request_id"], result=None, error=str(e)
+            )
+
+        # Send the response
+        response_queue.put(response)
+
+    # Create thread pool for concurrent request processing
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        logger.info(f"Started worker thread pool with {max_workers} workers")
+
+        while True:
+            try:
+                # Get the next request
+                wrapped_request = request_queue.get()
+
+                # Handle shutdown signal
+                if wrapped_request["method"] == "_shutdown":
+                    logger.info("Received shutdown signal, stopping worker thread pool")
+                    break
+
+                # Submit request to thread pool for concurrent processing
+                executor.submit(process_request, wrapped_request)
+
+            except Exception as e:
+                # Critical error in worker loop
+                logger.exception(f"Critical error in worker loop: {e}")
                 break
 
-            # Process the request
-            try:
-                method = getattr(trace_server, wrapped_request["method"])
-                with ddtrace.tracer.trace(
-                    f"cross_process_trace_server._trace_server_worker_loop_with_context.{wrapped_request['method']}",
-                    service="cross_process_trace_server",
-                ):
-                    result = method(wrapped_request["request"])
-
-                response = ResponseWrapper(
-                    request_id=wrapped_request["request_id"], result=result, error=None
-                )
-            except Exception as e:
-                response = ResponseWrapper(
-                    request_id=wrapped_request["request_id"], result=None, error=str(e)
-                )
-
-            # Send the response
-            response_queue.put(response)
-
-        except Exception as e:
-            # Critical error in worker loop
-            logger.exception(f"Critical error in worker loop: {e}")
-            break
+        # Shutdown the executor and wait for pending tasks
+        executor.shutdown(wait=True)
+        logger.info("Worker thread pool shut down successfully")
