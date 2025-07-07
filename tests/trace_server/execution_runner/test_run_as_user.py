@@ -9,6 +9,8 @@ spawning and isolation. The timeout tests are particularly important for
 ensuring the system can handle stuck processes.
 """
 
+import os
+
 import pytest
 
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
@@ -31,18 +33,12 @@ from weave.trace_server.execution_runner.run_as_user import (
     RunAsUser,
     RunAsUserException,
 )
-from weave.trace_server.external_to_internal_trace_server_adapter import (
-    ExternalTraceServer,
-)
 
 
 def get_internal_trace_server(
     trace_server: TestOnlyUserInjectingExternalTraceServer,
 ) -> tsi.TraceServerInterface:
-    if isinstance(trace_server, ExternalTraceServer):
-        return trace_server._internal_trace_server
-    else:
-        return trace_server
+    return trace_server._internal_trace_server
 
 
 class TestRunAsUser:
@@ -71,8 +67,6 @@ class TestRunAsUser:
         assert result.result == "Success: test_value"
         assert result.process_id is not None
         # Verify it ran in a different process
-        import os
-
         assert result.process_id != os.getpid()
 
     @pytest.mark.asyncio

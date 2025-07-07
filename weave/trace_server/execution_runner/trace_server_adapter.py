@@ -33,7 +33,7 @@ SERVER_SIDE_ENTITY_PLACEHOLDER = "__SERVER__"
 SERVER_SIDE_PROJECT_ID_PREFIX = SERVER_SIDE_ENTITY_PLACEHOLDER + "/"
 
 
-def externalize_trace_server(
+def with_externalized_id_handling_trace_server(
     trace_server: tsi.TraceServerInterface, project_id: str, wb_user_id: str
 ) -> tsi.TraceServerInterface:
     """

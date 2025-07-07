@@ -40,8 +40,8 @@ from weave.trace_server.execution_runner.process_safe_trace_server import (
 )
 from weave.trace_server.execution_runner.trace_server_adapter import (
     SERVER_SIDE_ENTITY_PLACEHOLDER,
-    externalize_trace_server,
     make_externalize_ref_converter,
+    with_externalized_id_handling_trace_server,
 )
 from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 
@@ -165,7 +165,7 @@ def _generic_child_process_wrapper(
             safe_trace_server.shutdown()
 
 
-class RunAsUserException(Exception):
+class RunAsUserError(Exception):
     """
     Exception raised when a user-scoped function execution fails.
 
@@ -255,7 +255,7 @@ class RunAsUser:
 
         Raises:
             ValueError: If wb_user_id is None or if parameters don't match instance values
-            RunAsUserException: If process execution fails or times out
+            RunAsUserError: If process execution fails or times out
         """
         if project_id != self.project_id:
             raise ValueError(
@@ -267,7 +267,7 @@ class RunAsUser:
             )
 
         # Wrap the trace server with user context and project validation
-        wrapped_trace_server = externalize_trace_server(
+        wrapped_trace_server = with_externalized_id_handling_trace_server(
             self.internal_trace_server, project_id, wb_user_id
         )
 
@@ -313,13 +313,13 @@ class RunAsUser:
                     # Force kill if still running
                     process.kill()
                     process.join(timeout=1)
-                raise RunAsUserException(
+                raise RunAsUserError(
                     f"Process execution timed out after {self.timeout_seconds} seconds"
                 )
 
             # Check if the process completed successfully
             if process.exitcode != 0:
-                raise RunAsUserException(
+                raise RunAsUserError(
                     f"Process execution failed with exit code: {process.exitcode}"
                 )
 
@@ -328,7 +328,7 @@ class RunAsUser:
                 result_dict = result_queue.get_nowait()
             except Exception as e:
                 logger.exception(f"Error getting result: {e}")
-                raise RunAsUserException(
+                raise RunAsUserError(
                     "Process completed but no result was returned"
                 ) from e
 
@@ -356,7 +356,7 @@ class RunAsUser:
 
         Raises:
             ValueError: If request parameters don't match instance values or wb_user_id is missing
-            RunAsUserException: If model execution fails
+            RunAsUserError: If model execution fails
         """
         if not req.wb_user_id:
             raise ValueError("wb_user_id is required")
