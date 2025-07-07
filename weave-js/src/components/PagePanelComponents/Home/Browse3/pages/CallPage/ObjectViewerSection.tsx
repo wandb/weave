@@ -19,7 +19,6 @@ import {ObjectViewer} from './ObjectViewer';
 import {getValueType} from './traverse';
 import {ValueView} from './ValueView';
 import {DocumentView} from '../DocumentView/DocumentView';
-import { ParsedCall } from './CallPage';
 
 const EXPANDED_IDS_LENGTH = 200;
 
@@ -261,10 +260,6 @@ export const ObjectViewerSection = ({
         <ValueView data={oneResultData} isExpanded={true} />
       </>
     );
-  }
-
-  if (data._type === 'Document') {
-    return <DocumentView data={data as ParsedCall} />;
   }
 
   // Here we have a very special case for when the section is viewing a dataset.

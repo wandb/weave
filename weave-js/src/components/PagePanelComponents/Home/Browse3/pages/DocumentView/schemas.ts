@@ -35,18 +35,18 @@ export type WeaveDocumentSchema = z.infer<typeof WeaveDocumentSchema>;
 /**
  * A wrapper for a successful parse. The result is now always an array.
  */
-export type ParseResult<T, R extends string> = {
-  schema: R;
+export type ParseResult<T> = {
+  schema: string;
   result: T[]; // MODIFIED: No longer OneOrMany<T>, always T[]
 };
 
 /**
  * The final output. Fields are now either an array or null.
  */
-export type ParsedCall<T, R extends string> = {
+export type ParsedCall<T> = {
   id: string;
-  inputs: ParseResult<T, R>[] | null; // MODIFIED: No longer OneOrMany<T>
-  output: ParseResult<T, R>[] | null; // MODIFIED: No longer OneOrMany<...>
+  inputs: ParseResult<T>[] | null; // MODIFIED: No longer OneOrMany<T>
+  output: ParseResult<T>[] | null; // MODIFIED: No longer OneOrMany<...>
 };
 // endregion
 

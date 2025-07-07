@@ -24,6 +24,7 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
+import { DocumentView } from '../DocumentView/DocumentView';
 import {callHasDocuments, parseCall} from '../DocumentView/parser';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
@@ -193,22 +194,9 @@ const useCallTabs = (call: CallSchema) => {
             content: (
               <ScrollableTabContent>
                 <Tailwind>
-                  <div style={{flex: '1 1 auto', padding: '16px'}}>
-                    {call.traceCall.inputs && (
-                      <ObjectViewerSection
-                        title="Input"
-                        data={call.traceCall.inputs}
-                        isExpanded
-                      />
-                    )}
-                    {call.traceCall.output && (
-                      <ObjectViewerSection
-                        title="Output"
-                        data={parseCall(call.traceCall)}
-                        isExpanded
-                      />
-                    )}
-                  </div>
+                  {call.traceCall && (
+                    <DocumentView data={parseCall(call)}/>
+                  )}
                 </Tailwind>
               </ScrollableTabContent>
             ),

@@ -8,13 +8,13 @@ import {
 } from './schemas';
 
 // --- Caches ---
-const parsedCallCache = new Map<string, ParsedCall<WeaveDocumentSchema, 'Document'>>();
+const parsedCallCache = new Map<string, ParsedCall<WeaveDocumentSchema>>();
 
 // --- Private Implementation Functions ---
 function findAllDocuments(
   node: unknown
-): ParseResult<WeaveDocumentSchema, 'Document'>[] {
-  const allFound: ParseResult<WeaveDocumentSchema, 'Document'>[] = [];
+): ParseResult<WeaveDocumentSchema>[] {
+  const allFound: ParseResult<WeaveDocumentSchema>[] = [];
 
   for (const parser of SCHEMA_PARSERS) {
     const parseResult = parser.schema.safeParse(node);
@@ -48,7 +48,7 @@ function findAllDocuments(
  */
 function _getTraceDocuments(
   trace: TraceCallSchema
-): ParsedCall<WeaveDocumentSchema, 'Document'> { // Return type is updated
+): ParsedCall<WeaveDocumentSchema> { // Return type is updated
   // Find all ParseResult objects in the output (if present)
   const parsedOutputs = 'output' in trace ? findAllDocuments(trace.output) : [];
 
@@ -73,7 +73,7 @@ function _getTraceDocuments(
  */
 export function getTraceDocuments(
   trace: TraceCallSchema
-): ParsedCall<WeaveDocumentSchema, 'Document'> {
+): ParsedCall<WeaveDocumentSchema> {
   if (parsedCallCache.has(trace.id)) {
     return parsedCallCache.get(trace.id)!;
   }
@@ -84,7 +84,7 @@ export function getTraceDocuments(
 
 export function parseCall(
   call: CallSchema
-): ParsedCall<WeaveDocumentSchema, 'Document'> {
+): ParsedCall<WeaveDocumentSchema> {
   if (!call.traceCall) {
     return getTraceDocuments({
       id: call.traceId,
