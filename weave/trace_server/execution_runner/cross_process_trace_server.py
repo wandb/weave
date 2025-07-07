@@ -424,6 +424,15 @@ class CrossProcessTraceServer(TraceServerInterface):
         # TODO: Implement proper async support
         return self._send_request("apply_scorer", req)
 
+    async def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes:
+        """
+        Evaluate a model asynchronously.
+
+        Note: Async methods require special handling. Currently runs synchronously.
+        """
+        # TODO: Implement proper async support
+        return self._send_request("evaluate_model", req)
+
 
 def generate_child_process_trace_server_args(
     trace_server: TraceServerInterface,

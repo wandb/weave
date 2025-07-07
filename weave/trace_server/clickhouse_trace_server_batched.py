@@ -2148,6 +2148,46 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ).apply_scorer(req)
         return res
 
+    async def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        """
+        Evaluate a model in an isolated process with user-specific context.
+
+        This method delegates evaluation execution to the RunAsUser class, which spawns
+        a separate process to ensure memory isolation between different users.
+        The evaluation runs with a user-scoped WeaveClient that can only access data
+        belonging to the authenticated user.
+
+        Args:
+            req: Evaluation execution request containing:
+                - evaluation_ref: Reference to the evaluation to execute
+                - model_ref: Reference to the model to evaluate
+                - project_id: Project scope for execution
+                - wb_user_id: User ID for authentication and scoping
+
+        Returns:
+            Evaluation execution response containing:
+                - output: The evaluation results
+                - call_id: Unique identifier for the traced evaluation
+
+        Raises:
+            ValueError: If wb_user_id is not provided in the request
+            RunAsUserException: If the evaluation execution fails in the child process
+
+        Security:
+            - Runs in a separate process for memory isolation
+            - All references are validated to match the project scope
+            - User context is enforced throughout execution
+        """
+        if not req.wb_user_id:
+            raise ValueError("wb_user_id is required")
+
+        res = await RunAsUser(
+            internal_trace_server=self,
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+        ).evaluate_model(req)
+        return res
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:

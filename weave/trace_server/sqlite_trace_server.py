@@ -1439,6 +1439,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             "apply_scorer is not implemented for SQLite trace server"
         )
 
+    async def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise NotImplementedError(
+            "evaluate_model is not implemented for SQLite trace server"
+        )
+
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
             raise TypeError(

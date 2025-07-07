@@ -43,6 +43,9 @@ from weave.trace_server.execution_runner.trace_server_adapter import (
     make_externalize_ref_converter,
 )
 from weave.trace_server.execution_runner.user_scripts.apply_scorer import apply_scorer
+from weave.trace_server.execution_runner.user_scripts.evaluate_model import (
+    evaluate_model,
+)
 from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 
 logger = logging.getLogger(__name__)
@@ -373,4 +376,33 @@ class RunAsUser:
             req.project_id,
             req.wb_user_id,
             tsi.ApplyScorerRes,
+        )
+
+    async def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        """
+        Evaluate a model in an isolated process.
+
+        This is a specialized method for running evaluations with proper isolation.
+        The evaluation execution happens in a separate process to prevent memory
+        contamination and ensure security.
+
+        Args:
+            req: Evaluation execution request containing evaluation and model references
+
+        Returns:
+            Evaluation execution response with output and call ID
+
+        Raises:
+            ValueError: If request parameters don't match instance values or wb_user_id is missing
+            RunAsUserException: If evaluation execution fails
+        """
+        if not req.wb_user_id:
+            raise ValueError("wb_user_id is required")
+
+        return await self._run_user_scoped_function(
+            evaluate_model,
+            req,
+            req.project_id,
+            req.wb_user_id,
+            tsi.EvaluateModelRes,
         )
