@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
 
-from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_trace_server import (
+    clickhouse_trace_server_batched as chts,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 

@@ -17,7 +17,7 @@ from moto import mock_aws
 
 from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import clickhouse_trace_server_batched
+from weave.trace_server.clickhouse_trace_server import clickhouse_trace_server_batched
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
 # Test Data Constants

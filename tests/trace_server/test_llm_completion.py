@@ -2,8 +2,10 @@ import datetime
 import unittest
 from unittest.mock import MagicMock, patch
 
-from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_trace_server import (
+    clickhouse_trace_server_batched as chts,
+)
 from weave.trace_server.errors import (
     InvalidRequest,
     MissingLLMApiKeyError,

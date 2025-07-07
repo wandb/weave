@@ -44,17 +44,9 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 
-from . import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from .clickhouse_trace_server_settings import (
-    CLICKHOUSE_DEFAULT_QUERY_SETTINGS,
-    CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT,
-    CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT,
-    ENTITY_TOO_LARGE_PAYLOAD,
-    FILE_CHUNK_SIZE,
-)
 from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
@@ -65,16 +57,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_query_stats_query,
     combine_conditions,
     optimized_project_contains_call_query,
-)
-from .clickhouse_schema import (
-    CallDeleteCHInsertable,
-    CallEndCHInsertable,
-    CallStartCHInsertable,
-    CallUpdateCHInsertable,
-    ObjCHInsertable,
-    ObjDeleteCHInsertable,
-    SelectableCHCallSchema,
-    SelectableCHObjSchema,
 )
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
@@ -150,6 +132,25 @@ from weave.trace_server.trace_server_interface_util import (
     bytes_digest,
     extract_refs_from_values,
     str_digest,
+)
+
+from . import clickhouse_trace_server_migrator as wf_migrator
+from .clickhouse_schema import (
+    CallDeleteCHInsertable,
+    CallEndCHInsertable,
+    CallStartCHInsertable,
+    CallUpdateCHInsertable,
+    ObjCHInsertable,
+    ObjDeleteCHInsertable,
+    SelectableCHCallSchema,
+    SelectableCHObjSchema,
+)
+from .clickhouse_trace_server_settings import (
+    CLICKHOUSE_DEFAULT_QUERY_SETTINGS,
+    CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT,
+    CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT,
+    ENTITY_TOO_LARGE_PAYLOAD,
+    FILE_CHUNK_SIZE,
 )
 
 logger = logging.getLogger(__name__)
