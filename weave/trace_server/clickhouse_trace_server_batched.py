@@ -645,24 +645,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         deleted_at = datetime.datetime.now()
-        insertables = [
-            CallDeleteCHInsertable(
-                project_id=req.project_id,
-                id=call_id,
-                wb_user_id=req.wb_user_id,
-                deleted_at=deleted_at,
-            )
-            for call_id in all_descendants
-        ]
+        alter_sql = """
+            ALTER TABLE calls_merged
+            UPDATE
+                deleted_at = CAST({deleted_at:DateTime64(3)}, 'Nullable(DateTime64(3))'),
+                wb_user_id = CAST({wb_user_id:String}, 'Nullable(String)')
+            WHERE project_id = {project_id:String}
+                AND id IN {call_ids:Array(String)}
+        """
 
-        with self.call_batch():
-            for insertable in insertables:
-                self._insert_call(insertable)
+        self.ch_client.query(
+            alter_sql,
+            parameters={
+                "project_id": req.project_id,
+                "call_ids": all_descendants,
+                "deleted_at": deleted_at,
+                "wb_user_id": req.wb_user_id,
+            },
+        )
 
         return tsi.CallsDeleteRes()
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
-        valid_update_fields = ["display_name"]
+        valid_update_fields = ["display_name", "attributes_dump"]
         for field in valid_update_fields:
             if getattr(req, field, None) is not None:
                 return
@@ -674,15 +679,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
-        renamed_insertable = CallUpdateCHInsertable(
-            project_id=req.project_id,
-            id=req.call_id,
-            wb_user_id=req.wb_user_id,
-            display_name=req.display_name,
+        if not req.display_name:
+            raise ValueError("No display name to update")
+
+        alter_sql = """
+            ALTER TABLE calls_merged
+            UPDATE display_name = arrayReduce('argMaxState', [CAST({display_name:String}, 'Nullable(String)')], [toDateTime64(now(), 3)])
+            WHERE project_id = {project_id:String}
+                AND id = {call_id:String}
+        """
+        self.ch_client.query(
+            alter_sql,
+            parameters={
+                "project_id": req.project_id,
+                "call_id": req.call_id,
+                "display_name": req.display_name,
+            },
         )
-        self._insert_call(renamed_insertable)
 
         return tsi.CallUpdateRes()
+
+    # def calls_update(self)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
