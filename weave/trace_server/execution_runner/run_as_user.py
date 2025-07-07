@@ -305,7 +305,7 @@ class RunAsUser:
             if process.is_alive():
                 # Force kill if still running
                 process.kill()
-                process.join()
+                process.join(timeout=1)
             raise RunAsUserException(
                 f"Process execution timed out after {self.timeout_seconds} seconds"
             )
