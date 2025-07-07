@@ -45,7 +45,7 @@ export type ParseResult<T, R extends string> = {
  */
 export type ParsedCall<T, R extends string> = {
   id: string;
-  inputs: T[] | null; // MODIFIED: No longer OneOrMany<T>
+  inputs: ParseResult<T, R>[] | null; // MODIFIED: No longer OneOrMany<T>
   output: ParseResult<T, R>[] | null; // MODIFIED: No longer OneOrMany<...>
 };
 // endregion

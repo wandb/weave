@@ -1,3 +1,4 @@
+import { CallSchema } from '../wfReactInterface/wfDataModelHooksInterface';
 import {
   SCHEMA_PARSERS,
   TraceCallSchema,
@@ -41,14 +42,6 @@ function findAllDocuments(
   return allFound;
 }
 
-/**
- * Aggregates arrays of documents and returns null if the final list is empty.
- */
-function aggregateAndFinalize<T>(results: T[][]): T[] | null {
-  const flattened = results.flat();
-  return flattened.length > 0 ? flattened : null;
-}
-
 
 /**
  * The core, non-memoized parsing logic, updated for the new schema.
@@ -57,20 +50,17 @@ function _getTraceDocuments(
   trace: TraceCallSchema
 ): ParsedCall<WeaveDocumentSchema, 'Document'> { // Return type is updated
   // Find all ParseResult objects in the output (if present)
-  const outputResults = 'output' in trace ? findAllDocuments(trace.output) : [];
+  const parsedOutputs = 'output' in trace ? findAllDocuments(trace.output) : [];
 
   // Find all ParseResult objects in the inputs
-  const inputParseResults = findAllDocuments(trace.inputs);
+  const parsedInputs = findAllDocuments(trace.inputs);
  
-  // Extract the document arrays (WeaveDocumentSchema[][]) from the input results
-  const inputDocumentArrays = inputParseResults.map(pr => pr.result);
-
   return {
     id: trace.id,
     // Aggregate all found input documents into a single array, or null
-    inputs: aggregateAndFinalize(inputDocumentArrays),
+    inputs: parsedInputs,
     // If the list of output results is empty, return null
-    output: outputResults.length > 0 ? outputResults : null,
+    output: parsedOutputs
   };
 }
 
@@ -90,6 +80,18 @@ export function getTraceDocuments(
   const result = _getTraceDocuments(trace);
   parsedCallCache.set(trace.id, result);
   return result;
+}
+
+export function parseCall(
+  call: CallSchema
+): ParsedCall<WeaveDocumentSchema, 'Document'> {
+  if (!call.traceCall) {
+    return getTraceDocuments({
+      id: call.traceId,
+      inputs: {},
+    })
+  }
+  return getTraceDocuments(call.traceCall)
 }
 
 export function callHasDocuments(

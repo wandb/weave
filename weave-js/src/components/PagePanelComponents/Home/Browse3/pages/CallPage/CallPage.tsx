@@ -24,13 +24,14 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
-import {callHasDocuments} from '../DocumentView/parser';
+import {callHasDocuments, parseCall} from '../DocumentView/parser';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
+import {ObjectViewerSection} from './ObjectViewerSection';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
 
@@ -190,16 +191,26 @@ const useCallTabs = (call: CallSchema) => {
           {
             label: 'Documents',
             content: (
-              <>
-                <ScrollableTabContent>
-                  <Tailwind>
-                    <div>
-                      <p>Trace ID: {call.traceCall.id}</p>
-                      {callHasDocuments(call.traceCall) && <span style={{ color: 'green' }}>Contains Documents</span>}
-                    </div>
-                  </Tailwind>
-                </ScrollableTabContent>
-              </>
+              <ScrollableTabContent>
+                <Tailwind>
+                  <div style={{flex: '1 1 auto', padding: '16px'}}>
+                    {call.traceCall.inputs && (
+                      <ObjectViewerSection
+                        title="Input"
+                        data={call.traceCall.inputs}
+                        isExpanded
+                      />
+                    )}
+                    {call.traceCall.output && (
+                      <ObjectViewerSection
+                        title="Output"
+                        data={parseCall(call.traceCall)}
+                        isExpanded
+                      />
+                    )}
+                  </div>
+                </Tailwind>
+              </ScrollableTabContent>
             ),
           },
         ]
