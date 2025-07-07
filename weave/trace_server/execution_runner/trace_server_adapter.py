@@ -153,8 +153,7 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         """Validate and return user ID (no conversion needed)."""
         if user_id != self.user_id:
             raise ValueError(
-                f"User ID mismatch: {user_id} != {self.user_id}. "
-                "Stopping operation."
+                f"User ID mismatch: {user_id} != {self.user_id}. Stopping operation."
             )
         return user_id
 
@@ -162,8 +161,7 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         """Validate and return user ID (no conversion needed)."""
         if user_id != self.user_id:
             raise ValueError(
-                f"User ID mismatch: {user_id} != {self.user_id}. "
-                "Stopping operation."
+                f"User ID mismatch: {user_id} != {self.user_id}. Stopping operation."
             )
         return user_id
 

@@ -28,15 +28,14 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 import ddtrace
-from ddtrace.trace import tracer
 from pydantic import BaseModel
 
 from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.execution_runner.cross_process_trace_server import (
-    CrossProcessTraceServerArgs,
-    build_child_process_trace_server,
+from weave.trace_server.execution_runner.process_safe_trace_server import (
+    ProcessSafeTraceServerArgs,
+    ProcessSafeTraceServerClient,
     generate_child_process_trace_server_args,
 )
 from weave.trace_server.execution_runner.trace_server_adapter import (
@@ -116,7 +115,7 @@ class RunAsUserChildProcessContext(Generic[T]):
         result_queue: Queue for returning results from child to parent process
     """
 
-    trace_server_args: CrossProcessTraceServerArgs
+    trace_server_args: ProcessSafeTraceServerArgs
     project_id: str
     result_queue: multiprocessing.Queue[T]
     trace_ctx: ddtrace.SpanContext | None = None
@@ -147,19 +146,23 @@ def _generic_child_process_wrapper(
         Any exceptions in the child process will cause the process to exit with
         a non-zero code, which is handled by the parent.
     """
-    tracer.context_provider.activate(wrapper_context.trace_ctx)
-    with tracer.trace("run_as_user._generic_child_process_wrapper.inner"):
+    ddtrace.tracer.context_provider.activate(wrapper_context.trace_ctx)
+    with ddtrace.tracer.trace("run_as_user._generic_child_process_wrapper.inner"):
         # Build the trace server client in the child process
-        safe_trace_server = build_child_process_trace_server(
+        safe_trace_server = ProcessSafeTraceServerClient(
             wrapper_context.trace_server_args
         )
 
-        # Execute the function within a user-scoped client context
-        with user_scoped_client(wrapper_context.project_id, safe_trace_server):
-            res = asyncio.run(func(req))
+        try:
+            # Execute the function within a user-scoped client context
+            with user_scoped_client(wrapper_context.project_id, safe_trace_server):
+                res = asyncio.run(func(req))
 
-            # Convert the Pydantic response to a dict and send back
-            wrapper_context.result_queue.put(res.model_dump())
+                # Convert the Pydantic response to a dict and send back
+                wrapper_context.result_queue.put(res.model_dump())
+        finally:
+            # Ensure the trace server client is properly shut down
+            safe_trace_server.shutdown()
 
 
 class RunAsUserException(Exception):
@@ -275,58 +278,66 @@ class RunAsUser:
         # Create queue for receiving results from child process
         result_queue: multiprocessing.Queue[dict] = multiprocessing.Queue()
 
-        # Spawn child process with isolated memory space
-        process = multiprocessing.Process(
-            target=_generic_child_process_wrapper,
-            kwargs={
-                "wrapper_context": RunAsUserChildProcessContext(
-                    trace_server_args=generate_child_process_trace_server_args(
-                        wrapped_trace_server, max_workers=self.max_concurrent_requests
-                    ),
-                    project_id=project_id,
-                    result_queue=result_queue,
-                    trace_ctx=tracer.current_trace_context(),
-                ),
-                "func": func,
-                "req": externalized_req,
-            },
+        # Create the process-safe adapter for communication
+        adapter, trace_server_args = generate_child_process_trace_server_args(
+            wrapped_trace_server, max_workers=self.max_concurrent_requests
         )
 
-        # Start the child process and wait for completion
-        process.start()
-        process.join(timeout=self.timeout_seconds)
-
-        # Check if process is still alive (timeout occurred)
-        if process.is_alive():
-            # Terminate the process since it exceeded timeout
-            process.terminate()
-            # Give it a moment to terminate gracefully
-            process.join(timeout=1)
-            if process.is_alive():
-                # Force kill if still running
-                process.kill()
-                process.join(timeout=1)
-            raise RunAsUserException(
-                f"Process execution timed out after {self.timeout_seconds} seconds"
-            )
-
-        # Check if the process completed successfully
-        if process.exitcode != 0:
-            raise RunAsUserException(
-                f"Process execution failed with exit code: {process.exitcode}"
-            )
-
-        # Get the result and validate it matches the expected type
         try:
-            result_dict = result_queue.get_nowait()
-        except Exception as e:
-            logger.exception(f"Error getting result: {e}")
-            raise RunAsUserException(
-                "Process completed but no result was returned"
-            ) from e
+            # Spawn child process with isolated memory space
+            process = multiprocessing.Process(
+                target=_generic_child_process_wrapper,
+                kwargs={
+                    "wrapper_context": RunAsUserChildProcessContext(
+                        trace_server_args=trace_server_args,
+                        project_id=project_id,
+                        result_queue=result_queue,
+                        trace_ctx=ddtrace.tracer.current_trace_context(),
+                    ),
+                    "func": func,
+                    "req": externalized_req,
+                },
+            )
 
-        res = response_type.model_validate(result_dict)
-        return res
+            # Start the child process and wait for completion
+            process.start()
+            process.join(timeout=self.timeout_seconds)
+
+            # Check if process is still alive (timeout occurred)
+            if process.is_alive():
+                # Terminate the process since it exceeded timeout
+                process.terminate()
+                # Give it a moment to terminate gracefully
+                process.join(timeout=1)
+                if process.is_alive():
+                    # Force kill if still running
+                    process.kill()
+                    process.join(timeout=1)
+                raise RunAsUserException(
+                    f"Process execution timed out after {self.timeout_seconds} seconds"
+                )
+
+            # Check if the process completed successfully
+            if process.exitcode != 0:
+                raise RunAsUserException(
+                    f"Process execution failed with exit code: {process.exitcode}"
+                )
+
+            # Get the result and validate it matches the expected type
+            try:
+                result_dict = result_queue.get_nowait()
+            except Exception as e:
+                logger.exception(f"Error getting result: {e}")
+                raise RunAsUserException(
+                    "Process completed but no result was returned"
+                ) from e
+
+            res = response_type.model_validate(result_dict)
+            return res
+
+        finally:
+            # Always shut down the adapter to clean up worker threads
+            adapter.shutdown()
 
     @ddtrace.tracer.wrap(name="run_as_user.run_model")
     async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:

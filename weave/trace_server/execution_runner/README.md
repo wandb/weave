@@ -16,70 +16,68 @@ The execution runner provides a secure way to execute user code on the server wh
 
 ## Architecture
 
-### Layer Architecture
+### Three-Layer Architecture
+
+The execution runner follows a clean three-layer architecture:
+
+#### Layer 1: Externalization
+- **Component**: `externalize_trace_server` (from trace_server_adapter.py)
+- **Purpose**: Wraps the internal trace server with user context and security
+- **Responsibilities**:
+  - Injects user ID into all requests
+  - Validates project access
+  - Prefixes project IDs with `__SERVER__/`
+
+#### Layer 2: Process-Safe Adapter
+- **Component**: `ProcessSafeTraceServerAdapter` (from process_safe_trace_server.py)
+- **Purpose**: Exposes trace server through process-safe primitives
+- **Responsibilities**:
+  - Manages a pool of worker threads
+  - Provides multiprocessing queues for communication
+  - Handles concurrent request processing (N parallel requests)
+  - Lives in the parent process
+
+#### Layer 3: Client Proxy
+- **Component**: `ProcessSafeTraceServerClient` (from process_safe_trace_server.py)
+- **Purpose**: TraceServerInterface implementation for child process
+- **Responsibilities**:
+  - Uses queues from Layer 2 to communicate
+  - Implements all TraceServerInterface methods
+  - Handles request/response correlation
+  - Lives in the child process
+
+### Data Flow
 
 ```
-┌──────────────────────────────────────────────┐
-│         ClickHouse Server Process            │
-│                                              │
-│  ┌────────────────────────────────────────┐  │
-│  │     TraceServerAdapter (Security)      │  │ Layer 1: Request Validation
-│  │  - Injects user ID                     │  │
-│  │  - Validates project access            │  │
-│  │  - Prefixes project IDs                │  │
-│  └────────────────────────────────────────┘  │
-│                     │                         │
-│  ┌────────────────────────────────────────┐  │
-│  │         RunAsUser (Executor)           │  │ Layer 2: Process Management
-│  │  - Manages child process lifecycle     │  │
-│  │  - Handles timeouts/errors             │  │
-│  │  - Passes wrapped trace server         │  │
-│  └────────────────────────────────────────┘  │
-└──────────────────────│───────────────────────┘
-                       │ Process Boundary
-┌──────────────────────│───────────────────────┐
-│         Child Process (Isolated)             │
-│                     │                        │
-│  ┌────────────────────────────────────────┐  │
-│  │   CrossProcessTraceServer (Proxy)      │  │ Layer 3: Communication
-│  │  - Sends requests via queues           │  │
-│  │  - Receives responses                  │  │
-│  └────────────────────────────────────────┘  │
-│                     │                         │
-│  ┌────────────────────────────────────────┐  │
-│  │        User Code Execution             │  │ Layer 4: User Code
-│  │  - WeaveClient with user context       │  │
-│  │  - Runs model/scorer/eval             │  │
-│  └────────────────────────────────────────┘  │
-└──────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│              Parent Process                      │
+│                                                  │
+│  Internal      Layer 1         Layer 2          │
+│  TraceServer → Externalize → ProcessSafeAdapter │
+│      ↑                              ↓            │
+│      └──────── Workers ─────────────┘            │
+│                   ↓                              │
+│              [Queues]                            │
+└───────────────────┼─────────────────────────────┘
+                    │ Process Boundary
+┌───────────────────┼─────────────────────────────┐
+│              Child Process                       │
+│                   │                              │
+│              [Queues]                            │
+│                   ↓                              │
+│               Layer 3                            │
+│         ProcessSafeClient                        │
+│                   ↓                              │
+│             User Code                            │
+└─────────────────────────────────────────────────┘
 ```
 
-### Multiprocessing Communication
+### Key Design Principles
 
-```
-Parent Process                           Child Process
-─────────────                           ─────────────
-                                       
-TraceServerAdapter                      User Code
-      │                                      │
-      │ wraps                               │ uses
-      ↓                                      ↓
-Internal TraceServer                    CrossProcessTraceServer
-      │                                      │
-      │ handles requests                    │ sends requests
-      ↓                                      ↓
-Worker Thread Pool ←─── queues ────→ Request Queue
-      │                                      
-      ↓                                      
-Concurrent Processing                        
-(ThreadPoolExecutor)                         
-```
-
-The system uses multiprocessing queues for communication:
-1. Child process sends requests through request queue
-2. Parent's worker thread pool processes requests concurrently
-3. Responses are sent back through response queue
-4. Up to N requests can be processed simultaneously (configurable)
+1. **Clean Separation**: Each layer has a single, well-defined responsibility
+2. **No Global State**: No global registries or complex lifecycle management
+3. **Simple Communication**: Direct queue-based communication without intermediate threads
+4. **Concurrent by Design**: Worker pool processes multiple requests simultaneously
 
 ### Why Process Isolation?
 
@@ -108,7 +106,7 @@ graph TB
             end
             
             subgraph "Layer 2: Server Proxy Layer"
-                CTS[CrossProcessTraceServer]
+                CTS[ProcessSafeTraceServerClient]
                 CTS_DESC["• Proxy to parent process<br/>• Communicates via queues<br/>• Implements TraceServerInterface"]
             end
             
@@ -175,7 +173,7 @@ sequenceDiagram
     activate CP
     
     %% Execution Phase
-    CP->>CP: Build CrossProcessTraceServer<br/>from queues
+    CP->>CP: Build ProcessSafeTraceServerClient<br/>from handle
     CP->>US: Execute run_model
     activate US
     
@@ -209,7 +207,7 @@ sequenceDiagram
 
 ### Key Components
 
-1. **CrossProcessTraceServer**
+1. **ProcessSafeTraceServerClient**
    - Acts as a proxy in the child process
    - Sends requests through multiprocessing queues
    - Receives responses asynchronously
@@ -253,7 +251,7 @@ For a `run_model` request:
    - Spawns child process
 
 3. **Child process** executes the model:
-   - Builds `CrossProcessTraceServer` from queue arguments
+   - Builds `ProcessSafeTraceServerClient` from handle
    - Creates user-scoped WeaveClient
    - Loads model from reference
    - Executes model with inputs
@@ -270,7 +268,7 @@ For a `run_model` request:
 ```
 execution_runner/
 ├── README.md                       # This file
-├── cross_process_trace_server.py   # Queue-based trace server proxy
+├── process_safe_trace_server.py    # Process-safe trace server implementation
 ├── run_as_user.py                  # Main orchestrator for isolated execution
 ├── trace_server_adapter.py         # Security wrappers and ID conversion
 └── user_scripts/
@@ -339,3 +337,29 @@ runner = RunAsUser(
 - **Async Support**: Model execution is synchronous due to current interface limitations
 - **Resource Limits**: Add CPU/memory limits per child process
 - **Process Pooling**: Reuse processes for better performance 
+
+## Core Components
+
+### process_safe_trace_server.py
+Complete implementation of the three-layer architecture for process-safe trace server communication:
+- `ProcessSafeTraceServerAdapter`: Exposes trace server via process-safe queues (Layer 2)
+- `ProcessSafeTraceServerClient`: Client proxy for child processes (Layer 3)
+- `ProcessSafeTraceServerArgs`: Serializable handle containing communication primitives
+- Helper functions for creating and using process-safe trace servers
+
+### trace_server_adapter.py
+Security layer that wraps trace servers with user context:
+- `externalize_trace_server`: Wraps a trace server with user ID injection and project validation (Layer 1)
+- `TraceServerAdapterInternalOnly`: Validates and prefixes project IDs
+- Reference externalization to prevent cross-project access
+
+### run_as_user.py
+High-level API for executing user code in isolated processes:
+- `RunAsUser`: Main class that orchestrates process isolation
+- Process lifecycle management (spawn, monitor, cleanup)
+- Timeout handling and error propagation
+
+### run_model.py
+Implementation of the `run_model` functionality:
+- Loads and executes `LLMStructuredCompletionModel` instances
+- Handles model inference within the isolated environment 
