@@ -471,6 +471,9 @@ class ProcessSafeTraceServerClient(tsi.TraceServerInterface):
         # Note: Async needs special handling
         return self._call_method("run_model", req)
 
+    def apply_scorer(self, req: tsi.ApplyScorerReq) -> tsi.ApplyScorerRes:
+        return self._call_method("apply_scorer", req)
+
 
 # === Helper functions for easy usage ===
 
