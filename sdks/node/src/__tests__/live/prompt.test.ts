@@ -66,7 +66,6 @@ describe('Prompt persistence', () => {
 
     const prompt = new StringPrompt({
       content: 'Hello, {name}!',
-      description: 'A test prompt',
     });
 
     const ref = await client.publish(prompt);
