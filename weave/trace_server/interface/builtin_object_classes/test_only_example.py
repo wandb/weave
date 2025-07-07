@@ -31,4 +31,4 @@ class TestOnlyExample(base_object_def.BaseObject):
     nested_base_object: base_object_def.RefStr
 
 
-__all__ = ["TestOnlyExample", "TestOnlyNestedBaseObject", "TestOnlyInheritedBaseObject"]
+__all__ = ["TestOnlyExample", "TestOnlyInheritedBaseObject", "TestOnlyNestedBaseObject"]
