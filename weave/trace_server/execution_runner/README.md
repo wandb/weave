@@ -74,27 +74,53 @@ The execution runner uses a clean separation of concerns:
 
 ### Data Flow
 
-```
-┌─────────────────────────────────────────────────┐
-│              Parent Process                      │
-│                                                  │
-│  Internal      Security        Process-Safe      │
-│  TraceServer → Wrapper  →      Adapter          │
-│      ↑                              ↓            │
-│      └──────── Workers ─────────────┘            │
-│                   ↓                              │
-│              [Queues]                            │
-└───────────────────┼─────────────────────────────┘
-                    │ Process Boundary
-┌───────────────────┼─────────────────────────────┐
-│              Child Process                       │
-│                   │                              │
-│              [Queues]                            │
-│                   ↓                              │
-│           Process-Safe Client                    │
-│                   ↓                              │
-│             User Code                            │
-└─────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "Parent Process"
+        ITS[Internal<br/>TraceServer]
+        SW[Security<br/>Wrapper]
+        PSA[Process-Safe<br/>Adapter]
+        WT[Worker<br/>Threads]
+        RAU[RunAsUser]
+        
+        ITS --> SW
+        SW --> PSA
+        PSA --> WT
+        WT --> PSA
+        
+        RRQ1[Request/Response<br/>Queues]
+        RQ1[Result Queue]
+        
+        PSA -.-> RRQ1
+        WT -.-> RRQ1
+        RQ1 --> RAU
+    end
+    
+    subgraph "Child Process"
+        RRQ2[Request/Response<br/>Queues]
+        PSC[Process-Safe<br/>Client]
+        UC[User Code]
+        RQ2[Result Queue]
+        
+        RRQ2 --> PSC
+        PSC --> UC
+        UC --> RQ2
+    end
+    
+    %% Cross-process communication
+    RRQ1 -.->|Process<br/>Boundary| RRQ2
+    RQ2 -.->|Process<br/>Boundary| RQ1
+    
+    %% Styling
+    style ITS fill:#e3f2fd
+    style SW fill:#fce4ec
+    style PSA fill:#fff3e0
+    style PSC fill:#fff3e0
+    style UC fill:#e8f5e9
+    style RAU fill:#f3e5f5
+    
+    classDef queueStyle fill:#f5f5f5,stroke:#999,stroke-width:2px
+    class RRQ1,RRQ2,RQ1,RQ2 queueStyle
 ```
 
 ### Key Design Principles
@@ -103,6 +129,7 @@ The execution runner uses a clean separation of concerns:
 2. **No Global State**: No global registries or complex lifecycle management
 3. **Simple Communication**: Direct queue-based communication without intermediate threads
 4. **Concurrent by Design**: Worker pool processes multiple requests simultaneously
+5. **Separate Result Channel**: The final execution result uses a dedicated queue separate from trace server communication, ensuring clean separation between infrastructure messaging and business logic results
 
 ### Why Process Isolation?
 
@@ -183,6 +210,7 @@ sequenceDiagram
     participant WT as Worker Thread<br/>(Main Process)
     participant Q1 as Request Queue
     participant Q2 as Response Queue
+    participant RQ as Result Queue
     participant CP as Child Process
     participant US as User Script<br/>(run_model)
 
@@ -193,7 +221,7 @@ sequenceDiagram
     activate WT
     Note over WT: Holds wrapped<br/>trace server
     
-    RAU->>RAU: Create queues
+    RAU->>RAU: Create queues<br/>(request/response + result)
     RAU->>CP: Fork process
     activate CP
     
@@ -216,15 +244,20 @@ sequenceDiagram
     US-->>CP: Return result
     deactivate US
     
-    %% Cleanup Phase
-    CP->>RAU: Exit process
+    %% Return final result
+    CP->>RQ: Put final result
+    CP->>CP: Exit process
     deactivate CP
+    
+    %% Cleanup Phase
+    RAU->>RQ: Get result
     RAU->>WT: Shutdown signal
     deactivate WT
     RAU-->>MP: Return result
     
     %% Annotations
-    Note over Q1,Q2: Multiprocessing queues<br/>Only serializable data
+    Note over Q1,Q2: Multiprocessing queues<br/>For trace server communication
+    Note over RQ: Separate queue<br/>For final result only
     Note over CP,US: Isolated memory space<br/>No access to parent
 ```
 
