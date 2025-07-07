@@ -474,6 +474,9 @@ class ProcessSafeTraceServerClient(tsi.TraceServerInterface):
     def apply_scorer(self, req: tsi.ApplyScorerReq) -> tsi.ApplyScorerRes:
         return self._call_method("apply_scorer", req)
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        return self._call_method("evaluate_model", req)
+
 
 # === Helper functions for easy usage ===
 
