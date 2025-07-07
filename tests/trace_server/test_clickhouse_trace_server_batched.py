@@ -17,7 +17,7 @@ def test_clickhouse_storage_size_query_generation():
     # Mock the query builder and query stream
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.CallsQuery",
+            "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.CallsQuery",
             autospec=True,
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
@@ -160,7 +160,7 @@ def test_completions_create_stream_custom_provider():
 
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
     ):
@@ -294,7 +294,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
 
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,

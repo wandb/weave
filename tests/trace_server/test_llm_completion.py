@@ -345,7 +345,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         ]
 
         with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock the litellm completion stream
             mock_stream = MagicMock()
@@ -381,7 +381,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         class StreamingException(Exception): ...
 
         with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock litellm to raise an exception
             mock_litellm.side_effect = StreamingException("Test error")
@@ -437,7 +437,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
         with (
             patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+                "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(
                 chts.ClickHouseTraceServer, "_insert_call"
@@ -516,7 +516,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
         with (
             patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+                "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         ):
@@ -607,7 +607,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
     def test_missing_api_key(self):
         """Test handling of missing API key in streaming completion."""
         with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock litellm to raise MissingLLMApiKeyError
             mock_litellm.side_effect = MissingLLMApiKeyError(

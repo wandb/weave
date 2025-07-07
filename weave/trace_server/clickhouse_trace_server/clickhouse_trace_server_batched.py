@@ -44,10 +44,17 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 
-from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
+from . import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from .clickhouse_trace_server_settings import (
+    CLICKHOUSE_DEFAULT_QUERY_SETTINGS,
+    CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT,
+    CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT,
+    ENTITY_TOO_LARGE_PAYLOAD,
+    FILE_CHUNK_SIZE,
+)
 from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
@@ -59,7 +66,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     combine_conditions,
     optimized_project_contains_call_query,
 )
-from weave.trace_server.clickhouse_schema import (
+from .clickhouse_schema import (
     CallDeleteCHInsertable,
     CallEndCHInsertable,
     CallStartCHInsertable,
@@ -148,8 +155,6 @@ from weave.trace_server.trace_server_interface_util import (
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-FILE_CHUNK_SIZE = 100000
-
 MAX_DELETE_CALLS_COUNT = 1000
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
@@ -189,23 +194,6 @@ all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
 required_obj_select_columns = list(set(all_obj_select_columns) - set())
 
 ObjRefListType = list[ri.InternalObjectRef]
-
-
-CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
-CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT = 1 * 1024 * 1024  # 1 MiB
-ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
-
-# https://clickhouse.com/docs/operations/settings/settings#max_memory_usage
-DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
-# https://clickhouse.com/docs/operations/settings/settings#max_execution_time
-DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
-CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
-    or DEFAULT_MAX_MEMORY_USAGE,
-    "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
-    or DEFAULT_MAX_EXECUTION_TIME,
-    "function_json_value_return_type_allow_complex": "1",
-}
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):

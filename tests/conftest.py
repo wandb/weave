@@ -34,7 +34,7 @@ def patch_kafka_producer():
     If a test needs to test the Kafka producer, they should orride this patch explicitly.
     """
     with patch(
-        "weave.trace_server.clickhouse_trace_server_batched.KafkaProducer.from_env",
+        "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.KafkaProducer.from_env",
         return_value=MagicMock(),
     ):
         yield
