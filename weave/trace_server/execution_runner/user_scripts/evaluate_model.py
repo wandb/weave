@@ -20,12 +20,13 @@ async def evaluate_model(req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         )
 
     scorers = loaded_evaluation.scorers
-    for scorer in scorers:
-        if not isinstance(scorer, LLMAsAJudgeScorer):
-            raise TypeError(
-                f"Invalid scorer reference: expected LLMAsAJudgeScorer, "
-                f"got {type(scorer).__name__}"
-            )
+    if scorers:
+        for scorer in scorers:
+            if not isinstance(scorer, LLMAsAJudgeScorer):
+                raise TypeError(
+                    f"Invalid scorer reference: expected LLMAsAJudgeScorer, "
+                    f"got {type(scorer).__name__}"
+                )
 
     loaded_model = client.get(parse_uri(req.model_ref))
 
