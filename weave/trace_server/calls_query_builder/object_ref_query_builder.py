@@ -15,7 +15,7 @@ Key components:
 """
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union, get_args
 
 from pydantic import BaseModel
 
@@ -43,15 +43,18 @@ if TYPE_CHECKING:
     )
 
 
+# Add protection from ultra large queries, generally only realistically
+# constructed as an attack vector
+MAX_CTES_PER_QUERY = 10
+
+
 class ObjectRefCondition(BaseModel):
     """Base class for object reference conditions"""
 
     field_path: str
     expand_columns: list[str]
     case_insensitive: bool = False
-    conversion_type: Optional[Literal["double", "string", "int", "bool", "exists"]] = (
-        None
-    )
+    conversion_type: Optional[tsi_query.CastTo] = None
 
     @property
     def is_table_rows_condition(self) -> bool:
@@ -80,6 +83,9 @@ class ObjectRefCondition(BaseModel):
             >>> condition.get_expand_column_match(shortest=False)
             'inputs.model'
         """
+        if not self.field_path:
+            raise ValueError("Field path cannot be empty")
+
         for expand_col in sorted(self.expand_columns, key=len, reverse=not shortest):
             if self.field_path.startswith(expand_col + "."):
                 return expand_col
@@ -230,7 +236,7 @@ class ObjectRefCondition(BaseModel):
         """
         if self.unique_key not in field_to_object_join_alias_map:
             raise ValueError(
-                f"Condition key {self.unique_key} not found in field_to_object_join_alias_map"
+                f"Object ref condition key {self.unique_key} not found when generating sql."
             )
 
         cte_alias = field_to_object_join_alias_map[self.unique_key]
@@ -546,9 +552,8 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
             if self._is_object_ref_field(field_path) and isinstance(
                 operands[1], tsi_query.LiteralOperation
             ):
-                # Only include conversion_type if it's a valid CastTo type
                 condition_kwargs = {**kwargs}
-                if conversion_type in {"double", "string", "int", "bool", "exists"}:
+                if conversion_type in get_args(tsi_query.CastTo):
                     condition_kwargs["conversion_type"] = conversion_type
 
                 obj_condition = ObjectRefFilterCondition(
@@ -655,6 +660,12 @@ def build_object_ref_ctes(
     """
     if not object_ref_conditions:
         return "", {}
+
+    if len(object_ref_conditions) > MAX_CTES_PER_QUERY:
+        raise ValueError(
+            f"Too many object reference conditions ({len(object_ref_conditions)}). "
+            f"Maximum allowed: {MAX_CTES_PER_QUERY}."
+        )
 
     project_param = pb.add_param(project_id)
     cte_parts = []

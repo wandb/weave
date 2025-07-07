@@ -2283,6 +2283,20 @@ def test_filter_length_validation():
     with pytest.raises(ValueError):
         cq.as_sql(pb)
 
+    # Test with too many conditions
+    cq = CallsQuery(project_id="test/project")
+    complex_conditions = {
+        "$and": [
+            {"$eq": [{"$getField": f"inputs.field{i}"}, {"$literal": i}]}
+            for i in range(20)  # Exceeds MAX_CTES_PER_QUERY
+        ]
+    }
+    cq.add_field("id")
+    cq.add_condition(complex_conditions)
+    cq.set_expand_columns(["inputs"])
+    with pytest.raises(ValueError, match="Too many object reference conditions"):
+        s = cq.as_sql(pb)
+
 
 def test_disallowed_fields():
     cq = CallsQuery(project_id="test/project")
