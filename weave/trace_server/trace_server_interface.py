@@ -1124,7 +1124,7 @@ class ApplyScorerReq(BaseModel):
     project_id: str
     scorer_ref: str
     target_call_id: str
-    additional_inputs: Optional[dict | str] = None
+    additional_inputs: Optional[Union[dict, str]] = None
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
