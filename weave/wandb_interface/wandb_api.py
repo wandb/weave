@@ -479,7 +479,6 @@ class WandbApi:
     def upsert_project(
         self,
         project: str,
-        id: Optional[str] = None,
         description: Optional[str] = None,
         entity: Optional[str] = None,
     ) -> dict[str, Any]:
@@ -487,7 +486,6 @@ class WandbApi:
 
         Args:
             project (str): The project to create
-            id (str, optional): The id of the project.  If not provided, a new project will be created.
             description (str, optional): A description of this project
             entity (str, optional): The entity to scope this project to.
         """
@@ -496,7 +494,6 @@ class WandbApi:
             name=project,
             entity=entity,
             description=description,
-            id=id,
         )
 
 
