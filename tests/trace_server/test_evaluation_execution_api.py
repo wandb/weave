@@ -1,18 +1,26 @@
+import json
+
 import pytest
 
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace_server.execution_runner.run_as_user import with_client_bound_to_project
 from weave.trace_server.execution_runner.user_scripts.apply_scorer import apply_scorer
+from weave.trace_server.execution_runner.user_scripts.evaluate_model import (
+    evaluate_model,
+)
 from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 from weave.trace_server.trace_server_interface import (
     ApplyScorerReq,
     ApplyScorerRes,
     CallsQueryReq,
+    EvaluateModelReq,
+    EvaluateModelRes,
     ObjCreateReq,
     ObjQueryReq,
     RunModelReq,
     RunModelRes,
+    TableCreateReq,
     TraceServerInterface,
 )
 
@@ -422,5 +430,309 @@ async def test_apply_scorer(ch_only_trace_server: TraceServerInterface, client_c
             model_output="The weather is nice today.",
             user_input="What's the weather like?",
             expected_score="7",
+            run_mode_local=run_mode_local,
+        )
+
+
+@pytest.mark.asyncio
+async def test_evaluate_model(
+    ch_only_trace_server: TraceServerInterface, client_creator
+):
+    """
+    Test the evaluate_model API endpoint with isolated execution.
+
+    This test verifies that:
+    1. Evaluations can be created and executed through the evaluate_model API
+    2. Evaluation execution is properly traced (creates call records)
+    3. Evaluations correctly run models against datasets and apply scorers
+    4. Different projects are properly isolated from each other
+
+    The test creates a model, dataset, scorer, and evaluation, then runs
+    the evaluation through the evaluate_model API.
+    """
+    entity = "shawn"
+
+    def create_model(entity: str, project: str) -> str:
+        """Create a test model and return its reference URI."""
+        project_id = f"{entity}/{project}"
+        model_object_id = "test_model_for_eval"
+        llm_model_val = {
+            "llm_model_id": "gpt-4o-mini",
+            "default_params": {
+                "messages_template": [
+                    {
+                        "role": "system",
+                        "content": "You are a scorer. You will be given a user input and a model output. You will return a score from 0 to 10. Please return the score in a JSON object with the key 'score'.",
+                    },
+                ],
+                "response_format": "json_object",
+            },
+        }
+        model_create_res = ch_only_trace_server.obj_create(
+            ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": project_id,
+                        "object_id": model_object_id,
+                        "val": llm_model_val,
+                        "builtin_object_class": "LLMStructuredCompletionModel",
+                    }
+                }
+            )
+        )
+        return ObjectRef(
+            entity=entity,
+            project=project,
+            name=model_object_id,
+            _digest=model_create_res.digest,
+        ).uri()
+
+    def create_dataset(entity: str, project: str) -> str:
+        """Create a test dataset and return its reference URI."""
+        project_id = f"{entity}/{project}"
+        dataset_table_val = [
+            {"user_input": "How are you?", "expected": "I'm doing well, thank you!"},
+            # {"user_input": "What's 2+2?", "expected": "4"},
+            # {
+            #     "user_input": "Tell me a joke",
+            #     "expected": "Why did the chicken cross the road?",
+            # },
+        ]
+        dataset_table_res = ch_only_trace_server.table_create(
+            TableCreateReq.model_validate(
+                {
+                    "table": {
+                        "project_id": project_id,
+                        "rows": dataset_table_val,
+                    }
+                }
+            )
+        )
+        dataset_object_id = "test_eval_dataset"
+        dataset_val = {
+            "_type": "Dataset",
+            "_class_name": "Dataset",
+            "_bases": ["BaseModel", "Object", "Dataset"],
+            "rows": f"weave:///{project_id}/table/{dataset_table_res.digest}",
+        }
+        dataset_create_res = ch_only_trace_server.obj_create(
+            ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": project_id,
+                        "object_id": dataset_object_id,
+                        "val": dataset_val,
+                    }
+                }
+            )
+        )
+        return ObjectRef(
+            entity=entity,
+            project=project,
+            name=dataset_object_id,
+            _digest=dataset_create_res.digest,
+        ).uri()
+
+    def create_scorer(entity: str, project: str) -> str:
+        """Create a test scorer and return its reference URI."""
+        project_id = f"{entity}/{project}"
+
+        # First create the model for the scorer
+        scorer_model_object_id = "test_eval_scorer_model"
+        scorer_model_val = {
+            "llm_model_id": "gpt-4o-mini",
+            "default_params": {
+                "messages_template": [
+                    {
+                        "role": "system",
+                        "content": "You are an expert judge. Compare the model output to the expected output and return a score from 0 to 10.",
+                    },
+                ],
+                "response_format": "text",
+            },
+        }
+        scorer_model_create_res = ch_only_trace_server.obj_create(
+            ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": project_id,
+                        "object_id": scorer_model_object_id,
+                        "val": scorer_model_val,
+                        "builtin_object_class": "LLMStructuredCompletionModel",
+                    }
+                }
+            )
+        )
+        scorer_model_ref = ObjectRef(
+            entity=entity,
+            project=project,
+            name=scorer_model_object_id,
+            _digest=scorer_model_create_res.digest,
+        ).uri()
+
+        # Then create the scorer
+        scorer_object_id = "test_eval_llm_judge_scorer"
+        scorer_val = {
+            "_type": "LLMAsAJudgeScorer",
+            "_class_name": "LLMAsAJudgeScorer",
+            "_bases": ["BaseModel", "Scorer", "LLMAsAJudgeScorer"],
+            "model": scorer_model_ref,
+            "scoring_prompt": "User input: {user_input}\nModel output: {output}\nExpected output: {expected}\n\nScore the similarity (0-10).",
+        }
+        scorer_create_res = ch_only_trace_server.obj_create(
+            ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": project_id,
+                        "object_id": scorer_object_id,
+                        "val": scorer_val,
+                    }
+                }
+            )
+        )
+        return ObjectRef(
+            entity=entity,
+            project=project,
+            name=scorer_object_id,
+            _digest=scorer_create_res.digest,
+        ).uri()
+
+    def create_evaluation(
+        entity: str, project: str, dataset_ref: str, scorer_ref: str
+    ) -> str:
+        """Create a test evaluation and return its reference URI."""
+        project_id = f"{entity}/{project}"
+        evaluation_object_id = "test_evaluation"
+        evaluation_val = {
+            "_type": "Evaluation",
+            "_class_name": "Evaluation",
+            "_bases": ["BaseModel", "Object", "Evaluation"],
+            "dataset": dataset_ref,
+            "scorers": [scorer_ref],
+            # Note: You might need to add more fields depending on the Evaluation class structure
+        }
+        evaluation_create_res = ch_only_trace_server.obj_create(
+            ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": project_id,
+                        "object_id": evaluation_object_id,
+                        "val": evaluation_val,
+                    }
+                }
+            )
+        )
+        return ObjectRef(
+            entity=entity,
+            project=project,
+            name=evaluation_object_id,
+            _digest=evaluation_create_res.digest,
+        ).uri()
+
+    async def evaluate_model_harness(
+        entity: str,
+        project: str,
+        evaluation_ref: str,
+        model_ref: str,
+        run_mode_local: bool = False,
+    ) -> EvaluateModelRes:
+        """Run an evaluation on a model."""
+        project_id = f"{entity}/{project}"
+        req = EvaluateModelReq.model_validate(
+            {
+                "project_id": project_id,
+                "evaluation_ref": evaluation_ref,
+                "model_ref": model_ref,
+            }
+        )
+        # Mock the LLM completions for all the calls during evaluation
+        # This is a simplified mock - in reality the evaluation would make multiple calls
+        with with_simple_mock_litellm_completion(
+            json.dumps({"score": 9})
+        ):  # Mock score response
+            if run_mode_local:
+                with with_client_bound_to_project(
+                    entity, project, ch_only_trace_server
+                ):
+                    eval_res = await evaluate_model(req)
+            else:
+                eval_res = await ch_only_trace_server.evaluate_model(req)
+        return eval_res
+
+    async def do_test(
+        entity: str,
+        project: str,
+        run_mode_local: bool = False,
+    ):
+        project_id = f"{entity}/{project}"
+
+        # Create all necessary objects
+        model_ref_uri = create_model(entity, project)
+        dataset_ref_uri = create_dataset(entity, project)
+        scorer_ref_uri = create_scorer(entity, project)
+        evaluation_ref_uri = create_evaluation(
+            entity, project, dataset_ref_uri, scorer_ref_uri
+        )
+
+        # Run the evaluation
+        eval_res = await evaluate_model_harness(
+            entity, project, evaluation_ref_uri, model_ref_uri, run_mode_local
+        )
+
+        # Verify the evaluation output is a dictionary with results
+        assert isinstance(eval_res.output, dict)
+
+        # Query for calls
+        calls_res = ch_only_trace_server.calls_query(
+            CallsQueryReq.model_validate(
+                {
+                    "project_id": project_id,
+                }
+            )
+        )
+
+        # evaluate
+        # predict_and_score
+        #    predict
+        # complete
+        #    score
+        # complete
+        # summary
+        assert len(calls_res.calls) == 7
+
+        # Query for the specific evaluation call
+        eval_calls_res = ch_only_trace_server.calls_query(
+            CallsQueryReq.model_validate(
+                {
+                    "project_id": project_id,
+                    "filter": {
+                        "call_ids": [eval_res.call_id],
+                    },
+                }
+            )
+        )
+
+        assert len(eval_calls_res.calls) == 1
+        eval_call = eval_calls_res.calls[0]
+        assert eval_call.op_name.startswith(
+            f"weave:///{project_id}/op/Evaluation.evaluate:"
+        )
+        assert eval_res.output == eval_call.output
+        assert eval_call.summary == {}
+
+    for run_mode_local in [False, True]:
+        local_suffix = "_local" if run_mode_local else ""
+
+        # Test with first project
+        await do_test(
+            entity=entity,
+            project="test_evaluate_model_1" + local_suffix,
+            run_mode_local=run_mode_local,
+        )
+
+        # Test with second project to ensure isolation
+        await do_test(
+            entity=entity,
+            project="test_evaluate_model_2" + local_suffix,
             run_mode_local=run_mode_local,
         )

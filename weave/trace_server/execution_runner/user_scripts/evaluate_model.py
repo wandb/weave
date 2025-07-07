@@ -36,6 +36,8 @@ async def evaluate_model(req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
             f"got {type(loaded_model).__name__}"
         )
 
-    result, call = loaded_evaluation.evaluate.call(loaded_evaluation, loaded_model)
+    result, call = await loaded_evaluation.evaluate.call(
+        loaded_evaluation, loaded_model
+    )
 
     return tsi.EvaluateModelRes(output=result, call_id=call.id)
