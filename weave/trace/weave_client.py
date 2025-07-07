@@ -141,6 +141,7 @@ from weave.trace_server.trace_server_interface import (
 
 if TYPE_CHECKING:
     import pandas as pd
+    import wandb
 
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
@@ -2476,33 +2477,36 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
     return parallelism_main, parallelism_fastlane
 
 
-def safe_current_wb_run_id() -> str | None:
+def _safe_get_wandb_run() -> wandb.Run | None:
     try:
         import wandb
-
-        wandb_run = wandb.run
-        if wandb_run is None:
-            return None
-    except (ImportError, ModuleNotFoundError, AttributeError):
+    except (ImportError, ModuleNotFoundError):
         return None
-    else:
-        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
+
+    try:
+        wandb_run = wandb.run
+    except AttributeError:
+        return None
+
+    return wandb_run
+
+
+def safe_current_wb_run_id() -> str | None:
+    wandb_run = _safe_get_wandb_run()
+    if wandb_run is None:
+        return None
+
+    return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
 
 
 def safe_current_wb_run_step() -> int | None:
-    try:
-        import wandb
-
-        wandb_run = wandb.run
-        if wandb_run is None:
-            return None
-    except (ImportError, ModuleNotFoundError, AttributeError):
+    wandb_run = _safe_get_wandb_run()
+    if wandb_run is None:
         return None
-    else:
-        try:
-            return int(wandb_run.step)
-        except Exception:
-            return None
+    try:
+        return int(wandb_run.step)
+    except Exception:
+        return None
 
 
 def check_wandb_run_matches(
