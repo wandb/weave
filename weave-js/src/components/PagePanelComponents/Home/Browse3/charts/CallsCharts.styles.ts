@@ -13,7 +13,7 @@ export const callsChartsStyles = {
   header: {
     backgroundColor: MOON_50,
     borderBottom: '1px solid rgba(224, 224, 224, 1)',
-    padding: '7px 16px 7px 16px',
+    padding: '7px 16px 8px 16px',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     flexShrink: 0,
   },
