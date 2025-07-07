@@ -117,7 +117,10 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({ doc }) => {
         {doc.content}
       </Typography>
       {metadata && (
-        <Box onClick={() => setMetadataExpanded(!metadataExpanded)} sx={{ width: '100%', height: 'auto' }}>
+        <Box onClick={(e) => {
+          e.stopPropagation();
+          setMetadataExpanded(!metadataExpanded);
+        }} sx={{ width: '100%', height: 'auto' }}>
           <Button
             variant='ghost'
             size='small'
@@ -142,14 +145,12 @@ interface DocumentDropdownProps {
 
 export const DocumentDropdown: React.FC<DocumentDropdownProps> = ({ documents, title, isExpanded, setExpanded }) => {
   return (
-    <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+    <Box>
       <DropdownSection title={title} isExpanded={isExpanded} setExpanded={setExpanded}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16}}>
           {documents.map((doc, index) => (
-            <div key={index}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16}}>
-                <DocumentCard doc={doc} />
-              </div>
+            <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 16}}>
+              <DocumentCard doc={doc} />
             </div>
           ))}
         </div>
