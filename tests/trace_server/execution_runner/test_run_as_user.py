@@ -9,6 +9,8 @@ spawning and isolation. The timeout tests are particularly important for
 ensuring the system can handle stuck processes.
 """
 
+import os
+
 import pytest
 
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
@@ -29,20 +31,14 @@ from tests.trace_server.execution_runner.test_functions import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.execution_runner.run_as_user import (
     RunAsUser,
-    RunAsUserException,
-)
-from weave.trace_server.external_to_internal_trace_server_adapter import (
-    ExternalTraceServer,
+    RunAsUserError,
 )
 
 
 def get_internal_trace_server(
     trace_server: TestOnlyUserInjectingExternalTraceServer,
 ) -> tsi.TraceServerInterface:
-    if isinstance(trace_server, ExternalTraceServer):
-        return trace_server._internal_trace_server
-    else:
-        return trace_server
+    return trace_server._internal_trace_server
 
 
 class TestRunAsUser:
@@ -71,8 +67,6 @@ class TestRunAsUser:
         assert result.result == "Success: test_value"
         assert result.process_id is not None
         # Verify it ran in a different process
-        import os
-
         assert result.process_id != os.getpid()
 
     @pytest.mark.asyncio
@@ -88,7 +82,7 @@ class TestRunAsUser:
 
         req = TestRequest(value="test_error")
         # The child process will crash when the exception is raised
-        with pytest.raises(RunAsUserException, match="exit code"):
+        with pytest.raises(RunAsUserError, match="exit code"):
             await runner._run_user_scoped_function(
                 failing_function,
                 req,
@@ -111,7 +105,7 @@ class TestRunAsUser:
         )
 
         req = TestRequest(value="timeout_test", sleep_time=2.0)
-        with pytest.raises(RunAsUserException, match="timed out after 0.5 seconds"):
+        with pytest.raises(RunAsUserError, match="timed out after 0.5 seconds"):
             await runner._run_user_scoped_function(
                 timeout_function,
                 req,
@@ -132,7 +126,7 @@ class TestRunAsUser:
         )
 
         req = TestRequest(value="exit_test", exit_code=42)
-        with pytest.raises(RunAsUserException, match="exit code: 42"):
+        with pytest.raises(RunAsUserError, match="exit code: 42"):
             await runner._run_user_scoped_function(
                 exit_code_function,
                 req,

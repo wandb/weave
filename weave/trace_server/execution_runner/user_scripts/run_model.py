@@ -81,8 +81,9 @@ async def run_model(req: tsi.RunModelReq) -> tsi.RunModelRes:
         )
 
     # Execute the model with tracing
-    # Note: This is synchronous because the model interface is not async yet
-    # TODO: Support async models when the interface is updated
+    # Note: The model's predict method is synchronous, even though this run_model
+    # function is async. This is due to current model interface limitations.
+    # TODO: Support async model predict methods when the interface is updated
     result, call = loaded_model.predict.call(loaded_model, **inputs_value)
 
     # Return the result and trace information
