@@ -10,8 +10,7 @@ import { WeaveDocumentSchema } from './schemas';
 interface DropdownSectionProps {
   title: string;
   children: React.ReactNode;
-  isExpanded: boolean,
-  setExpanded: (val: boolean) => void;
+  defaultExpanded: boolean;
 }
 
 const TitleRow = styled.div`
@@ -35,12 +34,17 @@ Title.displayName = 'S.Title';
 export const DropdownSection: React.FC<DropdownSectionProps> = ({
   title,
   children,
-  isExpanded,
-  setExpanded
+  defaultExpanded,
 }) => {
+  const [isExpanded, setExpanded] = useState(defaultExpanded);
   return (
-    <Box onClick={() => setExpanded(!isExpanded)} sx={{ width: '100%', height: 'auto' }}>
-      <Button variant='ghost' size='small' icon={isExpanded ? "chevron-down" : "chevron-next"}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', height: 'auto'}}>
+      <Button
+        onClick={() => { setExpanded(!isExpanded); }}
+        variant='ghost'
+        size='small'
+        icon={isExpanded ? "chevron-down" : "chevron-next"}
+      >
         <Title>{title}</Title>
       </Button>
       <Collapse in={isExpanded}>
@@ -48,7 +52,7 @@ export const DropdownSection: React.FC<DropdownSectionProps> = ({
           {children}
         </Box>
       </Collapse>
-    </Box>
+    </div>
   );
 };
 
@@ -60,27 +64,26 @@ export const MetadataTable: React.FC<MetadataTableProps> = ({ data }) => {
   return (
     <Table size="small">
       <TableBody>
-        {Object.entries(data).map(([key, value]) => (
+        {Object.entries(data).map(([key, value], index) => (
           <TableRow key={key}>
-            <TableCell 
-              component="th" 
-              scope="row" 
+            <TableCell
+              component="th"
+              scope="row"
               sx={{ 
-                fontWeight: 500, 
+                fontWeight: 500,
                 color: 'text.secondary',
                 width: '30%',
-                borderBottom: '1px solid',
+                borderTop: index > 0 ? '1px solid' : '0px',
+                borderBottom: index < data.length - 1 ? '1px solid' : '0px',
                 borderColor: 'divider',
-                py: 1.5
               }}
             >
               {key}
             </TableCell>
             <TableCell 
-              sx={{ 
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                py: 1.5
+              sx={{
+                borderTop: index > 0 ? '1px solid' : '0px',
+                borderBottom: index < data.length - 1 ? '1px solid' : '0px',
               }}
             >
               {typeof value === 'object' ? JSON.stringify(value) : String(value)}
@@ -96,7 +99,6 @@ interface DocumentCardProps {
   doc: WeaveDocumentSchema;
 }
 export const DocumentCard: React.FC<DocumentCardProps> = ({ doc }) => {
-  const [metadataExpanded, setMetadataExpanded] = useState(false);
   const metadata = useMemo(() => {
     if (doc.metadata && typeof doc.metadata === 'object' && doc.content) {
       return doc.metadata;
@@ -113,40 +115,28 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({ doc }) => {
       paddingLeft={"16px"}
       paddingBottom={"12px"}
     >
-      <Typography variant="body2" color="text.secondary">
-        {doc.content}
-      </Typography>
-      {metadata && (
-        <Box onClick={(e) => {
-          e.stopPropagation();
-          setMetadataExpanded(!metadataExpanded);
-        }} sx={{ width: '100%', height: 'auto' }}>
-          <Button
-            variant='ghost'
-            size='small'
-            icon={metadataExpanded ? "chevron-down" : "chevron-next"}
-          >
-            <Title>{"Metadata"}</Title>
-          </Button>
-          <Collapse in={metadataExpanded}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8}}>
+        <Typography variant="body2" color="text.secondary">
+          {doc.content}
+        </Typography>
+        {metadata && (
+          <DropdownSection title={"Metadata"} defaultExpanded={false}>
             <MetadataTable data={metadata} />
-          </Collapse>
-        </Box>
-      )}
+          </DropdownSection>
+        )}
+      </div>
     </Box>
   );
 };
 interface DocumentDropdownProps {
   documents: WeaveDocumentSchema[];
   title: string;
-  isExpanded: boolean;
-  setExpanded: (val: boolean) => void;
 }
 
-export const DocumentDropdown: React.FC<DocumentDropdownProps> = ({ documents, title, isExpanded, setExpanded }) => {
+export const DocumentDropdown: React.FC<DocumentDropdownProps> = ({ documents, title }) => {
   return (
     <Box>
-      <DropdownSection title={title} isExpanded={isExpanded} setExpanded={setExpanded}>
+      <DropdownSection title={title} defaultExpanded={true}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16}}>
           {documents.map((doc, index) => (
             <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 16}}>

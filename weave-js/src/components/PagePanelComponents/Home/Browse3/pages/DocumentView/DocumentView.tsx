@@ -35,9 +35,6 @@ import { DropdownSection, DocumentDropdown } from './DropdownMenu';
 //
 //
 export const DocumentView: React.FC<{ data: ParsedCall<WeaveDocumentSchema>, isExpanded: boolean}> = ({ data }) => {
-  const [inputsExpanded, setInputsExpanded] = useState(true);
-  const [outputsExpanded, setOutputExpanded] = useState(true);
-
   const {inputsDocuments, outputDocuments} = useMemo(() => {
     const inputs = data.inputs?.filter(parsed => parsed.schema == "Document") ?? [];
     const output = data.output?.filter(parsed => parsed.schema == "Document") ?? [];
@@ -47,9 +44,9 @@ export const DocumentView: React.FC<{ data: ParsedCall<WeaveDocumentSchema>, isE
     }
   }, [data]);
   return (
-    <div>
-      {inputsDocuments && <DocumentDropdown title={'Inputs'} documents={inputsDocuments} isExpanded={inputsExpanded} setExpanded={setInputsExpanded} />}
-      {outputDocuments && <DocumentDropdown title={'Outputs'} documents={outputDocuments} isExpanded={outputsExpanded} setExpanded={setOutputExpanded}/>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16}}>
+      {inputsDocuments && <DocumentDropdown title={'Inputs'} documents={inputsDocuments} />}
+      {outputDocuments && <DocumentDropdown title={'Outputs'} documents={outputDocuments} />}
     </div>
   )
 };
