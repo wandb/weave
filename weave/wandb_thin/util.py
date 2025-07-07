@@ -8,10 +8,9 @@ def get_app_url() -> Optional[str]:
 
 def app_url(api_url: str) -> str:
     """Return the frontend app url without a trailing slash."""
-    # TODO: move me to settings
     app_url = get_app_url()
     if app_url is not None:
-        return str(app_url.strip("/"))
+        return app_url.strip("/")
     if "://api.wandb.test" in api_url:
         # dev mode
         return api_url.replace("://api.", "://app.").strip("/")
