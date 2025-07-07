@@ -27,6 +27,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
+import ddtrace
+from ddtrace.trace import tracer
 from pydantic import BaseModel
 
 from weave.trace.weave_client import WeaveClient
@@ -117,8 +119,10 @@ class RunAsUserChildProcessContext(Generic[T]):
     trace_server_args: CrossProcessTraceServerArgs
     project_id: str
     result_queue: multiprocessing.Queue[T]
+    trace_ctx: ddtrace.SpanContext | None = None
 
 
+@ddtrace.tracer.wrap(name="run_as_user._generic_child_process_wrapper")
 def _generic_child_process_wrapper(
     wrapper_context: RunAsUserChildProcessContext[dict],
     func: Callable[[TReq], Coroutine[Any, Any, TRes]],
@@ -143,17 +147,19 @@ def _generic_child_process_wrapper(
         Any exceptions in the child process will cause the process to exit with
         a non-zero code, which is handled by the parent.
     """
-    # Build the trace server client in the child process
-    safe_trace_server = build_child_process_trace_server(
-        wrapper_context.trace_server_args
-    )
+    tracer.context_provider.activate(wrapper_context.trace_ctx)
+    with tracer.trace("run_as_user._generic_child_process_wrapper.inner"):
+        # Build the trace server client in the child process
+        safe_trace_server = build_child_process_trace_server(
+            wrapper_context.trace_server_args
+        )
 
-    # Execute the function within a user-scoped client context
-    with user_scoped_client(wrapper_context.project_id, safe_trace_server):
-        res = asyncio.run(func(req))
+        # Execute the function within a user-scoped client context
+        with user_scoped_client(wrapper_context.project_id, safe_trace_server):
+            res = asyncio.run(func(req))
 
-        # Convert the Pydantic response to a dict and send back
-        wrapper_context.result_queue.put(res.model_dump())
+            # Convert the Pydantic response to a dict and send back
+            wrapper_context.result_queue.put(res.model_dump())
 
 
 class RunAsUserException(Exception):
@@ -210,6 +216,7 @@ class RunAsUser:
         self.wb_user_id = wb_user_id
         self.timeout_seconds = timeout_seconds
 
+    @ddtrace.tracer.wrap(name="run_as_user._run_user_scoped_function")
     async def _run_user_scoped_function(
         self,
         func: Callable[[TReq], Coroutine[Any, Any, TRes]],
@@ -274,6 +281,7 @@ class RunAsUser:
                     ),
                     project_id=project_id,
                     result_queue=result_queue,
+                    trace_ctx=tracer.current_trace_context(),
                 ),
                 "func": func,
                 "req": externalized_req,
@@ -316,6 +324,7 @@ class RunAsUser:
         res = response_type.model_validate(result_dict)
         return res
 
+    @ddtrace.tracer.wrap(name="run_as_user.run_model")
     async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
         """
         Execute a model in an isolated process.

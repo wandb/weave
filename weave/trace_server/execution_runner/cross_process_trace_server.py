@@ -18,6 +18,8 @@ import threading
 from collections.abc import Iterator
 from typing import Any, Optional, TypedDict
 
+import ddtrace
+
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.trace_server_interface import *
 
@@ -138,6 +140,7 @@ class CrossProcessTraceServer(TraceServerInterface):
                 # Log error but continue handling responses
                 logger.exception(f"Error handling response: {e}")
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server._send_request")
     def _send_request(self, method: str, request: Any) -> Any:
         """
         Send a request to the worker thread and wait for the response.
@@ -183,6 +186,7 @@ class CrossProcessTraceServer(TraceServerInterface):
 
         return response["result"]
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.shutdown")
     def shutdown(self) -> None:
         """Shutdown the cross-process trace server."""
         if not self._shutdown:
@@ -194,11 +198,13 @@ class CrossProcessTraceServer(TraceServerInterface):
             )
 
     # === OTEL API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.otel_export")
     def otel_export(self, req: OtelExportReq) -> OtelExportRes:
         """Export OpenTelemetry data."""
         return self._send_request("otel_export", req)
 
     # === Call API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.call_start")
     def call_start(self, req: CallStartReq) -> CallStartRes:
         """
         Start a new call by delegating to the worker thread.
@@ -211,18 +217,22 @@ class CrossProcessTraceServer(TraceServerInterface):
         """
         return self._send_request("call_start", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.call_end")
     def call_end(self, req: CallEndReq) -> CallEndRes:
         """End an existing call."""
         return self._send_request("call_end", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.call_read")
     def call_read(self, req: CallReadReq) -> CallReadRes:
         """Read call data."""
         return self._send_request("call_read", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.calls_query")
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes:
         """Query multiple calls."""
         return self._send_request("calls_query", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.calls_query_stream")
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]:
         """
         Query calls as a stream.
@@ -234,78 +244,96 @@ class CrossProcessTraceServer(TraceServerInterface):
         result = self.calls_query(req)
         return iter(result.calls)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.calls_delete")
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes:
         """Delete calls."""
         return self._send_request("calls_delete", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.calls_query_stats")
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes:
         """Query call statistics."""
         return self._send_request("calls_query_stats", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.call_update")
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes:
         """Update call data."""
         return self._send_request("call_update", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.call_start_batch")
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes:
         """Start multiple calls in a batch."""
         return self._send_request("call_start_batch", req)
 
     # === Op API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.op_create")
     def op_create(self, req: OpCreateReq) -> OpCreateRes:
         """Create an operation."""
         return self._send_request("op_create", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.op_read")
     def op_read(self, req: OpReadReq) -> OpReadRes:
         """Read operation data."""
         return self._send_request("op_read", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.ops_query")
     def ops_query(self, req: OpQueryReq) -> OpQueryRes:
         """Query operations."""
         return self._send_request("ops_query", req)
 
     # === Cost API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.cost_create")
     def cost_create(self, req: CostCreateReq) -> CostCreateRes:
         """Create cost data."""
         return self._send_request("cost_create", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.cost_query")
     def cost_query(self, req: CostQueryReq) -> CostQueryRes:
         """Query cost data."""
         return self._send_request("cost_query", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.cost_purge")
     def cost_purge(self, req: CostPurgeReq) -> CostPurgeRes:
         """Purge cost data."""
         return self._send_request("cost_purge", req)
 
     # === Obj API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.obj_create")
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes:
         """Create an object."""
         return self._send_request("obj_create", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.obj_read")
     def obj_read(self, req: ObjReadReq) -> ObjReadRes:
         """Read object data."""
         return self._send_request("obj_read", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.objs_query")
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes:
         """Query objects."""
         return self._send_request("objs_query", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.obj_delete")
     def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes:
         """Delete an object."""
         return self._send_request("obj_delete", req)
 
     # === Table API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.table_create")
     def table_create(self, req: TableCreateReq) -> TableCreateRes:
         """Create a table."""
         return self._send_request("table_create", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.table_update")
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes:
         """Update table data."""
         return self._send_request("table_update", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.table_query")
     def table_query(self, req: TableQueryReq) -> TableQueryRes:
         """Query table data."""
         return self._send_request("table_query", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.table_query_stream")
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]:
         """
         Query table rows as a stream.
@@ -317,10 +345,12 @@ class CrossProcessTraceServer(TraceServerInterface):
         result = self.table_query(req)
         return iter(result.rows)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.table_query_stats")
     def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes:
         """Query table statistics."""
         return self._send_request("table_query_stats", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.table_query_stats_batch")
     def table_query_stats_batch(
         self, req: TableQueryStatsBatchReq
     ) -> TableQueryStatsBatchRes:
@@ -328,41 +358,50 @@ class CrossProcessTraceServer(TraceServerInterface):
         return self._send_request("table_query_stats_batch", req)
 
     # === Ref API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.refs_read_batch")
     def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes:
         """Read multiple references in batch."""
         return self._send_request("refs_read_batch", req)
 
     # === File API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.file_create")
     def file_create(self, req: FileCreateReq) -> FileCreateRes:
         """Create a file."""
         return self._send_request("file_create", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.file_content_read")
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes:
         """Read file content."""
         return self._send_request("file_content_read", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.files_stats")
     def files_stats(self, req: FilesStatsReq) -> FilesStatsRes:
         """Get file statistics."""
         return self._send_request("files_stats", req)
 
     # === Feedback API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.feedback_create")
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes:
         """Create feedback."""
         return self._send_request("feedback_create", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.feedback_query")
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes:
         """Query feedback."""
         return self._send_request("feedback_query", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.feedback_purge")
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes:
         """Purge feedback."""
         return self._send_request("feedback_purge", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.feedback_replace")
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes:
         """Replace feedback."""
         return self._send_request("feedback_replace", req)
 
     # === Action API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.actions_execute_batch")
     def actions_execute_batch(
         self, req: ActionsExecuteBatchReq
     ) -> ActionsExecuteBatchRes:
@@ -370,10 +409,12 @@ class CrossProcessTraceServer(TraceServerInterface):
         return self._send_request("actions_execute_batch", req)
 
     # === Execute LLM API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.completions_create")
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes:
         """Create LLM completions."""
         return self._send_request("completions_create", req)
 
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.completions_create_stream")
     def completions_create_stream(
         self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
@@ -388,11 +429,13 @@ class CrossProcessTraceServer(TraceServerInterface):
         yield result.response
 
     # === Project statistics API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.project_stats")
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes:
         """Get project statistics."""
         return self._send_request("project_stats", req)
 
     # === Thread API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.threads_query_stream")
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]:
         """
         Query threads as a stream.
@@ -406,6 +449,7 @@ class CrossProcessTraceServer(TraceServerInterface):
         )
 
     # === Evaluation Execution API ===
+    @ddtrace.tracer.wrap(name="cross_process_trace_server.run_model")
     async def run_model(self, req: RunModelReq) -> RunModelRes:
         """
         Run a model asynchronously.
@@ -521,7 +565,11 @@ def _trace_server_worker_loop_with_context(
             # Process the request
             try:
                 method = getattr(trace_server, wrapped_request["method"])
-                result = method(wrapped_request["request"])
+                with ddtrace.tracer.trace(
+                    f"cross_process_trace_server._trace_server_worker_loop_with_context.{wrapped_request['method']}",
+                    service="cross_process_trace_server",
+                ):
+                    result = method(wrapped_request["request"])
 
                 response = ResponseWrapper(
                     request_id=wrapped_request["request_id"], result=result, error=None

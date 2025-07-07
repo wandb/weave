@@ -2067,6 +2067,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._insert_call, chunk_iter, start_call, model_name, req.project_id
         )
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.run_model")
     async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
         """
         Execute a model in an isolated process with user-specific context.
