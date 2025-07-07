@@ -31,7 +31,7 @@ from tests.trace_server.execution_runner.test_functions import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.execution_runner.run_as_user import (
     RunAsUser,
-    RunAsUserException,
+    RunAsUserError,
 )
 
 
@@ -82,7 +82,7 @@ class TestRunAsUser:
 
         req = TestRequest(value="test_error")
         # The child process will crash when the exception is raised
-        with pytest.raises(RunAsUserException, match="exit code"):
+        with pytest.raises(RunAsUserError, match="exit code"):
             await runner._run_user_scoped_function(
                 failing_function,
                 req,
@@ -105,7 +105,7 @@ class TestRunAsUser:
         )
 
         req = TestRequest(value="timeout_test", sleep_time=2.0)
-        with pytest.raises(RunAsUserException, match="timed out after 0.5 seconds"):
+        with pytest.raises(RunAsUserError, match="timed out after 0.5 seconds"):
             await runner._run_user_scoped_function(
                 timeout_function,
                 req,
@@ -126,7 +126,7 @@ class TestRunAsUser:
         )
 
         req = TestRequest(value="exit_test", exit_code=42)
-        with pytest.raises(RunAsUserException, match="exit code: 42"):
+        with pytest.raises(RunAsUserError, match="exit code: 42"):
             await runner._run_user_scoped_function(
                 exit_code_function,
                 req,
