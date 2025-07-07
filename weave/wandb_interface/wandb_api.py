@@ -487,6 +487,7 @@ class WandbApi:
 
         Args:
             project (str): The project to create
+            id (str, optional): The id of the project.  If not provided, a new project will be created.
             description (str, optional): A description of this project
             entity (str, optional): The entity to scope this project to.
         """

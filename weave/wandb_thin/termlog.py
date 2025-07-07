@@ -26,6 +26,7 @@ def termlog(
         string (str, optional): The string to print
         newline (bool, optional): Print a newline at the end of the string
         repeat (bool, optional): If set to False only prints the string once per process
+        prefix (bool, optional): If set to False, the prefix is not printed
     """
     _log(
         string=string,
