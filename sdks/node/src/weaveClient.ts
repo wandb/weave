@@ -300,10 +300,12 @@ export class WeaveClient {
     if (t == 'StringPrompt') {
       const {StringPrompt} = await import('./prompt');
 
+      const {content, description} = val;
+
       let obj = new StringPrompt({
         id: dataObj.id,
-        description: val.description,
-        content: val.content,
+        description,
+        content,
       });
 
       obj.__savedRef = ref;
@@ -314,10 +316,12 @@ export class WeaveClient {
     if (t == 'MessagesPrompt') {
       const {MessagesPrompt} = await import('./prompt');
 
+      const {description, messages} = val;
+
       let obj = new MessagesPrompt({
         id: dataObj.id,
-        description: val.description,
-        messages: val.messages,
+        description,
+        messages,
       });
 
       obj.__savedRef = ref;
@@ -333,7 +337,7 @@ export class WeaveClient {
 
       let obj = new Dataset({
         id: dataObj.id,
-        description: description,
+        description,
         rows,
       });
 

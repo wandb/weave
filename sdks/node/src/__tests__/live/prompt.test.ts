@@ -17,6 +17,16 @@ describe('Prompt', () => {
   });
 });
 
+describe('MessagesPrompt', () => {
+  test('should format a messages prompt', async () => {
+    const prompt = new MessagesPrompt({
+      messages: [{role: 'user', content: 'Hello, {name}!'}],
+    });
+    const formatted = prompt.format({name: 'John'});
+    expect(formatted).toEqual([{role: 'user', content: 'Hello, John!'}]);
+  });
+});
+
 describe('Prompt persistence', () => {
   const mockObjCreateObjCreatePost = jest.fn();
 
@@ -56,6 +66,7 @@ describe('Prompt persistence', () => {
 
     const prompt = new StringPrompt({
       content: 'Hello, {name}!',
+      description: 'A test prompt',
     });
 
     const ref = await client.publish(prompt);

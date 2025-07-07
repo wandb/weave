@@ -39,22 +39,20 @@ export class MessagesPrompt extends Prompt {
     message: Record<string, any>,
     values: Record<string, any> = {}
   ): Record<string, any> {
-    const formattedMessage: Record<string, any> = {};
-
-    for (const [key, value] of Object.entries(message)) {
-      if (typeof value === 'string') {
-        formattedMessage[key] = formatString(value, values);
-      } else if (
-        Array.isArray(value) &&
-        value.every(item => typeof item === 'object' && item !== null)
-      ) {
-        formattedMessage[key] = value.map(item =>
-          this.formatMessage(item, values)
-        );
-      } else {
-        formattedMessage[key] = value;
-      }
-    }
+    const formattedMessage = Object.fromEntries(
+      Object.entries(message).map(([key, value]) => {
+        if (typeof value === 'string') {
+          return [key, formatString(value, values)];
+        } else if (
+          Array.isArray(value) &&
+          value.every(item => typeof item === 'object' && item !== null)
+        ) {
+          return [key, value.map(item => this.formatMessage(item, values))];
+        } else {
+          return [key, value];
+        }
+      })
+    );
 
     return formattedMessage;
   }
