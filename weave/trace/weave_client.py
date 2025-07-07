@@ -2477,7 +2477,7 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
     return parallelism_main, parallelism_fastlane
 
 
-def _safe_get_wandb_run() -> wandb.Run | None:
+def _safe_get_wandb_run() -> wandb.sdk.wandb_run.Run | None:
     try:
         import wandb
     except (ImportError, ModuleNotFoundError):
