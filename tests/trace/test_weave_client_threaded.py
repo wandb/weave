@@ -30,7 +30,7 @@ def flask_server(client):
     time.sleep(2)
 
     url = f"http://{host}:{server_port}/"
-    yield url
+    return url
 
 
 def test_flask_server(flask_server):

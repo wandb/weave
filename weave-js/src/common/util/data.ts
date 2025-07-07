@@ -89,7 +89,8 @@ export function expandRangeToNElements(
   let endI: number | undefined;
 
   startI = _.sortedIndex(collection, begin);
-  endI = _.sortedIndex(collection, end);
+  // If the end is greater than the last element, set it to the last element
+  endI = Math.min(_.sortedIndex(collection, end), collection.length - 1);
 
   const itemsInRange = endI - startI + 1;
 

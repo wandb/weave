@@ -207,7 +207,7 @@ class RefFeedbackQuery(FeedbackQuery):
             except TypeError:
                 raise TypeError(
                     "annotation_ref must be a valid object ref, eg weave:///<entity>/<project>/object/<name>:<digest>"
-                )
+                ) from None
             freq.annotation_ref = annotation_ref
         response = self.client.server.feedback_create(freq)
         self.feedbacks = None  # Clear cache

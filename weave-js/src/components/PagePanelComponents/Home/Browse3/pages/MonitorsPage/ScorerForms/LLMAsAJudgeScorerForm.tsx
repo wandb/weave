@@ -417,12 +417,12 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
           </Box>
 
           <Box>
-            <FieldName name="Judge Model" />
+            <FieldName name="Judge model" />
             <LLMDropdownLoaded
               className="w-full"
               value={selectedJudgeModel || ''}
               isTeamAdmin={false}
-              direction={{horizontal: 'left', vertical: 'up'}}
+              direction={{horizontal: 'left'}}
               onChange={onJudgeModelChange}
             />
             {judgeModelError && (
@@ -436,7 +436,13 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             )}
           </Box>
           {judgeModel && (
-            <Box className="flex flex-col gap-8 rounded-md border border-moon-250 p-12">
+            <Box className="flex flex-col gap-16 rounded-md bg-moon-100 p-16">
+              <Typography
+                sx={typographyStyle}
+                className="text-sm font-semibold uppercase tracking-wide text-moon-500">
+                Model settings
+              </Typography>
+
               <Box>
                 <FieldName name="LLM ID" />
                 <Typography sx={{...typographyStyle, color: 'text.secondary'}}>
@@ -444,21 +450,21 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
                 </Typography>
               </Box>
               <Box>
-                <FieldName name="Judge Model Configuration Name" />
+                <FieldName name="Configuration name" />
                 <TextField
                   value={judgeModelName}
                   onChange={onJudgeModelNameChange}
                 />
               </Box>
               <Box>
-                <FieldName name="Judge Model System Prompt" />
+                <FieldName name="System prompt" />
                 <TextArea
                   value={systemPrompt}
                   onChange={e => onSystemPromptChange(e.target.value)}
                 />
               </Box>
               <Box>
-                <FieldName name="Judge Model Response Format" />
+                <FieldName name="Response format" />
                 <ResponseFormatSelect
                   responseFormat={
                     (responseFormat ||
@@ -470,10 +476,10 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             </Box>
           )}
           <Box>
-            <FieldName name="Scoring Prompt" />
+            <FieldName name="Scoring prompt" />
             <TextArea
               value={scoringPrompt}
-              placeholder="Enter a scoring prompt. You can use the following variables: {output} and {input}."
+              placeholder="Enter a scoring prompt. You can interpolate input and output values from your op."
               onChange={e => {
                 setScoringPrompt(e.target.value);
                 onValidationChange(
@@ -483,7 +489,7 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
             />
             {scoringPromptError && (
               <Typography
-                className="mt-1 text-sm"
+                className="mt-4 text-sm"
                 sx={{
                   ...typographyStyle,
                   color: 'error.main',
@@ -492,19 +498,18 @@ export const LLMAsAJudgeScorerForm = forwardRef<ScorerFormRef, ScorerFormProps>(
               </Typography>
             )}
             <Typography
-              className="mt-1 text-sm font-normal"
+              className="mt-4 text-sm font-normal"
               sx={{
                 ...typographyStyle,
                 color: 'text.secondary',
               }}>
               The scoring prompt will be used to score the output of your ops.
-              You can use the following variables: {'{output}'} and {'{input}'}.
-              See{' '}
+              You can interpolate input and output values from your op. See{' '}
               <Link
-                to="https://docs.wandb.ai/guides/monitors/scorers#llm-as-a-judge-scorer"
+                to="https://wandb.me/prompt-variables"
                 target="_blank"
                 className="text-blue-500">
-                docs
+                documentation
               </Link>{' '}
               for more details.
             </Typography>

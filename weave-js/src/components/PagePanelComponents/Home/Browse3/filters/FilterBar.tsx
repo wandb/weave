@@ -6,7 +6,6 @@ import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
-import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
 import {IconFilterAlt} from '../../../../Icon';
@@ -36,6 +35,12 @@ import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
 export const FILTER_INPUT_DEBOUNCE_MS = 1000;
 
+export type FieldOption = {
+  readonly value: string;
+  readonly label: string;
+  readonly description?: string;
+};
+
 type FilterBarProps = {
   entity: string;
   project: string;
@@ -44,9 +49,9 @@ type FilterBarProps = {
   columnInfo: ColumnInfo;
   selectedCalls: string[];
   clearSelectedCalls: () => void;
-
   width: number;
   height: number;
+  isGrouped?: boolean;
 };
 
 const isFilterIncomplete = (filter: GridFilterItem): boolean => {
@@ -67,6 +72,7 @@ export const FilterBar = ({
   selectedCalls,
   clearSelectedCalls,
   width,
+  isGrouped = false,
 }: FilterBarProps) => {
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
@@ -83,9 +89,6 @@ export const FilterBar = ({
   const [incompleteFilters, setIncompleteFilters] = useState<GridFilterItem[]>(
     []
   );
-
-  const {loading, userInfo} = useViewerInfo();
-  const isWandbAdmin = (!loading && userInfo?.admin) ?? false;
 
   // Merge the parent filter model with our incomplete filters
   useEffect(() => {
@@ -177,11 +180,13 @@ export const FilterBar = ({
       });
     }
   }
-  (options[0] as GroupedOption).options.unshift({
-    value: 'id',
-    label: 'Call ID',
-  });
-  if (isWandbAdmin) {
+
+  if (!isGrouped) {
+    // Add the default filters if the calls are not grouped
+    (options[0] as GroupedOption).options.push({
+      value: 'id',
+      label: 'Call ID',
+    });
     (options[0] as GroupedOption).options.push({
       value: MONITORED_FILTER_VALUE,
       label: 'Monitored',
@@ -385,9 +390,9 @@ export const FilterBar = ({
     <>
       <div
         ref={refBar}
-        className={`border-box flex h-32 cursor-pointer items-center gap-4 rounded px-8 ${
+        className={`border-box flex h-[34px] cursor-pointer items-center gap-4 rounded-md px-8 ${
           hasBorder
-            ? 'border border-moon-200 hover:border-teal-400 hover:ring-1 hover:ring-teal-400 dark:border-moon-200 dark:outline dark:outline-[1.5px] dark:outline-transparent dark:hover:border-teal-400 dark:hover:outline-teal-400'
+            ? 'border border-moon-250 hover:border-teal-350 hover:ring-1 hover:ring-teal-350 dark:border-moon-200 dark:outline dark:outline-[1.5px] dark:outline-transparent dark:hover:border-teal-400 dark:hover:outline-teal-400'
             : ''
         } ${
           !hasBorder ? 'hover:bg-teal-300/[0.48] dark:hover:bg-moon-200' : ''
@@ -396,7 +401,7 @@ export const FilterBar = ({
         <div>
           <IconFilterAlt />
         </div>
-        <div ref={refLabel} className="select-none font-semibold">
+        <div ref={refLabel} className="mr-4 select-none font-semibold">
           Filter
         </div>
         <VariableChildrenDisplay width={availableWidth} gap={8}>

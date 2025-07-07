@@ -66,7 +66,7 @@ def validate_extra(extra: list[str]) -> None:
                 except ValueError:
                     raise InvalidInternalRef(
                         f"Invalid list edge value at index {i}: {extra}"
-                    )
+                    ) from None
             pass
 
 

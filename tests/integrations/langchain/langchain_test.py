@@ -20,7 +20,7 @@ from weave.trace_server import trace_server_interface as tsi
 def ensure_tiktoken_file() -> Generator[None, None, None]:
     enc = tiktoken.get_encoding("cl100k_base")
     enc.encode("Test")
-    yield
+    return
 
 
 def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
