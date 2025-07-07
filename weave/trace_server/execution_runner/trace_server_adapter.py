@@ -84,7 +84,7 @@ def make_externalize_ref_converter(project_id: str) -> Callable[[T], T]:
         if project_id != internal_project_id:
             raise ValueError(
                 f"Project ID mismatch: {project_id} != {internal_project_id}. "
-                "This is a security issue."
+                "Stopping operation."
             )
         return SERVER_SIDE_PROJECT_ID_PREFIX + internal_project_id
 
@@ -124,7 +124,7 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         if found_project_id != self.project_id:
             raise ValueError(
                 f"Project ID mismatch: {found_project_id} != {self.project_id}. "
-                "This is a security issue."
+                "Stopping operation."
             )
         return found_project_id
 
@@ -133,7 +133,7 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         if project_id != self.project_id:
             raise ValueError(
                 f"Project ID mismatch: {project_id} != {self.project_id}. "
-                "This is a security issue."
+                "Stopping operation."
             )
         return SERVER_SIDE_PROJECT_ID_PREFIX + project_id
 
@@ -154,7 +154,7 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         if user_id != self.user_id:
             raise ValueError(
                 f"User ID mismatch: {user_id} != {self.user_id}. "
-                "This is a security issue."
+                "Stopping operation."
             )
         return user_id
 
@@ -163,7 +163,7 @@ class IdConverter(external_to_internal_trace_server_adapter.IdConverter):
         if user_id != self.user_id:
             raise ValueError(
                 f"User ID mismatch: {user_id} != {self.user_id}. "
-                "This is a security issue."
+                "Stopping operation."
             )
         return user_id
 
