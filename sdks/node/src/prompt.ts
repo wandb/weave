@@ -35,7 +35,7 @@ export class MessagesPrompt extends Prompt {
     this.messages = parameters.messages;
   }
 
-  formatMessage(
+  private formatMessage(
     message: Record<string, any>,
     values: Record<string, any> = {}
   ): Record<string, any> {
