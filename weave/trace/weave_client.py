@@ -2478,11 +2478,16 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
 
 
 def _safe_get_wandb_run() -> wandb.sdk.wandb_run.Run | None:
+    # Check if wandb is installed.  This will pass even if wandb is not installed
+    # if there is a wandb directory in the user's current directory, so the
+    # second check is required.
     try:
         import wandb
     except (ImportError, ModuleNotFoundError):
         return None
 
+    # If a wandb directory exists, but wandb is installed, `wandb.run` will raise
+    # AttributeError.  This is an artifact of how python handles imports.
     try:
         wandb_run = wandb.run
     except AttributeError:
