@@ -286,8 +286,8 @@ export class WeaveClient {
         object_id: ref.objectId,
         digest: ref.digest,
       });
-      val = res.data.obj.val;
       dataObj = res.data.obj;
+      val = dataObj.val;
     } catch (error) {
       if (error instanceof Error && error.message.includes('404')) {
         throw new Error(`Unable to find object for ref uri: ${ref.uri()}`);
@@ -328,13 +328,17 @@ export class WeaveClient {
     if (t == 'Dataset') {
       // Avoid circular dependency
       const {Dataset} = await import('./dataset');
-      const {_baseParameters, rows} = val;
+
+      const {description, rows} = val;
+
       let obj = new Dataset({
-        id: _baseParameters.id,
-        description: _baseParameters.description,
+        id: dataObj.id,
+        description: description,
         rows,
       });
+
       obj.__savedRef = ref;
+
       // TODO: The table row refs are not correct
       return obj;
     } else if (t == 'Table') {
