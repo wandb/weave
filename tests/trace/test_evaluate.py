@@ -4,6 +4,7 @@ import time
 from unittest.mock import patch
 
 import pytest
+from pydantic import BaseModel
 
 import weave
 from weave import Dataset, Evaluation, Model
@@ -159,7 +160,7 @@ def test_score_with_custom_summarize(client):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "scorers,expected_output_key",
+    ("scorers", "expected_output_key"),
     [
         # All scorer styles
         (
@@ -386,6 +387,8 @@ def test_evaluate_table_lazy_iter(client, monkeypatch):
     log = client.server.attribute_access_log
     assert [l for l in log if not l.startswith("_")] == [
         "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
         "table_create",
         "obj_create",
         "obj_read",
@@ -487,3 +490,25 @@ def test_evaluate_table_order(client):
     scores = [c.output["scores"]["score_simple"] for c in predict_and_score_calls]
     assert all(scores)
     assert len(scores) == 5
+
+
+def test_evaluate_with_pydantic_summary(client):
+    class MyScorerSummary(BaseModel):
+        awesome: int
+
+    class MyScorer(weave.Scorer):
+        @weave.op()
+        def score(self, target, output):
+            return target == output
+
+        @weave.op()
+        def summarize(self, score_rows):
+            return MyScorerSummary(awesome=3)
+
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[MyScorer()],
+    )
+    model = EvalModel()
+    result = asyncio.run(evaluation.evaluate(model))
+    assert result["MyScorer"].awesome == 3

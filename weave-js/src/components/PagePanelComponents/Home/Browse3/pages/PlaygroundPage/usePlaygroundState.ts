@@ -50,6 +50,7 @@ const DEFAULT_PLAYGROUND_STATE = {
   model: DEFAULT_LLM_MODEL,
   selectedChoiceIndex: 0,
   savedModel: DEFAULT_SAVED_MODEL,
+  jsonSchema: undefined,
 };
 
 type NumericPlaygroundStateKey =
@@ -88,10 +89,26 @@ const NUMERIC_SETTINGS_MAPPING: Record<
   },
 };
 
-export const usePlaygroundState = () => {
-  const [playgroundStates, setPlaygroundStates] = useState<PlaygroundState[]>([
-    DEFAULT_PLAYGROUND_STATE,
-  ]);
+const getDefaultModelState = (modelId: LLMMaxTokensKey): PlaygroundState => {
+  return {
+    ...DEFAULT_PLAYGROUND_STATE,
+    model: modelId,
+  };
+};
+
+const getDefaultModelsState = (
+  defaultModelIds: LLMMaxTokensKey[]
+): PlaygroundState[] => {
+  if (defaultModelIds.length === 0) {
+    return [DEFAULT_PLAYGROUND_STATE];
+  }
+  return defaultModelIds.map(modelId => getDefaultModelState(modelId));
+};
+
+export const usePlaygroundState = (defaultModelIds: LLMMaxTokensKey[]) => {
+  const [playgroundStates, setPlaygroundStates] = useState<PlaygroundState[]>(
+    getDefaultModelsState(defaultModelIds)
+  );
 
   const setPlaygroundStateField = useCallback(
     (
@@ -138,11 +155,69 @@ export const usePlaygroundState = () => {
             }
           }
         }
+        // We need to handle many different response format types
         if (inputs.response_format) {
-          newState.responseFormat =
-            inputs.response_format.type in PlaygroundResponseFormats
+          const responseFormats = Object.values(PlaygroundResponseFormats);
+
+          // String response format
+          if (
+            typeof inputs.response_format === 'string' &&
+            responseFormats.includes(
+              inputs.response_format as PlaygroundResponseFormats
+            )
+          ) {
+            newState.responseFormat =
+              inputs.response_format as PlaygroundResponseFormats;
+          }
+
+          // Object response format
+          // Where the response format is an object with a type property
+          if (inputs.response_format.type) {
+            newState.responseFormat = responseFormats.includes(
+              inputs.response_format.type
+            )
               ? inputs.response_format.type
               : PlaygroundResponseFormats.Text;
+          }
+          if (newState.responseFormat !== PlaygroundResponseFormats.Text) {
+            newState.jsonSchema = JSON.stringify(
+              inputs.response_format,
+              null,
+              2
+            );
+          }
+
+          // JsonSchema response format
+          // Where the response format is an object with no type property
+          // Assume it's a json schema e.g. something like this:
+          // {
+          //   "properties": {
+          //     "corrected_sentence": {
+          //       "title": "Corrected Sentence",
+          //       "type": "string"
+          //     }
+          //   },
+          //   "required": [
+          //     "corrected_sentence"
+          //   ],
+          //   "title": "ReturnFormat",
+          //   "type": "object"
+          // }
+          if (typeof inputs.response_format === 'object') {
+            newState.responseFormat = PlaygroundResponseFormats.JsonSchema;
+            newState.jsonSchema = JSON.stringify(
+              {
+                type: PlaygroundResponseFormats.JsonSchema,
+                json_schema: {
+                  name: 'my_schema',
+                  strict: true,
+                  schema: inputs.response_format,
+                },
+              },
+              null,
+              2
+            );
+          }
         }
         for (const [key, value] of Object.entries(NUMERIC_SETTINGS_MAPPING)) {
           if (inputs[value.pythonValue] !== undefined) {
@@ -206,7 +281,9 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
       state.responseFormat === PlaygroundResponseFormats.Text
         ? undefined
         : {
-            type: state.responseFormat,
+            ...(state.jsonSchema
+              ? JSON.parse(state.jsonSchema)
+              : {type: state.responseFormat}),
           },
     tools: tools.length > 0 ? tools : undefined,
   };

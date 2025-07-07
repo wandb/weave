@@ -174,6 +174,13 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Monitors',
+            slug: 'weave/monitors',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.JobAutomation,
+          },
+          {
+            type: 'button' as const,
             name: 'Prompts',
             slug: 'weave/prompts',
             isShown: isWeaveOnly,

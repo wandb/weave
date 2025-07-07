@@ -3,6 +3,12 @@ import TabItem from '@theme/TabItem';
 
 # Track LLM inputs & outputs
 
+:::tip
+For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave [Playground](./guides/tools/playground.md). 
+- [Developer documentation](./guides/integrations/inference.md)
+- [Product page](https://wandb.ai/site/inference) 
+:::
+
 <!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
 
 Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
@@ -94,13 +100,9 @@ _In this example, we're using openai so you will need to add an OpenAI [API key]
     // highlight-next-line
     import * as weave from 'weave';
     
-    With the new change this manual wrapping is no longer needed. We might need to add a link to the full set up guide.
     // highlight-next-line
     const openai = new OpenAI();
-    // In some cases, you may still need to use manual instrumentation:
-    // const openai = wrapOpenAI(new OpenAI());
-    // See the JS Integration guide for more information
-
+  
     async function extractDinos(input: string) {
       const response = await openai.chat.completions.create({
         model: 'gpt-4o',

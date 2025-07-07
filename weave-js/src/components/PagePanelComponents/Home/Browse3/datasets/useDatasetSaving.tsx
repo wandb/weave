@@ -1,3 +1,4 @@
+import {makeRefObject} from '@wandb/weave/util/refs';
 import React from 'react';
 import {toast} from 'react-toastify';
 
@@ -9,7 +10,8 @@ import {DatasetPublishToast} from './DatasetPublishToast';
 interface UseDatasetSavingOptions {
   entity: string;
   project: string;
-  onSaveComplete?: () => void;
+  onSaveComplete?: (datasetRef?: string) => void;
+  showToast?: boolean;
 }
 
 interface DatasetSavingResult {
@@ -25,6 +27,7 @@ export const useDatasetSaving = ({
   entity,
   project,
   onSaveComplete,
+  showToast = true,
 }: UseDatasetSavingOptions): DatasetSavingResult => {
   const [isCreatingDataset, setIsCreatingDataset] = React.useState(false);
   const router = useWeaveflowCurrentRouteContext();
@@ -37,6 +40,7 @@ export const useDatasetSaving = ({
   const handleSaveDataset = React.useCallback(
     async (name: string, rows: any[]) => {
       setIsCreatingDataset(true);
+      let datasetRef: undefined | string = undefined;
       try {
         // Create the dataset using the actual API function
         const result = await createNewDataset({
@@ -50,29 +54,40 @@ export const useDatasetSaving = ({
           router,
         });
 
-        // Show success message with link to the new dataset
-        toast(
-          <DatasetPublishToast
-            message={'Dataset created successfully!'}
-            url={result.url}
-          />,
-          {
-            position: 'top-right',
-            autoClose: 5000,
-            hideProgressBar: true,
-            closeOnClick: true,
-            pauseOnHover: true,
-          }
+        datasetRef = makeRefObject(
+          entity,
+          project,
+          'object',
+          result.objectId,
+          result.objectDigest,
+          undefined
         );
+
+        // Show success message with link to the new dataset
+        if (showToast) {
+          toast(
+            <DatasetPublishToast
+              message={'Dataset created successfully!'}
+              url={result.url}
+            />,
+            {
+              position: 'top-right',
+              autoClose: 5000,
+              hideProgressBar: true,
+              closeOnClick: true,
+              pauseOnHover: true,
+            }
+          );
+        }
       } catch (error: any) {
         console.error('Failed to create dataset:', error);
         toast.error(`Failed to create dataset: ${error.message}`);
       } finally {
         setIsCreatingDataset(false);
-        onSaveComplete?.();
+        onSaveComplete?.(datasetRef);
       }
     },
-    [entity, project, tableCreate, objCreate, router, onSaveComplete]
+    [entity, project, tableCreate, objCreate, router, onSaveComplete, showToast]
   );
 
   return {

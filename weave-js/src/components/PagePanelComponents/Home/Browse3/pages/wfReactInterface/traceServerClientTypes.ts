@@ -83,6 +83,8 @@ export type TraceCallSchema = {
   wb_run_id?: string;
   wb_user_id?: string;
   total_storage_size_bytes?: number;
+  thread_id?: string;
+  turn_id?: string;
 };
 export type TraceCallReadReq = {
   project_id: string;
@@ -108,6 +110,7 @@ interface TraceCallsFilter {
   trace_roots_only?: boolean;
   wb_run_ids?: string[];
   wb_user_ids?: string[];
+  turn_ids?: string[];
 }
 
 export type SortBy = {field: string; direction: 'asc' | 'desc'};
@@ -123,6 +126,7 @@ export type TraceCallsQueryReq = {
   expand_columns?: string[];
   include_costs?: boolean;
   include_feedback?: boolean;
+  include_storage_size?: boolean;
   include_total_storage_size?: boolean;
 };
 
@@ -211,6 +215,7 @@ export type FeedbackPurgeError = {
 export type FeedbackPurgeRes = FeedbackPurgeSuccess | FeedbackPurgeError;
 interface TraceObjectsFilter {
   base_object_classes?: string[];
+  leaf_object_classes?: string[];
   object_ids?: string[];
   is_op?: boolean;
   latest_only?: boolean;
@@ -238,6 +243,7 @@ export interface TraceObjSchema<
   is_latest: number;
   kind: 'op' | 'object';
   base_object_class?: OBC;
+  leaf_object_class?: OBC;
   val: T;
   wb_user_id?: string;
   size_bytes?: number;
@@ -530,4 +536,33 @@ export type TableSchemaForInsert = {
 export type TableCreateRes = {
   digest: string;
   row_digests: string[];
+};
+
+// Thread API types
+export type ThreadSchema = {
+  thread_id: string;
+  turn_count: number;
+  start_time: string;
+  last_updated: string;
+  first_turn_id?: string;
+  last_turn_id?: string;
+  p50_turn_duration_ms?: number;
+  p99_turn_duration_ms?: number;
+};
+
+export type ThreadsQueryFilter = {
+  after_datetime?: string;
+  before_datetime?: string;
+};
+
+export type ThreadsQueryReq = {
+  project_id: string;
+  filter?: ThreadsQueryFilter;
+  limit?: number;
+  offset?: number;
+  sort_by?: SortBy[];
+};
+
+export type ThreadsQueryRes = {
+  threads: ThreadSchema[];
 };

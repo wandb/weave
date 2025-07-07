@@ -180,7 +180,7 @@ export async function renderScreenshot(
 }
 
 export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
-  const {scene, context} = result;
+  const {scene, context, cleanup} = result;
   const {canvas, engine} = context;
 
   // canvas elements can't contain other html elements, so we create
@@ -190,7 +190,10 @@ export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
   fullScreenElement.style.height = '100%';
   fullScreenElement.style.width = '100%';
 
-  result.request.domElement.appendChild(fullScreenElement);
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+
+  document.body.appendChild(fullScreenElement);
   fullScreenElement.appendChild(canvas);
   canvas.width = window.screen.width;
   canvas.height = window.screen.height;
@@ -205,7 +208,12 @@ export async function renderFullscreen(result: RenderResult<RenderFullscreen>) {
   });
 
   onNextExitFullscreen(() => {
+    cleanup?.();
     canvas.remove();
+    fullScreenElement.remove();
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
   });
 
   try {
@@ -532,7 +540,8 @@ const pointCloudScene = (
       textBlock.linkOffsetY = -20;
     }
 
-    lines.color = new Color3(...color);
+    // Babylon expects colors in the range 0-1 but our sdk is expecting 0-255. So convert it here.
+    lines.color = new Color3(color[0] / 255, color[1] / 255, color[2] / 255);
   });
 
   itemsInScene.push(pcMesh);

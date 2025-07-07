@@ -98,6 +98,10 @@ class CallSchema(BaseModel):
     trace_id: str
     # Parent ID is optional because the call may be a root
     parent_id: Optional[str] = None
+    # Thread ID is optional
+    thread_id: Optional[str] = None
+    # Turn ID is optional
+    turn_id: Optional[str] = None
 
     # Start time is required
     started_at: datetime.datetime
@@ -122,6 +126,7 @@ class CallSchema(BaseModel):
     # WB Metadata
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
     deleted_at: Optional[datetime.datetime] = None
 
@@ -152,6 +157,10 @@ class StartedCallSchemaForInsert(BaseModel):
     trace_id: Optional[str] = None  # Will be generated if not provided
     # Parent ID is optional because the call may be a root
     parent_id: Optional[str] = None
+    # Thread ID is optional
+    thread_id: Optional[str] = None
+    # Turn ID is optional
+    turn_id: Optional[str] = None
 
     # Start time is required
     started_at: datetime.datetime
@@ -164,6 +173,7 @@ class StartedCallSchemaForInsert(BaseModel):
     # WB Metadata
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
 
 class EndedCallSchemaForInsert(BaseModel):
@@ -197,6 +207,7 @@ class ObjSchema(BaseModel):
     is_latest: int
     kind: str
     base_object_class: Optional[str]
+    leaf_object_class: Optional[str] = None
     val: Any
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -358,6 +369,8 @@ class CallsFilter(BaseModel):
     parent_ids: Optional[list[str]] = None
     trace_ids: Optional[list[str]] = None
     call_ids: Optional[list[str]] = None
+    thread_ids: Optional[list[str]] = None
+    turn_ids: Optional[list[str]] = None
     trace_roots_only: Optional[bool] = None
     wb_user_ids: Optional[list[str]] = None
     wb_run_ids: Optional[list[str]] = None
@@ -506,6 +519,11 @@ class ObjectVersionFilter(BaseModel):
         default=None,
         description="Filter objects by their base classes",
         examples=[["Model"], ["Dataset"]],
+    )
+    leaf_object_classes: Optional[list[str]] = Field(
+        default=None,
+        description="Filter objects by their leaf classes",
+        examples=[["Model"], ["Dataset"], ["LLMStructuredCompletionModel"]],
     )
     object_ids: Optional[list[str]] = Field(
         default=None,
@@ -1024,6 +1042,72 @@ class ProjectStatsRes(BaseModel):
     files_storage_size_bytes: int
 
 
+# Thread API
+
+
+class ThreadSchema(BaseModel):
+    thread_id: str
+    turn_count: int = Field(description="Number of turn calls in this thread")
+    start_time: datetime.datetime = Field(
+        description="Earliest start time of turn calls in this thread"
+    )
+    last_updated: datetime.datetime = Field(
+        description="Latest end time of turn calls in this thread"
+    )
+    first_turn_id: Optional[str] = Field(
+        description="Turn ID of the first turn in this thread (earliest start_time)"
+    )
+    last_turn_id: Optional[str] = Field(
+        description="Turn ID of the latest turn in this thread (latest end_time)"
+    )
+    p50_turn_duration_ms: Optional[float] = Field(
+        description="50th percentile (median) of turn durations in milliseconds within this thread"
+    )
+    p99_turn_duration_ms: Optional[float] = Field(
+        description="99th percentile of turn durations in milliseconds within this thread"
+    )
+
+
+class ThreadsQueryFilter(BaseModel):
+    after_datetime: Optional[datetime.datetime] = Field(
+        default=None,
+        description="Only include threads with start_time after this timestamp",
+        examples=["2024-01-01T00:00:00Z"],
+    )
+    before_datetime: Optional[datetime.datetime] = Field(
+        default=None,
+        description="Only include threads with last_updated before this timestamp",
+        examples=["2024-12-31T23:59:59Z"],
+    )
+
+
+class ThreadsQueryReq(BaseModel):
+    """
+    Query threads with aggregated statistics based on turn calls only.
+
+    Turn calls are the immediate children of thread contexts (where call.id == turn_id).
+    This provides meaningful conversation-level statistics rather than including all
+    nested implementation details.
+    """
+
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+    filter: Optional[ThreadsQueryFilter] = Field(
+        default=None,
+        description="Filter criteria for the threads query",
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of threads to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of threads to skip")
+    sort_by: Optional[list[SortBy]] = Field(
+        default=None,
+        description="Sorting criteria for the threads. Supported fields: 'thread_id', 'turn_count', 'start_time', 'last_updated', 'p50_turn_duration_ms', 'p99_turn_duration_ms'.",
+        examples=[[SortBy(field="last_updated", direction="desc")]],
+    )
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1102,3 +1186,6 @@ class TraceServerInterface(Protocol):
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
+
+    # Thread API
+    def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...

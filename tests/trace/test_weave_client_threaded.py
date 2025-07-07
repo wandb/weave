@@ -30,14 +30,14 @@ def flask_server(client):
     time.sleep(2)
 
     url = f"http://{host}:{server_port}/"
-    yield url
+    return url
 
 
 def test_flask_server(flask_server):
     url = flask_server
     response = requests.get(url)
     assert response.status_code == 200
-    assert response.text == "tiRVKBWTP7LOwjBEqe79WFS7HEibm1WG8nfe94VWZBo"
+    assert response.text == "0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A"
 
 
 def test_weave_client_global_accessible_in_thread(client):
