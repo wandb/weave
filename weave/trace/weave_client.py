@@ -2483,7 +2483,7 @@ def safe_current_wb_run_id() -> str | None:
         wandb_run = wandb.run
         if wandb_run is None:
             return None
-    except ImportError:
+    except (ImportError, ModuleNotFoundError, AttributeError):
         return None
     else:
         return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
@@ -2496,7 +2496,7 @@ def safe_current_wb_run_step() -> int | None:
         wandb_run = wandb.run
         if wandb_run is None:
             return None
-    except ImportError:
+    except (ImportError, ModuleNotFoundError, AttributeError):
         return None
     else:
         try:
