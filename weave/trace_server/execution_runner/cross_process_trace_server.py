@@ -36,7 +36,7 @@ CONTEXT_VARS_TO_PROPAGATE: list[contextvars.ContextVar] = [
 ]
 
 # Default timeout for request/response cycles
-TIMEOUT_SECONDS = 60.0
+TIMEOUT_SECONDS = 10.0
 
 
 class RequestWrapper(TypedDict):
@@ -79,6 +79,15 @@ class CrossProcessTraceServer(TraceServerInterface):
 
     The actual trace server runs in a separate thread (in the parent process)
     and this class can be used from child processes to communicate with it.
+
+    Typical construction looks like:
+    ```python
+    ts = build_child_process_trace_server(
+        generate_child_process_trace_server_args(
+            wrapped_trace_server
+        )
+    )
+    ```
     """
 
     def __init__(
@@ -127,7 +136,7 @@ class CrossProcessTraceServer(TraceServerInterface):
         """
         while not self._shutdown:
             try:
-                response = self._response_queue.get(timeout=0.1)
+                response = self._response_queue.get(timeout=0.5)
                 request_id = response["request_id"]
 
                 with self._lock:
@@ -138,7 +147,7 @@ class CrossProcessTraceServer(TraceServerInterface):
                 continue
             except Exception as e:
                 # Log error but continue handling responses
-                logger.exception(f"Error handling response: {e}")
+                logger.warning(f"Error handling response: {e}")
 
     @ddtrace.tracer.wrap(name="cross_process_trace_server._send_request")
     def _send_request(self, method: str, request: Any) -> Any:
