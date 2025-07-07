@@ -6,6 +6,7 @@ import { HStack } from '../../../LayoutElements';
 import { Button, ButtonVariants } from '@wandb/weave/components/Button';
 import { Tailwind } from '@wandb/weave/components/Tailwind';
 import { WeaveDocumentSchema } from './schemas';
+import { ObjectViewerSection } from './MetadataTable';
 
 interface DropdownSectionProps {
   title: string;
@@ -121,7 +122,8 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({ doc }) => {
         </Typography>
         {metadata && (
           <DropdownSection title={"Metadata"} defaultExpanded={false}>
-            <MetadataTable data={metadata} />
+           {/* <MetadataTable data={metadata} /> */} 
+           <ObjectViewerSection title={"Metadata"} data={metadata} noHide={true} isExpanded={false} collapseTitle={true} />
           </DropdownSection>
         )}
       </div>
