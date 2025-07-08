@@ -296,11 +296,7 @@ class OpCallSpec(BaseModel):
     run_calls: int
 
 
-def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
-    # @weave.type()
-    # class Number:
-    #     value: int
-
+def simple_line_call_bootstrap() -> OpCallSpec:
     class Number(weave.Object):
         value: int
 

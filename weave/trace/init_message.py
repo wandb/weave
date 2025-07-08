@@ -53,11 +53,12 @@ def _print_wandb_version_check() -> None:
     if not wandb_messages:
         return
 
-    # Don't print the upgrade message, only the delete or yank message
-    use_message = wandb_messages.get("delete_message") or wandb_messages.get(
-        "yank_message"
-    )  #  or wandb_messages.get("upgrade_message")
-    if not use_message:
+    use_message = (
+        wandb_messages.get("delete_message")
+        or wandb_messages.get("yank_message")
+        or wandb_messages.get("upgrade_message")
+    )
+    if use_message:
         logger.info(use_message)
 
 

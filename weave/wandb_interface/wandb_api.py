@@ -479,7 +479,6 @@ class WandbApi:
     def upsert_project(
         self,
         project: str,
-        id: Optional[str] = None,
         description: Optional[str] = None,
         entity: Optional[str] = None,
     ) -> dict[str, Any]:
@@ -495,7 +494,6 @@ class WandbApi:
             name=project,
             entity=entity,
             description=description,
-            id=id,
         )
 
 

@@ -131,7 +131,7 @@ langchain_nvidia_ai_endpoints = [
 ]
 litellm = ["litellm>=1.36.1,<=1.73.6"]
 # temporary max pin b/c 0.12.0 changes call structure and therefor tests
-llamaindex = ["llama-index>=0.10.35,<0.12.0", "openai<1.92.0"]
+llamaindex = ["llama-index>=0.10.35,<0.13.0", "openai<1.92.0"]
 mistral = ["mistralai>=1.0.0"]
 scorers = [
   "numpy>1.21.0",
@@ -155,6 +155,9 @@ modal = ["modal", "python-dotenv"]
 mcp = ["mcp[cli]>=1.6.0,<1.10.0"]
 vertexai = ["vertexai>=1.70.0", "shapely<=2.0.6"] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
+autogen = ["autogen-agentchat>=0.5.7"]
+autogen_tests = ["autogen-agentchat>=0.5.7", "autogen-ext[openai]>=0.5.7"]
+
 test = [
   "nox",
   "pytest>=8.2.0",
