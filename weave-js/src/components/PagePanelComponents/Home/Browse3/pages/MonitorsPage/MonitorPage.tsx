@@ -1,6 +1,7 @@
 import {Box, Typography} from '@mui/material';
 import {GridFilterItem} from '@mui/x-data-grid-pro';
-import {Button, ButtonVariants} from '@wandb/weave/components/Button';
+import {ButtonVariants} from '@wandb/weave/components/Button';
+import {TrackedButton} from '@wandb/weave/components/Button/TrackedButton';
 import {IconNames} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {BooleanIcon} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValueBoolean';
@@ -34,6 +35,7 @@ import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
 import {UserLink} from '@wandb/weave/components/UserLink';
 import {maybePluralizeWord} from '@wandb/weave/core/util/string';
+import {useObjectViewEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import {parseRef} from '@wandb/weave/react';
 import React, {useCallback, useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
@@ -45,8 +47,15 @@ const MONITOR_VERSIONS_SORT_KEY: SortBy[] = [
 ];
 const typographyStyle = {fontFamily: 'Source Sans Pro'};
 
-export const MonitorPage = (props: {objectName: string; version: string}) => {
+export const MonitorPage = (props: {
+  objectName: string;
+  version: string;
+  objectVersion: ObjectVersionSchema;
+}) => {
+  useObjectViewEvent(props.objectVersion);
+
   const {entity, project} = useEntityProject();
+
   const monitorVersionFilter = useMemo(
     () => ({
       objectIds: [props.objectName],
@@ -87,22 +96,30 @@ const MonitorPageInner = ({
   monitorVersions: ObjectVersionSchema[];
 }) => {
   const {entity, project} = useEntityProject();
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const allVersionRefs = useMemo(() => {
-    return monitorVersions.map(v => objectVersionKeyToRefUri(v));
-  }, [monitorVersions]);
+
+  const allVersionsSchema = useMemo(
+    () => ({...monitorVersions[0], versionHash: '*'}),
+    [monitorVersions]
+  );
+
+  const allVersionsRef = useMemo(
+    () => objectVersionKeyToRefUri(allVersionsSchema),
+    [allVersionsSchema]
+  );
 
   const callsFilterModel = useMemo(
     () => ({
       items: [
         {
           field: MONITORED_FILTER_VALUE,
-          operator: '(string): in',
-          value: allVersionRefs,
+          operator: '(monitored): by',
+          value: allVersionsRef,
         },
       ],
     }),
-    [allVersionRefs]
+    [allVersionsRef]
   );
 
   const filterItems: GridFilterItem[] = useMemo(
@@ -123,16 +140,10 @@ const MonitorPageInner = ({
     history.push(url);
   }, [baseRouter, history, callsFilterModel, entity, project]);
 
-  const callCountQuery: Query = useMemo(() => {
-    const allVersionRefOperands = allVersionRefs.map(versionRefUri => ({
-      $literal: versionRefUri,
-    }));
-    return {
-      $expr: {
-        $in: [{$getField: MONITORED_FILTER_VALUE}, allVersionRefOperands],
-      },
-    };
-  }, [allVersionRefs]);
+  const callCountQuery: Query = useMemo(
+    () => matchAllMonitorVersionsQuery(allVersionsRef),
+    [allVersionsRef]
+  );
 
   const {result: callCountResult} = useCallsStats({
     entity,
@@ -143,14 +154,6 @@ const MonitorPageInner = ({
 
   const handleEditClick = useCallback(() => setIsDrawerOpen(true), []);
   const handleCloseDrawer = useCallback(() => setIsDrawerOpen(false), []);
-
-  const monitorVersionForDelete = useMemo(() => {
-    return {
-      ...monitorVersions[0],
-      // We want to delete all versions of the monitor
-      versionHash: '*',
-    };
-  }, [monitorVersions]);
 
   return (
     <>
@@ -186,17 +189,19 @@ const MonitorPageInner = ({
                 </div>
               )}
               <div className="ml-auto flex-shrink-0">
-                <Button
+                <TrackedButton
                   title="Edit monitor"
                   tooltip="Edit monitor"
                   variant="ghost"
                   size="medium"
                   icon="pencil-edit"
                   onClick={handleEditClick}
-                />
+                  trackedName="edit-monitor">
+                  Edit monitor
+                </TrackedButton>
                 <DeleteObjectButtonWithModal
                   overrideDisplayStr={monitorVersions[0].val['name']}
-                  objVersionSchema={monitorVersionForDelete}
+                  objVersionSchema={allVersionsSchema}
                 />
               </div>
             </div>
@@ -284,12 +289,13 @@ const MonitorPageInner = ({
                         </>
                       )}
                     </span>
-                    <Button
+                    <TrackedButton
                       variant={ButtonVariants.Secondary}
                       icon={IconNames.Table}
-                      onClick={onGoToTableClick}>
+                      onClick={onGoToTableClick}
+                      trackedName="go-to-table-from-monitor">
                       Go to table
-                    </Button>
+                    </TrackedButton>
                   </Box>
                   <CallsTable
                     hideControls
@@ -312,3 +318,14 @@ const MonitorPageInner = ({
     </>
   );
 };
+
+export function matchAllMonitorVersionsQuery(monitorRef: string): Query {
+  return {
+    $expr: {
+      $contains: {
+        input: {$getField: MONITORED_FILTER_VALUE},
+        substr: {$literal: `${monitorRef.split(':').slice(0, -1).join(':')}:`},
+      },
+    },
+  };
+}

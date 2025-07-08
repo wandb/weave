@@ -30,18 +30,23 @@ import {queryToGridFilterModel} from '@wandb/weave/components/PagePanelComponent
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {
   useObjCreate,
-  useRootObjectVersions,
+  useObjectVersion,
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
-import {ObjectVersionSchema} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
+import {
+  ObjectVersionKey,
+  ObjectVersionSchema,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 import {
   Root as SwitchRoot,
   Thumb as SwitchThumb,
 } from '@wandb/weave/components/Switch';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {parseRef} from '@wandb/weave/react';
+import {newMonitorCreated} from '@wandb/weave/integrations/analytics/monitorEvents';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {toast} from 'react-toastify';
 import {useList} from 'react-use';
+
+import {refUriToObjectVersionKey} from '../wfReactInterface/utilities';
 
 const PAGE_SIZE = 10;
 const PAGE_OFFSET = 0;
@@ -66,7 +71,10 @@ const SCORER_FORMS: Map<string, ScorerFormType | null> = new Map([
 ]);
 
 export const MonitorDrawerRouter = (props: MonitorFormDrawerProps) => {
-  if (props.monitor) {
+  // Empty props.monitor.val['scorers'] should not happen but some such monitors
+  // were persisted in the DB due to an early bug.
+  // Fixed here: https://github.com/wandb/weave/pull/4945
+  if (props.monitor && props.monitor.val['scorers'].length > 0) {
     return (
       <EditMonitorDrawerWithScorers {...props} monitor={props.monitor} /> // Repeating monitor to appease type checking
     );
@@ -77,27 +85,20 @@ export const MonitorDrawerRouter = (props: MonitorFormDrawerProps) => {
 const EditMonitorDrawerWithScorers = (
   props: MonitorFormDrawerProps & {monitor: ObjectVersionSchema}
 ) => {
-  const {entity, project} = useEntityProject();
-  const scorerIds: string[] = useMemo(() => {
-    return (
-      props.monitor.val['scorers'].map(
-        (scorerRefUri: string) => parseRef(scorerRefUri).artifactName
-      ) || []
-    );
-  }, [props.monitor]);
+  // Supporting only one scorer for now
+  const scorerVersionKey: ObjectVersionKey = useMemo(
+    () => refUriToObjectVersionKey(props.monitor.val['scorers'][0])!,
+    [props.monitor]
+  );
 
-  const {result: scorers, loading} = useRootObjectVersions({
-    entity,
-    project,
-    filter: {
-      objectIds: scorerIds,
-      latestOnly: true,
-    },
+  const {result: scorer, loading: scorerLoading} = useObjectVersion({
+    key: scorerVersionKey,
   });
-  return loading || !scorers ? (
+
+  return scorerLoading || !scorer ? (
     <WaveLoader size="huge" />
   ) : (
-    <MonitorFormDrawer {...props} scorers={scorers} />
+    <MonitorFormDrawer {...props} scorers={[scorer]} />
   );
 };
 
@@ -132,7 +133,7 @@ export const MonitorFormDrawer = ({
 
   const {useCalls} = useWFHooks();
 
-  const [scorers, {set: setScorers}] = useList<ObjectVersionSchema>(
+  const [scorers] = useList<ObjectVersionSchema>(
     existingScorers || [
       {
         scheme: 'weave',
@@ -169,7 +170,6 @@ export const MonitorFormDrawer = ({
     });
     setFilterModel(queryToGridFilterModel(monitor.val['query']) ?? {items: []});
     setSelectedOpVersionOption(monitor.val['op_names'] ?? []);
-    setScorers(existingScorers ?? []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monitor]);
 
@@ -313,6 +313,10 @@ export const MonitorFormDrawer = ({
       });
 
       setIsCreating(false);
+
+      if (!monitor) {
+        newMonitorCreated({entity, project, monitorName});
+      }
 
       toast.success(
         `Monitor ${monitorName} ${monitor ? 'updated' : 'created'}`,

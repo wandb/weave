@@ -34,6 +34,7 @@ from weave.trace.refs import (
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
     DeletedRef,
+    TableRef,
 )
 from weave.trace.serialization.serializer import (
     get_serializer_for_obj,
@@ -136,14 +137,14 @@ def test_table_update(client):
     assert check_res.digest == table_create_res.digest
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_table_append(server):
     table_ref = server.new_table([1, 2, 3])
     new_table_ref, item_id = server.table_append(table_ref, 4)
     assert [r.val for r in server.table_query(new_table_ref)] == [1, 2, 3, 4]
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_table_remove(server):
     table_ref0 = server.new_table([1])
     table_ref1, item_id2 = server.table_append(table_ref0, 2)
@@ -152,23 +153,23 @@ def test_table_remove(server):
     assert [r.val for r in server.table_query(table_ref3)] == [1, 3]
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def new_val_single(server):
     obj_id = server.new_val(42)
     assert server.get(obj_id) == 42
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_new_val_with_list(server):
     ref = server.new_val({"a": [1, 2, 3]})
     server_val = server.get_val(ref)
     table_ref = server_val["a"]
-    assert isinstance(table_ref, chobj.TableRef)
+    assert isinstance(table_ref, TableRef)
     table_val = server.table_query(table_ref)
     assert [r.val for r in table_val] == [1, 2, 3]
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_object(server):
     obj_ref = server.new_object({"a": 43}, "my-obj", "latest")
     val_ref = server._resolve_object("my-obj", "latest")
@@ -739,7 +740,7 @@ def test_dataset_calls(client):
     assert calls[1].inputs["a"] == "yy"
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_mutations(client):
     dataset = client.save(
         weave.Dataset(
@@ -801,7 +802,7 @@ def test_mutations(client):
     assert new_ds_rows[2] == {"doc": "zz", "label": "e"}
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_stable_dataset_row_refs(client):
     dataset = client.save(
         weave.Dataset(
@@ -887,12 +888,12 @@ def test_object_mismatch_project_ref_nested(client):
     res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
     assert len(res.objs) == 2
 
-    op = [x for x in res.objs if x.kind == "op"][0]
+    op = next(x for x in res.objs if x.kind == "op")
     assert op.object_id == "hello_world"
     assert op.project_id == "shawn/test-project2"
     assert op.kind == "op"
 
-    obj = [x for x in res.objs if x.kind == "object"][0]
+    obj = next(x for x in res.objs if x.kind == "object")
     assert obj.object_id == "my-object"
     assert obj.project_id == "shawn/test-project2"
 
@@ -1316,7 +1317,7 @@ def test_summary_tokens(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert call.summary["usage"] == {
         "model_a": {"requests": 2, "prompt_tokens": 10, "completion_tokens": 16},
@@ -1360,7 +1361,7 @@ def test_summary_descendents(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello error: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert list(call.summary["descendants"].items()) == [
         (ObjectRefStrMatcher(name="model_a"), {"successes": 2, "errors": 0}),
@@ -1498,7 +1499,7 @@ def test_summary_tokens_cost(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert call.summary["usage"] == {
         "gpt-4": {

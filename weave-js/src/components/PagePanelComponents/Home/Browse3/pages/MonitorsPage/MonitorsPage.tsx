@@ -1,14 +1,14 @@
 import {PopupDropdown} from '@wandb/weave/common/components/PopupDropdown';
-import {Button} from '@wandb/weave/components/Button';
+import {TrackedButton} from '@wandb/weave/components/Button/TrackedButton';
 import {IconPencilEdit} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {CellValue} from '@wandb/weave/components/PagePanelComponents/Home/Browse2/CellValue';
 import {useEntityProject} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/context';
-import {MONITORED_FILTER_VALUE} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/filters/common';
 import {ALL_TRACES_OR_CALLS_REF_KEY} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/callsTableFilter';
 import {EMPTY_PROPS_MONITORS} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/EmptyContent';
 import {SimplePageLayout} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/common/SimplePageLayout';
 import {MonitorDrawerRouter} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/MonitorFormDrawer';
+import {matchAllMonitorVersionsQuery} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/MonitorsPage/MonitorPage';
 import {FilterableObjectVersionsTable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/ObjectsPage/ObjectVersionsTable';
 import {Query} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientInterface/query';
 import {useCallsStats} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
@@ -75,7 +75,11 @@ export const MonitorsPage = () => {
                       ],
                     ]}
                     trigger={
-                      <Button icon="overflow-horizontal" variant="ghost" />
+                      <TrackedButton
+                        icon="overflow-horizontal"
+                        variant="ghost"
+                        trackedName="monitor-overflow-menu-edit"
+                      />
                     }
                     offset="0px, -20px"
                     onOpen={() => setSelectedMonitor(obj)}
@@ -189,18 +193,10 @@ const CallCountCell = ({
   entity: string;
   project: string;
 }) => {
-  const query: Query = useMemo(() => {
-    return {
-      $expr: {
-        $contains: {
-          input: {$getField: MONITORED_FILTER_VALUE},
-          substr: {
-            $literal: `${monitorRef.split(':').slice(0, -1).join(':')}:`,
-          },
-        },
-      },
-    };
-  }, [monitorRef]);
+  const query: Query = useMemo(
+    () => matchAllMonitorVersionsQuery(monitorRef),
+    [monitorRef]
+  );
   const callsStats = useCallsStats({
     entity,
     project,
@@ -226,13 +222,14 @@ const MonitorsPageHeaderExtra: React.FC<{
   return (
     <Tailwind>
       <div className="mr-16 flex gap-8">
-        <Button
+        <TrackedButton
           icon="add-new"
           variant="ghost"
           onClick={onCreateMonitor}
+          trackedName="new-monitor"
           tooltip="Create a new monitor">
           New monitor
-        </Button>
+        </TrackedButton>
       </div>
     </Tailwind>
   );

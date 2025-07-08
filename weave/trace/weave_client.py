@@ -506,6 +506,8 @@ class CallDict(TypedDict):
     started_at: datetime.datetime | None
     ended_at: datetime.datetime | None
     deleted_at: datetime.datetime | None
+    thread_id: str | None
+    turn_id: str | None
 
 
 @dataclasses.dataclass
@@ -534,6 +536,8 @@ class Call:
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
     deleted_at: datetime.datetime | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
 
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
@@ -622,7 +626,6 @@ class Call:
         Returns:
             An iterator of calls.
         """
-        client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError(
                 "Can't get children of call without ID, was `weave.init` called?"
@@ -742,6 +745,8 @@ class Call:
             started_at=self.started_at,
             ended_at=self.ended_at,
             deleted_at=self.deleted_at,
+            thread_id=self.thread_id,
+            turn_id=self.turn_id,
         )
 
 
@@ -773,6 +778,8 @@ def make_client_call(
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
+        thread_id=server_call.thread_id,
+        turn_id=server_call.turn_id,
     )
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()
@@ -1267,7 +1274,24 @@ class WeaveClient:
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
+        # Get thread_id from context
+        thread_id = call_context.get_thread_id()
+        current_turn_id = call_context.get_turn_id()
+
         call_id = generate_id()
+
+        # Determine turn_id: call becomes a turn if thread boundary is crossed
+        if thread_id is None:
+            # No thread context, no turn_id
+            turn_id = None
+        elif parent is None or parent.thread_id != thread_id:
+            # This is a turn call - use its own ID as turn_id
+            turn_id = call_id
+            call_context.set_turn_id(call_id)
+        else:
+            # Inherit turn_id from context
+            turn_id = current_turn_id
+
         call = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
@@ -1277,6 +1301,8 @@ class WeaveClient:
             # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
             attributes=attributes_dict,
+            thread_id=thread_id,
+            turn_id=turn_id,
         )
         # Disallow further modification of attributes after the call is created
         attributes_dict.freeze()
@@ -1322,6 +1348,8 @@ class WeaveClient:
                     attributes=attributes_dict,
                     wb_run_id=current_wb_run_id,
                     wb_run_step=current_wb_run_step,
+                    thread_id=thread_id,
+                    turn_id=turn_id,
                 )
             )
 
@@ -1488,6 +1516,10 @@ class WeaveClient:
             self.server.call_end(call_end_req)
 
         self.future_executor.defer(send_end_call)
+
+        # If a turn call is finishing, reset turn context for next sibling
+        if call.turn_id == call.id and call.thread_id:
+            call_context.set_turn_id(None)
 
         call_context.pop_call(call.id)
 

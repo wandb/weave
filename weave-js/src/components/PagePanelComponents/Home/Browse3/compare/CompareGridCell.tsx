@@ -11,8 +11,10 @@ import {ObjectPath} from '../pages/CallPage/traverse';
 import {CodeDiff} from './CodeDiff';
 import {CompareGridCellValue} from './CompareGridCellValue';
 import {CompareGridPill} from './CompareGridPill';
+import {ImageCompareViewer} from './ImageCompareViewer';
 
 const ARROW = '→';
+const MAX_STRING_LENGTH_IN_DIFF_VIEW = 10000;
 
 type CompareGridCellProps = {
   path: ObjectPath;
@@ -23,6 +25,37 @@ type CompareGridCellProps = {
   compareValueType: any;
   rowChangeType: any;
 };
+
+function limitStringLength(str: string, maxLength: number) {
+  if (str.length > maxLength) {
+    return str.slice(0, maxLength) + '...';
+  }
+  return str;
+}
+
+/**
+ * Detects if a string is likely a base64 encoded image.
+ *
+ * @param str - The string to check
+ * @returns true if the string appears to be a base64 image
+ */
+function isBase64Image(str: string): boolean {
+  if (!str || typeof str !== 'string') {
+    return false;
+  }
+
+  // Check for data URL format: data:image/[type];base64,[data]
+  if (str.startsWith('data:image/') && str.includes(';base64,')) {
+    return true;
+  }
+
+  // Check for 'base64:' prefix format
+  if (str.startsWith('base64:')) {
+    return true;
+  }
+
+  return false;
+}
 
 export const CompareGridCell = ({
   path,
@@ -45,12 +78,18 @@ export const CompareGridCell = ({
   }
 
   if (valueType === 'string' && compareValueType === 'string') {
+    if (isBase64Image(compareValue) || isBase64Image(value)) {
+      return <ImageCompareViewer value={value} compareValue={compareValue} />;
+    }
     // TODO: Need to figure out how to override font to be 'Source Sans Pro'
     return (
       <div className="m-[-6px] flex items-start text-xs">
         <ReactDiffViewer
-          oldValue={compareValue}
-          newValue={value}
+          oldValue={limitStringLength(
+            compareValue,
+            MAX_STRING_LENGTH_IN_DIFF_VIEW
+          )}
+          newValue={limitStringLength(value, MAX_STRING_LENGTH_IN_DIFF_VIEW)}
           splitView={false}
           compareMethod={DiffMethod.WORDS}
           hideLineNumbers={true}

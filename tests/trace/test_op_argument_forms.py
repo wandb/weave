@@ -53,7 +53,7 @@ from weave.trace_server import trace_server_interface as tsi
 
 
 @pytest.mark.parametrize(
-    "fn, arg_variations",
+    ("fn", "arg_variations"),
     [
         # | fn()                            |   NO    |    NO    |  NO     |   NO     |    1     |
         (
