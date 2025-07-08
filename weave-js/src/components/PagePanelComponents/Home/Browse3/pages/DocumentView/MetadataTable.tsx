@@ -30,6 +30,7 @@ type ObjectViewerSectionProps = {
   isExpanded?: boolean;
   error?: string;
   collapseTitle?: boolean;
+  showMinimal?: boolean
 };
 
 const TitleRow = styled.div`
@@ -58,12 +59,20 @@ const ObjectViewerSectionNonEmptyMemoed = React.memo(
   (prevProps, nextProps) => _.isEqual(prevProps, nextProps)
 );
 
-const ObjectViewerSectionNonEmpty = ({
+// Use a deep comparison to avoid re-rendering when the data object hasn't really changed.
+const ObjectViewerDropdownSectionNonEmptyMemoed = React.memo(
+  (props: ObjectViewerSectionProps) => (
+    <ObjectViewerDropdownSection {...props} />
+  ),
+  (prevProps, nextProps) => _.isEqual(prevProps, nextProps)
+);
+
+const ObjectViewerDropdownSection = ({
   title,
   data,
   noHide,
-  isExpanded,
   collapseTitle,
+  showMinimal,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
   const startState = collapseTitle ? 'hidden' : 'collapsed';
@@ -71,6 +80,162 @@ const ObjectViewerSectionNonEmpty = ({
   // That way it restores the last state when uncollapsed
   const [lastMode, setLastMode] = useState('collapsed');
   const [mode, setMode] = useState(startState);
+  const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
+
+  const body = useMemo(() => {
+    if (mode === 'collapsed' || mode === 'expanded') {
+      return (
+        <ObjectViewer
+          apiRef={apiRef}
+          data={data}
+          isExpanded={mode === 'expanded'}
+          expandedIds={expandedIds}
+          setExpandedIds={setExpandedIds}
+          showMinimal={showMinimal}
+        />
+      );
+    }
+    if (mode === 'json') {
+      return (
+        <CodeEditor
+          value={JSON.stringify(data, null, 2)}
+          language="json"
+          handleMouseWheel
+          alwaysConsumeMouseWheel={false}
+          readOnly
+        />
+      );
+    }
+    return null;
+  }, [mode, apiRef, data, expandedIds]);
+
+  const setTreeExpanded = useCallback(
+    (setIsExpanded: boolean) => {
+      const rowIds = apiRef.current.getAllRowIds();
+      rowIds.forEach(rowId => {
+        const rowNode = apiRef.current.getRowNode(rowId);
+        if (rowNode && rowNode.type === 'group') {
+          apiRef.current.setRowChildrenExpansion(rowId, setIsExpanded);
+        }
+      });
+    },
+    [apiRef]
+  );
+  const getGroupIds = useCallback(() => {
+    const rowIds = apiRef.current.getAllRowIds();
+    return rowIds.filter(rowId => {
+      const rowNode = apiRef.current.getRowNode(rowId);
+      return rowNode && rowNode.type === 'group';
+    });
+  }, [apiRef]);
+
+  // Re-clicking the button will reapply collapse/expand
+  const onClickCollapsed = useCallback(() => {
+    if (mode === 'collapsed') {
+      setTreeExpanded(false);
+    }
+    setMode('collapsed');
+    setExpandedIds([]);
+  }, [mode, setTreeExpanded]);
+
+  const isExpandAllSmall = useMemo(() => {
+    return (
+      !!apiRef?.current?.getAllRowIds &&
+      getGroupIds().length - expandedIds.length < EXPANDED_IDS_LENGTH
+    );
+  }, [apiRef, expandedIds.length, getGroupIds]);
+
+  const onClickExpanded = useCallback(() => {
+    if (mode === 'expanded') {
+      setTreeExpanded(true);
+    }
+    setMode('expanded');
+    if (isExpandAllSmall) {
+      setExpandedIds(getGroupIds());
+    } else {
+      setExpandedIds(
+        getGroupIds().slice(0, expandedIds.length + EXPANDED_IDS_LENGTH)
+      );
+    }
+  }, [
+    expandedIds.length,
+    getGroupIds,
+    isExpandAllSmall,
+    mode,
+    setTreeExpanded,
+  ]);
+
+  return (
+    <Box sx={{height: '100%', display: 'flex', flexDirection: 'column', paddingRight: '16px'}}>
+      <TitleRow>
+        <Button
+          onClick={() => {
+            if(mode !== 'hidden') {
+              setLastMode(mode)
+              setMode('hidden');
+            } else {
+              setMode(lastMode);
+            }
+          }}
+          variant='ghost'
+          size='small'
+          icon={mode === 'hidden' ? "chevron-next" : "chevron-down"}
+        />
+        <Title>{title}</Title>
+        {mode !=="hidden" && (
+          <Button
+            variant="ghost"
+            icon="row-height-small"
+            active={mode === 'collapsed'}
+            onClick={onClickCollapsed}
+            tooltip="View collapsed"
+          />
+        )}
+        {mode !=="hidden" && (
+          <Button
+            variant="ghost"
+            icon="expand-uncollapse"
+            active={mode === 'expanded'}
+            onClick={onClickExpanded}
+            tooltip={
+              isExpandAllSmall
+                ? 'Expand all'
+                : `Expand next ${EXPANDED_IDS_LENGTH} rows`
+            }
+          />
+        )}
+        {mode !=="hidden" && (
+          <Button
+            variant="ghost"
+            icon="code-alt"
+            active={mode === 'json'}
+            onClick={() => setMode('json')}
+            tooltip="View as JSON"
+          />
+        )}
+        {!noHide && (
+          <Button
+            variant="ghost"
+            icon="hide-hidden"
+            active={mode === 'hidden'}
+            onClick={() => setMode('hidden')}
+            tooltip="Hide"
+          />
+        )}
+      </TitleRow>
+      {body}
+    </Box>
+  );
+}
+
+const ObjectViewerSectionNonEmpty = ({
+  title,
+  data,
+  noHide,
+  isExpanded,
+}: ObjectViewerSectionProps) => {
+  const apiRef = useGridApiRef();
+  const [mode, setMode] = useState('collapsed');
   const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
   const body = useMemo(() => {
@@ -158,52 +323,32 @@ const ObjectViewerSectionNonEmpty = ({
   return (
     <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
       <TitleRow>
+        <Title>{title}</Title>
         <Button
-          onClick={() => {
-            if(mode !== 'hidden') {
-              setLastMode(mode)
-              setMode('hidden');
-            } else {
-              setMode(lastMode);
-            }
-          }}
-          variant='ghost'
-          size='small'
-          icon={mode === 'hidden' ? "chevron-down" : "chevron-next"}
-        >
-          <Title>{title}</Title>
-        </Button>
-        {mode !=="hidden" && (
-          <Button
-            variant="ghost"
-            icon="row-height-small"
-            active={mode === 'collapsed'}
-            onClick={onClickCollapsed}
-            tooltip="View collapsed"
-          />
-        )}
-        {mode !=="hidden" && (
-          <Button
-            variant="ghost"
-            icon="expand-uncollapse"
-            active={mode === 'expanded'}
-            onClick={onClickExpanded}
-            tooltip={
-              isExpandAllSmall
-                ? 'Expand all'
-                : `Expand next ${EXPANDED_IDS_LENGTH} rows`
-            }
-          />
-        )}
-        {mode !=="hidden" && (
-          <Button
-            variant="ghost"
-            icon="code-alt"
-            active={mode === 'json'}
-            onClick={() => setMode('json')}
-            tooltip="View as JSON"
-          />
-        )}
+          variant="ghost"
+          icon="row-height-small"
+          active={mode === 'collapsed'}
+          onClick={onClickCollapsed}
+          tooltip="View collapsed"
+        />
+        <Button
+          variant="ghost"
+          icon="expand-uncollapse"
+          active={mode === 'expanded'}
+          onClick={onClickExpanded}
+          tooltip={
+            isExpandAllSmall
+              ? 'Expand all'
+              : `Expand next ${EXPANDED_IDS_LENGTH} rows`
+          }
+        />
+        <Button
+          variant="ghost"
+          icon="code-alt"
+          active={mode === 'json'}
+          onClick={() => setMode('json')}
+          tooltip="View as JSON"
+        />
         {!noHide && (
           <Button
             variant="ghost"
@@ -225,6 +370,8 @@ export const ObjectViewerSection = ({
   noHide,
   isExpanded,
   error,
+  collapseTitle,
+  showMinimal
 }: ObjectViewerSectionProps) => {
   const currentRef = useContext(WeaveCHTableSourceRefContext);
 
@@ -263,15 +410,27 @@ export const ObjectViewerSection = ({
     }
     const valueType = getValueType(value);
     if (valueType === 'object' || (valueType === 'array' && value.length > 0)) {
-      return (
+      return collapseTitle ? (
+        <ObjectViewerDropdownSectionNonEmptyMemoed
+          title={title}
+          data={value}
+          noHide={noHide}
+          isExpanded={isExpanded}
+          collapseTitle={collapseTitle}
+          showMinimal={showMinimal}
+        />
+      ) : (
         <ObjectViewerSectionNonEmptyMemoed
           title={title}
           data={value}
           noHide={noHide}
           isExpanded={isExpanded}
+          collapseTitle={collapseTitle}
+          showMinimal={showMinimal}
         />
       );
     }
+
     const oneResultData = {
       value,
       valueType,
@@ -317,12 +476,23 @@ export const ObjectViewerSection = ({
       return inner;
     }
   }
-  return (
-    <ObjectViewerSectionNonEmpty
+  return collapseTitle ? (
+    <ObjectViewerDropdownSectionNonEmptyMemoed
       title={title}
       data={data}
       noHide={noHide}
       isExpanded={isExpanded}
+      collapseTitle={collapseTitle}
+      showMinimal={showMinimal}
+    />
+  ) : (
+    <ObjectViewerSectionNonEmptyMemoed
+      title={title}
+      data={data}
+      noHide={noHide}
+      isExpanded={isExpanded}
+      collapseTitle={collapseTitle}
+      showMinimal={showMinimal}
     />
   );
 };

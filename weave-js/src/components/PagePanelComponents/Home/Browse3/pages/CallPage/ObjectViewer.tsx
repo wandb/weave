@@ -66,6 +66,7 @@ type ObjectViewerProps = {
   isExpanded: boolean;
   expandedIds: GridRowId[];
   setExpandedIds: Dispatch<SetStateAction<GridRowId[]>>;
+  showMinimal?: boolean;
 };
 
 // Traverse the data and find all ref URIs.
@@ -95,6 +96,7 @@ export const ObjectViewer = ({
   isExpanded,
   expandedIds,
   setExpandedIds,
+  showMinimal,
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
@@ -529,7 +531,8 @@ export const ObjectViewer = ({
         isGroupExpandedByDefault={node => {
           return expandedIds.includes(node.id);
         }}
-        columnHeaderHeight={38}
+        showMinimal={showMinimal}
+        columnHeaderHeight={showMinimal ? 0 : 38}
         rowHeight={DEFAULT_ROW_HEIGHT}
         getRowHeight={getRowHeight}
         hideFooter

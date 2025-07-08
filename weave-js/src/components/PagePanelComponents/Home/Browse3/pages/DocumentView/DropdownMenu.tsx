@@ -1,12 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Box, Typography, IconButton, Collapse, Stack, Table, TableBody, TableRow, TableCell } from '@mui/material';
-import { ExpandMore, ChevronRight } from '@mui/icons-material';
 import styled from 'styled-components';
-import { HStack } from '../../../LayoutElements';
-import { Button, ButtonVariants } from '@wandb/weave/components/Button';
-import { Tailwind } from '@wandb/weave/components/Tailwind';
+import { Button } from '@wandb/weave/components/Button';
 import { WeaveDocumentSchema } from './schemas';
-import { ObjectViewerSection } from './MetadataTable';
+import { ObjectViewerSection } from '../CallPage/ObjectViewerSection';
+// import { ObjectViewerSection } from './MetadataTable';
 
 interface DropdownSectionProps {
   title: string;
@@ -24,7 +22,7 @@ TitleRow.displayName = 'S.TitleRow';
 const Title = styled.div`
   font-family: Source Sans Pro;
   font-style: SemiBold
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   line-height: 100%;
   letter-spacing: 0px;
@@ -40,14 +38,15 @@ export const DropdownSection: React.FC<DropdownSectionProps> = ({
   const [isExpanded, setExpanded] = useState(defaultExpanded);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', height: 'auto'}}>
-      <Button
-        onClick={() => { setExpanded(!isExpanded); }}
-        variant='ghost'
-        size='small'
-        icon={isExpanded ? "chevron-down" : "chevron-next"}
-      >
+      <TitleRow>
+        <Button
+          onClick={() => { setExpanded(!isExpanded); }}
+          variant='ghost'
+          size='small'
+          icon={isExpanded ? "chevron-down" : "chevron-next"}
+        />
         <Title>{title}</Title>
-      </Button>
+      </TitleRow>
       <Collapse in={isExpanded}>
         <Box>
           {children}
@@ -121,15 +120,20 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({ doc }) => {
           {doc.content}
         </Typography>
         {metadata && (
-          <DropdownSection title={"Metadata"} defaultExpanded={false}>
-           {/* <MetadataTable data={metadata} /> */} 
-           <ObjectViewerSection title={"Metadata"} data={metadata} noHide={true} isExpanded={false} collapseTitle={true} />
-          </DropdownSection>
+          <ObjectViewerSection
+            title={"Metadata"}
+            data={metadata}
+            noHide={true}
+            isExpanded={false}
+            collapseTitle={true}
+            showMinimal={true}
+          />
         )}
       </div>
     </Box>
   );
 };
+
 interface DocumentDropdownProps {
   documents: WeaveDocumentSchema[];
   title: string;
