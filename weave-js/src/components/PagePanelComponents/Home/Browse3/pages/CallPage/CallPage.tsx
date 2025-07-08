@@ -70,8 +70,10 @@ export const CallPage: FC<CallPageProps> = props => {
     // in null response (bug on server side). As a result, the summary
     // will not show costs. FIXME (This results in a second query in
     // CallSummary.tsx)
+    // This flag and the below storage flag can cause long query times
+    // defer loading to the summary component
     // includeCosts: true,
-    includeTotalStorageSize: true,
+    // includeTotalStorageSize: true,
     refetchOnRename: true,
   });
 

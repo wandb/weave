@@ -202,7 +202,9 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/pydantic_ai",
             "guides/integrations/google_adk",
             "guides/integrations/agno",
+            "guides/integrations/autogen",
             "guides/integrations/js"
+
           ],
         },
         {

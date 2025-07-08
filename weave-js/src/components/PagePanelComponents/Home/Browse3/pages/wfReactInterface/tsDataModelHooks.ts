@@ -9,7 +9,7 @@ import * as _ from 'lodash';
 import {isEmpty} from 'lodash';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useAsyncFn} from 'react-use';
-import useAsync from 'react-use/lib/useAsync';
+import useAsync, {AsyncState} from 'react-use/lib/useAsync';
 import useAsyncRetry from 'react-use/lib/useAsyncRetry';
 
 import * as Types from '../../../../../../core/model/types';
@@ -2547,6 +2547,117 @@ export const useThreadsQuery = (
     threadsState,
     turnCallsDataResult,
   };
+};
+
+export const useThreadTurns = (
+  projectId: string,
+  threadId: string
+): {
+  turnsState: AsyncState<traceServerTypes.TraceCallSchema[]>;
+} => {
+  const getTsClient = useGetTraceServerClientContext();
+  const turns = useAsync(async () => {
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      query: {
+        $expr: {
+          $and: [
+            {$eq: [{$getField: 'thread_id'}, {$literal: threadId}]},
+            {$eq: [{$getField: 'id'}, {$getField: 'turn_id'}]},
+          ],
+        },
+      },
+      sort_by: [{field: 'started_at', direction: 'asc'}],
+      limit: 1000,
+      columns: [
+        'id',
+        'turn_id',
+        'started_at',
+        'ended_at',
+        'exception',
+        'inputs',
+        'op_name',
+      ],
+    });
+
+    return result.calls ?? [];
+  }, [getTsClient, threadId]);
+
+  return {
+    turnsState: turns,
+  };
+};
+
+export const useThreadMessageIds = (
+  projectId: string,
+  threadId: string
+): AsyncState<Array<string>> => {
+  const getTsClient = useGetTraceServerClientContext();
+  return useAsync(async () => {
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      query: {
+        $expr: {
+          $eq: [{$getField: 'thread_id'}, {$literal: threadId}],
+        },
+      },
+      columns: ['id', 'parent_id', 'summary', 'started_at'],
+    });
+
+    const calls = result.calls ?? [];
+
+    const parentIds = new Set(
+      calls.map(call => call.parent_id).filter(Boolean)
+    );
+
+    // Find leaf calls (calls whose ID is not a parent of any other call)
+    const leafCalls = calls.filter(call => !parentIds.has(call.id));
+
+    // Filter leaf calls for LLM calls (those with usage data)
+    const llmLeafCalls = leafCalls.filter(
+      call => !isEmpty(call.summary?.usage)
+    );
+
+    if (llmLeafCalls.length === 0) {
+      return [];
+    }
+
+    return _.map(llmLeafCalls, 'id');
+  }, [getTsClient, threadId]);
+};
+
+export const useThreadMessagesLoader = (
+  projectId: string,
+  threadId: string
+) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const messageIdsState = useThreadMessageIds(projectId, threadId);
+
+  const [loadMessagesState, loadMessages] = useAsyncFn(async () => {
+    if (messageIdsState.loading) {
+      return [];
+    }
+
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      filter: {call_ids: messageIdsState.value},
+      sort_by: [{field: 'started_at', direction: 'asc'}],
+      limit: 1000,
+      columns: ['id', 'started_at', 'turn_id', 'inputs', 'output'],
+      expand_columns: ['inputs', 'output'], // Server-side ref expansion
+    });
+
+    return result.calls ?? [];
+  }, [getTsClient, projectId, threadId, messageIdsState.value]);
+
+  useEffect(() => {
+    if (messageIdsState.value) {
+      loadMessages();
+    }
+  }, [messageIdsState.value, loadMessages]);
+
+  return loadMessagesState;
 };
 
 /// Utility Functions ///
