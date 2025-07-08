@@ -9,7 +9,7 @@ import * as _ from 'lodash';
 import {isEmpty} from 'lodash';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useAsyncFn} from 'react-use';
-import useAsync from 'react-use/lib/useAsync';
+import useAsync, {AsyncState} from 'react-use/lib/useAsync';
 import useAsyncRetry from 'react-use/lib/useAsyncRetry';
 
 import * as Types from '../../../../../../core/model/types';
@@ -2546,6 +2546,46 @@ export const useThreadsQuery = (
   return {
     threadsState,
     turnCallsDataResult,
+  };
+};
+
+export const useThreadTurns = (
+  projectId: string,
+  threadId: string
+): {
+  turnsState: AsyncState<traceServerTypes.TraceCallSchema[]>;
+} => {
+  const getTsClient = useGetTraceServerClientContext();
+  const turns = useAsync(async () => {
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      query: {
+        $expr: {
+          $and: [
+            {$eq: [{$getField: 'thread_id'}, {$literal: threadId}]},
+            {$eq: [{$getField: 'id'}, {$getField: 'turn_id'}]},
+          ],
+        },
+      },
+      sort_by: [{field: 'started_at', direction: 'asc'}],
+      limit: 1000,
+      columns: [
+        'id',
+        'turn_id',
+        'started_at',
+        'ended_at',
+        'exception',
+        'inputs',
+        'op_name',
+      ],
+    });
+
+    console.log({result});
+    return result.calls ?? [];
+  }, [getTsClient, threadId]);
+
+  return {
+    turnsState: turns,
   };
 };
 
