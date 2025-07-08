@@ -719,13 +719,17 @@ export const ExampleCompareSectionDetail: React.FC<{
         </Box>
       </HorizontalBox>
 
-      <HorizontalBox sx={{ gridGap: '8px' }}>
+      <HorizontalBox sx={{gridGap: '8px'}}>
         <Tooltip title={props.isExpanded ? 'Collapse' : 'Expand'}>
           <IconButton
             onClick={() => {
               props.onExpandToggle();
             }}>
-            <Icon name={props.isExpanded ? 'minimize-mode' : 'full-screen-mode-expand'} />
+            <Icon
+              name={
+                props.isExpanded ? 'minimize-mode' : 'full-screen-mode-expand'
+              }
+            />
           </IconButton>
         </Tooltip>
         <Tooltip title="Close">
