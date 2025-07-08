@@ -7,8 +7,8 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
     externalize_trace_server,
 )
-from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import environment as ts_env
+from weave.trace_server.clickhouse_trace_server import clickhouse_trace_server_batched
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 TEST_ENTITY = "shawn"

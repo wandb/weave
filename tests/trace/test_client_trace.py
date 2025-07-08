@@ -40,7 +40,7 @@ from weave.trace.refs import parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import (
+from weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched import (
     ENTITY_TOO_LARGE_PAYLOAD,
 )
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
@@ -3019,11 +3019,11 @@ def test_calls_stream_column_expansion_dynamic_batch_size(
     client, batch_size, monkeypatch
 ):
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_batched.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.INITIAL_CALLS_STREAM_BATCH_SIZE",
         1,
     )
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_batched.MAX_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.MAX_CALLS_STREAM_BATCH_SIZE",
         5,
     )
 
@@ -3331,7 +3331,7 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         # no need to strip in sqlite
         return
 
-    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    original_insert_call_batch = weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
 
     # Patch _insert_call_batch to raise InsertTooLarge
     def mock_insert_call_batch(self, batch):
@@ -3345,17 +3345,17 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         original_insert_call_batch(self, batch)
 
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched,
+        weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched,
         "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
         10 * 1024,  # 1KB
     )
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched,
+        weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched,
         "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
         1 * 1024,  # 1KB
     )
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
+        weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
         "_insert_call_batch",
         mock_insert_call_batch,
     )

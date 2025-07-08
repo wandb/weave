@@ -3,8 +3,12 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 
-from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
-from weave.trace_server.clickhouse_trace_server_migrator import MigrationError
+from weave.trace_server.clickhouse_trace_server import (
+    clickhouse_trace_server_migrator as trace_server_migrator,
+)
+from weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_migrator import (
+    MigrationError,
+)
 
 
 @pytest.fixture
