@@ -597,13 +597,13 @@ function makeCodeText(
   }
   if (Object.values(filter).some(value => value !== undefined)) {
     codeStr += `    filter={`;
-    if (filter.opVersionRefs) {
+    if (filter.opVersionRefs && filter.opVersionRefs.length > 0) {
       codeStr += `"op_names": ["${filter.opVersionRefs.join('", "')}"],`;
     }
-    if (filter.runIds) {
+    if (filter.runIds && filter.runIds.length > 0) {
       codeStr += `"run_ids": ["${filter.runIds.join('", "')}"],`;
     }
-    if (filter.userIds) {
+    if (filter.userIds && filter.userIds.length > 0) {
       codeStr += `"user_ids": ["${filter.userIds.join('", "')}"],`;
     }
     if (filter.traceId) {
@@ -612,7 +612,7 @@ function makeCodeText(
     if (filter.traceRootsOnly) {
       codeStr += `"trace_roots_only": True,`;
     }
-    if (filter.parentIds) {
+    if (filter.parentIds && filter.parentIds.length > 0) {
       codeStr += `"parent_ids": ["${filter.parentIds.join('", "')}"],`;
     }
     codeStr = codeStr.slice(0, -1);
@@ -651,10 +651,24 @@ function makeCurlText(
   const baseUrl = (window as any).CONFIG.TRACE_BACKEND_BASE_URL;
   const filterStr = JSON.stringify(
     {
-      op_names: filter.opVersionRefs,
-      input_refs: filter.inputObjectVersionRefs,
-      output_refs: filter.outputObjectVersionRefs,
-      parent_ids: filter.parentIds,
+      op_names:
+        filter.opVersionRefs && filter.opVersionRefs.length > 0
+          ? filter.opVersionRefs
+          : undefined,
+      input_refs:
+        filter.inputObjectVersionRefs &&
+        filter.inputObjectVersionRefs.length > 0
+          ? filter.inputObjectVersionRefs
+          : undefined,
+      output_refs:
+        filter.outputObjectVersionRefs &&
+        filter.outputObjectVersionRefs.length > 0
+          ? filter.outputObjectVersionRefs
+          : undefined,
+      parent_ids:
+        filter.parentIds && filter.parentIds.length > 0
+          ? filter.parentIds
+          : undefined,
       trace_ids: filter.traceId ? [filter.traceId] : undefined,
       call_ids: callIds,
       trace_roots_only: filter.traceRootsOnly,
