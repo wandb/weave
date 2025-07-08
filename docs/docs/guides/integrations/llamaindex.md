@@ -15,6 +15,7 @@ import weave
 from llama_index.llms.openai import OpenAI
 
 # Initialize Weave with your project name
+# highlight-next-line
 weave.init("llamaindex-demo")
 
 # All LlamaIndex operations are now automatically traced
@@ -23,13 +24,17 @@ response = llm.complete("William Shakespeare is ")
 print(response)
 ```
 
-That's it! The integration leverages LlamaIndex's instrumentation system to automatically capture traces for all operations including LLM calls, embeddings, retrievals, and agent steps.
+That's it! The integration leverages [LlamaIndex's instrumentation system](https://docs.llamaindex.ai/en/stable/module_guides/observability/instrumentation/) to automatically capture traces for all operations including LLM calls, embeddings, retrievals, and agent steps.
+
+![LlamaIndex Demo](imgs/llamaindex/simple_trace.png)
 
 ## Core LlamaIndex Components
 
-The Weave integration supports all major LlamaIndex components with automatic tracing:
+The Weave integration supports [all major LlamaIndex components](https://docs.llamaindex.ai/en/stable/module_guides/) with automatic tracing:
 
 ### LLM Operations
+
+Weave automatically traces all LlamaIndex LLM operations including completions, streaming, chat, and tool calling.
 
 #### Synchronous and Asynchronous Completions
 
@@ -37,6 +42,7 @@ The Weave integration supports all major LlamaIndex components with automatic tr
 import weave
 from llama_index.llms.openai import OpenAI
 
+# highlight-next-line
 weave.init("llamaindex-demo")
 
 llm = OpenAI(model="gpt-4o-mini")
@@ -56,6 +62,7 @@ print(response)
 import weave
 from llama_index.llms.openai import OpenAI
 
+# highlight-next-line
 weave.init("llamaindex-demo")
 
 llm = OpenAI(model="gpt-4o-mini")
@@ -73,11 +80,14 @@ async for token in handle:
 
 ### Chat Interface
 
+The LLM class also implements a chat method, which allows you to have more sophisticated interactions.
+
 ```python
 import weave
 from llama_index.llms.openai import OpenAI
 from llama_index.core.llms import ChatMessage
 
+# highlight-next-line
 weave.init("llamaindex-demo")
 
 llm = OpenAI(model="gpt-4o-mini")
@@ -102,12 +112,15 @@ for token in handle:
 
 ### Tool Calling
 
+Tool calling is a central piece for building agents and workflows. Weave automatically traces all tool calls, including synchronous and asynchronous calls.
+
 ```python
 import weave
 from pydantic import BaseModel
 from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
 
+# highlight-next-line
 weave.init("llamaindex-demo")
 
 class Song(BaseModel):
@@ -125,14 +138,20 @@ response = llm.predict_and_call([tool], "Pick a random song for me")
 print(response)
 ```
 
+![LlamaIndex Tool Calling](imgs/llamaindex/tool_call_trace.png)
+
 ### Agents
 
+In LlamaIndex, an agent is powered by an LLM to solve a task by executing a series of steps. It is given a set of tools, which can be anything from arbitrary functions up to full LlamaIndex query engines.
+
 ```python
+import asyncio
 import weave
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
 from llama_index.core.memory import ChatMemoryBuffer
 
+# highlight-next-line
 weave.init("llamaindex-demo")
 
 def multiply(a: float, b: float) -> float:
@@ -146,11 +165,20 @@ agent = FunctionAgent(
 )
 
 memory = ChatMemoryBuffer.from_defaults(token_limit=40000)
-response = await agent.run("What is 1234 * 4567?", memory=memory)
-print(response)
+
+# highlight-next-line
+@weave.op()
+async def main():
+    response = await agent.run("What is 1234 * 4567?", memory=memory)
+    print(response)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Workflows
+
+A workflow is an event-driven, step-based way to control the execution flow of an application. This paradigm allows you to create arbitrarily complex flows that encapsulate logic and make your application more maintainable and easier to understand.
 
 ```python
 import weave
@@ -162,6 +190,7 @@ from llama_index.core.workflow import (
     Event,
 )
 
+# highlight-next-line
 weave.init("llamaindex-demo")
 
 class FirstEvent(Event):
@@ -196,6 +225,7 @@ from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.llms.openai import OpenAI
 
+# highlight-next-line
 weave.init("llamaindex-demo")
 
 # Load and process documents
@@ -222,6 +252,7 @@ from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
 
+# highlight-next-line
 weave.init("llamaindex-demo")
 
 # Create a RAG tool
@@ -229,15 +260,18 @@ documents = SimpleDirectoryReader("data").load_data()
 index = VectorStoreIndex.from_documents(documents)
 query_engine = index.as_query_engine()
 
+# highlight-next-line
 def multiply(a: float, b: float) -> float:
     """Useful for multiplying two numbers."""
     return a * b
 
+# highlight-next-line
 async def search_documents(query: str) -> str:
     """Useful for answering questions about documents."""
     response = await query_engine.aquery(query)
     return str(response)
 
+# highlight-next-line
 # Create an agent with both tools
 agent = FunctionAgent(
     tools=[multiply, search_documents],
@@ -246,6 +280,7 @@ agent = FunctionAgent(
     and search through documents to answer questions.""",
 )
 
+# highlight-next-line
 response = await agent.run(
     "What did the author do in college? Also, what's 7 * 8?"
 )
