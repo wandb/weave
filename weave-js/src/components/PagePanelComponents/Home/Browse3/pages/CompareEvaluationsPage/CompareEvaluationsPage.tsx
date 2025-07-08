@@ -357,6 +357,8 @@ const ResultExplorer: React.FC<{
             flex: viewMode === 'detail' ? 1 : viewMode === 'split' ? 1 : 0,
             width: viewMode === 'detail' ? 'calc(100% - 64px)' : viewMode === 'split' ? '50%' : '0%',
             display: viewMode !== 'table' ? 'block' : 'none',
+            boxShadow: viewMode !== 'table' ? '0 4px 12px rgba(0, 0, 0, 0.15)' : 'none',
+            zIndex: viewMode !== 'table' ? 1 : 0,
           }}>
           <ExampleCompareSectionDetailGuarded
             state={state}
