@@ -384,6 +384,12 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
         ) {
           continue;
         }
+        if (
+          (toType.notRequiredKeys ?? []).includes(key) &&
+          !(type.notRequiredKeys ?? []).includes(key)
+        ) {
+          return false;
+        }
         if (keyType === undefined || !isAssignableTo(keyType, toKeyType)) {
           return false;
         }

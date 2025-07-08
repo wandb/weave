@@ -159,9 +159,7 @@ describe('union', () => {
       const td3 = typedDict({a: 'number', b: 'string'}); // no notRequiredKeys
 
       const result = union([td1, td2, td3]);
-      // The original uniqWith considers td1 and td3 as "assignable" to each other
-      // even though they have different notRequiredKeys, so it deduplicates to just td1
-      expect(result).toEqual(td1);
+      expect(result).toEqual(union([td1, td3]));
     });
 
     it('handles typedDicts with union properties', () => {
