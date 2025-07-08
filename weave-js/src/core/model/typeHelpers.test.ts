@@ -105,7 +105,7 @@ describe('union', () => {
     it('flattens nested unions', () => {
       const nestedUnion = {
         type: 'union' as const,
-        members: ['string', 'number'],
+        members: ['string' as const, 'number' as const],
       };
       expect(union([nestedUnion, 'boolean'])).toEqual({
         type: 'union',
