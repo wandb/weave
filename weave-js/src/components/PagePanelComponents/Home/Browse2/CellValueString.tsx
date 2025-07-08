@@ -152,7 +152,11 @@ const CellValueStringWithPopup = ({value, style}: CellValueStringProps) => {
   return (
     <>
       <StyledTooltip enterDelay={500} title={title}>
-        <Collapsed ref={ref} onClick={onClick} style={style} hasLineClamp={hasLineClamp}>
+        <Collapsed
+          ref={ref}
+          onClick={onClick}
+          style={style}
+          hasLineClamp={hasLineClamp}>
           {displayTrimmed}
         </Collapsed>
       </StyledTooltip>
