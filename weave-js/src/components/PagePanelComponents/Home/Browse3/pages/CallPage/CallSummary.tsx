@@ -5,6 +5,7 @@ import _ from 'lodash';
 import React, {useMemo} from 'react';
 
 import {parseRefMaybe} from '../../../../../../react';
+import {LoadingDots} from '../../../../../LoadingDots';
 import {Timestamp} from '../../../../../Timestamp';
 import {UserLink} from '../../../../../UserLink';
 import {SmallRef} from '../../smallRef/SmallRef';
@@ -22,17 +23,24 @@ const SUMMARY_FIELDS_EXCLUDED_FROM_GENERAL_RENDER = [
 
 const StorageSizeDisplay: React.FC<{
   size: number;
-}> = ({size}) => (
-  <span className="flex items-center gap-2">
-    {convertBytes(size)}
-    <Tooltip
-      content="The size does not include referenced objects, for example, images or audio blob storage."
-      trigger={
-        <Button icon="info" variant="ghost" size="small" active={false} />
-      }
-    />
-  </span>
-);
+  loading?: boolean;
+}> = ({size, loading}) => {
+  if (loading) {
+    return <LoadingDots />;
+  }
+
+  return (
+    <span className="flex items-center gap-2">
+      {convertBytes(size)}
+      <Tooltip
+        content="The size does not include referenced objects, for example, images or audio blob storage."
+        trigger={
+          <Button icon="info" variant="ghost" size="small" active={false} />
+        }
+      />
+    </span>
+  );
+};
 
 export const CallSummary: React.FC<{
   call: CallSchema;
@@ -71,21 +79,31 @@ export const CallSummary: React.FC<{
     return callWithCosts.result?.traceCall?.summary?.weave?.costs;
   }, [callWithCosts.result]);
 
-  const storageSizeBytesRow = useMemo(() => {
-    const size =
-      getJsonPayloadSize(span.inputs) +
-      getJsonPayloadSize(span.output) +
-      getJsonPayloadSize(span.attributes) +
-      getJsonPayloadSize(span.summary);
+  const callWithStorageSize = useCall({
+    key: {
+      entity: call.entity,
+      project: call.project,
+      callId: call.callId,
+    },
+    includeTotalStorageSize: true,
+  });
 
-    if (size === 0) {
-      return null;
-    }
+  const storageSizeBytesRow = useMemo(() => {
+    const storageSpan = callWithStorageSize.result?.rawSpan;
+
+    const size = storageSpan
+      ? getJsonPayloadSize(storageSpan.inputs) +
+        getJsonPayloadSize(storageSpan.output) +
+        getJsonPayloadSize(storageSpan.attributes) +
+        getJsonPayloadSize(storageSpan.summary)
+      : 0;
 
     return {
-      'Call Storage Size': <StorageSizeDisplay size={size} />,
+      'Call Storage Size': (
+        <StorageSizeDisplay size={size} loading={callWithStorageSize.loading} />
+      ),
     };
-  }, [span]);
+  }, [callWithStorageSize]);
 
   const traceStorageSizeBytesRow = useMemo(() => {
     if (call.parentId !== null) {
@@ -94,10 +112,17 @@ export const CallSummary: React.FC<{
 
     return {
       'Trace Storage Size': (
-        <StorageSizeDisplay size={call.totalStorageSizeBytes ?? 0} />
+        <StorageSizeDisplay
+          size={callWithStorageSize.result?.totalStorageSizeBytes ?? 0}
+          loading={callWithStorageSize.loading}
+        />
       ),
     };
-  }, [call.parentId, call.totalStorageSizeBytes]);
+  }, [
+    call.parentId,
+    callWithStorageSize.result?.totalStorageSizeBytes,
+    callWithStorageSize.loading,
+  ]);
 
   return (
     <div className="overflow-auto px-16 pt-12">
