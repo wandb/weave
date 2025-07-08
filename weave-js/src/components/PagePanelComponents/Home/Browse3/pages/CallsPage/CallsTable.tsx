@@ -96,6 +96,7 @@ import {ManageColumnsButton} from './ManageColumnsButton';
 import {OpSelector} from './OpSelector';
 import {ParentFilterTag} from './ParentFilterTag';
 import {ResizableHandle} from './ResizableHandle';
+import {usePinnedColumnsWidth} from './usePinnedColumnsWidth';
 
 const MAX_SELECT = 100;
 
@@ -598,6 +599,10 @@ export const CallsTable: FC<{
 
   // DataGrid Model Management
   const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
+
+  // Calculate pinned columns width
+  const pinnedColumnsWidth = usePinnedColumnsWidth(apiRef, pinModelResolved);
+  console.log('pinnedColumnsWidth', pinnedColumnsWidth);
 
   // END OF CPR FACTORED CODE
 
