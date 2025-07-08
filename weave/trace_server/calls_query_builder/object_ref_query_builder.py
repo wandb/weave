@@ -56,16 +56,6 @@ class ObjectRefCondition(BaseModel):
     case_insensitive: bool = False
     conversion_type: Optional[tsi_query.CastTo] = None
 
-    @property
-    def is_table_rows_condition(self) -> bool:
-        # TODO: is this the only time this is an actual table join condition??
-        if (
-            self.field_path.startswith("inputs.example")
-            and "inputs.example" in self.expand_columns
-        ):
-            return True
-        return False
-
     def get_expand_column_match(self, shortest: bool = True) -> Optional[str]:
         """Find the matching expand column for this field path.
 
@@ -252,16 +242,19 @@ class ObjectRefCondition(BaseModel):
         json_extract_sql = json_dump_field_as_sql(
             pb, table_alias, field_sql, key_parts, use_agg_fn=use_agg_fn
         )
-        if self.is_table_rows_condition:
-            # If we dealing with table row refs, they are in the format:
-            # weave-trace-internal:///<project_id>/object/<object_id>:<digest>/attr/rows/id/<row_digest>
-            # we only want to join on <row_digest> so extract it
-            json_extract_sql = f"regexpExtract({json_extract_sql}, '/([^/]+)$', 1)"
 
         if is_order_join:
-            return f"LEFT JOIN {cte_alias} ON {json_extract_sql} = {cte_alias}.ref"
+            # For joins, we need to handle both object refs and table row refs
+            # Table row refs have the format: weave-trace-internal:///<project_id>/object/<object_id>:<digest>/attr/rows/id/<row_digest>
+            # We need to extract the row digest part for table_rows matching
+            row_digest_extract = f"regexpExtract({json_extract_sql}, '/([^/]+)$', 1)"
+            return f"LEFT JOIN {cte_alias} ON ({json_extract_sql} = {cte_alias}.ref OR {row_digest_extract} = {cte_alias}.ref)"
 
-        return f"{json_extract_sql} IN (SELECT ref FROM {cte_alias})"
+        # For filtering, we need to handle both object refs and table row refs
+        # Table row refs have the format: weave-trace-internal:///<project_id>/object/<object_id>:<digest>/attr/rows/id/<row_digest>
+        # We need to extract the row digest part for table_rows matching
+        row_digest_extract = f"regexpExtract({json_extract_sql}, '/([^/]+)$', 1)"
+        return f"({json_extract_sql} IN (SELECT ref FROM {cte_alias}) OR {row_digest_extract} IN (SELECT ref FROM {cte_alias}))"
 
 
 class ObjectRefFilterCondition(ObjectRefCondition):
@@ -641,6 +634,9 @@ def build_object_ref_ctes(
     """
     Build CTEs (Common Table Expressions) for object reference filtering and ordering.
 
+    This function creates CTEs that check both object_versions and table_rows tables,
+    unioning the results to ensure we don't miss data regardless of which table contains it.
+
     For ordering conditions, this function creates a chain of CTEs where:
     1. The leaf CTE selects the actual value to order by from the deepest object
     2. Each intermediate CTE propagates this value up the reference chain
@@ -719,30 +715,29 @@ def build_object_ref_ctes(
                 val_condition = handler.handle_in_operation(condition)
         val_condition_sql = f"AND {val_condition}" if val_condition else ""
 
-        # Build the leaf CTE
-        if condition.is_table_rows_condition:
-            leaf_cte = f"""
-            {leaf_cte_name} AS (
-                SELECT {val_dump_select}
-                    any(digest) as ref
-                FROM table_rows
-                WHERE project_id = {param_slot(project_param, "String")}
+        # Build the leaf CTE that unions both object_versions and table_rows
+        leaf_cte = f"""
+        {leaf_cte_name} AS (
+            SELECT
+                digest,
+                {val_dump_select}
+                concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
+            FROM object_versions
+            WHERE project_id = {param_slot(project_param, "String")}
                 {val_condition_sql}
-                GROUP BY project_id, digest
-            )"""
-        else:
-            leaf_cte = f"""
-            {leaf_cte_name} AS (
-                SELECT
-                    object_id,
-                    digest,
-                    {val_dump_select}
-                    concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
-                FROM object_versions
-                WHERE project_id = {param_slot(project_param, "String")}
-                    {val_condition_sql}
-                GROUP BY project_id, object_id, digest
-            )"""
+            GROUP BY project_id, object_id, digest
+
+            UNION ALL
+
+            SELECT
+                digest,
+                {val_dump_select}
+                digest as ref
+            FROM table_rows
+            WHERE project_id = {param_slot(project_param, "String")}
+            {val_condition_sql}
+            GROUP BY project_id, digest
+        )"""
 
         cte_parts.append(leaf_cte)
         current_cte_name = leaf_cte_name

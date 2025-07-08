@@ -124,7 +124,7 @@ export type TraceCallsQueryReq = {
   query?: Query;
   columns?: string[];
   expand_columns?: string[];
-  do_expand?: boolean;
+  return_expanded_column_values?: boolean;
   include_costs?: boolean;
   include_feedback?: boolean;
   include_storage_size?: boolean;

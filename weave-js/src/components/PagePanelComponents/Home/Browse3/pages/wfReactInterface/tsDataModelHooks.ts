@@ -334,7 +334,7 @@ const useCallsNoExpansion = (
         ? Array.from(params.expandedRefColumns)
         : undefined,
       // Never expand server side, we handle this manually in the frontend
-      do_expand: false,
+      return_expanded_column_values: false,
       include_costs: params.includeCosts,
       include_feedback: params.includeFeedback,
       ...(params.includeStorageSize ? {include_storage_size: true} : null),

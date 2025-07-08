@@ -425,7 +425,7 @@ class CallsQueryReq(BaseModel):
     )
     # Internal flag used for playing nice with the recursive object ref handling
     # alreadly implemented in the frontend.
-    do_expand: Optional[bool] = Field(
+    return_expanded_column_values: Optional[bool] = Field(
         default=True,
         description="If true, the response will include the expanded columns. "
         "If false, the response expand_columns will only be used for filtering and ordering. ",
