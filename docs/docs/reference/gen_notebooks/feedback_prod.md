@@ -1,6 +1,6 @@
-
-## title: Log Feedback from Production
-
+---
+title: Log Feedback from Production
+---
 
 
 :::tip[This is a notebook]
@@ -12,7 +12,7 @@
 :::
 
 
-## 
+
 <!--- @wandbcode{feedback-colab} -->
 
 
@@ -21,9 +21,7 @@ It is often hard to automatically evaluate a generated LLM response so, dependin
 In this tutorial, we'll use a custom chatbot as an example app from which to collect user feedback.
 We'll use Streamlit to build the interface and we'll capture the LLM interactions and feedback in Weave.
 
-
 ## Setup
-
 
 
 ```python
@@ -41,7 +39,6 @@ _ = set_env("WANDB_API_KEY")
 ```
 
 Next, create a file called `chatbot.py` with the following contents:
-
 
 
 ```python
@@ -108,12 +105,10 @@ def render_feedback_buttons(call_idx):
     # Text feedback
     with col3:
         feedback_text = st.text_input("Feedback", key=f"feedback_input_{call_idx}")
-        if (
-            st.button("Submit Feedback", key=f"submit_feedback_{call_idx}")
-            and feedback_text
-        ):
-            st.session_state.calls[call_idx].feedback.add_note(feedback_text)
-            st.success("Feedback submitted!")
+        if st.button("Submit Feedback", key=f"submit_feedback_{call_idx}"):
+            if feedback_text:
+                st.session_state.calls[call_idx].feedback.add_note(feedback_text)
+                st.success("Feedback submitted!")
 
 
 def display_old_messages():
@@ -202,13 +197,12 @@ if __name__ == "__main__":
 
 You can run this with `streamlit run chatbot.py`.
 
-Now, you can interact with this application and click the feedback buttons after each response.
+Now, you can interact with this application and click the feedback buttons after each response. 
 Visit the Weave UI to see the attached feedback.
 
 ## Explanation
 
 If we consider our decorated prediction function as:
-
 
 
 ```python
@@ -228,7 +222,6 @@ def predict(input_data):
 We can use it as usual to deliver some model response to the user:
 
 
-
 ```python
 with weave.attributes(
     {"session": "123abc", "env": "prod"}
@@ -236,8 +229,7 @@ with weave.attributes(
     result = predict(input_data="your data here")  # user question through the App UI
 ```
 
-To attach feedback, you need the `call` object, which is obtained by using the `.call()` method _instead of calling the function as normal_:
-
+To attach feedback, you need the `call` object, which is obtained by using the `.call()` method *instead of calling the function as normal*:
 
 
 ```python
@@ -248,12 +240,10 @@ This call object is needed for attaching feedback to the specific response.
 After making the call, the output of the operation is available using `result` above.
 
 
-
 ```python
 call.feedback.add_reaction("👍")  # user reaction through the App UI
 ```
 
 ## Conclusion
 
-In this tutorial, we built a chat UI with Streamlit which had inputs & outputs captured in Weave, alongside 👍👎 buttons to capture user feedback.
-
+In this tutorial, we built a chat UI with Streamlit which had inputs & outputs captured in Weave, alongside 👍👎 buttons to capture user feedback. 
