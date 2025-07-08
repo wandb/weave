@@ -129,15 +129,15 @@ def get_verdict_patcher(
         return NoOpPatcher()
 
     # Check if verdict tracing is available
-    VerdictTracer = create_verdict_tracer_class()
-    if VerdictTracer is None:
+    verdict_tracer_cls = create_verdict_tracer_class()
+    if verdict_tracer_cls is None:
         return NoOpPatcher()
 
     global _verdict_patcher
     if _verdict_patcher is not None:
         return _verdict_patcher
 
-    tracer = VerdictTracer()
+    tracer = verdict_tracer_cls()
 
     _verdict_patcher = MultiPatcher(
         [
