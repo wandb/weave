@@ -10,6 +10,7 @@ import {
   typedDict,
   union,
 } from './helpers';
+import {Union} from './types';
 
 describe('allObjPaths', () => {
   it('simple case', () => {
@@ -242,8 +243,8 @@ describe('union', () => {
       ]);
 
       // Should be a union with 2 members
-      expect(result.type).toEqual('union');
-      expect((result as any).members.length).toEqual(2);
+      expect((result as Union).type).toEqual('union');
+      expect((result as Union).members.length).toEqual(2);
 
       // Find the members
       const members = (result as any).members;
