@@ -4,7 +4,7 @@ import {
   GridPaginationModel,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useMemo, useRef} from 'react';
 import {useHistory, useLocation} from 'react-router-dom';
 
 import {ProjectInfo} from '../../../../../../common/hooks/useProjectInfo';
@@ -55,6 +55,7 @@ export const ThreadsPageSavedViewControl = ({
   const location = useLocation();
   const currentViewerId = userInfo ? userInfo.id : null;
   const isReadonly = !currentViewerId || !userInfo?.teams.includes(entity);
+  const defaultFilterAdopted = useRef(false);
 
   const onRecordLastView = useCallback(
     (loadedView: string) => {
@@ -76,14 +77,33 @@ export const ThreadsPageSavedViewControl = ({
           DEFAULT_FILTER_THREADS
         );
         // If the parsed filter is empty (no items), use the default filter
-        if (parsedFilter && parsedFilter.items.length === 0) {
+        if (
+          parsedFilter &&
+          parsedFilter.items.length === 0 &&
+          !defaultFilterAdopted.current
+        ) {
+          defaultFilterAdopted.current = true;
           return DEFAULT_FILTER_THREADS;
         }
         return parsedFilter;
       }
-      return queryToGridFilterModel(viewDef.query) ?? DEFAULT_FILTER_THREADS;
+      const filterModel = queryToGridFilterModel(viewDef.query);
+      if (
+        filterModel &&
+        filterModel.items.length === 0 &&
+        !defaultFilterAdopted.current
+      ) {
+        defaultFilterAdopted.current = true;
+        return DEFAULT_FILTER_THREADS;
+      }
+      if (!defaultFilterAdopted.current) {
+        defaultFilterAdopted.current = true;
+        return DEFAULT_FILTER_THREADS;
+      }
+      return {items: []};
     }, [query.filters, viewDef])
   );
+
   const setFilterModel = useCallback(
     (newModel: GridFilterModel) => {
       const newQuery = new URLSearchParams(location.search);
