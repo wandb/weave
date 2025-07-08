@@ -463,10 +463,11 @@ def _get_class_and_subclass_patchers(
                     qualname = method.__qualname__
                     if "." in qualname:
                         owner_name = qualname.split(".")[0]
-                        if owner_name != cls_name:
-                            # Allow patching inherited methods for base_class if explicitly requested
-                            if not (cls is base_class and should_patch_base_class):
-                                continue
+                        # Allow patching inherited methods for base_class if explicitly requested
+                        if owner_name != cls_name and not (
+                            cls is base_class and should_patch_base_class
+                        ):
+                            continue
 
                 # Skip methods we've already patched
                 method_key = (cls_module_path, method_name)

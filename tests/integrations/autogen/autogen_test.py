@@ -264,7 +264,8 @@ async def test_agentchat_run_with_tool(
     calls = list(client.calls())
     assert len(calls) == 8
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert len(output.messages) == len(result.messages)
     flattened = flatten_calls(calls)
@@ -347,7 +348,8 @@ async def test_agentchat_run_stream_with_tool(
     calls = list(client.calls())
     assert len(calls) == 7
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     flattened = flatten_calls(calls)
     assert len(flattened) == 20
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
@@ -437,7 +439,8 @@ async def test_agentchat_group_chat(
     await model_client.close()
     calls = list(client.calls())
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
 
     assert len(calls) == 60
     flattened = flatten_calls(calls)
@@ -551,8 +554,8 @@ async def test_agentchat_group_chat(
         ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
         ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
         ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
-        ("autogen_core.FunctionTool.run", 0),
         ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_core.FunctionTool.run", 0),
         ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
         ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
         ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
@@ -599,8 +602,8 @@ async def test_agentchat_group_chat(
         ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
         ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
         ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
-        ("autogen_core.FunctionTool.run", 0),
         ("autogen_agentchat.RoundRobinGroupChatManager.on_message", 0),
+        ("autogen_core.FunctionTool.run", 0),
         ("autogen_agentchat.ChatAgentContainer.publish_message", 0),
         ("autogen_core.SingleThreadedAgentRuntime.publish_message", 1),
         ("autogen_core.SingleThreadedAgentRuntime.publish_message", 0),
@@ -728,7 +731,8 @@ async def test_agent_with_memory(
     await _run_agent()
     calls = list(client.calls())
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert len(calls) == 10
     flattened = flatten_calls(calls)
     assert len(flattened) == 31
@@ -867,7 +871,8 @@ async def test_workflows_singlethreaded_runtime(
 
     calls = list(client.calls())
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert len(calls) == 15
     flattened = flatten_calls(calls)
     assert len(flattened) == 41
