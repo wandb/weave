@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 from unittest import mock
 
 import pytest
@@ -2951,7 +2951,7 @@ def test_calls_stream_column_expansion(client):
         )
     )
 
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output == nested_ref.uri()
 
     # output is dereffed
@@ -2963,7 +2963,7 @@ def test_calls_stream_column_expansion(client):
         )
     )
 
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output["b"] == simple_ref.uri()
 
     # expand 2 refs, should be {"b": {"a": ref}}
@@ -2974,7 +2974,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output", "output.b"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output["b"]["a"] == ref.uri()
 
     # expand 3 refs, should be {"b": {"a": {"id": 123}}}
@@ -2985,7 +2985,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output", "output.b", "output.b.a"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output["b"]["a"]["id"] == "123"
 
     # incomplete expansion columns, output should be un expanded
@@ -2996,7 +2996,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output.b"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output == nested_ref.uri()
 
     # non-existent column, should be un expanded
@@ -3007,7 +3007,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output.b", "output.zzzz"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output == nested_ref.uri()
 
 
@@ -5553,7 +5553,7 @@ def test_thread_api_with_auto_generation(client):
 
 def test_calls_query_filter_contains_in_message_array(client):
     @weave.op
-    def op1(extra_message: str = None):
+    def op1(extra_message: Optional[str] = None):
         messages = ["hello", "world"]
         if extra_message:
             messages.append(extra_message)

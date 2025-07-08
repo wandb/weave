@@ -6967,6 +6967,12 @@
       "input": 1e-05,
       "output": 4e-05,
       "created_at": "2025-04-21 09:02:31"
+    },
+    {
+      "provider": "azure",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-07-03 03:07:28"
     }
   ],
   "azure/o3-2025-04-16": [
@@ -7343,6 +7349,12 @@
       "input": 1.5e-07,
       "output": 6e-07,
       "created_at": "2025-05-23 11:53:31"
+    },
+    {
+      "provider": "gemini",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-03 03:07:28"
     }
   ],
   "gemini-2.5-flash-preview-05-20": [
@@ -7351,6 +7363,12 @@
       "input": 1.5e-07,
       "output": 6e-07,
       "created_at": "2025-05-23 11:53:31"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-03 03:07:28"
     }
   ],
   "gemini-2.0-flash-preview-image-generation": [
@@ -7759,6 +7777,12 @@
       "input": 0.0,
       "output": 0.0,
       "created_at": "2025-06-12 11:16:03"
+    },
+    {
+      "provider": "mistral",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-07-03 03:07:28"
     }
   ],
   "cerebras/qwen-3-32b": [
@@ -7839,6 +7863,318 @@
       "input": 3e-06,
       "output": 8e-06,
       "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "o3-deep-research": [
+    {
+      "provider": "openai",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "o3-deep-research-2025-06-26": [
+    {
+      "provider": "openai",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "o4-mini-deep-research": [
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "o4-mini-deep-research-2025-06-26": [
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/o3-pro": [
+    {
+      "provider": "azure",
+      "input": 2e-05,
+      "output": 8e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/o3-pro-2025-06-10": [
+    {
+      "provider": "azure",
+      "input": 2e-05,
+      "output": 8e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/gpt-4o-transcribe": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/gpt-4o-mini-transcribe": [
+    {
+      "provider": "azure",
+      "input": 1.25e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/codex-mini": [
+    {
+      "provider": "azure",
+      "input": 1.5e-06,
+      "output": 6e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "mistral/magistral-medium-latest": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "mistral/magistral-small-latest": [
+    {
+      "provider": "mistral",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "deepseek/deepseek-r1": [
+    {
+      "provider": "deepseek",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "deepseek/deepseek-v3": [
+    {
+      "provider": "deepseek",
+      "input": 2.7e-07,
+      "output": 1.1e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "xai/grok-3-latest": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "xai/grok-3-mini": [
+    {
+      "provider": "xai",
+      "input": 3e-07,
+      "output": 5e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "xai/grok-3-mini-latest": [
+    {
+      "provider": "xai",
+      "input": 3e-07,
+      "output": 5e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "xai/grok-3-mini-fast": [
+    {
+      "provider": "xai",
+      "input": 6e-07,
+      "output": 4e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini-2.5-pro": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini/gemini-2.5-pro": [
+    {
+      "provider": "gemini",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini/gemini-2.5-flash": [
+    {
+      "provider": "gemini",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini-2.5-flash": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini/gemini-2.5-flash-lite-preview-06-17": [
+    {
+      "provider": "gemini",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini-2.5-flash-lite-preview-06-17": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/deepseek/deepseek-r1-0528": [
+    {
+      "provider": "openrouter",
+      "input": 5e-07,
+      "output": 2.15e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/google/gemini-2.5-pro": [
+    {
+      "provider": "openrouter",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/google/gemini-2.5-flash": [
+    {
+      "provider": "openrouter",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/anthropic/claude-sonnet-4": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/mistralai/mistral-small-3.1-24b-instruct": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/mistralai/mistral-small-3.2-24b-instruct": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.amazon.nova-micro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3.7e-08,
+      "output": 1.48e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.amazon.nova-lite-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 6.3e-08,
+      "output": 2.52e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.amazon.nova-pro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 8.4e-07,
+      "output": 3.36e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.anthropic.claude-3-haiku-20240307-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2.5e-07,
+      "output": 1.25e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.anthropic.claude-3-sonnet-20240229-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.anthropic.claude-3-5-sonnet-20240620-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.anthropic.claude-3-5-sonnet-20241022-v2:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.anthropic.claude-sonnet-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "watsonx/mistralai/mistral-large": [
+    {
+      "provider": "watsonx",
+      "input": 3e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-07 12:22:29"
+    }
+  ],
+  "azure_ai/cohere-rerank-v3.5": [
+    {
+      "provider": "azure_ai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-07-07 12:22:29"
     }
   ]
 }
