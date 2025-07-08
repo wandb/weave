@@ -1,9 +1,9 @@
+from tests.trace_server.test_calls_query_builder import assert_sql
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
 )
 from weave.trace_server.interface import query as tsi_query
-from tests.trace_server.test_calls_query_builder import assert_sql
 
 
 def test_object_ref_filter_simple() -> None:
@@ -33,9 +33,9 @@ def test_object_ref_filter_simple() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -107,9 +107,9 @@ def test_object_ref_filter_nested() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -223,9 +223,9 @@ def test_multiple_object_ref_filters() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -242,9 +242,9 @@ def test_multiple_object_ref_filters() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -361,9 +361,9 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -380,9 +380,9 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -399,9 +399,9 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -418,9 +418,9 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -558,9 +558,9 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -577,9 +577,9 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -596,9 +596,9 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -679,9 +679,9 @@ def test_object_ref_order_by_simple() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   nullIf(JSON_VALUE(any(val_dump), {pb_1:String}), '') AS object_val_dump,
                   digest as ref
@@ -747,9 +747,9 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
@@ -829,9 +829,9 @@ def test_object_ref_filter_complex_nested_path() -> None:
            GROUP BY project_id,
                     object_id,
                     digest
-           
+
            UNION ALL
-           
+
            SELECT digest,
                   digest as ref
            FROM table_rows
