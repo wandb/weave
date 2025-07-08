@@ -1,14 +1,14 @@
 import {
   allObjPaths,
+  dict,
   isAssignableTo,
   isListLike,
   list,
   listObjectTypePassTags,
+  maybe,
   taggedValue,
   typedDict,
   union,
-  maybe,
-  dict,
 } from './helpers';
 
 describe('allObjPaths', () => {
