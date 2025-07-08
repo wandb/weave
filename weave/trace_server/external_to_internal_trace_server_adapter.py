@@ -211,6 +211,32 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             # TODO: How do we correctly process user_id for the query filters?
         return self._ref_apply(self._internal_trace_server.calls_query_stats, req)
 
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        for item in req.batch:
+            if item.mode == "start":
+                req.start.project_id = self._idc.ext_to_int_project_id(
+                    req.start.project_id
+                )
+                if req.start.wb_run_id is not None:
+                    req.start.wb_run_id = self._idc.ext_to_int_run_id(
+                        req.start.wb_run_id
+                    )
+                if req.start.wb_user_id is not None:
+                    req.start.wb_user_id = self._idc.ext_to_int_user_id(
+                        req.start.wb_user_id
+                    )
+            elif item.mode == "end":
+                req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
+                if req.end.wb_run_id is not None:
+                    req.end.wb_run_id = self._idc.ext_to_int_run_id(req.end.wb_run_id)
+                if req.end.wb_user_id is not None:
+                    req.end.wb_user_id = self._idc.ext_to_int_user_id(
+                        req.end.wb_user_id
+                    )
+            else:
+                raise ValueError(f"Invalid mode: {item.mode}")
+        return self._ref_apply(self._internal_trace_server.call_start_batch, req)
+
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
