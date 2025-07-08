@@ -1,10 +1,11 @@
-import weave
+import asyncio
+
 import pytest
 
-from weave import Evaluation
+import weave
 from tests.trace.util import client_is_sqlite
+from weave import Evaluation
 from weave.trace_server import trace_server_interface as tsi
-import asyncio
 
 
 def test_filter_calls_by_ref_properties(client):
