@@ -17,10 +17,8 @@ model = "claude-3-haiku-20240307"
 def test_anthropic(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
-    anthropic_client = Anthropic(
-        api_key=api_key,
-    )
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
     message = anthropic_client.messages.create(
         model=model,
         max_tokens=1024,
@@ -57,10 +55,8 @@ def test_anthropic(
 def test_anthropic_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
-    anthropic_client = Anthropic(
-        api_key=api_key,
-    )
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
     stream = anthropic_client.messages.create(
         model=model,
         stream=True,
@@ -109,7 +105,7 @@ async def test_async_anthropic(
 ) -> None:
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
-        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+        api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
 
     message = await anthropic_client.messages.create(
@@ -151,7 +147,7 @@ async def test_async_anthropic_stream(
 ) -> None:
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
-        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+        api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
 
     stream = await anthropic_client.messages.create(
@@ -199,10 +195,8 @@ async def test_async_anthropic_stream(
 def test_tools_calling(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
-    anthropic_client = Anthropic(
-        api_key=api_key,
-    )
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
     message = anthropic_client.messages.create(
         model=model,
         max_tokens=1024,
@@ -261,10 +255,8 @@ def test_tools_calling(
 def test_anthropic_messages_stream_ctx_manager(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
-    anthropic_client = Anthropic(
-        api_key=api_key,
-    )
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
 
     all_content = ""
     with anthropic_client.messages.stream(
@@ -312,7 +304,7 @@ async def test_async_anthropic_messages_stream_ctx_manager(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     anthropic_client = AsyncAnthropic(
-        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+        api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
 
     all_content = ""
@@ -360,10 +352,8 @@ async def test_async_anthropic_messages_stream_ctx_manager(
 def test_anthropic_messages_stream_ctx_manager_text(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
-    anthropic_client = Anthropic(
-        api_key=api_key,
-    )
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
 
     all_content = ""
     with anthropic_client.messages.stream(
@@ -410,7 +400,7 @@ async def test_async_anthropic_messages_stream_ctx_manager_text(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
     anthropic_client = AsyncAnthropic(
-        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+        api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
 
     all_content = ""
@@ -457,10 +447,8 @@ async def test_async_anthropic_messages_stream_ctx_manager_text(
 def test_beta_anthropic(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
-    anthropic_client = Anthropic(
-        api_key=api_key,
-    )
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
     message = anthropic_client.beta.messages.create(
         model=model,
         max_tokens=1024,
@@ -497,10 +485,8 @@ def test_beta_anthropic(
 def test_beta_anthropic_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
-    anthropic_client = Anthropic(
-        api_key=api_key,
-    )
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
     stream = anthropic_client.beta.messages.create(
         model=model,
         stream=True,
@@ -549,7 +535,7 @@ async def test_beta_async_anthropic(
 ) -> None:
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
-        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+        api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
 
     message = await anthropic_client.beta.messages.create(
@@ -591,7 +577,7 @@ async def test_beta_async_anthropic_stream(
 ) -> None:
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
-        api_key=os.environ.get("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+        api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
 
     stream = await anthropic_client.beta.messages.create(
