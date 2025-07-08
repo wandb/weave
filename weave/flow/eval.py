@@ -119,12 +119,12 @@ class Evaluation(Object):
                 field_values[field_name] = getattr(obj, field_name)
 
         # special case for scorers
-        if "scorers" in field_values:
+        if orig_scorers := field_values.get("scorers"):
             from weave import scorers as weave_scorers
 
             assert weave_scorers
             scorers = []
-            for scorer in field_values["scorers"]:
+            for scorer in orig_scorers:
                 objectified = maybe_objectify(scorer)
                 scorers.append(objectified)
             field_values["scorers"] = scorers
