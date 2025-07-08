@@ -8160,5 +8160,21 @@
       "output": 1.5e-05,
       "created_at": "2025-07-03 03:07:28"
     }
+  ],
+  "watsonx/mistralai/mistral-large": [
+    {
+      "provider": "watsonx",
+      "input": 3e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-07 12:22:29"
+    }
+  ],
+  "azure_ai/cohere-rerank-v3.5": [
+    {
+      "provider": "azure_ai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-07-07 12:22:29"
+    }
   ]
 }
