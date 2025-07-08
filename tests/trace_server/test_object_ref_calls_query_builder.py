@@ -123,6 +123,7 @@ def test_object_ref_filter_nested() -> None:
                   concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
            FROM object_versions ov
            WHERE ov.project_id = {pb_0:String}
+             AND length(refs) > 0
              AND JSON_VALUE(ov.val_dump, {pb_3:String}) IN (SELECT ref FROM obj_filter_0)
            GROUP BY ov.project_id,
                     ov.object_id,
@@ -133,6 +134,7 @@ def test_object_ref_filter_nested() -> None:
                   concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
            FROM object_versions ov
            WHERE ov.project_id = {pb_0:String}
+             AND length(refs) > 0
              AND JSON_VALUE(ov.val_dump, {pb_4:String}) IN (SELECT ref FROM obj_filter_1)
            GROUP BY ov.project_id,
                     ov.object_id,
@@ -763,6 +765,7 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
                   concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
            FROM object_versions ov
            WHERE ov.project_id = {pb_0:String}
+             AND length(refs) > 0
              AND JSON_VALUE(ov.val_dump, {pb_3:String}) IN (SELECT ref FROM obj_filter_0)
            GROUP BY ov.project_id,
                     ov.object_id,
@@ -845,6 +848,7 @@ def test_object_ref_filter_complex_nested_path() -> None:
                   concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
            FROM object_versions ov
            WHERE ov.project_id = {pb_0:String}
+             AND length(refs) > 0
              AND JSON_VALUE(ov.val_dump, {pb_3:String}) IN (SELECT ref FROM obj_filter_0)
            GROUP BY ov.project_id,
                     ov.object_id,

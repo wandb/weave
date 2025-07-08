@@ -682,7 +682,6 @@ def build_object_ref_ctes(
 
         # Build the leaf-level CTE (filters on the actual property value)
         leaf_cte_name, cte_counter = _get_cte_name(cte_counter)
-
         leaf_property = condition.get_leaf_object_property_path()
         json_path_param = pb.add_param(quote_json_path(leaf_property))
 
@@ -715,70 +714,32 @@ def build_object_ref_ctes(
                 val_condition = handler.handle_in_operation(condition)
         val_condition_sql = f"AND {val_condition}" if val_condition else ""
 
-        # Build the leaf CTE that unions both object_versions and table_rows
-        leaf_cte = f"""
-        {leaf_cte_name} AS (
-            SELECT
-                digest,
-                {val_dump_select}
-                concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
-            FROM object_versions
-            WHERE project_id = {param_slot(project_param, "String")}
-                {val_condition_sql}
-            GROUP BY project_id, object_id, digest
-
-            UNION ALL
-
-            SELECT
-                digest,
-                {val_dump_select}
-                digest as ref
-            FROM table_rows
-            WHERE project_id = {param_slot(project_param, "String")}
-            {val_condition_sql}
-            GROUP BY project_id, digest
-        )"""
-
+        leaf_cte = _build_leaf_cte_sql(
+            project_param,
+            condition,
+            leaf_cte_name,
+            val_dump_select,
+            val_condition_sql,
+        )
         cte_parts.append(leaf_cte)
         current_cte_name = leaf_cte_name
 
         intermediate_refs = condition.get_intermediate_object_refs()
-        # If we have intermediate object references (nested), build CTEs for them
         if not intermediate_refs:
             field_to_cte_alias_map[condition.unique_key] = current_cte_name
             continue
 
-        # Work backwards to build the chain of CTEs
+        # Work backwards to build the chain of intermediate object references CTEs
         for ref_property in reversed(intermediate_refs):
             intermediate_cte_name, cte_counter = _get_cte_name(cte_counter)
-
             prop_json_path_param = pb.add_param(quote_json_path(ref_property))
-
-            # For intermediate CTEs, we need to propagate the object_val_dump from the previous CTE
-            # rather than selecting it from the current object's val_dump
-            intermediate_val_dump_select, join_clause_for_ordering = "", ""
-            if isinstance(condition, ObjectRefOrderCondition):
-                # Select the object_val_dump from the previous CTE to propagate the leaf value
-                intermediate_val_dump_select = (
-                    "any(prev.object_val_dump) AS object_val_dump,"
-                )
-                join_clause_for_ordering = f"JOIN {current_cte_name} prev ON JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) = prev.ref"
-
-            intermediate_cte = f"""
-            {intermediate_cte_name} AS (
-                SELECT
-                    ov.object_id,
-                    ov.digest,
-                    {intermediate_val_dump_select}
-                    concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
-                FROM object_versions ov
-                {join_clause_for_ordering}
-                WHERE ov.project_id = {param_slot(project_param, "String")}
-                    AND JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) IN (
-                        SELECT ref FROM {current_cte_name}
-                    )
-                GROUP BY ov.project_id, ov.object_id, ov.digest
-            )"""
+            intermediate_cte = _build_intermediate_cte_sql(
+                project_param,
+                intermediate_cte_name,
+                condition,
+                prop_json_path_param,
+                current_cte_name,
+            )
             cte_parts.append(intermediate_cte)
             current_cte_name = intermediate_cte_name
 
@@ -787,7 +748,78 @@ def build_object_ref_ctes(
     if not cte_parts:
         return "", {}
 
-    return ",\n".join(cte_parts), field_to_cte_alias_map
+    cte_part_sql = ",\n".join(cte_parts)
+
+    return cte_part_sql, field_to_cte_alias_map
+
+
+def _build_leaf_cte_sql(
+    project_param: str,
+    condition: ObjectRefCondition,
+    leaf_cte_name: str,
+    val_dump_select: str,
+    val_condition_sql: str,
+) -> str:
+    # Build the leaf CTE that unions both object_versions and table_rows
+    return f"""
+    {leaf_cte_name} AS (
+        SELECT
+            digest,
+            {val_dump_select}
+            concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
+        FROM object_versions
+        WHERE project_id = {param_slot(project_param, "String")}
+            {val_condition_sql}
+        GROUP BY project_id, object_id, digest
+
+        UNION ALL
+
+        SELECT
+            digest,
+            {val_dump_select}
+            digest as ref
+        FROM table_rows
+        WHERE project_id = {param_slot(project_param, "String")}
+        {val_condition_sql}
+        GROUP BY project_id, digest
+    )"""
+
+
+def _build_intermediate_cte_sql(
+    project_param: str,
+    intermediate_cte_name: str,
+    condition: ObjectRefCondition,
+    prop_json_path_param: str,
+    current_cte_name: str,
+) -> str:
+    # TODO: use object_version refs to further optimize performance, currently getting
+    #       the length can filter down, but we could actually compare the refs
+    # TODO: allow intermediate resolution of objects through table rows, currently
+    #       table rows can only be leaf
+
+    # For intermediate CTEs, we need to propagate the object_val_dump from the previous CTE
+    # rather than selecting it from the current object's val_dump
+    intermediate_val_dump_select, join_clause_for_ordering = "", ""
+    if isinstance(condition, ObjectRefOrderCondition):
+        # Select the object_val_dump from the previous CTE to propagate the leaf value
+        intermediate_val_dump_select = "any(prev.object_val_dump) AS object_val_dump,"
+        join_clause_for_ordering = f"JOIN {current_cte_name} prev ON JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) = prev.ref"
+    return f"""
+    {intermediate_cte_name} AS (
+        SELECT
+            ov.object_id,
+            ov.digest,
+            {intermediate_val_dump_select}
+            concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
+        FROM object_versions ov
+        {join_clause_for_ordering}
+        WHERE ov.project_id = {param_slot(project_param, "String")}
+            AND length(refs) > 0
+            AND JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) IN (
+                SELECT ref FROM {current_cte_name}
+            )
+        GROUP BY ov.project_id, ov.object_id, ov.digest
+    )"""
 
 
 def has_object_ref_field(field_path: str, expand_columns: list[str]) -> bool:
