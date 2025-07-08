@@ -202,17 +202,17 @@ const useColumnWidths = (
 /**
  * Renders a cell value from the dataset
  */
-const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps> = props => {
+const DatasetRowItemRenderer: React.FC<DatasetRowItemRendererProps & { lineClamp?: number }> = props => {
   const ctx = useCompareEvaluationsState();
   const row = useExampleCompareData(ctx, props.digest);
   if (row.loading) {
     return <LoadingDots />;
   }
-  return <DenseCellValue value={row.targetRowValue?.[props.inputKey]} />;
+  return <DenseCellValue value={row.targetRowValue?.[props.inputKey]} lineClamp={props.lineClamp} />;
 };
 
 const DenseCellValue: React.FC<
-  React.ComponentProps<typeof CellValue>
+  React.ComponentProps<typeof CellValue> & { lineClamp?: number }
 > = props => {
   if (props.value == null) {
     return <NotApplicable />;
@@ -233,14 +233,16 @@ const DenseCellValue: React.FC<
         stringStyle={{
           maxHeight: '100%',
           width: '100%',
-          overflow: 'auto',
+          overflow: 'hidden',
           textAlign: 'left',
           lineHeight: '1.2',
           flex: 1,
           whiteSpace: 'pre-wrap',
           wordWrap: 'break-word',
           textOverflow: 'ellipsis',
-          display: 'flex',
+          display: '-webkit-box',
+          WebkitLineClamp: props.lineClamp || 1,
+          WebkitBoxOrient: 'vertical',
         }}
       />
     </Box>
@@ -254,12 +256,10 @@ export const ExampleCompareSectionTable: React.FC<
   ExampleCompareSectionTableProps
 > = props => {
   const [modelsAsRows, setModelsAsRows] = useState(false);
-  const [rowHeight, setRowHeight] = useState(70);
-  const increaseRowHeight = useCallback(() => {
-    setRowHeight(v => clip(v * 2, 35, 35 * 2 ** 4));
-  }, []);
-  const decreaseRowHeight = useCallback(() => {
-    setRowHeight(v => clip(v / 2, 35, 35 * 2 ** 4));
+  const [isLargeRowSize, setIsLargeRowSize] = useState(false);
+  const rowHeight = isLargeRowSize ? 132 : 32;
+  const toggleRowSize = useCallback(() => {
+    setIsLargeRowSize(v => !v);
   }, []);
   const onlyOneModel = props.state.evaluationCallIdsOrdered.length === 1;
   const header = (
@@ -276,14 +276,9 @@ export const ExampleCompareSectionTable: React.FC<
           justifyContent: 'flex-start',
           alignItems: 'center',
         }}>
-        <Tooltip title="Increase Row Height">
-          <IconButton onClick={increaseRowHeight}>
-            <Icon name="expand-uncollapse" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Decrease Row Height">
-          <IconButton onClick={decreaseRowHeight}>
-            <Icon name="collapse" />
+        <Tooltip title={isLargeRowSize ? "Small Row Size" : "Large Row Size"}>
+          <IconButton onClick={toggleRowSize}>
+            <Icon name={isLargeRowSize ? "collapse" : "expand-uncollapse"} />
           </IconButton>
         </Tooltip>
         {!onlyOneModel && (
@@ -314,11 +309,13 @@ export const ExampleCompareSectionTable: React.FC<
       <ExampleCompareSectionTableModelsAsRows
         {...props}
         rowHeight={rowHeight}
+        lineClamp={isLargeRowSize ? 6 : 1}
       />
     ) : (
       <ExampleCompareSectionTableModelsAsColumns
         {...props}
         rowHeight={rowHeight}
+        lineClamp={isLargeRowSize ? 6 : 1}
       />
     );
   return (
@@ -571,7 +568,8 @@ const inputFields = (
   inputSubFields: string[],
   setSelectedInputDigest: (inputDigest: string) => void,
   onShowSplitView: () => void,
-  columnWidths: {[key: string]: number}
+  columnWidths: {[key: string]: number},
+  lineClamp: number
 ): GridColDef<RowData>[] => [
   {
     field: 'inputDigest',
@@ -622,6 +620,7 @@ const inputFields = (
         <DatasetRowItemRenderer
           digest={params.row.inputDigest}
           inputKey={key}
+          lineClamp={lineClamp}
         />
       );
     },
@@ -683,7 +682,7 @@ const expansionField = (
 
 // Component for displaying models as rows
 export const ExampleCompareSectionTableModelsAsRows: React.FC<
-  ExampleCompareSectionTableProps & {rowHeight: number}
+  ExampleCompareSectionTableProps & {rowHeight: number; lineClamp: number}
 > = props => {
   const ctx = useCompareEvaluationsState();
   const onlyOneModel = ctx.state.evaluationCallIdsOrdered.length === 1;
@@ -722,7 +721,8 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView,
-        inputWidths
+        inputWidths,
+        props.lineClamp
       ),
       ...(onlyOneModel
         ? []
@@ -843,12 +843,14 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
             return (
               <DenseCellValue
                 value={params.row.output[key]?.[params.row.evaluationCallId]}
+                lineClamp={props.lineClamp}
               />
             );
           }
           return (
             <DenseCellValue
               value={params.row.output[key]?.[params.row.evaluationCallId]}
+              lineClamp={props.lineClamp}
             />
           );
         },
@@ -919,6 +921,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     setSelectedInputDigest,
     props.onShowSplitView,
     props.state,
+    props.lineClamp,
     inputWidths,
     onlyOneModel,
     hasTrials,
@@ -1026,7 +1029,7 @@ const useOnlyExpandedRows = (
 
 // Component for displaying models as columns
 export const ExampleCompareSectionTableModelsAsColumns: React.FC<
-  ExampleCompareSectionTableProps & {rowHeight: number}
+  ExampleCompareSectionTableProps & {rowHeight: number; lineClamp: number}
 > = props => {
   const ctx = useCompareEvaluationsState();
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(ctx.state);
@@ -1062,7 +1065,8 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         inputSubFields.inputSubFields,
         setSelectedInputDigest,
         props.onShowSplitView,
-        inputWidths
+        inputWidths,
+        props.lineClamp
       ),
       ...(hasTrials
         ? [
@@ -1101,12 +1105,14 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                 return (
                   <DenseCellValue
                     value={params.row.output?.[key]?.[evaluationCallId]}
+                    lineClamp={props.lineClamp}
                   />
                 );
               }
               return (
                 <DenseCellValue
                   value={params.row.output?.[key]?.[evaluationCallId]}
+                  lineClamp={props.lineClamp}
                 />
               );
             },
@@ -1181,6 +1187,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     setSelectedInputDigest,
     props.onShowSplitView,
     props.state,
+    props.lineClamp,
     inputWidths,
     hasTrials,
     toggleDefaultExpansionState,
@@ -1330,6 +1337,3 @@ const useColumnsWithControlledWidths = (columns: GridColDef<RowData>[]) => {
   };
 };
 
-const clip = (value: number, min: number, max: number) => {
-  return Math.max(min, Math.min(value, max));
-};
