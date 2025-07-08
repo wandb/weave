@@ -51,8 +51,15 @@ from weave.trace_server.execution_runner.user_scripts.run_model import run_model
 
 logger = logging.getLogger(__name__)
 
+
 # Maximum time (in seconds) to wait for a child process to complete execution
 EXECUTION_TIMEOUT_SECONDS = 60
+
+# Default number of concurrent requests the trace server adapter can handle
+DEFAULT_MAX_WORKERS = 8
+
+# Maximum time (in seconds) to wait for a server request to complete
+SERVER_REQUEST_TIMEOUT_SECONDS = 5
 
 
 @contextmanager
@@ -123,6 +130,7 @@ class RunAsUserChildProcessContext(Generic[T]):
 
     process_safe_trace_server_handle: ProcessSafeTraceServerHandle
     project_id: str
+    server_request_timeout_seconds: float
     result_queue: multiprocessing.Queue[T]
     trace_ctx: ddtrace.SpanContext | None = None
 
@@ -156,7 +164,8 @@ def _generic_child_process_wrapper(
     with ddtrace.tracer.trace("run_as_user._generic_child_process_wrapper.inner"):
         # Build the trace server client in the child process
         safe_trace_server = ProcessSafeTraceServerClient(
-            wrapper_context.process_safe_trace_server_handle
+            wrapper_context.process_safe_trace_server_handle,
+            wrapper_context.server_request_timeout_seconds,
         )
 
         try:
@@ -211,7 +220,8 @@ class RunAsUser:
         project_id: str,
         wb_user_id: str,
         timeout_seconds: float = EXECUTION_TIMEOUT_SECONDS,
-        max_concurrent_requests: int = 10,
+        server_request_timeout_seconds: float = SERVER_REQUEST_TIMEOUT_SECONDS,
+        max_concurrent_requests: int = DEFAULT_MAX_WORKERS,
     ) -> None:
         """
         Initialize a RunAsUser instance with specific trace server and user context.
@@ -227,6 +237,7 @@ class RunAsUser:
         self.project_id = project_id
         self.wb_user_id = wb_user_id
         self.timeout_seconds = timeout_seconds
+        self.server_request_timeout_seconds = server_request_timeout_seconds
         self.max_concurrent_requests = max_concurrent_requests
 
     @ddtrace.tracer.wrap(name="run_as_user._run_user_scoped_function")
@@ -299,6 +310,7 @@ class RunAsUser:
                     "wrapper_context": RunAsUserChildProcessContext(
                         process_safe_trace_server_handle=process_safe_trace_server_handle,
                         project_id=project_id,
+                        server_request_timeout_seconds=self.server_request_timeout_seconds,
                         result_queue=result_queue,
                         trace_ctx=ddtrace.tracer.current_trace_context(),
                     ),

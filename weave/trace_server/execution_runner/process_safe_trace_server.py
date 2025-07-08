@@ -13,6 +13,7 @@ import logging
 import multiprocessing
 import queue
 import threading
+import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -65,7 +66,7 @@ class ProcessSafeTraceServerAdapter:
     def __init__(
         self,
         trace_server: tsi.TraceServerInterface,
-        max_workers: int = 10,
+        max_workers: int,
         context_values: Optional[dict[contextvars.ContextVar, Any]] = None,
     ):
         """
@@ -234,13 +235,18 @@ class ProcessSafeTraceServerClient(tsi.TraceServerInterface):
     - Handles request/response correlation
     """
 
-    def __init__(self, handle: ProcessSafeTraceServerHandle):
+    def __init__(
+        self,
+        handle: ProcessSafeTraceServerHandle,
+        server_request_timeout_seconds: float,
+    ):
         """
         Initialize client with a process-safe handle.
 
         Args:
             handle: Handle containing queues for communication
         """
+        self.server_request_timeout_seconds = server_request_timeout_seconds
         self.request_queue = handle.request_queue
         self.response_queue = handle.response_queue
 
@@ -312,8 +318,13 @@ class ProcessSafeTraceServerClient(tsi.TraceServerInterface):
         )
 
         # Wait for response
-        if not event.wait(timeout=30.0):
-            raise TimeoutError(f"Request {request_id} timed out")
+        start_time = time.time()
+        if not event.wait(timeout=self.server_request_timeout_seconds):
+            raise TimeoutError(f"Request {request_id} timed out: {method_name}({args})")
+        end_time = time.time()
+        logger.debug(
+            f"Request {request_id} took {end_time - start_time} seconds: {method_name}({args})"
+        )
 
         # Get response
         with self._lock:
@@ -483,7 +494,7 @@ class ProcessSafeTraceServerClient(tsi.TraceServerInterface):
 
 def create_process_safe_trace_server(
     trace_server: tsi.TraceServerInterface,
-    max_workers: int = 10,
+    max_workers: int,
     context_values: Optional[dict[contextvars.ContextVar, Any]] = None,
 ) -> tuple[ProcessSafeTraceServerAdapter, ProcessSafeTraceServerHandle]:
     """
@@ -515,6 +526,7 @@ def create_process_safe_trace_server(
 
 # === Context propagation support ===
 
+
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 # List of context variables to propagate to worker threads
@@ -522,13 +534,10 @@ CONTEXT_VARS_TO_PROPAGATE: list[contextvars.ContextVar] = [
     _secret_fetcher_context,
 ]
 
-# Default number of concurrent requests the trace server adapter can handle
-DEFAULT_MAX_WORKERS = 10
-
 
 def generate_child_process_trace_server_args(
     trace_server: tsi.TraceServerInterface,
-    max_workers: int = DEFAULT_MAX_WORKERS,
+    max_workers: int,
 ) -> tuple[ProcessSafeTraceServerAdapter, ProcessSafeTraceServerHandle]:
     """
     Generate a handle for child process trace server.

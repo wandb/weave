@@ -22,6 +22,7 @@ from weave.trace_server.trace_server_interface import (
     RunModelRes,
     TableCreateReq,
     TraceServerInterface,
+    TraceStatus,
 )
 
 
@@ -545,10 +546,10 @@ async def test_evaluate_model(
                 "messages_template": [
                     {
                         "role": "system",
-                        "content": "You are an expert judge. Compare the model output to the expected output and return a score from 0 to 10.",
+                        "content": "You are an expert judge. Compare the model output to the expected output and return a score from 0 to 10. Please return the score in a JSON object with the key 'score'.",
                     },
                 ],
-                "response_format": "text",
+                "response_format": "json_object",
             },
         }
         scorer_model_create_res = ch_only_trace_server.obj_create(
@@ -694,11 +695,13 @@ async def test_evaluate_model(
         # evaluate
         # predict_and_score
         #    predict
-        # complete
+        #       complete
         #    score
-        # complete
+        #       predict
+        #          complete
         # summary
-        assert len(calls_res.calls) == 7
+        #    scorer summary
+        assert len(calls_res.calls) == 9
 
         # Query for the specific evaluation call
         eval_calls_res = ch_only_trace_server.calls_query(
@@ -718,7 +721,17 @@ async def test_evaluate_model(
             f"weave:///{project_id}/op/Evaluation.evaluate:"
         )
         assert eval_res.output == eval_call.output
-        assert eval_call.summary == {}
+        assert isinstance(eval_call.summary, dict)
+        assert eval_call.summary["status_counts"] == {
+            TraceStatus.SUCCESS: 7,
+            TraceStatus.ERROR: 0,
+        }
+        assert eval_call.summary["weave"]["status"] == TraceStatus.SUCCESS
+        assert eval_call.output == {
+            "output": {"score": {"mean": 9.0}},
+            "LLMAsAJudgeScorer": {"score": {"mean": 9.0}},
+            "model_latency": {"mean": pytest.approx(0, abs=1)},
+        }
 
     for run_mode_local in [False, True]:
         local_suffix = "_local" if run_mode_local else ""
