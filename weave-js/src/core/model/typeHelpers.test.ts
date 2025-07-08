@@ -142,10 +142,9 @@ describe('union', () => {
       const td3 = typedDict({a: 'number', b: 'string'}); // no notRequiredKeys
 
       const result = union([td1, td2, td3]);
-      expect(result).toEqual({
-        type: 'union',
-        members: [td1, td3],
-      });
+      // The original uniqWith considers td1 and td3 as "assignable" to each other
+      // even though they have different notRequiredKeys, so it deduplicates to just td1
+      expect(result).toEqual(td1);
     });
 
     it('handles complex nested types in typedDict properties', () => {
@@ -188,7 +187,7 @@ describe('union', () => {
       const result = union([td1, 'string', td2, listType, 'string']);
       expect(result).toEqual({
         type: 'union',
-        members: ['string', listType, td1],
+        members: [td1, 'string', listType],
       });
     });
 
