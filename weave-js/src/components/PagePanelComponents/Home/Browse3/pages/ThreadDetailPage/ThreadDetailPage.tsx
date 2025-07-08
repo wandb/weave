@@ -1,7 +1,8 @@
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import React, {FC, useState} from 'react';
+import React, {FC, useCallback, useEffect, useRef, useState} from 'react';
+import {usePrevious} from 'react-use';
 
 import {useEntityProject} from '../../context';
 import {SimplePageLayout} from '../common/SimplePageLayout';
@@ -10,8 +11,8 @@ import {SplitPanelRight} from '../common/SplitPanels/SplitPanelRight';
 import {StatusChip} from '../common/StatusChip';
 import {ComputedCallStatusType} from '../wfReactInterface/traceServerClientTypes';
 import {useThreadTurns} from '../wfReactInterface/tsDataModelHooks';
+import {ThreadChatView, ThreadChatViewRef} from './ThreadChatView';
 import {ThreadMetadata} from './ThreadMetadata';
-import {ThreadTurnDetails} from './ThreadTurnDetails';
 import {ThreadTurnsList} from './ThreadTurnsList';
 
 export interface ThreadDetailHeaderProps {
@@ -87,6 +88,14 @@ export interface ThreadDetailPageProps {
  * - Thread metadata (ID, status, turn count, etc.)
  * - Timeline of turns within the thread
  * - Performance metrics and latency information
+ * - Bidirectional synchronization between turn selection and scroll position
+ *
+ * The page maintains synchronization between user-initiated turn selection
+ * (via navigation buttons or turn list) and scroll-based turn visibility,
+ * preventing infinite loops through source-aware state management.
+ *
+ * Optimized communication: ThreadChatView directly reports turn indices
+ * instead of turn IDs, eliminating the need for conversion logic.
  *
  * @param threadId - The ID of the thread to display
  *
@@ -97,6 +106,9 @@ export const ThreadDetailPage: FC<ThreadDetailPageProps> = ({threadId}) => {
   // State for selected turn index
   const [selectedTurnIndex, setSelectedTurnIndex] = useState<number>(0);
 
+  // Track the source of selection changes to prevent infinite loops
+  const [isScrollTriggered, setIsScrollTriggered] = useState<boolean>(false);
+
   // TODO: Replace with actual status from API/state
   const status: ComputedCallStatusType = 'success';
 
@@ -106,25 +118,61 @@ export const ThreadDetailPage: FC<ThreadDetailPageProps> = ({threadId}) => {
 
   const turnCount = turnsState.value?.length || 0;
 
-  // Navigation callbacks - navigate between turns
+  // Ref for ThreadChatView to enable programmatic scrolling
+  const chatViewRef = useRef<ThreadChatViewRef>(null);
+
+  // Get the currently selected turn ID from the index
+  const selectedTurnId = turnsState.value?.[selectedTurnIndex]?.id;
+
+  // Track previous selectedTurnId
+  const prevSelectedTurnId = usePrevious(selectedTurnId);
+
+  // Handle scroll-initiated turn visibility changes from ThreadChatView
+  const handleVisibleTurnChange = useCallback(
+    (turnIndex: number) => {
+      if (turnIndex !== selectedTurnIndex) {
+        setIsScrollTriggered(true);
+        setSelectedTurnIndex(turnIndex);
+        // Reset the scroll trigger flag after a brief delay to allow state to update
+        setTimeout(() => setIsScrollTriggered(false), 0);
+      }
+    },
+    [selectedTurnIndex]
+  );
+
+  // Navigation callbacks - navigate between turns (user-initiated)
   const handleUpClick = () => {
     if (selectedTurnIndex > 0) {
+      setIsScrollTriggered(false); // Ensure this is user-initiated
       setSelectedTurnIndex(selectedTurnIndex - 1);
     }
   };
 
   const handleDownClick = () => {
     if (selectedTurnIndex < turnCount - 1) {
+      setIsScrollTriggered(false); // Ensure this is user-initiated
       setSelectedTurnIndex(selectedTurnIndex + 1);
     }
   };
 
   const handleTurnSelect = (index: number) => {
+    setIsScrollTriggered(false); // Ensure this is user-initiated
     setSelectedTurnIndex(index);
   };
 
-  // Get the currently selected turn ID from the index
-  const selectedTurnId = turnsState.value?.[selectedTurnIndex]?.id;
+  // Scroll to turn when selectedTurnId changes due to user interaction
+  useEffect(() => {
+    // Only scroll if:
+    // 1. selectedTurnId exists and actually changed
+    // 2. The change was NOT triggered by scrolling (to prevent infinite loops)
+    if (
+      selectedTurnId &&
+      selectedTurnId !== prevSelectedTurnId &&
+      !isScrollTriggered
+    ) {
+      chatViewRef.current?.scrollToTurn(selectedTurnId);
+    }
+  }, [selectedTurnId, prevSelectedTurnId, isScrollTriggered]);
 
   return (
     <SimplePageLayout
@@ -167,9 +215,11 @@ export const ThreadDetailPage: FC<ThreadDetailPageProps> = ({threadId}) => {
                         maxWidth="0%" // No right drawer needed
                         isDrawerOpen={false}
                         main={
-                          <ThreadTurnDetails
-                            selectedTurnId={selectedTurnId}
-                            isLoading={turnsState.loading}
+                          <ThreadChatView
+                            ref={chatViewRef}
+                            turnsState={turnsState}
+                            threadId={threadId}
+                            onVisibleTurnChange={handleVisibleTurnChange}
                           />
                         }
                       />

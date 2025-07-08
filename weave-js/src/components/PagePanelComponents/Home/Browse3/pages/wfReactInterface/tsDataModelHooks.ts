@@ -2580,13 +2580,84 @@ export const useThreadTurns = (
       ],
     });
 
-    console.log({result});
     return result.calls ?? [];
   }, [getTsClient, threadId]);
 
   return {
     turnsState: turns,
   };
+};
+
+export const useThreadMessageIds = (
+  projectId: string,
+  threadId: string
+): AsyncState<Array<string>> => {
+  const getTsClient = useGetTraceServerClientContext();
+  return useAsync(async () => {
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      query: {
+        $expr: {
+          $eq: [{$getField: 'thread_id'}, {$literal: threadId}],
+        },
+      },
+      columns: ['id', 'parent_id', 'summary', 'started_at'],
+    });
+
+    const calls = result.calls ?? [];
+
+    const parentIds = new Set(
+      calls.map(call => call.parent_id).filter(Boolean)
+    );
+
+    // Find leaf calls (calls whose ID is not a parent of any other call)
+    const leafCalls = calls.filter(call => !parentIds.has(call.id));
+
+    // Filter leaf calls for LLM calls (those with usage data)
+    const llmLeafCalls = leafCalls.filter(
+      call => !isEmpty(call.summary?.usage)
+    );
+
+    if (llmLeafCalls.length === 0) {
+      return [];
+    }
+
+    return _.map(llmLeafCalls, 'id');
+  }, [getTsClient, threadId]);
+};
+
+export const useThreadMessagesLoader = (
+  projectId: string,
+  threadId: string
+) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const messageIdsState = useThreadMessageIds(projectId, threadId);
+
+  const [loadMessagesState, loadMessages] = useAsyncFn(async () => {
+    if (messageIdsState.loading) {
+      return [];
+    }
+
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      filter: {call_ids: messageIdsState.value},
+      sort_by: [{field: 'started_at', direction: 'asc'}],
+      limit: 1000,
+      columns: ['id', 'started_at', 'turn_id', 'inputs', 'output'],
+      expand_columns: ['inputs', 'output'], // Server-side ref expansion
+    });
+
+    return result.calls ?? [];
+  }, [getTsClient, projectId, threadId, messageIdsState.value]);
+
+  useEffect(() => {
+    if (messageIdsState.value) {
+      loadMessages();
+    }
+  }, [messageIdsState.value, loadMessages]);
+
+  return loadMessagesState;
 };
 
 /// Utility Functions ///
