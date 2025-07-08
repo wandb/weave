@@ -740,40 +740,35 @@ export function union(members: Type[]): Type {
     }
   }
 
-  // Separate typedDicts from other types for optimized deduplication
-  const typedDicts: TypedDictType[] = [];
-  const otherTypes: Type[] = [];
+  // Deduplicate while preserving order
+  const uniqMembers: Type[] = [];
+  const seenTypedDictKeys = new Set<string>();
+  const seenOtherTypes: Type[] = [];
 
   for (const member of allMembers) {
     if (isTypedDict(member)) {
-      typedDicts.push(member);
+      // Use fast key-based deduplication for typedDicts
+      const key = getTypedDictKey(member);
+      if (!seenTypedDictKeys.has(key)) {
+        seenTypedDictKeys.add(key);
+        uniqMembers.push(member);
+      }
     } else {
-      otherTypes.push(member);
+      // Use original comparison logic for other types
+      const isDuplicate = seenOtherTypes.some(
+        seen =>
+          _.isEqual(seen, member) ||
+          (seen &&
+            member &&
+            isAssignableTo(seen, member) &&
+            isAssignableTo(member, seen))
+      );
+      if (!isDuplicate) {
+        seenOtherTypes.push(member);
+        uniqMembers.push(member);
+      }
     }
   }
-
-  // Fast deduplication for typedDicts using Map
-  const uniqueTypedDictMap = new Map<string, Type>();
-  for (const td of typedDicts) {
-    const key = getTypedDictKey(td);
-    if (!uniqueTypedDictMap.has(key)) {
-      uniqueTypedDictMap.set(key, td);
-    }
-  }
-
-  // Use original logic for other types
-  const uniqOtherTypes = _.uniqWith(otherTypes, (a, b) => {
-    return (
-      _.isEqual(a, b) ||
-      (a && b && isAssignableTo(a, b) && isAssignableTo(b, a))
-    );
-  });
-
-  // Combine deduplicated results
-  const uniqMembers = [
-    ...uniqOtherTypes,
-    ...Array.from(uniqueTypedDictMap.values()),
-  ];
 
   // Split TaggedValue members out.
   const nonTaggedMembers: Type[] = [];
