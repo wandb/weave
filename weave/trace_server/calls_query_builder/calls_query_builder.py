@@ -353,10 +353,10 @@ class OrderField(BaseModel):
         else:
             options = [(None, self.direction)]
         res = ""
-        for index, (cast, direction) in enumerate(options):
+        for index, (cast_to, direction) in enumerate(options):
             if index > 0:
                 res += ", "
-            res += f"{self.field.as_sql(pb, table_alias, cast)} {direction}"
+            res += f"{self.field.as_sql(pb, table_alias, cast_to)} {direction}"
         return res
 
 
@@ -414,6 +414,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.trace_roots_only is not None,
                 self.filter.wb_user_ids,
                 self.filter.wb_run_ids,
+                self.filter.turn_ids,
             ]
         )
 
@@ -461,6 +462,8 @@ class CallsQuery(BaseModel):
         return self
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
+        if field in DISALLOWED_FILTERING_FIELDS:
+            raise ValueError(f"Field {field} is not allowed in ORDER BY")
         direction = direction.upper()
         if direction not in ("ASC", "DESC"):
             raise ValueError(f"Direction {direction} is not allowed")
@@ -577,17 +580,13 @@ class CallsQuery(BaseModel):
             raise ValueError("Missing select columns")
 
         # Determine if the query `has_heavy_fields` by checking
-        # if it `has_heavy_select or has_heavy_filter or has_heavy_order`
         has_heavy_select = any(field.is_heavy() for field in self.select_fields)
-
         has_heavy_filter = any(
             condition.is_heavy() for condition in self.query_conditions
         )
-
         has_heavy_order = any(
             order_field.field.is_heavy() for order_field in self.order_fields
         )
-
         has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
 
         # Determine if `predicate_pushdown_possible` which is
@@ -624,7 +623,7 @@ class CallsQuery(BaseModel):
         # This can occur when there is an out of order call part insertion or worse,
         # when such occurance happens and the client terminates early.
         # Additionally: This condition is also REQUIRED for proper functioning
-        # when using the op_name and trace_id pre-group by optimizations
+        # when using pre-group by (WHERE) optimizations
         self.add_condition(
             tsi_query.NotOperation.model_validate(
                 {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
@@ -635,9 +634,9 @@ class CallsQuery(BaseModel):
         if not should_optimize and not self.include_costs:
             return self._as_sql_base_format(pb, table_alias)
 
-        # If so, build the two queries
+        # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(project_id=self.project_id)
-        outer_query = CallsQuery(
+        select_query = CallsQuery(
             project_id=self.project_id,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
@@ -646,29 +645,20 @@ class CallsQuery(BaseModel):
         # Select Fields:
         filter_query.add_field("id")
         for field in self.select_fields:
-            outer_query.select_fields.append(field)
+            select_query.select_fields.append(field)
 
-        # Query Conditions
+        # Query conditions and filter
         for condition in self.query_conditions:
-            if condition.is_heavy():
-                outer_query.query_conditions.append(condition)
-            else:
-                filter_query.query_conditions.append(condition)
+            filter_query.query_conditions.append(condition)
 
-        # Hardcoded Filter - always light
         filter_query.hardcoded_filter = self.hardcoded_filter
 
         # Order Fields:
-        if has_light_order_filter:
-            filter_query.order_fields = self.order_fields
-            filter_query.limit = self.limit
-            filter_query.offset = self.offset
-            # SUPER IMPORTANT: still need to re-sort the final query
-            outer_query.order_fields = self.order_fields
-        else:
-            outer_query.order_fields = self.order_fields
-            outer_query.limit = self.limit
-            outer_query.offset = self.offset
+        filter_query.order_fields = self.order_fields
+        filter_query.limit = self.limit
+        filter_query.offset = self.offset
+        # SUPER IMPORTANT: still need to re-sort the final query
+        select_query.order_fields = self.order_fields
 
         raw_sql = f"""
         WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
@@ -684,13 +674,13 @@ class CallsQuery(BaseModel):
                 for sort_by in self.order_fields
             ]
             raw_sql += f""",
-            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
+            all_calls AS ({select_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
             {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
             """
 
         else:
             raw_sql += f"""
-            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
+            {select_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
             """
 
         return safely_format_sql(raw_sql, logger)
@@ -734,6 +724,16 @@ class CallsQuery(BaseModel):
             table_alias,
         )
         trace_id_sql = process_trace_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        thread_id_sql = process_thread_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        turn_id_sql = process_turn_id_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -846,6 +846,8 @@ class CallsQuery(BaseModel):
         {parent_ids_filter_sql}
         {op_name_sql}
         {trace_id_sql}
+        {thread_id_sql}
+        {turn_id_sql}
         {str_filter_opt_sql}
         {ref_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
@@ -866,6 +868,8 @@ ALLOWED_CALL_FIELDS = {
     "id": CallsMergedField(field="id"),
     "trace_id": CallsMergedAggField(field="trace_id", agg_fn="any"),
     "parent_id": CallsMergedAggField(field="parent_id", agg_fn="any"),
+    "thread_id": CallsMergedAggField(field="thread_id", agg_fn="any"),
+    "turn_id": CallsMergedAggField(field="turn_id", agg_fn="any"),
     "op_name": CallsMergedAggField(field="op_name", agg_fn="any"),
     "started_at": CallsMergedAggField(field="started_at", agg_fn="any"),
     "attributes_dump": CallsMergedDynamicField(field="attributes_dump", agg_fn="any"),
@@ -909,9 +913,8 @@ def get_field_by_name(name: str) -> CallsMergedField:
             dumped_start_part = start_part + "_dump"
             if dumped_start_part in ALLOWED_CALL_FIELDS:
                 field = ALLOWED_CALL_FIELDS[dumped_start_part]
-                if isinstance(field, CallsMergedDynamicField):
-                    if len(field_parts) > 1:
-                        return field.with_path(field_parts[1:])
+                if isinstance(field, CallsMergedDynamicField) and len(field_parts) > 1:
+                    return field.with_path(field_parts[1:])
                 return field
             raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
@@ -1195,6 +1198,76 @@ def process_trace_id_filter_to_sql(
     return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
 
 
+def process_thread_id_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the thread_id and returns a sql string if there are any thread_ids."""
+    if (
+        hardcoded_filter is None
+        or hardcoded_filter.filter.thread_ids is None
+        or len(hardcoded_filter.filter.thread_ids) == 0
+    ):
+        return ""
+
+    thread_ids = hardcoded_filter.filter.thread_ids
+
+    assert_parameter_length_less_than_max("thread_ids", len(thread_ids))
+
+    thread_id_field = get_field_by_name("thread_id")
+    if not isinstance(thread_id_field, CallsMergedAggField):
+        raise TypeError("thread_id is not an aggregate field")
+    thread_id_field_sql = thread_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    # If there's only one thread_id, use an equality condition for performance
+    if len(thread_ids) == 1:
+        thread_cond = f"{thread_id_field_sql} = {param_slot(param_builder.add_param(thread_ids[0]), 'String')}"
+    elif len(thread_ids) > 1:
+        thread_cond = f"{thread_id_field_sql} IN {param_slot(param_builder.add_param(thread_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({thread_cond} OR {thread_id_field_sql} IS NULL)"
+
+
+def process_turn_id_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the turn_id and returns a sql string if there are any turn_ids."""
+    if (
+        hardcoded_filter is None
+        or hardcoded_filter.filter.turn_ids is None
+        or len(hardcoded_filter.filter.turn_ids) == 0
+    ):
+        return ""
+
+    turn_ids = hardcoded_filter.filter.turn_ids
+
+    assert_parameter_length_less_than_max("turn_ids", len(turn_ids))
+
+    turn_id_field = get_field_by_name("turn_id")
+    if not isinstance(turn_id_field, CallsMergedAggField):
+        raise TypeError("turn_id is not an aggregate field")
+    turn_id_field_sql = turn_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    # If there's only one turn_id, use an equality condition for performance
+    if len(turn_ids) == 1:
+        turn_cond = f"{turn_id_field_sql} = {param_slot(param_builder.add_param(turn_ids[0]), 'String')}"
+    elif len(turn_ids) > 1:
+        turn_cond = f"{turn_id_field_sql} IN {param_slot(param_builder.add_param(turn_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({turn_cond} OR {turn_id_field_sql} IS NULL)"
+
+
 def process_trace_roots_only_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
@@ -1316,6 +1389,18 @@ def process_calls_filter_to_conditions(
         assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
             f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+        )
+
+    if filter.thread_ids is not None:
+        assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
+        conditions.append(
+            f"{get_field_by_name('thread_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
+        )
+
+    if filter.turn_ids is not None:
+        assert_parameter_length_less_than_max("turn_ids", len(filter.turn_ids))
+        conditions.append(
+            f"{get_field_by_name('turn_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.turn_ids), 'Array(String)')}"
         )
 
     if filter.wb_user_ids:

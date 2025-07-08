@@ -23,7 +23,7 @@ from weave.trace.vals import WeaveObject
 
 class Message(TypedDict):
     role: str
-    content: str
+    content: Union[str, list[dict]]
 
 
 def maybe_dedent(content: str, dedent: bool) -> str:
@@ -108,10 +108,12 @@ class MessagesPrompt(Prompt):
         self.messages = messages
 
     def format_message(self, message: dict, **kwargs: Any) -> dict:
-        m = {}
+        m: dict[str, Any] = {}
         for k, v in message.items():
             if isinstance(v, str):
                 m[k] = v.format(**kwargs)
+            elif isinstance(v, list) and all(isinstance(d, dict) for d in v):
+                m[k] = [self.format_message(d, **kwargs) for d in v]
             else:
                 m[k] = v
         return m
@@ -183,8 +185,8 @@ class EasyPrompt(UserList, Prompt):
             # TODO: Override role and do dedent?
             self.data.append(item)
         elif isinstance(item, list):
-            for item in item:
-                self.append(item)
+            for sub_item in item:
+                self.append(sub_item)
         else:
             raise TypeError(f"Cannot append {item} of type {type(item)} to Prompt")
 

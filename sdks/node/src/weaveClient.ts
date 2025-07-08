@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import {uuidv7} from 'uuidv7';
 
 import {MAX_OBJECT_NAME_LENGTH} from './constants';
-import {Dataset} from './dataset';
 import {computeDigest} from './digest';
 import {
   CallSchema,
@@ -280,13 +279,15 @@ export class WeaveClient {
 
   public async get(ref: ObjectRef): Promise<any> {
     let val: any;
+    let dataObj: any;
     try {
       const res = await this.traceServerApi.obj.objReadObjReadPost({
         project_id: ref.projectId,
         object_id: ref.objectId,
         digest: ref.digest,
       });
-      val = res.data.obj.val;
+      dataObj = res.data.obj;
+      val = dataObj.val;
     } catch (error) {
       if (error instanceof Error && error.message.includes('404')) {
         throw new Error(`Unable to find object for ref uri: ${ref.uri()}`);
@@ -295,14 +296,53 @@ export class WeaveClient {
     }
 
     const t = val?._type;
+
+    if (t == 'StringPrompt') {
+      const {StringPrompt} = await import('./prompt');
+
+      const {content, description} = val;
+
+      let obj = new StringPrompt({
+        id: dataObj.id,
+        description,
+        content,
+      });
+
+      obj.__savedRef = ref;
+
+      return obj;
+    }
+
+    if (t == 'MessagesPrompt') {
+      const {MessagesPrompt} = await import('./prompt');
+
+      const {description, messages} = val;
+
+      let obj = new MessagesPrompt({
+        id: dataObj.id,
+        description,
+        messages,
+      });
+
+      obj.__savedRef = ref;
+
+      return obj;
+    }
+
     if (t == 'Dataset') {
-      const {_baseParameters, rows} = val;
+      // Avoid circular dependency
+      const {Dataset} = await import('./dataset');
+
+      const {description, rows} = val;
+
       let obj = new Dataset({
-        id: _baseParameters.id,
-        description: _baseParameters.description,
+        id: dataObj.id,
+        description,
         rows,
       });
+
       obj.__savedRef = ref;
+
       // TODO: The table row refs are not correct
       return obj;
     } else if (t == 'Table') {

@@ -308,8 +308,8 @@ def make_random_video(video_size: tuple[int, int] = (64, 64), duration: float = 
 @pytest.fixture
 def dataset_ref(client):
     # This fixture represents a saved dataset containing videos
-    N_ROWS = 3
-    rows = weave.Table([{"video": make_random_video()} for _ in range(N_ROWS)])
+    n_rows = 3
+    rows = weave.Table([{"video": make_random_video()} for _ in range(n_rows)])
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 
@@ -330,14 +330,15 @@ async def test_videos_in_dataset_for_evaluation(client, dataset_ref):
     res = await evaluation.evaluate(model)
 
     assert isinstance(res, dict)
-    assert "model_latency" in res and "mean" in res["model_latency"]
+    assert "model_latency" in res
+    assert "mean" in res["model_latency"]
     assert isinstance(res["model_latency"]["mean"], (int, float))
 
 
 def test_videos_in_load_of_dataset(client):
-    N_ROWS = 3
+    n_rows = 3
     # Create smaller duration videos to avoid encoding issues
-    videos = [make_random_video(duration=0.1) for _ in range(N_ROWS)]
+    videos = [make_random_video(duration=0.1) for _ in range(n_rows)]
     rows = weave.Table([{"video": video} for video in videos])
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)

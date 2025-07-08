@@ -232,9 +232,8 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative step not supported")
 
         # Apply limit if provided
-        if self.limit is not None:
-            if stop is None or stop > self.limit:
-                stop = self.limit
+        if self.limit is not None and (stop is None or stop > self.limit):
+            stop = self.limit
 
         # Apply offset if provided
         if self.offset is not None:
@@ -297,7 +296,7 @@ class PaginatedIterator(Generic[T, R]):
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         records = []
         for item in self:
@@ -507,6 +506,8 @@ class CallDict(TypedDict):
     started_at: datetime.datetime | None
     ended_at: datetime.datetime | None
     deleted_at: datetime.datetime | None
+    thread_id: str | None
+    turn_id: str | None
 
 
 @dataclasses.dataclass
@@ -535,6 +536,8 @@ class Call:
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
     deleted_at: datetime.datetime | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
 
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
@@ -584,7 +587,7 @@ class Call:
             try:
                 entity, project = self.project_id.split("/")
             except ValueError:
-                raise ValueError(f"Invalid project_id: {self.project_id}")
+                raise ValueError(f"Invalid project_id: {self.project_id}") from None
             weave_ref = CallRef(entity, project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
@@ -599,7 +602,7 @@ class Call:
         try:
             entity, project = self.project_id.split("/")
         except ValueError:
-            raise ValueError(f"Invalid project_id: {self.project_id}")
+            raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
 
     @property
@@ -623,7 +626,6 @@ class Call:
         Returns:
             An iterator of calls.
         """
-        client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError(
                 "Can't get children of call without ID, was `weave.init` called?"
@@ -743,6 +745,8 @@ class Call:
             started_at=self.started_at,
             ended_at=self.ended_at,
             deleted_at=self.deleted_at,
+            thread_id=self.thread_id,
+            turn_id=self.turn_id,
         )
 
 
@@ -774,6 +778,8 @@ def make_client_call(
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
+        thread_id=server_call.thread_id,
+        turn_id=server_call.turn_id,
     )
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()
@@ -907,6 +913,9 @@ class AttributesDict(dict):
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
+# This size is correlated with the maximum single row insert size
+# in clickhouse, which is currently unavoidable.
+MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
@@ -1014,11 +1023,13 @@ class WeaveClient:
                 if e.response.content:
                     try:
                         reason = json.loads(e.response.content).get("reason")
-                        raise ValueError(reason)
+                        raise ValueError(reason) from None
                     except json.JSONDecodeError:
-                        raise ValueError(e.response.content)
+                        raise ValueError(e.response.content) from None
                 if e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from e
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -1040,7 +1051,9 @@ class WeaveClient:
                 )
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from None
                 raise
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
@@ -1261,7 +1274,24 @@ class WeaveClient:
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
+        # Get thread_id from context
+        thread_id = call_context.get_thread_id()
+        current_turn_id = call_context.get_turn_id()
+
         call_id = generate_id()
+
+        # Determine turn_id: call becomes a turn if thread boundary is crossed
+        if thread_id is None:
+            # No thread context, no turn_id
+            turn_id = None
+        elif parent is None or parent.thread_id != thread_id:
+            # This is a turn call - use its own ID as turn_id
+            turn_id = call_id
+            call_context.set_turn_id(call_id)
+        else:
+            # Inherit turn_id from context
+            turn_id = current_turn_id
+
         call = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
@@ -1271,6 +1301,8 @@ class WeaveClient:
             # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
             attributes=attributes_dict,
+            thread_id=thread_id,
+            turn_id=turn_id,
         )
         # Disallow further modification of attributes after the call is created
         attributes_dict.freeze()
@@ -1303,23 +1335,32 @@ class WeaveClient:
             inputs_json = to_json(
                 maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
             )
-            self.server.call_start(
-                CallStartReq(
-                    start=StartedCallSchemaForInsert(
-                        project_id=project_id,
-                        id=call_id,
-                        op_name=op_def_ref.uri(),
-                        display_name=call.display_name,
-                        trace_id=trace_id,
-                        started_at=started_at,
-                        parent_id=parent_id,
-                        inputs=inputs_json,
-                        attributes=attributes_dict,
-                        wb_run_id=current_wb_run_id,
-                        wb_run_step=current_wb_run_step,
-                    )
+            call_start_req = CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    op_name=op_def_ref.uri(),
+                    display_name=call.display_name,
+                    trace_id=trace_id,
+                    started_at=started_at,
+                    parent_id=parent_id,
+                    inputs=inputs_json,
+                    attributes=attributes_dict,
+                    wb_run_id=current_wb_run_id,
+                    wb_run_step=current_wb_run_step,
+                    thread_id=thread_id,
+                    turn_id=turn_id,
                 )
             )
+
+            bytes_size = len(call_start_req.model_dump_json())
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    f"Trace input size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes."
+                    "Inputs may be dropped."
+                )
+
+            self.server.call_start(call_start_req)
             return True
 
         def on_complete(f: Future) -> None:
@@ -1456,20 +1497,29 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
-            self.server.call_end(
-                CallEndReq(
-                    end=EndedCallSchemaForInsert(
-                        project_id=project_id,
-                        id=call.id,
-                        ended_at=ended_at,
-                        output=output_json,
-                        summary=merged_summary,
-                        exception=exception_str,
-                    )
+            call_end_req = CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call.id,
+                    ended_at=ended_at,
+                    output=output_json,
+                    summary=merged_summary,
+                    exception=exception_str,
                 )
             )
+            bytes_size = len(call_end_req.model_dump_json())
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
+                    "Output may be dropped."
+                )
+            self.server.call_end(call_end_req)
 
         self.future_executor.defer(send_end_call)
+
+        # If a turn call is finishing, reset turn context for next sibling
+        if call.turn_id == call.id and call.thread_id:
+            call_context.set_turn_id(None)
 
         call_context.pop_call(call.id)
 

@@ -781,7 +781,8 @@ export const LLM_MAX_TOKENS = {
   },
 };
 
-export const DEFAULT_LLM_MODEL: LLMMaxTokensKey = 'gpt-4.1-mini-2025-04-14';
+export const DEFAULT_LLM_MODEL: LLMMaxTokensKey =
+  'cw_meta-llama_Llama-3.1-8B-Instruct';
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
 
