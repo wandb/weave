@@ -414,6 +414,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.trace_roots_only is not None,
                 self.filter.wb_user_ids,
                 self.filter.wb_run_ids,
+                self.filter.turn_ids,
             ]
         )
 

@@ -5,6 +5,7 @@ import React, {FC, useCallback, useContext, useEffect, useRef} from 'react';
 
 import {makeRefCall} from '../../../../../../util/refs';
 import {Button} from '../../../../../Button';
+import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {Tailwind} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
@@ -69,8 +70,10 @@ export const CallPage: FC<CallPageProps> = props => {
     // in null response (bug on server side). As a result, the summary
     // will not show costs. FIXME (This results in a second query in
     // CallSummary.tsx)
+    // This flag and the below storage flag can cause long query times
+    // defer loading to the summary component
     // includeCosts: true,
-    includeTotalStorageSize: true,
+    // includeTotalStorageSize: true,
     refetchOnRename: true,
   });
 
@@ -358,17 +361,19 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
       isLeftSidebarOpen={!hideTraceTreeActual}
       leftSidebarContent={
         <Tailwind style={{display: 'contents'}}>
-          <div className="h-full bg-moon-50">
-            <TraceNavigator
-              entity={focusedCall.entity}
-              project={focusedCall.project}
-              traceId={focusedCall.traceId}
-              focusedCallId={focusedCallId}
-              rootCallId={rootCallId}
-              setFocusedCallId={setFocusedCallId}
-              setRootCallId={setRootCallId}
-            />
-          </div>
+          <ErrorBoundary>
+            <div className="h-full bg-moon-50">
+              <TraceNavigator
+                entity={focusedCall.entity}
+                project={focusedCall.project}
+                traceId={focusedCall.traceId}
+                focusedCallId={focusedCallId}
+                rootCallId={rootCallId}
+                setFocusedCallId={setFocusedCallId}
+                setRootCallId={setRootCallId}
+              />
+            </div>
+          </ErrorBoundary>
         </Tailwind>
       }
       tabs={callTabs}

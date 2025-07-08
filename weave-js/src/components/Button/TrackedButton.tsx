@@ -7,7 +7,7 @@ import {Button, ButtonProps} from './Button';
 export const TrackedButton = (props: ButtonProps & {trackedName: string}) => {
   const {entity, project} = useEntityProject();
 
-  const {trackedName, onClick: clientOnClick} = props;
+  const {trackedName, onClick: clientOnClick, ...restProps} = props;
 
   const onClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -17,5 +17,5 @@ export const TrackedButton = (props: ButtonProps & {trackedName: string}) => {
     [entity, project, trackedName, clientOnClick]
   );
 
-  return <Button {...props} onClick={onClick} />;
+  return <Button {...restProps} onClick={onClick} />;
 };

@@ -15,7 +15,14 @@ PY313_INCOMPATIBLE_SHARDS = [
     "notdiamond",
     "crewai",
 ]
-PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents", "dspy"]
+PY39_INCOMPATIBLE_SHARDS = [
+    "crewai",
+    "google_genai",
+    "mcp",
+    "smolagents",
+    "dspy",
+    "autogen_tests",
+]
 NUM_TRACE_SHARDS = 4
 
 
@@ -76,6 +83,7 @@ trace_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SHARDS + 1)]
         "huggingface",
         "smolagents",
         "mcp",
+        "autogen_tests",
         "trace",
         *trace_shards,
     ],
@@ -132,6 +140,7 @@ def tests(session, shard):
         "trace_server_bindings": ["trace_server_bindings"],
         "mistral": ["integrations/mistral/"],
         "scorers": ["scorers/"],
+        "autogen_tests": ["integrations/autogen/"],
         "trace": ["trace/"],
         **{shard: ["trace/"] for shard in trace_shards},
     }
