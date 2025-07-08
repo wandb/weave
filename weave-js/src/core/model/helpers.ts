@@ -666,6 +666,57 @@ export function isNullable(t: Type): boolean {
   return isUnion(t) && t.members.findIndex(m => m === 'none') !== -1;
 }
 
+// Fast type hashing function for typedDict deduplication
+function getTypedDictKey(type: Type): string {
+  // Simple types can be used directly as keys
+  if (isSimpleTypeShape(type)) {
+    return type;
+  }
+
+  // For complex types, create a canonical string representation
+  // This is much faster than deep equality checks
+  if (isTypedDict(type)) {
+    const keys = Object.keys(type.propertyTypes).sort();
+    const props = keys
+      .map(k => `${k}:${getTypedDictKey(type.propertyTypes[k]!)}`)
+      .join(',');
+    const notRequired = type.notRequiredKeys
+      ? `,notRequired:[${type.notRequiredKeys.sort().join(',')}]`
+      : '';
+    return `typedDict:{${props}${notRequired}}`;
+  }
+
+  // For nested types within typedDict properties
+  if (isTaggedValue(type)) {
+    return `tagged:${getTypedDictKey(type.tag)}:${getTypedDictKey(type.value)}`;
+  }
+
+  if (type.type === 'list') {
+    return `list:${getTypedDictKey(type.objectType)}:${type.minLength ?? ''}:${
+      type.maxLength ?? ''
+    }`;
+  }
+
+  if (type.type === 'dict') {
+    return `dict:${getTypedDictKey(type.objectType)}`;
+  }
+
+  if (type.type === 'union') {
+    const memberKeys = type.members.map(m => getTypedDictKey(m)).sort();
+    return `union:[${memberKeys.join(',')}]`;
+  }
+
+  if (type.type === 'function') {
+    const inputs = Object.entries(type.inputTypes)
+      .map(([k, v]) => `${k}:${getTypedDictKey(v)}`)
+      .join(',');
+    return `function:{${inputs}}:${getTypedDictKey(type.outputType)}`;
+  }
+
+  // For other types, use JSON stringification as fallback
+  return JSON.stringify(type);
+}
+
 export function union(members: Type[]): Type {
   if (members.length === 0) {
     return 'invalid';
@@ -682,12 +733,41 @@ export function union(members: Type[]): Type {
       allMembers.push(mem);
     }
   }
-  const uniqMembers = _.uniqWith(
-    allMembers,
-    (a, b) =>
+
+  // Separate typedDicts from other types for optimized deduplication
+  const typedDicts: TypedDictType[] = [];
+  const otherTypes: Type[] = [];
+
+  for (const member of allMembers) {
+    if (isTypedDict(member)) {
+      typedDicts.push(member);
+    } else {
+      otherTypes.push(member);
+    }
+  }
+
+  // Fast deduplication for typedDicts using Map
+  const uniqueTypedDictMap = new Map<string, Type>();
+  for (const td of typedDicts) {
+    const key = getTypedDictKey(td);
+    if (!uniqueTypedDictMap.has(key)) {
+      uniqueTypedDictMap.set(key, td);
+    }
+  }
+
+  // Use original logic for other types
+  const uniqOtherTypes = _.uniqWith(otherTypes, (a, b) => {
+    return (
       _.isEqual(a, b) ||
       (a && b && isAssignableTo(a, b) && isAssignableTo(b, a))
-  );
+    );
+  });
+
+  // Combine deduplicated results
+  const uniqMembers = [
+    ...uniqOtherTypes,
+    ...Array.from(uniqueTypedDictMap.values()),
+  ];
 
   // Split TaggedValue members out.
   const nonTaggedMembers: Type[] = [];
