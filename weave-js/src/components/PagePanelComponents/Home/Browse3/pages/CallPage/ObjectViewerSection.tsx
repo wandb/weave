@@ -75,11 +75,10 @@ const ObjectViewerDropdownSection = ({
   showMinimal,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
-  const startState = collapseTitle ? 'hidden' : 'collapsed';
   // Update this when we change the state to hidden
   // That way it restores the last state when uncollapsed
-  const [lastMode, setLastMode] = useState('collapsed');
-  const [mode, setMode] = useState(startState);
+  const [collapsed, setCollapsed] = useState(true);
+  const [mode, setMode] = useState('collapsed');
   const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
   const body = useMemo(() => {
@@ -107,7 +106,7 @@ const ObjectViewerDropdownSection = ({
       );
     }
     return null;
-  }, [mode, apiRef, data, expandedIds]);
+  }, [collapsed, mode, apiRef, data, expandedIds]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {
@@ -169,20 +168,13 @@ const ObjectViewerDropdownSection = ({
     <Box sx={{height: '100%', display: 'flex', flexDirection: 'column', paddingRight: '16px'}}>
       <TitleRow>
         <Button
-          onClick={() => {
-            if(mode !== 'hidden') {
-              setLastMode(mode)
-              setMode('hidden');
-            } else {
-              setMode(lastMode);
-            }
-          }}
+          onClick={() => { setCollapsed(!collapsed) }}
           variant='ghost'
           size='small'
-          icon={mode === 'hidden' ? "chevron-next" : "chevron-down"}
+          icon={collapsed ? "chevron-next" : "chevron-down"}
         />
         <Title>{title}</Title>
-        {mode !=="hidden" && (
+        {!collapsed && (
           <Button
             variant="ghost"
             icon="row-height-small"
@@ -191,7 +183,7 @@ const ObjectViewerDropdownSection = ({
             tooltip="View collapsed"
           />
         )}
-        {mode !=="hidden" && (
+        {!collapsed && (
           <Button
             variant="ghost"
             icon="expand-uncollapse"
@@ -204,7 +196,7 @@ const ObjectViewerDropdownSection = ({
             }
           />
         )}
-        {mode !=="hidden" && (
+        {!collapsed && (
           <Button
             variant="ghost"
             icon="code-alt"
@@ -223,7 +215,7 @@ const ObjectViewerDropdownSection = ({
           />
         )}
       </TitleRow>
-      {body}
+      {!collapsed && body}
     </Box>
   );
 }
