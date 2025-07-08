@@ -5,7 +5,7 @@ import {getGlobalDomain} from './urls';
 export interface Callable {}
 
 export interface WeaveObjectParameters {
-  id?: string;
+  name?: string;
   description?: string;
 }
 
@@ -55,7 +55,10 @@ export class WeaveObject {
   }
 
   saveAttrs() {
-    const attrs: {[key: string]: any} = {};
+    const attrs: {[key: string]: any} = {
+      name: this._baseParameters?.name,
+      description: this._baseParameters?.description,
+    };
 
     for (const key of Object.keys(this)) {
       if (!key.startsWith('_')) {
@@ -70,8 +73,8 @@ export class WeaveObject {
     return attrs;
   }
 
-  get id() {
-    return this._baseParameters.id ?? this.constructor.name;
+  get name() {
+    return this._baseParameters.name ?? this.constructor.name;
   }
 
   get description() {
