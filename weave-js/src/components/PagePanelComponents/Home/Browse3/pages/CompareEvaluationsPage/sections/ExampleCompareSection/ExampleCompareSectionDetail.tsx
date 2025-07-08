@@ -134,7 +134,7 @@ const stickyHeaderStyleMixin: React.CSSProperties = {
   top: 0,
   zIndex: 1,
   backgroundColor: MOON_100,
-  fontWeight: 'bold',
+  fontWeight: 600,
 };
 
 const stickySidebarStyleMixin: React.CSSProperties = {
@@ -142,7 +142,7 @@ const stickySidebarStyleMixin: React.CSSProperties = {
   left: 0,
   zIndex: 1,
   backgroundColor: MOON_100,
-  fontWeight: 'bold',
+  fontWeight: 600,
 };
 
 const stickySidebarHeaderMixin: React.CSSProperties = {
@@ -676,13 +676,15 @@ export const ExampleCompareSectionDetail: React.FC<{
         bgcolor: MOON_100,
         padding: '16px',
         height: HEADER_HIEGHT_PX,
+        borderLeft: `1px solid ${MOON_200}`,
       }}>
       <HorizontalBox
         sx={{
           alignItems: 'center',
           flex: 1,
+          gridGap: '8px',
         }}>
-        <Tooltip title="Previous Example">
+        <Tooltip title="Previous example">
           <IconButton
             // disabled={targetIndex === 0}
             onClick={() => {
@@ -691,7 +693,7 @@ export const ExampleCompareSectionDetail: React.FC<{
             <Icon name="chevron-up" />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Next Example">
+        <Tooltip title="Next example">
           <IconButton
             // disabled={targetIndex === filteredRows.length - 1}
             onClick={() => {
@@ -703,24 +705,27 @@ export const ExampleCompareSectionDetail: React.FC<{
         <Box
           style={{
             flex: 0,
+            marginLeft: '8px',
+            marginRight: '4px',
           }}>
           {inputRef && <SmallRef objRef={inputRef} iconOnly />}
         </Box>
         <Box
           style={{
+            fontWeight: '600',
             flex: 1,
           }}>
           {`Example ${targetIndex + 1} of ${filteredRows.length}`}
         </Box>
       </HorizontalBox>
 
-      <HorizontalBox>
+      <HorizontalBox sx={{ gridGap: '8px' }}>
         <Tooltip title={props.isExpanded ? 'Collapse' : 'Expand'}>
           <IconButton
             onClick={() => {
               props.onExpandToggle();
             }}>
-            <Icon name={props.isExpanded ? 'expand-right' : 'contract-left'} />
+            <Icon name={props.isExpanded ? 'minimize-mode' : 'full-screen-mode-expand'} />
           </IconButton>
         </Tooltip>
         <Tooltip title="Close">
