@@ -341,9 +341,9 @@ const ResultExplorer: React.FC<{
         }}>
         <Box
           style={{
-            flex: 1,
-            width: '50%',
-            display: viewMode !== 'detail' ? 'block' : 'none',
+            flex: viewMode === 'detail' ? 0.2 : 1,
+            width: viewMode === 'detail' ? '20%' : '50%',
+            display: 'block',
           }}>
           <ExampleCompareSectionTable
             state={state}
@@ -354,10 +354,10 @@ const ResultExplorer: React.FC<{
 
         <Box
           style={{
-            flex: 1,
-            width: '50%',
+            flex: viewMode === 'detail' ? 0.8 : 1,
+            width: viewMode === 'detail' ? '80%' : '50%',
             borderLeft: '1px solid #e0e0e0',
-            display: viewMode !== 'table' ? 'block' : 'none',
+            display: 'block',
           }}>
           <ExampleCompareSectionDetailGuarded
             state={state}
