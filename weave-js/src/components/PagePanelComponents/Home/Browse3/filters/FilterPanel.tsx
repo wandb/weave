@@ -19,6 +19,7 @@ type FilterPanelProps = {
   columnInfo: ColumnInfo;
   selectedCalls: string[];
   clearSelectedCalls: () => void;
+  isGrouped?: boolean;
 };
 
 export const FilterPanel = (props: FilterPanelProps) => {

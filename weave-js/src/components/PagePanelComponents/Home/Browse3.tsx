@@ -58,6 +58,8 @@ import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
+import {ThreadDetailPage} from './Browse3/pages/ThreadDetailPage/ThreadDetailPage';
+import {ThreadsPageLoadView} from './Browse3/pages/ThreadsPage/ThreadsPageLoadView';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
   useWFHooks,
@@ -116,6 +118,7 @@ const tabOptions = [
   'ops',
   'op-versions',
   'calls',
+  'threads',
   'evaluations',
   'leaderboards',
   'boards',
@@ -418,6 +421,12 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/threads/:itemName`}>
+          <ThreadDetailPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/threads`}>
+          <ThreadsPageBinding />
         </Route>
         <Route path={`${projectRoot}/monitors`}>
           <MonitorsPageBinding />
@@ -1014,4 +1023,14 @@ const PlaygroundPageBinding = () => {
       modelIds={modelIds}
     />
   );
+};
+
+const ThreadsPageBinding = () => {
+  const query = useURLSearchParamsDict();
+  return <ThreadsPageLoadView view={query.view} />;
+};
+
+const ThreadDetailPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  return <ThreadDetailPage threadId={params.itemName} />;
 };
