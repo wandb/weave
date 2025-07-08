@@ -1278,8 +1278,9 @@ export const CallsTable: FC<{
           </div>
           <div
             style={{
-              width: `${containerRef.current ? containerRef.current.clientWidth - pinnedColumnsWidth.total : CHARTS_MIN_WIDTH_PX}px`,
+              width: '100%',
               minWidth: `${CHARTS_MIN_WIDTH_PX}px`,
+              borderLeft: '1px solid rgba(224, 224, 224, 1)',
               height: '100%',
               overflowX: 'hidden',
               overflowY: 'auto',
