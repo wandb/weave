@@ -1,17 +1,45 @@
 """
-Object reference query builder for call queries.
+Object reference query builder for call queries. Calls can log basic payloads, which
+appear as text in the inputs/outpt, but objects and table rows are saved to the
+object_versions and table_rows tables with a ref in the call field. Example:
 
-This module handles the specialized logic for filtering calls based on object references
-in expand columns. It provides functionality to:
+{
+    "inputs": {
+        "model": {
+            "config": "weave-trace-internal:///<project_id>/object/<object_id>:<digest>"
+        }
+        "example": "weave-trace-internal:///<project_id>/object/<object_id>:<digest>/attr/rows/id/<row_digest>"
+    }
+}
 
-1. Detect object reference operands in queries
-2. Process object reference conditions into CTEs (Common Table Expressions)
-3. Generate optimized SQL for object reference filtering
+To filter and sort by fields stored in these objects, we need to query the underlying
+tables. This is achieved through using CTEs, which can traverse potentially very nested
+object references in the call payload fields.
 
-Key components:
-- ObjectRefCondition: Represents a condition that filters on object references
-- ObjectRefQueryProcessor: Handles processing of object ref conditions in queries
-- CTE building functions for efficient object reference filtering
+Method:
+1. Identify object references in the call payload fields, paths to which must be provided
+by the caller, in the expand_columns parameter.
+2. Process the leaf object reference condition, which filters on the value, or in the case
+of ordering extracts and returns the value, into a CTE. In this way we are starting from the
+bottom of the tree, working our way up to the root.
+3. Then we processe the intermediate object reference conditions, which find all objects
+with a json path value that matches the intermediate object reference condition, into a CTE.
+4. Finally, the main query filters or orders on the result of the last CTE.
+
+Advantages:
+1. The performance of this is reasonable, because we do the biggest operations on the
+object_versions table, which is generally much smaller than the calls table. By doing this
+first,
+
+Limitations:
+1. This method is 100% reliant on the caller providing the correct expand_columns. If the
+expand_columns are incorrect, or the data contains data that is both a ref AND the raw value,
+the results will be incomplete. If expand_columns are provided, we *expect* that there will
+be refs in those locations, and vice versa.
+2. There is not currently a way to filter by objects that are stored in table rows. The reason
+for this is because we don't want to check the UNION of all table_rows and object_versions for
+every intermediate CTE. We can pretty easily add this with a max condition on the number of CTEs;
+it will not be performant.
 """
 
 from abc import abstractmethod
@@ -807,7 +835,6 @@ def _build_intermediate_cte_sql(
     return f"""
     {intermediate_cte_name} AS (
         SELECT
-            ov.object_id,
             ov.digest,
             {intermediate_val_dump_select}
             concat('weave-trace-internal:///', ov.project_id, '/object/', ov.object_id, ':', ov.digest) AS ref
