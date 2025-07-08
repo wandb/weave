@@ -8,7 +8,7 @@ import React, {useCallback, useEffect, useMemo, useRef} from 'react';
 import styled from 'styled-components';
 
 import {
-  MOON_50,
+  MOON_100,
   MOON_200,
   MOON_300,
   MOON_800,
@@ -133,7 +133,7 @@ const stickyHeaderStyleMixin: React.CSSProperties = {
   position: 'sticky',
   top: 0,
   zIndex: 1,
-  backgroundColor: MOON_50,
+  backgroundColor: MOON_100,
   fontWeight: 'bold',
 };
 
@@ -141,7 +141,7 @@ const stickySidebarStyleMixin: React.CSSProperties = {
   position: 'sticky',
   left: 0,
   zIndex: 1,
-  backgroundColor: MOON_50,
+  backgroundColor: MOON_100,
   fontWeight: 'bold',
 };
 
@@ -673,7 +673,7 @@ export const ExampleCompareSectionDetail: React.FC<{
       sx={{
         justifyContent: 'space-between',
         alignItems: 'center',
-        bgcolor: MOON_50,
+        bgcolor: MOON_100,
         padding: '16px',
         height: HEADER_HIEGHT_PX,
       }}>
@@ -953,7 +953,7 @@ export const ExampleCompareSectionDetail: React.FC<{
                       <GridCell
                         key={metricIndex}
                         style={{
-                          backgroundColor: MOON_50,
+                          backgroundColor: MOON_100,
                         }}>
                         {scorerMetricKeyComp(scorerIndex, metricIndex)}
                       </GridCell>
