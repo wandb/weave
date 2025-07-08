@@ -299,7 +299,7 @@ export const ExampleCompareSectionTable: React.FC<
                   : 'transparent',
               color: rowSize === 'small' ? TEAL_600 : 'inherit',
             }}>
-            <Icon name="row-height-small" />
+            <Icon name="row-height-large" />
           </IconButton>
         </Tooltip>
         <Tooltip title="Medium row size">
@@ -325,7 +325,7 @@ export const ExampleCompareSectionTable: React.FC<
                   : 'transparent',
               color: rowSize === 'large' ? TEAL_600 : 'inherit',
             }}>
-            <Icon name="row-height-large" />
+            <Icon name="row-height-small" />
           </IconButton>
         </Tooltip>
         {!onlyOneModel && (
