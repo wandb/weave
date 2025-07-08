@@ -7,7 +7,7 @@ import {
   GridEventListener,
   GridRenderCellParams,
 } from '@mui/x-data-grid-pro';
-import {MOON_50} from '@wandb/weave/common/css/color.styles';
+import {MOON_50, TEAL_600} from '@wandb/weave/common/css/color.styles';
 import {Icon} from '@wandb/weave/components/Icon';
 import {IconButton} from '@wandb/weave/components/IconButton';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
@@ -256,11 +256,12 @@ export const ExampleCompareSectionTable: React.FC<
   ExampleCompareSectionTableProps
 > = props => {
   const [modelsAsRows, setModelsAsRows] = useState(false);
-  const [isLargeRowSize, setIsLargeRowSize] = useState(false);
-  const rowHeight = isLargeRowSize ? 132 : 32;
-  const toggleRowSize = useCallback(() => {
-    setIsLargeRowSize(v => !v);
-  }, []);
+  const [rowSize, setRowSize] = useState<'small' | 'medium' | 'large'>('small');
+  const rowHeight = rowSize === 'large' ? 132 : rowSize === 'medium' ? 80 : 32;
+  const lineClamp = rowSize === 'large' ? 6 : rowSize === 'medium' ? 3 : 1;
+  const setRowSizeSmall = useCallback(() => setRowSize('small'), []);
+  const setRowSizeMedium = useCallback(() => setRowSize('medium'), []);
+  const setRowSizeLarge = useCallback(() => setRowSize('large'), []);
   const onlyOneModel = props.state.evaluationCallIdsOrdered.length === 1;
   const header = (
     <HorizontalBox
@@ -275,16 +276,45 @@ export const ExampleCompareSectionTable: React.FC<
         sx={{
           justifyContent: 'flex-start',
           alignItems: 'center',
+          gridGap: '4px'
         }}>
-        <Tooltip title={isLargeRowSize ? "Small Row Size" : "Large Row Size"}>
-          <IconButton onClick={toggleRowSize}>
-            <Icon name={isLargeRowSize ? "collapse" : "expand-uncollapse"} />
+        <Tooltip title="Small row size">
+          <IconButton 
+            onClick={setRowSizeSmall} 
+            style={{ 
+              backgroundColor: rowSize === 'small' ? 'rgba(169, 237, 242, 0.5)' : 'transparent',
+              color: rowSize === 'small' ? TEAL_600 : 'inherit'
+            }}
+          >
+            <Icon name="row-height-small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Medium row size">
+          <IconButton 
+            onClick={setRowSizeMedium}
+            style={{ 
+              backgroundColor: rowSize === 'medium' ? 'rgba(169, 237, 242, 0.5)' : 'transparent',
+              color: rowSize === 'medium' ? TEAL_600 : 'inherit'
+            }}
+          >
+            <Icon name="row-height-medium" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Large row size">
+          <IconButton 
+            onClick={setRowSizeLarge}
+            style={{ 
+              backgroundColor: rowSize === 'large' ? 'rgba(169, 237, 242, 0.5)' : 'transparent',
+              color: rowSize === 'large' ? TEAL_600 : 'inherit'
+            }}
+          >
+            <Icon name="row-height-large" />
           </IconButton>
         </Tooltip>
         {!onlyOneModel && (
-          <Tooltip title="Pivot on Model">
+          <Tooltip title="Pivot on model">
             <IconButton onClick={() => setModelsAsRows(v => !v)}>
-              <Icon name="table" />
+              <Icon name="retry" />
             </IconButton>
           </Tooltip>
         )}
@@ -295,7 +325,7 @@ export const ExampleCompareSectionTable: React.FC<
           alignItems: 'center',
         }}>
         {!props.shouldHighlightSelectedRow && (
-          <Tooltip title="Show Detail Panel">
+          <Tooltip title="Show detail panel">
             <IconButton onClick={props.onShowSplitView}>
               <Icon name="panel" />
             </IconButton>
@@ -309,13 +339,13 @@ export const ExampleCompareSectionTable: React.FC<
       <ExampleCompareSectionTableModelsAsRows
         {...props}
         rowHeight={rowHeight}
-        lineClamp={isLargeRowSize ? 6 : 1}
+        lineClamp={lineClamp}
       />
     ) : (
       <ExampleCompareSectionTableModelsAsColumns
         {...props}
         rowHeight={rowHeight}
-        lineClamp={isLargeRowSize ? 6 : 1}
+        lineClamp={lineClamp}
       />
     );
   return (
