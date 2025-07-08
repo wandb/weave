@@ -102,17 +102,84 @@ export const normalizeAnthropicChatCompletion = (
 };
 
 export const normalizeAnthropicChatRequest = (
-  request: ChatRequest & {system: string}
+  request: ChatRequest & {system?: string}
 ) => {
-  // Anthropic has system message as a top-level request field
+  const normalizedMessages = request.messages.flatMap(message => {
+    // Handle string content or null content
+    if (typeof message.content === 'string' || !message.content) {
+      return [message];
+    }
+
+    // Handle array content (Anthropic format)
+    if (Array.isArray(message.content)) {
+      // Check if this is a tool_result message
+      const toolResult: any = message.content.find(
+        (part: any) => part.type === 'tool_result'
+      );
+      if (toolResult && !_.isString(toolResult)) {
+        if ('content' in toolResult && 'tool_use_id' in toolResult) {
+          return [
+            {
+              role: 'tool',
+              content: toolResult.content,
+              tool_call_id: toolResult.tool_use_id,
+            },
+          ];
+        }
+      }
+
+      // Extract tool uses and text content
+      const textParts: any[] = [];
+      const toolCalls: any[] = [];
+
+      message.content.forEach((part: any) => {
+        if (part.type === 'text') {
+          textParts.push(part.text);
+        } else if (part.type === 'tool_use') {
+          toolCalls.push({
+            id: part.id,
+            type: 'function',
+            function: {
+              name: part.name,
+              arguments: JSON.stringify(part.input),
+            },
+          });
+        }
+      });
+
+      // Build the normalized message
+      const normalizedMessage: any = {
+        ...message,
+        content: textParts.length > 0 ? textParts.join('') : null,
+      };
+
+      if (toolCalls.length > 0) {
+        normalizedMessage.tool_calls = toolCalls;
+      }
+
+      return [normalizedMessage];
+    }
+
+    // Return message as-is for other formats
+    return [message];
+  });
+
+  // Add system message if present
+  if (request.system) {
+    return {
+      ...request,
+      messages: [
+        {
+          role: 'system',
+          content: request.system,
+        },
+        ...normalizedMessages,
+      ],
+    };
+  }
+
   return {
     ...request,
-    messages: [
-      {
-        role: 'system',
-        content: request.system,
-      },
-      ...request.messages,
-    ],
+    messages: normalizedMessages,
   };
 };
