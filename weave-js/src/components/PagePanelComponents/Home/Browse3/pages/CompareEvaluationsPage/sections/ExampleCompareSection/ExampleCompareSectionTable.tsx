@@ -259,6 +259,10 @@ export const ExampleCompareSectionTable: React.FC<
   const [rowSize, setRowSize] = useState<'small' | 'medium' | 'large'>('small');
   const rowHeight = rowSize === 'large' ? 132 : rowSize === 'medium' ? 80 : 32;
   const lineClamp = rowSize === 'large' ? 6 : rowSize === 'medium' ? 3 : 1;
+  
+  // Calculate input line clamp multiplier for modelsAsRows mode
+  const numberOfModels = props.state.evaluationCallIdsOrdered.length;
+  const inputLineClamp = modelsAsRows ? lineClamp * numberOfModels : lineClamp;
   const setRowSizeSmall = useCallback(() => setRowSize('small'), []);
   const setRowSizeMedium = useCallback(() => setRowSize('medium'), []);
   const setRowSizeLarge = useCallback(() => setRowSize('large'), []);
@@ -340,12 +344,14 @@ export const ExampleCompareSectionTable: React.FC<
         {...props}
         rowHeight={rowHeight}
         lineClamp={lineClamp}
+        inputLineClamp={inputLineClamp}
       />
     ) : (
       <ExampleCompareSectionTableModelsAsColumns
         {...props}
         rowHeight={rowHeight}
         lineClamp={lineClamp}
+        inputLineClamp={inputLineClamp}
       />
     );
   return (
@@ -712,7 +718,7 @@ const expansionField = (
 
 // Component for displaying models as rows
 export const ExampleCompareSectionTableModelsAsRows: React.FC<
-  ExampleCompareSectionTableProps & {rowHeight: number; lineClamp: number}
+  ExampleCompareSectionTableProps & {rowHeight: number; lineClamp: number; inputLineClamp: number}
 > = props => {
   const ctx = useCompareEvaluationsState();
   const onlyOneModel = ctx.state.evaluationCallIdsOrdered.length === 1;
@@ -752,7 +758,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         setSelectedInputDigest,
         props.onShowSplitView,
         inputWidths,
-        props.lineClamp
+        props.inputLineClamp
       ),
       ...(onlyOneModel
         ? []
@@ -952,6 +958,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
     props.onShowSplitView,
     props.state,
     props.lineClamp,
+    props.inputLineClamp,
     inputWidths,
     onlyOneModel,
     hasTrials,
@@ -1059,7 +1066,7 @@ const useOnlyExpandedRows = (
 
 // Component for displaying models as columns
 export const ExampleCompareSectionTableModelsAsColumns: React.FC<
-  ExampleCompareSectionTableProps & {rowHeight: number; lineClamp: number}
+  ExampleCompareSectionTableProps & {rowHeight: number; lineClamp: number; inputLineClamp: number}
 > = props => {
   const ctx = useCompareEvaluationsState();
   const {filteredRows, outputColumnKeys} = useFilteredAggregateRows(ctx.state);
@@ -1096,7 +1103,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         setSelectedInputDigest,
         props.onShowSplitView,
         inputWidths,
-        props.lineClamp
+        props.inputLineClamp
       ),
       ...(hasTrials
         ? [
@@ -1218,6 +1225,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
     props.onShowSplitView,
     props.state,
     props.lineClamp,
+    props.inputLineClamp,
     inputWidths,
     hasTrials,
     toggleDefaultExpansionState,
