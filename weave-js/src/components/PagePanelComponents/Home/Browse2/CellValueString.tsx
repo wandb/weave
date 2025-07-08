@@ -39,10 +39,10 @@ type CellValueStringProps = {
   style?: React.CSSProperties;
 };
 
-const Collapsed = styled.div`
+const Collapsed = styled.div<{hasLineClamp?: boolean}>`
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  ${props => !props.hasLineClamp && 'white-space: nowrap;'}
   cursor: pointer;
 `;
 Collapsed.displayName = 'S.Collapsed';
@@ -146,10 +146,13 @@ const CellValueStringWithPopup = ({value, style}: CellValueStringProps) => {
   // Unfortunate but necessary to get appear on top of peek drawer.
   const stylePopper = {zIndex: 1};
 
+  // Check if line-clamp is being used in the style prop
+  const hasLineClamp = style && 'WebkitLineClamp' in style;
+
   return (
     <>
       <StyledTooltip enterDelay={500} title={title}>
-        <Collapsed ref={ref} onClick={onClick} style={style}>
+        <Collapsed ref={ref} onClick={onClick} style={style} hasLineClamp={hasLineClamp}>
           {displayTrimmed}
         </Collapsed>
       </StyledTooltip>
