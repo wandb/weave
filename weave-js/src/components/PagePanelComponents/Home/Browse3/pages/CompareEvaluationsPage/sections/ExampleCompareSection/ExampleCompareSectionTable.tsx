@@ -30,7 +30,7 @@ import {
 } from '../../compositeMetricsUtil';
 import {EvaluationComparisonState} from '../../ecpState';
 import {HorizontalBox, VerticalBox} from '../../Layout';
-import {EvaluationModelLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
+import {EvaluationCallLink} from '../ComparisonDefinitionSection/EvaluationDefinition';
 import {
   ColumnsManagementPanel,
   CUSTOM_GROUP_KEY_TO_CONTROL_CHILDREN_VISIBILITY,
@@ -741,7 +741,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
                 }
 
                 return (
-                  <EvaluationModelLink
+                  <EvaluationCallLink
                     callId={params.row.evaluationCallId}
                     state={props.state}
                   />
@@ -1086,7 +1086,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
             disableReorder: true,
             renderHeader: (params: GridColumnHeaderParams<RowData>) => {
               return (
-                <EvaluationModelLink
+                <EvaluationCallLink
                   callId={evaluationCallId}
                   state={props.state}
                 />
@@ -1127,7 +1127,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
                     disableReorder: true,
                     renderHeader: (params: GridColumnHeaderParams<RowData>) => {
                       return (
-                        <EvaluationModelLink
+                        <EvaluationCallLink
                           callId={evaluationCallId}
                           state={props.state}
                         />
