@@ -192,6 +192,9 @@ test = [
   "filelock",
   "httpx",
 
+  # Media Generation
+  "reportlab",     # PDF generation
+
   "confluent-kafka",
 
   "weave[trace_server]",
