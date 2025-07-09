@@ -1,9 +1,10 @@
 import {Box} from '@mui/material';
+import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import React, {useMemo} from 'react';
 
 import {MetadataViewerSection} from './MetadataViewerSection';
 import {ParsedCall, WeaveDocument} from './schemas';
-import {Body, Header} from './Styles';
+import {Body, Header} from './StyledText';
 
 interface DocumentCardProps {
   doc: WeaveDocument;
@@ -20,7 +21,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({doc}) => {
   return (
     <Box
       border={1}
-      borderColor={'#DFE0E2'}
+      borderColor={MOON_250}
       borderRadius={'8px'}
       paddingX={'20px'}
       paddingY={'16px'}>
