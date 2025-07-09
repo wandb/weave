@@ -1,10 +1,10 @@
 import {Icon, IconName} from '@wandb/weave/components/Icon';
-import _ from 'lodash';
 import React from 'react';
 import {Input} from 'semantic-ui-react';
 
 import {Button} from '../../../components/Button';
 import clamp from '../../util/clamp';
+import {shiftInputByValue} from '../../util/shiftInputByValue';
 
 interface NumberInputProps {
   className?: string;
@@ -59,27 +59,14 @@ const NumberInput: React.FC<NumberInputProps> = ({
       const v = parseFloat(
         stringValue === '' ? props?.placeholder?.toString() ?? '' : stringValue
       );
-      let newValue;
-      if (ticks) {
-        if (strideLength) {
-          const shift = direction * strideLength;
-          newValue = clamp(shift + v, {
-            min: ticks[0],
-            max: ticks[ticks.length - 1],
-          });
-        } else {
-          // When no stride length is set get the next valid step
-          const currentIndex = _.sortedIndex(ticks, v);
-          const finalIndex = clamp(currentIndex + direction, {
-            min: 0,
-            max: ticks.length - 1,
-          });
-          newValue = ticks[finalIndex];
-        }
-      } else {
-        newValue = v + direction * (strideLength ?? 1);
-        newValue = clamp(newValue, {min, max});
-      }
+      const newValue = shiftInputByValue(
+        ticks,
+        strideLength,
+        direction,
+        v,
+        min,
+        max
+      );
 
       if (inputRef.current) {
         inputRef.current.value = newValue.toString();

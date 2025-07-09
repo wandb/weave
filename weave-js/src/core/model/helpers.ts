@@ -1,4 +1,5 @@
 import _, {isArray, isObject, mapValues} from 'lodash';
+import memize from 'memize';
 
 import {hexToId} from '../util/digest';
 import {has} from '../util/has';
@@ -195,6 +196,7 @@ const filePrefixToMediaType = (prefix: string): MediaType | null => {
   } else if (prefix === 'partitioned-table') {
     return {type: 'partitioned-table', columnTypes: {}};
   }
+
   return null;
 };
 
@@ -746,7 +748,7 @@ export function union(members: Type[]): Type {
   const seenOtherTypes: Type[] = [];
 
   for (const member of allMembers) {
-    if (isTypedDict(member)) {
+    if (isTypedDict(member) || isTaggedValue(member)) {
       // Use fast key-based deduplication for typedDicts
       const key = getTypedDictKey(member);
       if (!seenTypedDictKeys.has(key)) {
@@ -1245,62 +1247,64 @@ export const nullableTaggableValue = (type: Type): Type => {
   );
 };
 
-export const typedDictPropertyTypes = (type: Type): {[key: string]: Type} => {
-  type = nullableTaggableValue(type);
-  if (isUnion(type)) {
-    // TODO: (tim) make this nicer code. This makes a union out of the "union" of keys
-    return type.members.reduce<{[key: string]: any}>((prev, curr, ndx) => {
-      const unwrappedCurr = nullableTaggableValue(curr);
-      if (!isTypedDict(unwrappedCurr) && unwrappedCurr !== 'none') {
-        throw new Error(
-          'typedDictPropertyTypes: incoming union type contains non-dict'
-        );
-      }
-      let newVal: {[key: string]: any} = {};
-      if (ndx === 0) {
-        newVal =
-          unwrappedCurr !== 'none' ? unwrappedCurr.propertyTypes ?? {} : {};
-      } else {
-        for (const existingProp in prev) {
-          if (prev[existingProp] != null) {
-            const prevProp = prev[existingProp];
-            if (
-              unwrappedCurr !== 'none' &&
-              unwrappedCurr.propertyTypes[existingProp]
-            ) {
-              const currProp = unwrappedCurr.propertyTypes[existingProp];
-              if (currProp) {
-                newVal[existingProp] = union([prevProp, currProp]);
+export const typedDictPropertyTypes = memize(
+  (type: Type): {[key: string]: Type} => {
+    type = nullableTaggableValue(type);
+    if (isUnion(type)) {
+      // TODO: (tim) make this nicer code. This makes a union out of the "union" of keys
+      return type.members.reduce<{[key: string]: any}>((prev, curr, ndx) => {
+        const unwrappedCurr = nullableTaggableValue(curr);
+        if (!isTypedDict(unwrappedCurr) && unwrappedCurr !== 'none') {
+          throw new Error(
+            'typedDictPropertyTypes: incoming union type contains non-dict'
+          );
+        }
+        let newVal: {[key: string]: any} = {};
+        if (ndx === 0) {
+          newVal =
+            unwrappedCurr !== 'none' ? unwrappedCurr.propertyTypes ?? {} : {};
+        } else {
+          for (const existingProp in prev) {
+            if (prev[existingProp] != null) {
+              const prevProp = prev[existingProp];
+              if (
+                unwrappedCurr !== 'none' &&
+                unwrappedCurr.propertyTypes[existingProp]
+              ) {
+                const currProp = unwrappedCurr.propertyTypes[existingProp];
+                if (currProp) {
+                  newVal[existingProp] = union([prevProp, currProp]);
+                } else {
+                  newVal[existingProp] = union([prevProp, 'none']);
+                }
               } else {
                 newVal[existingProp] = union([prevProp, 'none']);
               }
             } else {
-              newVal[existingProp] = union([prevProp, 'none']);
+              newVal[existingProp] = prev[existingProp];
             }
-          } else {
-            newVal[existingProp] = prev[existingProp];
           }
-        }
 
-        if (unwrappedCurr !== 'none') {
-          for (const newProp in unwrappedCurr.propertyTypes) {
-            if (unwrappedCurr.propertyTypes[newProp]) {
-              const currProp = unwrappedCurr.propertyTypes[newProp];
-              if (currProp != null && prev[newProp] == null) {
-                newVal[newProp] = union([currProp, 'none']);
+          if (unwrappedCurr !== 'none') {
+            for (const newProp in unwrappedCurr.propertyTypes) {
+              if (unwrappedCurr.propertyTypes[newProp]) {
+                const currProp = unwrappedCurr.propertyTypes[newProp];
+                if (currProp != null && prev[newProp] == null) {
+                  newVal[newProp] = union([currProp, 'none']);
+                }
               }
             }
           }
         }
-      }
-      return newVal;
-    }, {});
+        return newVal;
+      }, {});
+    }
+    if (!isTypedDict(type)) {
+      throw new Error('typedDictPropertyTypes: expected a typed dict');
+    }
+    return type.propertyTypes as {[key: string]: Type};
   }
-  if (!isTypedDict(type)) {
-    throw new Error('typedDictPropertyTypes: expected a typed dict');
-  }
-  return type.propertyTypes as {[key: string]: Type};
-};
+);
 
 export const objectTypeAttrTypes = (
   type: ObjectType
