@@ -1,4 +1,10 @@
+import base64
+from io import BytesIO
 from typing import Any, Callable, Optional
+
+import requests
+from PIL import Image
+from requests.exceptions import RequestException
 
 from weave.integrations.openai.openai_utils import (
     create_basic_wrapper_async,
@@ -13,22 +19,15 @@ DEFAULT_IMAGE_MODEL = "dall-e-2"
 DEFAULT_IMAGE_SIZE = "1024x1024"
 
 
-def _postprocess_inputs_with_defaults(inputs: dict[str, Any]) -> dict[str, Any]:
+def openai_image_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     """Returns the inputs, setting default model and size if not present."""
     result = dict(inputs) if inputs is not None else {}
-    if "model" not in result or not result["model"]:
-        result["model"] = DEFAULT_IMAGE_MODEL
-    if "size" not in result or not result["size"]:
-        result["size"] = DEFAULT_IMAGE_SIZE
+    result["model"] = result.get("model", DEFAULT_IMAGE_MODEL)
+    result["size"] = result.get("size", DEFAULT_IMAGE_SIZE)
     return result
 
 
-def _postprocess_inputs_passthrough(inputs: dict[str, Any]) -> dict[str, Any]:
-    """Returns the inputs unchanged."""
-    return inputs
-
-
-def _postprocess_outputs_image(outputs: dict[str, Any]) -> Any:
+def openai_image_postprocess_outputs(outputs: dict[str, Any]) -> Any:
     """
     Postprocess outputs of the trace for OpenAI Image APIs.
 
@@ -36,13 +35,6 @@ def _postprocess_outputs_image(outputs: dict[str, Any]) -> Any:
     (original_response, image1, image2, ...), where each image is a PIL.Image.
     If no images are found, returns just the original response.
     """
-    import base64
-    from io import BytesIO
-
-    import requests
-    from PIL import Image
-    from requests.exceptions import RequestException
-
     outputs = maybe_unwrap_api_response(outputs)
     if hasattr(outputs, "data") and len(outputs.data) > 0:
         images = []
@@ -65,7 +57,7 @@ def _postprocess_outputs_image(outputs: dict[str, Any]) -> Any:
     return outputs
 
 
-def _on_finish_image(
+def openai_image_on_finish(
     call: Call,
     output: Any,
     exception: Optional[BaseException] = None,
@@ -75,28 +67,11 @@ def _on_finish_image(
     On finish handler for OpenAI Image APIs that ensures the usage
     metadata is added to the summary of the trace.
     """
-    model_name = call.inputs.get("model") or default_model
+    model_name = call.inputs.get("model", default_model)
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if call.summary is not None:
         call.summary.update(summary_update)
-
-
-def openai_image_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-    "Postprocess inputs for the OpenAI Image API (set default model and size)."
-    return _postprocess_inputs_with_defaults(inputs)
-
-
-def openai_image_postprocess_outputs(outputs: dict[str, Any]) -> Any:
-    "Postprocess outputs for the OpenAI Image API."
-    return _postprocess_outputs_image(outputs)
-
-
-def openai_image_on_finish(
-    call: Call, output: Any, exception: Optional[BaseException] = None
-) -> None:
-    "On finish handler for the OpenAI Image API."
-    _on_finish_image(call, output, exception)
 
 
 def openai_image_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
@@ -121,19 +96,19 @@ def openai_image_wrapper_async(settings: OpSettings) -> Callable[[Callable], Cal
 
 def openai_image_edit_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     "Postprocess inputs for the OpenAI Image Edit API (set default model and size)."
-    return _postprocess_inputs_with_defaults(inputs)
+    return openai_image_postprocess_inputs(inputs)
 
 
 def openai_image_edit_postprocess_outputs(outputs: dict[str, Any]) -> Any:
     "Postprocess outputs for the OpenAI Image Edit API."
-    return _postprocess_outputs_image(outputs)
+    return openai_image_postprocess_outputs(outputs)
 
 
 def openai_image_edit_on_finish(
     call: Call, output: Any, exception: Optional[BaseException] = None
 ) -> None:
     "On finish handler for the OpenAI Image Edit API."
-    _on_finish_image(call, output, exception)
+    openai_image_on_finish(call, output, exception)
 
 
 def openai_image_edit_wrapper_sync(
@@ -165,16 +140,9 @@ def openai_image_variation_postprocess_inputs(inputs: dict[str, Any]) -> dict[st
     # For variation, model should be blank if set, but not setting it should not produce error
     result = dict(inputs) if inputs is not None else {}
     # Only set model to blank if it is present and not blank already
-    if "model" in result and result["model"]:
-        result["model"] = ""
-    if "size" not in result or not result["size"]:
-        result["size"] = DEFAULT_IMAGE_SIZE
+    result["model"] = result.get("model", "")
+    result["size"] = result.get("size", DEFAULT_IMAGE_SIZE)
     return result
-
-
-def openai_image_variation_postprocess_outputs(outputs: dict[str, Any]) -> Any:
-    "Postprocess outputs for the OpenAI Image Variation API."
-    return _postprocess_outputs_image(outputs)
 
 
 def openai_image_variation_on_finish(
@@ -198,7 +166,7 @@ def openai_image_variation_wrapper_sync(
     return create_basic_wrapper_sync(
         settings,
         postprocess_inputs=openai_image_variation_postprocess_inputs,
-        postprocess_output=openai_image_variation_postprocess_outputs,
+        postprocess_output=openai_image_postprocess_outputs,
         on_finish_handler=openai_image_variation_on_finish,
     )
 
@@ -210,6 +178,6 @@ def openai_image_variation_wrapper_async(
     return create_basic_wrapper_async(
         settings,
         postprocess_inputs=openai_image_variation_postprocess_inputs,
-        postprocess_output=openai_image_variation_postprocess_outputs,
+        postprocess_output=openai_image_postprocess_outputs,
         on_finish_handler=openai_image_variation_on_finish,
     )
