@@ -40,7 +40,7 @@ import {
   USE_TABLE_FOR_ARRAYS,
   WeaveCHTableSourceRefContext,
 } from '../CallPage/DataTableView';
-import {ObjectViewerGroupingCell} from '../CallPage/ObjectViewerGroupingCell';
+import {MetadataViewerGroupingCell} from './MetadataViewerGroupingCell';
 import {
   getKnownImageDictContexts,
   isKnownImageDictFormat,
@@ -327,8 +327,8 @@ export const MetadataViewer = ({
       {
         field: 'value',
         headerName: 'Value',
-        headerAlign: 'right',
-        align: 'right',
+        headerAlign: 'left',
+        align: 'left',
         flex: 1,
         display: 'flex',
         sortable: false,
@@ -406,6 +406,7 @@ export const MetadataViewer = ({
     () => ({
       headerName: 'Path',
       hideDescendantCount: true,
+      width: 125,
       renderCell: params => {
         const refToExpand = params.row.value;
         const isTruncated = params.row?.value?.[TRUNCATION_KEY];
@@ -414,7 +415,7 @@ export const MetadataViewer = ({
         }
 
         return (
-          <ObjectViewerGroupingCell
+          <MetadataViewerGroupingCell
             {...params}
             onClick={() => {
               setExpandedIds(eIds => {
@@ -503,6 +504,8 @@ export const MetadataViewer = ({
   const inner = useMemo(() => {
     const body = (rows.some(row => {row.isLoader === true})) ? <LoadingDots /> : (
       <StyledDataGrid
+        slots={{ columnHeaders: () => null }}
+        keepBorders={false}
         apiRef={apiRef}
         hideHeaders={true}
         // Start Column Menu
@@ -539,7 +542,6 @@ export const MetadataViewer = ({
         rowSelection={false}
         groupingColDef={groupingColDef}
         sx={{
-          border: 'none',
           flex: 1,
           height: '100%',
           borderRadius: '0px',
@@ -552,6 +554,10 @@ export const MetadataViewer = ({
             // only the first column
             '&:first-of-type': {
               paddingRight: '8px',
+              paddingLeft: '0px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             },
           },
 

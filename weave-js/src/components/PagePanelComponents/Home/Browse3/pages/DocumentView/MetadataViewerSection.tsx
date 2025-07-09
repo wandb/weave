@@ -34,7 +34,6 @@ const MetadataViewerSectionInner = ({
       return (
         <MetadataViewer
           apiRef={apiRef}
-          hideHeaders={true}
           data={data}
           isExpanded={mode === 'expanded'}
           expandedIds={expandedIds}
@@ -143,7 +142,7 @@ const MetadataViewerSectionInner = ({
 
   const headerSection = (
     <div>
-      <div style={{ display: 'flex', alignItems: 'left', marginBottom: '0px' }}>
+      <div style={{ display: 'flex', minHeight: "32px" }}>
         <Button
           onClick={() => { setIsOpen(!isOpen) }}
           variant='ghost'
@@ -158,8 +157,8 @@ const MetadataViewerSectionInner = ({
   );
 
   return (
-    <div style={{height: '100%', display: 'flex', flexDirection: 'column', margin: 0, padding: 0}}>
-      <div style={{height: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'space-between'}}>
+    <div style={{height: '100%', display: 'flex', flexDirection: 'column', margin: 0, padding: 0, gap: 8}}>
+      <div style={{height: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
         {headerSection}
         {isOpen && buttonSection}
       </div>

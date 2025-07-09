@@ -33,26 +33,16 @@ const LoadingOverlay = () => <Loading centered />;
 export const StyledDataGrid = styled(
   ({
     keepBorders,
-    hideHeaders,
     ...otherProps
   }: DataGridProProps & {keepBorders?: boolean, hideHeaders?: boolean}) => {
     const slots = otherProps.slots ?? {};
-    if (hideHeaders) {
-      slots.columnHeaders = () => null;
-    }
     if (!slots.loadingOverlay) {
       slots.loadingOverlay = LoadingOverlay;
     }
     return <DataGridPro slots={slots} {...otherProps} />;
   }
-)(({keepBorders, hideHeaders}) => ({
+)(({keepBorders}) => ({
   ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
-  ...(hideHeaders ? {
-    borderRight: 0,
-    borderLeft: 0,
-    borderBottom: 0,
-    borderTop: 0
-  } : {}),
 
   fontFamily: 'Source Sans Pro',
 

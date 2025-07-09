@@ -5,15 +5,15 @@ import React, {FC, MouseEvent} from 'react';
 
 import {Button} from '../../../../../Button';
 import {Tooltip} from '../../../../../Tooltip';
-import {CursorBox} from './CursorBox';
-import {maybeGetDeletedRefValuePlaceholderFromRow} from './ObjectViewer';
+import {CursorBox} from '../CallPage/CursorBox';
+import {maybeGetDeletedRefValuePlaceholderFromRow} from '../CallPage/ObjectViewer';
 
-const INSET_SPACING = 40;
+const INSET_SPACING = 30;
 
 /**
  * Utility component for the ObjectViewer to allow expanding/collapsing of keys.
  */
-export const ObjectViewerGroupingCell: FC<
+export const MetadataViewerGroupingCell: FC<
   GridRenderCellParams & {onClick?: (event: MouseEvent) => void; removeSpacing?: boolean}
 > = props => {
   const {id, field, rowNode, row} = props;
@@ -64,14 +64,14 @@ export const ObjectViewerGroupingCell: FC<
           />
         );
       })}
-      {!props.removeSpacing && <Box
+      {<Box
         sx={{
           flex: `0 0 ${INSET_SPACING}px`,
           width: `${INSET_SPACING}px`,
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'left',
+          alignItems: 'center',
           justifyContent: 'center',
         }}>
         {isGroup || isExpandableRef ? (
