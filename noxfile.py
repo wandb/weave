@@ -83,6 +83,7 @@ trace_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SHARDS + 1)]
         "huggingface",
         "smolagents",
         "mcp",
+        "verdict",
         "autogen_tests",
         "trace",
         *trace_shards,
