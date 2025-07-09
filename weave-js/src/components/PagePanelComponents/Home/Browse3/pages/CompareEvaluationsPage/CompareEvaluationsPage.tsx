@@ -344,7 +344,7 @@ const ResultExplorer: React.FC<{
             flex: viewMode === 'detail' ? 0 : viewMode === 'split' ? 1 : 1,
             width:
               viewMode === 'detail'
-                ? '64px'
+                ? '56px'
                 : viewMode === 'split'
                 ? '50%'
                 : '100%',
@@ -352,7 +352,7 @@ const ResultExplorer: React.FC<{
           }}>
           <ExampleCompareSectionTable
             state={state}
-            shouldHighlightSelectedRow={viewMode === 'split'}
+            shouldHighlightSelectedRow={viewMode === 'detail'}
             onShowSplitView={() => setViewMode('detail')}
           />
         </Box>
@@ -362,7 +362,7 @@ const ResultExplorer: React.FC<{
             flex: viewMode === 'detail' ? 1 : viewMode === 'split' ? 1 : 0,
             width:
               viewMode === 'detail'
-                ? 'calc(100% - 64px)'
+                ? 'calc(100% - 56px)'
                 : viewMode === 'split'
                 ? '50%'
                 : '0%',
