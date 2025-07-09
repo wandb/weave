@@ -15,8 +15,8 @@ const DEFAULT_INSET_SPACING = 40;
  */
 export const ObjectViewerGroupingCell: FC<
   GridRenderCellParams & {
-    insetSpacing?: number,
-    onClick?: (event: MouseEvent) => void
+    insetSpacing?: number;
+    onClick?: (event: MouseEvent) => void;
   }
 > = props => {
   const {id, field, rowNode, row} = props;

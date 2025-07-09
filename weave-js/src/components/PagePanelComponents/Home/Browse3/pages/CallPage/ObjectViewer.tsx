@@ -412,7 +412,7 @@ export const ObjectViewer = ({
     () => ({
       headerName: 'Path',
       hideDescendantCount: true,
-      ...(groupingFixedWidth !== undefined && { width: groupingFixedWidth }),
+      ...(groupingFixedWidth !== undefined && {width: groupingFixedWidth}),
       renderCell: params => {
         const refToExpand = params.row.value;
         const isTruncated = params.row?.value?.[TRUNCATION_KEY];
@@ -589,10 +589,21 @@ export const ObjectViewer = ({
         }}
       />
     );
-  }, [apiRef, rows, columns, getRowHeight, groupingColDef, expandedIds, truncateOverflow]);
+  }, [
+    apiRef,
+    rows,
+    columns,
+    getRowHeight,
+    groupingColDef,
+    expandedIds,
+    truncateOverflow,
+    hideHeaders,
+  ]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
-  return <div style={{overflow: 'hidden', height: '100%', flex: 1}}>{inner}</div>;
+  return (
+    <div style={{overflow: 'hidden', height: '100%', flex: 1}}>{inner}</div>
+  );
 };
 
 // Helper function to build the base ref for a given path. This function is used
