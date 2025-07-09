@@ -1,7 +1,6 @@
 import importlib
 from typing import TYPE_CHECKING, Any, Callable, Union
 
-import dspy.dspy_callback
 from pydantic import BaseModel
 
 import weave
