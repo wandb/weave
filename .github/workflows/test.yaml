@@ -273,13 +273,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install nox "uv<0.7.0"  # pin to unblock CI
       - name: Run nox (Non Trace Server)
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "not trace_server"
