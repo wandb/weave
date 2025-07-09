@@ -59,6 +59,10 @@ def default_filename(
 ) -> str:
     now = datetime.now()
     datetime_str = now.strftime("%Y%m%d_%H%M%S")
+    # Do not give the file an empty extension. Prefer none
+    if len(extension) == 0:
+        return datetime_str
+
     return datetime_str + "." + extension
 
 
