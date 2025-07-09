@@ -1,9 +1,5 @@
-import {Box, Collapse} from '@mui/material';
+import Box from '@mui/material/Box';
 import {GridRowId, useGridApiRef} from '@mui/x-data-grid-pro';
-import {WeaveCHTable, WeaveCHTableSourceRefContext} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallPage/DataTableView';
-import {ObjectViewer} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallPage/ObjectViewer';
-import {getValueType} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallPage/traverse';
-import {ValueView} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallPage/ValueView';
 import _ from 'lodash';
 import React, {useCallback, useContext, useMemo, useState} from 'react';
 import styled from 'styled-components';
@@ -18,6 +14,10 @@ import {CustomWeaveTypeDispatcher} from '../../typeViews/CustomWeaveTypeDispatch
 import {DocLink} from '../common/Links';
 import {TabUseBannerError} from '../common/TabUseBanner';
 import {OBJECT_ATTR_EDGE_NAME} from '../wfReactInterface/constants';
+import {WeaveCHTable, WeaveCHTableSourceRefContext} from './DataTableView';
+import {ObjectViewer} from './ObjectViewer';
+import {getValueType} from './traverse';
+import {ValueView} from './ValueView';
 
 const EXPANDED_IDS_LENGTH = 200;
 
@@ -246,7 +246,6 @@ export const ObjectViewerSection = ({
         />
       );
     }
-
     const oneResultData = {
       value,
       valueType,
@@ -293,7 +292,7 @@ export const ObjectViewerSection = ({
     }
   }
   return (
-    <ObjectViewerSectionNonEmptyMemoed
+    <ObjectViewerSectionNonEmpty
       title={title}
       data={data}
       noHide={noHide}

@@ -14,10 +14,7 @@ const INSET_SPACING = 40;
  * Utility component for the ObjectViewer to allow expanding/collapsing of keys.
  */
 export const ObjectViewerGroupingCell: FC<
-  GridRenderCellParams & {
-    onClick?: (event: MouseEvent) => void;
-    removeSpacing?: boolean;
-  }
+  GridRenderCellParams & {onClick?: (event: MouseEvent) => void}
 > = props => {
   const {id, field, rowNode, row} = props;
   const isGroup = rowNode.type === 'group';
@@ -67,47 +64,45 @@ export const ObjectViewerGroupingCell: FC<
           />
         );
       })}
-      {!props.removeSpacing && (
-        <Box
-          sx={{
-            flex: `0 0 ${INSET_SPACING}px`,
-            width: `${INSET_SPACING}px`,
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'left',
-            justifyContent: 'center',
-          }}>
-          {isGroup || isExpandableRef ? (
-            <Button
-              variant="ghost"
-              icon={
-                isGroup && rowNode.childrenExpanded
-                  ? 'chevron-down'
-                  : 'chevron-next'
-              }
-            />
-          ) : (
+      <Box
+        sx={{
+          flex: `0 0 ${INSET_SPACING}px`,
+          width: `${INSET_SPACING}px`,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        {isGroup || isExpandableRef ? (
+          <Button
+            variant="ghost"
+            icon={
+              isGroup && rowNode.childrenExpanded
+                ? 'chevron-down'
+                : 'chevron-next'
+            }
+          />
+        ) : (
+          <Box
+            sx={{
+              width: '100%',
+              height: '100%',
+              pr: 2,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
             <Box
               sx={{
                 width: '100%',
                 height: '100%',
-                pr: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <Box
-                sx={{
-                  width: '100%',
-                  height: '100%',
-                }}></Box>
-              <Box sx={{width: '100%', height: '100%'}}></Box>
-            </Box>
-          )}
-        </Box>
-      )}
+              }}></Box>
+            <Box sx={{width: '100%', height: '100%'}}></Box>
+          </Box>
+        )}
+      </Box>
       <Tooltip
         content={tooltipContent}
         trigger={
