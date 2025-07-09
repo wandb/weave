@@ -8,8 +8,8 @@ from pydantic import BaseModel
 
 from weave.integrations.patcher import Patcher
 from weave.trace.context import weave_client_context
-from weave.trace.weave_client import Call, WeaveClient
 from weave.trace.util import log_once
+from weave.trace.weave_client import Call, WeaveClient
 
 _import_failed = False
 
@@ -195,7 +195,10 @@ if not _import_failed:
             """Creates a Weave call when a LlamaIndex span starts."""
             gc = get_weave_client()
             if gc is None:
-                log_once(logger.warn, "Please call `weave.init()` to enable LlamaIndex tracing")
+                log_once(
+                    logger.warn,
+                    "Please call `weave.init()` to enable LlamaIndex tracing",
+                )
                 return
             op_name = _get_op_name_from_span(id_)
 
@@ -228,7 +231,9 @@ if not _import_failed:
                 if self._is_streaming:
                     _accumulators[id_] = [call, False, {}, None, None]
             except Exception as e:
-                log_once(logger.error, f"Error creating call for {op_name} (ID: {id_}): {e}")
+                log_once(
+                    logger.error, f"Error creating call for {op_name} (ID: {id_}): {e}"
+                )
 
         def _prepare_to_exit_or_drop(
             self,
@@ -327,7 +332,10 @@ if not _import_failed:
             """Processes a LlamaIndex event, creating or finishing a Weave call."""
             gc = get_weave_client()
             if gc is None:
-                log_once(logger.warn, "Please call `weave.init()` to enable LlamaIndex tracing")
+                log_once(
+                    logger.warn,
+                    "Please call `weave.init()` to enable LlamaIndex tracing",
+                )
                 return
             event_class_name = event.class_name()
 
@@ -352,7 +360,9 @@ if not _import_failed:
                     # Parent: span call or global root
                     parent_call_for_event = _weave_calls_map.get(event.span_id)
                     # Create a new call for the start event
-                    call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
+                    call = gc.create_call(
+                        op_name, raw_event_payload, parent_call_for_event
+                    )
                     _weave_calls_map[event_pairing_key] = call
 
                     # For streaming LLMCompletion and LLMChat events, pre-create the InProgress call
@@ -360,7 +370,9 @@ if not _import_failed:
                     if (
                         base_event_name in ["LLMCompletion", "LLMChat"]
                     ) and event.span_id in _accumulators:
-                        progress_op_name = f"llama_index.event.{base_event_name}InProgress"
+                        progress_op_name = (
+                            f"llama_index.event.{base_event_name}InProgress"
+                        )
                         progress_event_key = (event.span_id, progress_op_name)
                         # Create InProgress call as child of LLM start event
                         progress_call = gc.create_call(
@@ -401,7 +413,10 @@ if not _import_failed:
                             deferred_result = acc_entry[3]
                             deferred_err = acc_entry[4]
 
-                        if progress_call is not None and last_progress_payload is not None:
+                        if (
+                            progress_call is not None
+                            and last_progress_payload is not None
+                        ):
                             gc.finish_call(progress_call, last_progress_payload)
                     if event_pairing_key in _weave_calls_map:
                         # Found matching start event, finish its call with end event data
@@ -428,9 +443,13 @@ if not _import_failed:
                                         deferred_result.model_dump(exclude_none=True)
                                     )
                                 else:
-                                    outputs = _process_inputs({"result": deferred_result})
+                                    outputs = _process_inputs(
+                                        {"result": deferred_result}
+                                    )
                             except Exception:
-                                outputs = _process_inputs({"result": str(deferred_result)})
+                                outputs = _process_inputs(
+                                    {"result": str(deferred_result)}
+                                )
 
                         gc.finish_call(span_call, outputs, exception=deferred_err)
                     else:
@@ -439,10 +458,14 @@ if not _import_failed:
                     # Parent: span call or global root
                     parent_call_for_event = _weave_calls_map.get(event.span_id)
                     # Handle non-start/end events as instantaneous events
-                    call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
+                    call = gc.create_call(
+                        op_name, raw_event_payload, parent_call_for_event
+                    )
                     gc.finish_call(call, raw_event_payload)
             except Exception as e:
-                print(f"Weave(EventHandler): Error processing event {op_name} (Key: {event_pairing_key}): {e}")
+                print(
+                    f"Weave(EventHandler): Error processing event {op_name} (Key: {event_pairing_key}): {e}"
+                )
 
 else:
 
