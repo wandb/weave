@@ -1,19 +1,16 @@
 import base64
-import os
 import tempfile
 from pathlib import Path
-from typing import Annotated, Literal
 
 import pytest
+from util import generate_media
 
 import weave
 from weave import Dataset
 from weave.trace.table import Table
-from weave.trace.weave_client import WeaveClient, get_ref
+from weave.trace.weave_client import WeaveClient
 from weave.type_wrappers.Content.content import Content
-from util import (
-    generate_media
-)
+
 
 @pytest.fixture(scope="session")
 def video_file(tmp_path_factory) -> Path:
@@ -22,12 +19,14 @@ def video_file(tmp_path_factory) -> Path:
     file.save(fn)
     return fn
 
+
 @pytest.fixture(scope="session")
 def image_file(tmp_path_factory) -> Path:
     file = generate_media("PNG")
     fn = tmp_path_factory.mktemp("data") / "file.png"
     file.save(fn)
     return fn
+
 
 @pytest.fixture(scope="session")
 def pdf_file(tmp_path_factory) -> Path:
@@ -36,6 +35,7 @@ def pdf_file(tmp_path_factory) -> Path:
     file.save(fn)
     return fn
 
+
 @pytest.fixture(scope="session")
 def audio_file(tmp_path_factory) -> Path:
     file = "file.wav"
@@ -43,6 +43,7 @@ def audio_file(tmp_path_factory) -> Path:
     fn = tmp_path_factory.mktemp("data") / "file.wav"
     file.save(fn)
     return fn
+
 
 # New parameterization list using fixture names
 MEDIA_TEST_PARAMS = [
@@ -54,8 +55,12 @@ MEDIA_TEST_PARAMS = [
 
 
 class TestWeaveContent:
-    @pytest.mark.parametrize(("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS)
-    def test_content_from_path(self, fixture_name: str, extension: str, mimetype: str, request):
+    @pytest.mark.parametrize(
+        ("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS
+    )
+    def test_content_from_path(
+        self, fixture_name: str, extension: str, mimetype: str, request
+    ):
         """Test creating Content from file path."""
         file_path = request.getfixturevalue(fixture_name)
 
@@ -63,7 +68,7 @@ class TestWeaveContent:
         content = Content.from_path(str(file_path))
         assert content is not None
         assert content.extension == extension
-        assert content.mimetype == mimetype 
+        assert content.mimetype == mimetype
         assert content.filename == file_path.name
         assert content.size > 0
         assert isinstance(content.data, bytes)
@@ -71,8 +76,12 @@ class TestWeaveContent:
         assert content.input_type == "<class 'str'>"
         assert content.input_category == "path"
 
-    @pytest.mark.parametrize(("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS)
-    def test_content_from_bytes(self, fixture_name: str, extension: str, mimetype: str, request):
+    @pytest.mark.parametrize(
+        ("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS
+    )
+    def test_content_from_bytes(
+        self, fixture_name: str, extension: str, mimetype: str, request
+    ):
         """Test creating Content from bytes."""
         file_path = request.getfixturevalue(fixture_name)
         file_bytes = file_path.read_bytes()
@@ -91,8 +100,12 @@ class TestWeaveContent:
         content2 = Content.from_bytes(file_bytes, mimetype)
         assert content2.mimetype == mimetype
 
-    @pytest.mark.parametrize(("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS)
-    def test_content_from_base64(self, fixture_name: str, extension: str, mimetype: str, request):
+    @pytest.mark.parametrize(
+        ("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS
+    )
+    def test_content_from_base64(
+        self, fixture_name: str, extension: str, mimetype: str, request
+    ):
         """Test creating Content from base64 encoded string."""
         file_path = request.getfixturevalue(fixture_name)
         file_bytes = file_path.read_bytes()
@@ -110,8 +123,12 @@ class TestWeaveContent:
         assert content.input_type == "<class 'str'>"
         assert content.input_category == "base64"
 
-    @pytest.mark.parametrize(("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS)
-    def test_content_from_pathlib(self, fixture_name: str, extension: str, mimetype: str, request):
+    @pytest.mark.parametrize(
+        ("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS
+    )
+    def test_content_from_pathlib(
+        self, fixture_name: str, extension: str, mimetype: str, request
+    ):
         """Test creating Content from pathlib.Path object."""
         file_path = request.getfixturevalue(fixture_name)
 
@@ -145,8 +162,12 @@ class TestWeaveContent:
             expected_path = Path(tmpdir) / image_file.name
             assert expected_path.exists()
 
-    @pytest.mark.parametrize(("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS)
-    def test_content_in_ops(self, fixture_name: str, extension: str, mimetype: str, request):
+    @pytest.mark.parametrize(
+        ("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS
+    )
+    def test_content_in_ops(
+        self, fixture_name: str, extension: str, mimetype: str, request
+    ):
         """Test Content as input/output of weave ops."""
         file_path = request.getfixturevalue(fixture_name)
 
@@ -267,8 +288,9 @@ class TestWeaveContent:
         assert retrieved.mimetype == content.mimetype
         assert retrieved.size == content.size
 
-
-    def test_content_in_dataset(self, image_file, audio_file, video_file, pdf_file, client: WeaveClient):
+    def test_content_in_dataset(
+        self, image_file, audio_file, video_file, pdf_file, client: WeaveClient
+    ):
         """Test Content objects as dataset values."""
         rows = []
         original_files = {}
@@ -276,11 +298,13 @@ class TestWeaveContent:
         # Use fixtures to create content and store original data for verification
         for file_path in [image_file, audio_file, video_file, pdf_file]:
             content = Content.from_path(file_path)
-            rows.append({
-                "name": file_path.name,
-                "content": content,
-                "expected_mimetype": content.mimetype,
-            })
+            rows.append(
+                {
+                    "name": file_path.name,
+                    "content": content,
+                    "expected_mimetype": content.mimetype,
+                }
+            )
             original_files[file_path.name] = file_path.read_bytes()
 
         # Create and publish dataset
@@ -311,4 +335,4 @@ class TestWeaveContent:
         assert isinstance(result, Content)
         assert result.data == test_data
         assert result.extension == "txt"
-        assert result.mimetype == "text/plain" # Simplified in mock
+        assert result.mimetype == "text/plain"  # Simplified in mock
