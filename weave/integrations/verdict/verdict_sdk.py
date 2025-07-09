@@ -121,22 +121,23 @@ def get_verdict_patcher(
 
     # Check if verdict tracing is available
     if not import_failed:
-        verdict_tracer_cls = VerdictTracerImpl
+        verdict_tracer = VerdictTracerImpl()
     else:
-        verdict_tracer_cls = None
+        verdict_tracer = None
 
     global _verdict_patcher
     if _verdict_patcher is not None:
         return _verdict_patcher
 
-    tracer = verdict_tracer_cls()
+    if verdict_tracer is None:
+        return NoOpPatcher()
 
     _verdict_patcher = MultiPatcher(
         [
             SymbolPatcher(
                 lambda: importlib.import_module("verdict.core.pipeline"),
                 "Pipeline.__init__",
-                create_pipeline_init_wrapper(tracer),
+                create_pipeline_init_wrapper(verdict_tracer),
             ),
         ]
     )
