@@ -1,6 +1,7 @@
 import importlib
 from typing import TYPE_CHECKING, Any, Callable, Union
 
+import dspy.dspy_callback
 from pydantic import BaseModel
 
 import weave
@@ -8,6 +9,12 @@ from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
 from weave.trace.op import Op
 from weave.trace.serialization.serialize import dictify
+from weave.utils.optional_modules import get_module
+
+np = get_module("numpy")
+dspy = get_module("dspy")
+Example = dspy.Example
+Module = dspy.Module
 
 if TYPE_CHECKING:
     from dspy.primitives.prediction import Example
@@ -32,9 +39,6 @@ def get_symbol_patcher(
 
 
 def dump_dspy_objects(data: Any) -> Any:
-    import numpy as np
-    from dspy import Example, Module
-
     if isinstance(data, Example):
         return data.toDict()
 
@@ -96,9 +100,6 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 def dspy_postprocess_outputs(
     outputs: Union[Any, "Example"],
 ) -> Union[list[Any], dict[str, Any], Any]:
-    import numpy as np
-    from dspy import Example, Module
-
     if isinstance(outputs, Module):
         outputs = outputs.dump_state()
 

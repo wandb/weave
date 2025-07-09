@@ -1,6 +1,5 @@
 from typing import Any, Union
 
-import numpy as np
 from pydantic import Field, validate_call
 
 import weave
@@ -8,6 +7,9 @@ from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.scorer_types import HuggingFaceScorer
 from weave.scorers.utils import load_hf_model_weights
+from weave.utils.optional_modules import get_module
+
+np = get_module("numpy")
 
 CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.55
 

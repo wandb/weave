@@ -16,13 +16,12 @@ from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, sanitize_object_name
+from weave.utils.optional_modules import get_module
 
-try:
-    import numpy as np
-except ImportError:
-    _NUMPY_AVAILABLE = False
-else:
+if np := get_module("numpy"):
     _NUMPY_AVAILABLE = True
+else:
+    _NUMPY_AVAILABLE = False
 
 
 class Scorer(Object):

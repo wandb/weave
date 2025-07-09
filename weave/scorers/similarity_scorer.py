@@ -1,12 +1,14 @@
 from collections.abc import Sequence
 from typing import Any
 
-import numpy as np
 from pydantic import Field
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_EMBEDDING_MODEL
 from weave.scorers.scorer_types import LLMScorer
+from weave.utils.optional_modules import get_module
+
+np = get_module("numpy")
 
 
 class EmbeddingSimilarityScorer(LLMScorer):
