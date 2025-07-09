@@ -21,7 +21,6 @@ TINY_MODEL_PATHS = {
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer_tiny:latest",
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer_tiny:latest",
     "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer_tiny:latest",
-    "llamaguard_scorer": "c-metrics/weave-scorers/llamaguard_scorer_tiny:latest",
 }
 
 # Hugging Face Hub model paths for testing
