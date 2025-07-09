@@ -1,6 +1,7 @@
 import pytest
 
-from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
+from tests.scorers.test_utils import generate_large_text
+from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.moderation_scorer import WeaveBiasScorerV1
 
 
@@ -8,7 +9,7 @@ from weave.scorers.moderation_scorer import WeaveBiasScorerV1
 def weave_bias_scorer():
     """Fixture that returns a WeaveBiasScorer instance using a tiny downloaded model."""
     return WeaveBiasScorerV1(
-        model_name_or_path=TINY_MODEL_PATHS["bias_scorer"],
+        model_name_or_path=MODEL_PATHS["bias_scorer"],
         device="cpu",  # Use CPU for testing
         threshold=0.5,
     )
