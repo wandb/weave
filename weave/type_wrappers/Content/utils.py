@@ -5,6 +5,7 @@ import mimetypes
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +75,8 @@ def guess_from_buffer(buffer: bytes) -> str | None:
     if not MAGIC_LIB_AVAILABLE:
         return None
 
-    matches = puremagic.magic_stream(buffer)
-    _, mimetype, *_ = matches[0]
-    return mimetype
+    match = puremagic.magic_stream(BytesIO(buffer))[0]
+    return match.mime_type
 
 def guess_from_filename(filename: str) -> str | None:
     return mimetypes.guess_type(filename)[0]

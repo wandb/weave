@@ -47,7 +47,7 @@ def create_bytes_content(
     input: bytes, /, **values: Unpack[ContentArgs]
 ) -> BaseContentHandler:
     values["size"] = values["size"] or len(input)
-    values["extra"]["input_type"] = values["extra"].get("input_type", type(input))
+    values["extra"]["input_type"] = values["extra"].get("input_type", str(type(input)))
     values["extra"]["input_category"] = values["extra"].get("input_category", "data")
     # Raw binary data has no encoding unless explicitly provided
     if values["mimetype"] is None or values["extension"] is None:
