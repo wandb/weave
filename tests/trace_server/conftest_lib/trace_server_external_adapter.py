@@ -124,6 +124,10 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.obj.wb_user_id = self._user_id
         return super().obj_create(req)
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        req.wb_user_id = self._user_id
+        return super().evaluate_model(req)
+
 
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface, user_id: str = "test_user"

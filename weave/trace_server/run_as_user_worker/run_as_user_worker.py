@@ -570,6 +570,14 @@ class WorkerTraceServer(tsi.TraceServerInterface):
     ) -> Iterator[tsi.ThreadSchema]:
         return self.local_trace_server.threads_query_stream(req)
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        return self.local_trace_server.evaluate_model(req)
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        return self.local_trace_server.evaluation_status(req)
+
 
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface, project_id: str, wb_user_id: str

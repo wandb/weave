@@ -635,6 +635,18 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/threads/stream_query", req, tsi.ThreadsQueryReq, tsi.ThreadSchema
         )
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise NotImplementedError(
+            "evaluate_model is not implemented for remote HTTP trace server"
+        )
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        raise NotImplementedError(
+            "evaluation_status is not implemented for remote HTTP trace server"
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,

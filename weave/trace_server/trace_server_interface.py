@@ -1108,6 +1108,26 @@ class ThreadsQueryReq(BaseModel):
     )
 
 
+class EvaluateModelReq(BaseModel):
+    project_id: str
+    evaluation_ref: str
+    model_ref: str
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class EvaluateModelRes(BaseModel):
+    call_id: str
+
+
+class EvaluationStatusReq(BaseModel):
+    project_id: str
+    call_id: str
+
+
+class EvaluationStatusRes(BaseModel):
+    status: str
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1189,3 +1209,7 @@ class TraceServerInterface(Protocol):
 
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...
+
+    # Evaluation API
+    def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
+    def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
