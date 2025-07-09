@@ -331,7 +331,7 @@ export const ExampleCompareSectionTable: React.FC<
         {!onlyOneModel && (
           <Tooltip title="Pivot on model">
             <IconButton onClick={() => setModelsAsRows(v => !v)}>
-              <Icon name="retry" />
+              <Icon name="layout-tabs" />
             </IconButton>
           </Tooltip>
         )}
