@@ -19,6 +19,7 @@ try:
         Tracer,
         current_trace_context,
     )
+
     import_failed = False
 except (ImportError, ModuleNotFoundError):
     import_failed = True
@@ -27,6 +28,7 @@ except (ImportError, ModuleNotFoundError):
 def create_verdict_tracer_class() -> Optional[Tracer]:
     """Create VerdictTracer class if verdict.util.tracing is available."""
     if not import_failed:
+
         class VerdictTracerImpl(Tracer):
             """A tracer that logs calls to the Weave tracing backend."""
 
@@ -94,7 +96,6 @@ def create_verdict_tracer_class() -> Optional[Tracer]:
         return VerdictTracerImpl
     else:
         return None
-
 
 
 def create_pipeline_init_wrapper(
