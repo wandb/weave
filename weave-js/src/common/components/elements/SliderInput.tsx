@@ -8,6 +8,7 @@ import {SliderKeyboardOperation} from '../../util/media';
 // Doesn't yet work in nested panels yet.
 // import {BetterPopup} from '../BetterPopup';
 import NumberInput from './NumberInput';
+import {shiftInputByValue} from '../../util/shiftInputByValue';
 
 export interface SliderInputProps {
   min: number;
@@ -85,10 +86,26 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
     const keyboardOperations = React.useMemo(() => {
       return {
         [SliderKeyboardOperation.INCREMENT]: (event: KeyboardEvent) => {
-          update(sliderValue + 1);
+          const newValue = shiftInputByValue(
+            ticks,
+            strideLength,
+            1,
+            sliderValue,
+            min,
+            max
+          );
+          update(newValue);
         },
         [SliderKeyboardOperation.DECREMENT]: (event: KeyboardEvent) => {
-          update(sliderValue - 1);
+          const newValue = shiftInputByValue(
+            ticks,
+            strideLength,
+            -1,
+            sliderValue,
+            min,
+            max
+          );
+          update(newValue);
         },
       };
     }, [sliderValue, update]);
