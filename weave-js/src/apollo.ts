@@ -9,7 +9,10 @@ import Observable from 'zen-observable';
 
 const makeHttpLink = (uri: string) =>
   createHttpLink({
-    fetch: (input: RequestInfo, init?: RequestInit): Promise<Response> => {
+    fetch: (
+      input: RequestInfo | URL,
+      init?: RequestInit
+    ): Promise<Response> => {
       // we force using window.fetch because we need to use datadog's updated instance of window.fetch
       return window.fetch(input, init);
     },
