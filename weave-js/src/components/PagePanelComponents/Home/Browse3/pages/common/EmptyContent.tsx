@@ -2,7 +2,8 @@ import {Box} from '@mui/material';
 import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
 import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
 import React, {useEffect, useState} from 'react';
-import {useParams} from 'react-router-dom';
+
+import {useEntityProject} from '../../context';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
@@ -16,7 +17,7 @@ import {Link} from './Links';
 
 const NewDatasetButton: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const {entity, project} = useParams<{entity: string; project: string}>();
+  const {entity, project} = useEntityProject();
   const {isCreatingDataset, handleSaveDataset} = useDatasetSaving({
     entity,
     project,
@@ -46,10 +47,7 @@ const NewDatasetButton: React.FC = () => {
 const TracesMoreInformation: React.FC = () => {
   const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
   const userInfoLoaded = !viewerLoading ? userInfo : null;
-  const {entity: entityName, project: projectName} = useParams<{
-    entity: string;
-    project: string;
-  }>();
+  const {entity: entityName, project: projectName} = useEntityProject();
   const {orgName} = useOrgName({
     entityName,
     skip: viewerLoading || !entityName,
@@ -159,10 +157,7 @@ const NewMonitorButton: React.FC = () => {
 const EvaluationsMoreInformation: React.FC = () => {
   const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
   const userInfoLoaded = !viewerLoading ? userInfo : null;
-  const {entity: entityName, project: projectName} = useParams<{
-    entity: string;
-    project: string;
-  }>();
+  const {entity: entityName, project: projectName} = useEntityProject();
   const {orgName} = useOrgName({
     entityName,
     skip: viewerLoading || !entityName,
