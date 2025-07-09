@@ -1,0 +1,321 @@
+interactions:
+- request:
+    body: '{"messages":[{"content":"You are a helpful AI assistant, use the tool to
+      increment the number.","role":"system"},{"role":"user","name":"user","content":"Increment
+      the number 1 to 3."}],"model":"gpt-4.1-nano-2025-04-14","parallel_tool_calls":false,"stream":false,"tool_choice":"auto","tools":[{"type":"function","function":{"name":"increment_number","description":"Increment
+      a number by 1.","parameters":{"type":"object","properties":{"number":{"description":"number","title":"Number","type":"integer"}},"required":["number"],"additionalProperties":false},"strict":false}}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '573'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.93.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.93.1
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.6
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFNRb5swEH7nV1j3HCpIQKS8dXuYMqnSJq2dtLVCxhzEnbEt26zNovz3
+        CZMASTNpPCDrvrvvvvvO3geEAK8gJ8C21LFWi/CDicpHs9lsfrxsqq8pfv9TfinvPz9ku+71HhZ9
+        hSpfkLlT1Q1TrRbouJIDzAxShz1rnKXxbbZKotQDrapQ9GWNdmFyE4eSShUuo2UaRkkYJ8fyreIM
+        LeTkZ0AIIXv/74XKCt8gJ9HiFGnRWtog5GMSIWCU6CNAreXWUelgMYFMSYey1y47IWaAU0oUjAox
+        NR6+/ew8uUWFKN5oWi4/fvrWRY+4zcz67u41ydzDvN9AvdNeUN1JNro0w8d4ftGMEJC09bVcMoMt
+        SlfIri3RXHAQAtQ0XZ/Q64f9Ewx5T5DHBzjLPQTXzs8zLwzWnaXivUlUSuVor9W79HxEDuNChGq0
+        UaW9KIWaS263hUFq/Zxzu4OTEC8BurONgjaq1a5w6hf6plk6kMJ06yYwTo6gU46KKb6+XVxhKyp0
+        lPuFj3eMUbbFaqqc7hrtKq5mQDCb/L2Ya9zD9Fw2/0M/AYyhdlgV2mDF2fnAU5rB/k3+K2302AsG
+        i+Y3Z1g4jqbfRoU17cRwccHurMO2qLls0GjD/WuBWher9SpZ0WW9riE4BH8BAAD//wMAQPRdFDwE
+        AAA=
+    headers:
+      CF-RAY:
+      - 95bf2bd61bf18b05-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Jul 2025 11:16:45 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=SSLIQnYMvmL09MRnYxpjaBfciEt9nd1sq.4ZNJHoR0M-1751973405-1.0.1.1-ZncYqJcgSqRd.2GBYBT9Uc5ZfOvGSl3DvJdMe_2tphfBRwzIoregbh88_UZNUsQdmda2LJnLdmW4WUYf.gjSqCMPAm7G6WoOAb_wF.7VNTI;
+        path=/; expires=Tue, 08-Jul-25 11:46:45 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=5g.6STMG37wB8yXd5O0Tge7W9KA1a9BS.0WvHq0_51U-1751973405885-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '249'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '254'
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999971'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_e68274dad463590ec41feceb4b8b86d0
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"content":"You are a helpful AI assistant, use the tool to
+      increment the number.","role":"system"},{"role":"user","name":"user","content":"Increment
+      the number 1 to 3."},{"role":"assistant","tool_calls":[{"id":"call_xa5b2CGTu0Veh7r8AAw47tUt","function":{"arguments":"{\"number\":1}","name":"increment_number"},"type":"function"}]},{"content":"2","role":"tool","tool_call_id":"call_xa5b2CGTu0Veh7r8AAw47tUt"}],"model":"gpt-4.1-nano-2025-04-14","parallel_tool_calls":false,"stream":false,"tool_choice":"auto","tools":[{"type":"function","function":{"name":"increment_number","description":"Increment
+      a number by 1.","parameters":{"type":"object","properties":{"number":{"description":"number","title":"Number","type":"integer"}},"required":["number"],"additionalProperties":false},"strict":false}}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '811'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=SSLIQnYMvmL09MRnYxpjaBfciEt9nd1sq.4ZNJHoR0M-1751973405-1.0.1.1-ZncYqJcgSqRd.2GBYBT9Uc5ZfOvGSl3DvJdMe_2tphfBRwzIoregbh88_UZNUsQdmda2LJnLdmW4WUYf.gjSqCMPAm7G6WoOAb_wF.7VNTI;
+        _cfuvid=5g.6STMG37wB8yXd5O0Tge7W9KA1a9BS.0WvHq0_51U-1751973405885-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.93.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.93.1
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.6
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAwAAAP//jFPbattAEH3XVyzzbAXrktrRYyGU0lBKILRpEsR6NZLX3Ru7KxNj/O9l
+        JVuSHReqB7HMmTlz5szuPiIEeAUFAbamnkkj4s92vvpZv2c/0vuvj0+y1vL5Wf9q3MOm2WqYhQq9
+        2iDzp6obpqUR6LlWPcwsUo+BNVncJneLLJ9/6gCpKxShrDE+zm+SWFGl43Se3sbzPE7yY/lac4YO
+        CvISEULIvvsHoarCdyjIfHaKSHSONgjFkEQIWC1CBKhz3HmqPMxGkGnlUQXtqhViAnitRcmoEGPj
+        /ttPzqNbVIgyW7Tb5bcm/73bPm1QVs3D/ZfHdfp90q+n3plOUN0qNrg0wYd4cdGMEFBUdrVcMYsS
+        lS9VK1doLzgIAWqbNiQE/bB/hT7vFYr0AGe5h+ja+W3ihcW6dVR8NIkqpT0NWjuX3o7IYViI0I2x
+        euUuSqHmirt1aZG6bs6p3dFJSCcB2rONgrFaGl96/Qe7pnfLnhTGWzeCSX4EvfZUTOJJOrtCV1bo
+        Ke82PlwyRtkaq7F0vGy0rbieANFk9I9qrnH343PV/A/9CDCGxmNVGosVZ+cTj2kWw6P8V9pgcicY
+        HNotZ1h6jjaso8KatqJ/KeB2zqMsa64atMby7rlAbcpsmeUZTetlDdEh+gsAAP//AwCbamVuPQQA
+        AA==
+    headers:
+      CF-RAY:
+      - 95bf2bdb99ab8b05-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Jul 2025 11:16:46 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '350'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '358'
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999970'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_cfc6971202486feca5a3696150adb2f0
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"content":"You are a helpful AI assistant, use the tool to
+      increment the number.","role":"system"},{"role":"user","name":"user","content":"Increment
+      the number 1 to 3."},{"role":"assistant","tool_calls":[{"id":"call_xa5b2CGTu0Veh7r8AAw47tUt","function":{"arguments":"{\"number\":1}","name":"increment_number"},"type":"function"}]},{"content":"2","role":"tool","tool_call_id":"call_xa5b2CGTu0Veh7r8AAw47tUt"},{"role":"assistant","tool_calls":[{"id":"call_37uv8Kg4ZyvUjemdgLEGRh2N","function":{"arguments":"{\"number\":2}","name":"increment_number"},"type":"function"}]},{"content":"3","role":"tool","tool_call_id":"call_37uv8Kg4ZyvUjemdgLEGRh2N"}],"model":"gpt-4.1-nano-2025-04-14","parallel_tool_calls":false,"stream":false,"tool_choice":"auto","tools":[{"type":"function","function":{"name":"increment_number","description":"Increment
+      a number by 1.","parameters":{"type":"object","properties":{"number":{"description":"number","title":"Number","type":"integer"}},"required":["number"],"additionalProperties":false},"strict":false}}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '1049'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=SSLIQnYMvmL09MRnYxpjaBfciEt9nd1sq.4ZNJHoR0M-1751973405-1.0.1.1-ZncYqJcgSqRd.2GBYBT9Uc5ZfOvGSl3DvJdMe_2tphfBRwzIoregbh88_UZNUsQdmda2LJnLdmW4WUYf.gjSqCMPAm7G6WoOAb_wF.7VNTI;
+        _cfuvid=5g.6STMG37wB8yXd5O0Tge7W9KA1a9BS.0WvHq0_51U-1751973405885-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.93.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.93.1
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.6
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA4xSy27bMBC86ysWPFuGXq4TH4sEyCW5pGiLFIFAkSuJDUUS5KpNEfjfC0qOpbQp
+        0AsPOzvDmd19SQCYkuwATPScxOB0+tFnzdcvg62aB3d7dTWKcP38VNw/3Nx9vg5sExm2+Y6CXllb
+        YQenkZQ1Myw8csKomu93+eW+rLL9BAxWoo60zlFabfPUcGPTIit2aValeXWi91YJDOwA3xIAgJfp
+        jUaNxGd2gGzzWhkwBN4hO5ybAJi3OlYYD0EF4obYZgGFNYRm8v6pRzDj0KCHHHoeoEE0oIzwOKAh
+        lEA/lUAgCx656KHcrpU8tmPgMY4ZtV4B3BhLPI5jyvB4Qo5n19p2ztsm/EFlrTIq9LVHHqyJDgNZ
+        xyb0mAA8TtMZ3wRmztvBUU32Cafv8iKf9diylRW6O4FkietVvfyweUevlkhc6bCaLxNc9CgX6rIM
+        PkplV0CySv23m/e05+TKdP8jvwBCoCOUtfMolXibeGnzGI/2X23nKU+GWUD/QwmsSaGPm5DY8lHP
+        l8TCr0A41K0yHXrn1XxOravLi7IqedFetCw5Jr8BAAD//wMAMXWBqF0DAAA=
+    headers:
+      CF-RAY:
+      - 95bf2be08e2b8b05-BOM
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 08 Jul 2025 11:16:47 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '351'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '357'
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999968'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_33dffc7888ce3cfc94fa77251443d75d
+    status:
+      code: 200
+      message: OK
+version: 1

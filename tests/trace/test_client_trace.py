@@ -14,7 +14,6 @@ from typing import Any, Callable, Optional
 from unittest import mock
 
 import pytest
-import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
@@ -297,11 +296,7 @@ class OpCallSpec(BaseModel):
     run_calls: int
 
 
-def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
-    # @weave.type()
-    # class Number:
-    #     value: int
-
+def simple_line_call_bootstrap() -> OpCallSpec:
     class Number(weave.Object):
         value: int
 
@@ -364,12 +359,8 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
 
     num_calls = 5
     run_calls = 0
-    if init_wandb:
-        run = wandb.init()
     for i in range(num_calls):
         liner(Number(value=i), i, i)
-    if init_wandb:
-        run.finish()
     result["liner"].num_calls += num_calls
     result["adder"].num_calls += num_calls
     result["multiplier"].num_calls += num_calls

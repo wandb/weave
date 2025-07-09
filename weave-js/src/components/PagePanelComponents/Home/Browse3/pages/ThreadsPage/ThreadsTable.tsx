@@ -358,7 +358,6 @@ export const ThreadsTable: FC<{
         onPaginationModelChange={onPaginationModelChange}
         // Filtering
         filterModel={filterModel}
-        onFilterModelChange={setFilterModel}
         filterMode="server"
         // Sorting
         sortModel={sortModel}

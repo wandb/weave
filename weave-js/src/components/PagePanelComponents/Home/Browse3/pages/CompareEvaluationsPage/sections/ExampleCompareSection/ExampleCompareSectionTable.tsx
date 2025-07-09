@@ -997,6 +997,7 @@ export const ExampleCompareSectionTableModelsAsRows: React.FC<
         left: ['inputDigest'],
       }}
       rowHeight={props.rowHeight}
+      columnHeaderHeight={40}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
       columns={columnsWithControlledWidths}
@@ -1292,6 +1293,7 @@ export const ExampleCompareSectionTableModelsAsColumns: React.FC<
         left: ['inputDigest'],
       }}
       rowHeight={props.rowHeight}
+      columnHeaderHeight={40}
       rowSelectionModel={selectedRowInputDigest}
       unstable_rowSpanning={true}
       columns={columnsWithControlledWidths}
