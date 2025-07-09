@@ -10,7 +10,6 @@ type PlaygroundChatInputProps = {
   isLoading: boolean;
   onSend: (role: PlaygroundMessageRole, chatText: string) => void;
   onAdd: (role: PlaygroundMessageRole, chatText: string) => void;
-  settingsTab: number | null;
   hasConfiguredProviders?: boolean;
 };
 

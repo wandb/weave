@@ -35,17 +35,16 @@ classifiers = [
 requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
+  "sentry-sdk>=2.0.0,<3.0.0",
   "pydantic>=2.0.0",
-  "wandb>=0.17.1",
-  "packaging>=21.0",         # For version parsing in integrations
-  "tenacity>=8.3.0,!=8.4.0", # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
-  "emoji>=2.12.1",           # For emoji shortcode support in Feedback
-  "rich",                    # Used for special formatting of tables (should be made optional)
-  "click",                   # Used for terminal/stdio printing
-  "gql[aiohttp,requests]",   # Used exclusively in wandb_api.py
-  "jsonschema>=4.23.0",      # Used by scorers for field validation
-  "diskcache==5.6.3",        # Used for data caching
-  "nest-asyncio==1.6.0",     # Used to support nested event loops in asyncio
+  "packaging>=21.0",          # For version parsing in integrations
+  "tenacity>=8.3.0,!=8.4.0",  # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
+  "rich",                     # Used for special formatting of tables (should be made optional)
+  "click",                    # Used for terminal/stdio printing
+  "gql[aiohttp,requests]",    # Used exclusively in wandb_api.py
+  "jsonschema>=4.23.0",       # Used by scorers for field validation
+  "diskcache==5.6.3",         # Used for data caching
+  "nest-asyncio==1.6.0",      # Used to support nested event loops in asyncio
 
   # This dependency will be updated each time we regenerate the trace server bindings.
   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
@@ -61,6 +60,7 @@ dependencies = [
 # `trace_server` is the dependency list of the trace server itself. We eventually will extract
 # this to a separate package. Note, when that happens, we will need to pull along some of the
 #default dependencies as well.
+wandb = ["wandb>=0.17.1"]
 trace_server = [
   "ddtrace>=2.7.0",
   # BYOB - S3
@@ -75,6 +75,8 @@ trace_server = [
   "opentelemetry-proto>=1.12.0",
   "opentelemetry-semantic-conventions-ai>=0.4.3",
   "openinference-semantic-conventions>=0.1.17",
+  # For emoji shortcode support in Feedback
+  "emoji>=2.12.1",
 ]
 trace_server_tests = [
   # BYOB - S3

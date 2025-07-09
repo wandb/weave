@@ -50,7 +50,7 @@ describe.skip('Publishing Various Data Types', () => {
 
   const datasetOp = op(async function dataset() {
     return new Dataset({
-      id: 'my-dataset',
+      name: 'my-dataset',
       rows: [
         {name: 'Alice', age: 10},
         {name: 'Bob', age: 20},
