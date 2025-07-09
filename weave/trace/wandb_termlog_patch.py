@@ -10,9 +10,9 @@ start to track referrers.
 
 import inspect
 from functools import wraps
-from typing import Any
+from typing import Any, Optional
 
-import wandb
+import weave.wandb_thin as wandb
 
 wandb_termlog = wandb.termlog
 patched = False
@@ -27,16 +27,17 @@ def unsafe_termlog(*args: Any, **kwargs: Any) -> None:
     """
     bound_args = inspect.signature(wandb_termlog).bind(*args, **kwargs)
     bound_args.apply_defaults()
-    if string_arg_val := bound_args.arguments.get("string"):
-        if isinstance(string_arg_val, str):
-            if (
-                string_arg_val.startswith(
-                    "You can find your API key in your browser here:"
-                )
-                and "http" in string_arg_val
-                and string_arg_val.endswith("/authorize")
-            ):
-                string_arg_val = string_arg_val + "?ref=weave"
+    string_arg_val: Optional[str] = bound_args.arguments.get("string")
+    if (
+        string_arg_val
+        and isinstance(string_arg_val, str)
+        and (
+            string_arg_val.startswith("You can find your API key in your browser here:")
+            and "http" in string_arg_val
+            and string_arg_val.endswith("/authorize")
+        )
+    ):
+        string_arg_val = string_arg_val + "?ref=weave"
     bound_args.arguments["string"] = string_arg_val
     return wandb_termlog(**bound_args.arguments)
 

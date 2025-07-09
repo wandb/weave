@@ -218,6 +218,13 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
+
+  threadsUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
+  threadUIUrl: (entityName: string, projectName: string, threadId: string) => {
+    throw new Error('Not implemented');
+  },
 };
 
 export const browse3ContextGen = (
@@ -488,6 +495,16 @@ export const browse3ContextGen = (
         .join('&');
       return `${projectRoot(entityName, projectName)}/compare?${params}`;
     },
+    threadsUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/threads`;
+    },
+    threadUIUrl: (
+      entityName: string,
+      projectName: string,
+      threadId: string
+    ) => {
+      return `${projectRoot(entityName, projectName)}/threads/${threadId}`;
+    },
   };
   return browse3Context;
 };
@@ -587,6 +604,12 @@ type RouteType = {
     entityName: string,
     projectName: string,
     objectSpecifiers: string[]
+  ) => string;
+  threadsUIUrl: (entityName: string, projectName: string) => string;
+  threadUIUrl: (
+    entityName: string,
+    projectName: string,
+    threadId: string
   ) => string;
 };
 
@@ -719,6 +742,12 @@ const useMakePeekingRouter = (): RouteType => {
     ) => {
       return setSearchParam(PEEK_PARAM, baseContext.compareObjectsUri(...args));
     },
+    threadsUIUrl: (...args: Parameters<typeof baseContext.threadsUIUrl>) => {
+      throw new Error('Threads list not available in peek mode');
+    },
+    threadUIUrl: (...args: Parameters<typeof baseContext.threadUIUrl>) => {
+      return setSearchParam(PEEK_PARAM, baseContext.threadUIUrl(...args));
+    },
   };
 };
 
@@ -833,4 +862,38 @@ export const WeaveHeaderExtrasProvider = ({
       {children}
     </WeaveHeaderExtrasContext.Provider>
   );
+};
+
+export const EntityProjectContext = React.createContext<{
+  entity: string;
+  project: string;
+  projectId: string;
+}>({
+  entity: '',
+  project: '',
+  projectId: '',
+});
+
+export const EntityProjectProvider: React.FC<{
+  children: React.ReactNode;
+  entity: string;
+  project: string;
+}> = ({children, entity, project}) => {
+  const value = useMemo(
+    () => ({
+      entity,
+      project,
+      projectId: `${entity}/${project}`,
+    }),
+    [entity, project]
+  );
+  return (
+    <EntityProjectContext.Provider value={value}>
+      {children}
+    </EntityProjectContext.Provider>
+  );
+};
+
+export const useEntityProject = () => {
+  return useContext(EntityProjectContext);
 };

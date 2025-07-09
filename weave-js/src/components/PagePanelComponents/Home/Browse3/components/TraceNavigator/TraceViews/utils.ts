@@ -118,7 +118,7 @@ export const buildTraceTreeFlat = (
     .sort((a, b) => b.dfsOrder - a.dfsOrder)
     .forEach(node => {
       if (node.call.exception !== null || node.descendantHasErrors) {
-        if (node.call.parent_id) {
+        if (node.call.parent_id && traceTreeFlat[node.call.parent_id]) {
           traceTreeFlat[node.call.parent_id].descendantHasErrors = true;
         }
       }

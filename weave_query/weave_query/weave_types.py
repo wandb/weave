@@ -920,10 +920,19 @@ class TypedDict(Type):
         for k, ptype in self.property_types.items():
             if k in self.not_required_keys and k not in other_type.property_types:
                 continue
+            ## In the case where we have a required key, but the key is not required for 
+            ## the other type, we need to fail assignability. Example: 
+            ## t1 = {"a": int, "b": int}
+            ## t2 = {"a": int, "b": int, not_required_keys: ["b"]}
+            ## t1.assign_type(t2) should fail
+            if k in other_type.not_required_keys and k not in self.not_required_keys:
+                return False
+
             if k not in other_type.property_types or not ptype.assign_type(
                 other_type.property_types[k]
             ):
                 return False
+        
         return True
 
     def _to_dict(self):  # type: ignore

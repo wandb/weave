@@ -3,7 +3,11 @@ import {
   TableCreateReq,
   TableCreateRes,
 } from '../pages/wfReactInterface/traceServerClientTypes';
-import {ObjectVersionSchema} from '../pages/wfReactInterface/wfDataModelHooksInterface';
+import {
+  ObjectVersionSchema,
+  UseObjCreateParams,
+  UseTableUpdateParams,
+} from '../pages/wfReactInterface/wfDataModelHooksInterface';
 
 export interface CreateNewDatasetOptions {
   projectId: string;
@@ -12,7 +16,7 @@ export interface CreateNewDatasetOptions {
   datasetName: string;
   rows: Array<Record<string, any>>;
   tableCreate: (table: TableCreateReq) => Promise<TableCreateRes>;
-  objCreate: (projectId: string, objectId: string, obj: any) => Promise<any>;
+  objCreate: (useObjCreateParams: UseObjCreateParams) => Promise<any>;
   router: any;
 }
 
@@ -25,12 +29,8 @@ export interface UpdateDatasetOptions {
   updateSpecs: Array<
     {pop: {index: number}} | {insert: {index: number; row: Record<string, any>}}
   >;
-  tableUpdate: (
-    projectId: string,
-    tableDigest: string,
-    specs: any
-  ) => Promise<any>;
-  objCreate: (projectId: string, objectId: string, obj: any) => Promise<any>;
+  tableUpdate: (useTableUpdateParams: UseTableUpdateParams) => Promise<any>;
+  objCreate: (useObjCreateParams: UseObjCreateParams) => Promise<string>;
   router: any;
 }
 
@@ -43,7 +43,11 @@ export const createNewDataset = async ({
   tableCreate,
   objCreate,
   router,
-}: CreateNewDatasetOptions) => {
+}: CreateNewDatasetOptions): Promise<{
+  url: string;
+  objectId: string;
+  objectDigest: string;
+}> => {
   const newTableResult = await tableCreate({
     table: {
       project_id: projectId,
@@ -62,14 +66,18 @@ export const createNewDataset = async ({
     newTableResult.digest
   );
 
-  const newDatasetResp = await objCreate(projectId, datasetName, {
-    _type: 'Dataset',
-    name: datasetName,
-    description: null,
-    ref: null,
-    _class_name: 'Dataset',
-    _bases: ['Object', 'BaseModel'],
-    rows: newTableRef,
+  const newDatasetResp = await objCreate({
+    projectId,
+    objectId: datasetName,
+    val: {
+      _type: 'Dataset',
+      name: datasetName,
+      description: null,
+      ref: null,
+      _class_name: 'Dataset',
+      _bases: ['Object', 'BaseModel'],
+      rows: newTableRef,
+    },
   });
 
   const newDatasetUrl = router.objectVersionUIUrl(
@@ -84,6 +92,7 @@ export const createNewDataset = async ({
   return {
     url: newDatasetUrl,
     objectId: datasetName,
+    objectDigest: newDatasetResp,
   };
 };
 
@@ -100,11 +109,11 @@ export const updateExistingDataset = async ({
 }: UpdateDatasetOptions) => {
   const existingTableDigest = datasetObject.rows.split('/').pop();
 
-  const updatedTableResult = await tableUpdate(
+  const updatedTableResult = await tableUpdate({
     projectId,
-    existingTableDigest,
-    updateSpecs
-  );
+    baseDigest: existingTableDigest,
+    updates: updateSpecs,
+  });
 
   if (!updatedTableResult?.digest) {
     throw new Error('Invalid response from table update');
@@ -116,14 +125,14 @@ export const updateExistingDataset = async ({
     updatedTableResult.digest
   );
 
-  const updatedDatasetResp = await objCreate(
+  const updatedDatasetResp = await objCreate({
     projectId,
-    selectedDataset.objectId,
-    {
+    objectId: selectedDataset.objectId,
+    val: {
       ...datasetObject,
       rows: updatedTableRef,
-    }
-  );
+    },
+  });
 
   const updatedDatasetUrl = router.objectVersionUIUrl(
     entity,
@@ -137,5 +146,6 @@ export const updateExistingDataset = async ({
   return {
     url: updatedDatasetUrl,
     objectId: selectedDataset.objectId,
+    objectDigest: updatedDatasetResp,
   };
 };

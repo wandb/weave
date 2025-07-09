@@ -31,11 +31,12 @@ describe('createNewDataset', () => {
 
   it('should create a new dataset with initial data', async () => {
     mockTableCreate.mockResolvedValue({digest: 'new-digest'});
-    mockObjCreate.mockResolvedValue({version: 'v1'});
+    mockObjCreate.mockResolvedValue('v1');
 
     const result = await createNewDataset(createOptions);
 
     expect(result).toEqual({
+      objectDigest: 'v1',
       url: '/mock-url',
       objectId: 'new-dataset',
     });
@@ -47,14 +48,18 @@ describe('createNewDataset', () => {
       },
     });
 
-    expect(mockObjCreate).toHaveBeenCalledWith('test-project', 'new-dataset', {
-      _type: 'Dataset',
-      name: 'new-dataset',
-      description: null,
-      ref: null,
-      _class_name: 'Dataset',
-      _bases: ['Object', 'BaseModel'],
-      rows: 'weave:///test-entity/test-project/table/new-digest',
+    expect(mockObjCreate).toHaveBeenCalledWith({
+      projectId: 'test-project',
+      objectId: 'new-dataset',
+      val: {
+        _type: 'Dataset',
+        name: 'new-dataset',
+        description: null,
+        ref: null,
+        _class_name: 'Dataset',
+        _bases: ['Object', 'BaseModel'],
+        rows: 'weave:///test-entity/test-project/table/new-digest',
+      },
     });
   });
 
@@ -84,22 +89,28 @@ describe('updateExistingDataset', () => {
 
   it('should update existing dataset with new version', async () => {
     mockTableUpdate.mockResolvedValue({digest: 'updated-digest'});
-    mockObjCreate.mockResolvedValue({version: 'v2'});
+    mockObjCreate.mockResolvedValue('v2');
 
     const result = await updateExistingDataset(updateOptions);
 
     expect(result).toEqual({
+      objectDigest: 'v2',
       url: '/mock-url',
       objectId: 'dataset-123',
     });
 
-    expect(mockTableUpdate).toHaveBeenCalledWith('test-project', 'old-digest', [
-      {pop: {index: 0}},
-      {insert: {index: 0, row: {data: 'new'}}},
-    ]);
+    expect(mockTableUpdate).toHaveBeenCalledWith({
+      projectId: 'test-project',
+      baseDigest: 'old-digest',
+      updates: [{pop: {index: 0}}, {insert: {index: 0, row: {data: 'new'}}}],
+    });
 
-    expect(mockObjCreate).toHaveBeenCalledWith('test-project', 'dataset-123', {
-      rows: 'weave:///test-entity/test-project/table/updated-digest',
+    expect(mockObjCreate).toHaveBeenCalledWith({
+      projectId: 'test-project',
+      objectId: 'dataset-123',
+      val: {
+        rows: 'weave:///test-entity/test-project/table/updated-digest',
+      },
     });
   });
 

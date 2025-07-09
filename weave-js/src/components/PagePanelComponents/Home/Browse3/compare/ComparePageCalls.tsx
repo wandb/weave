@@ -27,7 +27,12 @@ export const ComparePageCalls = ({
   onlyChanged,
 }: ComparePageCallsProps) => {
   const {useCalls} = useWFHooks();
-  const calls = useCalls(entity, project, {callIds});
+  const calls = useCalls({
+    entity,
+    project,
+    filter: {callIds},
+    includeStorageSize: true,
+  });
   if (calls.loading) {
     return <LoadingDots />;
   }

@@ -19,13 +19,31 @@ PY39_INCOMPATIBLE_SHARDS = [
     "crewai",
     "google_genai",
     "mcp",
+    "smolagents",
+    "dspy",
+    "autogen_tests",
 ]
+NUM_TRACE_SHARDS = 4
 
 
 @nox.session
 def lint(session):
     session.install("pre-commit", "jupyter")
-    session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
+    dry_run = session.posargs and "dry-run" in session.posargs
+    if dry_run:
+        session.run(
+            "pre-commit",
+            "run",
+            "--hook-stage",
+            "pre-push",
+            "--files",
+            "./weave/__init__.py",
+        )
+    else:
+        session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
+
+
+trace_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SHARDS + 1)]
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
@@ -38,9 +56,9 @@ def lint(session):
         # For example,
         #   nox -e "tests-3.12(shard='custom')" -- test_your_thing.py
         "custom",
-        "trace",
         "flow",
         "trace_server",
+        "trace_server_bindings",
         "anthropic",
         "cerebras",
         "cohere",
@@ -54,8 +72,7 @@ def lint(session):
         "langchain",
         "litellm",
         "llamaindex",
-        "mistral0",
-        "mistral1",
+        "mistral",
         "notdiamond",
         "openai",
         "openai_agents",
@@ -64,7 +81,11 @@ def lint(session):
         "scorers",
         "pandas-test",
         "huggingface",
+        "smolagents",
         "mcp",
+        "autogen_tests",
+        "trace",
+        *trace_shards,
     ],
 )
 def tests(session, shard):
@@ -78,7 +99,7 @@ def tests(session, shard):
     session.chdir("tests")
 
     env = {
-        k: session.env.get(k)
+        k: session.env.get(k) or os.getenv(k)
         for k in [
             "WEAVE_SENTRY_ENV",
             "CI",
@@ -114,12 +135,14 @@ def tests(session, shard):
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
-        "trace": ["trace/"],
         "flow": ["flow/"],
         "trace_server": ["trace_server/"],
-        "mistral0": ["integrations/mistral/v0/"],
-        "mistral1": ["integrations/mistral/v1/"],
+        "trace_server_bindings": ["trace_server_bindings"],
+        "mistral": ["integrations/mistral/"],
         "scorers": ["scorers/"],
+        "autogen_tests": ["integrations/autogen/"],
+        "trace": ["trace/"],
+        **{shard: ["trace/"] for shard in trace_shards},
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
@@ -128,13 +151,25 @@ def tests(session, shard):
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
 
-    session.run(
+    # Add sharding logic for trace1, trace2, trace3
+    pytest_args = [
         "pytest",
         "--durations=20",
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
         "--cov-branch",
+    ]
+
+    # Handle trace sharding: run every 3rd test starting at different offsets
+    if shard in trace_shards:
+        shard_id = int(shard[-1]) - 1
+        pytest_args.extend(
+            ["--shard-id", str(shard_id), "--num-shards", str(NUM_TRACE_SHARDS)]
+        )
+
+    session.run(
+        *pytest_args,
         *session.posargs,
         *test_dirs,
         env=env,

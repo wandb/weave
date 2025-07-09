@@ -226,6 +226,25 @@ def mock_apply_guardrail_make_api_call(
     return orig(self, operation_name, api_params)
 
 
+def mock_invoke_exception_make_api_call(
+    self, operation_name: str, api_params: dict
+) -> dict:
+    if operation_name == "InvokeModel":
+        # Simulate a ValidationException for invalid model ID
+        from botocore.exceptions import ClientError
+
+        raise ClientError(
+            error_response={
+                "Error": {
+                    "Code": "ValidationException",
+                    "Message": "The provided model identifier is invalid.",
+                }
+            },
+            operation_name="InvokeModel",
+        )
+    return orig(self, operation_name, api_params)
+
+
 @pytest.mark.skip_clickhouse_client
 @mock_aws
 @pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
@@ -462,3 +481,53 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
         assert result.metadata["usage"]["inputTokens"] == 25
         assert result.metadata["usage"]["outputTokens"] == 30
         assert result.metadata["usage"]["totalTokens"] == 55
+
+
+@pytest.mark.skip_clickhouse_client
+@mock_aws
+def test_bedrock_invoke_exception_handling(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """Test that the postprocessor handles exceptions gracefully without crashing."""
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=mock_invoke_exception_make_api_call,
+    ):
+        # Call invoke_model with an invalid model ID that will trigger a ValidationException
+        body = json.dumps(
+            {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 30,
+                "temperature": 0.7,
+                "messages": [{"role": "user", "content": invoke_prompt}],
+            }
+        )
+
+        # The call should raise a ValidationException
+        with pytest.raises(Exception) as exc_info:
+            bedrock_client.invoke_model(
+                modelId="invalid-model-id",
+                body=body,
+                contentType="application/json",
+                accept="application/json",
+            )
+
+        # Verify it's the correct exception
+        assert "ValidationException" in str(exc_info.value)
+        assert "The provided model identifier is invalid" in str(exc_info.value)
+
+    # Check that a trace was captured even with the exception
+    calls = list(client.calls())
+    assert len(calls) == 1, "Expected exactly one trace call even with exception"
+    call = calls[0]
+
+    # Verify the exception was captured in the trace
+    assert call.exception is not None
+    assert "ValidationException" in str(call.exception)
+    assert call.ended_at is not None
+
+    # Verify the output is None (since the call failed)
+    assert call.output is None

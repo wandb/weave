@@ -53,17 +53,24 @@ export type IconOnlyPillProps = {
   icon: IconName;
   color?: TagColorName;
   isInteractive?: boolean;
+  style?: React.CSSProperties;
 };
 export const IconOnlyPill: FC<IconOnlyPillProps> = ({
   icon,
   color,
   isInteractive,
+  style,
 }) => {
   const classes = useTagClasses({color, isInteractive});
   return (
     <Tailwind>
       <div className={twMerge(classes, 'rounded-2xl', 'max-w-[22px]')}>
-        <Icon role="presentation" className="m-4 h-14 w-14" name={icon} />
+        <Icon
+          role="presentation"
+          className="m-4 h-14 w-14"
+          name={icon}
+          style={style}
+        />
       </div>
     </Tailwind>
   );

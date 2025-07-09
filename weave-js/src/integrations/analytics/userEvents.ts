@@ -294,3 +294,28 @@ export const docsLinkClicked = makeTrackEvent<
     };
   }
 >('Weave docs link clicked');
+
+export const buttonClicked = makeTrackEvent<
+  {
+    buttonName: string;
+    entity: string;
+    project: string;
+  },
+  {
+    _description: `User clicked a button`;
+    _location: '';
+    _motivation: 'Used for tracking button clicks';
+    buttonName: {
+      description: 'Name of button';
+      exampleValues: ['my-button'];
+    };
+    entity: {
+      description: 'Entity of button';
+      exampleValues: ['my-entity'];
+    };
+    project: {
+      description: 'Project of button';
+      exampleValues: ['my-project'];
+    };
+  }
+>('Weave button clicked');

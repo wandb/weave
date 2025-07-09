@@ -106,20 +106,19 @@ def crew_kickoff_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     """
     results = {}
     for k, v in inputs.items():
-        if k == "self":
-            if hasattr(v, "model_dump"):
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", category=UserWarning)
-                    crew_dict = v.model_dump()
-                    if isinstance(crew_dict, dict):
-                        results["self"] = {
-                            k2: v2
-                            for k2, v2 in crew_dict.items()
-                            if v2 is not None
-                            and not (isinstance(v2, list) and len(v2) == 0)
-                        }
-                    else:
-                        results["self"] = crew_dict
+        if k == "self" and hasattr(v, "model_dump"):
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                crew_dict = v.model_dump()
+                if isinstance(crew_dict, dict):
+                    results["self"] = {
+                        k2: v2
+                        for k2, v2 in crew_dict.items()
+                        if v2 is not None
+                        and not (isinstance(v2, list) and len(v2) == 0)
+                    }
+                else:
+                    results["self"] = crew_dict
         if k == "inputs":
             results["inputs"] = dictify(v)
 

@@ -111,13 +111,17 @@ async def test_evaluation_performance(client: WeaveClient):
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
-    assert log == ["ensure_project_exists"]
+    assert log == ["ensure_project_exists", "get_call_processor", "get_call_processor"]
 
     with paused_client(client) as client:
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
         log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
-        assert log == ["ensure_project_exists"]
+        assert log == [
+            "ensure_project_exists",
+            "get_call_processor",
+            "get_call_processor",
+        ]
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
@@ -129,6 +133,7 @@ async def test_evaluation_performance(client: WeaveClient):
         counts
         == {
             "ensure_project_exists": 1,
+            "get_call_processor": 2,
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops

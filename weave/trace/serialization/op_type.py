@@ -5,6 +5,7 @@ import builtins
 import inspect
 import io
 import json
+import logging
 import os
 import re
 import sys
@@ -27,8 +28,13 @@ from weave.trace.serialization import serializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace_server.trace_server_interface_util import str_digest
 
+logger = logging.getLogger(__name__)
+
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
+
+# Memory address with at least 4 charaters (decrease false positives)
+MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{4,}>", re.ASCII)
 
 CODE_DEP_ERROR_SENTINEL = "<error>"
 
@@ -215,9 +221,11 @@ def reconstruct_signature(fn: Callable) -> str:
                 return annotation.__name__
             # Otherwise, check if the type is imported and use the alias if given
             for name, obj in module.__dict__.items():
-                if isinstance(obj, py_types.ModuleType):
-                    if annotation.__module__ == obj.__name__:
-                        return f"{name}.{annotation.__name__}"
+                if (
+                    isinstance(obj, py_types.ModuleType)
+                    and annotation.__module__ == obj.__name__
+                ):
+                    return f"{name}.{annotation.__name__}"
         return str(annotation)
 
     def quote_default_str(default: Any) -> Any:
@@ -313,7 +321,7 @@ def get_code_deps_safe(
     try:
         return _get_code_deps(fn, artifact, {}, depth)
     except Exception as e:
-        print(f"Error getting code deps for {fn}: {e}")
+        logger.info(f"Error getting code deps for {fn}: {e}")
         return {
             "import_code": [],
             "code": [CODE_DEP_ERROR_SENTINEL],
@@ -442,6 +450,8 @@ def _get_code_deps(
                         json_val = REDACTED_VALUE
                     else:
                         json_val = to_json(var_value, client._project_id(), client)
+                        if _has_memory_address(json_val):
+                            json_val = _replace_memory_address(json_val)
                 except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
@@ -460,6 +470,22 @@ def _get_code_deps(
                     )
                     code.append(code_paragraph)
     return {"import_code": import_code, "code": code, "warnings": warnings}
+
+
+def _has_memory_address(obj: Any) -> bool:
+    return isinstance(obj, str) and MEMORY_ADDRESS_PATTERN.search(obj) is not None
+
+
+def _replace_memory_address(json_val: str) -> str:
+    """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>"""
+
+    def _replacement_with_same_length(match: re.Match[str]) -> str:
+        # Get matched text and replace with 0s of the same length
+        address = match.group(0)
+        # Keep the 0x prefix and > suffix, replace the rest with 0s
+        return "0x" + "0" * (len(address) - 3) + ">"
+
+    return MEMORY_ADDRESS_PATTERN.sub(_replacement_with_same_length, json_val)
 
 
 def find_last_weave_op_function(
@@ -563,7 +589,7 @@ def load_instance(
     try:
         mod = __import__(import_name, fromlist=[module_dir])
     except Exception as e:
-        print("Op loading exception. This might be fine!", e)
+        logger.info(f"Op loading exception. This might be fine! {e}")
         import traceback
 
         traceback.print_exc()
@@ -582,7 +608,7 @@ def load_instance(
     # so we resort to looking at the source ast.
     last_op_function = find_last_weave_op_function(inspect.getsource(mod))
     if last_op_function is None:
-        print(
+        logger.info(
             f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=}"
         )
         return None

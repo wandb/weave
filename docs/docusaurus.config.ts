@@ -113,6 +113,17 @@ const config: Config = {
       },
     ],
     "plugin-image-zoom",
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        redirects: [
+          {
+            from: ['/guides/evaluation/imperative_evaluations'],
+            to: '/guides/evaluation/evaluation_logger',
+          },
+        ]  
+      },
+    ],
   ],
 
   themes: [

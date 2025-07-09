@@ -64,8 +64,6 @@ const CreateDatasetDrawerContent: React.FC<{
   const {datasetName, parsedData, isLoading, error, drawerWidth, isFullscreen} =
     state;
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
   const handleNameChange = useCallback(
@@ -81,64 +79,10 @@ const CreateDatasetDrawerContent: React.FC<{
     [dispatch]
   );
 
-  const handleFileChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        await parseFile(file);
-      }
-    },
-    [parseFile]
-  );
-
-  const handleUploadClick = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
   const wrappedOnClose = useCallback(() => {
     handleCloseDrawer();
     onClose();
   }, [handleCloseDrawer, onClose]);
-
-  // Handle drag events
-  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback(
-    async (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-
-      const files = e.dataTransfer.files;
-      if (files.length > 0) {
-        const file = files[0];
-        const fileExtension = file.name.split('.').pop()?.toLowerCase();
-        if (SUPPORTED_FILE_EXTENSIONS.includes(fileExtension as any)) {
-          await parseFile(file);
-        } else {
-          toast.error(
-            `Please upload a ${SUPPORTED_FILE_EXTENSIONS.join(', ')} file`
-          );
-        }
-      }
-    },
-    [parseFile]
-  );
 
   const handleToggleFullscreen = useCallback(() => {
     dispatch({
@@ -285,74 +229,7 @@ const CreateDatasetDrawerContent: React.FC<{
               </Box>
 
               {!parsedData ? (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '2px dashed',
-                    borderColor: isDragging ? TEAL_500 : MOON_300,
-                    borderRadius: '8px',
-                    p: 4,
-                    flex: 1,
-                    minHeight: '300px',
-                    backgroundColor: isDragging
-                      ? `${TEAL_300}52`
-                      : 'transparent',
-                    transition: 'all 0.2s ease',
-                  }}
-                  onDragEnter={handleDragEnter}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      ...typographyStyle,
-                      fontSize: '1.125rem',
-                      fontWeight: 600,
-                    }}
-                    gutterBottom>
-                    {isDragging ? 'Drop file here' : 'Upload your data file'}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={typographyStyle}
-                    color="textSecondary"
-                    align="center"
-                    gutterBottom>
-                    Drag and drop your {SUPPORTED_FILE_EXTENSIONS.join(', ')}{' '}
-                    file here, or click below to browse.
-                    <br />
-                    Your file will be converted to a dataset that you can edit
-                    before saving.
-                  </Typography>
-                  <Box sx={{mt: 2}}>
-                    <input
-                      data-testid="create-dataset-file-input"
-                      accept={SUPPORTED_FILE_EXTENSIONS.map(
-                        ext => `.${ext}`
-                      ).join(',')}
-                      id="data-upload"
-                      type="file"
-                      style={{display: 'none'}}
-                      onChange={handleFileChange}
-                      ref={fileInputRef}
-                    />
-                    <Button onClick={handleUploadClick} variant="secondary">
-                      Browse for file
-                    </Button>
-                  </Box>
-                  {isDragging && (
-                    <Typography
-                      variant="body2"
-                      sx={{...typographyStyle, fontWeight: 'bold', mt: 2}}
-                      style={{color: TEAL_500}}>
-                      Release to upload
-                    </Typography>
-                  )}
-                </Box>
+                <DatasetFilePicker handleFileSelect={parseFile} />
               ) : (
                 <Box
                   sx={{
@@ -414,5 +291,133 @@ const CreateDatasetDrawerContent: React.FC<{
         )}
       </Box>
     </ResizableDrawer>
+  );
+};
+
+export const DatasetFilePicker: React.FC<{
+  handleFileSelect: (file: File) => Promise<void>;
+}> = ({handleFileSelect}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        await handleFileSelect(file);
+      }
+    },
+    [handleFileSelect]
+  );
+
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  // Handle drag events
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        const file = files[0];
+        const fileExtension = file.name.split('.').pop()?.toLowerCase();
+        if (SUPPORTED_FILE_EXTENSIONS.includes(fileExtension as any)) {
+          await handleFileSelect(file);
+        } else {
+          toast.error(
+            `Please upload a ${SUPPORTED_FILE_EXTENSIONS.join(', ')} file`
+          );
+        }
+      }
+    },
+    [handleFileSelect]
+  );
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: '2px dashed',
+        borderColor: isDragging ? TEAL_500 : MOON_300,
+        borderRadius: '8px',
+        p: 4,
+        flex: 1,
+        minHeight: '300px',
+        backgroundColor: isDragging ? `${TEAL_300}52` : 'transparent',
+        transition: 'all 0.2s ease',
+      }}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}>
+      <Typography
+        variant="h6"
+        sx={{
+          ...typographyStyle,
+          fontSize: '1.125rem',
+          fontWeight: 600,
+        }}
+        gutterBottom>
+        {isDragging ? 'Drop file here' : 'Upload your data file'}
+      </Typography>
+      <Typography
+        variant="body2"
+        sx={typographyStyle}
+        color="textSecondary"
+        align="center"
+        gutterBottom>
+        Drag and drop your {SUPPORTED_FILE_EXTENSIONS.join(', ')} file here, or
+        click below to browse.
+        <br />
+        Your file will be converted to a dataset that you can edit before
+        saving.
+      </Typography>
+      <Box sx={{mt: 2}}>
+        <input
+          data-testid="create-dataset-file-input"
+          accept={SUPPORTED_FILE_EXTENSIONS.map(ext => `.${ext}`).join(',')}
+          id="data-upload"
+          type="file"
+          style={{display: 'none'}}
+          onChange={handleFileChange}
+          ref={fileInputRef}
+        />
+        <Button onClick={handleUploadClick} variant="secondary">
+          Browse for file
+        </Button>
+      </Box>
+      {isDragging && (
+        <Typography
+          variant="body2"
+          sx={{...typographyStyle, fontWeight: 'bold', mt: 2}}
+          style={{color: TEAL_500}}>
+          Release to upload
+        </Typography>
+      )}
+    </Box>
   );
 };

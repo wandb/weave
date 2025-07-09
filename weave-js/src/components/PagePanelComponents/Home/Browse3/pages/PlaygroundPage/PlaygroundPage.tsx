@@ -1,4 +1,3 @@
-import {Box} from '@mui/material';
 import {WeaveLoader} from '@wandb/weave/common/components/WeaveLoader';
 import {Button} from '@wandb/weave/components/Button';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -11,23 +10,28 @@ import React, {
   useState,
 } from 'react';
 
+import {getModelsByIds} from '../../inference/modelInfo';
+import {getPlaygroundModelString} from '../../inference/util';
+import {normalizeChatTraceCall} from '../ChatView/hooks';
 import {SimplePageLayoutWithHeader} from '../common/SimplePageLayout';
 import {useWFHooks} from '../wfReactInterface/context';
-import {useBaseObjectInstances} from '../wfReactInterface/objectClassQuery';
+import {
+  useBaseObjectInstances,
+  useLeafObjectInstances,
+} from '../wfReactInterface/objectClassQuery';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {LLM_MAX_TOKENS, LLMMaxTokensKey} from './llmMaxTokens';
 import {PlaygroundChat} from './PlaygroundChat/PlaygroundChat';
 import {PlaygroundSettings} from './PlaygroundSettings/PlaygroundSettings';
 import {useConfiguredProviders} from './useConfiguredProviders';
-import {
-  DEFAULT_SYSTEM_MESSAGE,
-  parseTraceCall,
-  usePlaygroundState,
-} from './usePlaygroundState';
+import {DEFAULT_SYSTEM_MESSAGE, usePlaygroundState} from './usePlaygroundState';
 
 export type PlaygroundPageProps = {
   entity: string;
   project: string;
   callId: string;
+  // IDs of models from the inference catalog
+  modelIds: string[];
 };
 
 type PlaygroundPageInnerProps = PlaygroundPageProps &
@@ -36,23 +40,29 @@ type PlaygroundPageInnerProps = PlaygroundPageProps &
     setSettingsTab: Dispatch<SetStateAction<number | null>>;
   };
 
+const isLLMMaxTokensKey = (key: string): key is LLMMaxTokensKey => {
+  return key in LLM_MAX_TOKENS;
+};
+
 export const PlaygroundPage = (props: PlaygroundPageProps) => {
   const [settingsTab, setSettingsTab] = useState<number | null>(null);
+
+  // We expect the passed in models to all be in LLM_MAX_TOKENS,
+  // but ignore them if they are not.
+  const initialModelStrings = getModelsByIds(
+    props.modelIds.filter(isLLMMaxTokensKey)
+  ).map(getPlaygroundModelString);
 
   const {
     setPlaygroundStates,
     playgroundStates,
     setPlaygroundStateField,
     setPlaygroundStateFromTraceCall,
-  } = usePlaygroundState();
+  } = usePlaygroundState(initialModelStrings);
 
   return (
     <SimplePageLayoutWithHeader
-      title={
-        <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-          Playground
-        </Box>
-      }
+      title="Playground"
       hideTabsIfSingle
       headerContent={null}
       tabs={[
@@ -119,27 +129,17 @@ export const PlaygroundPageInner = ({
       : null;
   }, [entity, project, callId]);
 
-  const call = useCall(callKey);
-  const callWithCosts = useCall(callKey, {
-    includeCosts: true,
-  });
+  const call = useCall({key: callKey});
+  const callWithCosts = useCall({key: callKey, includeCosts: true});
 
-  const {result: calls} = useCalls(
+  const {result: calls} = useCalls({
     entity,
     project,
-    {
+    filter: {
       callIds: playgroundStates.map(state => state.traceCall.id || ''),
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    {
-      includeCosts: true,
-    }
-  );
+    includeCosts: true,
+  });
 
   const {
     result: configuredProviders,
@@ -167,6 +167,14 @@ export const PlaygroundPageInner = ({
     filter: {
       latest_only: true,
     },
+  });
+
+  const {
+    result: savedModelsResult,
+    loading: savedModelsLoading,
+    refetch: refetchSavedModels,
+  } = useLeafObjectInstances('LLMStructuredCompletionModel', {
+    project_id: projectId,
   });
 
   const refetchCustomLLMs = useCallback(() => {
@@ -215,7 +223,7 @@ export const PlaygroundPageInner = ({
           if (state.traceCall.id === c.callId) {
             newStates[idx] = {
               ...state,
-              traceCall: parseTraceCall(c.traceCall || {}),
+              traceCall: normalizeChatTraceCall(c.traceCall || {}),
             };
             break;
           }
@@ -248,6 +256,8 @@ export const PlaygroundPageInner = ({
           customProvidersResult={customProvidersResult || []}
           customProviderModelsResult={customProviderModelsResult || []}
           configuredProviders={configuredProviders}
+          savedModelsResult={savedModelsResult || []}
+          savedModelsLoading={savedModelsLoading}
         />
       )}
       {settingsTab !== null && (
@@ -256,6 +266,8 @@ export const PlaygroundPageInner = ({
           setPlaygroundStateField={setPlaygroundStateField}
           settingsTab={settingsTab}
           setSettingsTab={setSettingsTab}
+          projectId={projectId}
+          refetchSavedModels={refetchSavedModels}
         />
       )}
     </div>

@@ -11,8 +11,12 @@ import styled from 'styled-components';
 import * as userEvents from '../../../../../../integrations/analytics/userEvents';
 import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {useWeaveflowCurrentRouteContext} from '../../context';
-import {CallStatusType} from '../common/StatusChip';
 import {useWFHooks} from '../wfReactInterface/context';
+import {
+  ComputedCallStatuses,
+  ComputedCallStatusType,
+} from '../wfReactInterface/traceServerClientTypes';
+import {traceCallStatusCode} from '../wfReactInterface/tsDataModelHooks';
 import {
   CallFilter,
   CallSchema,
@@ -317,7 +321,7 @@ const getCallSortStartTime = (call: CallSchema): number => {
 type CallRow = {
   id: string;
   call: CallSchema;
-  status: CallStatusType;
+  status: ComputedCallStatusType;
   hierarchy: string[];
   path: string;
   isTraceRootCall: boolean;
@@ -376,21 +380,16 @@ export const useCallFlattenedTraceTree = (
     ],
     []
   );
-  const traceCalls = useCalls(
-    call.entity,
-    call.project,
-    {
+  const traceCalls = useCalls({
+    entity: call.entity,
+    project: call.project,
+    filter: {
       traceId: call.traceId,
     },
-    undefined,
-    undefined,
-    undefined,
-    undefined,
     columns,
-    undefined,
     // Refetch the trace tree on delete or rename
-    {refetchOnDelete: true}
-  );
+    refetchOnDelete: true,
+  });
 
   const traceCallsResult = useMemo(
     () => traceCalls.result ?? [],
@@ -409,21 +408,14 @@ export const useCallFlattenedTraceTree = (
   );
 
   const costCols = useMemo(() => ['id'], []);
-  const costs = useCalls(
-    call.entity,
-    call.project,
-    costFilter,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    costCols,
-    undefined,
-    {
-      skip: traceCalls.loading,
-      includeCosts: true,
-    }
-  );
+  const costs = useCalls({
+    entity: call.entity,
+    project: call.project,
+    filter: costFilter,
+    columns: costCols,
+    skip: traceCalls.loading,
+    includeCosts: true,
+  });
 
   const costResult = useMemo(() => {
     return addCostsToCallResults(traceCallsResult, costs.result ?? []);
@@ -496,7 +488,9 @@ export const useCallFlattenedTraceTree = (
       rows.push({
         id: parentCall.callId,
         call: parentCall,
-        status: parentCall.rawSpan.status_code,
+        status: parentCall.traceCall
+          ? traceCallStatusCode(parentCall.traceCall)
+          : ComputedCallStatuses.running,
         hierarchy: [parentCall.callId],
         path: '',
         isTraceRootCall: parentCall.callId === lastCall.callId,
@@ -551,7 +545,9 @@ export const useCallFlattenedTraceTree = (
       rows.push({
         id: targetCall.callId,
         call: targetCall,
-        status: targetCall.rawSpan.status_code,
+        status: targetCall.traceCall
+          ? traceCallStatusCode(targetCall.traceCall)
+          : ComputedCallStatuses.running,
         hierarchy: newHierarchy,
         path: newPath,
         isTraceRootCall: targetCall.callId === lastCall.callId,
@@ -632,10 +628,10 @@ export const useCallFlattenedTraceTree = (
       for (const row of rows) {
         if (
           'status' in row &&
-          row.status === 'SUCCESS' &&
+          row.status === ComputedCallStatuses.success &&
           ancestors.has(row.id)
         ) {
-          row.status = 'DESCENDANT_ERROR';
+          row.status = ComputedCallStatuses.descendant_error;
         }
       }
     }

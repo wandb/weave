@@ -22,6 +22,16 @@ logger = logging.getLogger(__name__)
 
 _tracing_enabled = contextvars.ContextVar("tracing_enabled", default=True)
 
+# Thread ID context variable for tracking execution threads
+_thread_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "thread_id", default=None
+)
+
+# Turn ID context variable for tracking turns within threads
+_turn_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "turn_id", default=None
+)
+
 
 def push_call(call: Call) -> None:
     new_stack = copy.copy(_call_stack.get())
@@ -118,6 +128,13 @@ def get_current_call() -> Call | None:
         The Call object for the currently executing Op, or
         None if tracking has not been initialized or this method is
         invoked outside an Op.
+
+    Note:
+        The returned Call's ``attributes`` dictionary becomes immutable
+        once the call starts. Use :func:`weave.attributes` to set
+        call metadata before invoking an Op. The ``summary`` field may
+        be updated while the Op executes and will be merged with
+        computed summary information when the call finishes.
     """
     return _call_stack.get()[-1] if _call_stack.get() else None
 
@@ -157,3 +174,47 @@ def set_tracing_enabled(enabled: bool) -> Iterator[None]:
 def tracing_disabled() -> Iterator[None]:
     with set_tracing_enabled(False):
         yield
+
+
+def get_thread_id() -> str | None:
+    """Get the current thread_id from context.
+
+    Returns:
+        The current thread_id if set, None otherwise.
+    """
+    return _thread_id.get()
+
+
+@contextlib.contextmanager
+def set_thread_id(thread_id: str | None) -> Iterator[str | None]:
+    """Set the thread_id in the current context.
+
+    Args:
+        thread_id: The thread_id to set in context.
+
+    Yields:
+        The thread_id that was set.
+    """
+    token = _thread_id.set(thread_id)
+    try:
+        yield thread_id
+    finally:
+        _thread_id.reset(token)
+
+
+def get_turn_id() -> str | None:
+    """Get the current turn_id from context.
+
+    Returns:
+        The current turn_id if set, None otherwise.
+    """
+    return _turn_id.get()
+
+
+def set_turn_id(turn_id: str | None) -> None:
+    """Set the turn_id in the current context.
+
+    Args:
+        turn_id: The turn_id to set in context.
+    """
+    _turn_id.set(turn_id)

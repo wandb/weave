@@ -5,6 +5,7 @@
 import React from 'react';
 
 import {parseRef} from '../../../../../react';
+import {RunOption, SelectRun} from '../../../../SelectRun';
 import {UserLink} from '../../../../UserLink';
 import {SmallRef} from '../smallRef/SmallRef';
 import {
@@ -17,6 +18,7 @@ import {
 } from './common';
 import {IdList} from './IdList';
 import {SelectDatetimeDropdown} from './SelectDatetimeDropdown';
+import {SelectMonitor} from './SelectMonitor';
 import {TextValue} from './TextValue';
 import {ValueInputBoolean} from './ValueInputBoolean';
 import {ValueInputStatus} from './ValueInputStatus';
@@ -61,6 +63,33 @@ export const SelectValue = ({
   }
   if (fieldType === 'user') {
     return <UserLink userId={value} includeName={true} hasPopover={false} />;
+  }
+  if (fieldType === 'monitor') {
+    return (
+      <SelectMonitor
+        entity={entity}
+        project={project}
+        value={value}
+        onChange={onSetValue}
+      />
+    );
+  }
+  if (fieldType === 'run') {
+    return (
+      <SelectRun
+        entityName={entity}
+        projectName={project}
+        runName={
+          typeof value === 'string' && value.includes(':')
+            ? value.split(':')[1]
+            : value
+        }
+        onSelectRun={(run: RunOption) => {
+          const value = `${run.projectInternalId}:${run.value}`;
+          onSetValue(value);
+        }}
+      />
+    );
   }
   if (fieldType === 'datetime') {
     // For date range, only show active state for the last filter

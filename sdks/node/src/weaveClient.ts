@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import {uuidv7} from 'uuidv7';
 
 import {MAX_OBJECT_NAME_LENGTH} from './constants';
-import {Dataset} from './dataset';
 import {computeDigest} from './digest';
 import {
   CallSchema,
@@ -33,6 +32,7 @@ import {Table, TableRef, TableRowRef} from './table';
 import {packageVersion} from './utils/userAgent';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
+import {Call, CallState, InternalCall} from './call';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 
@@ -211,7 +211,7 @@ export class WeaveClient {
   public async getCall(
     callId: string,
     includeCosts: boolean = false
-  ): Promise<CallSchema> {
+  ): Promise<Call> {
     const calls = await this.getCalls({call_ids: [callId]}, includeCosts);
     if (calls.length === 0) {
       throw new Error(`Call not found: ${callId}`);
@@ -223,10 +223,12 @@ export class WeaveClient {
     includeCosts: boolean = false,
     limit: number = 1000
   ) {
-    const calls: CallSchema[] = [];
+    const calls: Call[] = [];
     const iterator = this.getCallsIterator(filter, includeCosts, limit);
     for await (const call of iterator) {
-      calls.push(call);
+      const internalCall = new InternalCall();
+      internalCall.updateWithCallSchemaData(call);
+      calls.push(internalCall.proxy);
     }
     return calls;
   }
@@ -277,13 +279,15 @@ export class WeaveClient {
 
   public async get(ref: ObjectRef): Promise<any> {
     let val: any;
+    let dataObj: any;
     try {
       const res = await this.traceServerApi.obj.objReadObjReadPost({
         project_id: ref.projectId,
         object_id: ref.objectId,
         digest: ref.digest,
       });
-      val = res.data.obj.val;
+      dataObj = res.data.obj;
+      val = dataObj.val;
     } catch (error) {
       if (error instanceof Error && error.message.includes('404')) {
         throw new Error(`Unable to find object for ref uri: ${ref.uri()}`);
@@ -292,14 +296,53 @@ export class WeaveClient {
     }
 
     const t = val?._type;
+
+    if (t == 'StringPrompt') {
+      const {StringPrompt} = await import('./prompt');
+
+      const {content, description, name} = val;
+
+      let obj = new StringPrompt({
+        name,
+        description,
+        content,
+      });
+
+      obj.__savedRef = ref;
+
+      return obj;
+    }
+
+    if (t == 'MessagesPrompt') {
+      const {MessagesPrompt} = await import('./prompt');
+
+      const {description, messages, name} = val;
+
+      let obj = new MessagesPrompt({
+        name,
+        description,
+        messages,
+      });
+
+      obj.__savedRef = ref;
+
+      return obj;
+    }
+
     if (t == 'Dataset') {
-      const {_baseParameters, rows} = val;
+      // Avoid circular dependency
+      const {Dataset} = await import('./dataset');
+
+      const {description, rows, name} = val;
+
       let obj = new Dataset({
-        id: _baseParameters.id,
-        description: _baseParameters.description,
+        name: name || dataObj.id,
+        description,
         rows,
       });
+
       obj.__savedRef = ref;
+
       // TODO: The table row refs are not correct
       return obj;
     } else if (t == 'Table') {
@@ -387,7 +430,7 @@ export class WeaveClient {
       const classChain = getClassChain(obj);
       const className = classChain[0];
       if (!objId) {
-        objId = sanitizeObjectName(obj.id);
+        objId = objectNameToId(obj.name);
       }
 
       let saveAttrs = obj.saveAttrs();
@@ -649,13 +692,13 @@ export class WeaveClient {
         response.data.digest
       );
 
-      // console.log('Saved op: ', ref.ui_url());
       return ref;
     })();
     return op.__savedRef;
   }
 
   public async createCall(
+    internalCall: InternalCall,
     opRef: OpRef | Op<any>,
     params: any[],
     parameterNames: ParameterNamesOption,
@@ -690,10 +733,13 @@ export class WeaveClient {
       },
       inputs,
     };
+    internalCall.updateWithCallSchemaData(startReq);
+    internalCall.state = CallState.pending;
     return this.saveCallStart(startReq);
   }
 
   public async finishCall(
+    call: InternalCall,
     result: any,
     currentCall: CallStackEntry,
     parentCall: CallStackEntry | undefined,
@@ -713,16 +759,27 @@ export class WeaveClient {
     await startCallPromise;
     this.saveWeaveValues(result);
     result = await this.serializedVal(result);
-    await this.saveCallEnd({
-      project_id: this.projectId,
-      id: currentCall.callId,
+    const callSchemaExchangeData = {
       ended_at: endTime.toISOString(),
       output: result,
       summary: mergedSummary,
+    };
+    this.saveCallEnd({
+      project_id: this.projectId,
+      id: currentCall.callId,
+      ...callSchemaExchangeData,
+      // User might change the display name of the call after the call has started.
+      // take this into account when logging the end call.
+      ...(call.callSchema.display_name === null
+        ? null
+        : {display_name: call.callSchema.display_name!}),
     });
+    call.updateWithCallSchemaData(callSchemaExchangeData);
+    call.state = CallState.finished;
   }
 
   public async finishCallWithException(
+    call: InternalCall,
     error: any,
     currentCall: CallStackEntry,
     parentCall: CallStackEntry | undefined,
@@ -737,13 +794,31 @@ export class WeaveClient {
     );
     // ensure end is logged after start is logged
     await startCallPromise;
-    await this.saveCallEnd({
-      project_id: this.projectId,
-      id: currentCall.callId,
+    const callSchemaExchangeData = {
       ended_at: endTime.toISOString(),
       output: null,
       summary: mergedSummary,
       exception: error instanceof Error ? error.message : String(error),
+    };
+    this.saveCallEnd({
+      project_id: this.projectId,
+      id: currentCall.callId,
+      ...callSchemaExchangeData,
+      // User might change the display name of the call after the call has started.
+      // take this into account when logging the end call.
+      ...(call.callSchema.display_name === null
+        ? null
+        : {display_name: call.callSchema.display_name!}),
+    });
+    call.updateWithCallSchemaData(callSchemaExchangeData);
+    call.state = CallState.failed;
+  }
+
+  public async updateCall(callId: string, displayName: string) {
+    await this.traceServerApi.call.callUpdateCallUpdatePost({
+      project_id: this.projectId,
+      call_id: callId,
+      display_name: displayName,
     });
   }
 }
@@ -830,7 +905,7 @@ async function maybeFormatCode(code: string) {
   //   }
 }
 
-function sanitizeObjectName(name: string): string {
+function objectNameToId(name: string): string {
   // Replaces any non-alphanumeric characters with a single dash and removes
   // any leading or trailing dashes. This is more restrictive than the DB
   // constraints and can be relaxed if needed.

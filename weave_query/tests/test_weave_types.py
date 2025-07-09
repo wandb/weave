@@ -503,6 +503,21 @@ def test_typetype():
     )
 
 
+def test_not_required_keys():
+    t1 = weave.types.TypedDict({"a": weave.types.Int()})
+    t2 = weave.types.TypedDict({"a": weave.types.Int(), "b": weave.types.String()}, not_required_keys={"b"})
+    t3 = weave.types.TypedDict({"a": weave.types.Int(), "b": weave.types.String()})
+
+    assert t1.assign_type(t2)
+    assert t1.assign_type(t3)
+
+    assert t2.assign_type(t1)
+    assert t2.assign_type(t3)
+
+    assert not t3.assign_type(t1)
+    assert not t3.assign_type(t2)
+
+
 def test_typetype_disjoint_from_normal_type_hierarchy():
     assert not weave.type_of(weave.types.List()).assign_type(weave.type_of(None))
 
@@ -747,3 +762,5 @@ def test_load_unknown_subobj_type():
     assert isinstance(t, types.TypedDict)
     assert t.property_types["a"] == types.Int()
     assert t.property_types["b"] == types.UnknownType()
+
+
