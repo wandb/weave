@@ -9,14 +9,13 @@ from typing import TYPE_CHECKING, Any, TypedDict
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from polyfile.magic import MagicMatcher
-
+    import puremagic
 try:
-    from polyfile.magic import MagicMatcher
+    import puremagic
 
-    POLYFILE_LIB_AVAILABLE = True
+    MAGIC_LIB_AVAILABLE = True
 except Exception as e:
-    POLYFILE_LIB_AVAILABLE = False
+    MAGIC_LIB_AVAILABLE = False
 
 # See: https://mimesniff.spec.whatwg.org/
 # Buffer size should be >= 1445 for deterministic results in most cases
@@ -72,12 +71,12 @@ def get_extension_from_mimetype(mimetype: str) -> str:
 
 
 def guess_from_buffer(buffer: bytes) -> str | None:
-    if not POLYFILE_LIB_AVAILABLE:
+    if not MAGIC_LIB_AVAILABLE:
         return None
 
-    # This should always default to application/octet-stream if it fails to resolve
-    return next(MagicMatcher.DEFAULT_INSTANCE.match(buffer)).mimetypes[0]
-
+    matches = puremagic.magic_stream(buffer)
+    _, mimetype, *_ = matches[0]
+    return mimetype
 
 def guess_from_filename(filename: str) -> str | None:
     return mimetypes.guess_type(filename)[0]
@@ -117,12 +116,12 @@ def get_mime_and_extension(
         return mimetype, extension
     elif mimetype and not extension:
         return mimetype, get_extension_from_mimetype(mimetype)
-    elif not POLYFILE_LIB_AVAILABLE:
+    elif not MAGIC_LIB_AVAILABLE:
         logger.warning(
             "Failed to determine MIME type from file extension and cannot infer from data\n"
-            "MIME type detection from raw data requires the polyfile library\n"
-            "Install it by running: `pip install polyfile`\n"
-            "See: https://pypi.org/project/polyfile for detailed instructions"
+            "MIME type detection from raw data requires the puremagic library\n"
+            "Install it by running: `pip install puremagic`\n"
+            "See: https://pypi.org/project/puremagic for detailed instructions"
         )
     if filename is not None:
         idx = filename.rfind(".")
