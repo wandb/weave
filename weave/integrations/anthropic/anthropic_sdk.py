@@ -22,11 +22,15 @@ def anthropic_accumulator(
     value: MessageStreamEvent,
 ) -> Message:
     from anthropic.types import (
-        ContentBlockDeltaEvent,
         Message,
-        MessageDeltaEvent,
+        RawContentBlockDeltaEvent,
+        RawMessageDeltaEvent,
         TextBlock,
         Usage,
+    )
+    from anthropic.types.beta import (
+        BetaRawContentBlockDeltaEvent,
+        BetaRawMessageDeltaEvent,
     )
 
     if acc is None:
@@ -49,14 +53,16 @@ def anthropic_accumulator(
         acc.usage.input_tokens += value.message.usage.input_tokens
 
     # Accumulate the content if it's a ContentBlockDeltaEvent
-    if isinstance(value, ContentBlockDeltaEvent) and hasattr(value.delta, "text"):
+    if isinstance(
+        value, (RawContentBlockDeltaEvent, BetaRawContentBlockDeltaEvent)
+    ) and hasattr(value.delta, "text"):
         if acc.content and isinstance(acc.content[-1], TextBlock):
             acc.content[-1].text += value.delta.text
         else:
             acc.content.append(TextBlock(type="text", text=value.delta.text))
 
     # Handle MessageDeltaEvent for stop_reason and stop_sequence
-    if isinstance(value, MessageDeltaEvent):
+    if isinstance(value, (RawMessageDeltaEvent, BetaRawMessageDeltaEvent)):
         if hasattr(value.delta, "stop_reason") and value.delta.stop_reason:
             acc.stop_reason = value.delta.stop_reason
         if hasattr(value.delta, "stop_sequence") and value.delta.stop_sequence:
@@ -122,10 +128,11 @@ def anthropic_stream_accumulator(
     value: MessageStream,
 ) -> Message:
     from anthropic.lib.streaming._types import MessageStopEvent
+    from anthropic.types.beta import BetaRawMessageStopEvent
 
     if acc is None:
         acc = ""
-    if isinstance(value, MessageStopEvent):
+    if isinstance(value, (MessageStopEvent, BetaRawMessageStopEvent)):
         acc = value.message
     return acc
 
@@ -207,6 +214,18 @@ def get_anthropic_patcher(
     async_stream_settings = base.model_copy(
         update={"name": base.name or "anthropic.AsyncMessages.stream"}
     )
+    beta_messages_create_settings = base.model_copy(
+        update={"name": base.name or "anthropic.beta.Messages.create"}
+    )
+    beta_async_messages_create_settings = base.model_copy(
+        update={"name": base.name or "anthropic.beta.AsyncMessages.create"}
+    )
+    beta_stream_settings = base.model_copy(
+        update={"name": base.name or "anthropic.beta.Messages.stream"}
+    )
+    beta_async_stream_settings = base.model_copy(
+        update={"name": base.name or "anthropic.beta.AsyncMessages.stream"}
+    )
 
     _anthropic_patcher = MultiPatcher(
         [
@@ -230,6 +249,26 @@ def get_anthropic_patcher(
                 lambda: importlib.import_module("anthropic.resources.messages"),
                 "AsyncMessages.stream",
                 create_stream_wrapper(async_stream_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.beta.messages"),
+                "Messages.create",
+                create_wrapper_sync(beta_messages_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.beta.messages"),
+                "AsyncMessages.create",
+                create_wrapper_async(beta_async_messages_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.beta.messages"),
+                "Messages.stream",
+                create_stream_wrapper(beta_stream_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.beta.messages"),
+                "AsyncMessages.stream",
+                create_stream_wrapper(beta_async_stream_settings),
             ),
         ]
     )
