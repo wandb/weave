@@ -16,7 +16,13 @@ import graphql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
-from wandb.sdk.internal.internal_api import _thread_local_api_settings
+
+try:
+    from wandb.sdk.internal.internal_api import _thread_local_api_settings
+except ImportError:
+    WANDB_AVAILABLE = False
+else:
+    WANDB_AVAILABLE = True
 
 from weave.trace import env
 
@@ -51,15 +57,17 @@ def set_wandb_thread_local_api_settings(
     cookies: Optional[dict],
     headers: Optional[dict],
 ) -> None:
-    _thread_local_api_settings.api_key = api_key
-    _thread_local_api_settings.cookies = cookies
-    _thread_local_api_settings.headers = headers
+    if WANDB_AVAILABLE:
+        _thread_local_api_settings.api_key = api_key
+        _thread_local_api_settings.cookies = cookies
+        _thread_local_api_settings.headers = headers
 
 
 def reset_wandb_thread_local_api_settings() -> None:
-    _thread_local_api_settings.api_key = None
-    _thread_local_api_settings.cookies = None
-    _thread_local_api_settings.headers = None
+    if WANDB_AVAILABLE:
+        _thread_local_api_settings.api_key = None
+        _thread_local_api_settings.cookies = None
+        _thread_local_api_settings.headers = None
 
 
 def set_wandb_api_context(
@@ -454,6 +462,39 @@ class WandbApi:
             return None
 
         return result.get("viewer", {}).get("username", None)
+
+    UPSERT_PROJECT_MUTATION = gql.gql(
+        """
+    mutation UpsertModel($name: String!, $id: String, $entity: String!, $description: String, $repo: String)  {
+        upsertModel(input: { id: $id, name: $name, entityName: $entity, description: $description, repo: $repo }) {
+            model {
+                name
+                description
+            }
+        }
+    }
+    """
+    )
+
+    def upsert_project(
+        self,
+        project: str,
+        description: Optional[str] = None,
+        entity: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Create a new project.
+
+        Args:
+            project (str): The project to create
+            description (str, optional): A description of this project
+            entity (str, optional): The entity to scope this project to.
+        """
+        return self.query(
+            self.UPSERT_PROJECT_MUTATION,
+            name=project,
+            entity=entity,
+            description=description,
+        )
 
 
 async def get_wandb_api() -> WandbApiAsync:
