@@ -96,57 +96,28 @@ class TestWeaveContent:
         assert content.input_type == "<class 'pathlib.PosixPath'>"
         assert content.input_category == "object"
 
-    @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
-    def test_content_publish_and_retrieve(
-        self, client: WeaveClient, file: str, extension: str, mimetype: str
-    ):
-        """Test publishing and retrieving Content objects."""
-        file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
-        content = Content.from_path(file_path)
+    def test_content_save_method(self):
+        """Test saving Content to a file."""
+        # Use a small test file
+        original_path = os.path.join(TEST_FILE_DIR, "file.png")
+        content = Content.from_path(original_path)
 
-        # Publish the content
-        ref = weave.publish(content, name=f"test_content_{extension}")
-        assert ref is not None
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Test save without filename
+            dest_path = os.path.join(tmpdir, "saved_file.png")
+            content.save(dest_path)
+            assert os.path.exists(dest_path)
 
-        # Retrieve and verify
-        retrieved = ref.get()
-        assert isinstance(retrieved, Content)
-        assert retrieved.data == content.data
-        assert retrieved.extension == extension
-        assert retrieved.mimetype == mimetype
-        assert retrieved.size == content.size
+            # Verify saved content
+            with open(dest_path, "rb") as f:
+                saved_data = f.read()
+            assert saved_data == content.data
 
-    def test_content_in_dataset(self, client: WeaveClient):
-        """Test Content objects as dataset values."""
-        # Create Content objects for each test file
-        rows = []
-        for file, extension, mimetype in TEST_FILES:
-            file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
-            content = Content.from_path(file_path)
-            rows.append(
-                {
-                    "name": f"{file}.{extension}",
-                    "content": content,
-                    "expected_mimetype": mimetype,
-                }
-            )
-
-        # Create and publish dataset
-        dataset = Dataset(rows=Table(rows))
-        ref = weave.publish(dataset, name="test_content_dataset")
-
-        # Retrieve and verify
-        retrieved_dataset = ref.get()
-        assert len(retrieved_dataset.rows) == len(TEST_FILES)
-
-        for row in retrieved_dataset.rows:
-            assert isinstance(row["content"], Content)
-            assert row["content"].mimetype == row["expected_mimetype"]
-            # Verify data integrity
-            original_path = os.path.join(TEST_FILE_DIR, row["name"])
-            with open(original_path, "rb") as f:
-                original_data = f.read()
-            assert row["content"].data == original_data
+            # Test save to directory (should use original filename)
+            content_with_filename = Content.from_path(original_path)
+            content_with_filename.save(tmpdir)
+            expected_path = os.path.join(tmpdir, "file.png")
+            assert os.path.exists(expected_path)
 
     @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
     def test_content_in_ops(self, file: str, extension: str, mimetype: str):
@@ -194,29 +165,6 @@ class TestWeaveContent:
         assert result["size"] == content.size
         assert result["extension"] == extension
         assert result["mimetype"] == mimetype
-
-    def test_content_save_method(self, client: WeaveClient):
-        """Test saving Content to a file."""
-        # Use a small test file
-        original_path = os.path.join(TEST_FILE_DIR, "file.png")
-        content = Content.from_path(original_path)
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Test save without filename
-            dest_path = os.path.join(tmpdir, "saved_file.png")
-            content.save(dest_path)
-            assert os.path.exists(dest_path)
-
-            # Verify saved content
-            with open(dest_path, "rb") as f:
-                saved_data = f.read()
-            assert saved_data == content.data
-
-            # Test save to directory (should use original filename)
-            content_with_filename = Content.from_path(original_path)
-            content_with_filename.save(tmpdir)
-            expected_path = os.path.join(tmpdir, "file.png")
-            assert os.path.exists(expected_path)
 
     def test_content_as_string(self):
         """Test converting Content to string for text files."""
@@ -291,6 +239,58 @@ class TestWeaveContent:
         # Test with custom encoding
         content2 = Content(file_bytes, "txt", encoding="latin-1")
         assert content2.encoding == "latin-1"
+
+    @pytest.mark.parametrize(("file", "extension", "mimetype"), TEST_FILES)
+    def test_content_publish_and_retrieve(
+        self, client: WeaveClient, file: str, extension: str, mimetype: str
+    ):
+        """Test publishing and retrieving Content objects."""
+        file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
+        content = Content.from_path(file_path)
+
+        # Publish the content
+        ref = weave.publish(content, name=f"test_content_{extension}")
+        assert ref is not None
+
+        # Retrieve and verify
+        retrieved = ref.get()
+        assert isinstance(retrieved, Content)
+        assert retrieved.data == content.data
+        assert retrieved.extension == extension
+        assert retrieved.mimetype == mimetype
+        assert retrieved.size == content.size
+
+    def test_content_in_dataset(self, client: WeaveClient):
+        """Test Content objects as dataset values."""
+        # Create Content objects for each test file
+        rows = []
+        for file, extension, mimetype in TEST_FILES:
+            file_path = os.path.join(TEST_FILE_DIR, f"{file}.{extension}")
+            content = Content.from_path(file_path)
+            rows.append(
+                {
+                    "name": f"{file}.{extension}",
+                    "content": content,
+                    "expected_mimetype": mimetype,
+                }
+            )
+
+        # Create and publish dataset
+        dataset = Dataset(rows=Table(rows))
+        ref = weave.publish(dataset, name="test_content_dataset")
+
+        # Retrieve and verify
+        retrieved_dataset = ref.get()
+        assert len(retrieved_dataset.rows) == len(TEST_FILES)
+
+        for row in retrieved_dataset.rows:
+            assert isinstance(row["content"], Content)
+            assert row["content"].mimetype == row["expected_mimetype"]
+            # Verify data integrity
+            original_path = os.path.join(TEST_FILE_DIR, row["name"])
+            with open(original_path, "rb") as f:
+                original_data = f.read()
+            assert row["content"].data == original_data
 
     def test_content_postprocessing(self, client: WeaveClient):
         """Test that Content postprocessing works correctly in ops."""
