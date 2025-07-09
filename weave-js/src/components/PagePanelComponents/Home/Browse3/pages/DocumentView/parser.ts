@@ -3,15 +3,15 @@ import {
   ParsedCall,
   ParseResult,
   SCHEMA_PARSERS,
-  TraceCallSchema,
-  WeaveDocumentSchema,
+  TraceCallMinimalSchema,
+  WeaveDocument,
 } from './schemas';
 
 // Cached call parses
-const parsedCallCache = new Map<string, ParsedCall<WeaveDocumentSchema>>();
+const parsedCallCache = new Map<string, ParsedCall<WeaveDocument>>();
 
-function findAllDocuments(node: unknown): ParseResult<WeaveDocumentSchema>[] {
-  const allFound: ParseResult<WeaveDocumentSchema>[] = [];
+function findAllDocuments(node: unknown): ParseResult<WeaveDocument>[] {
+  const allFound: ParseResult<WeaveDocument>[] = [];
 
   for (const parser of SCHEMA_PARSERS) {
     const parseResult = parser.schema.safeParse(node);
@@ -45,8 +45,8 @@ function findAllDocuments(node: unknown): ParseResult<WeaveDocumentSchema>[] {
  * The core, non-memoized parsing logic, updated for the new schema.
  */
 function _getTraceDocuments(
-  trace: TraceCallSchema
-): ParsedCall<WeaveDocumentSchema> {
+  trace: TraceCallMinimalSchema
+): ParsedCall<WeaveDocument> {
   // Return type is updated
   // Find all ParseResult objects in the output (if present)
   const parsedOutputs = 'output' in trace ? findAllDocuments(trace.output) : [];
@@ -63,15 +63,9 @@ function _getTraceDocuments(
   };
 }
 
-// --- Public, Memoized API ---
-
-/**
- * The public API remains the same, but its return type has been updated
- * automatically via TypeScript inference.
- */
 export function getTraceDocuments(
-  trace: TraceCallSchema
-): ParsedCall<WeaveDocumentSchema> {
+  trace: TraceCallMinimalSchema
+): ParsedCall<WeaveDocument> {
   if (parsedCallCache.has(trace.id)) {
     return parsedCallCache.get(trace.id)!;
   }
@@ -80,7 +74,7 @@ export function getTraceDocuments(
   return result;
 }
 
-export function parseCall(call: CallSchema): ParsedCall<WeaveDocumentSchema> {
+export function parseCall(call: CallSchema): ParsedCall<WeaveDocument> {
   if (!call.traceCall) {
     return getTraceDocuments({
       id: call.traceId,
@@ -90,7 +84,7 @@ export function parseCall(call: CallSchema): ParsedCall<WeaveDocumentSchema> {
   return getTraceDocuments(call.traceCall);
 }
 
-export function callHasDocuments(trace: TraceCallSchema): boolean {
+export function callHasDocuments(trace: TraceCallMinimalSchema): boolean {
   const isValid = (val: null | any[]) => {
     return val !== null && val.length > 0;
   };

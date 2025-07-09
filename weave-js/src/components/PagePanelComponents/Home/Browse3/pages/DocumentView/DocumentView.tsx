@@ -2,11 +2,11 @@ import {Box} from '@mui/material';
 import React, {useMemo} from 'react';
 
 import {MetadataViewerSection} from './MetadataViewerSection';
-import {ParsedCall, WeaveDocumentSchema} from './schemas';
+import {ParsedCall, WeaveDocument} from './schemas';
 import {Body, Header} from './Styles';
 
 interface DocumentCardProps {
-  doc: WeaveDocumentSchema;
+  doc: WeaveDocument;
 }
 
 const DocumentCard: React.FC<DocumentCardProps> = ({doc}) => {
@@ -39,7 +39,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({doc}) => {
 };
 
 interface DocumentDropdownProps {
-  documents: WeaveDocumentSchema[];
+  documents: WeaveDocument[];
   title: string;
 }
 
@@ -73,7 +73,7 @@ const DocumentDropdown: React.FC<DocumentDropdownProps> = ({
 };
 
 export const DocumentView: React.FC<{
-  data: ParsedCall<WeaveDocumentSchema>;
+  data: ParsedCall<WeaveDocument>;
 }> = ({data}) => {
   const {inputsDocuments, outputDocuments} = useMemo(() => {
     const inputs =

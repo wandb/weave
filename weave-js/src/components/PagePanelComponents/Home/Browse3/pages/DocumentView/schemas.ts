@@ -7,6 +7,12 @@ export type ID = string | number;
 export type Metadata = Record<string, any>;
 export type Content = string;
 
+export type TraceCallMinimalSchema = {
+  id: string;
+  inputs: KeyedDictType;
+  output?: unknown;
+};
+
 export type KeyedDictType = {
   [key: string]: any;
   _keys?: string[];
@@ -18,7 +24,8 @@ export const WeaveDocumentSchema = z.object({
   metadata: z.record(z.any()).optional(),
   extra: z.record(z.any()).optional(),
 });
-export type WeaveDocumentSchemaType = z.infer<typeof WeaveDocumentSchema>;
+
+export type WeaveDocument = z.infer<typeof WeaveDocumentSchema>;
 
 export type ParseResult<T> = {
   schema: string;
@@ -39,9 +46,9 @@ const LangchainDocumentSourceSchema = z
   .catchall(z.any());
 
 const LangchainParser = LangchainDocumentSourceSchema.transform(
-  (doc): WeaveDocumentSchemaType[] => {
+  (doc): WeaveDocument[] => {
     const {page_content, metadata, ...extra} = doc;
-    const result: WeaveDocumentSchemaType = {
+    const result: WeaveDocument = {
       content: page_content,
       metadata,
     };
@@ -65,7 +72,7 @@ const ChromaQueryResultSourceSchema = z
   .catchall(z.any());
 
 const ChromaParser = ChromaQueryResultSourceSchema.transform(
-  (queryResult): WeaveDocumentSchemaType[] => {
+  (queryResult): WeaveDocument[] => {
     const ids = Array.isArray(queryResult.ids)
       ? queryResult.ids
       : [queryResult.ids];
