@@ -274,8 +274,8 @@ class RunAsUser:
         return result
 
     def execute_internal(
-        self, func: Callable[[BaseModel], BaseModel], req: BaseModel
-    ) -> BaseModel:
+        self, func: Callable[[BaseModel], BaseModel | None], req: BaseModel
+    ) -> BaseModel | None:
         """
         Execute a function on behalf of the user.
 
@@ -295,6 +295,8 @@ class RunAsUser:
         """
         external_req = self.int_to_ext(req)
         external_res = self.execute_external(func, external_req)
+        if external_res is None:
+            return None
         return self.ext_to_int(external_res)
 
     def stop(self) -> None:

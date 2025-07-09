@@ -4,13 +4,13 @@ from weave.flow.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.refs import parse_uri
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
+from weave.trace_server.trace_server_worker import trace_server_worker as tsw
 
 
-def evaluate_model(req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+def evaluate_model(req: tsw.EvaluateModelJob) -> None:
     client = require_weave_client()
 
     loaded_evaluation = client.get(parse_uri(req.evaluation_ref))
@@ -38,8 +38,6 @@ def evaluate_model(req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
             f"got {type(loaded_model).__name__}"
         )
 
-    result, call = asyncio.run(
-        loaded_evaluation.evaluate.call(loaded_evaluation, loaded_model)
-    )
+    asyncio.run(loaded_evaluation.evaluate.call(loaded_evaluation, loaded_model))
 
-    return tsi.EvaluateModelRes(output=result, call_id=call.id)
+    return
