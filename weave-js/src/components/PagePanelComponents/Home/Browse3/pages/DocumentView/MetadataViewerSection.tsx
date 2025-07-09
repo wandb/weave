@@ -1,7 +1,7 @@
-import {Box, Collapse} from '@mui/material';
+import {Collapse} from '@mui/material';
 import {GridRowId, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {useCallback, useContext, useMemo, useState} from 'react';
+import React, {Fragment, useCallback, useMemo, useState} from 'react';
 
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
@@ -33,24 +33,28 @@ const MetadataViewerSectionInner = ({
   const body = useMemo(() => {
     if (mode === 'collapsed' || mode === 'expanded') {
       return (
-        <MetadataViewer
-          apiRef={apiRef}
-          data={data}
-          isExpanded={mode === 'expanded'}
-          expandedIds={expandedIds}
-          setExpandedIds={setExpandedIds}
-        />
+        <Fragment>
+          <MetadataViewer
+            apiRef={apiRef}
+            data={data}
+            isExpanded={mode === 'expanded'}
+            expandedIds={expandedIds}
+            setExpandedIds={setExpandedIds}
+          />
+        </Fragment>
       );
     }
     if (mode === 'json') {
       return (
-        <CodeEditor
-          value={JSON.stringify(data, null, 2)}
-          language="json"
-          handleMouseWheel
-          alwaysConsumeMouseWheel={false}
-          readOnly
-        />
+        <Fragment>
+          <CodeEditor
+            value={JSON.stringify(data, null, 2)}
+            language="json"
+            handleMouseWheel
+            alwaysConsumeMouseWheel={false}
+            readOnly
+          />
+        </Fragment>
       );
     }
     return null;

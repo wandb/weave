@@ -504,10 +504,9 @@ export const MetadataViewer = ({
   const inner = useMemo(() => {
     const body = (rows.some(row => {row.isLoader === true})) ? <LoadingDots /> : (
       <StyledDataGrid
-        slots={{ columnHeaders: () => null }}
+        slots={{ columnHeaders: React.forwardRef(() => null) }}
         keepBorders={false}
         apiRef={apiRef}
-        hideHeaders={true}
         // Start Column Menu
         // ColumnMenu is only needed when we have other actions
         // such as filtering.

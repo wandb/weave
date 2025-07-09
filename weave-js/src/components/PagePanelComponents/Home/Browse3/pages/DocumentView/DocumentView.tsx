@@ -65,7 +65,7 @@ const DocumentDropdown: React.FC<DocumentDropdownProps> = ({ documents, title })
 };
 
 
-export const DocumentView: React.FC<{ data: ParsedCall<WeaveDocumentSchema>, isExpanded: boolean}> = ({ data }) => {
+export const DocumentView: React.FC<{ data: ParsedCall<WeaveDocumentSchema>}> = ({ data }) => {
   const {inputsDocuments, outputDocuments} = useMemo(() => {
     const inputs = data.inputs?.filter(parsed => parsed.schema == "Document") ?? [];
     const output = data.output?.filter(parsed => parsed.schema == "Document") ?? [];
