@@ -1,6 +1,4 @@
-import {ApolloProvider} from '@apollo/client';
 import {GridColDef, GridRenderCellParams} from '@mui/x-data-grid-pro';
-import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {useIsViewerTeamAdmin} from '@wandb/weave/common/hooks/useIsTeamAdmin';
 import {Button} from '@wandb/weave/components/Button';
 import {Pill} from '@wandb/weave/components/Tag';
@@ -268,12 +266,8 @@ export const ProvidersTab: React.FC<{
   projectName: string;
 }> = ({entityName, projectName}) => {
   return (
-    <ApolloProvider client={makeGorillaApolloClient()}>
-      <WFDataModelAutoProvider
-        entityName={entityName}
-        projectName={projectName}>
-        <ProvidersTabInner entityName={entityName} projectName={projectName} />
-      </WFDataModelAutoProvider>
-    </ApolloProvider>
+    <WFDataModelAutoProvider entityName={entityName} projectName={projectName}>
+      <ProvidersTabInner entityName={entityName} projectName={projectName} />
+    </WFDataModelAutoProvider>
   );
 };

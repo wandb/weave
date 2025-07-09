@@ -1,12 +1,10 @@
-import {
-  ApolloClient,
-  gql,
-  TypedDocumentNode,
-  useApolloClient,
-} from '@apollo/client';
+import {useApolloClient} from '@apollo/react-hooks';
+import {TypedDocumentNode} from '@graphql-typed-document-node/core';
 import {useIsAuthenticated} from '@wandb/weave/context/WeaveViewerContext';
 import {opRootViewer, opUserUserInfo} from '@wandb/weave/core';
 import {useNodeValue} from '@wandb/weave/react';
+import {ApolloClient} from 'apollo-client';
+import gql from 'graphql-tag';
 import {useEffect, useState} from 'react';
 
 import {useIsMounted} from './useIsMounted';

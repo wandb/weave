@@ -2,7 +2,8 @@
  * This is a GraphQL approach to querying project information.
  */
 
-import {gql, useApolloClient} from '@apollo/client';
+import {useApolloClient} from '@apollo/react-hooks';
+import gql from 'graphql-tag';
 import {useEffect, useState} from 'react';
 
 // Note: id is the "external" ID, which changes when a project is renamed.

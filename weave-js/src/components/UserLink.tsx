@@ -1,4 +1,6 @@
-import {ApolloClient, gql, useApolloClient} from '@apollo/client';
+import {useApolloClient} from '@apollo/react-hooks';
+import gql from 'graphql-tag';
+import {ApolloClient} from 'apollo-client';
 import {Avatar, Popover, TooltipProps} from '@mui/material';
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import {NotApplicable} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/NotApplicable';

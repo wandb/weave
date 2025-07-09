@@ -1,4 +1,4 @@
-import {useMutation as useApolloMutation} from '@apollo/client';
+import {useMutation as useApolloMutation} from '@apollo/react-hooks';
 import Popover from '@mui/material/Popover';
 import {KeyboardShortcut} from '@wandb/weave/common/components/elements/KeyboardShortcut';
 import {toast} from '@wandb/weave/common/components/elements/Toast';

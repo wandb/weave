@@ -1,4 +1,5 @@
-import {gql, useApolloClient} from '@apollo/client';
+import {useApolloClient} from '@apollo/react-hooks';
+import gql from 'graphql-tag';
 import {useEffect, useState} from 'react';
 
 import {useIsMounted} from './useIsMounted';
