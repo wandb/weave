@@ -84,13 +84,17 @@ WORKER_PROJECT_ID_PREFIX = WORKER_ENTITY + "/"
 REQUEST_TIMEOUT_SEC = 10
 
 
+class ServiceConfig(BaseModel):
+    local_clickhouse_trace_server_kwargs: dict[str, Any]
+    remote_trace_server_kwargs: dict[str, Any] | None = None
+
+
 class SerializableWorkerClientConfig(BaseModel):
     """Configuration for a worker client - serializable across processes."""
 
-    project: str
+    project_id: str
     user_id: str
-    remote_trace_server_kwargs: dict[str, Any]
-    local_clickhouse_trace_server_kwargs: dict[str, Any]
+    service_config: ServiceConfig
 
 
 def worker_client(config: SerializableWorkerClientConfig) -> WorkerWeaveClient:
@@ -117,20 +121,23 @@ def worker_client(config: SerializableWorkerClientConfig) -> WorkerWeaveClient:
         ... )
         >>> client = worker_client(config)
     """
+    remote_trace_server = None
+    if config.service_config.remote_trace_server_kwargs is not None:
+        remote_trace_server = RemoteHTTPTraceServer(
+            **config.service_config.remote_trace_server_kwargs,
+        )
     return WorkerWeaveClient(
         entity=WORKER_ENTITY,
-        project=config.project,
+        project=config.project_id,
         server=WorkerTraceServer(
             local_trace_server=externalize_trace_server(
                 ClickHouseTraceServer(
-                    **config.local_clickhouse_trace_server_kwargs,
+                    **config.service_config.local_clickhouse_trace_server_kwargs,
                 ),
-                config.project,
+                config.project_id,
                 config.user_id,
             ),
-            remote_trace_server=RemoteHTTPTraceServer(
-                **config.remote_trace_server_kwargs,
-            ),
+            remote_trace_server=remote_trace_server,
         ),
     )
 
@@ -224,7 +231,7 @@ class RunAsUser:
         )
         self.process.start()
         self.int_to_ext, self.ext_to_int = make_externalize_ref_converter(
-            config.project
+            config.project_id
         )
 
     def execute_external(
@@ -419,10 +426,14 @@ class WorkerTraceServer(tsi.TraceServerInterface):
     def __init__(
         self,
         local_trace_server: tsi.TraceServerInterface,
-        remote_trace_server: tsi.TraceServerInterface,
+        remote_trace_server: tsi.TraceServerInterface | None = None,
     ):
         self.local_trace_server = local_trace_server
-        self.remote_trace_server = remote_trace_server
+        self.remote_trace_server = (
+            remote_trace_server
+            if remote_trace_server is not None
+            else local_trace_server
+        )
 
     # OTEL API
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:

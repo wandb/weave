@@ -1124,8 +1124,33 @@ class EvaluationStatusReq(BaseModel):
     call_id: str
 
 
+class EvaluationStatusPending(BaseModel):
+    status: Literal["pending"]
+
+
+class EvaluationStatusRunning(BaseModel):
+    status: Literal["running"]
+    completed_rows: int
+    total_rows: int
+
+
+class EvaluationStatusFailed(BaseModel):
+    status: Literal["failed"]
+    error: Optional[str] = None
+
+
+class EvaluationStatusComplete(BaseModel):
+    status: Literal["complete"]
+    output: Optional[Any] = None
+
+
 class EvaluationStatusRes(BaseModel):
-    status: str
+    status: Union[
+        EvaluationStatusPending,
+        EvaluationStatusRunning,
+        EvaluationStatusFailed,
+        EvaluationStatusComplete,
+    ]
 
 
 class TraceServerInterface(Protocol):

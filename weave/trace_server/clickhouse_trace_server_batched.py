@@ -144,6 +144,10 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server.trace_server_worker.trace_server_worker import (
+    EvaluateModelJob,
+    WorkerInterface,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -218,6 +222,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
+        worker: WorkerInterface | None = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -232,9 +237,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
         self._kafka_producer: Optional[KafkaProducer] = None
+        self._worker: Optional[WorkerInterface] = worker
 
     @classmethod
-    def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
+    def from_env(cls, **kwargs: Any) -> "ClickHouseTraceServer":
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
         return ClickHouseTraceServer(
@@ -243,7 +249,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             user=wf_env.wf_clickhouse_user(),
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
-            use_async_insert=use_async_insert,
+            **kwargs,
         )
 
     @property
@@ -2067,50 +2073,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        raise NotImplementedError()
-        # """
-        # Evaluate a model in an isolated process with user-specific context.
-
-        # This method delegates evaluation execution to the RunAsUser class, which spawns
-        # a separate process to ensure memory isolation between different users.
-        # The evaluation runs with a user-scoped WeaveClient that can only access data
-        # belonging to the authenticated user.
-
-        # Args:
-        #     req: Evaluation execution request containing:
-        #         - evaluation_ref: Reference to the evaluation to execute
-        #         - model_ref: Reference to the model to evaluate
-        #         - project_id: Project scope for execution
-        #         - wb_user_id: User ID for authentication and scoping
-
-        # Returns:
-        #     Evaluation execution response containing:
-        #         - output: The evaluation results
-        #         - call_id: Unique identifier for the traced evaluation
-
-        # Raises:
-        #     ValueError: If wb_user_id is not provided in the request
-        #     RunAsUserException: If the evaluation execution fails in the child process
-
-        # Security:
-        #     - Runs in a separate process for memory isolation
-        #     - All references are validated to match the project scope
-        #     - User context is enforced throughout execution
-        # """
-        # if not req.wb_user_id:
-        #     raise ValueError("wb_user_id is required")
-
-        # res = RunAsUser(
-        #     internal_trace_server=self,
-        #     project_id=req.project_id,
-        #     wb_user_id=req.wb_user_id,
-        # ).evaluate_model(req)
-        # return res
+        if self._worker is None:
+            raise ValueError("Worker is not set")
+        if not req.wb_user_id:
+            raise ValueError("wb_user_id is required")
+        eval_call_id = generate_id()
+        self._worker.submit_evaluate_model_job(
+            EvaluateModelJob(
+                project_id=req.project_id,
+                evaluation_ref=req.evaluation_ref,
+                model_ref=req.model_ref,
+                wb_user_id=req.wb_user_id,
+                evaluation_call_id=eval_call_id,
+            )
+        )
+        return tsi.EvaluateModelRes(call_id=eval_call_id)
 
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
-        return tsi.EvaluationStatusRes(status="completed")
+        # call = self.call_read(req.call_id)
+        return tsi.EvaluationStatusRes(
+            status=tsi.EvaluationStatusPending(status="pending")
+        )
 
     # Private Methods
     @property
