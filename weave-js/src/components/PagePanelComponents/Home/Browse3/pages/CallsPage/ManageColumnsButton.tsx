@@ -4,7 +4,7 @@
 
 import {Popover} from '@mui/material';
 import {GridColDef, GridColumnVisibilityModel} from '@mui/x-data-grid-pro';
-import {Switch} from '@wandb/weave/components';
+import {Checkbox} from '@wandb/weave/components';
 import classNames from 'classnames';
 import React, {useCallback, useRef, useState} from 'react';
 
@@ -20,12 +20,16 @@ type ManageColumnsButtonProps = {
   columnInfo: ColumnInfo;
   columnVisibilityModel: GridColumnVisibilityModel;
   setColumnVisibilityModel: (model: GridColumnVisibilityModel) => void;
+  pinnedColumns?: Set<string>;
+  onToggleColumnPin?: (columnId: string) => void;
 };
 
 export const ManageColumnsButton = ({
   columnInfo,
   columnVisibilityModel,
   setColumnVisibilityModel,
+  pinnedColumns = new Set(),
+  onToggleColumnPin,
 }: ManageColumnsButtonProps) => {
   const [search, setSearch] = useState('');
   const lowerSearch = search.toLowerCase();
@@ -41,7 +45,7 @@ export const ManageColumnsButton = ({
 
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const onClick = (event: React.MouseEvent<HTMLElement>) => {
+  const onClick = () => {
     setAnchorEl(anchorEl ? null : ref.current);
     setSearch('');
   };
@@ -118,9 +122,7 @@ export const ManageColumnsButton = ({
           <div className="min-w-[360px] p-12">
             <DraggableHandle>
               <div className="flex items-center pb-8">
-                <div className="flex-auto text-xl font-semibold">
-                  Manage columns
-                </div>
+                <div className="flex-auto font-semibold">Manage columns</div>
                 <div className="ml-16 text-moon-500">
                   {maybePluralize(numHidden, 'hidden column', 's')}
                 </div>
@@ -154,24 +156,39 @@ export const ManageColumnsButton = ({
                         'flex items-center py-2',
                         disabled ? 'opacity-40' : ''
                       )}>
-                      <Switch.Root
+                      <Checkbox
                         id={idSwitch}
                         size="small"
                         checked={checked}
-                        onCheckedChange={isOn => {
+                        onCheckedChange={() => {
                           toggleColumnShow(col.field);
                         }}
-                        disabled={disabled}>
-                        <Switch.Thumb size="small" checked={checked} />
-                      </Switch.Root>
+                        disabled={disabled}
+                      />
                       <label
                         htmlFor={idSwitch}
                         className={classNames(
-                          'ml-6',
+                          'ml-6 flex-auto',
                           disabled ? '' : 'cursor-pointer'
                         )}>
                         {label}
                       </label>
+                      {onToggleColumnPin && (
+                        <Button
+                          size="small"
+                          variant="ghost"
+                          icon="pin"
+                          onClick={() => onToggleColumnPin(col.field)}
+                          disabled={disabled}
+                          active={pinnedColumns.has(col.field)}
+                          className={classNames('ml-2')}
+                          tooltip={
+                            pinnedColumns.has(col.field)
+                              ? 'Unpin column'
+                              : 'Pin column'
+                          }
+                        />
+                      )}
                     </div>
                   </div>
                 );
