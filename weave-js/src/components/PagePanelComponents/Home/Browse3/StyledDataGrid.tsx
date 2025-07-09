@@ -33,11 +33,11 @@ const LoadingOverlay = () => <Loading centered />;
 export const StyledDataGrid = styled(
   ({
     keepBorders,
-    showMinimal,
+    hideHeaders,
     ...otherProps
-  }: DataGridProProps & {keepBorders?: boolean, showMinimal?: boolean}) => {
+  }: DataGridProProps & {keepBorders?: boolean, hideHeaders?: boolean}) => {
     const slots = otherProps.slots ?? {};
-    if (showMinimal) {
+    if (hideHeaders) {
       slots.columnHeaders = () => null;
     }
     if (!slots.loadingOverlay) {
@@ -45,9 +45,9 @@ export const StyledDataGrid = styled(
     }
     return <DataGridPro slots={slots} {...otherProps} />;
   }
-)(({keepBorders, showMinimal}) => ({
+)(({keepBorders, hideHeaders}) => ({
   ...(!keepBorders ? {borderRight: 0, borderLeft: 0, borderBottom: 0} : {}),
-  ...(showMinimal ? {
+  ...(hideHeaders ? {
     borderRight: 0,
     borderLeft: 0,
     borderBottom: 0,

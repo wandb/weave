@@ -37,26 +37,20 @@ export type WeaveDocumentSchema = z.infer<typeof WeaveDocumentSchema>;
  */
 export type ParseResult<T> = {
   schema: string;
-  result: T[]; // MODIFIED: No longer OneOrMany<T>, always T[]
+  result: T[];
 };
 
-/**
- * The final output. Fields are now either an array or null.
- */
 export type ParsedCall<T> = {
   id: string;
-  inputs: ParseResult<T>[] | null; // MODIFIED: No longer OneOrMany<T>
-  output: ParseResult<T>[] | null; // MODIFIED: No longer OneOrMany<...>
+  inputs: ParseResult<T>[] | null;
+  output: ParseResult<T>[] | null;
 };
-// endregion
-
-
 // region: Source Schema Parsers (MODIFIED)
 
 // --- Parser 1: LangchainDocument ---
 const LangchainDocumentSourceSchema = z.object({
-    page_content: z.string(),
-    metadata: z.record(z.any()).optional(),
+  page_content: z.string(),
+  metadata: z.record(z.any()).optional(),
 }).catchall(z.any());
 
 // MODIFIED: The transform now wraps the single document in an array.

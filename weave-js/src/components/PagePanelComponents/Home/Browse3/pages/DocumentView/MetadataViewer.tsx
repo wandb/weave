@@ -39,20 +39,20 @@ import {isExpandableRef} from '../wfReactInterface/tsDataModelHooksCallRefExpans
 import {
   USE_TABLE_FOR_ARRAYS,
   WeaveCHTableSourceRefContext,
-} from './DataTableView';
-import {ObjectViewerGroupingCell} from './ObjectViewerGroupingCell';
+} from '../CallPage/DataTableView';
+import {ObjectViewerGroupingCell} from '../CallPage/ObjectViewerGroupingCell';
 import {
   getKnownImageDictContexts,
   isKnownImageDictFormat,
-} from './objectViewerUtilities';
+} from '../CallPage/objectViewerUtilities';
 import {
   getValueType,
   mapObject,
   ObjectPath,
   traverse,
   TraverseContext,
-} from './traverse';
-import {ValueView} from './ValueView';
+} from '../CallPage/traverse';
+import {ValueView} from '../CallPage/ValueView';
 
 const DEFAULT_ROW_HEIGHT = 38;
 const CODE_ROW_HEIGHT = 350;
@@ -66,7 +66,6 @@ type ObjectViewerProps = {
   isExpanded: boolean;
   expandedIds: GridRowId[];
   setExpandedIds: Dispatch<SetStateAction<GridRowId[]>>;
-  hideHeaders?: boolean;
 };
 
 // Traverse the data and find all ref URIs.
@@ -90,13 +89,12 @@ export const ARRAY_TRUNCATION_LENGTH = 50;
 const TRUNCATION_KEY = '__weave_array_truncated__';
 
 // This is a general purpose object viewer that can be used to view any object.
-export const ObjectViewer = ({
+export const MetadataViewer = ({
   apiRef,
   data,
   isExpanded,
   expandedIds,
   setExpandedIds,
-  hideHeaders,
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
@@ -329,6 +327,8 @@ export const ObjectViewer = ({
       {
         field: 'value',
         headerName: 'Value',
+        headerAlign: 'right',
+        align: 'right',
         flex: 1,
         display: 'flex',
         sortable: false,
@@ -501,9 +501,10 @@ export const ObjectViewer = ({
   // Finally, we memoize the inner data grid component. This is important to
   // reduce the number of re-renders when the data changes.
   const inner = useMemo(() => {
-    return (
+    const body = (rows.some(row => {row.isLoader === true})) ? <LoadingDots /> : (
       <StyledDataGrid
         apiRef={apiRef}
+        hideHeaders={true}
         // Start Column Menu
         // ColumnMenu is only needed when we have other actions
         // such as filtering.
@@ -531,13 +532,16 @@ export const ObjectViewer = ({
         isGroupExpandedByDefault={node => {
           return expandedIds.includes(node.id);
         }}
-        columnHeaderHeight={38}
+        columnHeaderHeight={0}
         rowHeight={DEFAULT_ROW_HEIGHT}
         getRowHeight={getRowHeight}
         hideFooter
         rowSelection={false}
         groupingColDef={groupingColDef}
         sx={{
+          border: 'none',
+          flex: 1,
+          height: '100%',
           borderRadius: '0px',
           '& .MuiDataGrid-row:hover': {
             backgroundColor: 'inherit',
@@ -571,10 +575,15 @@ export const ObjectViewer = ({
         }}
       />
     );
+    return body
+    // Removing rows here makes it render without jumping
+    // Not sure if this is a loading issue, a data issue
   }, [apiRef, rows, columns, getRowHeight, groupingColDef, expandedIds]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
-  return <div style={{overflow: 'hidden', height: '100%'}}>{inner}</div>;
+  return (
+    <div style={{overflow: 'hidden', height: '100%'}}>{inner}</div>
+  );
 };
 
 // Helper function to build the base ref for a given path. This function is used
@@ -703,7 +712,6 @@ const ShowMoreButtons = ({
       sx={{
         display: 'flex',
         width: '100%',
-        justifyContent: 'flex-start',
         gap: 1,
       }}>
       {truncatedCount > ARRAY_TRUNCATION_LENGTH && (
