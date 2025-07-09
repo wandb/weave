@@ -244,7 +244,7 @@ jobs:
       - name: Run docs
         run: make docs
 
-  trace-noserver:
+  trace_no_server:
     name: Trace non-trace server tests
     timeout-minutes: 10
     runs-on: ubuntu-latest
@@ -259,7 +259,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard: ["trace-noserver"]
+        nox-shard: ["trace_no_server"]
       fail-fast: false
     steps:
       - name: Checkout
