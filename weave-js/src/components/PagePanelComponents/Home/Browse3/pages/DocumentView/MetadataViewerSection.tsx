@@ -1,7 +1,13 @@
 import {Collapse} from '@mui/material';
 import {GridRowId, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {Fragment, useCallback, useEffect, useMemo, useState} from 'react';
+import React, {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
@@ -31,7 +37,6 @@ const MetadataViewerSectionInner = ({
   const [mode, setMode] = useState('collapsed');
   const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
-
   // Suppress MUI DataGrid errors about empty parent height.
   // There's no way to prevent this error since MUI expects the Grid to actually render when mounted.
   // - Adding a container with a min height everywhere it makes sense doesn't fix it.
@@ -47,7 +52,9 @@ const MetadataViewerSectionInner = ({
       if (
         args[0] &&
         typeof args[0] === 'string' &&
-        args[0].includes('MUI X: useResizeContainer - The parent DOM element of the data grid has an empty height')
+        args[0].includes(
+          'MUI X: useResizeContainer - The parent DOM element of the data grid has an empty height'
+        )
       ) {
         return; // Suppress this specific error
       }

@@ -30,7 +30,7 @@ export type ParseResult<T> = {
 };
 
 export type ParsedCall<T> = {
-  id:string;
+  id: string;
   inputs: ParseResult<T>[] | null;
   output: ParseResult<T>[] | null;
 };
