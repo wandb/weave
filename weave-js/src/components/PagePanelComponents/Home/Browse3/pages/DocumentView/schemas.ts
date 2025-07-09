@@ -1,8 +1,5 @@
-// src/schemas.ts (Updated)
-
 import {z} from 'zod';
 
-// region: Provided Type Definitions (Unchanged)
 export type ID = string | number;
 export type Metadata = Record<string, any>;
 export type Content = string;
@@ -33,7 +30,7 @@ export type ParseResult<T> = {
 };
 
 export type ParsedCall<T> = {
-  id: string;
+  id:string;
   inputs: ParseResult<T>[] | null;
   output: ParseResult<T>[] | null;
 };
@@ -59,34 +56,32 @@ const LangchainParser = LangchainDocumentSourceSchema.transform(
   }
 );
 
-const ChromaQueryResultSourceSchema = z
+const IDSchema = z.union([z.string(), z.number()]);
+const MetadataSchema = z.record(z.any());
+
+// This schema accepts both GetResult (flat arrays) and QueryResult (nested arrays).
+const ChromaGetOrQueryResultSourceSchema = z
   .object({
-    ids: z.union([
-      z.string(),
-      z.number(),
-      z.array(z.union([z.string(), z.number()])),
-    ]),
-    documents: z.union([z.string(), z.array(z.string())]).optional(),
-    metadatas: z.array(z.record(z.any())).optional(),
+    ids: z.union([z.array(IDSchema), z.array(z.array(IDSchema))]),
+    documents: z
+      .union([z.array(z.string()), z.array(z.array(z.string()))])
+      .optional()
+      .nullable(),
+    metadatas: z
+      .union([z.array(MetadataSchema), z.array(z.array(MetadataSchema))])
+      .optional()
+      .nullable(),
   })
   .catchall(z.any());
 
-const ChromaParser = ChromaQueryResultSourceSchema.transform(
+// This unified parser handles both GetResult and QueryResult.
+const ChromaParser = ChromaGetOrQueryResultSourceSchema.transform(
   (queryResult): WeaveDocument[] => {
-    const ids = Array.isArray(queryResult.ids)
-      ? queryResult.ids
-      : [queryResult.ids];
-    const documents = queryResult.documents
-      ? Array.isArray(queryResult.documents)
-        ? queryResult.documents
-        : [queryResult.documents]
-      : [];
-    const metadatas = queryResult.metadatas
-      ? Array.isArray(queryResult.metadatas)
-        ? queryResult.metadatas
-        : [queryResult.metadatas]
-      : [];
+    const ids: ID[] = queryResult.ids.flat();
+    const documents: Content[] = queryResult.documents?.flat() ?? [];
+    const metadatas: Metadata[] = queryResult.metadatas?.flat() ?? [];
 
+    // Map the normalized, flat arrays to the target WeaveDocument structure.
     return ids.map((id, i) => ({
       id,
       content: documents[i] ?? '',
@@ -95,7 +90,8 @@ const ChromaParser = ChromaQueryResultSourceSchema.transform(
   }
 );
 
+// Export the available parsers
 export const SCHEMA_PARSERS: {name: string; schema: z.ZodTypeAny}[] = [
   {name: 'LangchainDocument', schema: LangchainParser},
-  {name: 'ChromaQueryResult', schema: ChromaParser},
+  {name: 'ChromaResult', schema: ChromaParser},
 ];
