@@ -6,7 +6,7 @@ import React, {useEffect, useState} from 'react';
 import {useEntityProject} from '../../context';
 
 import {TargetBlank} from '../../../../../../common/util/links';
-import * as userEvents from '../../../../../../integrations/analytics/userEvents';
+import {TrackedTargetBlank} from '../../../../../../common/util/TrackedTargetBlank';
 import * as viewEvents from '../../../../../../integrations/analytics/viewEvents';
 import {Button} from '../../../../../Button';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
@@ -67,67 +67,40 @@ const TracesMoreInformation: React.FC = () => {
     });
   }, [userInfoLoaded, orgName, entityName, projectName]);
 
-  const fireAnalyticsForEmpty =
-    (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
-      if (!userInfoLoaded || !url || !projectName || !entityName) {
-        return;
-      }
-      const baseEventData = {
-        userId: userInfoLoaded.id,
-        organizationName: orgName,
-        entityName,
-        projectName,
-        source: 'traces_empty_state',
-      };
-
-      if (type === 'doc' && docType) {
-        userEvents.docsLinkClicked({
-          ...baseEventData,
-          docType,
-          url,
-        });
-      } else if (type === 'colab') {
-        userEvents.colabButtonClicked({
-          ...baseEventData,
-          url,
-        });
-      }
-    };
-
   const COLAB_URL =
     'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb';
 
   return (
     <>
       Learn{' '}
-      <TargetBlank
+      <TrackedTargetBlank
         href="http://wandb.me/weave_traces"
-        onClick={fireAnalyticsForEmpty(
-          'doc',
-          'empty_state_tracing_basics',
-          'http://wandb.me/weave_traces'
-        )}>
+        trackedName="tracing_basics"
+        source="traces_empty_state"
+        docType="empty_state_tracing_basics"
+        trackingType="doc">
         tracing basics
-      </TargetBlank>{' '}
+      </TrackedTargetBlank>{' '}
       or see traces in action by{' '}
-      <TargetBlank
+      <TrackedTargetBlank
         href="http://wandb.me/weave_quickstart"
-        onClick={fireAnalyticsForEmpty(
-          'doc',
-          'empty_state_quickstart_guide',
-          'http://wandb.me/weave_quickstart'
-        )}>
+        trackedName="quickstart_guide"
+        source="traces_empty_state"
+        docType="empty_state_quickstart_guide"
+        trackingType="doc">
         following our quickstart guide
-      </TargetBlank>
+      </TrackedTargetBlank>
       .
       <Box sx={{mt: 2}}>
-        <TargetBlank
+        <TrackedTargetBlank
           href={COLAB_URL}
-          onClick={fireAnalyticsForEmpty('colab', undefined, COLAB_URL)}>
+          trackedName="colab_traces"
+          source="traces_empty_state"
+          trackingType="colab">
           <Button variant="secondary" icon="logo-colab">
             Get started with Colab
           </Button>
-        </TargetBlank>
+        </TrackedTargetBlank>
       </Box>
     </>
   );
@@ -177,67 +150,40 @@ const EvaluationsMoreInformation: React.FC = () => {
     });
   }, [userInfoLoaded, orgName, entityName, projectName]);
 
-  const fireAnalyticsForEmpty =
-    (type: 'doc' | 'colab', docType?: string, url?: string) => () => {
-      if (!userInfoLoaded || !url || !projectName || !entityName) {
-        return;
-      }
-      const baseEventData = {
-        userId: userInfoLoaded.id,
-        organizationName: orgName,
-        entityName,
-        projectName,
-        source: 'evaluations_empty_state',
-      };
-
-      if (type === 'doc' && docType) {
-        userEvents.docsLinkClicked({
-          ...baseEventData,
-          docType,
-          url,
-        });
-      } else if (type === 'colab') {
-        userEvents.colabButtonClicked({
-          ...baseEventData,
-          url,
-        });
-      }
-    };
-
   const COLAB_URL =
     'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Eval.ipynb';
 
   return (
     <>
       Learn{' '}
-      <TargetBlank
+      <TrackedTargetBlank
         href="https://wandb.me/weave_evals"
-        onClick={fireAnalyticsForEmpty(
-          'doc',
-          'empty_state_evaluation_basics',
-          'https://wandb.me/weave_evals'
-        )}>
+        trackedName="evaluation_basics"
+        source="evaluations_empty_state"
+        docType="empty_state_evaluation_basics"
+        trackingType="doc">
         evaluation basics
-      </TargetBlank>{' '}
+      </TrackedTargetBlank>{' '}
       or follow our tutorial to{' '}
-      <TargetBlank
+      <TrackedTargetBlank
         href="http://wandb.me/weave_eval_tut"
-        onClick={fireAnalyticsForEmpty(
-          'doc',
-          'empty_state_evaluation_tutorial',
-          'http://wandb.me/weave_eval_tut'
-        )}>
+        trackedName="evaluation_tutorial"
+        source="evaluations_empty_state"
+        docType="empty_state_evaluation_tutorial"
+        trackingType="doc">
         set up an evaluation pipeline
-      </TargetBlank>
+      </TrackedTargetBlank>
       .
       <Box sx={{mt: 2}}>
-        <TargetBlank
+        <TrackedTargetBlank
           href={COLAB_URL}
-          onClick={fireAnalyticsForEmpty('colab', undefined, COLAB_URL)}>
+          trackedName="colab_evaluations"
+          source="evaluations_empty_state"
+          trackingType="colab">
           <Button variant="secondary" icon="logo-colab">
             Get started with Colab
           </Button>
-        </TargetBlank>
+        </TrackedTargetBlank>
       </Box>
     </>
   );
