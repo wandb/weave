@@ -1,7 +1,9 @@
 import {
   GridColDef,
+  GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
+  GridPinnedColumnFields,
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
@@ -57,6 +59,12 @@ const convertFilterModelToDatetimeFilters = (
 };
 
 export const ThreadsTable: FC<{
+  columnVisibilityModel: GridColumnVisibilityModel;
+  setColumnVisibilityModel: (newModel: GridColumnVisibilityModel) => void;
+
+  pinModel: GridPinnedColumnFields;
+  setPinModel: (newModel: GridPinnedColumnFields) => void;
+
   filterModel: GridFilterModel;
   setFilterModel: (newModel: GridFilterModel) => void;
 
@@ -66,6 +74,10 @@ export const ThreadsTable: FC<{
   paginationModel: GridPaginationModel;
   setPaginationModel: (newModel: GridPaginationModel) => void;
 }> = ({
+  columnVisibilityModel,
+  setColumnVisibilityModel,
+  pinModel,
+  setPinModel,
   filterModel,
   setFilterModel,
   sortModel,
@@ -338,6 +350,11 @@ export const ThreadsTable: FC<{
         rows={tableData}
         columns={columns}
         loading={loading}
+        // Column management
+        columnVisibilityModel={columnVisibilityModel}
+        onColumnVisibilityModelChange={setColumnVisibilityModel}
+        pinnedColumns={pinModel}
+        onPinnedColumnsChange={setPinModel}
         // Column Menu - disable filter and column management features
         disableColumnFilter={true}
         // Pagination

@@ -12,27 +12,20 @@ from weave.trace.context import weave_client_context
 _verdict_patcher: Union[MultiPatcher, None] = None
 
 
-def get_verdict_module() -> Optional[Any]:
-    """Get the verdict module if it's available."""
-    try:
-        import verdict
-    except ImportError:
-        return None
-    else:
-        return verdict
+try:
+    from verdict.util.tracing import (
+        Call,
+        TraceContext,
+        Tracer,
+        current_trace_context,
+    )
+
+    _import_failed = False
+except (ImportError, ModuleNotFoundError):
+    _import_failed = True
 
 
-def create_verdict_tracer_class() -> Optional[type]:
-    """Create VerdictTracer class if verdict.util.tracing is available."""
-    try:
-        from verdict.util.tracing import (
-            Call,
-            TraceContext,
-            Tracer,
-            current_trace_context,
-        )
-    except (ImportError, ModuleNotFoundError):
-        return None
+if not _import_failed:
 
     class VerdictTracerImpl(Tracer):
         """A tracer that logs calls to the Weave tracing backend."""
@@ -98,8 +91,6 @@ def create_verdict_tracer_class() -> Optional[type]:
                 )
                 current_trace_context.reset(token)
 
-    return VerdictTracerImpl
-
 
 def create_pipeline_init_wrapper(
     tracer: Any,
@@ -129,22 +120,24 @@ def get_verdict_patcher(
         return NoOpPatcher()
 
     # Check if verdict tracing is available
-    verdict_tracer_cls = create_verdict_tracer_class()
-    if verdict_tracer_cls is None:
-        return NoOpPatcher()
+    if not _import_failed:
+        verdict_tracer = VerdictTracerImpl()
+    else:
+        verdict_tracer = None
 
     global _verdict_patcher
     if _verdict_patcher is not None:
         return _verdict_patcher
 
-    tracer = verdict_tracer_cls()
+    if verdict_tracer is None:
+        return NoOpPatcher()
 
     _verdict_patcher = MultiPatcher(
         [
             SymbolPatcher(
                 lambda: importlib.import_module("verdict.core.pipeline"),
                 "Pipeline.__init__",
-                create_pipeline_init_wrapper(tracer),
+                create_pipeline_init_wrapper(verdict_tracer),
             ),
         ]
     )

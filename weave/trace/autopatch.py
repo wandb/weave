@@ -121,8 +121,8 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_openai_agents_patcher(settings.openai_agents).attempt_patch()
     get_verdict_patcher(settings.verdict).attempt_patch()
 
-    llamaindex_patcher.attempt_patch()
     langchain_patcher.attempt_patch()
+    llamaindex_patcher.attempt_patch()
     get_autogen_patcher(settings.autogen).attempt_patch()
 
 
@@ -181,6 +181,6 @@ def reset_autopatch() -> None:
     get_openai_agents_patcher().undo_patch()
     get_verdict_patcher().undo_patch()
 
-    llamaindex_patcher.undo_patch()
     langchain_patcher.undo_patch()
+    llamaindex_patcher.undo_patch()
     get_autogen_patcher().undo_patch()
