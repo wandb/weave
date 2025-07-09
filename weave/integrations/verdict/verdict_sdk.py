@@ -20,12 +20,12 @@ try:
         current_trace_context,
     )
 
-    import_failed = False
+    _import_failed = False
 except (ImportError, ModuleNotFoundError):
-    import_failed = True
+    _import_failed = True
 
 
-if not import_failed:
+if not _import_failed:
 
     class VerdictTracerImpl(Tracer):
         """A tracer that logs calls to the Weave tracing backend."""
@@ -120,7 +120,7 @@ def get_verdict_patcher(
         return NoOpPatcher()
 
     # Check if verdict tracing is available
-    if not import_failed:
+    if not _import_failed:
         verdict_tracer = VerdictTracerImpl()
     else:
         verdict_tracer = None
