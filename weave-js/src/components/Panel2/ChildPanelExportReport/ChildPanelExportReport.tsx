@@ -74,7 +74,9 @@ export const ChildPanelExportReport = ({
     null
   );
 
-  const [getReport, {data: reportQueryData}] = useLazyQuery(GET_REPORT);
+  const [getReport, {data: reportQueryData}] = useLazyQuery(GET_REPORT, {
+    fetchPolicy: 'no-cache',
+  });
   const [upsertReport] = useMutation(UPSERT_REPORT);
   const [deleteReportDraft] = useMutation(DELETE_REPORT_DRAFT);
   const [isAddingPanel, setIsAddingPanel] = useState(false);
@@ -150,11 +152,11 @@ export const ChildPanelExportReport = ({
           documentId
         );
       }
-      const {data} = await getReport({
-        variables: {id: selectedReport.id!},
-        fetchPolicy: 'no-cache',
-      });
-      const report = data?.view;
+
+      getReport({variables: {id: selectedReport.id!}});
+
+      const report = reportQueryData?.view;
+
       if (!report) {
         throw new Error('Report not found');
       }
