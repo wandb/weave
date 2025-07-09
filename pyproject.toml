@@ -193,6 +193,7 @@ test = [
   "httpx",
 
   # Media Generation
+  "opencv-python", # Video generation
   "reportlab",     # PDF generation
 
   "confluent-kafka",
