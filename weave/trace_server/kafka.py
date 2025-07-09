@@ -36,6 +36,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             topic=EVALUATE_MODEL_JOB_TOPIC,
             value=job.model_dump_json(),
         )
+        self.flush()
 
 
 class KafkaConsumer(ConfluentKafkaConsumer):

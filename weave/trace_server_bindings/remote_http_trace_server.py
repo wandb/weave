@@ -225,7 +225,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         stream: bool = False,
     ) -> requests.Response:
         r = self.post(
-            self.trace_server_url + url,
+            url,
             # `by_alias` is required since we have Mongo-style properties in the
             # query models that are aliased to conform to start with `$`. Without
             # this, the model_dump will use the internal property names which are
@@ -636,15 +636,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        raise NotImplementedError(
-            "evaluate_model is not implemented for remote HTTP trace server"
+        return self._generic_request(
+            "/evaluations/evaluate_model", req, tsi.EvaluateModelReq, tsi.EvaluateModelRes
         )
 
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
-        raise NotImplementedError(
-            "evaluation_status is not implemented for remote HTTP trace server"
+        return self._generic_request(
+            "/evaluations/status", req, tsi.EvaluationStatusReq, tsi.EvaluationStatusRes
         )
 
 

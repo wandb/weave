@@ -131,7 +131,7 @@ def worker_client(config: SerializableWorkerClientConfig) -> WorkerWeaveClient:
         project=config.project_id,
         server=WorkerTraceServer(
             local_trace_server=externalize_trace_server(
-                ClickHouseTraceServer(
+                ClickHouseTraceServer.from_env(
                     **config.service_config.local_clickhouse_trace_server_kwargs,
                 ),
                 config.project_id,
