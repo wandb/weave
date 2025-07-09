@@ -2,8 +2,8 @@
  * Select a Run from within a Project.
  */
 import {useApolloClient} from '@apollo/react-hooks';
-import gql from 'graphql-tag';
 import {Select} from '@wandb/weave/components/Form/Select';
+import gql from 'graphql-tag';
 import _ from 'lodash';
 import React, {useEffect, useState} from 'react';
 

@@ -3,9 +3,9 @@
  */
 
 import {useApolloClient} from '@apollo/react-hooks';
-import gql from 'graphql-tag';
 import {TooltipProps} from '@mui/material';
 import * as Colors from '@wandb/weave/common/css/color.styles';
+import gql from 'graphql-tag';
 import React, {useEffect, useState} from 'react';
 import styled from 'styled-components';
 

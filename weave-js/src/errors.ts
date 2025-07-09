@@ -1,5 +1,4 @@
 import {ApolloError} from 'apollo-client';
-
 import {get} from 'lodash';
 
 import {WeaveApp} from './weave';

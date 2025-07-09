@@ -1,5 +1,4 @@
 import {useLazyQuery, useMutation} from '@apollo/react-hooks';
-
 import {coreAppUrl} from '@wandb/weave/config';
 import {opRootViewer} from '@wandb/weave/core';
 import * as Urls from '@wandb/weave/core/_external/util/urls';
