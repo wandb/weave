@@ -3,7 +3,7 @@ import importlib
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Callable, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
@@ -24,8 +24,11 @@ try:
 except (ImportError, ModuleNotFoundError):
     import_failed = True
 
+if TYPE_CHECKING:
+    from verdict.util.tracing import Tracer
 
-def create_verdict_tracer_class() -> Optional[Tracer]:
+
+def create_verdict_tracer_class() -> Optional[type[Tracer]]:
     """Create VerdictTracer class if verdict.util.tracing is available."""
     if not import_failed:
 
