@@ -5,10 +5,10 @@ import {Popup} from 'semantic-ui-react';
 
 import {ID} from '../../util/id';
 import {SliderKeyboardOperation} from '../../util/media';
+import {shiftInputByValue} from '../../util/shiftInputByValue';
 // Doesn't yet work in nested panels yet.
 // import {BetterPopup} from '../BetterPopup';
 import NumberInput from './NumberInput';
-import {shiftInputByValue} from '../../util/shiftInputByValue';
 
 export interface SliderInputProps {
   min: number;
@@ -108,7 +108,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
           update(newValue);
         },
       };
-    }, [sliderValue, update]);
+    }, [sliderValue, update, ticks, strideLength, min, max]);
 
     const isFormField = React.useCallback(
       (node?: Element | null | undefined) => {

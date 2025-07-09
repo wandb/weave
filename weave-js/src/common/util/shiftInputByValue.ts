@@ -1,4 +1,5 @@
 import _ from 'lodash';
+
 import clamp from './clamp';
 
 export function shiftInputByValue(
