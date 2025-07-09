@@ -4,7 +4,7 @@ import {WeaveObject} from '../../weaveObject';
 
 class ExampleObject extends WeaveObject {
   constructor(
-    public name: string,
+    public key: string,
     public value: number
   ) {
     super({});
@@ -13,7 +13,7 @@ class ExampleObject extends WeaveObject {
   }
 
   async method() {
-    return this.name + '!';
+    return this.key + '!';
   }
 }
 
