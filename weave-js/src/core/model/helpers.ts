@@ -196,6 +196,7 @@ const filePrefixToMediaType = (prefix: string): MediaType | null => {
   } else if (prefix === 'partitioned-table') {
     return {type: 'partitioned-table', columnTypes: {}};
   }
+
   return null;
 };
 
@@ -747,7 +748,7 @@ export function union(members: Type[]): Type {
   const seenOtherTypes: Type[] = [];
 
   for (const member of allMembers) {
-    if (isTypedDict(member)) {
+    if (isTypedDict(member) || isTaggedValue(member)) {
       // Use fast key-based deduplication for typedDicts
       const key = getTypedDictKey(member);
       if (!seenTypedDictKeys.has(key)) {
