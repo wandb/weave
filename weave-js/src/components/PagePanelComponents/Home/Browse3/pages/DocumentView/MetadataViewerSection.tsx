@@ -58,7 +58,7 @@ const MetadataViewerSectionInner = ({
       );
     }
     return null;
-  }, [isOpen, mode, apiRef, data, expandedIds]);
+  }, [mode, apiRef, data, expandedIds]);
 
   const setTreeExpanded = useCallback(
     (setIsExpanded: boolean) => {
