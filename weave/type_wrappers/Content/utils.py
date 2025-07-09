@@ -128,5 +128,4 @@ def get_mime_and_extension(
         if idx != -1:
             extension = filename[idx:]
 
-    extension = extension or ""
-    return "application/octet-stream", extension
+    return "application/octet-stream", ""
