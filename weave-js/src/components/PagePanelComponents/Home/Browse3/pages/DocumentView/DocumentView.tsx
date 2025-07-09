@@ -1,9 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Box, Typography, IconButton, Collapse, Stack, Table, TableBody, TableRow, TableCell } from '@mui/material';
-import styled from 'styled-components';
+import { Box, Collapse } from '@mui/material';
 import { Button } from '@wandb/weave/components/Button';
 import {ParsedCall, WeaveDocumentSchema} from './schemas';
-import { ObjectViewerSection } from '../CallPage/ObjectViewerSection';
 import { MetadataViewerSection } from './MetadataViewerSection';
 import {Header, Body} from './Styles';
 
@@ -49,31 +47,18 @@ interface DocumentDropdownProps {
 }
 
 const DocumentDropdown: React.FC<DocumentDropdownProps> = ({ documents, title }) => {
-  const [isExpanded, setExpanded] = useState(true);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', height: 'auto'}}>
       <div style={{ display: 'flex', marginBottom: '4px' }}>
-        <Button
-          onClick={() => { setExpanded(!isExpanded); }}
-          variant='ghost'
-          size='small'
-          icon={isExpanded ? "chevron-down" : "chevron-next"}
-          style={{fontSize: "16px"}}
-        >
-          <Header>{title}</Header>
-        </Button>
+        <Header>{title}</Header>
       </div>
-      <Collapse in={isExpanded}>
-        <Box>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16}}>
-            {documents.map((doc, index) => (
-              <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 16}}>
-                <DocumentCard doc={doc} />
-              </div>
-            ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16}}>
+        {documents.map((doc, index) => (
+          <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 16}}>
+            <DocumentCard doc={doc} />
           </div>
-        </Box>
-      </Collapse>
+        ))}
+      </div>
     </div>
   );
 };

@@ -148,7 +148,7 @@ const MetadataViewerSectionInner = ({
           variant='ghost'
           size='small'
           icon={isOpen ? "chevron-down" : "chevron-next"}
-          style={{fontSize: "14px"}}
+          style={{fontSize: "14px", padding: 0}}
         >
           <Subheader>{title}</Subheader>
         </Button>
@@ -157,13 +157,15 @@ const MetadataViewerSectionInner = ({
   );
 
   return (
-    <div style={{height: '100%', display: 'flex', flexDirection: 'column', margin: 0, padding: 0, gap: 8}}>
+    <div style={{height: '100%', display: 'flex', flexDirection: 'column', margin: 0, padding: 0}}>
       <div style={{height: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
         {headerSection}
         {isOpen && buttonSection}
       </div>
       <Collapse in={isOpen}>
-        {body}
+        <div style={{paddingTop: "8px"}}>
+          {body}
+        </div>
       </Collapse>
     </div>
   );
