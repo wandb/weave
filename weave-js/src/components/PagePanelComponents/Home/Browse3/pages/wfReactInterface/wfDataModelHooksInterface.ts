@@ -353,6 +353,7 @@ export interface UseFileContentParams {
 
 export interface UseFeedbackParams {
   key: FeedbackKey | null;
+  skip?: boolean;
   sortBy?: traceServerClientTypes.SortBy[];
 }
 

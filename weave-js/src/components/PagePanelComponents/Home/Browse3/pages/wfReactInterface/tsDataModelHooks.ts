@@ -718,7 +718,8 @@ const useFeedback = (
     if (doReload) {
       setDoReload(false);
     }
-    if (!deepKey) {
+    if (!deepKey || params.skip) {
+      setResult({loading: false, result: null, error: null});
       return;
     }
     setResult({loading: true, result: null, error: null});
@@ -753,7 +754,7 @@ const useFeedback = (
     return () => {
       mounted = false;
     };
-  }, [deepKey, getTsClient, doReload, params.sortBy]);
+  }, [deepKey, getTsClient, doReload, params.sortBy, params.skip]);
 
   return {...result, refetch};
 };

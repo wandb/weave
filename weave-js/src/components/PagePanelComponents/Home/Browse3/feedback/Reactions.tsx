@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {v4 as uuidv4} from 'uuid';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {parseRef} from '../../../../../react';
@@ -12,6 +13,7 @@ import {ReactionsLoaded} from './ReactionsLoaded';
 
 type ReactionsProps = {
   weaveRef: string;
+  feedbackData?: Feedback[];
   readonly?: boolean;
 
   // By default show controls on mouse over or if feedback exists.
@@ -25,6 +27,7 @@ const SORT_BY: SortBy[] = [{field: 'created_at', direction: 'asc'}];
 
 export const Reactions = ({
   weaveRef,
+  feedbackData,
   readonly = false,
   forceVisible,
   twWrapperStyles = {},
@@ -46,6 +49,7 @@ export const Reactions = ({
       project,
       weaveRef,
     },
+    skip: feedbackData !== undefined,
     sortBy: SORT_BY,
   });
   const getTsClient = useGetTraceServerClientContext();
@@ -54,41 +58,104 @@ export const Reactions = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (query.result) {
+    if (feedbackData && feedbackData.length > 0) {
+      // Use provided feedback data directly
+      setFeedback(feedbackData);
+    } else if (query.result) {
+      // Use query result when no feedback data provided
       setFeedback(query.result);
     }
-  }, [query.result]);
+  }, [query.result, feedbackData]);
 
-  const onAddEmoji = (emoji: string) => {
-    const req = {
+  const createFeedbackOptimistically = async (
+    feedbackType: string,
+    payload: Record<string, any>
+  ) => {
+    // Create optimistic feedback item
+    // @ts-ignore - wb_user_id will be filled by server response
+    const optimisticFeedback: Feedback = {
+      id: uuidv4(),
       project_id: projectId,
       weave_ref: weaveRef,
       creator: null,
-      feedback_type: 'wandb.reaction.1',
-      payload: {emoji},
+      created_at: new Date().toISOString(),
+      feedback_type: feedbackType,
+      payload,
     };
-    getTsClient().feedbackCreate(req);
-  };
-  const onAddNote = (note: string) => {
-    const req = {
-      project_id: projectId,
-      weave_ref: weaveRef,
-      creator: null,
-      feedback_type: 'wandb.note.1',
-      payload: {note},
-    };
-    getTsClient().feedbackCreate(req);
+
+    // Optimistically update local state
+    setFeedback(prevFeedback =>
+      prevFeedback
+        ? [...prevFeedback, optimisticFeedback]
+        : [optimisticFeedback]
+    );
+
+    // Make API call
+    try {
+      const req = {
+        project_id: projectId,
+        weave_ref: weaveRef,
+        creator: null,
+        feedback_type: feedbackType,
+        payload,
+      };
+      const result = await getTsClient().feedbackCreate(req);
+
+      // Update with real feedback data from server
+      if ('id' in result) {
+        setFeedback(
+          prevFeedback =>
+            prevFeedback?.map(f =>
+              f.id === optimisticFeedback.id
+                ? {...f, id: result.id, created_at: result.created_at}
+                : f
+            ) || null
+        );
+      }
+    } catch (error) {
+      // Revert optimistic update on error
+      setFeedback(
+        prevFeedback =>
+          prevFeedback?.filter(f => f.id !== optimisticFeedback.id) || null
+      );
+      console.error('Failed to create feedback:', error);
+    }
   };
 
-  const onRemoveFeedback = (id: string) => {
-    getTsClient().feedbackPurge({
-      project_id: projectId,
-      query: {
-        $expr: {
-          $eq: [{$getField: 'id'}, {$literal: id}],
+  const onAddEmoji = async (emoji: string) => {
+    await createFeedbackOptimistically('wandb.reaction.1', {emoji});
+  };
+
+  const onAddNote = async (note: string) => {
+    await createFeedbackOptimistically('wandb.note.1', {note});
+  };
+
+  const onRemoveFeedback = async (id: string) => {
+    // Store the item being removed for potential rollback
+    const itemToRemove = feedback?.find(f => f.id === id);
+
+    // Optimistically remove from local state
+    setFeedback(prevFeedback => prevFeedback?.filter(f => f.id !== id) || null);
+
+    // Make API call
+    try {
+      await getTsClient().feedbackPurge({
+        project_id: projectId,
+        query: {
+          $expr: {
+            $eq: [{$getField: 'id'}, {$literal: id}],
+          },
         },
-      },
-    });
+      });
+    } catch (error) {
+      // Revert optimistic update on error
+      if (itemToRemove) {
+        setFeedback(prevFeedback =>
+          prevFeedback ? [...prevFeedback, itemToRemove] : [itemToRemove]
+        );
+      }
+      console.error('Failed to remove feedback:', error);
+    }
   };
 
   if (loadingUserInfo || feedback === null) {
