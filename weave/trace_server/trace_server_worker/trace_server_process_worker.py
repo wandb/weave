@@ -54,6 +54,7 @@ class TestOnlyProcessWorker(tsw.WorkerInterface):
             evaluate_model,
             job,
         )
+        runner.stop()
 
     def submit_evaluate_model_job(
         self, job: tsw.EvaluateModelJob
