@@ -244,6 +244,46 @@ jobs:
       - name: Run docs
         run: make docs
 
+  trace-noserver:
+    name: Trace non-trace server tests
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            #
+          ]
+        nox-shard: ["trace-noserver"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox "uv<0.7.0"  # pin to unblock CI
+      - name: Run nox (Non Trace Server)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "not trace_server"
+
   trace-tests:
     name: Trace nox tests
     timeout-minutes: 30
@@ -288,7 +328,7 @@ jobs:
             "pandas-test",
             "mcp",
             "smolagents",
-            "autogen_tests"
+            "autogen_tests",
           ]
       fail-fast: false
     services:
@@ -339,17 +379,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install nox "uv<0.7.0"  # pin to unblock CI
-      - name: Run nox (Non Trace Server)
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          DD_TRACE_ENABLED: false
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "not trace_server"
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
