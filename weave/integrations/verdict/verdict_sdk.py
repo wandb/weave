@@ -3,7 +3,7 @@ import importlib
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
