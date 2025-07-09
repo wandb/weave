@@ -78,9 +78,6 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 
 logger = logging.getLogger(__name__)
 
-# Special placeholder used to indicate server-managed entities
-WORKER_ENTITY = "__[WORKER]__"
-WORKER_PROJECT_ID_PREFIX = WORKER_ENTITY + "/"
 REQUEST_TIMEOUT_SEC = 10
 
 
@@ -92,17 +89,17 @@ class ServiceConfig(BaseModel):
 class SerializableWorkerClientConfig(BaseModel):
     """Configuration for a worker client - serializable across processes."""
 
-    project_id: str
+    internal_project_id: str
+    external_project_id: str
     user_id: str
     service_config: ServiceConfig
 
 
-def worker_client(config: SerializableWorkerClientConfig) -> WorkerWeaveClient:
+def worker_client(config: SerializableWorkerClientConfig) -> WeaveClient:
     """
     Create a worker client configured for secure user impersonation.
 
     This function creates a specialized WeaveClient that:
-    - Enforces the WORKER_ENTITY for all operations
     - Sets up dual trace servers (local for storage, remote for API calls)
     - Wraps the local server with security validation
 
@@ -110,7 +107,7 @@ def worker_client(config: SerializableWorkerClientConfig) -> WorkerWeaveClient:
         config: Serializable configuration containing project, user_id, and server settings
 
     Returns:
-        A configured WorkerWeaveClient instance
+        A configured WeaveClient instance
 
     Examples:
         >>> config = SerializableWorkerClientConfig(
@@ -121,24 +118,29 @@ def worker_client(config: SerializableWorkerClientConfig) -> WorkerWeaveClient:
         ... )
         >>> client = worker_client(config)
     """
+    entity, project = config.external_project_id.split("/", 1)
+    if not entity or not project:
+        raise ValueError(f"Invalid external project ID: {config.external_project_id}")
     remote_trace_server = None
     if config.service_config.remote_trace_server_kwargs is not None:
         remote_trace_server = RemoteHTTPTraceServer(
             **config.service_config.remote_trace_server_kwargs,
         )
-    return WorkerWeaveClient(
-        entity=WORKER_ENTITY,
-        project=config.project_id,
+    return WeaveClient(
+        entity=entity,
+        project=project,
         server=WorkerTraceServer(
             local_trace_server=externalize_trace_server(
-                ClickHouseTraceServer.from_env(
+                trace_server=ClickHouseTraceServer.from_env(
                     **config.service_config.local_clickhouse_trace_server_kwargs,
                 ),
-                config.project_id,
-                config.user_id,
+                external_project_id=config.external_project_id,
+                internal_project_id=config.internal_project_id,
+                wb_user_id=config.user_id,
             ),
             remote_trace_server=remote_trace_server,
         ),
+        ensure_project_exists=False,
     )
 
 
@@ -231,7 +233,8 @@ class RunAsUser:
         )
         self.process.start()
         self.int_to_ext, self.ext_to_int = make_externalize_ref_converter(
-            config.project_id
+            internal_project_id=config.internal_project_id,
+            external_project_id=config.external_project_id,
         )
 
     def execute_external(
@@ -362,45 +365,41 @@ class RunAsUser:
                     break
 
 
-class WorkerWeaveClient(WeaveClient):
-    """
-    A specialized WeaveClient for backend worker processes.
+# class WorkerWeaveClient(WeaveClient):
+#     """
+#     A specialized WeaveClient for backend worker processes.
 
-    This client enforces security conventions required for server-side execution:
-    - Forces the entity to be WORKER_ENTITY regardless of input
-    - Prevents project creation (ensure_project_exists is always False)
-    - Uses a WorkerTraceServer that routes requests appropriately
+#     This client enforces security conventions required for server-side execution:
+#     - Forces the entity to be WORKER_ENTITY regardless of input
+#     - Prevents project creation (ensure_project_exists is always False)
+#     - Uses a WorkerTraceServer that routes requests appropriately
 
-    These restrictions ensure that worker processes cannot:
-    - Impersonate arbitrary entities
-    - Create new projects
-    - Access resources outside their assigned scope
+#     These restrictions ensure that worker processes cannot:
+#     - Impersonate arbitrary entities
+#     - Create new projects
+#     - Access resources outside their assigned scope
 
-    Args:
-        entity: Must be WORKER_ENTITY (will be forced if different)
-        project: The project to operate within
-        server: The trace server interface (typically WorkerTraceServer)
-        ensure_project_exists: Must be False (will be forced if True)
-    """
+#     Args:
+#         entity: Must be WORKER_ENTITY (will be forced if different)
+#         project: The project to operate within
+#         server: The trace server interface (typically WorkerTraceServer)
+#         ensure_project_exists: Must be False (will be forced if True)
+#     """
 
-    def __init__(
-        self,
-        entity: str,
-        project: str,
-        server: tsi.TraceServerInterface,
-        ensure_project_exists: bool = False,
-    ):
-        if entity != WORKER_ENTITY:
-            logger.warning(f"entity must be '{WORKER_ENTITY}', but got {entity}")
-            entity = WORKER_ENTITY
+#     def __init__(
+#         self,
+#         entity: str,
+#         project: str,
+#         server: tsi.TraceServerInterface,
+#         ensure_project_exists: bool = False,
+#     ):
+#         if ensure_project_exists:
+#             logger.warning(
+#                 "ensure_project_exists is True, but this is not supported for run_as_user_worker"
+#             )
+#             ensure_project_exists = False
 
-        if ensure_project_exists:
-            logger.warning(
-                "ensure_project_exists is True, but this is not supported for run_as_user_worker"
-            )
-            ensure_project_exists = False
-
-        super().__init__(entity, project, server, ensure_project_exists)
+#         super().__init__(entity, project, server, ensure_project_exists)
 
 
 class WorkerTraceServer(tsi.TraceServerInterface):
@@ -593,7 +592,10 @@ class WorkerTraceServer(tsi.TraceServerInterface):
 
 
 def externalize_trace_server(
-    trace_server: tsi.TraceServerInterface, project_id: str, wb_user_id: str
+    trace_server: tsi.TraceServerInterface,
+    external_project_id: str,
+    internal_project_id: str,
+    wb_user_id: str,
 ) -> tsi.TraceServerInterface:
     """
     Wrap a trace server with user context injection and security validation.
@@ -613,7 +615,9 @@ def externalize_trace_server(
     """
     return UserInjectingExternalTraceServer(
         trace_server,
-        id_converter=WorkerIdConverter(project_id, wb_user_id),
+        id_converter=WorkerIdConverter(
+            external_project_id, internal_project_id, wb_user_id
+        ),
         user_id=wb_user_id,
     )
 
@@ -699,7 +703,8 @@ T = TypeVar("T")
 
 
 def make_externalize_ref_converter(
-    project_id: str,
+    internal_project_id: str,
+    external_project_id: str,
 ) -> tuple[Callable[[T], T], Callable[[T], T]]:
     """
     Create a converter function that externalizes references for a specific project.
@@ -718,27 +723,21 @@ def make_externalize_ref_converter(
         ValueError: If any reference contains a different project ID
     """
 
-    def convert_project_id_int_to_ext(internal_project_id: str) -> str:
-        if project_id != internal_project_id:
+    def convert_project_id_int_to_ext(int_project_id: str) -> str:
+        if internal_project_id != int_project_id:
             raise ValueError(
-                f"Security violation: Attempted to access project '{internal_project_id}' "
-                f"but this operation is scoped to project '{project_id}'"
+                f"Security violation: Attempted to access project '{int_project_id}' "
+                f"but this operation is scoped to project '{internal_project_id}'"
             )
-        return WORKER_PROJECT_ID_PREFIX + internal_project_id
+        return external_project_id
 
-    def convert_project_id_ext_to_int(external_project_id: str) -> str:
-        entity, extracted_project_id = external_project_id.split("/", 1)
-        if entity != WORKER_ENTITY:
+    def convert_project_id_ext_to_int(ext_project_id: str) -> str:
+        if ext_project_id != external_project_id:
             raise ValueError(
-                f"Security violation: Invalid entity in project ID '{external_project_id}'. "
-                f"Expected entity '{WORKER_ENTITY}'"
+                f"Security violation: Attempted to access project '{ext_project_id}' "
+                f"but this operation is scoped to project '{external_project_id}'"
             )
-        if extracted_project_id != project_id:
-            raise ValueError(
-                f"Security violation: Attempted to access project '{extracted_project_id}' "
-                f"but this operation is scoped to project '{project_id}'"
-            )
-        return extracted_project_id
+        return internal_project_id
 
     def int_to_ext(obj: T) -> T:
         return universal_int_to_ext_ref_converter(obj, convert_project_id_int_to_ext)
@@ -757,7 +756,9 @@ class WorkerIdConverter(external_to_internal_trace_server_adapter.IdConverter):
     IDs match the expected values. Any mismatch is treated as a security violation.
     """
 
-    def __init__(self, project_id: str, user_id: str):
+    def __init__(
+        self, external_project_id: str, internal_project_id: str, user_id: str
+    ):
         """
         Initialize the ID converter with expected project and user IDs.
 
@@ -766,31 +767,26 @@ class WorkerIdConverter(external_to_internal_trace_server_adapter.IdConverter):
             user_id: The only user ID that should be allowed
         """
         self.user_id = user_id
-        self.project_id = project_id
+        self.external_project_id = external_project_id
+        self.internal_project_id = internal_project_id
 
     def ext_to_int_project_id(self, project_id: str) -> str:
         """Convert external project ID to internal format with validation."""
-        if not project_id.startswith(WORKER_PROJECT_ID_PREFIX):
+        if project_id != self.external_project_id:
             raise ValueError(
-                f"Invalid project ID format: Expected prefix '{WORKER_PROJECT_ID_PREFIX}' "
+                f"Invalid project ID format: Expected '{self.external_project_id}' "
                 f"but got '{project_id}'"
             )
-        found_project_id = project_id[len(WORKER_PROJECT_ID_PREFIX) :]
-        if found_project_id != self.project_id:
-            raise ValueError(
-                f"Security violation: Attempted to access project '{found_project_id}' "
-                f"but this converter is scoped to project '{self.project_id}'"
-            )
-        return found_project_id
+        return self.internal_project_id
 
     def int_to_ext_project_id(self, project_id: str) -> str | None:
         """Convert internal project ID to external format with validation."""
-        if project_id != self.project_id:
+        if project_id != self.internal_project_id:
             raise ValueError(
                 f"Security violation: Attempted to externalize project '{project_id}' "
-                f"but this converter is scoped to project '{self.project_id}'"
+                f"but this converter is scoped to project '{self.internal_project_id}'"
             )
-        return WORKER_PROJECT_ID_PREFIX + project_id
+        return self.external_project_id
 
     def ext_to_int_run_id(self, run_id: str) -> str:
         """Run IDs are not supported for server-side evaluation."""

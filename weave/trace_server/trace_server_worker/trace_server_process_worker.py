@@ -44,7 +44,8 @@ class TestOnlyProcessWorker(tsw.WorkerInterface):
     ) -> None:
         runner = RunAsUser(
             SerializableWorkerClientConfig(
-                project_id=job.project_id,
+                external_project_id=job.project_id,
+                internal_project_id="BROKEN_IDK",
                 user_id=job.wb_user_id,
                 service_config=service_config,
             )
