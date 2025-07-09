@@ -2,7 +2,7 @@
 The purpose of this module is to expose a pattern/utilty that allows a runtime
 to execute a workload on behalf of a user. This is particularly useful for our
 backend workers that need to execute scorers / evals for users. The primary
-interface exposed is the `RunAsUser` class. This ois constructed with a simple
+interface exposed is the `RunAsUser` class. This is constructed with a simple
 configurations that is serializable across processes and executes functions
 on behalf of a user. For example:
 
@@ -25,14 +25,16 @@ In the above example, the runner will execute 3 functions in sequence as if it w
 the user executing them. This is almost like running a cell in a notebook. Upon
 stopping, the runner will flush all pending operations to the trace server.
 
-Note: when running in a worker process, it is possible that the request is in the internal format, in
-which case the execute_internal method can be used.
+Note: when running in a worker process, it is possible that the request is in the internal format
+(using `weave-trace-internal:///` prefix instead of `weave:///`), in which case the execute_internal
+method can be used. The execute_internal method handles the conversion between internal and external
+formats automatically.
 
 The primary benefit of this pattern is that:
 a. the WeaveClient/TraceServer boundary needs special treatment in this case to work correctly. This
 complexity is hidden from the caller, allowing the caller to write pure Weave-code.
 b. the process isolation allows for memory isolation of the user's code, ensuring
-that references attached to shared symbols (ie. ops) are not accidentally used across 
+that references attached to shared symbols (ie. ops) are not accidentally used across
 user/project pairs.
 
 ----
@@ -45,14 +47,13 @@ and eventually flushes the client before exiting.
 * `WorkerWeaveClient`: this class sets up the special WeaveClient used by the worker. It contains:
     1. Logic to ensure that the entity/project pair is correct
     2. A `WorkerTraceServer` which is a special trace server that dispatches requests to a local
-    trace server or a remote trace server. The `remote_trace_server` is needed when the woker needs
+    trace server or a remote trace server. The `remote_trace_server` is needed when the worker needs
     to call out to the hosted trace server.
-        `* local_trace_server`: Is a wrapped `ClickHouseTraceServer` that has been "externalized" via
+        * `local_trace_server`: Is a wrapped `ClickHouseTraceServer` that has been "externalized" via
         the `externalize_trace_server` function. This wrapped server will correctly unwrap/rewrap the refs
         and project IDs correctly to adapt to the worker's entity/project pair.
-        `* remote_trace_server`: Is a `RemoteHTTPTraceServer` that is used to call out to the hosted trace server.
+        * `remote_trace_server`: Is a `RemoteHTTPTraceServer` that is used to call out to the hosted trace server.
 """
-
 
 from __future__ import annotations
 
@@ -69,7 +70,10 @@ from weave.trace.weave_init import InitializedClient
 from weave.trace_server import external_to_internal_trace_server_adapter
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter, universal_int_to_ext_ref_converter
+from weave.trace_server.trace_server_converter import (
+    universal_ext_to_int_ref_converter,
+    universal_int_to_ext_ref_converter,
+)
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 logger = logging.getLogger(__name__)
@@ -90,7 +94,29 @@ class SerializableWorkerClientConfig(BaseModel):
 
 
 def worker_client(config: SerializableWorkerClientConfig) -> WorkerWeaveClient:
-    """Create a worker client."""
+    """
+    Create a worker client configured for secure user impersonation.
+
+    This function creates a specialized WeaveClient that:
+    - Enforces the WORKER_ENTITY for all operations
+    - Sets up dual trace servers (local for storage, remote for API calls)
+    - Wraps the local server with security validation
+
+    Args:
+        config: Serializable configuration containing project, user_id, and server settings
+
+    Returns:
+        A configured WorkerWeaveClient instance
+
+    Examples:
+        >>> config = SerializableWorkerClientConfig(
+        ...     project="my-project",
+        ...     user_id="user-123",
+        ...     remote_trace_server_kwargs={"url": "https://api.wandb.ai"},
+        ...     local_clickhouse_trace_server_kwargs={"host": "localhost"}
+        ... )
+        >>> client = worker_client(config)
+    """
     return WorkerWeaveClient(
         entity=WORKER_ENTITY,
         project=config.project,
@@ -113,6 +139,27 @@ def worker_client(config: SerializableWorkerClientConfig) -> WorkerWeaveClient:
 def with_client(
     client: WeaveClient,
 ) -> Generator[WeaveClient, None, None]:
+    """
+    Context manager for proper WeaveClient lifecycle management.
+
+    Ensures that:
+    - The client is properly initialized before use
+    - All pending operations are flushed on exit
+    - The initialization context is properly reset
+
+    Args:
+        client: The WeaveClient to manage
+
+    Yields:
+        The initialized WeaveClient
+
+    Examples:
+        >>> client = worker_client(config)
+        >>> with with_client(client) as active_client:
+        ...     # Use active_client for operations
+        ...     pass
+        >>> # Client is now flushed and reset
+    """
     # Initialize the client context
     ic = InitializedClient(client)
 
@@ -132,6 +179,41 @@ RequestQueueItem = tuple[
 
 
 class RunAsUser:
+    """
+    Execute functions on behalf of a user in an isolated process.
+
+    This class provides a secure way to execute user code in a separate process
+    with proper WeaveClient initialization and cleanup. It's designed for backend
+    workers that need to run scorers, evaluations, or other user functions.
+
+    The class manages:
+    - A child process for isolated execution
+    - Bidirectional queues for communication
+    - Automatic reference format conversion (internal ↔ external)
+    - Graceful shutdown and resource cleanup
+
+    Attributes:
+        config: The worker client configuration
+        process: The child process running the worker loop
+        request_queue: Queue for sending requests to the worker
+        response_queue: Queue for receiving responses from the worker
+        int_to_ext: Converter function for internal to external references
+        ext_to_int: Converter function for external to internal references
+
+    Examples:
+        >>> config = SerializableWorkerClientConfig(
+        ...     project="my-project",
+        ...     user_id="user-123",
+        ...     remote_trace_server_kwargs={"url": "https://api.wandb.ai"},
+        ...     local_clickhouse_trace_server_kwargs={}
+        ... )
+        >>> runner = RunAsUser(config)
+        >>> try:
+        ...     result = runner.execute_external(my_function, request)
+        ... finally:
+        ...     runner.stop()
+    """
+
     def __init__(self, config: SerializableWorkerClientConfig):
         self.config = config
         self.request_queue: Queue[RequestQueueItem] = Queue()
@@ -141,32 +223,102 @@ class RunAsUser:
             args=(self.config, self.request_queue, self.response_queue),
         )
         self.process.start()
-        self.int_to_ext, self.ext_to_int = make_externalize_ref_converter(config.project)
+        self.int_to_ext, self.ext_to_int = make_externalize_ref_converter(
+            config.project
+        )
 
     def execute_external(
         self, func: Callable[[BaseModel], BaseModel], req: BaseModel
     ) -> BaseModel:
         """
-        Execute a function on behalf of the user. The request and response are
-        expected to be in the external format. External format contains an entity and
-        use the `weave:///` prefix.
+        Execute a function on behalf of the user.
+
+        The request and response are expected to be in the external format.
+        External format contains an entity and uses the `weave:///` prefix.
+
+        Args:
+            func: Function to execute
+            req: Request in external format
+
+        Returns:
+            Response in external format
+
+        Raises:
+            TimeoutError: If the function execution exceeds REQUEST_TIMEOUT_SEC
+            Exception: Any exception raised by the function
         """
         self.request_queue.put(("EXEC", (func, req)))
-        return self.response_queue.get(timeout=REQUEST_TIMEOUT_SEC)
+        try:
+            result = self.response_queue.get(timeout=REQUEST_TIMEOUT_SEC)
+            # If the worker returned an exception, re-raise it
+            if isinstance(result, Exception):
+                raise result
+        except Exception as e:
+            # Check if process is still alive
+            if not self.process.is_alive():
+                raise RuntimeError(
+                    "Worker process terminated unexpectedly. " "Check logs for details."
+                ) from e
+            if isinstance(e, (TimeoutError, RuntimeError)):
+                raise
+            raise TimeoutError(
+                f"Function execution timed out after {REQUEST_TIMEOUT_SEC} seconds"
+            ) from e
+        return result
 
-    def execute_internal(self, func: Callable[[BaseModel], BaseModel], req: BaseModel) -> BaseModel:
+    def execute_internal(
+        self, func: Callable[[BaseModel], BaseModel], req: BaseModel
+    ) -> BaseModel:
         """
-        Execute a function on behalf of the user. The request and response are
-        expected to be in the internal format. Internal format does not contain an entity and
-        uses the `weave-trace-internal:///` prefix.
+        Execute a function on behalf of the user.
+
+        The request and response are expected to be in the internal format.
+        Internal format does not contain an entity and uses the `weave-trace-internal:///` prefix.
+
+        Args:
+            func: Function to execute
+            req: Request in internal format
+
+        Returns:
+            Response in internal format
+
+        Raises:
+            TimeoutError: If the function execution exceeds REQUEST_TIMEOUT_SEC
+            Exception: Any exception raised by the function
         """
         external_req = self.int_to_ext(req)
         external_res = self.execute_external(func, external_req)
         return self.ext_to_int(external_res)
 
     def stop(self) -> None:
+        """Stop the worker process gracefully."""
+        if not self.process.is_alive():
+            logger.warning("Worker process is already stopped")
+            return
+
         self.request_queue.put(STOP_SIGNAL)
-        self.process.join()
+        self.process.join(timeout=30)  # Wait up to 30 seconds for graceful shutdown
+
+        if self.process.is_alive():
+            logger.warning("Worker process did not stop gracefully, terminating...")
+            self.process.terminate()
+            self.process.join(timeout=5)
+
+            if self.process.is_alive():
+                logger.error("Worker process did not terminate, killing...")
+                self.process.kill()
+                self.process.join()
+
+    def __del__(self) -> None:
+        """Cleanup method to ensure the worker process is stopped."""
+        try:
+            if hasattr(self, "process") and self.process.is_alive():
+                logger.warning(
+                    "RunAsUser being destroyed with active worker process, stopping..."
+                )
+                self.stop()
+        except Exception as e:
+            logger.exception(f"Error during RunAsUser cleanup: {e}")
 
     def runner_loop(
         self,
@@ -174,24 +326,52 @@ class RunAsUser:
         request_queue: Queue,
         response_queue: Queue,
     ) -> None:
+        """Main loop for the worker process."""
         client = worker_client(config)
         with with_client(client):
             while True:
-                signal, args = request_queue.get()
-                if signal == "EXEC":
-                    func, request = args
-                    response = func(request)
-                    response_queue.put(response)
-                elif signal == "STOP":
+                try:
+                    signal, args = request_queue.get()
+                    if signal == "EXEC":
+                        func, request = args
+                        try:
+                            response = func(request)
+                            response_queue.put(response)
+                        except Exception as e:
+                            # Log the error but continue processing
+                            logger.error(
+                                f"Error executing function: {e}", exc_info=True
+                            )
+                            # Put the exception back so the parent process knows
+                            response_queue.put(e)
+                    elif signal == "STOP":
+                        break
+                    else:
+                        raise ValueError(f"Unknown signal: {signal}")
+                except Exception as e:
+                    logger.error(f"Fatal error in runner loop: {e}", exc_info=True)
                     break
-                else:
-                    raise ValueError(f"Unknown signal: {signal}")
 
 
 class WorkerWeaveClient(WeaveClient):
     """
-    A weave client that is intended to run by a weave backend worker. It enforces conventions
-    that are useful for workers.
+    A specialized WeaveClient for backend worker processes.
+
+    This client enforces security conventions required for server-side execution:
+    - Forces the entity to be WORKER_ENTITY regardless of input
+    - Prevents project creation (ensure_project_exists is always False)
+    - Uses a WorkerTraceServer that routes requests appropriately
+
+    These restrictions ensure that worker processes cannot:
+    - Impersonate arbitrary entities
+    - Create new projects
+    - Access resources outside their assigned scope
+
+    Args:
+        entity: Must be WORKER_ENTITY (will be forced if different)
+        project: The project to operate within
+        server: The trace server interface (typically WorkerTraceServer)
+        ensure_project_exists: Must be False (will be forced if True)
     """
 
     def __init__(
@@ -215,7 +395,26 @@ class WorkerWeaveClient(WeaveClient):
 
 
 class WorkerTraceServer(tsi.TraceServerInterface):
-    """This trace server dispatches requests to a local trace server or a remote trace server."""
+    """
+    Trace server that intelligently routes requests between local and remote servers.
+
+    This server acts as a dispatcher that:
+    - Routes most operations to the local trace server (ClickHouse)
+    - Routes certain operations to the remote trace server (API calls)
+
+    The routing logic ensures that:
+    - Data storage operations stay local for performance
+    - API operations (actions, completions) go to the remote server
+    - All operations maintain proper user context and security
+
+    Routing rules:
+    - Local: call operations, object storage, tables, feedback, costs
+    - Remote: actions_execute_batch, completions_create
+
+    Args:
+        local_trace_server: Server for local operations (typically wrapped ClickHouse)
+        remote_trace_server: Server for remote API operations (typically HTTP)
+    """
 
     def __init__(
         self,
@@ -478,7 +677,9 @@ class UserInjectingExternalTraceServer(
 T = TypeVar("T")
 
 
-def make_externalize_ref_converter(project_id: str) -> tuple[Callable[[T], T], Callable[[T], T]]:
+def make_externalize_ref_converter(
+    project_id: str,
+) -> tuple[Callable[[T], T], Callable[[T], T]]:
     """
     Create a converter function that externalizes references for a specific project.
 
@@ -490,7 +691,7 @@ def make_externalize_ref_converter(project_id: str) -> tuple[Callable[[T], T], C
         project_id: The project ID to validate against
 
     Returns:
-        A converter function that externalizes references
+        A tuple of (int_to_ext, ext_to_int) converter functions
 
     Raises:
         ValueError: If any reference contains a different project ID
@@ -503,24 +704,24 @@ def make_externalize_ref_converter(project_id: str) -> tuple[Callable[[T], T], C
                 f"but this operation is scoped to project '{project_id}'"
             )
         return WORKER_PROJECT_ID_PREFIX + internal_project_id
-    
+
     def convert_project_id_ext_to_int(external_project_id: str) -> str:
-        entity, project_id = external_project_id.split("/", 1)
+        entity, extracted_project_id = external_project_id.split("/", 1)
         if entity != WORKER_ENTITY:
             raise ValueError(
-                f"Security violation: Attempted to access project '{external_project_id}' "
-                f"but this operation is scoped to project '{project_id}'"
+                f"Security violation: Invalid entity in project ID '{external_project_id}'. "
+                f"Expected entity '{WORKER_ENTITY}'"
             )
-        if project_id != project_id:
+        if extracted_project_id != project_id:
             raise ValueError(
-                f"Security violation: Attempted to access project '{external_project_id}' "
+                f"Security violation: Attempted to access project '{extracted_project_id}' "
                 f"but this operation is scoped to project '{project_id}'"
             )
-        return project_id
+        return extracted_project_id
 
     def int_to_ext(obj: T) -> T:
         return universal_int_to_ext_ref_converter(obj, convert_project_id_int_to_ext)
-    
+
     def ext_to_int(obj: T) -> T:
         return universal_ext_to_int_ref_converter(obj, convert_project_id_ext_to_int)
 
