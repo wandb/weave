@@ -637,7 +637,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         return self._generic_request(
-            "/evaluations/evaluate_model", req, tsi.EvaluateModelReq, tsi.EvaluateModelRes
+            "/evaluations/evaluate_model",
+            req,
+            tsi.EvaluateModelReq,
+            tsi.EvaluateModelRes,
         )
 
     def evaluation_status(
