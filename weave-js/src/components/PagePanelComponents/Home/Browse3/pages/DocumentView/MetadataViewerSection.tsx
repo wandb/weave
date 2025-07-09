@@ -21,7 +21,7 @@ type Data = Record<string, any>;
 const MetadataViewerSectionInner = ({
   title,
   data,
-  open
+  open,
 }: MetadataViewerSectionProps) => {
   const apiRef = useGridApiRef();
   // Update this when we change the state to hidden
@@ -147,14 +147,15 @@ const MetadataViewerSectionInner = ({
 
   const headerSection = (
     <div>
-      <div style={{ display: 'flex', minHeight: "32px" }}>
+      <div style={{display: 'flex', minHeight: '32px'}}>
         <Button
-          onClick={() => { setIsOpen(!isOpen) }}
-          variant='ghost'
-          size='small'
-          icon={isOpen ? "chevron-down" : "chevron-next"}
-          style={{fontSize: "14px"}}
-        >
+          onClick={() => {
+            setIsOpen(!isOpen);
+          }}
+          variant="ghost"
+          size="small"
+          icon={isOpen ? 'chevron-down' : 'chevron-next'}
+          style={{fontSize: '14px'}}>
           <Subheader>{title}</Subheader>
         </Button>
       </div>
@@ -162,19 +163,31 @@ const MetadataViewerSectionInner = ({
   );
 
   return (
-    <div style={{height: '100%', display: 'flex', flexDirection: 'column', margin: 0, padding: 0}}>
-      <div style={{height: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+    <div
+      style={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        margin: 0,
+        padding: 0,
+      }}>
+      <div
+        style={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
         {headerSection}
         {isOpen && buttonSection}
       </div>
       <Collapse in={isOpen}>
-        <div style={{paddingTop: "8px"}}>
-          {body}
-        </div>
+        <div style={{paddingTop: '8px'}}>{body}</div>
       </Collapse>
     </div>
   );
-}
+};
 
 // Use a deep comparison to avoid re-rendering when the data object hasn't really changed.
 const MetadataViewerSectionMemoed = React.memo(
@@ -185,6 +198,5 @@ const MetadataViewerSectionMemoed = React.memo(
 );
 
 export const MetadataViewerSection = (props: MetadataViewerSectionProps) => {
-  return <MetadataViewerSectionMemoed {...props} />
-}
-
+  return <MetadataViewerSectionMemoed {...props} />;
+};

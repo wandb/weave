@@ -98,33 +98,6 @@ export const MetadataViewer = ({
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
-  // Suppress MUI DataGrid errors about empty parent height.
-  // There's no way to prevent this error since MUI expects the Grid to actually render when mounted.
-  // - Adding a container with a min height everywhere it makes sense doesn't fix it.
-  // - Conditionally rendering the DataGrid comes with all sorts of issues:
-  // 1. Pop in - Table will suddenly appear
-  // 2. Animation flaws
-  // 3. Table fields can jump
-  // We need the grid to process even while it is collapsed so it is ready when opened.
-  // This should be fixed upstream but for now we can just surpress the error.
-  useEffect(() => {
-    const originalError = console.error;
-    console.error = (...args) => {
-      if (
-        args[0] &&
-        typeof args[0] === 'string' &&
-        args[0].includes('MUI X: useResizeContainer - The parent DOM element of the data grid has an empty height')
-      ) {
-        return; // Suppress this specific error
-      }
-      originalError.apply(console, args);
-    };
-
-    return () => {
-      console.error = originalError;
-    };
-  }, []);
-
   // `truncatedData` holds the data with all arrays truncated to ARRAY_TRUNCATION_LENGTH, unless we have specifically added more rows to the array
   // `truncatedStore` is used to store the additional rows that we can add to the array when the user clicks "Show more"
   const {truncatedData, truncatedStore, setTruncatedData, setTruncatedStore} =
@@ -529,9 +502,9 @@ export const MetadataViewer = ({
   // Finally, we memoize the inner data grid component. This is important to
   // reduce the number of re-renders when the data changes.
   const inner = useMemo(() => {
-    const body = (rows.some(row => {row.isLoader === true})) ? <LoadingDots /> : (
+    return (
       <StyledDataGrid
-        slots={{ columnHeaders: React.forwardRef(() => null) }}
+        slots={{columnHeaders: React.forwardRef(() => null)}}
         keepBorders={false}
         apiRef={apiRef}
         // Start Column Menu
@@ -607,15 +580,10 @@ export const MetadataViewer = ({
         }}
       />
     );
-    return body
-    // Removing rows here makes it render without jumping
-    // Not sure if this is a loading issue, a data issue
   }, [apiRef, rows, columns, getRowHeight, groupingColDef, expandedIds]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
-  return (
-    <div style={{overflow: 'hidden', height: '100%'}}>{inner}</div>
-  );
+  return <div style={{overflow: 'hidden', height: '100%'}}>{inner}</div>;
 };
 
 // Helper function to build the base ref for a given path. This function is used

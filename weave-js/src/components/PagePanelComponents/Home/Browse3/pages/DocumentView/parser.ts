@@ -91,10 +91,9 @@ export function parseCall(call: CallSchema): ParsedCall<WeaveDocumentSchema> {
 }
 
 export function callHasDocuments(trace: TraceCallSchema): boolean {
-
   const isValid = (val: null | any[]) => {
     return val !== null && val.length > 0;
-  }
+  };
 
   const {inputs, output} = getTraceDocuments(trace);
   return isValid(inputs) || isValid(output);

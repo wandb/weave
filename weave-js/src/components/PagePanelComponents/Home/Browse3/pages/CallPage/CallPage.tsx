@@ -32,7 +32,6 @@ import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
-import {ObjectViewerSection} from './ObjectViewerSection';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
 
