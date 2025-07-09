@@ -1,3 +1,59 @@
+"""
+The purpose of this module is to expose a pattern/utilty that allows a runtime
+to execute a workload on behalf of a user. This is particularly useful for our
+backend workers that need to execute scorers / evals for users. The primary
+interface exposed is the `RunAsUser` class. This ois constructed with a simple
+configurations that is serializable across processes and executes functions
+on behalf of a user. For example:
+
+```python
+runner = RunAsUser(SerializableWorkerClientConfig(
+    project="my-project",
+    user_id="my-user",
+    remote_trace_server_kwargs={
+        "url": "http://localhost:8000",
+    },
+    local_clickhouse_trace_server_kwargs={}
+))
+res = runner.execute_external(fn_1, req)
+res = runner.execute_external(fn_2, req)
+res = runner.execute_external(fn_3, req)
+runner.stop()
+```
+
+In the above example, the runner will execute 3 functions in sequence as if it was
+the user executing them. This is almost like running a cell in a notebook. Upon
+stopping, the runner will flush all pending operations to the trace server.
+
+Note: when running in a worker process, it is possible that the request is in the internal format, in
+which case the execute_internal method can be used.
+
+The primary benefit of this pattern is that:
+a. the WeaveClient/TraceServer boundary needs special treatment in this case to work correctly. This
+complexity is hidden from the caller, allowing the caller to write pure Weave-code.
+b. the process isolation allows for memory isolation of the user's code, ensuring
+that references attached to shared symbols (ie. ops) are not accidentally used across 
+user/project pairs.
+
+----
+
+Now, let's take a look at the underlying structure:
+
+* `RunAsUser`: this class sets up a child process that is used to execute functions. The child
+process initializes a special WorkerWeaveClient (discussed below), processes 1 request at a time,
+and eventually flushes the client before exiting.
+* `WorkerWeaveClient`: this class sets up the special WeaveClient used by the worker. It contains:
+    1. Logic to ensure that the entity/project pair is correct
+    2. A `WorkerTraceServer` which is a special trace server that dispatches requests to a local
+    trace server or a remote trace server. The `remote_trace_server` is needed when the woker needs
+    to call out to the hosted trace server.
+        `* local_trace_server`: Is a wrapped `ClickHouseTraceServer` that has been "externalized" via
+        the `externalize_trace_server` function. This wrapped server will correctly unwrap/rewrap the refs
+        and project IDs correctly to adapt to the worker's entity/project pair.
+        `* remote_trace_server`: Is a `RemoteHTTPTraceServer` that is used to call out to the hosted trace server.
+"""
+
+
 from __future__ import annotations
 
 import logging
@@ -13,7 +69,7 @@ from weave.trace.weave_init import InitializedClient
 from weave.trace_server import external_to_internal_trace_server_adapter
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.trace_server_converter import universal_int_to_ext_ref_converter
+from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter, universal_int_to_ext_ref_converter
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 logger = logging.getLogger(__name__)
@@ -39,7 +95,7 @@ def worker_client(config: SerializableWorkerClientConfig) -> WorkerWeaveClient:
         entity=WORKER_ENTITY,
         project=config.project,
         server=WorkerTraceServer(
-            local_trace_server=secure_trace_server(
+            local_trace_server=externalize_trace_server(
                 ClickHouseTraceServer(
                     **config.local_clickhouse_trace_server_kwargs,
                 ),
@@ -85,12 +141,28 @@ class RunAsUser:
             args=(self.config, self.request_queue, self.response_queue),
         )
         self.process.start()
+        self.int_to_ext, self.ext_to_int = make_externalize_ref_converter(config.project)
 
-    def execute(
+    def execute_external(
         self, func: Callable[[BaseModel], BaseModel], req: BaseModel
     ) -> BaseModel:
+        """
+        Execute a function on behalf of the user. The request and response are
+        expected to be in the external format. External format contains an entity and
+        use the `weave:///` prefix.
+        """
         self.request_queue.put(("EXEC", (func, req)))
         return self.response_queue.get(timeout=REQUEST_TIMEOUT_SEC)
+
+    def execute_internal(self, func: Callable[[BaseModel], BaseModel], req: BaseModel) -> BaseModel:
+        """
+        Execute a function on behalf of the user. The request and response are
+        expected to be in the internal format. Internal format does not contain an entity and
+        uses the `weave-trace-internal:///` prefix.
+        """
+        external_req = self.int_to_ext(req)
+        external_res = self.execute_external(func, external_req)
+        return self.ext_to_int(external_res)
 
     def stop(self) -> None:
         self.request_queue.put(STOP_SIGNAL)
@@ -272,13 +344,13 @@ class WorkerTraceServer(tsi.TraceServerInterface):
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
-        return self.local_trace_server.actions_execute_batch(req)
+        return self.remote_trace_server.actions_execute_batch(req)
 
     # Execute LLM API
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        return self.local_trace_server.completions_create(req)
+        return self.remote_trace_server.completions_create(req)
 
     # Execute LLM API (Streaming)
     # Returns an iterator of JSON-serializable chunks that together form the streamed
@@ -287,7 +359,7 @@ class WorkerTraceServer(tsi.TraceServerInterface):
     def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
-        return self.local_trace_server.completions_create_stream(req)
+        return self.remote_trace_server.completions_create_stream(req)
 
     # Project statistics API
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
@@ -300,7 +372,7 @@ class WorkerTraceServer(tsi.TraceServerInterface):
         return self.local_trace_server.threads_query_stream(req)
 
 
-def secure_trace_server(
+def externalize_trace_server(
     trace_server: tsi.TraceServerInterface, project_id: str, wb_user_id: str
 ) -> tsi.TraceServerInterface:
     """
@@ -406,7 +478,7 @@ class UserInjectingExternalTraceServer(
 T = TypeVar("T")
 
 
-def make_externalize_ref_converter(project_id: str) -> Callable[[T], T]:
+def make_externalize_ref_converter(project_id: str) -> tuple[Callable[[T], T], Callable[[T], T]]:
     """
     Create a converter function that externalizes references for a specific project.
 
@@ -424,18 +496,35 @@ def make_externalize_ref_converter(project_id: str) -> Callable[[T], T]:
         ValueError: If any reference contains a different project ID
     """
 
-    def convert_project_id(internal_project_id: str) -> str:
+    def convert_project_id_int_to_ext(internal_project_id: str) -> str:
         if project_id != internal_project_id:
             raise ValueError(
                 f"Security violation: Attempted to access project '{internal_project_id}' "
                 f"but this operation is scoped to project '{project_id}'"
             )
         return WORKER_PROJECT_ID_PREFIX + internal_project_id
+    
+    def convert_project_id_ext_to_int(external_project_id: str) -> str:
+        entity, project_id = external_project_id.split("/", 1)
+        if entity != WORKER_ENTITY:
+            raise ValueError(
+                f"Security violation: Attempted to access project '{external_project_id}' "
+                f"but this operation is scoped to project '{project_id}'"
+            )
+        if project_id != project_id:
+            raise ValueError(
+                f"Security violation: Attempted to access project '{external_project_id}' "
+                f"but this operation is scoped to project '{project_id}'"
+            )
+        return project_id
 
-    def convert(obj: T) -> T:
-        return universal_int_to_ext_ref_converter(obj, convert_project_id)
+    def int_to_ext(obj: T) -> T:
+        return universal_int_to_ext_ref_converter(obj, convert_project_id_int_to_ext)
+    
+    def ext_to_int(obj: T) -> T:
+        return universal_ext_to_int_ref_converter(obj, convert_project_id_ext_to_int)
 
-    return convert
+    return int_to_ext, ext_to_int
 
 
 class WorkerIdConverter(external_to_internal_trace_server_adapter.IdConverter):
