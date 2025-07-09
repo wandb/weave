@@ -52,7 +52,7 @@ import {
 } from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
 import {isExpandableRef} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {MetadataViewerGroupingCell} from './MetadataViewerGroupingCell';
+import {ObjectViewerGroupingCell} from '../CallPage/ObjectViewerGroupingCell';
 
 const DEFAULT_ROW_HEIGHT = 38;
 const CODE_ROW_HEIGHT = 350;
@@ -415,8 +415,9 @@ export const MetadataViewer = ({
         }
 
         return (
-          <MetadataViewerGroupingCell
+          <ObjectViewerGroupingCell
             {...params}
+            insetSpacing={30}
             onClick={() => {
               setExpandedIds(eIds => {
                 if (eIds.includes(params.row.id)) {
