@@ -5,7 +5,7 @@ import React, {Fragment, useCallback, useMemo, useState} from 'react';
 
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
-import {MetadataViewer} from './MetadataViewer';
+import {ObjectViewer} from '../CallPage/ObjectViewer';
 import {Subheader} from './Styles';
 
 type MetadataViewerSectionProps = {
@@ -14,6 +14,7 @@ type MetadataViewerSectionProps = {
   open?: boolean;
   error?: string;
 };
+
 const EXPANDED_IDS_LENGTH = 200;
 
 type Data = Record<string, any>;
@@ -34,12 +35,16 @@ const MetadataViewerSectionInner = ({
     if (mode === 'collapsed' || mode === 'expanded') {
       return (
         <Fragment>
-          <MetadataViewer
+          <ObjectViewer
             apiRef={apiRef}
             data={data}
             isExpanded={mode === 'expanded'}
             expandedIds={expandedIds}
             setExpandedIds={setExpandedIds}
+            hideHeaders={true}
+            truncateOverflow={true}
+            groupingFixedWidth={125}
+            cellGroupingInset={30}
           />
         </Fragment>
       );
