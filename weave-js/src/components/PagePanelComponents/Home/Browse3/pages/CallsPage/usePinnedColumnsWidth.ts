@@ -30,7 +30,7 @@ export const usePinnedColumnsWidth = (
       }
 
       const columnsState = apiRef.current.state.columns;
-      if (!columnsState) {
+      if (!columnsState || !columnsState.lookup) {
         return;
       }
 
@@ -57,24 +57,48 @@ export const usePinnedColumnsWidth = (
         });
       }
 
-      setPinnedWidths({
+      const newWidths = {
         left: leftWidth,
         right: rightWidth,
         total: leftWidth + rightWidth,
+      };
+
+      // Only update if widths have actually changed
+      setPinnedWidths(prev => {
+        if (prev.left !== newWidths.left || prev.right !== newWidths.right || prev.total !== newWidths.total) {
+          return newWidths;
+        }
+        return prev;
       });
     };
 
-    // Calculate initially
-    calculatePinnedWidths();
+    // Use a timeout to ensure the grid is fully initialized before calculating widths
+    const timeoutId = setTimeout(calculatePinnedWidths, 0);
 
-    // Subscribe to column state changes
-    const unsubscribe = apiRef.current?.subscribeEvent?.(
-      'columnWidthChange',
-      calculatePinnedWidths
-    );
+    // Subscribe to multiple events to ensure we catch width changes
+    const unsubscribes: (() => void)[] = [];
+
+    if (apiRef.current) {
+      // Subscribe to column width changes
+      const unsubscribeWidth = apiRef.current.subscribeEvent?.('columnWidthChange', calculatePinnedWidths);
+      if (unsubscribeWidth) unsubscribes.push(unsubscribeWidth);
+
+      // Subscribe to columns order changes (including pinning)
+      const unsubscribeOrder = apiRef.current.subscribeEvent?.('columnOrderChange', calculatePinnedWidths);
+      if (unsubscribeOrder) unsubscribes.push(unsubscribeOrder);
+
+      // Subscribe to column visibility changes
+      const unsubscribeVisibility = apiRef.current.subscribeEvent?.('columnVisibilityModelChange', calculatePinnedWidths);
+      if (unsubscribeVisibility) unsubscribes.push(unsubscribeVisibility);
+
+      // Subscribe to rows set event to recalculate when data changes
+      const unsubscribeRows = apiRef.current.subscribeEvent?.('rowsSet', calculatePinnedWidths);
+      if (unsubscribeRows) unsubscribes.push(unsubscribeRows);
+    }
 
     return () => {
-      unsubscribe?.();
+      clearTimeout(timeoutId);
+      unsubscribes.forEach(unsub => unsub());
     };
   }, [apiRef, pinnedColumns]);
 
