@@ -2,6 +2,7 @@ import {Box, Collapse} from '@mui/material';
 import {GridRowId, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
 import React, {useCallback, useContext, useMemo, useState} from 'react';
+
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
 import {MetadataViewer} from './MetadataViewer';
@@ -148,7 +149,7 @@ const MetadataViewerSectionInner = ({
           variant='ghost'
           size='small'
           icon={isOpen ? "chevron-down" : "chevron-next"}
-          style={{fontSize: "14px", padding: 0}}
+          style={{fontSize: "14px"}}
         >
           <Subheader>{title}</Subheader>
         </Button>

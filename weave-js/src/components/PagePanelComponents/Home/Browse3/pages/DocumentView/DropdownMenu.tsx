@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { Box, Typography, IconButton, Collapse, Stack, Table, TableBody, TableRow, TableCell } from '@mui/material';
-import styled from 'styled-components';
+import { Box, Collapse, IconButton, Stack, Table, TableBody, TableCell,TableRow, Typography } from '@mui/material';
 import { Button } from '@wandb/weave/components/Button';
-import { WeaveDocumentSchema } from './schemas';
+import React, { useMemo, useState } from 'react';
+import styled from 'styled-components';
+
 import { ObjectViewerSection } from '../CallPage/ObjectViewerSection';
+import { WeaveDocumentSchema } from './schemas';
 // import { ObjectViewerSection } from './MetadataTable';
 
 interface DropdownSectionProps {

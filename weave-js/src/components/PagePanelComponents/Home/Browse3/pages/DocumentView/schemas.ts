@@ -1,6 +1,6 @@
 // src/schemas.ts (Updated)
 
-import { z } from 'zod';
+import {z} from 'zod';
 
 // region: Provided Type Definitions (Unchanged)
 export type ID = string | number;
@@ -17,7 +17,6 @@ export type TraceCallSchema = {
   output?: unknown;
 };
 // endregion
-
 
 // region: Target Type Definitions (MODIFIED)
 
@@ -48,15 +47,18 @@ export type ParsedCall<T> = {
 // region: Source Schema Parsers (MODIFIED)
 
 // --- Parser 1: LangchainDocument ---
-const LangchainDocumentSourceSchema = z.object({
-  page_content: z.string(),
-  metadata: z.record(z.any()).optional(),
-}).catchall(z.any());
+const LangchainDocumentSourceSchema = z
+  .object({
+    page_content: z.string(),
+    metadata: z.record(z.any()).optional(),
+  })
+  .catchall(z.any());
 
 // MODIFIED: The transform now wraps the single document in an array.
 const LangchainParser = LangchainDocumentSourceSchema.transform(
-  (doc): WeaveDocumentSchema[] => { // Return type is now an array
-    const { page_content, metadata, ...extra } = doc;
+  (doc): WeaveDocumentSchema[] => {
+    // Return type is now an array
+    const {page_content, metadata, ...extra} = doc;
     const result: WeaveDocumentSchema = {
       content: page_content,
       metadata,
@@ -69,31 +71,47 @@ const LangchainParser = LangchainDocumentSourceSchema.transform(
 );
 
 // --- Parser 2: ChromaQueryResult ---
-const ChromaQueryResultSourceSchema = z.object({
-  ids: z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))]),
-  documents: z.union([z.string(), z.array(z.string())]).optional(),
-  metadatas: z.array(z.record(z.any())).optional(),
-}).catchall(z.any());
+const ChromaQueryResultSourceSchema = z
+  .object({
+    ids: z.union([
+      z.string(),
+      z.number(),
+      z.array(z.union([z.string(), z.number()])),
+    ]),
+    documents: z.union([z.string(), z.array(z.string())]).optional(),
+    metadatas: z.array(z.record(z.any())).optional(),
+  })
+  .catchall(z.any());
 
 // Unchanged: This parser already returns an array.
 const ChromaParser = ChromaQueryResultSourceSchema.transform(
-    (queryResult): WeaveDocumentSchema[] => {
-        // ... implementation is the same, as it already returns WeaveDocumentSchema[]
-        const ids = Array.isArray(queryResult.ids) ? queryResult.ids : [queryResult.ids];
-        const documents = queryResult.documents ? (Array.isArray(queryResult.documents) ? queryResult.documents : [queryResult.documents]) : [];
-        const metadatas = queryResult.metadatas ? (Array.isArray(queryResult.metadatas) ? queryResult.metadatas : [queryResult.metadatas]) : [];
-        
-        return ids.map((id, i) => ({
-            id,
-            content: documents[i] ?? '',
-            metadata: metadatas?.[i],
-        }));
-    }
+  (queryResult): WeaveDocumentSchema[] => {
+    // ... implementation is the same, as it already returns WeaveDocumentSchema[]
+    const ids = Array.isArray(queryResult.ids)
+      ? queryResult.ids
+      : [queryResult.ids];
+    const documents = queryResult.documents
+      ? Array.isArray(queryResult.documents)
+        ? queryResult.documents
+        : [queryResult.documents]
+      : [];
+    const metadatas = queryResult.metadatas
+      ? Array.isArray(queryResult.metadatas)
+        ? queryResult.metadatas
+        : [queryResult.metadatas]
+      : [];
+
+    return ids.map((id, i) => ({
+      id,
+      content: documents[i] ?? '',
+      metadata: metadatas?.[i],
+    }));
+  }
 );
 
 // The registry remains structurally the same.
-export const SCHEMA_PARSERS: { name: string; schema: z.ZodTypeAny }[] = [
-  { name: 'LangchainDocument', schema: LangchainParser },
-  { name: 'ChromaQueryResult', schema: ChromaParser },
+export const SCHEMA_PARSERS: {name: string; schema: z.ZodTypeAny}[] = [
+  {name: 'LangchainDocument', schema: LangchainParser},
+  {name: 'ChromaQueryResult', schema: ChromaParser},
 ];
 // endregion

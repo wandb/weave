@@ -1,19 +1,17 @@
-import { CallSchema } from '../wfReactInterface/wfDataModelHooksInterface';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {
+  ParsedCall,
+  ParseResult,
   SCHEMA_PARSERS,
   TraceCallSchema,
   WeaveDocumentSchema,
-  ParseResult,
-  ParsedCall,
 } from './schemas';
 
 // --- Caches ---
 const parsedCallCache = new Map<string, ParsedCall<WeaveDocumentSchema>>();
 
 // --- Private Implementation Functions ---
-function findAllDocuments(
-  node: unknown
-): ParseResult<WeaveDocumentSchema>[] {
+function findAllDocuments(node: unknown): ParseResult<WeaveDocumentSchema>[] {
   const allFound: ParseResult<WeaveDocumentSchema>[] = [];
 
   for (const parser of SCHEMA_PARSERS) {
@@ -34,7 +32,9 @@ function findAllDocuments(
   } else if (node && typeof node === 'object') {
     for (const key in node) {
       if (Object.prototype.hasOwnProperty.call(node, key)) {
-        allFound.push(...findAllDocuments((node as Record<string, unknown>)[key]));
+        allFound.push(
+          ...findAllDocuments((node as Record<string, unknown>)[key])
+        );
       }
     }
   }
@@ -42,28 +42,27 @@ function findAllDocuments(
   return allFound;
 }
 
-
 /**
  * The core, non-memoized parsing logic, updated for the new schema.
  */
 function _getTraceDocuments(
   trace: TraceCallSchema
-): ParsedCall<WeaveDocumentSchema> { // Return type is updated
+): ParsedCall<WeaveDocumentSchema> {
+  // Return type is updated
   // Find all ParseResult objects in the output (if present)
   const parsedOutputs = 'output' in trace ? findAllDocuments(trace.output) : [];
 
   // Find all ParseResult objects in the inputs
   const parsedInputs = findAllDocuments(trace.inputs);
- 
+
   return {
     id: trace.id,
     // Aggregate all found input documents into a single array, or null
     inputs: parsedInputs,
     // If the list of output results is empty, return null
-    output: parsedOutputs
+    output: parsedOutputs,
   };
 }
-
 
 // --- Public, Memoized API ---
 
@@ -82,21 +81,17 @@ export function getTraceDocuments(
   return result;
 }
 
-export function parseCall(
-  call: CallSchema
-): ParsedCall<WeaveDocumentSchema> {
+export function parseCall(call: CallSchema): ParsedCall<WeaveDocumentSchema> {
   if (!call.traceCall) {
     return getTraceDocuments({
       id: call.traceId,
       inputs: {},
-    })
+    });
   }
-  return getTraceDocuments(call.traceCall)
+  return getTraceDocuments(call.traceCall);
 }
 
-export function callHasDocuments(
-  trace: TraceCallSchema
-): boolean {
-  const { inputs, output } = getTraceDocuments(trace);
-  return inputs !== null || output !== null
+export function callHasDocuments(trace: TraceCallSchema): boolean {
+  const {inputs, output} = getTraceDocuments(trace);
+  return inputs !== null || output !== null;
 }

@@ -34,7 +34,7 @@ export const StyledDataGrid = styled(
   ({
     keepBorders,
     ...otherProps
-  }: DataGridProProps & {keepBorders?: boolean, hideHeaders?: boolean}) => {
+  }: DataGridProProps & {keepBorders?: boolean; hideHeaders?: boolean}) => {
     const slots = otherProps.slots ?? {};
     if (!slots.loadingOverlay) {
       slots.loadingOverlay = LoadingOverlay;

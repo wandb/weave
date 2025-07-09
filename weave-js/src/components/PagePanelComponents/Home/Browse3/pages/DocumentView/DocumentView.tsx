@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
 import { Box, Collapse } from '@mui/material';
 import { Button } from '@wandb/weave/components/Button';
-import {ParsedCall, WeaveDocumentSchema} from './schemas';
+import React, { useMemo, useState } from 'react';
+
 import { MetadataViewerSection } from './MetadataViewerSection';
-import {Header, Body} from './Styles';
+import {ParsedCall, WeaveDocumentSchema} from './schemas';
+import {Body,Header} from './Styles';
 
 interface DocumentCardProps {
   doc: WeaveDocumentSchema;

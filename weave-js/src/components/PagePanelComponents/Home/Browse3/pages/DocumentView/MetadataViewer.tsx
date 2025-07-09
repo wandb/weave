@@ -31,16 +31,9 @@ import {
 } from '../../typeViews/customWeaveType.types';
 import {getCustomWeaveTypePreferredRowHeight} from '../../typeViews/CustomWeaveTypeDispatcher';
 import {
-  LIST_INDEX_EDGE_NAME,
-  OBJECT_ATTR_EDGE_NAME,
-} from '../wfReactInterface/constants';
-import {useWFHooks} from '../wfReactInterface/context';
-import {isExpandableRef} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
-import {
   USE_TABLE_FOR_ARRAYS,
   WeaveCHTableSourceRefContext,
 } from '../CallPage/DataTableView';
-import {MetadataViewerGroupingCell} from './MetadataViewerGroupingCell';
 import {
   getKnownImageDictContexts,
   isKnownImageDictFormat,
@@ -53,6 +46,13 @@ import {
   TraverseContext,
 } from '../CallPage/traverse';
 import {ValueView} from '../CallPage/ValueView';
+import {
+  LIST_INDEX_EDGE_NAME,
+  OBJECT_ATTR_EDGE_NAME,
+} from '../wfReactInterface/constants';
+import {useWFHooks} from '../wfReactInterface/context';
+import {isExpandableRef} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
+import {MetadataViewerGroupingCell} from './MetadataViewerGroupingCell';
 
 const DEFAULT_ROW_HEIGHT = 38;
 const CODE_ROW_HEIGHT = 350;

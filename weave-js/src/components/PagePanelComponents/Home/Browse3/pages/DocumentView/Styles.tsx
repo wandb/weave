@@ -1,5 +1,5 @@
-import React from 'react';
 import {Typography} from '@mui/material';
+import React from 'react';
 
 export const Header = ({children}: {children: string}) => (
   <Typography variant="body1" sx={{fontSize: '16px', fontWeight: 600, color: 'text.primary', fontFamily: 'Source Sans Pro'}}>
