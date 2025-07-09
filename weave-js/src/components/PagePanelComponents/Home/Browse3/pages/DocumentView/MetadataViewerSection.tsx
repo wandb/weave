@@ -6,7 +6,7 @@ import React, {Fragment, useCallback, useMemo, useState} from 'react';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
 import {ObjectViewer} from '../CallPage/ObjectViewer';
-import {Subheader} from './Styles';
+import {Subheader} from './StyledText';
 
 type MetadataViewerSectionProps = {
   title: string;
