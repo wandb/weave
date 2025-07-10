@@ -118,6 +118,17 @@ class Evaluation(Object):
             if hasattr(obj, field_name):
                 field_values[field_name] = getattr(obj, field_name)
 
+        # special case for scorers
+        # if orig_scorers := field_values.get("scorers"):
+        #     from weave import scorers as weave_scorers
+
+        #     assert weave_scorers
+        #     scorers = []
+        #     for scorer in orig_scorers:
+        #         objectified = maybe_objectify(scorer)
+        #         scorers.append(objectified)
+        #     field_values["scorers"] = scorers
+
         return cls(**field_values)
 
     def model_post_init(self, __context: Any) -> None:
