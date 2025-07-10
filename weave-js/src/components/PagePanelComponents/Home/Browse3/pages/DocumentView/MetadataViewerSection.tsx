@@ -28,7 +28,7 @@ type MetadataViewerSectionProps = {
 enum ViewerMode {
   Collapsed,
   Expanded,
-  Json
+  Json,
 }
 
 const MetadataViewerSectionInner = ({
