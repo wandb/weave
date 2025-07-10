@@ -55,7 +55,7 @@ async def test_hallucination_scorer_score(hallucination_scorer):
     context = "John likes various types of cheese."
     output = "John's favorite cheese is cheddar."
     result = await hallucination_scorer.score(output=output, context=context)
-    
+
     _ = HallucinationResponse.model_validate(result)
 
     assert result["has_hallucination"] == True

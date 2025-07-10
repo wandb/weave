@@ -3,8 +3,8 @@ import asyncio
 import pytest
 
 import weave
-from weave.scorers.default_models import MODEL_PATHS
 from weave.flow.scorer import WeaveScorerResult
+from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.trust_scorer import WeaveTrustScorerV1
 
 
@@ -125,14 +125,14 @@ def test_score_with_logic(trust_scorer):
 # we need to test parallelism and how it plays with weave.Evaluations
 def test_trust_scorer_parallelism(trust_scorer):
     trust_scorer.run_in_parallel = True
-    N_SAMPLES = 100
+    n_samples = 100
     ds = [
         {
             "output": "France's capital city is paris. It is known for the eiffel tower.",
             "query": "What is the capital of France?",
             "context": "Paris is the capital city of France, home of the eiffel tower.",
         }
-    ] * N_SAMPLES
+    ] * n_samples
 
     @weave.op
     def model(output):
@@ -147,11 +147,10 @@ def test_trust_scorer_parallelism(trust_scorer):
     assert len(eval_result["WeaveTrustScorerV1"]["metadata"]["raw_outputs"]) == 5
 
     # Check that all scorers passed
-    assert eval_result["WeaveTrustScorerV1"]["passed"]["true_count"] == N_SAMPLES
+    assert eval_result["WeaveTrustScorerV1"]["passed"]["true_count"] == n_samples
     assert eval_result["WeaveTrustScorerV1"]["passed"]["true_fraction"] == 1.0
 
     raw_outputs = eval_result["WeaveTrustScorerV1"]["metadata"]["raw_outputs"]
-
 
     # Verify specific mean scores
     assert raw_outputs["WeaveHallucinationScorerV1"]["metadata"]["score"][
