@@ -4,7 +4,6 @@ import _ from 'lodash';
 import React, {
   Fragment,
   useCallback,
-  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -199,12 +198,14 @@ const MetadataViewerSectionInner = ({
         {headerSection}
         {isOpen && buttonSection}
       </div>
-      <Collapse in={isOpen} sx={{
-        '& .MuiCollapse-wrapperInner': {
-          minHeight: '50px',
-          paddingTop: '8px',
-        }
-      }}>
+      <Collapse
+        in={isOpen}
+        sx={{
+          '& .MuiCollapse-wrapperInner': {
+            minHeight: '50px',
+            paddingTop: '8px',
+          },
+        }}>
         {body}
       </Collapse>
     </div>
