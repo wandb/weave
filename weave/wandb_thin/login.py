@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 import click
 
 from weave.utils.netrc import Netrc
+from weave.wandb_thin import utils
+
+logger = logging.getLogger(__name__)
 
 
 def login(
@@ -34,9 +38,14 @@ def _login(host: str | None = None) -> None:
     netrc = Netrc()
     credentials = netrc.get_credentials(host)
     if credentials is None:
+        app_url = utils.app_url(host)
+        logger.info("Logging into Weights & Biases")
+        logger.info(f"You can find your API key in your browser here: {app_url}")
+        logger.info("Paste an API key from your profile and hit enter:")
         api_key = click.prompt(
             "Enter your Weights & Biases API key", hide_input=True, err=True
         )
+        logger.info("")
         _validate_api_key(api_key)
         netrc.add_or_update_entry(host, "user", api_key)
     else:
