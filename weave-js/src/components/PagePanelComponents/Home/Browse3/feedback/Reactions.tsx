@@ -33,7 +33,10 @@ export const Reactions = ({
   twWrapperStyles = {},
 }: ReactionsProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const [feedback, setFeedback] = useState<Feedback[] | null>(null);
+  const [feedback, setFeedback] = useState<Feedback[] | null>(
+    feedbackData ?? []
+  );
+  const [useServerState, setUseServerState] = useState(false);
 
   const parsedRef = parseRef(weaveRef);
   if (parsedRef.scheme !== 'weave') {
@@ -49,28 +52,44 @@ export const Reactions = ({
       project,
       weaveRef,
     },
-    skip: feedbackData !== undefined,
+    skip: feedbackData !== undefined && !useServerState,
     sortBy: SORT_BY,
   });
   const getTsClient = useGetTraceServerClientContext();
+
   useEffect(() => {
     return getTsClient().registerOnFeedbackListener(weaveRef, query.refetch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Handle initial data setup and server state management
   useEffect(() => {
-    if (feedbackData && feedbackData.length > 0) {
-      // Use provided feedback data directly
-      setFeedback(feedbackData);
-    } else if (query.result) {
-      // Use query result when no feedback data provided
-      setFeedback(query.result);
+    if (useServerState) {
+      // In server mode, use query result directly
+      if (query.result !== undefined) {
+        setFeedback(query.result);
+      }
+    } else {
+      // In initial mode
+      if (feedbackData !== undefined) {
+        // Use provided feedbackData
+        setFeedback(feedbackData);
+      } else if (query.result !== undefined) {
+        // No feedbackData provided, use query result
+        setFeedback(query.result);
+      }
     }
-  }, [query.result, feedbackData]);
+  }, [query.result, feedbackData, useServerState]);
 
   const createFeedbackOptimistically = async (
     feedbackType: string,
     payload: Record<string, any>
   ) => {
+    // Switch to server state mode on first mutation
+    if (!useServerState) {
+      setUseServerState(true);
+    }
+
     // Create optimistic feedback item
     // @ts-ignore - wb_user_id will be filled by server response
     const optimisticFeedback: Feedback = {
@@ -99,19 +118,10 @@ export const Reactions = ({
         feedback_type: feedbackType,
         payload,
       };
-      const result = await getTsClient().feedbackCreate(req);
+      await getTsClient().feedbackCreate(req);
 
-      // Update with real feedback data from server
-      if ('id' in result) {
-        setFeedback(
-          prevFeedback =>
-            prevFeedback?.map(f =>
-              f.id === optimisticFeedback.id
-                ? {...f, id: result.id, created_at: result.created_at}
-                : f
-            ) || null
-        );
-      }
+      // The server state will be updated via the query refetch triggered by the feedback listener
+      // We don't need to manually update the state here as the useEffect will handle it
     } catch (error) {
       // Revert optimistic update on error
       setFeedback(
@@ -131,6 +141,11 @@ export const Reactions = ({
   };
 
   const onRemoveFeedback = async (id: string) => {
+    // Switch to server state mode on first mutation
+    if (!useServerState) {
+      setUseServerState(true);
+    }
+
     // Store the item being removed for potential rollback
     const itemToRemove = feedback?.find(f => f.id === id);
 
@@ -147,6 +162,9 @@ export const Reactions = ({
           },
         },
       });
+
+      // The server state will be updated via the query refetch triggered by the feedback listener
+      // We don't need to manually update the state here as the useEffect will handle it
     } catch (error) {
       // Revert optimistic update on error
       if (itemToRemove) {
