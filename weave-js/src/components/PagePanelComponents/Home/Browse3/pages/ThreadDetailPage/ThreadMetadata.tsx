@@ -1,9 +1,6 @@
 import React, {FC, useMemo} from 'react';
 
-import {
-  traceCallLatencyMs,
-  useThreadTurns,
-} from '../wfReactInterface/tsDataModelHooks';
+import {useThreadTurns} from '../wfReactInterface/tsDataModelHooks';
 
 export interface ThreadMetadataProps {
   turnsState: ReturnType<typeof useThreadTurns>['turnsState'];
@@ -30,28 +27,14 @@ export const ThreadMetadata: FC<ThreadMetadataProps> = ({turnsState}) => {
     }
 
     const turns = turnsState.value;
-    const turnCount = turns.length;
+    const turnCount = turns.thread.turn_count;
 
-    // Calculate latencies for completed turns (convert ms to seconds)
-    const latencies = turns
-      .filter(turn => turn.ended_at) // Only completed turns
-      .map(turn => traceCallLatencyMs(turn) / 1000) // Convert to seconds
-      .sort((a, b) => a - b);
-
-    if (latencies.length === 0) {
-      return {
-        turnCount,
-        p50Latency: '-',
-        p99Latency: '-',
-      };
-    }
-
-    // Calculate percentiles
-    const p50Index = Math.floor(latencies.length * 0.5);
-    const p99Index = Math.floor(latencies.length * 0.99);
-
-    const p50Latency = `${latencies[p50Index].toFixed(3)}s`;
-    const p99Latency = `${latencies[p99Index].toFixed(3)}s`;
+    const p50Latency = `${(
+      (turns.thread.p50_turn_duration_ms ?? 0) / 1e3
+    ).toFixed(3)}s`;
+    const p99Latency = `${(
+      (turns.thread.p99_turn_duration_ms ?? 0) / 1e3
+    ).toFixed(3)}s`;
 
     return {
       turnCount,

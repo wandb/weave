@@ -2553,10 +2553,25 @@ export const useThreadTurns = (
   projectId: string,
   threadId: string
 ): {
-  turnsState: AsyncState<traceServerTypes.TraceCallSchema[]>;
+  turnsState: AsyncState<{
+    turnCalls: traceServerTypes.TraceCallSchema[];
+    thread: traceServerTypes.ThreadSchema;
+  }>;
 } => {
   const getTsClient = useGetTraceServerClientContext();
+
   const turns = useAsync(async () => {
+    // get the thread so we know the basic metadata
+    const thread = await getTsClient().threadsStreamQuery({
+      project_id: projectId,
+      filter: {thread_ids: [threadId]},
+    });
+
+    if (thread.threads.length === 0) {
+      throw new Error(`Thread ${threadId} not found`);
+    }
+
+    // Only get the most recent 500 turns
     const result = await getTsClient().callsStreamQuery({
       project_id: projectId,
       query: {
@@ -2567,8 +2582,8 @@ export const useThreadTurns = (
           ],
         },
       },
-      sort_by: [{field: 'started_at', direction: 'asc'}],
-      limit: 1000,
+      sort_by: [{field: 'ended_at', direction: 'desc'}],
+      limit: 500,
       columns: [
         'id',
         'turn_id',
@@ -2580,7 +2595,14 @@ export const useThreadTurns = (
       ],
     });
 
-    return result.calls ?? [];
+    // reverse the calls so they are in the correct order
+    const turnCalls = result.calls ?? [];
+    turnCalls.reverse();
+
+    return {
+      thread: thread.threads[0],
+      turnCalls,
+    };
   }, [getTsClient, threadId]);
 
   return {
@@ -2590,16 +2612,14 @@ export const useThreadTurns = (
 
 export const useThreadMessageIds = (
   projectId: string,
-  threadId: string
+  turnIds: string[]
 ): AsyncState<Array<string>> => {
   const getTsClient = useGetTraceServerClientContext();
   return useAsync(async () => {
     const result = await getTsClient().callsStreamQuery({
       project_id: projectId,
-      query: {
-        $expr: {
-          $eq: [{$getField: 'thread_id'}, {$literal: threadId}],
-        },
+      filter: {
+        turn_ids: turnIds,
       },
       columns: ['id', 'parent_id', 'summary', 'started_at'],
     });
@@ -2623,33 +2643,71 @@ export const useThreadMessageIds = (
     }
 
     return _.map(llmLeafCalls, 'id');
-  }, [getTsClient, threadId]);
+  }, [getTsClient, turnIds]);
 };
 
+/**
+ * Loads message data for a thread, handling large numbers of message IDs by batching requests.
+ *
+ * @param projectId - The project ID containing the thread
+ * @param turnIds - A group of turn IDs to load messages for
+ * @returns AsyncState containing the loaded message calls
+ */
 export const useThreadMessagesLoader = (
   projectId: string,
-  threadId: string
+  turnIds: string[]
 ) => {
   const getTsClient = useGetTraceServerClientContext();
 
-  const messageIdsState = useThreadMessageIds(projectId, threadId);
+  const messageIdsState = useThreadMessageIds(projectId, turnIds);
 
   const [loadMessagesState, loadMessages] = useAsyncFn(async () => {
     if (messageIdsState.loading) {
       return [];
     }
 
-    const result = await getTsClient().callsStreamQuery({
-      project_id: projectId,
-      filter: {call_ids: messageIdsState.value},
-      sort_by: [{field: 'started_at', direction: 'asc'}],
-      limit: 1000,
-      columns: ['id', 'started_at', 'turn_id', 'inputs', 'output'],
-      expand_columns: ['inputs', 'output'], // Server-side ref expansion
+    const messageIds = messageIdsState.value;
+    if (!messageIds || messageIds.length === 0) {
+      return [];
+    }
+
+    // If we have more than 500 call_ids, we need to make multiple requests
+    const BATCH_SIZE = 500;
+    const batches: string[][] = [];
+
+    for (let i = 0; i < messageIds.length; i += BATCH_SIZE) {
+      batches.push(messageIds.slice(i, i + BATCH_SIZE));
+    }
+
+    // Make all requests in parallel
+    const results = await Promise.all(
+      batches.map(batch =>
+        getTsClient().callsStreamQuery({
+          project_id: projectId,
+          filter: {call_ids: batch},
+          sort_by: [{field: 'started_at', direction: 'asc'}],
+          limit: 1000,
+          columns: ['id', 'started_at', 'turn_id', 'inputs', 'output'],
+          expand_columns: ['inputs', 'output'], // Server-side ref expansion
+        })
+      )
+    );
+
+    // Combine all results
+    const allCalls: traceServerTypes.TraceCallSchema[] = [];
+    results.forEach(result => {
+      allCalls.push(...(result.calls ?? []));
     });
 
-    return result.calls ?? [];
-  }, [getTsClient, projectId, threadId, messageIdsState.value]);
+    // Sort the final results by started_at to maintain order across batches
+    allCalls.sort((a, b) => {
+      return (
+        new Date(a.started_at).getTime() - new Date(b.started_at).getTime()
+      );
+    });
+
+    return allCalls;
+  }, [getTsClient, projectId, turnIds, messageIdsState.value]);
 
   useEffect(() => {
     if (messageIdsState.value) {

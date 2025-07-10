@@ -11,7 +11,7 @@ import {SplitPanelRight} from '../common/SplitPanels/SplitPanelRight';
 import {StatusChip} from '../common/StatusChip';
 import {ComputedCallStatusType} from '../wfReactInterface/traceServerClientTypes';
 import {useThreadTurns} from '../wfReactInterface/tsDataModelHooks';
-import {ThreadChatView, ThreadChatViewRef} from './ThreadChatView';
+import {ThreadChatViewRef, ThreadChatViewStaging} from './ThreadChatView';
 import {ThreadMetadata} from './ThreadMetadata';
 import {ThreadTurnsList} from './ThreadTurnsList';
 
@@ -116,13 +116,13 @@ export const ThreadDetailPage: FC<ThreadDetailPageProps> = ({threadId}) => {
 
   const {turnsState} = useThreadTurns(`${entity}/${project}`, threadId);
 
-  const turnCount = turnsState.value?.length || 0;
+  const turnCount = turnsState.value?.turnCalls?.length || 0;
 
   // Ref for ThreadChatView to enable programmatic scrolling
   const chatViewRef = useRef<ThreadChatViewRef>(null);
 
   // Get the currently selected turn ID from the index
-  const selectedTurnId = turnsState.value?.[selectedTurnIndex]?.id;
+  const selectedTurnId = turnsState.value?.turnCalls?.[selectedTurnIndex]?.id;
 
   // Track previous selectedTurnId
   const prevSelectedTurnId = usePrevious(selectedTurnId);
@@ -215,10 +215,9 @@ export const ThreadDetailPage: FC<ThreadDetailPageProps> = ({threadId}) => {
                         maxWidth="0%" // No right drawer needed
                         isDrawerOpen={false}
                         main={
-                          <ThreadChatView
+                          <ThreadChatViewStaging
                             ref={chatViewRef}
                             turnsState={turnsState}
-                            threadId={threadId}
                             onVisibleTurnChange={handleVisibleTurnChange}
                           />
                         }

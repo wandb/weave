@@ -17,8 +17,8 @@ import {CallChat} from './CallChat';
 import {TurnAnchor} from './TurnAnchor';
 
 export interface ThreadChatViewProps {
-  threadId: string;
-  turnsState: ReturnType<typeof useThreadTurns>['turnsState'];
+  firstTurnIndex: number;
+  turnIds: string[];
   onVisibleTurnChange?: (turnIndex: number) => void;
 }
 
@@ -60,9 +60,9 @@ export interface ThreadChatViewRef {
 export const ThreadChatView = forwardRef<
   ThreadChatViewRef,
   ThreadChatViewProps
->(({threadId, turnsState, onVisibleTurnChange}, ref) => {
+>(({turnIds, onVisibleTurnChange, firstTurnIndex}, ref) => {
   const {projectId} = useEntityProject();
-  const messagesState = useThreadMessagesLoader(projectId, threadId);
+  const messagesState = useThreadMessagesLoader(projectId, turnIds);
 
   const turnRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -76,14 +76,6 @@ export const ThreadChatView = forwardRef<
 
     return _.groupBy(messagesState.value, 'turn_id');
   }, [messagesState.value]);
-
-  const turnIds = useMemo(() => {
-    if (turnsState.loading) {
-      return [];
-    }
-
-    return turnsState.value?.map(turn => turn.id);
-  }, [turnsState]);
 
   // Debounced callback to report visible turn changes
   const debouncedVisibleTurnChange = useMemo(
@@ -134,7 +126,7 @@ export const ThreadChatView = forwardRef<
           }}
           className="px-16 py-12 even:bg-moon-100">
           <span className=" mb-8 flex h-18 w-18 items-center justify-center rounded-[20px] bg-moon-200 text-xs font-bold">
-            {groupIndex + 1}
+            {firstTurnIndex + groupIndex + 1}
           </span>
 
           {!hasTurnCalls && <TurnAnchor turnId={turnId} />}
@@ -146,7 +138,7 @@ export const ThreadChatView = forwardRef<
         </div>
       );
     });
-  }, [turnIds, messageGroups]);
+  }, [turnIds, messageGroups, firstTurnIndex]);
 
   // Set up scroll-based visibility detection
   // Using scroll handler for reliable, predictable turn detection
@@ -218,7 +210,7 @@ export const ThreadChatView = forwardRef<
     };
   }, [turnIds, messageComponents, debouncedVisibleTurnChange]);
 
-  if (messagesState.loading || turnsState.loading) {
+  if (messagesState.loading) {
     return <div>Loading thread messages...</div>;
   }
 
@@ -226,11 +218,7 @@ export const ThreadChatView = forwardRef<
     return <div>Error loading messages: {messagesState.error.message}</div>;
   }
 
-  if (
-    messageGroups.length === 0 &&
-    !messagesState.loading &&
-    !turnsState.loading
-  ) {
+  if (messageGroups.length === 0) {
     return <div>No messages found in this thread.</div>;
   }
 
@@ -240,5 +228,47 @@ export const ThreadChatView = forwardRef<
       className="flex h-full flex-col overflow-y-auto">
       {messageComponents}
     </div>
+  );
+});
+
+interface ThreadChatViewStagingProps {
+  turnsState: ReturnType<typeof useThreadTurns>['turnsState'];
+  onVisibleTurnChange?: (turnIndex: number) => void;
+}
+export const ThreadChatViewStaging = forwardRef<
+  ThreadChatViewRef,
+  ThreadChatViewStagingProps
+>(({turnsState, onVisibleTurnChange}, ref) => {
+  const turnIds = useMemo(() => {
+    if (turnsState.value) {
+      return turnsState.value.turnCalls.map(turn => turn.id);
+    }
+    return [];
+  }, [turnsState.value]);
+
+  const firstTurnIndex = useMemo(() => {
+    if (turnsState.value) {
+      return (
+        turnsState.value.thread.turn_count - turnsState.value.turnCalls.length
+      );
+    }
+    return 0;
+  }, [turnsState]);
+
+  if (turnsState.loading) {
+    return <div>Loading thread messages...</div>;
+  }
+
+  if (turnsState.error) {
+    return <div>Error loading messages: {turnsState.error.message}</div>;
+  }
+
+  return (
+    <ThreadChatView
+      ref={ref}
+      turnIds={turnIds}
+      onVisibleTurnChange={onVisibleTurnChange}
+      firstTurnIndex={firstTurnIndex}
+    />
   );
 });
