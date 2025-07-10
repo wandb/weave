@@ -1,5 +1,5 @@
-import os
 import json
+import os
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -100,7 +100,6 @@ def _resolve_model_path(
     Raises:
         ValueError: If neither a model_name_or_path nor a default_model is provided.
     """
-
     if default_model:
         return str(download_model_from_huggingface_hub(default_model))
 
@@ -114,7 +113,7 @@ def _resolve_model_path(
     )
 
 
-def load_model_weights(
+def load_local_model_weights(
     model_name_or_path: str = "", default_model: Optional[str] = None
 ) -> str:
     """Resolves the path to a model, downloading it if necessary.
