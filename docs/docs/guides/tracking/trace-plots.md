@@ -1,71 +1,60 @@
 # Trace Plots
 
-The _trace plots_ feature provides a way for you to visually analyze and understand key trace metrics across different time intervals, operations, models, or hosts. Metrics include cost, latency, and token usage. This guide walks you through how to use this feature and interpret the different chart types.
+The _trace plots_ tool in Weave allows you to explore, visualize, and debug trace-level metrics (e.g. latency, cost, tokens) using interactive charts. You can use the default trace plots or create your own via the custom trace plot builder.
 
-## Get started with trace plots
+![Trace plots in action](imgs/plots-example.png)
 
-To open the trace plots view:
+## Get started
 
-1. From your Weave project dashboard, navigate to the **Traces** tab.
-2. (Optional) Apply a **Filter** to select relevant runs or evaluations.
-3. Click **Show Metrics** to open the side pane with [default trace charts](#default-trace-charts).
+1. Navigate to your project’s **Traces** page.
+2. (Optional) Select **Filter** to filter selected traces (e.g. by datetime or operation).
+3. In the upper right hand corner of the **Traces** view, click the **Show Metrics** icon to open the trace plots side pane. 
 
-## Default trace charts
+    ![The  **Show Metrics** icon](imgs/plots-show-metrics-icon.png)
 
-When you first open the **Show Metrics** side pane, you’ll see three default visualizations:
+    From here, you can:
+   - View the [default trace plots](#default-trace-plots).
+   - Create a [custom trace plots](#create-a-custom-trace-plot).
+4. Charts update dynamically based on your trace filters and selections.
 
-- [Stacked Bar Chart (Cost over Time)](#stacked-bar-chart-cost-over-time)
-- [Latency line chart](#latency-line-chart)
+## Default trace plots
 
-### Stacked bar chart (cost over time)
+When you first open the trace plots panel, Weave auto-generates a few trace plots based on your available project trace data:
 
-- Shows total cost grouped by operation (op).
-- Automatically uses dynamic time binning (e.g., 4-second blocks).
-- Supports zooming by selecting a region to drill into smaller time bins.
+- Bar chart (cost or latency grouped over time bins)
+- Line chart (latency over time)
+- Scatter plot (e.g. prompt tokens vs. completion tokens)
 
-### Latency line chart
+Each trace plot is interactive:
 
-- Displays latency (e.g., P95) across the same time bins.
-- By default, grouped by op.
-- Includes:
-  - Hover tooltips with per-bin values.
-  - Shaded region highlighting based on cursor position.
-  - Zoom in/out via horizontal or rectangular selection.
+- Hover for tooltips
+- Drag to zoom
+- Double-click to reset
+- Click points in scatter plots to open a specific trace
 
-### Scatter plot
+## Create a custom trace plot
 
-- Plots prompt tokens vs. completion tokens.
-- Each point is color-coded by op.
-- Clicking a point opens the associated trace in detail.
+You can also create custom trace plot. To create a custom trace plot, do the following:
 
-## Filtering and grouping
+1. From the trace plots side pane, click **➕ Add Chart** .
 
-You can filter and group metrics by:
+    ![**➕ Add Chart** button.](imgs/plots-add-chart.png)
 
-- Operation (op)
-- Host
-- Model
-- Custom dimensions (if available)
+2. In the pop-up, select one of the available trace plot types:
 
-Selecting a specific op disables default grouping, showing you an ungrouped line chart specific to that op.
+    ![Available custom trace plot types](imgs/plots-custom-chart-types.png)
+    
+3. For the selected trace plot type, configure your trace plot. For information on configuration options by trace plot type, see [Trace plot settings by plot type](#trace-plot-settings-by-plot-type).
+4. Click **Save chart** to save your chart.
 
-## Chart settings
+### Trace plot settings by plot type
 
-Click the settings gear icon to customize your trace plot:
+When adding or editing a custom trace plot, the available configuration options vary slightly depending on the selected trace plot type. The table provides a breakdown of the configurable options.
 
-### Y-axis metric options:
-
-- Cost
-- Latency (P95, P99, etc.)
-- Exceptions
-- Prompt Tokens
-- Completion Tokens
-- Inputs, Outputs
-- Scores
-
-### Additional controls:
-
-- Chart type (Bar, Line, Scatter)
-- Aggregation method (Sum, P95, P99, Count, etc.)
-- Binning granularity
-- Max number of calls (default: 250, configurable up to 1000)
+| Setting         | Scatter Plot         | Line Chart           | Bar Chart            |
+| --------------- | -------------------- | -------------------- | -------------------- |
+| Y-axis      | ✅ Required           | ✅ Required           | ✅ Required           |
+| X-axis      | ✅ Selectable         | Fixed (`started at`) | Fixed (`started at`) |
+| Grouping    | ✅ Optional           | ✅ Optional           | ✅ Optional           |
+| Binning     | ❌ Not used           | ✅ Used               | ✅ Used               |
+| Aggregation | ❌ Not used           | ✅ Used               | ✅ Used               |
