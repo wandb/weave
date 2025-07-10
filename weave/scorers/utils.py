@@ -1,3 +1,4 @@
+import os
 import json
 from importlib.util import find_spec
 from pathlib import Path
@@ -83,27 +84,22 @@ def download_model_from_huggingface_hub(model_name: str) -> str:
     return snapshot_download(model_name, local_dir=str(local_dir))
 
 
-def load_hf_model_weights(
+def _resolve_model_path(
     model_name_or_path: str = "", default_model: Optional[str] = None
 ) -> str:
-    """Load the local model weights for a Hugging Face model.
+    """Dispatcher to resolve a model path from various sources.
 
-    If a default_model is supplied, it downloads the default model from the
-    Hugging Face Hub. Otherwise, if model_name_or_path is a directory, it is
-    assumed to be the local model weights path. If model_name_or_path is provided
-    and is not a local directory, it will be downloaded from wandb artifacts.
-
-    Args:
-        model_name_or_path (str): The path or name of the model.
-        default_model (str, optional): The default model artifact to use if model_name_or_path is empty.
+    Resolution priority:
+    1. A default model from Hugging Face Hub, if `default_model` is provided.
+    2. A local directory path, if `model_name_or_path` is a valid directory.
+    3. A model from W&B Artifacts, if `model_name_or_path` is provided.
 
     Returns:
-        str: The local model weights path.
+        str: The local path to the downloaded model weights.
 
     Raises:
         ValueError: If neither a model_name_or_path nor a default_model is provided.
     """
-    import os
 
     if default_model:
         return str(download_model_from_huggingface_hub(default_model))
@@ -115,4 +111,23 @@ def load_hf_model_weights(
 
     raise ValueError(
         "No model_name_or_path or no default_model provided, please set one of the two."
+    )
+
+
+def load_model_weights(
+    model_name_or_path: str = "", default_model: Optional[str] = None
+) -> str:
+    """Resolves the path to a model, downloading it if necessary.
+
+    Args:
+        model_name_or_path (str, optional): The path to a local model directory
+            or the name of a model in W&B Artifacts. Defaults to "".
+        default_model (str, optional): The name of a default Weave local model on the Hugging Face Hub.
+            Defaults to None.
+
+    Returns:
+        str: The local path to the model weights.
+    """
+    return _resolve_model_path(
+        model_name_or_path=model_name_or_path, default_model=default_model
     )
