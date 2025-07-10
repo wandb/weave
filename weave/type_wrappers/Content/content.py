@@ -1,3 +1,4 @@
+# content.py
 from __future__ import annotations
 
 import base64
@@ -35,7 +36,7 @@ class BaseContentHandler(BaseModel):
 
     def __init__(self, data: bytes, /, **values: Any):
         # Default here so when a factory calls a factory we can safely do the existence check
-        values["encoding"] = values["encoding"] or "utf-8"
+        values["encoding"] = values.get("encoding") or "utf-8"
         super().__init__(data=data, **values)
 
     @property
@@ -109,30 +110,54 @@ T = TypeVar("T", bound=str)
 
 class Content(Generic[T]):
     """
-    This is similar to a factory but uses the instance as an attribute so we can
-    benefit from the organization of the content handlers without having to
-    manage the object recognition for the weave serializers
+    A container for content, such as files, raw bytes, or base64 encoded strings.
+
+    The primary constructor `Content()` accepts raw bytes. For other data types,
+    use the appropriate classmethod constructors:
+    - `Content.from_path()` for file paths.
+    - `Content.from_bytes()` for binary data (alias for the constructor).
+    - `Content.from_b64()` for base64 encoded strings.
+
+    This class abstracts away the handling of different content sources, providing
+    a uniform interface to access the data and its metadata.
     """
 
     content_handler: BaseContentHandler
-    _last_saved_path: str | None = None
+    _last_saved_path: str | None
 
     def __init__(
         self,
-        input: Any,
+        data: bytes,
         type_hint: str | None = None,
         /,
         **values: Unpack[ContentKeywordArgs],
     ):
+        """
+        Initializes Content from raw bytes. This is the primary constructor.
+
+        Args:
+            data: The binary data.
+            type_hint: An optional hint for the mimetype or extension.
+            **values: Additional keyword arguments for content properties.
+        """
+        content_args = self._prepare_content_args(type_hint, values)
+        self.content_handler = create_bytes_content(data, **content_args)
+        self._last_saved_path = None
+
+    @staticmethod
+    def _prepare_content_args(
+        type_hint: str | None, values: ContentKeywordArgs
+    ) -> ContentArgs:
+        """Helper to process common constructor arguments."""
         if type_hint:
-            if type_hint.find("/") != -1:
+            if "/" in type_hint:
                 values["mimetype"] = type_hint
             else:
                 values["extension"] = type_hint.lstrip(".")
 
         extra = values.get("extra", {})
 
-        content_args: ContentArgs = {
+        return {
             "filename": values.get("filename", None),
             "path": values.get("path", None),
             "extension": values.get("extension", None),
@@ -142,32 +167,6 @@ class Content(Generic[T]):
             "extra": extra,
         }
 
-        if isinstance(input, Path):
-            content_args["extra"]["input_type"] = content_args["extra"].get(
-                "input_type"
-            ) or str(input.__class__)
-            content_args["extra"]["input_category"] = content_args["extra"].get(
-                "input_category", "object"
-            )
-            self.content_handler = create_file_content(str(input), **content_args)
-
-        elif isinstance(input, str):
-            if is_valid_path(input):
-                self.content_handler = create_file_content(str(input), **content_args)
-            else:
-                try:
-                    self.content_handler = create_b64_content(
-                        str(input), **content_args
-                    )
-                except ValueError as e:
-                    raise ValueError(
-                        f"Failed to parse string {input} as a valid path or base64 string"
-                    ) from e
-        elif isinstance(input, bytes):
-            self.content_handler = create_bytes_content(input, **content_args)
-        else:
-            raise TypeError(f"Unsupported input type: {type(input)}")
-
     @classmethod
     def from_path(
         cls,
@@ -176,9 +175,37 @@ class Content(Generic[T]):
         /,
         **values: Unpack[ContentKeywordArgs],
     ) -> Content:
-        if not Path(path).exists():
-            raise FileNotFoundError(f"File not found - {path}")
-        return cls(path, type_hint, **values)
+        """
+        Creates a Content object from a file path.
+
+        Args:
+            path: The path to the file.
+            type_hint: An optional hint for the mimetype or extension.
+            **values: Additional keyword arguments for content properties.
+
+        Returns:
+            A new Content instance.
+
+        Raises:
+            FileNotFoundError: If the path does not exist or is not a file.
+        """
+        if not is_valid_path(path):
+            raise FileNotFoundError(f"File not found or is not a file: {path}")
+
+        path_obj = Path(path)
+        data = path_obj.read_bytes()
+
+        # Populate values with path-specific metadata if not already provided
+        values.setdefault("filename", path_obj.name)
+        values.setdefault("path", str(path_obj))
+        values.setdefault("size", path_obj.stat().st_size)
+
+        extra = values.setdefault("extra", {})
+        extra.setdefault("original_path", str(path_obj))
+        extra.setdefault("input_type", str(type(path)))
+        extra.setdefault("input_category", "path")
+
+        return cls(data, type_hint, **values)
 
     @classmethod
     def from_bytes(
@@ -188,6 +215,48 @@ class Content(Generic[T]):
         /,
         **values: Unpack[ContentKeywordArgs],
     ) -> Content:
+        """
+        Creates a Content object from raw bytes. Alias for `Content()`.
+
+        Args:
+            data: The binary data.
+            type_hint: An optional hint for the mimetype or extension.
+            **values: Additional keyword arguments for content properties.
+
+        Returns:
+            A new Content instance.
+        """
+        return cls(data, type_hint, **values)
+
+    @classmethod
+    def from_b64(
+        cls,
+        b64_string: str | bytes,
+        type_hint: str | None = None,
+        /,
+        **values: Unpack[ContentKeywordArgs],
+    ) -> Content:
+        """
+        Creates a Content object from a base64 encoded string.
+
+        Args:
+            b64_string: The base64 encoded string or bytes.
+            type_hint: An optional hint for the mimetype or extension.
+            **values: Additional keyword arguments for content properties.
+
+        Returns:
+            A new Content instance.
+        """
+        try:
+            data = base64.b64decode(b64_string, validate=True)
+        except Exception as e:
+            raise ValueError(f"Invalid base64 string: {e}") from e
+
+        # Populate values with b64-specific metadata
+        extra = values.setdefault("extra", {})
+        extra.setdefault("input_type", str(type(b64_string)))
+        extra.setdefault("input_category", "base64")
+        values.setdefault("encoding", "base64")
         return cls(data, type_hint, **values)
 
     @property
@@ -292,4 +361,4 @@ class Content(Generic[T]):
             f.write(self.data)
 
         # Update the last_saved_path to reflect the saved copy. This ensures open works.
-        self._last_saved_path = str(dest)
+        self._last_saved_path = str(path)
