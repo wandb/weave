@@ -138,7 +138,13 @@ def tests(session, shard):
             env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
         )
     else:
-        session.run_install("uv", "sync", "--group=test")
+        session.run_install(
+            "uv",
+            "sync",
+            "--group=test",
+            f"--python={session.virtualenv.location}",
+            env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+        )
 
     session.chdir("tests")
 
