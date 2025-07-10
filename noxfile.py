@@ -47,6 +47,29 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
+def non_server_tests(session):
+    pytest_args = [
+        "pytest",
+        "--durations=20",
+        "--strict-markers",
+        "--cov=weave",
+        "--cov-report=html",
+        "--cov-branch",
+        "-m",
+        "not trace_server",
+    ]
+    test_dirs = ["trace/"]
+
+    session.run_install("uv", "sync", "--group=test")
+    session.chdir("tests")
+    session.run(
+        *pytest_args,
+        *session.posargs,
+        *test_dirs,
+    )
+
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 @nox.parametrize(
     "shard",
     [
@@ -87,7 +110,6 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "autogen_tests",
         "trace",
         *trace_server_shards,
-        "trace_no_server",
     ],
 )
 def tests(session, shard):
@@ -150,7 +172,6 @@ def tests(session, shard):
         "autogen_tests": ["integrations/autogen/"],
         "trace": ["trace/"],
         **{shard: ["trace/"] for shard in trace_server_shards},
-        "trace_no_server": ["trace/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
@@ -179,9 +200,6 @@ def tests(session, shard):
                 "-m trace_server",
             ]
         )
-
-    if shard == "trace_no_server":
-        pytest_args.extend(["-m", "not trace_server"])
 
     session.run(
         *pytest_args,
