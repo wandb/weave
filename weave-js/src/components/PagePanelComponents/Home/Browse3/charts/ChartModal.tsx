@@ -11,8 +11,10 @@ import React from 'react';
 import NumberInput from '../../../../../common/components/elements/NumberInput';
 import {Button} from '../../../../Button';
 import {Select as CustomSelect} from '../../../../Form/Select';
+import {TextField} from '../../../../Form/TextField';
 import {Icon} from '../../../../Icon';
 import {BarChart} from './BarChart';
+import {generateChartAutoName} from './Chart';
 import {useMultipleOperations} from './chartDataProcessing';
 import {
   convertSchemaToAxisFields,
@@ -404,7 +406,35 @@ export const ChartModal: React.FC<ChartModalProps> = ({
               p: 3,
               backgroundColor: MOON_50,
             }}>
-            <SectionHeader first>Plot Type</SectionHeader>
+            <SectionHeader first>Chart Name</SectionHeader>
+            <Box sx={{mb: 2}}>
+              <TextField
+                value={localConfig.customName || ''}
+                onChange={value =>
+                  setLocalConfig(prev => ({
+                    ...prev,
+                    customName: value || undefined,
+                  }))
+                }
+                placeholder={
+                  localConfig.yAxis &&
+                  localConfig.plotType &&
+                  localConfig.aggregation
+                    ? generateChartAutoName(
+                        localConfig.yAxis,
+                        localConfig.plotType,
+                        localConfig.aggregation,
+                        localConfig.xAxis || 'started_at',
+                        callData
+                      )
+                    : 'Chart name'
+                }
+                variant="default"
+                size="medium"
+              />
+            </Box>
+
+            <SectionHeader>Plot Type</SectionHeader>
             <CustomSelect
               value={
                 plotTypeOptions.find(
