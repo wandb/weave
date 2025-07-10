@@ -24,6 +24,33 @@ PY39_INCOMPATIBLE_SHARDS = [
     "autogen_tests",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
+INTEGRATION_SHARDS = [
+    "anthropic",
+    "cerebras",
+    "cohere",
+    "crewai",
+    "dspy",
+    "google_ai_studio",
+    "google_genai",
+    "groq",
+    "instructor",
+    "langchain_nvidia_ai_endpoints",
+    "langchain",
+    "litellm",
+    "llamaindex",
+    "mistral",
+    "notdiamond",
+    "openai",
+    "openai_agents",
+    "vertexai",
+    "bedrock",
+    "scorers",
+    "huggingface",
+    "smolagents",
+    "mcp",
+    "verdict",
+    "autogen_tests",
+]
 
 
 @nox.session
@@ -82,33 +109,9 @@ def non_server_tests(session):
         "flow",
         "trace_server",
         "trace_server_bindings",
-        "anthropic",
-        "cerebras",
-        "cohere",
-        "crewai",
-        "dspy",
-        "google_ai_studio",
-        "google_genai",
-        "groq",
-        "instructor",
-        "langchain_nvidia_ai_endpoints",
-        "langchain",
-        "litellm",
-        "llamaindex",
-        "mistral",
-        "notdiamond",
-        "openai",
-        "openai_agents",
-        "vertexai",
-        "bedrock",
-        "scorers",
         "pandas-test",
-        "huggingface",
-        "smolagents",
-        "mcp",
-        "verdict",
-        "autogen_tests",
         "trace",
+        *INTEGRATION_SHARDS,
         *trace_server_shards,
     ],
 )
@@ -119,12 +122,16 @@ def tests(session, shard):
     if session.python.startswith("3.9") and shard in PY39_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
 
-    session.run_install(
-        "uv",
-        "sync",
-        f"--extra={shard}",
-        "--group=test",
-    )
+    if shard in INTEGRATION_SHARDS:
+        session.run_install(
+            "uv",
+            "sync",
+            f"--extra={shard}",
+            "--group=test",
+        )
+    else:
+        session.run_install("uv", "sync", "--group=test")
+
     session.chdir("tests")
 
     env = {
