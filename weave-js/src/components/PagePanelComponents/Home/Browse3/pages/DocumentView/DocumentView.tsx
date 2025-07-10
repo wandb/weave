@@ -17,7 +17,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({doc}) => {
   }, [doc]);
 
   return (
-    <div className="tw-style border border-moon-250 rounded-lg px-20 py-16">
+    <div className="tw-style rounded-lg border border-moon-250 px-20 py-16">
       <div className="flex flex-col gap-8">
         <Body>{doc.content}</Body>
         {metadata && (
@@ -42,8 +42,8 @@ const DocumentDropdown: React.FC<DocumentDropdownProps> = ({
   title,
 }) => {
   return (
-    <div className="tw-style flex flex-col gap-8 w-full h-auto">
-      <div className="flex mb-4">
+    <div className="tw-style flex h-auto w-full flex-col gap-8">
+      <div className="mb-4 flex">
         <Header>{title}</Header>
       </div>
       <div className="flex flex-col gap-16">
