@@ -13,14 +13,14 @@ def test_object_ref_filter_simple() -> None:
         tsi_query.EqOperation.model_validate(
             {
                 "$eq": [
-                    {"$getField": "inputs.model.temperature"},
+                    {"$getField": "output.model.temperature"},
                     {"$literal": 1},
                 ]
             }
         )
     )
     cq.add_order("started_at", "desc")
-    cq.set_expand_columns(["inputs.model"])
+    cq.set_expand_columns(["output.model"])
     assert_sql(
         cq,
         """
@@ -47,12 +47,14 @@ def test_object_ref_filter_simple() -> None:
           (SELECT calls_merged.id AS id
            FROM calls_merged
            WHERE calls_merged.project_id = {pb_0:String}
+             AND (length(calls_merged.output_refs) > 0
+                  OR calls_merged.ended_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}) IN
+           HAVING (((JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}) IN
                       (SELECT ref
                        FROM obj_filter_0)
-                   OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}), '/([^/]+)$', 1) IN
+                   OR regexpExtract(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), '/([^/]+)$', 1) IN
                       (SELECT ref
                        FROM obj_filter_0)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -142,6 +144,8 @@ def test_object_ref_filter_nested() -> None:
            FROM calls_merged
            WHERE calls_merged.project_id = {pb_0:String}
              AND (calls_merged.parent_id IS NULL)
+             AND (length(calls_merged.input_refs) > 0
+                  OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}) IN
@@ -257,6 +261,8 @@ def test_multiple_object_ref_filters() -> None:
            FROM calls_merged
            WHERE calls_merged.project_id = {pb_0:String}
              AND (calls_merged.parent_id IS NULL)
+             AND (length(calls_merged.input_refs) > 0
+                  OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
@@ -435,6 +441,8 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
              AND (calls_merged.parent_id IS NULL)
              AND ((lower(calls_merged.inputs_dump) LIKE {pb_10:String}
                   OR calls_merged.inputs_dump IS NULL))
+             AND (length(calls_merged.input_refs) > 0
+                  OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
@@ -612,6 +620,8 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
         WHERE calls_merged.project_id = {pb_0:String}
           AND ((calls_merged.op_name IN {pb_10:Array(String)})
                OR (calls_merged.op_name IS NULL))
+          AND (length(calls_merged.input_refs) > 0
+               OR calls_merged.started_at IS NULL)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         HAVING (((((((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
@@ -771,6 +781,8 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
           (SELECT calls_merged.id AS id
            FROM calls_merged
            WHERE calls_merged.project_id = {pb_0:String}
+             AND (length(calls_merged.input_refs) > 0
+                  OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
@@ -854,6 +866,8 @@ def test_object_ref_filter_complex_nested_path() -> None:
            FROM calls_merged
            WHERE calls_merged.project_id = {pb_0:String}
              AND (calls_merged.parent_id IS NULL)
+             AND (length(calls_merged.input_refs) > 0
+                  OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN

@@ -411,7 +411,12 @@ class Condition(BaseModel):
             processor = ObjectRefQueryProcessor(
                 pb, table_alias, expand_columns, field_to_object_join_alias_map
             )
-            return processor.process_operand(self.operand)
+            sql = processor.process_operand(self.operand)
+            if self._consumed_fields is None:
+                self._consumed_fields = []
+            for raw_field_path in processor.fields_used:
+                self._consumed_fields.append(get_field_by_name(raw_field_path))
+            return sql
 
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
@@ -854,12 +859,24 @@ class CallsQuery(BaseModel):
 
         # Filter out object ref conditions from optimization since they're handled via CTEs
         non_object_ref_conditions = []
+        object_ref_fields_consumed: set[str] = set()
         for condition in self.query_conditions:
             if not (
                 expand_columns
                 and is_object_ref_operand(condition.operand, expand_columns)
             ):
                 non_object_ref_conditions.append(condition)
+            else:
+                if condition._consumed_fields is not None:
+                    object_ref_fields_consumed.update(
+                        f.field for f in condition._consumed_fields
+                    )
+
+        object_refs_filter_opt_sql = process_object_refs_filter_to_opt_sql(
+            pb,
+            table_alias,
+            object_ref_fields_consumed,
+        )
 
         optimization_conditions = process_query_to_optimization_sql(
             non_object_ref_conditions,
@@ -975,6 +992,7 @@ class CallsQuery(BaseModel):
         {turn_id_sql}
         {str_filter_opt_sql}
         {ref_filter_opt_sql}
+        {object_refs_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -1476,6 +1494,28 @@ def process_ref_filters_to_sql(
         return ""
 
     return " AND (" + combine_conditions(ref_filters, "AND") + ")"
+
+
+def process_object_refs_filter_to_opt_sql(
+    param_builder: ParamBuilder,
+    table_alias: str,
+    object_ref_fields_consumed: set[str],
+) -> str:
+    """Processes object ref fields to an optimization sql string."""
+    if not object_ref_fields_consumed:
+        return ""
+
+    # Optimization for filtering with refs, only include calls that have non-zero
+    # input refs when we are conditioning on refs in inputs, or is a naked call end.
+    refs_filter_opt_sql = ""
+    if "inputs_dump" in object_ref_fields_consumed:
+        refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0 OR {table_alias}.started_at IS NULL)"
+    # If we are conditioning on output refs, filter down calls to those with non-zero
+    # output refs, or they are a naked call start.
+    if "output_dump" in object_ref_fields_consumed:
+        refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
+
+    return refs_filter_opt_sql
 
 
 def process_calls_filter_to_conditions(

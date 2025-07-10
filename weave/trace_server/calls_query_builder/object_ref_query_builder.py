@@ -461,6 +461,7 @@ class ObjectRefQueryProcessor:
         self.table_alias = table_alias
         self.expand_columns = expand_columns
         self.field_to_object_join_alias_map = field_to_object_join_alias_map
+        self.fields_used: set[str] = set()
 
     def process_operand(self, operand: "tsi_query.Operand") -> str:
         """Recursively process any operand, handling object refs and nested operations."""
@@ -498,7 +499,10 @@ class ObjectRefQueryProcessor:
                 raise ValueError(
                     f"Leaf operand {operand} has multiple object ref conditions: {object_ref_conditions}"
                 )
-            return object_ref_conditions[0].as_sql_condition(
+
+            condition = object_ref_conditions[0]
+            self.fields_used.add(condition.field_path)
+            return condition.as_sql_condition(
                 self.pb, self.table_alias, self.field_to_object_join_alias_map
             )
         else:
@@ -512,6 +516,7 @@ class ObjectRefQueryProcessor:
                 self.pb,
                 self.table_alias,
             )
+            self.fields_used.update(f.field for f in filter_conditions.fields_used)
             return combine_conditions(filter_conditions.conditions, "AND")
 
 
@@ -957,6 +962,7 @@ def get_all_object_ref_conditions(
         return []
 
     all_object_ref_conditions: list[ObjectRefCondition] = []
+    fields_used: set[str] = set()
     for condition in conditions:
         object_ref_conditions = condition.get_object_ref_conditions(expand_columns)
         all_object_ref_conditions.extend(object_ref_conditions)
