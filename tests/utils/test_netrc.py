@@ -5,6 +5,7 @@ This module contains comprehensive tests for the netrc utilities including
 the Netrc class, helper functions, and edge cases.
 """
 
+import netrc
 import os
 import tempfile
 from pathlib import Path
@@ -85,7 +86,7 @@ def test_netrc_read_malformed_file(temp_netrc):
     malformed_content = "invalid netrc content"
     temp_netrc.path.write_text(malformed_content)
 
-    with pytest.raises(Exception):  # netrc.NetrcParseError inherits from Exception
+    with pytest.raises(netrc.NetrcParseError):
         temp_netrc.read()
 
 

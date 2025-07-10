@@ -116,7 +116,7 @@ def init_weave(
         try:
             import wandb
         except (ImportError, ModuleNotFoundError):
-            from weave import wandb_thin as wandb
+            from weave import wandb_thin as wandb  # type: ignore[no-redef]
         finally:
             wandb.login(anonymous="never", force=True, host=host)  # type: ignore
 
