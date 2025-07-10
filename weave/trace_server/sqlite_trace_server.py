@@ -1472,9 +1472,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # Extract filter values
         after_datetime = None
         before_datetime = None
+        thread_id = None
         if req.filter is not None:
             after_datetime = req.filter.after_datetime
             before_datetime = req.filter.before_datetime
+            thread_id = req.filter.thread_id
 
         # Use the dedicated query builder
         query, parameters = make_threads_query_sqlite(
@@ -1484,6 +1486,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             sort_by=req.sort_by,
             sortable_datetime_after=after_datetime,
             sortable_datetime_before=before_datetime,
+            thread_id=thread_id,
         )
 
         cursor.execute(query, parameters)
