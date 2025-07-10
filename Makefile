@@ -1,10 +1,7 @@
 .PHONY: docs build
 
 setup-docs-ci:
-	pip install uv
-	uv venv .venv --python 3.13
-	source .venv/bin/activate && \
-		uv sync --group docs
+	pip install -e . --group docs
 	playwright install
 
 	cd docs && \

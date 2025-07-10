@@ -241,7 +241,6 @@ jobs:
           node-version: "20"
       - name: Setup docs
         run: make setup-docs-ci
-        shell: bash
       - name: Run docs
         run: make docs
 
