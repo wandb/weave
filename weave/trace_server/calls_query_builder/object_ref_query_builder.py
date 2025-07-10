@@ -29,7 +29,9 @@ with a json path value that matches the intermediate object reference condition,
 Advantages:
 1. The performance of this is reasonable, because we do the biggest operations on the
 object_versions table, which is generally much smaller than the calls table. By doing this
-first,
+first, we narrow down the number of calls that get grouped.
+2. This method provides flexibility in where the data is stored, both object_versions and
+table_rows (at least at the leaf level) are searched for when filtering.
 
 Limitations:
 1. This method is 100% reliant on the caller providing the correct expand_columns. If the
@@ -39,7 +41,11 @@ be refs in those locations, and vice versa.
 2. There is not currently a way to filter by objects that are stored in table rows. The reason
 for this is because we don't want to check the UNION of all table_rows and object_versions for
 every intermediate CTE. We can pretty easily add this with a max condition on the number of CTEs;
-it will not be performant.
+it will not be performant. For longterm performance, we should figure out a way of conveying
+whether data lives in the object_versions table or the table_rows table.
+TODO: could this be done through the expand_columns, like:
+    ["inputs.[example]", "inputs.[example].image"]
+where brackets indicate that the data is stored in the table_rows table.
 """
 
 from abc import abstractmethod
