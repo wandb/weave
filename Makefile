@@ -1,7 +1,8 @@
 .PHONY: docs build
 
 setup-docs-ci:
-	pip install -e .[docs]
+	pip install uv
+	uv sync --group docs
 	playwright install
 
 	cd docs && \
