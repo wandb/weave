@@ -2074,7 +2074,7 @@ class WeaveClient:
                 return val
             # Check if existing ref is to current project, if not,
             # remove the ref and recreate it in the current project
-            if val.project == self.project:
+            if val.project == self.project and val.entity == self.entity:
                 return val
             val = orig_val
 

@@ -5,6 +5,7 @@ import {Popup} from 'semantic-ui-react';
 
 import {ID} from '../../util/id';
 import {SliderKeyboardOperation} from '../../util/media';
+import {shiftInputByValue} from '../../util/shiftInputByValue';
 // Doesn't yet work in nested panels yet.
 // import {BetterPopup} from '../BetterPopup';
 import NumberInput from './NumberInput';
@@ -85,13 +86,29 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
     const keyboardOperations = React.useMemo(() => {
       return {
         [SliderKeyboardOperation.INCREMENT]: (event: KeyboardEvent) => {
-          update(sliderValue + 1);
+          const newValue = shiftInputByValue(
+            ticks,
+            strideLength,
+            1,
+            sliderValue,
+            min,
+            max
+          );
+          update(newValue);
         },
         [SliderKeyboardOperation.DECREMENT]: (event: KeyboardEvent) => {
-          update(sliderValue - 1);
+          const newValue = shiftInputByValue(
+            ticks,
+            strideLength,
+            -1,
+            sliderValue,
+            min,
+            max
+          );
+          update(newValue);
         },
       };
-    }, [sliderValue, update]);
+    }, [sliderValue, update, ticks, strideLength, min, max]);
 
     const isFormField = React.useCallback(
       (node?: Element | null | undefined) => {

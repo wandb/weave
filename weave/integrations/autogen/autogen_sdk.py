@@ -560,6 +560,10 @@ def get_autogen_patcher(
         return _autogen_patcher
 
     try:
+        if importlib.util.find_spec("autogen_agentchat") is None:
+            logger.debug("autogen_agentchat package not found, skipping patching")
+            return NoOpPatcher()
+
         # Preload autogen-ext modules to ensure subclasses are properly discovered
         _preload_autogen_extensions()
 
