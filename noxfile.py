@@ -87,7 +87,13 @@ def non_server_tests(session):
     ]
     test_dirs = ["trace/"]
 
-    session.run_install("uv", "sync", "--group=test")
+    session.run_install(
+        "uv",
+        "sync",
+        "--group=test",
+        f"--python={session.virtualenv.location}",
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
     session.chdir("tests")
     session.run(
         *pytest_args,
