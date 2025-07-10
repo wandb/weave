@@ -7,7 +7,7 @@ from typing import Any, Optional, Union, cast
 from pydantic import BaseModel
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import max_calls_queue_size
+from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -78,6 +78,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         should_batch: bool = False,
         *,
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
+        auth: Optional[tuple[str, str]] = None,
+        extra_headers: Optional[dict[str, str]] = None,
     ):
         super().__init__()
         self.trace_server_url = trace_server_url
@@ -87,8 +89,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self.call_processor = AsyncBatchProcessor(
                 self._flush_calls,
                 max_queue_size=max_calls_queue_size(),
+                enable_disk_fallback=should_enable_disk_fallback(),
             )
-        self._auth: Optional[tuple[str, str]] = None
+        self._auth: Optional[tuple[str, str]] = auth
+        self._extra_headers: Optional[dict[str, str]] = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
     def ensure_project_exists(
@@ -109,17 +113,31 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
+    def get(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        return requests.get(
+            self.trace_server_url + url,
+            *args,
+            **kwargs,
+        )
+
+    def post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        return requests.post(
+            self.trace_server_url + url,
+            *args,
+            auth=self._auth,
+            headers=self._extra_headers,
+            **kwargs,
+        )
+
     @with_retry
     def _send_batch_to_server(self, encoded_data: bytes) -> None:
         """Send a batch of data to the server with retry logic.
 
         This method is separated from _flush_calls to avoid recursive retries.
         """
-        r = requests.post(
-            self.trace_server_url + "/call/upsert_batch",
+        r = self.post(
+            "/call/upsert_batch",
             data=encoded_data,  # type: ignore
-            auth=self._auth,
-            # timeout=DEFAULT_TIMEOUT,
         )
         if r.status_code == 413:
             # handle 413 explicitly to provide actionable error message
@@ -213,16 +231,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         req: BaseModel,
         stream: bool = False,
     ) -> requests.Response:
-        r = requests.post(
-            self.trace_server_url + url,
+        r = self.post(
+            url,
             # `by_alias` is required since we have Mongo-style properties in the
             # query models that are aliased to conform to start with `$`. Without
             # this, the model_dump will use the internal property names which are
             # not valid for the `model_validate` step.
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
-            auth=self._auth,
             stream=stream,
-            # timeout=DEFAULT_TIMEOUT,
         )
         if r.status_code == 500:
             reason_val = r.text
@@ -266,9 +282,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @with_retry
     def server_info(self) -> ServerInfoRes:
-        r = requests.get(
-            self.trace_server_url + "/server_info",
-            # timeout=DEFAULT_TIMEOUT,
+        r = self.get(
+            "/server_info",
         )
         r.raise_for_status()
         return ServerInfoRes.model_validate(r.json())
@@ -511,23 +526,19 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @with_retry
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        r = requests.post(
-            self.trace_server_url + "/files/create",
-            auth=self._auth,
+        r = self.post(
+            "/files/create",
             data={"project_id": req.project_id},
             files={"file": (req.name, req.content)},
-            # timeout=DEFAULT_TIMEOUT,
         )
         r.raise_for_status()
         return tsi.FileCreateRes.model_validate(r.json())
 
     @with_retry
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        r = requests.post(
-            self.trace_server_url + "/files/content",
+        r = self.post(
+            "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},
-            auth=self._auth,
-            # timeout=DEFAULT_TIMEOUT,
         )
         r.raise_for_status()
         # TODO: Should stream to disk rather than to memory
@@ -622,6 +633,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         return self._generic_request(
             "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
+        )
+
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        return self._generic_stream_request(
+            "/threads/stream_query", req, tsi.ThreadsQueryReq, tsi.ThreadSchema
         )
 
 

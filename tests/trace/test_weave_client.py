@@ -34,6 +34,7 @@ from weave.trace.refs import (
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
     DeletedRef,
+    TableRef,
 )
 from weave.trace.serialization.serializer import (
     get_serializer_for_obj,
@@ -136,14 +137,14 @@ def test_table_update(client):
     assert check_res.digest == table_create_res.digest
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_table_append(server):
     table_ref = server.new_table([1, 2, 3])
     new_table_ref, item_id = server.table_append(table_ref, 4)
     assert [r.val for r in server.table_query(new_table_ref)] == [1, 2, 3, 4]
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_table_remove(server):
     table_ref0 = server.new_table([1])
     table_ref1, item_id2 = server.table_append(table_ref0, 2)
@@ -152,23 +153,23 @@ def test_table_remove(server):
     assert [r.val for r in server.table_query(table_ref3)] == [1, 3]
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def new_val_single(server):
     obj_id = server.new_val(42)
     assert server.get(obj_id) == 42
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_new_val_with_list(server):
     ref = server.new_val({"a": [1, 2, 3]})
     server_val = server.get_val(ref)
     table_ref = server_val["a"]
-    assert isinstance(table_ref, chobj.TableRef)
+    assert isinstance(table_ref, TableRef)
     table_val = server.table_query(table_ref)
     assert [r.val for r in table_val] == [1, 2, 3]
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_object(server):
     obj_ref = server.new_object({"a": 43}, "my-obj", "latest")
     val_ref = server._resolve_object("my-obj", "latest")
@@ -739,7 +740,7 @@ def test_dataset_calls(client):
     assert calls[1].inputs["a"] == "yy"
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_mutations(client):
     dataset = client.save(
         weave.Dataset(
@@ -801,7 +802,7 @@ def test_mutations(client):
     assert new_ds_rows[2] == {"doc": "zz", "label": "e"}
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_stable_dataset_row_refs(client):
     dataset = client.save(
         weave.Dataset(
@@ -887,12 +888,12 @@ def test_object_mismatch_project_ref_nested(client):
     res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
     assert len(res.objs) == 2
 
-    op = [x for x in res.objs if x.kind == "op"][0]
+    op = next(x for x in res.objs if x.kind == "op")
     assert op.object_id == "hello_world"
     assert op.project_id == "shawn/test-project2"
     assert op.kind == "op"
 
-    obj = [x for x in res.objs if x.kind == "object"][0]
+    obj = next(x for x in res.objs if x.kind == "object")
     assert obj.object_id == "my-object"
     assert obj.project_id == "shawn/test-project2"
 
@@ -1316,7 +1317,7 @@ def test_summary_tokens(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert call.summary["usage"] == {
         "model_a": {"requests": 2, "prompt_tokens": 10, "completion_tokens": 16},
@@ -1360,7 +1361,7 @@ def test_summary_descendents(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello error: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert list(call.summary["descendants"].items()) == [
         (ObjectRefStrMatcher(name="model_a"), {"successes": 2, "errors": 0}),
@@ -1400,8 +1401,8 @@ def test_table_partitioning(network_proxy_client):
     creation into multiple updates
     """
     client, remote_client, records = network_proxy_client
-    NUM_ROWS = 16
-    rows = list(row_gen(NUM_ROWS, 1024))
+    num_rows = 16
+    rows = list(row_gen(num_rows, 1024))
     exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
     row_digests = [
         "2df5YAp2sqlYyxEpTKsIrUlf9Kc5ZxEkbqtqUnYOLhk",
@@ -1452,7 +1453,7 @@ def test_table_partitioning(network_proxy_client):
     assert len(records) == (
         1  # The first create call,
         + 1  # the second  create
-        + NUM_ROWS / 2  # updates - 2 per batch
+        + num_rows / 2  # updates - 2 per batch
     )
 
 
@@ -1498,7 +1499,7 @@ def test_summary_tokens_cost(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert call.summary["usage"] == {
         "gpt-4": {
@@ -1513,30 +1514,30 @@ def test_summary_tokens_cost(client):
         },
     }
 
-    callsWithCost = list(
+    calls_with_cost = list(
         client.get_calls(
             filter=tsi.CallsFilter(op_names=[call.op_name]),
             include_costs=True,
         )
     )
-    callsNoCost = list(
+    calls_no_cost = list(
         client.get_calls(
             filter=tsi.CallsFilter(op_names=[call.op_name]),
             include_costs=False,
         )
     )
 
-    assert len(callsWithCost) == len(callsNoCost)
-    assert len(callsWithCost) == 1
+    assert len(calls_with_cost) == len(calls_no_cost)
+    assert len(calls_with_cost) == 1
 
-    noCostCallSummary = callsNoCost[0].summary
-    withCostCallSummary = callsWithCost[0].summary
+    no_cost_call_summary = calls_no_cost[0].summary
+    with_cost_call_summary = calls_with_cost[0].summary
 
-    assert withCostCallSummary.get("weave", "bah") != "bah"
-    assert len(withCostCallSummary["weave"]["costs"]) == 2
+    assert with_cost_call_summary.get("weave", "bah") != "bah"
+    assert len(with_cost_call_summary["weave"]["costs"]) == 2
 
-    gpt4cost = withCostCallSummary["weave"]["costs"]["gpt-4"]
-    gpt4ocost = withCostCallSummary["weave"]["costs"]["gpt-4o"]
+    gpt4cost = with_cost_call_summary["weave"]["costs"]["gpt-4"]
+    gpt4ocost = with_cost_call_summary["weave"]["costs"]["gpt-4o"]
 
     # delete the effective_date and created_at fields, as they will be different each start up
     del gpt4cost["effective_date"]
@@ -1584,7 +1585,7 @@ def test_summary_tokens_cost(client):
 
     # for no cost call, there should be no cost information
     # currently that means no weave object in the summary
-    assert noCostCallSummary["weave"] == {
+    assert no_cost_call_summary["weave"] == {
         "status": "success",
         "trace_name": "models",
         "latency_ms": AnyIntMatcher(),
@@ -1603,14 +1604,14 @@ def test_summary_tokens_cost_sqlite(client):
     _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
     call1 = client.create_call("y", {"a": 6, "b": 11})
 
-    callsWithCost = list(client.get_calls(include_costs=True))
-    callsNoCost = list(client.get_calls(include_costs=False))
+    calls_with_cost = list(client.get_calls(include_costs=True))
+    calls_no_cost = list(client.get_calls(include_costs=False))
 
-    assert len(callsWithCost) == len(callsNoCost)
-    assert len(callsWithCost) == 4
+    assert len(calls_with_cost) == len(calls_no_cost)
+    assert len(calls_with_cost) == 4
 
-    noCostCallSummary = callsNoCost[0].summary
-    withCostCallSummary = callsWithCost[0].summary
+    no_cost_call_summary = calls_no_cost[0].summary
+    with_cost_call_summary = calls_with_cost[0].summary
 
     weave_summary = {
         "weave": {
@@ -1619,8 +1620,8 @@ def test_summary_tokens_cost_sqlite(client):
         }
     }
 
-    assert noCostCallSummary == weave_summary
-    assert withCostCallSummary == weave_summary
+    assert no_cost_call_summary == weave_summary
+    assert with_cost_call_summary == weave_summary
 
 
 def test_ref_in_dict(client):
@@ -2063,7 +2064,7 @@ def test_calls_query_filter_by_strings(client):
     test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
     test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
 
-    for i in range(5):
+    for _i in range(5):
         dummy_op()
 
     # Flush to ensure all calls are persisted

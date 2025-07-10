@@ -9,6 +9,7 @@ import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Pill} from '@wandb/weave/components/Tag';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import ReactDOM from 'react-dom';
@@ -55,7 +56,12 @@ export interface ProviderOption {
   llms: Array<LLMOption>;
   isDisabled?: boolean;
   providers?: ProviderOption[];
+  isPreview?: boolean; // If true, show a preview pill in the dropdown
 }
+
+export type OpenDirection = {
+  horizontal: 'left' | 'right';
+};
 
 export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   onChange: (
@@ -67,7 +73,9 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   project: string;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
-  onViewCatalog?: (provider: string) => void;
+  onViewCatalog?: (path?: string) => void;
+  providers?: ProviderOption[];
+  direction: OpenDirection;
 }
 
 const SubMenu = ({
@@ -80,6 +88,7 @@ const SubMenu = ({
   onConfigureProvider,
   onViewCatalog,
   providers,
+  direction,
 }: {
   value: string;
   llms: Array<LLMOption>;
@@ -88,62 +97,169 @@ const SubMenu = ({
     maxTokens: number,
     savedModel?: SavedPlaygroundModelState
   ) => void;
-  position: {top: number; left: number};
+  position: {top: number; left: number; bottom: number; right: number};
   onSelect: () => void;
   isAdmin?: boolean;
   onConfigureProvider?: (provider: string) => void;
-  onViewCatalog?: (provider: string) => void;
+  onViewCatalog?: (path?: string) => void;
   providers?: ProviderOption[];
+  direction: OpenDirection;
 }) => {
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth);
+      setViewportHeight(window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const subMenuPosition = useMemo(() => {
+    // Calculate if dropdown is above or below 50% of the viewport
+    const dropdownMidpoint = (position.top + position.bottom) / 2;
+    const viewportMidpoint = viewportHeight / 2;
+    const shouldOpenDown = dropdownMidpoint < viewportMidpoint;
+
+    if (direction.horizontal === 'right') {
+      if (shouldOpenDown) {
+        return {
+          left: position.right + 1,
+          top: position.top,
+        };
+      } else {
+        return {
+          left: position.right + 1,
+          bottom: viewportHeight - position.bottom + 4,
+        };
+      }
+    } else if (direction.horizontal === 'left') {
+      if (shouldOpenDown) {
+        return {
+          right: viewportWidth - position.left + 1,
+          top: position.top,
+        };
+      } else {
+        return {
+          right: viewportWidth - position.left + 1,
+          bottom: viewportHeight - position.bottom - 4,
+        };
+      }
+    }
+    return {};
+  }, [direction, position, viewportWidth, viewportHeight]);
+
   return ReactDOM.createPortal(
-    <Box
-      sx={{
-        position: 'fixed',
-        left: position.left - 4,
-        top: position.top - 6,
-        backgroundColor: 'white',
-        boxShadow: '0 2px 8px ' + hexToRGB(OBLIVION, 0.15),
-        borderRadius: '4px',
-        width: '300px',
-        maxHeight: '400px',
-        overflowY: 'auto',
-        border: '1px solid ' + hexToRGB(OBLIVION, 0.1),
-        p: '6px',
-        zIndex: 1,
-      }}>
-      {llms.map(llm => {
-        // TODO: Would be nice to have all models in the catalog so we could
-        //       display tiles, link to comparison and details, etc.
-        const isCoreWeaveModel = value === 'coreweave';
-        const catalogModel = isCoreWeaveModel
-          ? MODEL_INDEX[llm.catalogId ?? '']
-          : null;
-        const isUnspportedCoreWeaveModel =
-          isCoreWeaveModel &&
-          (!catalogModel || catalogModel.apiStyle !== 'chat');
-        if (isUnspportedCoreWeaveModel) {
-          // Playground doesn't support embedding models.
-          return null;
-        }
-        return (
+    <Tailwind>
+      <Box
+        sx={{
+          position: 'fixed',
+          ...subMenuPosition,
+          backgroundColor: 'white',
+          boxShadow: '0 2px 8px ' + hexToRGB(OBLIVION, 0.15),
+          borderRadius: '4px',
+          width: '300px',
+          maxHeight: '400px',
+          overflowY: 'auto',
+          border: '1px solid ' + hexToRGB(OBLIVION, 0.1),
+          p: '6px',
+          zIndex: 10000,
+        }}>
+        {llms.map(llm => {
+          // TODO: Would be nice to have all models in the catalog so we could
+          //       display tiles, link to comparison and details, etc.
+          const isCoreWeaveModel = value === 'coreweave';
+          const catalogModel = isCoreWeaveModel
+            ? MODEL_INDEX[llm.catalogId ?? '']
+            : null;
+          const isUnspportedCoreWeaveModel =
+            isCoreWeaveModel &&
+            (!catalogModel || catalogModel.apiStyle !== 'chat');
+          if (isUnspportedCoreWeaveModel) {
+            // Playground doesn't support embedding models.
+            return null;
+          }
+          return (
+            <Box
+              key={`${llm.value}${llm.versionIndex}`}
+              onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                onChange(
+                  llm.value as LLMMaxTokensKey,
+                  llm.max_tokens,
+                  llm.defaultParams && llm.baseModelId
+                    ? LLMOptionToSavedPlaygroundModelState(llm)
+                    : undefined
+                );
+                onSelect();
+              }}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                width: '100%',
+                wordBreak: 'break-all',
+                wordWrap: 'break-word',
+                whiteSpace: 'normal',
+                p: '6px',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                '&:hover': {
+                  backgroundColor: hexToRGB(OBLIVION, 0.04),
+                  '& .info-button': {
+                    opacity: 1,
+                  },
+                },
+              }}>
+              <Box sx={{flex: 1}}>
+                {llm.label}
+                {llm.subLabel && (
+                  <div className="text-sm text-moon-500">{llm.subLabel}</div>
+                )}
+              </Box>
+              {catalogModel && onViewCatalog && (
+                <Box sx={{opacity: 0}} className="info-button">
+                  <Button
+                    icon="info"
+                    variant="ghost"
+                    size="small"
+                    tooltip={
+                      <ModelTile
+                        model={catalogModel}
+                        hint="Click info button for full model details"
+                      />
+                    }
+                    tooltipProps={{
+                      className: 'p-0 bg-transparent',
+                      side: 'bottom',
+                      sideOffset: 8,
+                    }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onViewCatalog(
+                        `${catalogModel.provider}/${catalogModel.id}`
+                      );
+                    }}
+                  />
+                </Box>
+              )}
+            </Box>
+          );
+        })}
+        {onViewCatalog && !providers && value === 'coreweave' && (
           <Box
-            key={`${llm.value}${llm.versionIndex}`}
             onClick={e => {
-              e.preventDefault();
               e.stopPropagation();
-              onChange(
-                llm.value as LLMMaxTokensKey,
-                llm.max_tokens,
-                llm.defaultParams && llm.baseModelId
-                  ? LLMOptionToSavedPlaygroundModelState(llm)
-                  : undefined
-              );
-              onSelect();
+              // TODO: Pass the value as the path if we add comparison for other providers
+              onViewCatalog();
             }}
             sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1,
               width: '100%',
               wordBreak: 'break-all',
               wordWrap: 'break-word',
@@ -151,6 +267,7 @@ const SubMenu = ({
               p: '6px',
               cursor: 'pointer',
               borderRadius: '4px',
+              fontWeight: 600,
               '&:hover': {
                 backgroundColor: hexToRGB(OBLIVION, 0.04),
                 '& .info-button': {
@@ -158,128 +275,70 @@ const SubMenu = ({
                 },
               },
             }}>
-            <Box sx={{flex: 1}}>
-              {llm.label}
-              {llm.subLabel && (
-                <div className="text-sm text-moon-500">{llm.subLabel}</div>
-              )}
+            <Box sx={{flex: 1}}>Compare models</Box>
+            <Box sx={{opacity: 0}} className="info-button">
+              <Icon width={18} height={18} name="forward-next" />
             </Box>
-            {catalogModel && onViewCatalog && (
-              <Box sx={{opacity: 0}} className="info-button">
+          </Box>
+        )}
+        {providers?.map(provider => {
+          const tooltipContent =
+            provider.value !== 'custom-provider' && !isAdmin
+              ? 'You must be an admin to configure this provider'
+              : undefined;
+
+          const trigger = (
+            <Box
+              key={provider.value}
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                p: '6px',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                '&:hover': {
+                  backgroundColor: hexToRGB(OBLIVION, 0.04),
+                },
+                width: '100%',
+              }}
+              onClick={() => {
+                if (provider.value === 'custom-provider' || isAdmin) {
+                  onConfigureProvider?.(provider.value);
+                }
+              }}>
+              <Box
+                sx={{
+                  wordBreak: 'break-all',
+                  wordWrap: 'break-word',
+                  whiteSpace: 'normal',
+                }}>
+                {provider.label}
+              </Box>
+              <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
                 <Button
-                  icon="info"
                   variant="ghost"
                   size="small"
-                  tooltip={
-                    <ModelTile
-                      model={catalogModel}
-                      hint="Click info button for full model details"
-                    />
-                  }
-                  tooltipProps={{
-                    className: 'p-0 bg-transparent',
-                    side: 'bottom',
-                    sideOffset: 8,
-                  }}
                   onClick={e => {
+                    e.preventDefault();
                     e.stopPropagation();
-                    onViewCatalog(
-                      `${catalogModel.provider}/${catalogModel.id}`
-                    );
+                    onConfigureProvider?.(provider.value);
                   }}
-                />
+                  disabled={!isAdmin && provider.value !== 'custom-provider'}>
+                  Configure
+                </Button>
               </Box>
-            )}
-          </Box>
-        );
-      })}
-      {onViewCatalog && !providers && value === 'coreweave' && (
-        <Box
-          onClick={e => {
-            e.stopPropagation();
-            onViewCatalog(value);
-          }}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            width: '100%',
-            wordBreak: 'break-all',
-            wordWrap: 'break-word',
-            whiteSpace: 'normal',
-            p: '6px',
-            cursor: 'pointer',
-            borderRadius: '4px',
-            fontWeight: 600,
-            '&:hover': {
-              backgroundColor: hexToRGB(OBLIVION, 0.04),
-              '& .info-button': {
-                opacity: 1,
-              },
-            },
-          }}>
-          <Box sx={{flex: 1}}>Compare models</Box>
-          <Box sx={{opacity: 0}} className="info-button">
-            <Icon width={18} height={18} name="forward-next" />
-          </Box>
-        </Box>
-      )}
-      {providers?.map(provider => {
-        const tooltipContent =
-          provider.value !== 'custom-provider' && !isAdmin
-            ? 'You must be an admin to configure this provider'
-            : undefined;
-
-        const trigger = (
-          <Box
-            key={provider.value}
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              p: '6px',
-              cursor: 'pointer',
-              borderRadius: '4px',
-              '&:hover': {
-                backgroundColor: hexToRGB(OBLIVION, 0.04),
-              },
-              width: '100%',
-            }}
-            onClick={() => {
-              if (provider.value === 'custom-provider' || isAdmin) {
-                onConfigureProvider?.(provider.value);
-              }
-            }}>
-            <Box
-              sx={{
-                wordBreak: 'break-all',
-                wordWrap: 'break-word',
-                whiteSpace: 'normal',
-              }}>
-              {provider.label}
             </Box>
-            <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
-              <Button
-                variant="ghost"
-                size="small"
-                onClick={e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onConfigureProvider?.(provider.value);
-                }}
-                disabled={!isAdmin && provider.value !== 'custom-provider'}>
-                Configure
-              </Button>
-            </Box>
-          </Box>
-        );
+          );
 
-        return tooltipContent ? (
-          <Tooltip content={tooltipContent} trigger={trigger} />
-        ) : (
-          trigger
-        );
-      })}
-    </Box>,
+          return tooltipContent ? (
+            <Tooltip content={tooltipContent} trigger={trigger} />
+          ) : (
+            trigger
+          );
+        })}
+      </Box>
+    </Tailwind>,
     document.body
   );
 };
@@ -292,10 +351,16 @@ const SubMenuOption = ({
   isAdmin,
   onConfigureProvider,
   onViewCatalog,
+  direction,
   ...props
 }: CustomOptionProps) => {
   const [isHovered, setIsHovered] = useState(false);
-  const [position, setPosition] = useState({top: 0, left: 0});
+  const [position, setPosition] = useState({
+    top: 0,
+    left: 0,
+    bottom: 0,
+    right: 0,
+  });
   const optionRef = useRef<HTMLDivElement>(null);
   const {llms, isDisabled} = props.data;
   const hasOptions = llms.length > 0 || (props.data.providers?.length ?? 0) > 0;
@@ -305,7 +370,9 @@ const SubMenuOption = ({
       const rect = optionRef.current.getBoundingClientRect();
       setPosition({
         top: rect.top,
-        left: rect.right + 4,
+        bottom: rect.bottom,
+        left: rect.left,
+        right: rect.right,
       });
     }
   }, [isHovered]);
@@ -336,9 +403,19 @@ const SubMenuOption = ({
           <Box
             sx={{
               display: 'flex',
-              justifyContent: 'space-between',
               alignItems: 'center',
             }}>
+            {direction.horizontal === 'left' && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1,
+                  marginRight: '8px',
+                  alignItems: 'center',
+                }}>
+                {hasOptions && <Icon name="chevron-back" color="moon_500" />}
+              </Box>
+            )}
             <Box
               sx={{
                 wordBreak: 'break-all',
@@ -346,11 +423,22 @@ const SubMenuOption = ({
                 whiteSpace: 'normal',
                 width: '90%',
               }}>
-              {children}
+              <div className="flex items-center gap-8">
+                {children}
+                {props.data.isPreview && <Pill label="Preview" color="moon" />}
+              </div>
             </Box>
-            <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
-              {hasOptions && <Icon name="chevron-next" color="moon_500" />}
-            </Box>
+            {direction.horizontal === 'right' && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1,
+                  marginLeft: 'auto',
+                  alignItems: 'center',
+                }}>
+                {hasOptions && <Icon name="chevron-next" color="moon_500" />}
+              </Box>
+            )}
           </Box>
         </components.Option>
       </Box>
@@ -371,6 +459,7 @@ const SubMenuOption = ({
           isAdmin={isAdmin}
           onConfigureProvider={onConfigureProvider}
           onViewCatalog={onViewCatalog}
+          direction={direction}
         />
       )}
     </Box>
@@ -572,6 +661,7 @@ export const useLLMDropdownOptions = (
         label:
           LLM_PROVIDER_LABELS[provider as keyof typeof LLM_PROVIDER_LABELS],
         value: provider,
+        isPreview: provider === 'coreweave',
         llms: status ? providerLLMs : [],
         isDisabled: !status,
       };

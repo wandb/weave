@@ -11,9 +11,7 @@ from weave.trace_server.trace_server_interface import (
     CompletionsCreateRequestInputs,
 )
 
-# TODO: Fast follow up
-# JSON_SCHEMA = "json_schema"
-ResponseFormat = Literal["json_object", "text"]
+ResponseFormat = Literal["json_object", "json_schema", "text"]
 
 
 def is_response_format(value: Any) -> bool:
@@ -137,7 +135,7 @@ class LLMStructuredCompletionModel(Model):
     @op
     def predict(
         self,
-        user_input: MessageListLike = [],
+        user_input: Optional[MessageListLike] = None,
         config: Optional[LLMStructuredModelParamsLike] = None,
         **template_vars: Any,
     ) -> Union[Message, str, dict[str, Any]]:
@@ -150,12 +148,56 @@ class LLMStructuredCompletionModel(Model):
             config: Optional configuration to override default parameters
             **template_vars: Variables to substitute in the messages template using {variable_name} syntax
         """
+        if user_input is None:
+            user_input = []
+
         current_client = get_weave_client()
         if current_client is None:
             raise WeaveInitError(
                 "You must call `weave.init(<project_name>)` first, to predict with a LLMStructuredCompletionModel"
             )
 
+        req = self.prepare_completion_request(
+            project_id=f"{current_client.entity}/{current_client.project}",
+            user_input=user_input,
+            config=config,
+            **template_vars,
+        )
+
+        # 5. Call the LLM API
+        try:
+            api_response = current_client.server.completions_create(req=req)
+        except Exception as e:
+            raise RuntimeError("Failed to call LLM completions endpoint.") from e
+
+        # 6. Extract the message from the API response
+        try:
+            # The 'response' attribute of CompletionsCreateRes is a dict
+            response_payload = api_response.response
+            response_format = (
+                req.inputs.response_format.get("type")
+                if req.inputs.response_format is not None
+                else None
+            )
+            return parse_response(response_payload, response_format)
+        except (
+            KeyError,
+            IndexError,
+            TypeError,
+            AttributeError,
+            json.JSONDecodeError,
+        ) as e:
+            raise RuntimeError(
+                f"Failed to extract message from LLM response payload. Response: {api_response.response}"
+            ) from e
+
+    def prepare_completion_request(
+        self,
+        project_id: str,
+        user_input: MessageListLike,
+        config: Optional[LLMStructuredModelParamsLike],
+        **template_vars: Any,
+    ) -> CompletionsCreateReq:
         # Ensure user_input is properly converted to a list of Message objects
         # This is needed because the @op decorator might interfere with Pydantic validation
         if not isinstance(user_input, list) or (
@@ -194,47 +236,29 @@ class LLMStructuredCompletionModel(Model):
             model=model_id_str, messages=prepared_messages_dicts, **completion_params
         )
         req = CompletionsCreateReq(
-            project_id=f"{current_client.entity}/{current_client.project}",
+            project_id=project_id,
             inputs=completion_inputs,
         )
 
-        # 5. Call the LLM API
-        try:
-            api_response = current_client.server.completions_create(req=req)
-        except Exception as e:
-            raise RuntimeError("Failed to call LLM completions endpoint.") from e
+        return req
 
-        # 6. Extract the message from the API response
-        try:
-            # The 'response' attribute of CompletionsCreateRes is a dict
-            response_payload = api_response.response
-            if response_payload.get("error"):
-                # Or handle more gracefully depending on desired behavior
-                raise RuntimeError(
-                    f"LLM API returned an error: {response_payload['error']}"
-                )
 
-            # Assuming OpenAI-like structure: a list of choices, first choice has the message
-            output_message_dict = response_payload["choices"][0]["message"]
+def parse_response(
+    response_payload: dict, response_format: Optional[ResponseFormat]
+) -> Union[Message, str, dict[str, Any]]:
+    if response_payload.get("error"):
+        # Or handle more gracefully depending on desired behavior
+        raise RuntimeError(f"LLM API returned an error: {response_payload['error']}")
 
-            if default_p_model.response_format == "text":
-                return output_message_dict["content"]
-            elif default_p_model.response_format == "json_object":
-                return json.loads(output_message_dict["content"])
-            else:
-                raise ValueError(
-                    f"Invalid response_format: {default_p_model.response_format}"
-                )
-        except (
-            KeyError,
-            IndexError,
-            TypeError,
-            AttributeError,
-            json.JSONDecodeError,
-        ) as e:
-            raise RuntimeError(
-                f"Failed to extract message from LLM response payload. Response: {api_response.response}"
-            ) from e
+    # Assuming OpenAI-like structure: a list of choices, first choice has the message
+    output_message_dict = response_payload["choices"][0]["message"]
+
+    if response_format == "text":
+        return output_message_dict["content"]
+    elif response_format == "json_object":
+        return json.loads(output_message_dict["content"])
+    else:
+        raise ValueError(f"Invalid response_format: {response_format}")
 
 
 def _prepare_llm_messages(

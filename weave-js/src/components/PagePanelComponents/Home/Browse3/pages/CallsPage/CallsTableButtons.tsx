@@ -186,6 +186,7 @@ export const ExportSelector = ({
   };
 
   const pythonText = makeCodeText(
+    callQueryParams.entity,
     callQueryParams.project,
     selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
@@ -570,6 +571,7 @@ function makeLeafColumns(visibleColumns: string[]) {
 }
 
 function makeCodeText(
+  entity: string,
   project: string,
   callIds: string[] | undefined,
   filter: CallFilter,
@@ -578,7 +580,7 @@ function makeCodeText(
   includeFeedback: boolean,
   includeCosts: boolean
 ) {
-  let codeStr = `import weave\n\nclient = weave.init("${project}")`;
+  let codeStr = `import weave\n\nclient = weave.init("${entity}/${project}")`;
   codeStr += `\ncalls = client.get_calls(\n`;
   const filteredCallIds = callIds ?? filter.callIds;
   if (filteredCallIds && filteredCallIds.length > 0) {
@@ -595,13 +597,13 @@ function makeCodeText(
   }
   if (Object.values(filter).some(value => value !== undefined)) {
     codeStr += `    filter={`;
-    if (filter.opVersionRefs) {
+    if (filter.opVersionRefs && filter.opVersionRefs.length > 0) {
       codeStr += `"op_names": ["${filter.opVersionRefs.join('", "')}"],`;
     }
-    if (filter.runIds) {
+    if (filter.runIds && filter.runIds.length > 0) {
       codeStr += `"run_ids": ["${filter.runIds.join('", "')}"],`;
     }
-    if (filter.userIds) {
+    if (filter.userIds && filter.userIds.length > 0) {
       codeStr += `"user_ids": ["${filter.userIds.join('", "')}"],`;
     }
     if (filter.traceId) {
@@ -610,7 +612,7 @@ function makeCodeText(
     if (filter.traceRootsOnly) {
       codeStr += `"trace_roots_only": True,`;
     }
-    if (filter.parentIds) {
+    if (filter.parentIds && filter.parentIds.length > 0) {
       codeStr += `"parent_ids": ["${filter.parentIds.join('", "')}"],`;
     }
     codeStr = codeStr.slice(0, -1);
@@ -647,17 +649,28 @@ function makeCurlText(
   includeCosts: boolean
 ) {
   const baseUrl = (window as any).CONFIG.TRACE_BACKEND_BASE_URL;
+  const hasOpNames = filter.opVersionRefs && filter.opVersionRefs.length > 0;
+  const hasInputRefs =
+    filter.inputObjectVersionRefs && filter.inputObjectVersionRefs.length > 0;
+  const hasOutputRefs =
+    filter.outputObjectVersionRefs && filter.outputObjectVersionRefs.length > 0;
+  const hasParentIds = filter.parentIds && filter.parentIds.length > 0;
+  const hasTraceIds = filter.traceId;
+  const hasCallIds = callIds && callIds.length > 0;
+  const hasRunIds = filter.runIds && filter.runIds.length > 0;
+  const hasUserIds = filter.userIds && filter.userIds.length > 0;
+
   const filterStr = JSON.stringify(
     {
-      op_names: filter.opVersionRefs,
-      input_refs: filter.inputObjectVersionRefs,
-      output_refs: filter.outputObjectVersionRefs,
-      parent_ids: filter.parentIds,
-      trace_ids: filter.traceId ? [filter.traceId] : undefined,
-      call_ids: callIds,
+      op_names: hasOpNames ? filter.opVersionRefs : undefined,
+      input_refs: hasInputRefs ? filter.inputObjectVersionRefs : undefined,
+      output_refs: hasOutputRefs ? filter.outputObjectVersionRefs : undefined,
+      parent_ids: hasParentIds ? filter.parentIds : undefined,
+      trace_ids: hasTraceIds ? [filter.traceId] : undefined,
+      call_ids: hasCallIds ? callIds : undefined,
       trace_roots_only: filter.traceRootsOnly,
-      wb_run_ids: filter.runIds,
-      wb_user_ids: filter.userIds,
+      wb_run_ids: hasRunIds ? filter.runIds : undefined,
+      wb_user_ids: hasUserIds ? filter.userIds : undefined,
     },
     null,
     0

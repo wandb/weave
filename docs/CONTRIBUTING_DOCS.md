@@ -7,6 +7,7 @@ Thanks for contributing to Weave Docs 💛!
 - Ensure tone and style is consistent with existing documentation.
 - Update the `sidebar.ts` file if you add new pages.
 - **Always run** `make docs` before submitting a PR to ensure all auto-generated docs are fresh.
+- When moving a page from one location to another e.g. moving from `https://weave-docs.wandb.ai/old_url` to `https://weave-docs.wandb.ai/new_url`, always [add redirects as described here](#moving-pages-and-redirects).
 
 ## Setup
 
@@ -53,7 +54,8 @@ In successful `yarn start` output, you'll see a port number where you can previe
    ```bash
    yarn start
    ```
-4. Preview and review your changes in the docs UI. 
+4. Preview and review your changes in the docs UI.
+   > When moving a page from one location to another e.g. moving from `https://weave-docs.wandb.ai/old_url` to `https://weave-docs.wandb.ai/new_url`, always [add redirects as described here](#moving-pages-and-redirects).
 5. Run `make docs` to regenerate API and notebook docs. 
 
     > Our CI builds and deploys the current state of the documentation but does not automatically regenerate API or notebook docs. If you skip `make docs`, stale or missing docs might be deployed. For more information, see [`make docs`](#make-docs).
@@ -81,6 +83,48 @@ When to run `make docs`:
 
 - On any Python, Service, SDK, or docs-related changes.
 - Always run before opening a documentation pull request.
+
+## Moving pages and redirects
+
+When moving a page from one location to another e.g. moving from `https://weave-docs.wandb.ai/old_url` to `https://weave-docs.wandb.ai/new_url`, always add redirects. To add and test a redirect, follow these steps:
+
+1. Open `docs/docusaurus.config.ts`
+2. Find `redirects`:
+
+   ```typescript
+   {
+    redirects: [
+        {
+           from: ['/guides/evaluation/imperative_evaluations'],
+           to: '/guides/evaluation/evaluation_logger',
+        },
+      ]  
+    },
+   ```
+3. Add a new redirect object to the `redirects` list and save the file:
+
+   ```typescript
+   {
+    redirects: [
+        {
+           from: ['/guides/evaluation/imperative_evaluations'],
+           to: '/guides/evaluation/evaluation_logger',
+        },
+        {
+           from: ['/old_url'],
+           to: '/new_url',
+        }
+      ]  
+    },
+   ```
+4. Test the build. Note that you can't test redirects when running `yarn start`:
+   ```bash
+   yarn build
+   yarn serve
+   ```
+5. Navigate to the local site build e.g. `http://localhost:3000/`
+6. Manually confirm that the redirect works e.g. `http://localhost:3000/old_url` redirects to `http://localhost:3000/new_url`
+7. Complete all steps described in [How to edit the docs locally](#how-to-edit-the-docs-locally).
 
 ## Doc generation details
 

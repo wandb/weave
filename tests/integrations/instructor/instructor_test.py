@@ -307,7 +307,8 @@ def test_instructor_iterable_async_stream(
     assert len(calls) == 2
 
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "AsyncInstructor.create"
     output = call.output
@@ -317,7 +318,8 @@ def test_instructor_iterable_async_stream(
     assert output[1].age == 30
 
     call = calls[1]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
@@ -370,7 +372,8 @@ list of speakers.
     assert len(calls) == 2
 
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "Instructor.create_partial"
     output = call.output
@@ -385,7 +388,8 @@ list of speakers.
     assert output.users[2].twitter == "@CodeMaster2023"
 
     call = calls[1]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
@@ -442,7 +446,8 @@ list of speakers.
     assert len(calls) == 2
 
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "AsyncInstructor.create_partial"
     output = call.output
@@ -457,6 +462,7 @@ list of speakers.
     assert output.users[2].twitter == "@CodeMaster2023"
 
     call = calls[1]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"

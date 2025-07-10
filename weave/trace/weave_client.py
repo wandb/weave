@@ -14,7 +14,7 @@ import time
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -31,6 +31,8 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
+from weave.chat.chat import Chat
+from weave.chat.inference_models import InferenceModels
 from weave.trace import trace_sentry, urls
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
@@ -141,6 +143,7 @@ from weave.trace_server.trace_server_interface import (
 
 if TYPE_CHECKING:
     import pandas as pd
+    import wandb
 
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
@@ -232,9 +235,8 @@ class PaginatedIterator(Generic[T, R]):
             raise ValueError("Negative step not supported")
 
         # Apply limit if provided
-        if self.limit is not None:
-            if stop is None or stop > self.limit:
-                stop = self.limit
+        if self.limit is not None and (stop is None or stop > self.limit):
+            stop = self.limit
 
         # Apply offset if provided
         if self.offset is not None:
@@ -297,7 +299,7 @@ class PaginatedIterator(Generic[T, R]):
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         records = []
         for item in self:
@@ -507,6 +509,8 @@ class CallDict(TypedDict):
     started_at: datetime.datetime | None
     ended_at: datetime.datetime | None
     deleted_at: datetime.datetime | None
+    thread_id: str | None
+    turn_id: str | None
 
 
 @dataclasses.dataclass
@@ -535,6 +539,8 @@ class Call:
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
     deleted_at: datetime.datetime | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
 
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
@@ -584,7 +590,7 @@ class Call:
             try:
                 entity, project = self.project_id.split("/")
             except ValueError:
-                raise ValueError(f"Invalid project_id: {self.project_id}")
+                raise ValueError(f"Invalid project_id: {self.project_id}") from None
             weave_ref = CallRef(entity, project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
@@ -599,7 +605,7 @@ class Call:
         try:
             entity, project = self.project_id.split("/")
         except ValueError:
-            raise ValueError(f"Invalid project_id: {self.project_id}")
+            raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
 
     @property
@@ -623,7 +629,6 @@ class Call:
         Returns:
             An iterator of calls.
         """
-        client = weave_client_context.require_weave_client()
         if not self.id:
             raise ValueError(
                 "Can't get children of call without ID, was `weave.init` called?"
@@ -743,6 +748,8 @@ class Call:
             started_at=self.started_at,
             ended_at=self.ended_at,
             deleted_at=self.deleted_at,
+            thread_id=self.thread_id,
+            turn_id=self.turn_id,
         )
 
 
@@ -774,6 +781,8 @@ def make_client_call(
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
+        thread_id=server_call.thread_id,
+        turn_id=server_call.turn_id,
     )
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()
@@ -907,6 +916,9 @@ class AttributesDict(dict):
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
+# This size is correlated with the maximum single row insert size
+# in clickhouse, which is currently unavoidable.
+MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
@@ -1014,11 +1026,13 @@ class WeaveClient:
                 if e.response.content:
                     try:
                         reason = json.loads(e.response.content).get("reason")
-                        raise ValueError(reason)
+                        raise ValueError(reason) from None
                     except json.JSONDecodeError:
-                        raise ValueError(e.response.content)
+                        raise ValueError(e.response.content) from None
                 if e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from e
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -1040,7 +1054,9 @@ class WeaveClient:
                 )
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
-                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
+                    raise ValueError(
+                        f"Unable to find object for ref uri: {ref.uri()}"
+                    ) from None
                 raise
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
@@ -1261,7 +1277,24 @@ class WeaveClient:
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
+        # Get thread_id from context
+        thread_id = call_context.get_thread_id()
+        current_turn_id = call_context.get_turn_id()
+
         call_id = generate_id()
+
+        # Determine turn_id: call becomes a turn if thread boundary is crossed
+        if thread_id is None:
+            # No thread context, no turn_id
+            turn_id = None
+        elif parent is None or parent.thread_id != thread_id:
+            # This is a turn call - use its own ID as turn_id
+            turn_id = call_id
+            call_context.set_turn_id(call_id)
+        else:
+            # Inherit turn_id from context
+            turn_id = current_turn_id
+
         call = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
@@ -1271,6 +1304,8 @@ class WeaveClient:
             # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
             attributes=attributes_dict,
+            thread_id=thread_id,
+            turn_id=turn_id,
         )
         # Disallow further modification of attributes after the call is created
         attributes_dict.freeze()
@@ -1303,23 +1338,32 @@ class WeaveClient:
             inputs_json = to_json(
                 maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
             )
-            self.server.call_start(
-                CallStartReq(
-                    start=StartedCallSchemaForInsert(
-                        project_id=project_id,
-                        id=call_id,
-                        op_name=op_def_ref.uri(),
-                        display_name=call.display_name,
-                        trace_id=trace_id,
-                        started_at=started_at,
-                        parent_id=parent_id,
-                        inputs=inputs_json,
-                        attributes=attributes_dict,
-                        wb_run_id=current_wb_run_id,
-                        wb_run_step=current_wb_run_step,
-                    )
+            call_start_req = CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    op_name=op_def_ref.uri(),
+                    display_name=call.display_name,
+                    trace_id=trace_id,
+                    started_at=started_at,
+                    parent_id=parent_id,
+                    inputs=inputs_json,
+                    attributes=attributes_dict,
+                    wb_run_id=current_wb_run_id,
+                    wb_run_step=current_wb_run_step,
+                    thread_id=thread_id,
+                    turn_id=turn_id,
                 )
             )
+
+            bytes_size = len(call_start_req.model_dump_json())
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    f"Trace input size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes."
+                    "Inputs may be dropped."
+                )
+
+            self.server.call_start(call_start_req)
             return True
 
         def on_complete(f: Future) -> None:
@@ -1456,20 +1500,29 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
-            self.server.call_end(
-                CallEndReq(
-                    end=EndedCallSchemaForInsert(
-                        project_id=project_id,
-                        id=call.id,
-                        ended_at=ended_at,
-                        output=output_json,
-                        summary=merged_summary,
-                        exception=exception_str,
-                    )
+            call_end_req = CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call.id,
+                    ended_at=ended_at,
+                    output=output_json,
+                    summary=merged_summary,
+                    exception=exception_str,
                 )
             )
+            bytes_size = len(call_end_req.model_dump_json())
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
+                    "Output may be dropped."
+                )
+            self.server.call_end(call_end_req)
 
         self.future_executor.defer(send_end_call)
+
+        # If a turn call is finishing, reset turn context for next sibling
+        if call.turn_id == call.id and call.thread_id:
+            call_context.set_turn_id(None)
 
         call_context.pop_call(call.id)
 
@@ -1632,9 +1685,7 @@ class WeaveClient:
         llm_id: str,
         prompt_token_cost: float,
         completion_token_cost: float,
-        effective_date: datetime.datetime | None = datetime.datetime.now(
-            datetime.timezone.utc
-        ),
+        effective_date: datetime.datetime | None = None,
         prompt_token_cost_unit: str | None = "USD",
         completion_token_cost_unit: str | None = "USD",
         provider_id: str | None = "default",
@@ -1662,6 +1713,8 @@ class WeaveClient:
             Which has one field called a list of tuples called ids.
             Each tuple contains the llm_id and the id of the created cost object.
         """
+        if effective_date is None:
+            effective_date = datetime.datetime.now(datetime.timezone.utc)
         cost = CostCreateInput(
             prompt_token_cost=prompt_token_cost,
             completion_token_cost=completion_token_cost,
@@ -2012,7 +2065,7 @@ class WeaveClient:
                 return val
             # Check if existing ref is to current project, if not,
             # remove the ref and recreate it in the current project
-            if val.project == self.project:
+            if val.project == self.project and val.entity == self.entity:
                 return val
             val = orig_val
 
@@ -2198,6 +2251,14 @@ class WeaveClient:
 
         self.send_file_cache.put(req, res)
         return res
+
+    @cached_property
+    def inference_models(self) -> InferenceModels:
+        return InferenceModels(self)
+
+    @cached_property
+    def chat(self) -> Chat:
+        return Chat(self)
 
     @property
     def num_outstanding_jobs(self) -> int:
@@ -2426,33 +2487,41 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
     return parallelism_main, parallelism_fastlane
 
 
-def safe_current_wb_run_id() -> str | None:
+def _safe_get_wandb_run() -> wandb.sdk.wandb_run.Run | None:
+    # Check if wandb is installed.  This will pass even if wandb is not installed
+    # if there is a wandb directory in the user's current directory, so the
+    # second check is required.
     try:
         import wandb
-
-        wandb_run = wandb.run
-        if wandb_run is None:
-            return None
-    except ImportError:
+    except (ImportError, ModuleNotFoundError):
         return None
-    else:
-        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
+
+    # If a wandb directory exists, but wandb is installed, `wandb.run` will raise
+    # AttributeError.  This is an artifact of how python handles imports.
+    try:
+        wandb_run = wandb.run
+    except AttributeError:
+        return None
+
+    return wandb_run
+
+
+def safe_current_wb_run_id() -> str | None:
+    wandb_run = _safe_get_wandb_run()
+    if wandb_run is None:
+        return None
+
+    return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
 
 
 def safe_current_wb_run_step() -> int | None:
-    try:
-        import wandb
-
-        wandb_run = wandb.run
-        if wandb_run is None:
-            return None
-    except ImportError:
+    wandb_run = _safe_get_wandb_run()
+    if wandb_run is None:
         return None
-    else:
-        try:
-            return int(wandb_run.step)
-        except Exception:
-            return None
+    try:
+        return int(wandb_run.step)
+    except Exception:
+        return None
 
 
 def check_wandb_run_matches(

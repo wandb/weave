@@ -1,11 +1,11 @@
 import inspect
+import math
 import textwrap
 from collections.abc import Sequence
 from dataclasses import dataclass
 from numbers import Number
 from typing import Any, Callable, Optional, Union, cast
 
-import numpy as np
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
@@ -16,6 +16,13 @@ from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, sanitize_object_name
+
+try:
+    import numpy as np
+except ImportError:
+    _NUMPY_AVAILABLE = False
+else:
+    _NUMPY_AVAILABLE = True
 
 
 class Scorer(Object):
@@ -36,8 +43,6 @@ class Scorer(Object):
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
 
-
-class BuiltInScorer(Scorer):
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
         field_values = {}
@@ -72,12 +77,58 @@ def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
     return True
 
 
+def variance(data: Sequence[Union[int, float]]) -> float:
+    """
+    Calculate the variance of a sequence of numeric values.
+
+    Args:
+        data (Sequence[Union[int, float]]): A sequence of numeric values.
+
+    Returns:
+        float: The variance of the data. Returns 0 if data has length <= 1.
+
+    Examples:
+        >>> variance([1, 2, 3, 4, 5])
+        2.0
+        >>> variance([1])
+        0
+        >>> variance([])
+        0
+    """
+    if len(data) <= 1:
+        return 0
+
+    mean = sum(data) / len(data)
+    return sum((x - mean) ** 2 for x in data) / len(data)
+
+
 def stderr(data: Sequence[Union[int, float]]) -> float:
-    if len(data) > 1:
-        sample_variance = np.var(data, ddof=1)
+    """
+    Calculate the standard error of the mean for a sequence of numeric values.
+
+    Args:
+        data (Sequence[Union[int, float]]): A sequence of numeric values.
+
+    Returns:
+        float: The standard error of the mean. Returns 0 if data has length <= 1.
+
+    Examples:
+        >>> stderr([1, 2, 3, 4, 5])
+        0.7071067811865476
+        >>> stderr([1])
+        0
+        >>> stderr([])
+        0
+    """
+    if len(data) <= 1:
+        return 0
+
+    if _NUMPY_AVAILABLE:
+        sample_variance = float(np.var(data, ddof=1))
         return float(np.sqrt(sample_variance / len(data)))
     else:
-        return 0
+        sample_variance = variance(data)
+        return float(math.sqrt(sample_variance / len(data)))  # type: ignore
 
 
 def auto_summarize(data: list) -> Optional[dict[str, Any]]:
@@ -108,7 +159,10 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
             "true_fraction": true_count / len(data),
         }
     elif isinstance(val, Number):
-        return {"mean": np.mean(data).item()}
+        if _NUMPY_AVAILABLE:
+            return {"mean": np.mean(data).item()}
+        else:
+            return {"mean": sum(data) / len(data)}
     elif isinstance(val, dict):
         result = {}
         all_keys = list(
@@ -160,7 +214,7 @@ def get_scorer_attributes(
         except AttributeError:
             raise ValueError(
                 f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
-            )
+            ) from None
     elif is_op(scorer):
         scorer = as_op(scorer)
         scorer_name = cast(str, scorer.name)
@@ -207,6 +261,11 @@ def preparer_scorer_op_args(
     score_op = scorer_attributes.score_op
     score_signature = inspect.signature(score_op)
     score_arg_names = list(score_signature.parameters.keys())
+
+    has_var_keyword_arg = any(
+        param.kind == inspect.Parameter.VAR_KEYWORD
+        for param in score_signature.parameters.values()
+    )
 
     # The keys of `score_args` must match the argument names of the scorer's `score` method.
     # If scorer.column_map is set, then user is indicating that the dataset column(s)
@@ -289,7 +348,14 @@ def preparer_scorer_op_args(
                 raise ValueError(message)
     else:
         # Without column mapping, directly match scorer arguments to example keys
-        score_args = {k: v for k, v in example.items() if k in score_arg_names}
+        score_args = {
+            k: v
+            for k, v in example.items()
+            if k in score_arg_names or has_var_keyword_arg
+        }
+
+        if has_var_keyword_arg and "inputs" not in score_args:
+            score_args["inputs"] = example
 
     # Determine which parameter name is used for model output
     # Scorers must have either 'output' or 'model_output' (deprecated) parameter
@@ -389,7 +455,7 @@ async def apply_scorer_async(
             c. change dataset column names to match expected {scorer_name} argument names: {required_arg_names}
             """
         )
-        raise OpCallError(message)
+        raise OpCallError(message) from e
 
     return ApplyScorerSuccess(result=result, score_call=score_call)
 

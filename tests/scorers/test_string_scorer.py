@@ -7,7 +7,7 @@ from weave.scorers import (
 
 
 @pytest.mark.parametrize(
-    "output, target, expected_result",
+    ("output", "target", "expected_result"),
     [
         ("Morgan", "Hello my name is Morgan", True),
         ("Alice", "Hello my name is Bob", False),
@@ -20,7 +20,7 @@ def test_string_match_scorer(output, target, expected_result):
 
 
 @pytest.mark.parametrize(
-    "output, target, expected_distance",
+    ("output", "target", "expected_distance"),
     [
         ("Hello", "Hallo", 1),
         ("Hello", "Hello", 0),

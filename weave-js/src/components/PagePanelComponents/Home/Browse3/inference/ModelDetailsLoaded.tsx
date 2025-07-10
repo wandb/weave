@@ -6,7 +6,7 @@ import {toast} from 'react-toastify';
 import {TargetBlank} from '../../../../../common/util/links';
 import {Button} from '../../../../Button';
 import {CodeEditor} from '../../../../CodeEditor';
-import {Icon, IconPrivacyOpen} from '../../../../Icon';
+import {Icon} from '../../../../Icon';
 import {ToggleButtonGroup} from '../../../../ToggleButtonGroup';
 import {Tooltip} from '../../../../Tooltip';
 import {Link} from '../pages/common/Links';
@@ -32,7 +32,10 @@ type ModelDetailsLoadedProps = {
   inferenceContext: InferenceContextType;
 };
 
-const BASE_URL = 'https://infr.cw4637-staging.coreweave.app/v1';
+const BASE_URL_QA = 'https://infr.cw4637-staging.coreweave.app/v1';
+const BASE_URL_PROD = 'https://api.inference.wandb.ai/v1';
+const BASE_URL =
+  window.location.hostname === 'qa.wandb.ai' ? BASE_URL_QA : BASE_URL_PROD;
 
 // # Enable HTTPX debugging
 // import logging
@@ -44,23 +47,27 @@ const CODE_EXAMPLES_CHAT: Record<string, string> = {
 import openai
 import weave
 
-# Set a custom base URL
+# Weave autopatches OpenAI to log LLM calls to W&B
+weave.init("<team>/<project>")
+
 client = openai.OpenAI(
+    # The custom base URL points to W&B Inference
     base_url='${BASE_URL}',
-    # Generally recommend setting OPENAI_API_KEY in the environment
-    api_key="some-key-value"
+
+    # Get your API key from ${window.location.origin}/authorize
+    # Consider setting it in the environment as OPENAI_API_KEY instead for safety
+    api_key="<your-apikey>",
+
+    # Team and project are required for usage tracking
+    project="<team>/<project>",
 )
 
-# Make a call using the client
 response = client.chat.completions.create(
     model="{model_id}",
     messages=[
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "Tell me a joke."}
     ],
-    extra_headers={
-        "OpenAI-Project": "entity1/project1"
-    },
 )
 
 print(response.choices[0].message.content)`,
@@ -69,10 +76,10 @@ import OpenAI from "openai";
 
 // Initialize OpenAI client with API key, base URL, and custom headers
 const client = new OpenAI({
-  apiKey: "some-key-value", // 🔐 Replace with your actual API key
+  apiKey: "<your-apikey>", // 🔐 Replace with your actual API key
   baseURL: "${BASE_URL}", // 🔁 Replace with your actual base URL
   defaultHeaders: {
-    "OpenAI-Project": "entity1/project1",
+    "OpenAI-Project": "<team>/<project>",
   },
 });
 
@@ -91,8 +98,8 @@ console.log(response.choices[0].message.content);
   Curl: `
   curl ${BASE_URL}/chat/completions \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer some-key-value" \\
-  -H "OpenAI-Project: entity1/project1" \\
+  -H "Authorization: Bearer <your-apikey>" \\
+  -H "OpenAI-Project: <team>/<project>" \\
   -d '{
     "model": "{model_id}",
     "messages": [
@@ -151,12 +158,11 @@ export const ModelDetailsLoaded = ({
   const onOpenPlayground = () => {
     navigateToPlayground(history, model.id, inferenceContext);
   };
-  const hasPlayground = !!model.idPlayground && inferenceContext.isLoggedIn;
+  const hasPlayground =
+    !!model.idPlayground && inferenceContext.isInferenceEnabled;
   const tooltipPlayground = hasPlayground
     ? undefined
-    : inferenceContext.isLoggedIn
-    ? 'This model is not available in the playground'
-    : 'You must be logged in to use the playground';
+    : inferenceContext.availabilityMessage;
 
   const hasPrice =
     (model.priceCentsPerBillionTokensInput ?? 0) > 0 ||
@@ -176,7 +182,14 @@ export const ModelDetailsLoaded = ({
     codeExample = codeExample.replace('{model_id}', model.idPlayground);
   }
 
-  const onClickCopy = useCallback(() => {
+  const onClickCopyModelId = useCallback(() => {
+    copyToClipboard(model.idPlayground ?? '');
+    toast('Copied to clipboard', {
+      position: 'bottom-right',
+    });
+  }, [model.idPlayground]);
+
+  const onClickCopyCode = useCallback(() => {
     copyToClipboard(codeExample);
     toast.success('Copied to clipboard');
   }, [codeExample]);
@@ -198,6 +211,16 @@ export const ModelDetailsLoaded = ({
           </div>
         </div>
         <div className="flex items-center gap-8">
+          {model.idPlayground && (
+            <Button
+              size="large"
+              icon="copy"
+              variant="secondary"
+              onClick={onClickCopyModelId}
+              tooltip="Copy model ID to clipboard">
+              {model.idPlayground}
+            </Button>
+          )}
           <Button
             size="large"
             onClick={onOpenPlayground}
@@ -258,7 +281,7 @@ export const ModelDetailsLoaded = ({
             {model.license && (
               <>
                 <div className="flex items-center">
-                  <IconPrivacyOpen width={18} height={18} />
+                  <Icon name="courthouse-license" width={18} height={18} />
                 </div>
                 <div className="flex items-center">
                   {getModelLicense(model)}
@@ -299,36 +322,45 @@ export const ModelDetailsLoaded = ({
         </div>
       </div>
 
-      <div className="mt-16 text-lg font-semibold leading-8">
-        Use this model
-      </div>
+      {hasPlayground && (
+        <>
+          <div className="mt-16 text-lg font-semibold leading-8">
+            Use this model
+          </div>
 
-      <div className="mb-8 flex items-center">
-        <div className="flex-grow">
-          <ToggleButtonGroup
-            options={[
-              {value: 'Python'},
-              // TODO {value: 'TypeScript'},
-              {value: 'Curl'},
-            ]}
-            value={selectedLanguage}
-            size="small"
-            onValueChange={setSelectedLanguage}
-          />
-        </div>
-        <div>
-          <Button variant="ghost" icon="copy" onClick={onClickCopy} />
-        </div>
-      </div>
-      <div className="[&_.monaco-editor]:!absolute">
-        <CodeEditor
-          value={codeExample}
-          language={CODE_LANGUAGE_MAP[selectedLanguage]}
-          readOnly
-          handleMouseWheel
-          alwaysConsumeMouseWheel={false}
-        />
-      </div>
+          <div className="mb-8 flex items-center">
+            <div className="flex-grow">
+              <ToggleButtonGroup
+                options={[
+                  {value: 'Python'},
+                  // TODO {value: 'TypeScript'},
+                  {value: 'Curl'},
+                ]}
+                value={selectedLanguage}
+                size="small"
+                onValueChange={setSelectedLanguage}
+              />
+            </div>
+            <div>
+              <Button
+                variant="ghost"
+                icon="copy"
+                onClick={onClickCopyCode}
+                tooltip="Copy code sample to clipboard"
+              />
+            </div>
+          </div>
+          <div className="[&_.monaco-editor]:!absolute">
+            <CodeEditor
+              value={codeExample}
+              language={CODE_LANGUAGE_MAP[selectedLanguage]}
+              readOnly
+              handleMouseWheel
+              alwaysConsumeMouseWheel={false}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };

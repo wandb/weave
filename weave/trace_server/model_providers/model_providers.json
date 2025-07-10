@@ -71,6 +71,14 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "gpt-4o-audio-preview-2025-06-03": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-4o-mini-audio-preview": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-4o-mini-audio-preview-2024-12-17": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -88,6 +96,10 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-4o-mini-2024-07-18": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "codex-mini-latest": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -111,6 +123,22 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "o3-deep-research": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o3-deep-research-2025-06-26": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o3-pro": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o3-pro-2025-06-10": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "o3": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -128,6 +156,14 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "o4-mini": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o4-mini-deep-research": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "o4-mini-deep-research-2025-06-26": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -463,6 +499,14 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/o3-pro": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/o3-pro-2025-06-10": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/o3": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
@@ -539,6 +583,14 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/gpt-4o-transcribe": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-4o-mini-transcribe": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/o3-mini": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
@@ -572,6 +624,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure/eu/o1-2024-12-17": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/codex-mini": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1007,6 +1063,10 @@
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
+  "mistral/mistral-medium-2505": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
   "mistral/mistral-medium-2312": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
@@ -1075,6 +1135,26 @@
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
+  "mistral/devstral-small-2505": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/magistral-medium-latest": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/magistral-medium-2506": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/magistral-small-latest": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/magistral-small-2506": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
   "mistral/mistral-embed": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
@@ -1084,6 +1164,14 @@
     "api_key_name": "DEEPSEEK_API_KEY"
   },
   "deepseek/deepseek-chat": {
+    "litellm_provider": "deepseek",
+    "api_key_name": "DEEPSEEK_API_KEY"
+  },
+  "deepseek/deepseek-r1": {
+    "litellm_provider": "deepseek",
+    "api_key_name": "DEEPSEEK_API_KEY"
+  },
+  "deepseek/deepseek-v3": {
     "litellm_provider": "deepseek",
     "api_key_name": "DEEPSEEK_API_KEY"
   },
@@ -1107,6 +1195,10 @@
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },
+  "xai/grok-3-latest": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
   "xai/grok-3-beta": {
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
@@ -1119,15 +1211,27 @@
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },
+  "xai/grok-3-mini": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-3-mini-latest": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-3-mini-fast": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-3-mini-fast-latest": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
   "xai/grok-3-mini-beta": {
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },
   "xai/grok-3-mini-fast-beta": {
-    "litellm_provider": "xai",
-    "api_key_name": "XAI_API_KEY"
-  },
-  "xai/grok-3-mini-fast-latest": {
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },
@@ -1319,6 +1423,14 @@
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
+  "claude-4-opus-20250514": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
+  "claude-4-sonnet-20250514": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
   "claude-3-7-sonnet-latest": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
@@ -1335,6 +1447,14 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
+  "gemini/gemini-2.5-pro": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-2.5-flash": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
   "gemini/gemini-2.5-flash-preview-tts": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
@@ -1344,6 +1464,10 @@
     "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.5-flash-preview-04-17": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-2.5-flash-lite-preview-06-17": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -1368,6 +1492,10 @@
     "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.5-pro-preview-tts": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-2.5-pro-preview-06-05": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -1627,6 +1755,18 @@
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "apac.amazon.nova-micro-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "apac.amazon.nova-lite-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "apac.amazon.nova-pro-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "us.amazon.nova-premier-v1:0": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
@@ -1732,6 +1872,26 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "eu.anthropic.claude-sonnet-4-20250514-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "apac.anthropic.claude-3-haiku-20240307-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "apac.anthropic.claude-3-sonnet-20240229-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "apac.anthropic.claude-3-5-sonnet-20240620-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "apac.anthropic.claude-3-5-sonnet-20241022-v2:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "apac.anthropic.claude-sonnet-4-20250514-v1:0": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },

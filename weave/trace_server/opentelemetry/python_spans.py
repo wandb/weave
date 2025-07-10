@@ -293,11 +293,12 @@ class Span:
         if len(inputs) == 1:
             nested_top_level_input = inputs.get("inputs") or inputs.get("input")
             # If it isn't a dict we just have to nest it under the key
-            if nested_top_level_input is not None and isinstance(
-                nested_top_level_input, (dict)
+            if (
+                nested_top_level_input is not None
+                and isinstance(nested_top_level_input, (dict))
+                and all(type(key) == str for key in nested_top_level_input.keys())
             ):
-                if all(type(key) == str for key in nested_top_level_input.keys()):
-                    inputs = to_json_serializable(nested_top_level_input)
+                inputs = to_json_serializable(nested_top_level_input)
 
         outputs = get_weave_outputs(events, self.attributes) or {}
         # Only de-nest if we have one key

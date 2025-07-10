@@ -229,7 +229,7 @@ def save(
             json.dump(metadata, f)
 
     if isinstance(obj, wave.Wave_read):
-        with artifact.writeable_file_path(audio_filename(".wav")) as fp:
+        with artifact.writeable_file_path(audio_filename("wav")) as fp:
             return export_wave_read(obj, fp, name)
 
     with artifact.writeable_file_path(audio_filename(obj.format)) as fp:
