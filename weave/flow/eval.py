@@ -118,16 +118,28 @@ class Evaluation(Object):
             if hasattr(obj, field_name):
                 field_values[field_name] = getattr(obj, field_name)
 
-        # special case for scorers
+        # Start mega-hack
+        # This is a very bad hack. Our deserialization/portability logic
+        # is totally broken. It will require a complete re-write of our
+        # deserialization layer to fix. The specific issue is that our
+        # deserialization code does not recursively deserialize custom objects
+        # (in this case scorers) and therefore needs to be done manually.
+        # In the meantime, this is such a common pattern, that I am going to
+        # fix it here. If you are a future dev and you actually fix the
+        # serialization stuff, that may or may not break this. That is OK!
+        # please feel free to remove this as we have tests that validate the
+        # end-user experience.
         if orig_scorers := field_values.get("scorers"):
             from weave import scorers as weave_scorers
 
             assert weave_scorers
             scorers = []
             for scorer in orig_scorers:
-                objectified = maybe_objectify(scorer)
-                scorers.append(objectified)
+                if isinstance(scorer, WeaveObject):
+                    scorer = maybe_objectify(scorer)
+                scorers.append(scorer)
             field_values["scorers"] = scorers
+        # End mega-hack
 
         return cls(**field_values)
 

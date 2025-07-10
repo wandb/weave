@@ -1,7 +1,9 @@
 import {
   GridColDef,
+  GridColumnVisibilityModel,
   GridFilterModel,
   GridPaginationModel,
+  GridPinnedColumnFields,
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
@@ -9,11 +11,11 @@ import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import React, {FC, useCallback, useMemo} from 'react';
+import {useHistory} from 'react-router-dom';
 
-import {monthRoundedTime} from '../../../../../../common/util/time';
 import {TailwindContents} from '../../../../../Tailwind';
 import {Timestamp} from '../../../../../Timestamp';
-import {useEntityProject} from '../../context';
+import {useEntityProject, useWeaveflowRouteContext} from '../../context';
 import {FilterPanel} from '../../filters/FilterPanel';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {ColumnInfo} from '../../types';
@@ -57,6 +59,12 @@ const convertFilterModelToDatetimeFilters = (
 };
 
 export const ThreadsTable: FC<{
+  columnVisibilityModel: GridColumnVisibilityModel;
+  setColumnVisibilityModel: (newModel: GridColumnVisibilityModel) => void;
+
+  pinModel: GridPinnedColumnFields;
+  setPinModel: (newModel: GridPinnedColumnFields) => void;
+
   filterModel: GridFilterModel;
   setFilterModel: (newModel: GridFilterModel) => void;
 
@@ -66,6 +74,10 @@ export const ThreadsTable: FC<{
   paginationModel: GridPaginationModel;
   setPaginationModel: (newModel: GridPaginationModel) => void;
 }> = ({
+  columnVisibilityModel,
+  setColumnVisibilityModel,
+  pinModel,
+  setPinModel,
   filterModel,
   setFilterModel,
   sortModel,
@@ -74,6 +86,8 @@ export const ThreadsTable: FC<{
   setPaginationModel,
 }) => {
   const {entity, project} = useEntityProject();
+  const history = useHistory();
+  const {peekingRouter} = useWeaveflowRouteContext();
 
   // Setup Ref to underlying table
   const apiRef = useGridApiRef();
@@ -177,6 +191,20 @@ export const ThreadsTable: FC<{
         width: 100,
         flex: 1,
         sortable: false,
+        renderCell: params => (
+          <div
+            className="hover:text-blue-800 cursor-pointer text-blue-600 hover:underline"
+            onClick={() => {
+              const threadId = params.value;
+              if (threadId) {
+                history.push(
+                  peekingRouter.threadUIUrl(entity, project, threadId)
+                );
+              }
+            }}>
+            {params.value}
+          </div>
+        ),
       },
       {
         field: 'status',
@@ -265,7 +293,7 @@ export const ThreadsTable: FC<{
           if (!params.value) return '';
           // Convert from milliseconds to seconds for monthRoundedTime
           const timeS = params.value / 1000;
-          return monthRoundedTime(timeS);
+          return timeS.toFixed(3) + 's';
         },
       },
       {
@@ -278,11 +306,13 @@ export const ThreadsTable: FC<{
           if (!params.value) return '';
           // Convert from milliseconds to seconds for monthRoundedTime
           const timeS = params.value / 1000;
-          return monthRoundedTime(timeS);
+          return timeS.toFixed(3) + 's';
         },
       },
     ],
-    [turnCallsDataResult]
+    // Adding the missing peekingRouter to the dependency array causes a re-render loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [turnCallsDataResult, entity, history, project]
   );
 
   return (
@@ -320,6 +350,11 @@ export const ThreadsTable: FC<{
         rows={tableData}
         columns={columns}
         loading={loading}
+        // Column management
+        columnVisibilityModel={columnVisibilityModel}
+        onColumnVisibilityModelChange={setColumnVisibilityModel}
+        pinnedColumns={pinModel}
+        onPinnedColumnsChange={setPinModel}
         // Column Menu - disable filter and column management features
         disableColumnFilter={true}
         // Pagination
@@ -340,7 +375,6 @@ export const ThreadsTable: FC<{
         onPaginationModelChange={onPaginationModelChange}
         // Filtering
         filterModel={filterModel}
-        onFilterModelChange={setFilterModel}
         filterMode="server"
         // Sorting
         sortModel={sortModel}

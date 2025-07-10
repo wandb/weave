@@ -113,6 +113,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
+    def get(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        return requests.get(
+            self.trace_server_url + url,
+            *args,
+            **kwargs,
+        )
+
     def post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
         return requests.post(
             self.trace_server_url + url,
@@ -275,7 +282,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @with_retry
     def server_info(self) -> ServerInfoRes:
-        r = requests.get(
+        r = self.get(
             "/server_info",
         )
         r.raise_for_status()

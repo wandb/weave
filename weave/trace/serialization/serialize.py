@@ -320,7 +320,7 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             if cls:
                 # Filter out metadata fields before validation
                 obj_data = {
-                    k: v for k, v in obj.items() if k not in ("_class_name", "_bases")
+                    k: v for k, v in obj.items() if k in cls.model_fields.keys()
                 }
                 return cls.model_validate(obj_data)
 
