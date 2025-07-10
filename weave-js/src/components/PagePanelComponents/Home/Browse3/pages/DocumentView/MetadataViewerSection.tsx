@@ -1,12 +1,7 @@
 import {Collapse} from '@mui/material';
 import {GridRowId, useGridApiRef} from '@mui/x-data-grid-pro';
 import _ from 'lodash';
-import React, {
-  Fragment,
-  useCallback,
-  useMemo,
-  useState,
-} from 'react';
+import React, {Fragment, useCallback, useMemo, useState} from 'react';
 
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
@@ -163,7 +158,7 @@ const MetadataViewerSectionInner = ({
 
   const headerSection = (
     <div>
-      <div className="tw-style flex min-h-32">
+      <div className="tw-style min-h-32 flex">
         <Button
           onClick={() => {
             setIsOpen(!isOpen);
@@ -179,8 +174,8 @@ const MetadataViewerSectionInner = ({
   );
 
   return (
-    <div className="tw-style h-full flex flex-col m-0 p-0">
-      <div className="tw-style h-full flex flex-row justify-between items-center">
+    <div className="tw-style m-0 flex h-full flex-col p-0">
+      <div className="tw-style flex h-full flex-row items-center justify-between">
         {headerSection}
         {isOpen && buttonSection}
       </div>
