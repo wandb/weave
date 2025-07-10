@@ -1,5 +1,3 @@
-import {Box} from '@mui/material';
-import {MOON_250} from '@wandb/weave/common/css/color.styles';
 import React, {useMemo} from 'react';
 
 import {MetadataViewerSection} from './MetadataViewerSection';
@@ -19,13 +17,8 @@ const DocumentCard: React.FC<DocumentCardProps> = ({doc}) => {
   }, [doc]);
 
   return (
-    <Box
-      border={1}
-      borderColor={MOON_250}
-      borderRadius={'8px'}
-      paddingX={'20px'}
-      paddingY={'16px'}>
-      <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>
+    <div className="tw-style border border-moon-250 rounded-lg px-20 py-16">
+      <div className="flex flex-col gap-8">
         <Body>{doc.content}</Body>
         {metadata && (
           <MetadataViewerSection
@@ -35,7 +28,7 @@ const DocumentCard: React.FC<DocumentCardProps> = ({doc}) => {
           />
         )}
       </div>
-    </Box>
+    </div>
   );
 };
 
@@ -49,22 +42,13 @@ const DocumentDropdown: React.FC<DocumentDropdownProps> = ({
   title,
 }) => {
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        width: '100%',
-        height: 'auto',
-      }}>
-      <div style={{display: 'flex', marginBottom: '4px'}}>
+    <div className="tw-style flex flex-col gap-8 w-full h-auto">
+      <div className="flex mb-4">
         <Header>{title}</Header>
       </div>
-      <div style={{display: 'flex', flexDirection: 'column', gap: 16}}>
+      <div className="flex flex-col gap-16">
         {documents.map((doc, index) => (
-          <div
-            key={index}
-            style={{display: 'flex', flexDirection: 'column', gap: 16}}>
+          <div key={index} className="flex flex-col gap-16">
             <DocumentCard doc={doc} />
           </div>
         ))}
@@ -90,7 +74,7 @@ export const DocumentView: React.FC<{
   }, [data]);
 
   return (
-    <div style={{display: 'flex', flexDirection: 'column', gap: 16}}>
+    <div className="tw-style flex flex-col gap-16">
       {inputsDocuments && (
         <DocumentDropdown title={'Inputs'} documents={inputsDocuments} />
       )}
