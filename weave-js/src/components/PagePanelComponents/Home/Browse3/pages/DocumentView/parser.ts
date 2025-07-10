@@ -7,9 +7,6 @@ import {
   WeaveDocument,
 } from './schemas';
 
-// Cached call parses
-const parsedCallCache = new Map<string, ParsedCall<WeaveDocument>>();
-
 function findAllDocuments(node: unknown): ParseResult<WeaveDocument>[] {
   const allFound: ParseResult<WeaveDocument>[] = [];
 
@@ -42,7 +39,7 @@ function findAllDocuments(node: unknown): ParseResult<WeaveDocument>[] {
 }
 
 // The core, parsing logic
-function _getTraceDocuments(
+function getTraceDocuments(
   trace: TraceCallMinimalSchema
 ): ParsedCall<WeaveDocument> {
   // Find all ParseResult objects in the output (if present)
@@ -58,17 +55,6 @@ function _getTraceDocuments(
     // If the list of output results is empty, return null
     output: parsedOutputs,
   };
-}
-
-export function getTraceDocuments(
-  trace: TraceCallMinimalSchema
-): ParsedCall<WeaveDocument> {
-  if (parsedCallCache.has(trace.id)) {
-    return parsedCallCache.get(trace.id)!;
-  }
-  const result = _getTraceDocuments(trace);
-  parsedCallCache.set(trace.id, result);
-  return result;
 }
 
 export function parseCall(call: CallSchema): ParsedCall<WeaveDocument> {
