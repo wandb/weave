@@ -32,7 +32,7 @@ To send traces from Agno to Weave, configure OTEL with a `TracerProvider` and an
 It is recommended that you store sensitive environment variables like your API key and project info in an environment file (e.g., `.env`), and load them using `os.environ`. This keeps your credentials secure and out of your codebase.
 :::
 
-### Required configuration
+#### Required configuration
 
 - **Endpoint:** `https://trace.wandb.ai/otel/v1/traces`
 - **Headers:**
@@ -41,7 +41,7 @@ It is recommended that you store sensitive environment variables like your API k
 
 ## Send OTEL traces from Agno to Weave
 
-The following code snippet demonstrates how to configure an OTLP span exporter and tracer provider to send OTEL traces from an Agno application to Weave.
+Once you've completed the [prerequisites](#prerequisites), you can send OTEL traces from Agno to Weave. The following code snippet demonstrates how to configure an OTLP span exporter and tracer provider to send OTEL traces from an Agno application to Weave.
 
 :::important
 To ensure that Weave traces Agno properly, set the global tracer provider _before_ using Agno components in your code.
@@ -87,7 +87,7 @@ tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
 trace.set_tracer_provider(tracer_provider)
 ```
 
-## Trace Agno Agents with OTEL
+## Trace Agno agents with OTEL
 
 After setting up the tracer provider, you can create and run Agno agents with automatic tracing. The following example demonstrates how to create a simple agent with tools:
 
@@ -133,7 +133,7 @@ All agent operations are automatically traced and sent to Weave, allowing you to
 
 ![A trace visualization of an Agno agent](./imgs/agno/agno_agent_trace.png)
 
-## Trace Agno Tools with OTEL
+## Trace Agno tools with OTEL
 
 When you define and use tools with Agno, these tool calls are also captured in the trace. The OTEL integration automatically instruments both the agent's reasoning process and the individual tool executions, providing a comprehensive view of your agent's behavior.
 
@@ -180,7 +180,7 @@ research_agent.print_response(
 
 ![A trace visualization of Agno tool calls](./imgs/agno/agno_tool_calls.png)
 
-## Trace Multi-Agent Teams with OTEL
+## Trace multi-agent teams with OTEL
 
 Agno's powerful multi-agent architecture allows you to create teams of agents that can collaborate and share context. These team interactions are also fully traced:
 
@@ -288,7 +288,7 @@ The reasoning steps will be visible in the trace, showing how the agent breaks d
 
 ![A trace visualization of Agno reasoning agent](./imgs/agno/agno_reasoning_trace.png)
 
-## Work with Memory and Knowledge
+## Work with memory and knowledge
 
 Agno agents can maintain memory and access knowledge bases. These operations are also traced:
 
