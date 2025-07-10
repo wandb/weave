@@ -163,7 +163,7 @@ const MetadataViewerSectionInner = ({
 
   const headerSection = (
     <div>
-      <div style={{display: 'flex', minHeight: '32px'}}>
+      <div className="tw-style flex min-h-32">
         <Button
           onClick={() => {
             setIsOpen(!isOpen);
@@ -171,7 +171,7 @@ const MetadataViewerSectionInner = ({
           variant="ghost"
           size="small"
           icon={isOpen ? 'chevron-down' : 'chevron-next'}
-          style={{fontSize: '14px'}}>
+          className="tw-style text-14">
           <Subheader>{title}</Subheader>
         </Button>
       </div>
@@ -179,33 +179,14 @@ const MetadataViewerSectionInner = ({
   );
 
   return (
-    <div
-      style={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        margin: 0,
-        padding: 0,
-      }}>
-      <div
-        style={{
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
+    <div className="tw-style h-full flex flex-col m-0 p-0">
+      <div className="tw-style h-full flex flex-row justify-between items-center">
         {headerSection}
         {isOpen && buttonSection}
       </div>
       <Collapse
         in={isOpen}
-        sx={{
-          '& .MuiCollapse-wrapperInner': {
-            minHeight: '50px',
-            paddingTop: '8px',
-          },
-        }}>
+        className="tw-style [&_.MuiCollapse-wrapperInner]:min-h-[50px] [&_.MuiCollapse-wrapperInner]:pt-8">
         {body}
       </Collapse>
     </div>
