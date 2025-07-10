@@ -134,6 +134,8 @@ class RunAsUser:
             RunAsUserError: If execution fails, times out, or process crashes.
             TypeError: If function is not pickleable.
         """
+        # TODO: Add support for response_type validation
+        # TODO: Consider adding execution metrics (timing, memory usage)
         if not callable(func):
             raise TypeError("func must be callable")
 
@@ -195,6 +197,8 @@ class RunAsUser:
 
     def _start_process(self) -> None:
         """Start the worker process."""
+        # TODO: Add support for process pool instead of single process
+        # TODO: Consider adding process health monitoring
         self._request_queue = multiprocessing.Queue()
         self._response_queue = multiprocessing.Queue()
 
@@ -206,6 +210,8 @@ class RunAsUser:
 
     def _stop_process(self) -> None:
         """Stop the worker process."""
+        # TODO: Add signal handling for more graceful shutdown
+        # TODO: Consider adding process resource usage logging
         if self._process is None:
             return
 
@@ -248,6 +254,8 @@ class RunAsUser:
         response_queue: multiprocessing.Queue[Any],
     ) -> None:
         """Main loop for the worker process."""
+        # TODO: Add support for keep-alive heartbeat to detect stalled processes
+        # TODO: Consider adding memory usage monitoring and limits
         try:
             # Create and initialize the client
             client = client_factory()
