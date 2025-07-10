@@ -47,17 +47,17 @@ class Netrc:
     machine hostname login username password password_value
     """
 
-    def __init__(self, netrc_path: str | None = None):
+    def __init__(self, path: str | Path | None = None):
         """
         Initialize the NetrcManager.
 
         Args:
-            netrc_path (Optional[str]): Path to the netrc file. If None, uses default ~/.netrc
+            netrc_path (str | Path | None): Path to the netrc file. If None, uses default ~/.netrc
         """
-        if netrc_path is None:
-            self.netrc_path = Path.home() / ".netrc"
+        if path is None:
+            self.path = Path.home() / ".netrc"
         else:
-            self.netrc_path = Path(netrc_path)
+            self.path = Path(path)
 
     def read(self) -> dict[str, Credentials]:
         """
@@ -78,11 +78,11 @@ class Netrc:
             >>> if creds:
             ...     print(f"Login: {creds['login']}")
         """
-        if not self.netrc_path.exists():
-            raise FileNotFoundError(f"Netrc file not found at {self.netrc_path}")
+        if not self.path.exists():
+            raise FileNotFoundError(f"Netrc file not found at {self.path}")
 
         try:
-            netrc_obj = netrc.netrc(str(self.netrc_path))
+            netrc_obj = netrc.netrc(str(self.path))
             # Convert from netrc format to our TypedDict format with validation
             result: dict[str, Credentials] = {}
             for machine, credentials in netrc_obj.hosts.items():
@@ -95,7 +95,7 @@ class Netrc:
                 }
         except netrc.NetrcParseError as e:
             raise netrc.NetrcParseError(
-                f"Failed to parse netrc file: {self.netrc_path}"
+                f"Failed to parse netrc file: {self.path}"
             ) from e
         else:
             return result
@@ -118,10 +118,10 @@ class Netrc:
         """
         try:
             # Ensure the parent directory exists
-            self.netrc_path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
 
             # Write the netrc file
-            with open(self.netrc_path, "w") as f:
+            with open(self.path, "w") as f:
                 for machine, creds in credentials.items():
                     f.write(f"machine {machine}\n")
                     f.write(f"  login {creds['login']}\n")
@@ -131,11 +131,9 @@ class Netrc:
                     f.write("\n")
 
             # Set appropriate permissions (readable/writable by owner only)
-            os.chmod(self.netrc_path, 0o600)
+            os.chmod(self.path, 0o600)
         except OSError as e:
-            raise PermissionError(
-                f"Unable to write to netrc file: {self.netrc_path}"
-            ) from e
+            raise PermissionError(f"Unable to write to netrc file: {self.path}") from e
 
     def add_or_update_entry(
         self, machine: str, login: str, password: str, account: str = ""
