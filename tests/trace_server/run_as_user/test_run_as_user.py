@@ -10,8 +10,8 @@ ensuring the system can handle stuck processes.
 """
 
 import logging
-from typing import Callable
 from contextlib import asynccontextmanager
+from typing import Callable
 
 import pytest
 
@@ -93,21 +93,21 @@ def create_test_client_factory_and_cleanup(
 @asynccontextmanager
 async def runner_with_cleanup(
     trace_server_factory: Callable[[], TraceServerInterface],
-    entity: str = "test_entity", 
+    entity: str = "test_entity",
     project: str = "test_project",
-    **runner_kwargs
+    **runner_kwargs,
 ):
     """
     Async context manager that provides a RunAsUser instance with automatic cleanup.
-    
+
     This eliminates the repetitive setup/teardown code in tests.
-    
+
     Args:
         trace_server_factory: Factory function that creates a trace server
         entity: Entity name for the client
-        project: Project name for the client  
+        project: Project name for the client
         **runner_kwargs: Additional arguments to pass to RunAsUser constructor
-        
+
     Yields:
         RunAsUser: Configured runner instance
     """
@@ -115,7 +115,7 @@ async def runner_with_cleanup(
         trace_server_factory, entity=entity, project=project
     )
     runner = RunAsUser(client_factory=client_factory, **runner_kwargs)
-    
+
     try:
         yield runner
     finally:
@@ -137,6 +137,7 @@ class TestRunAsUser:
             assert result.process_id is not None
             # Verify it ran in a different process
             import os
+
             assert result.process_id != os.getpid()
 
     @pytest.mark.asyncio
@@ -151,7 +152,9 @@ class TestRunAsUser:
     async def test_process_timeout(self, trace_server_factory):
         """Test handling of process timeout."""
         # Create runner with very short timeout
-        async with runner_with_cleanup(trace_server_factory, timeout_seconds=0.5) as runner:
+        async with runner_with_cleanup(
+            trace_server_factory, timeout_seconds=0.5
+        ) as runner:
             req = TestRequest(value="timeout_test", sleep_time=2.0)
             with pytest.raises(RunAsUserError, match="timed out after 0.5 seconds"):
                 await runner.execute(timeout_function, req)
@@ -168,9 +171,10 @@ class TestRunAsUser:
     async def test_project_isolation(self, trace_server_factory):
         """Test that different projects are properly isolated."""
         # Use two separate context managers for different projects
-        async with runner_with_cleanup(trace_server_factory, project="project1") as runner1, \
-                   runner_with_cleanup(trace_server_factory, project="project2") as runner2:
-
+        async with (
+            runner_with_cleanup(trace_server_factory, project="project1") as runner1,
+            runner_with_cleanup(trace_server_factory, project="project2") as runner2,
+        ):
             # Each runner should see its own project context
             req1 = TestRequest(
                 value="test", expected_project="project1", expected_entity="test_entity"
@@ -188,9 +192,10 @@ class TestRunAsUser:
     async def test_entity_isolation(self, trace_server_factory):
         """Test that different entities are properly isolated."""
         # Use two separate context managers for different entities
-        async with runner_with_cleanup(trace_server_factory, entity="entity1") as runner1, \
-                   runner_with_cleanup(trace_server_factory, entity="entity2") as runner2:
-
+        async with (
+            runner_with_cleanup(trace_server_factory, entity="entity1") as runner1,
+            runner_with_cleanup(trace_server_factory, entity="entity2") as runner2,
+        ):
             # Each runner should work with its own entity context
             req1 = TestRequest(
                 value="test", expected_project="test_project", expected_entity="entity1"
@@ -244,7 +249,7 @@ class TestRunAsUser:
             class NonPickleableFunction:
                 def __call__(self, req):
                     return TestResponse(result="test")
-            
+
             with pytest.raises(TypeError, match="func must be pickleable"):
                 await runner.execute(NonPickleableFunction(), TestRequest(value="test"))
 

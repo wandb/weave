@@ -276,6 +276,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
     ) -> Iterator[tsi.ThreadSchema]:
         return self._send_streaming_request("threads_query_stream", req)
 
+
 class CrossProcessTraceServerReceiver:
     """
     This class acts as a TraceServerInterface which receives requests from queues. It
