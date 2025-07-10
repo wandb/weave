@@ -54,6 +54,11 @@ dependencies = [
 
   # TODO: Uncomment when ready to commit to the new bindings.
   # "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@9f62f9b3422d2afa7ad56f853ff510a81c1abb73",
+
+  # This transforms X | Y into typing.Union[X, Y] and list[X] into typing.List[X] etc.
+  # It allows us to use those type annotations in Python 3.9 with Pydantic.
+  # See https://github.com/pydantic/pydantic/issues/7873
+  "eval-type-backport",
 ]
 
 [project.optional-dependencies]
@@ -171,7 +176,6 @@ test = [
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
   "freezegun",
-  "eval_type_backport",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
