@@ -35,6 +35,16 @@ def wf_scoring_worker_batch_timeout() -> int:
     return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", 5))
 
 
+def wf_call_complete_worker_batch_size() -> int:
+    """The batch size for the call complete worker."""
+    return int(os.environ.get("WF_CALL_COMPLETE_WORKER_BATCH_SIZE", 100))
+
+
+def wf_call_complete_worker_batch_timeout() -> int:
+    """The timeout for the call complete worker."""
+    return int(os.environ.get("WF_CALL_COMPLETE_WORKER_BATCH_TIMEOUT", 5))
+
+
 # Clickhouse Settings
 
 

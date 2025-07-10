@@ -228,6 +228,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._database = database
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
+        self._call_start_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
@@ -415,6 +416,58 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        """Returns a stream of calls that match the given query."""
+        id_filter_sql = ""
+        if req.filter is not None and req.filter.call_ids is not None:
+            filter_str = ",".join([f"'{call_id}'" for call_id in req.filter.call_ids])
+            id_filter_sql = f"AND id IN ({filter_str})"
+
+        op_name_filter_sql = ""
+        if req.filter is not None and req.filter.op_names is not None:
+            filter_str = ",".join([f"'{op_name}'" for op_name in req.filter.op_names])
+            op_name_filter_sql = f"AND op_name IN ({filter_str})"
+
+        parent_id_filter_sql = ""
+        if req.filter is not None and req.filter.parent_ids is not None:
+            filter_str = ",".join(
+                [f"'{parent_id}'" for parent_id in req.filter.parent_ids]
+            )
+            parent_id_filter_sql = f"AND parent_id IN ({filter_str})"
+
+        trace_id_filter_sql = ""
+        if req.filter is not None and req.filter.trace_ids is not None:
+            filter_str = ",".join(
+                [f"'{trace_id}'" for trace_id in req.filter.trace_ids]
+            )
+            trace_id_filter_sql = f"AND trace_id IN ({filter_str})"
+
+        sql = f"""
+        SELECT {','.join(all_call_select_columns)}
+        FROM calls_complete
+        WHERE project_id = '{req.project_id}'
+            {id_filter_sql}
+            {op_name_filter_sql}
+            {parent_id_filter_sql}
+            {trace_id_filter_sql}
+            AND deleted_at IS NULL
+        ORDER BY started_at_inverse ASC
+        LIMIT {req.limit or 50}
+        OFFSET {req.offset or 0}
+        """
+
+        raw_res = self._query_stream(sql, {})
+
+        def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
+            return _ch_call_dict_to_call_schema_dict(
+                dict(zip(all_call_select_columns, row))
+            )
+
+        for row in raw_res:
+            yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+
+    def calls_query_stream_old(
+        self, req: tsi.CallsQueryReq
+    ) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(
             project_id=req.project_id,
@@ -2111,7 +2164,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     #     self.ch_client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
-    def _insert_call_batch(self, batch: list) -> None:
+    def _insert_call_batch(self, batch: list, table: str = "call_parts") -> None:
         if root_span := ddtrace.tracer.current_span():
             root_span.set_tags(
                 {
@@ -2129,7 +2182,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # are caught, reverting to default behavior.
                 settings["wait_for_async_insert"] = 1
             self._insert(
-                "call_parts",
+                table,
                 data=batch,
                 column_names=all_call_insert_columns,
                 settings=settings,
@@ -2321,6 +2374,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for key in all_call_insert_columns:
             row.append(parameters.get(key, None))
         self._call_batch.append(row)
+        if hasattr(ch_call, "started_at") and ch_call.started_at is not None:
+            self._call_start_batch.append(row)
         if self._flush_immediately:
             self._flush_calls()
 
@@ -2332,8 +2387,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             logger.info("Retrying with large objects stripped.")
             batch = self._strip_large_values(self._call_batch)
             self._insert_call_batch(batch)
-
         self._call_batch = []
+
+        try:
+            self._insert_call_batch(self._call_start_batch, "calls_complete")
+        except InsertTooLarge:
+            logger.info("Retrying with large objects stripped.")
+            batch = self._strip_large_values(self._call_start_batch)
+            self._insert_call_batch(batch)
+        self._call_start_batch = []
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
