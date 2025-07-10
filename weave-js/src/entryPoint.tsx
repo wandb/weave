@@ -2,7 +2,6 @@ import './globalStyleImports';
 
 import {
   getNightMode,
-  updateUserInfo,
   useViewerUserInfo,
 } from '@wandb/weave/common/hooks/useViewerUserInfo';
 import React, {FC, useEffect} from 'react';
@@ -89,13 +88,11 @@ const setPageNightMode = (isNightMode: boolean) => {
 // Handle light/dark mode theme
 const Themer = ({children}: ThemerProps) => {
   const {loading, userInfo} = useViewerUserInfo();
-  const apolloClient = useApolloClient();
 
   useMousetrap('option+m', () => {
     const isNightMode = getNightMode(userInfo);
     setPageNightMode(!isNightMode);
     userInfo.betaFeatures.night = !isNightMode;
-    updateUserInfo(userInfo, apolloClient);
   });
 
   useEffect(() => {
