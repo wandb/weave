@@ -41,13 +41,10 @@ function findAllDocuments(node: unknown): ParseResult<WeaveDocument>[] {
   return allFound;
 }
 
-/**
- * The core, non-memoized parsing logic, updated for the new schema.
- */
+// The core, parsing logic
 function _getTraceDocuments(
   trace: TraceCallMinimalSchema
 ): ParsedCall<WeaveDocument> {
-  // Return type is updated
   // Find all ParseResult objects in the output (if present)
   const parsedOutputs = 'output' in trace ? findAllDocuments(trace.output) : [];
 
