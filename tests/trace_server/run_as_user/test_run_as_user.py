@@ -11,6 +11,7 @@ ensuring the system can handle stuck processes.
 
 import logging
 from typing import Callable
+from contextlib import asynccontextmanager
 
 import pytest
 
@@ -89,18 +90,46 @@ def create_test_client_factory_and_cleanup(
     return factory, cleanup
 
 
+@asynccontextmanager
+async def runner_with_cleanup(
+    trace_server_factory: Callable[[], TraceServerInterface],
+    entity: str = "test_entity", 
+    project: str = "test_project",
+    **runner_kwargs
+):
+    """
+    Async context manager that provides a RunAsUser instance with automatic cleanup.
+    
+    This eliminates the repetitive setup/teardown code in tests.
+    
+    Args:
+        trace_server_factory: Factory function that creates a trace server
+        entity: Entity name for the client
+        project: Project name for the client  
+        **runner_kwargs: Additional arguments to pass to RunAsUser constructor
+        
+    Yields:
+        RunAsUser: Configured runner instance
+    """
+    client_factory, cleanup = create_test_client_factory_and_cleanup(
+        trace_server_factory, entity=entity, project=project
+    )
+    runner = RunAsUser(client_factory=client_factory, **runner_kwargs)
+    
+    try:
+        yield runner
+    finally:
+        runner.stop()
+        cleanup()
+
+
 class TestRunAsUser:
     """Test cases for RunAsUser class."""
 
     @pytest.mark.asyncio
     async def test_successful_execution(self, trace_server_factory):
         """Test successful function execution in isolated process."""
-        client_factory, cleanup = create_test_client_factory_and_cleanup(
-            trace_server_factory
-        )
-        runner = RunAsUser(client_factory=client_factory)
-
-        try:
+        async with runner_with_cleanup(trace_server_factory) as runner:
             req = TestRequest(value="test_value")
             result = await runner.execute(successful_function, req)
 
@@ -108,76 +137,40 @@ class TestRunAsUser:
             assert result.process_id is not None
             # Verify it ran in a different process
             import os
-
             assert result.process_id != os.getpid()
-        finally:
-            runner.stop()
-            cleanup()
 
     @pytest.mark.asyncio
     async def test_exception_in_child_process(self, trace_server_factory):
         """Test handling of exceptions thrown in child process."""
-        client_factory, cleanup = create_test_client_factory_and_cleanup(
-            trace_server_factory
-        )
-        runner = RunAsUser(client_factory=client_factory)
-
-        try:
+        async with runner_with_cleanup(trace_server_factory) as runner:
             req = TestRequest(value="test_error")
             with pytest.raises(RunAsUserError, match="Function execution failed"):
                 await runner.execute(failing_function, req)
-        finally:
-            runner.stop()
-            cleanup()
 
     @pytest.mark.asyncio
     async def test_process_timeout(self, trace_server_factory):
         """Test handling of process timeout."""
-        client_factory, cleanup = create_test_client_factory_and_cleanup(
-            trace_server_factory
-        )
         # Create runner with very short timeout
-        runner = RunAsUser(client_factory=client_factory, timeout_seconds=0.5)
-
-        try:
+        async with runner_with_cleanup(trace_server_factory, timeout_seconds=0.5) as runner:
             req = TestRequest(value="timeout_test", sleep_time=2.0)
             with pytest.raises(RunAsUserError, match="timed out after 0.5 seconds"):
                 await runner.execute(timeout_function, req)
-        finally:
-            runner.stop()
-            cleanup()
 
     @pytest.mark.asyncio
     async def test_process_exit_code(self, trace_server_factory):
         """Test handling of process that exits with specific code."""
-        client_factory, cleanup = create_test_client_factory_and_cleanup(
-            trace_server_factory
-        )
-        runner = RunAsUser(client_factory=client_factory)
-
-        try:
+        async with runner_with_cleanup(trace_server_factory) as runner:
             req = TestRequest(value="exit_test", exit_code=42)
             with pytest.raises(RunAsUserError, match="exit code: 42"):
                 await runner.execute(exit_code_function, req)
-        finally:
-            runner.stop()
-            cleanup()
 
     @pytest.mark.asyncio
     async def test_project_isolation(self, trace_server_factory):
         """Test that different projects are properly isolated."""
-        # Create two runners for different projects
-        client_factory1, cleanup1 = create_test_client_factory_and_cleanup(
-            trace_server_factory, project="project1"
-        )
-        client_factory2, cleanup2 = create_test_client_factory_and_cleanup(
-            trace_server_factory, project="project2"
-        )
+        # Use two separate context managers for different projects
+        async with runner_with_cleanup(trace_server_factory, project="project1") as runner1, \
+                   runner_with_cleanup(trace_server_factory, project="project2") as runner2:
 
-        runner1 = RunAsUser(client_factory=client_factory1)
-        runner2 = RunAsUser(client_factory=client_factory2)
-
-        try:
             # Each runner should see its own project context
             req1 = TestRequest(
                 value="test", expected_project="project1", expected_entity="test_entity"
@@ -190,27 +183,14 @@ class TestRunAsUser:
             )
             result2 = await runner2.execute(check_isolation_function, req2)
             assert "Isolation verified" in result2.result
-        finally:
-            runner1.stop()
-            runner2.stop()
-            cleanup1()
-            cleanup2()
 
     @pytest.mark.asyncio
     async def test_entity_isolation(self, trace_server_factory):
         """Test that different entities are properly isolated."""
-        # Create two runners for different entities
-        client_factory1, cleanup1 = create_test_client_factory_and_cleanup(
-            trace_server_factory, entity="entity1"
-        )
-        client_factory2, cleanup2 = create_test_client_factory_and_cleanup(
-            trace_server_factory, entity="entity2"
-        )
+        # Use two separate context managers for different entities
+        async with runner_with_cleanup(trace_server_factory, entity="entity1") as runner1, \
+                   runner_with_cleanup(trace_server_factory, entity="entity2") as runner2:
 
-        runner1 = RunAsUser(client_factory=client_factory1)
-        runner2 = RunAsUser(client_factory=client_factory2)
-
-        try:
             # Each runner should work with its own entity context
             req1 = TestRequest(
                 value="test", expected_project="test_project", expected_entity="entity1"
@@ -223,21 +203,11 @@ class TestRunAsUser:
             )
             result2 = await runner2.execute(check_isolation_function, req2)
             assert "Isolation verified" in result2.result
-        finally:
-            runner1.stop()
-            runner2.stop()
-            cleanup1()
-            cleanup2()
 
     @pytest.mark.asyncio
     async def test_multiple_args(self, trace_server_factory):
         """Test passing multiple arguments via request object."""
-        client_factory, cleanup = create_test_client_factory_and_cleanup(
-            trace_server_factory
-        )
-        runner = RunAsUser(client_factory=client_factory)
-
-        try:
+        async with runner_with_cleanup(trace_server_factory) as runner:
             req = TestRequest(
                 value="unused",
                 arg_a="hello",
@@ -246,15 +216,12 @@ class TestRunAsUser:
             )
             result = await runner.execute(multi_arg_function, req)
             assert result.result == "a=hello, b=42, c=custom"
-        finally:
-            runner.stop()
-            cleanup()
 
     @pytest.mark.asyncio
     async def test_invalid_client_factory(self):
         """Test that invalid client factories are rejected."""
         # Test non-callable factory
-        with pytest.raises(ValueError, match="client_factory must be callable"):
+        with pytest.raises(TypeError, match="client_factory must be callable"):
             RunAsUser(client_factory="not_callable")
 
         # Test non-pickleable factory
@@ -262,42 +229,29 @@ class TestRunAsUser:
             def __call__(self):
                 return WeaveClient(entity="test", project="test")
 
-        with pytest.raises(ValueError, match="client_factory must be pickleable"):
+        with pytest.raises(TypeError, match="client_factory must be pickleable"):
             RunAsUser(client_factory=NonPickleableFactory())
 
     @pytest.mark.asyncio
     async def test_invalid_function(self, trace_server_factory):
         """Test that invalid functions are rejected."""
-        client_factory, cleanup = create_test_client_factory_and_cleanup(
-            trace_server_factory
-        )
-        runner = RunAsUser(client_factory=client_factory)
-
-        try:
+        async with runner_with_cleanup(trace_server_factory) as runner:
             # Test non-callable function
-            with pytest.raises(ValueError, match="func must be callable"):
+            with pytest.raises(TypeError, match="func must be callable"):
                 await runner.execute("not_callable", TestRequest(value="test"))
 
             # Test non-pickleable function
             class NonPickleableFunction:
                 def __call__(self, req):
                     return TestResponse(result="test")
-
-            with pytest.raises(ValueError, match="func must be pickleable"):
+            
+            with pytest.raises(TypeError, match="func must be pickleable"):
                 await runner.execute(NonPickleableFunction(), TestRequest(value="test"))
-        finally:
-            runner.stop()
-            cleanup()
 
     @pytest.mark.asyncio
     async def test_reuse_runner(self, trace_server_factory):
         """Test that a runner can be reused for multiple executions."""
-        client_factory, cleanup = create_test_client_factory_and_cleanup(
-            trace_server_factory
-        )
-        runner = RunAsUser(client_factory=client_factory)
-
-        try:
+        async with runner_with_cleanup(trace_server_factory) as runner:
             # First execution
             req1 = TestRequest(value="first")
             result1 = await runner.execute(successful_function, req1)
@@ -310,19 +264,11 @@ class TestRunAsUser:
 
             # Both should have run in the same process
             assert result1.process_id == result2.process_id
-        finally:
-            runner.stop()
-            cleanup()
 
     @pytest.mark.asyncio
     async def test_process_restart_after_crash(self, trace_server_factory):
         """Test that the process is restarted after a crash."""
-        client_factory, cleanup = create_test_client_factory_and_cleanup(
-            trace_server_factory
-        )
-        runner = RunAsUser(client_factory=client_factory)
-
-        try:
+        async with runner_with_cleanup(trace_server_factory) as runner:
             # First execution should succeed
             req1 = TestRequest(value="success")
             result1 = await runner.execute(successful_function, req1)
@@ -340,19 +286,11 @@ class TestRunAsUser:
             assert result3.result == "Success: after_crash"
             # Should be a different process
             assert result3.process_id != first_pid
-        finally:
-            runner.stop()
-            cleanup()
 
     @pytest.mark.asyncio
     async def test_context_manager_cleanup(self, trace_server_factory):
         """Test that resources are properly cleaned up."""
-        client_factory, cleanup = create_test_client_factory_and_cleanup(
-            trace_server_factory
-        )
-        runner = RunAsUser(client_factory=client_factory)
-
-        try:
+        async with runner_with_cleanup(trace_server_factory) as runner:
             # Execute a function to start the process
             req = TestRequest(value="test")
             result = await runner.execute(successful_function, req)
@@ -369,5 +307,3 @@ class TestRunAsUser:
             # Process should be stopped
             assert not process.is_alive()
             assert runner._process is None
-        finally:
-            cleanup()
