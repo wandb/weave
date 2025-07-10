@@ -1,7 +1,7 @@
 import abc
 import typing
-from collections.abc import Iterator
-from typing import Callable, TypeVar
+from collections.abc import Coroutine, Iterator
+from typing import Any, Callable, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
@@ -73,6 +73,18 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         )
         return res_conv
 
+    async def _async_ref_apply(
+        self, method: Callable[[A], Coroutine[Any, Any, B]], req: A
+    ) -> B:
+        req_conv = universal_ext_to_int_ref_converter(
+            req, self._idc.ext_to_int_project_id
+        )
+        res = await method(req_conv)
+        res_conv = universal_int_to_ext_ref_converter(
+            res, self._idc.int_to_ext_project_id
+        )
+        return res_conv
+
     def _stream_ref_apply(
         self, method: Callable[[A], Iterator[B]], req: A
     ) -> Iterator[B]:
@@ -116,6 +128,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
         return self._ref_apply(self._internal_trace_server.call_end, req)
+
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        raise NotImplementedError("CallStartBatch is not supported")
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         original_project_id = req.project_id
@@ -419,3 +434,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         return self._stream_ref_apply(
             self._internal_trace_server.threads_query_stream, req
         )
+
+    async def run_model(self, req: tsi.RunModelReq) -> tsi.RunModelRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return await self._async_ref_apply(self._internal_trace_server.run_model, req)

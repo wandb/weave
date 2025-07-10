@@ -1108,6 +1108,18 @@ class ThreadsQueryReq(BaseModel):
     )
 
 
+class RunModelReq(BaseModel):
+    project_id: str
+    model_ref: str
+    inputs: Union[dict, str]
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class RunModelRes(BaseModel):
+    call_id: str
+    output: Any
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1189,3 +1201,6 @@ class TraceServerInterface(Protocol):
 
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...
+
+    # Evaluation Lifecycle Execution API
+    async def run_model(self, req: RunModelReq) -> RunModelRes: ...
