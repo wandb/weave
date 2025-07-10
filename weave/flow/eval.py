@@ -120,12 +120,15 @@ class Evaluation(Object):
 
         # Start mega-hack
         # This is a very bad hack. Our deserialization/portability logic
-        # if totally broken. It will require a complete re-write of our
-        # deserialziation layer to fix. In the meantime, this is such a
-        # common pattern, that I am going to fix it here. If you are a
-        # future dev and you actually fix the serialization stuff, that
-        # may or may not break this. That is OK! please feel free to remove
-        # this as we have tests that validate the end-user experience.
+        # is totally broken. It will require a complete re-write of our
+        # deserialization layer to fix. The specific issue is that our
+        # deserialization code does not recursively deserialize custom objects
+        # (in this case scorers) and therefore needs to be done manually.
+        # In the meantime, this is such a common pattern, that I am going to
+        # fix it here. If you are a future dev and you actually fix the
+        # serialization stuff, that may or may not break this. That is OK!
+        # please feel free to remove this as we have tests that validate the
+        # end-user experience.
         if orig_scorers := field_values.get("scorers"):
             from weave import scorers as weave_scorers
 
