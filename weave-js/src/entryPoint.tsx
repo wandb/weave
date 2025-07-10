@@ -1,9 +1,7 @@
 import './globalStyleImports';
 
-import {ApolloProvider, useApolloClient} from '@apollo/client';
 import {
   getNightMode,
-  updateUserInfo,
   useViewerUserInfo,
 } from '@wandb/weave/common/hooks/useViewerUserInfo';
 import React, {FC, useEffect} from 'react';
@@ -12,10 +10,8 @@ import useMousetrap from 'react-hook-mousetrap';
 import {BrowserRouter as Router, Route, Switch} from 'react-router-dom';
 import {StateInspector} from 'reinspect';
 
-import {makeGorillaApolloClient} from './apollo';
 import {onAppError} from './components/automation';
 import PagePanel from './components/PagePanel';
-import {Browse3} from './components/PagePanelComponents/Home/Browse3';
 import {OptionalTraceServerClientContextProvider} from './components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
 import {PanelInteractContextProvider} from './components/Panel2/PanelInteractContext';
 import {PanelRootContextProvider} from './components/Panel2/PanelPanel';
@@ -92,13 +88,11 @@ const setPageNightMode = (isNightMode: boolean) => {
 // Handle light/dark mode theme
 const Themer = ({children}: ThemerProps) => {
   const {loading, userInfo} = useViewerUserInfo();
-  const apolloClient = useApolloClient();
 
   useMousetrap('option+m', () => {
     const isNightMode = getNightMode(userInfo);
     setPageNightMode(!isNightMode);
     userInfo.betaFeatures.night = !isNightMode;
-    updateUserInfo(userInfo, apolloClient);
   });
 
   useEffect(() => {
@@ -161,41 +155,33 @@ const BrowseWrapper: FC = props => (
 
 const basename = getConfig().PREFIX;
 ReactDOM.render(
-  <ApolloProvider client={makeGorillaApolloClient()}>
-    <Router basename={basename}>
-      <Switch>
-        <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
-          <Main browserType={URL_RECENT} />
-        </Route>
-        <Route path={[`/${URL_BROWSE}/${URL_TEMPLATES}/:templateName?`]}>
-          <Main browserType={URL_TEMPLATES} />
-        </Route>
-        <Route
-          path={[
-            `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?/:assetType?/:preview?`,
-            `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?/:assetType?`,
-            `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?`,
-            `/${URL_BROWSE}/${URL_WANDB}/:entity?`,
-          ]}>
-          <Main browserType={URL_WANDB} />
-        </Route>
-        <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
-          <Main browserType={URL_LOCAL} />
-        </Route>
-        <Route path={`/${URL_BROWSE3}`}>
-          <BrowseWrapper>
-            <Browse3
-              projectRoot={(entityName: string, projectName: string) => {
-                return `/${URL_BROWSE3}/${entityName}/${projectName}`;
-              }}
-            />
-          </BrowseWrapper>
-        </Route>
-        <Route path="/">
-          <Main />
-        </Route>
-      </Switch>
-    </Router>
-  </ApolloProvider>,
+  <Router basename={basename}>
+    <Switch>
+      <Route path={`/${URL_BROWSE}/${URL_RECENT}/:assetType?`}>
+        <Main browserType={URL_RECENT} />
+      </Route>
+      <Route path={[`/${URL_BROWSE}/${URL_TEMPLATES}/:templateName?`]}>
+        <Main browserType={URL_TEMPLATES} />
+      </Route>
+      <Route
+        path={[
+          `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?/:assetType?/:preview?`,
+          `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?/:assetType?`,
+          `/${URL_BROWSE}/${URL_WANDB}/:entity?/:project?`,
+          `/${URL_BROWSE}/${URL_WANDB}/:entity?`,
+        ]}>
+        <Main browserType={URL_WANDB} />
+      </Route>
+      <Route path={`/${URL_BROWSE}/${URL_LOCAL}/:assetType?/:preview?`}>
+        <Main browserType={URL_LOCAL} />
+      </Route>
+      <Route path={`/${URL_BROWSE3}`}>
+        <BrowseWrapper></BrowseWrapper>
+      </Route>
+      <Route path="/">
+        <Main />
+      </Route>
+    </Switch>
+  </Router>,
   document.getElementById('root')
 );

@@ -1,7 +1,9 @@
 /**
  * Link to a Weights & Biases Run.
  */
-import {ApolloClient, gql, useApolloClient} from '@apollo/client';
+import {useApolloClient} from '@apollo/react-hooks';
+import {ApolloClient} from 'apollo-client';
+import gql from 'graphql-tag';
 import React, {useEffect, useState} from 'react';
 
 import {LoadingDots} from '../../../LoadingDots';

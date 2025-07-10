@@ -3,7 +3,8 @@
  * There is a query engine based approach in useViewerUserInfo.ts.
  */
 
-import {gql, useApolloClient} from '@apollo/client';
+import {useApolloClient} from '@apollo/react-hooks';
+import gql from 'graphql-tag';
 import {useEffect, useState} from 'react';
 
 const VIEWER_QUERY = gql`

@@ -116,7 +116,7 @@ export default defineConfig(({mode, command}) => {
       dedupe: ['react', '@material-ui/styles', 'mdast-util-to-hast'],
     },
     optimizeDeps: {
-      entries: './index.html',
+      //entries: './index.html',
       include: [
         'd',
         'yaml-ast-parser-custom-tags',

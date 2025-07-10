@@ -3,13 +3,11 @@
  * There is a query engine based approach in useViewerUserInfo.ts.
  */
 
-import {
-  gql,
-  TypedDocumentNode,
-  useApolloClient,
-  useMutation,
-} from '@apollo/client';
+import {useApolloClient} from '@apollo/react-hooks';
+import {TypedDocumentNode} from '@graphql-typed-document-node/core';
+import gql from 'graphql-tag';
 import {useCallback, useEffect, useState} from 'react';
+import {useMutation} from 'react-apollo';
 
 const SECRETS_QUERY = gql`
   query secrets($entityName: String!) {
