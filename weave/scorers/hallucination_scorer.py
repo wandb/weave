@@ -1,5 +1,5 @@
 import logging
-from typing import Union
+from typing import Any, Union
 
 from pydantic import BaseModel, Field, PrivateAttr, validate_call
 
@@ -148,7 +148,7 @@ class HallucinationFreeScorer(LLMScorer):
     )
 
     @weave.op
-    async def score(self, *, output: str, context: str) -> dict:
+    async def score(self, *, output: str, context: str, **kwargs: Any) -> dict:
         output = stringify(output)
         response = await self._acompletion(
             messages=[

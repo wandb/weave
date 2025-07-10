@@ -28,7 +28,7 @@ class EmbeddingSimilarityScorer(LLMScorer):
     threshold: float = Field(0.5, description="The threshold for the similarity score")
 
     @weave.op
-    async def score(self, *, output: str, target: str) -> Any:
+    async def score(self, *, output: str, target: str, **kwargs: Any) -> Any:
         # Ensure the threshold is within the valid range for cosine similarity.
         assert -1 <= self.threshold <= 1, "`threshold` should be between -1 and 1"
 
