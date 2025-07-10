@@ -11,7 +11,7 @@ from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallba
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.utils.retry import _is_retryable_exception, with_retry
+from weave.utils.retry import _is_retryable_exception, get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
@@ -114,18 +114,27 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self._auth = auth
 
     def get(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        headers = dict(self._extra_headers) if self._extra_headers else {}
+        if retry_id := get_current_retry_id():
+            headers["X-Weave-Retry-Id"] = retry_id
+
         return requests.get(
             self.trace_server_url + url,
             *args,
+            headers=headers,
             **kwargs,
         )
 
     def post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        headers = dict(self._extra_headers) if self._extra_headers else {}
+        if retry_id := get_current_retry_id():
+            headers["X-Weave-Retry-Id"] = retry_id
+
         return requests.post(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
-            headers=self._extra_headers,
+            headers=headers,
             **kwargs,
         )
 
