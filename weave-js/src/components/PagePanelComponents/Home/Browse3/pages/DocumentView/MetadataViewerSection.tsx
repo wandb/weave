@@ -14,6 +14,10 @@ import {CodeEditor} from '../../../../../CodeEditor';
 import {ObjectViewer} from '../CallPage/ObjectViewer';
 import {Subheader} from './StyledText';
 
+const EXPANDED_IDS_LENGTH = 200;
+
+type Data = Record<string, any>;
+
 type MetadataViewerSectionProps = {
   title: string;
   data: Data;
@@ -21,9 +25,11 @@ type MetadataViewerSectionProps = {
   error?: string;
 };
 
-const EXPANDED_IDS_LENGTH = 200;
-
-type Data = Record<string, any>;
+enum ViewerMode {
+  Collapsed,
+  Expanded,
+  Json
+}
 
 const MetadataViewerSectionInner = ({
   title,
@@ -34,7 +40,7 @@ const MetadataViewerSectionInner = ({
   // Update this when we change the state to hidden
   // That way it restores the last state when uncollapsed
   const [isOpen, setIsOpen] = useState(open ?? false);
-  const [mode, setMode] = useState('collapsed');
+  const [mode, setMode] = useState(ViewerMode.Collapsed);
   const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
   // Suppress MUI DataGrid errors about empty parent height.
@@ -67,13 +73,13 @@ const MetadataViewerSectionInner = ({
   }, []);
 
   const body = useMemo(() => {
-    if (mode === 'collapsed' || mode === 'expanded') {
+    if (mode === ViewerMode.Collapsed || mode === ViewerMode.Expanded) {
       return (
         <Fragment>
           <ObjectViewer
             apiRef={apiRef}
             data={data}
-            isExpanded={mode === 'expanded'}
+            isExpanded={mode === ViewerMode.Expanded}
             expandedIds={expandedIds}
             setExpandedIds={setExpandedIds}
             hideHeaders={true}
@@ -84,7 +90,7 @@ const MetadataViewerSectionInner = ({
         </Fragment>
       );
     }
-    if (mode === 'json') {
+    if (mode === ViewerMode.Json) {
       return (
         <Fragment>
           <CodeEditor
@@ -122,10 +128,10 @@ const MetadataViewerSectionInner = ({
 
   // Re-clicking the button will reapply collapse/expand
   const onClickCollapsed = useCallback(() => {
-    if (mode === 'collapsed') {
+    if (mode === ViewerMode.Collapsed) {
       setTreeExpanded(false);
     }
-    setMode('collapsed');
+    setMode(ViewerMode.Collapsed);
     setExpandedIds([]);
   }, [mode, setTreeExpanded]);
 
@@ -137,10 +143,10 @@ const MetadataViewerSectionInner = ({
   }, [apiRef, expandedIds.length, getGroupIds]);
 
   const onClickExpanded = useCallback(() => {
-    if (mode === 'expanded') {
+    if (mode === ViewerMode.Expanded) {
       setTreeExpanded(true);
     }
-    setMode('expanded');
+    setMode(ViewerMode.Expanded);
     if (isExpandAllSmall) {
       setExpandedIds(getGroupIds());
     } else {
@@ -160,14 +166,14 @@ const MetadataViewerSectionInner = ({
       <Button
         variant="ghost"
         icon="row-height-small"
-        active={mode === 'collapsed'}
+        active={mode === ViewerMode.Collapsed}
         onClick={onClickCollapsed}
         tooltip="View collapsed"
       />
       <Button
         variant="ghost"
         icon="expand-uncollapse"
-        active={mode === 'expanded'}
+        active={mode === ViewerMode.Expanded}
         onClick={onClickExpanded}
         tooltip={
           isExpandAllSmall
@@ -178,8 +184,8 @@ const MetadataViewerSectionInner = ({
       <Button
         variant="ghost"
         icon="code-alt"
-        active={mode === 'json'}
-        onClick={() => setMode('json')}
+        active={mode === ViewerMode.Json}
+        onClick={() => setMode(ViewerMode.Json)}
         tooltip="View as JSON"
       />
     </div>
