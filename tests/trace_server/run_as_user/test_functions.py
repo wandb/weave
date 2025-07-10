@@ -25,7 +25,7 @@ class TestRequest(BaseModel):
     sleep_time: Optional[float] = None
     exit_code: Optional[int] = None
     expected_project: Optional[str] = None
-    expected_user: Optional[str] = None
+    expected_entity: Optional[str] = None
     # For multi-arg test
     arg_a: Optional[str] = None
     arg_b: Optional[int] = None
@@ -64,20 +64,24 @@ async def check_isolation_function(req: TestRequest) -> TestResponse:
     if client is None:
         return TestResponse(result="No client in context")
 
-    # Check project matches (removing the __SERVER__/ prefix)
-    actual_project = client._project_id()
-    if actual_project.startswith("__SERVER__/"):
-        actual_project = actual_project[len("__SERVER__/") :]
+    # Get the actual entity and project from the client
+    actual_entity = client.entity
+    actual_project = client.project
 
+    # Check entity matches if expected
+    if req.expected_entity and actual_entity != req.expected_entity:
+        return TestResponse(
+            result=f"Entity mismatch: expected {req.expected_entity}, got {actual_entity}"
+        )
+
+    # Check project matches if expected
     if req.expected_project and actual_project != req.expected_project:
         return TestResponse(
             result=f"Project mismatch: expected {req.expected_project}, got {actual_project}"
         )
 
-    # Note: We can't easily check user ID from the client, but the fact that
-    # we're running means the validation passed
     return TestResponse(
-        result=f"Isolation verified for {req.expected_project}/{req.expected_user}"
+        result=f"Isolation verified for {actual_entity}/{actual_project}"
     )
 
 
