@@ -180,6 +180,8 @@ import {ReactComponent as ImportPaused} from '../../assets/icons/icon-paused.svg
 import {ReactComponent as ImportPencilEdit} from '../../assets/icons/icon-pencil-edit.svg';
 import {ReactComponent as ImportPhoto} from '../../assets/icons/icon-photo.svg';
 import {ReactComponent as ImportPin} from '../../assets/icons/icon-pin.svg';
+import {ReactComponent as ImportPinToLeft} from '../../assets/icons/icon-pin-to-left.svg';
+import {ReactComponent as ImportPinToLeftFilled} from '../../assets/icons/icon-pin-to-left-filled.svg';
 import {ReactComponent as ImportPinToRight} from '../../assets/icons/icon-pin-to-right.svg';
 import {ReactComponent as ImportPlay} from '../../assets/icons/icon-play.svg';
 import {ReactComponent as ImportPlotly} from '../../assets/icons/icon-plotly.svg';
@@ -845,6 +847,12 @@ export const IconPhoto = (props: SVGIconProps) => (
 export const IconPin = (props: SVGIconProps) => (
   <ImportPin {...updateIconProps(props)} />
 );
+export const IconPinToLeft = (props: SVGIconProps) => (
+  <ImportPinToLeft {...updateIconProps(props)} />
+);
+export const IconPinToLeftFilled = (props: SVGIconProps) => (
+  <ImportPinToLeftFilled {...updateIconProps(props)} />
+);
 export const IconPinToRight = (props: SVGIconProps) => (
   <ImportPinToRight {...updateIconProps(props)} />
 );
@@ -1348,6 +1356,8 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'pencil-edit': IconPencilEdit,
   photo: IconPhoto,
   pin: IconPin,
+  'pin-to-left': IconPinToLeft,
+  'pin-to-left-filled': IconPinToLeftFilled,
   'pin-to-right': IconPinToRight,
   play: IconPlay,
   plotly: IconPlotly,

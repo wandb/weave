@@ -203,8 +203,8 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/google_adk",
             "guides/integrations/agno",
             "guides/integrations/autogen",
+            "guides/integrations/verdict",
             "guides/integrations/js"
-
           ],
         },
         {
