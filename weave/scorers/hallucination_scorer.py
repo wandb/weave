@@ -284,6 +284,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
         query: str,
         context: Union[str, list[str]],
         output: str,
+        **kwargs: Any,
     ) -> WeaveScorerResult:
         """
         Score the hallucination of the query and context.
