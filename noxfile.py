@@ -97,7 +97,12 @@ def tests(session, shard):
     if session.python.startswith("3.9") and shard in PY39_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
 
-    session.install("-e", f".[{shard},test]")
+    session.run_install(
+        "uv",
+        "sync",
+        f"--extra={shard}",
+        "--group=test",
+    )
     session.chdir("tests")
 
     env = {
