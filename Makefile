@@ -3,6 +3,7 @@
 setup-docs-ci:
 	pip install uv
 	uv sync --group docs
+	source .venv/bin/activate
 	playwright install
 
 	cd docs && \
