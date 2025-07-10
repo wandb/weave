@@ -29,7 +29,7 @@ from weave.flow.scorer import (
 )
 from weave.flow.util import make_memorable_name, transpose
 from weave.trace.env import get_weave_parallelism
-from weave.trace.objectify import register_object
+from weave.trace.objectify import maybe_objectify, register_object
 from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
@@ -118,16 +118,25 @@ class Evaluation(Object):
             if hasattr(obj, field_name):
                 field_values[field_name] = getattr(obj, field_name)
 
-        # special case for scorers
-        # if orig_scorers := field_values.get("scorers"):
-        #     from weave import scorers as weave_scorers
+        # Start mega-hack
+        # This is a very bad hack. Our deserialization/portability logic
+        # if totally broken. It will require a complete re-write of our
+        # deserialziation layer to fix. In the meantime, this is such a
+        # common pattern, that I am going to fix it here. If you are a
+        # future dev and you actually fix the serialization stuff, that
+        # may or may not break this. That is OK! please feel free to remove
+        # this as we have tests that validate the end-user experience.
+        if orig_scorers := field_values.get("scorers"):
+            from weave import scorers as weave_scorers
 
-        #     assert weave_scorers
-        #     scorers = []
-        #     for scorer in orig_scorers:
-        #         objectified = maybe_objectify(scorer)
-        #         scorers.append(objectified)
-        #     field_values["scorers"] = scorers
+            assert weave_scorers
+            scorers = []
+            for scorer in orig_scorers:
+                if isinstance(scorer, WeaveObject):
+                    scorer = maybe_objectify(scorer)
+                scorers.append(scorer)
+            field_values["scorers"] = scorers
+        # End mega-hack
 
         return cls(**field_values)
 

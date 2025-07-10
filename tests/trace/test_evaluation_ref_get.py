@@ -1,5 +1,3 @@
-import pytest
-
 import weave
 from weave.scorers import LLMAsAJudgeScorer
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
@@ -10,8 +8,12 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 )
 
 
-@pytest.mark.asyncio
-async def test_basic_llm_evaluations(client):
+def test_publish_and_load_evaluation(client):
+    """
+    This test just verifies the round trip for the evaluation.
+
+    We do not actually run it here,
+    """
     scorer = LLMAsAJudgeScorer(
         model=LLMStructuredCompletionModel(
             llm_model_id="gpt-4o-mini",
@@ -44,7 +46,9 @@ async def test_basic_llm_evaluations(client):
 
     gotten_eval = weave.get(published_eval_ref.uri())
     gotten_model = weave.get(published_model_ref.uri())
+    assert isinstance(gotten_model, LLMStructuredCompletionModel)
 
-    result = await gotten_eval.evaluate(gotten_model)
-
-    assert result == "NO WAY"
+    assert isinstance(gotten_eval, weave.Evaluation)
+    assert isinstance(gotten_eval.dataset, weave.Dataset)
+    for scorer in gotten_eval.scorers:
+        assert isinstance(scorer, LLMAsAJudgeScorer)
