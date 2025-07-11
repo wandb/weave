@@ -22,7 +22,7 @@ PY39_INCOMPATIBLE_SHARDS = [
     "mcp",
     "smolagents",
     "dspy",
-    "autogen_tests",
+    "autogen",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
 INTEGRATION_SHARDS = [
