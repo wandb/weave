@@ -24,7 +24,7 @@ async def test_evaluation_status(client):
     @weave.op
     def model(a: int) -> int:
         assert get_status() == EvaluationStatusRunning(
-            status="running", completed_rows=a - 1, total_rows=3
+            completed_rows=a - 1, total_rows=3
         )
         return a + 1
 
@@ -39,7 +39,7 @@ async def test_evaluation_status(client):
     ]
     eval = weave.Evaluation(dataset=dataset, scorers=[scorer])
 
-    assert get_status() == EvaluationStatusNotFound(status="pending")
+    assert get_status() == EvaluationStatusNotFound()
 
     # mock weave.trace.env.py::get_weave_parallelism to return 1 (allows for checking status deterministically)
     with mock.patch("weave.trace.env.get_weave_parallelism", return_value=1):
@@ -59,6 +59,4 @@ async def test_evaluation_status(client):
         ):
             await eval.evaluate(model=model)
 
-    assert get_status() == EvaluationStatusComplete(
-        status="complete", completed_rows=3, total_rows=3
-    )
+    assert get_status() == EvaluationStatusComplete(completed_rows=3, total_rows=3)
