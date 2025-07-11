@@ -144,6 +144,13 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,
 )
+from weave.trace_server.trace_server_worker.trace_server_kafka_worker import (
+    KafkaProducerWorker,
+)
+from weave.trace_server.trace_server_worker.trace_server_worker import (
+    EvaluateModelJob,
+    WorkerInterface,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -218,6 +225,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
+        worker: WorkerInterface | None = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -232,9 +240,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
         self._kafka_producer: Optional[KafkaProducer] = None
+        self._worker: Optional[WorkerInterface] = worker
 
     @classmethod
-    def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
+    def from_env(cls, **kwargs: Any) -> "ClickHouseTraceServer":
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
         return ClickHouseTraceServer(
@@ -243,7 +252,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             user=wf_env.wf_clickhouse_user(),
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
-            use_async_insert=use_async_insert,
+            **kwargs,
         )
 
     @property
@@ -259,6 +268,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return self._kafka_producer
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
+
+    @property
+    def worker(self) -> WorkerInterface | None:
+        # TODO: fix up this pattern
+        if self._worker is not None:
+            return self._worker
+        if wf_env.wf_enable_online_eval():
+            self._worker = KafkaProducerWorker(self.kafka_producer)
+
+        return self._worker
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -2064,6 +2083,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Otherwise, wrap the iterator with tracking
         return _create_tracked_stream_wrapper(
             self._insert_call, chunk_iter, start_call, model_name, req.project_id
+        )
+
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        worker = self.worker
+        if worker is None:
+            raise ValueError("Worker is not set")
+        if not req.wb_user_id:
+            raise ValueError("wb_user_id is required")
+        eval_call_id = generate_id()
+        worker.submit_evaluate_model_job(
+            EvaluateModelJob(
+                project_id=req.project_id,
+                evaluation_ref=req.evaluation_ref,
+                model_ref=req.model_ref,
+                wb_user_id=req.wb_user_id,
+                evaluation_call_id=eval_call_id,
+            )
+        )
+        return tsi.EvaluateModelRes(call_id=eval_call_id)
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        # call = self.call_read(req.call_id)
+        return tsi.EvaluationStatusRes(
+            status=tsi.EvaluationStatusPending(status="pending")
         )
 
     # Private Methods

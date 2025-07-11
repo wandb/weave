@@ -507,6 +507,14 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     ) -> Iterator[tsi.ThreadSchema]:
         return self._next_trace_server.threads_query_stream(req)
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        return self._next_trace_server.evaluate_model(req)
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        return self._next_trace_server.evaluation_status(req)
+
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
     raw_dict = obj.model_dump()

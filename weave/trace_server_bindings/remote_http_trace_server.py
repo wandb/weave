@@ -642,6 +642,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/threads/stream_query", req, tsi.ThreadsQueryReq, tsi.ThreadSchema
         )
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        return self._generic_request(
+            "/evaluations/evaluate_model",
+            req,
+            tsi.EvaluateModelReq,
+            tsi.EvaluateModelRes,
+        )
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        return self._generic_request(
+            "/evaluations/status", req, tsi.EvaluationStatusReq, tsi.EvaluationStatusRes
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,

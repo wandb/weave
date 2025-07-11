@@ -1529,6 +1529,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 p99_turn_duration_ms=p99_turn_duration_ms,
             )
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise NotImplementedError(
+            "evaluate_model is not implemented for SQLite trace server"
+        )
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        raise NotImplementedError(
+            "evaluation_status is not implemented for SQLite trace server"
+        )
+
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
