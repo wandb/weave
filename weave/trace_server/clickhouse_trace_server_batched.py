@@ -101,6 +101,7 @@ from weave.trace_server.llm_completion import (
     lite_llm_completion,
     lite_llm_completion_stream,
 )
+from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
@@ -2072,7 +2073,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
-        raise NotImplementedError("Evaluation status is not implemented")
+        return evaluation_status(self, req)
 
     # Private Methods
     @property

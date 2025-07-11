@@ -202,6 +202,7 @@ export const FilterBar = ({
     ) {
       setFilterToDelete(localFilterModel.items[0].id);
       setShowDeleteWarning(true);
+      setAnchorEl(null); // Close popover to avoid focus trap conflicts
       return;
     }
 
@@ -286,6 +287,7 @@ export const FilterBar = ({
       if (isFirstDatetimeFilter) {
         setFilterToDelete(filterId);
         setShowDeleteWarning(true);
+        setAnchorEl(null); // Close popover to avoid focus trap conflicts
         return;
       }
 
@@ -323,6 +325,7 @@ export const FilterBar = ({
   const handleCancelDelete = useCallback(() => {
     setShowDeleteWarning(false);
     setFilterToDelete(null);
+    setAnchorEl(refBar.current); // Reopen popover after cancel
   }, []);
 
   const onSetSelected = useCallback(() => {
