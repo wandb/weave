@@ -1124,29 +1124,29 @@ class EvaluationStatusReq(BaseModel):
     call_id: str
 
 
-class EvaluationStatusPending(BaseModel):
-    status: Literal["pending"]
+class EvaluationStatusNotFound(BaseModel):
+    code: Literal["not_found"] = "not_found"
 
 
 class EvaluationStatusRunning(BaseModel):
-    status: Literal["running"]
+    code: Literal["running"] = "running"
     completed_rows: int
     total_rows: int
 
 
 class EvaluationStatusFailed(BaseModel):
-    status: Literal["failed"]
+    code: Literal["failed"] = "failed"
     error: Optional[str] = None
 
 
 class EvaluationStatusComplete(BaseModel):
-    status: Literal["complete"]
+    code: Literal["complete"] = "complete"
     output: Optional[Any] = None
 
 
 class EvaluationStatusRes(BaseModel):
     status: Union[
-        EvaluationStatusPending,
+        EvaluationStatusNotFound,
         EvaluationStatusRunning,
         EvaluationStatusFailed,
         EvaluationStatusComplete,
