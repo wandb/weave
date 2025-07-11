@@ -54,6 +54,10 @@ def evaluate_model(args: EvaluateModelArgs) -> None:
             f"got {type(loaded_model).__name__}"
         )
 
-    asyncio.run(loaded_evaluation.evaluate.call(loaded_evaluation, loaded_model))
+    asyncio.run(
+        loaded_evaluation.evaluate(
+            loaded_model, __weave={"call_id": args.evaluation_call_id}
+        )
+    )
 
     return

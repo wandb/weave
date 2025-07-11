@@ -11,6 +11,7 @@ from weave.trace.weave_client import WeaveClient, generate_id
 from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
     EvaluateModelReq,
+    EvaluateModelRes,
     EvaluationStatusComplete,
     EvaluationStatusNotFound,
     EvaluationStatusReq,
@@ -253,10 +254,8 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
             _digest=evaluation_create_res.digest,
         ).uri()
 
-    model_ref_uri = create_model(entity, project)
-    evaluation_ref_uri = create_evaluation(
-        entity, project, create_dataset(entity, project), create_scorer(entity, project)
-    )
+    model_ref_uri = create_model()
+    evaluation_ref_uri = create_evaluation(create_dataset(), create_scorer())
 
     return model_ref_uri, evaluation_ref_uri
 
@@ -275,13 +274,26 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     The test creates a model, dataset, scorer, and evaluation, then runs
     the evaluation through the evaluate_model API.
     """
-    entity = "shawn"
-    project = "test_evaluate_model_" + (
-        "local" if direct_script_execution else "remote"
-    )
-    project_id = f"{entity}/{project}"
+    project_id = client._project_id()
+    entity, project = project_id.split("/")
+
+    def evaluate_model_wrapped(req: EvaluateModelReq):
+        call_id = generate_id()
+        res = evaluate_model_worker.evaluate_model(
+            evaluate_model_worker.EvaluateModelArgs(
+                project_id=req.project_id,
+                evaluation_ref=req.evaluation_ref,
+                model_ref=req.model_ref,
+                wb_user_id=entity,
+                evaluation_call_id=call_id,
+            )
+        )
+        return EvaluateModelRes(
+            call_id=call_id,
+        )
+
     evaluate_model_fn = (
-        evaluate_model_worker.evaluate_model
+        evaluate_model_wrapped
         if direct_script_execution
         else client.server.evaluate_model
     )
@@ -305,9 +317,6 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         json.dumps({"score": 9})
     ):  # Mock score response
         eval_res = evaluate_model_fn(req)
-
-    # Verify the evaluation output is a dictionary with results
-    assert isinstance(eval_res.output, dict)
 
     # Query for calls
     calls_res = client.server.calls_query(
@@ -346,7 +355,6 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     assert eval_call.op_name.startswith(
         f"weave:///{project_id}/op/Evaluation.evaluate:"
     )
-    assert eval_res.output == eval_call.output
     assert isinstance(eval_call.summary, dict)
     assert eval_call.summary["status_counts"] == {
         TraceStatus.SUCCESS: 7,

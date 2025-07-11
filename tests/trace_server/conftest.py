@@ -9,6 +9,7 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
 )
 from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server import environment as ts_env
+from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 TEST_ENTITY = "shawn"
@@ -85,9 +86,20 @@ def get_sqlite_trace_server() -> Callable[[], TestOnlyUserInjectingExternalTrace
     return sqlite_trace_server_inner
 
 
+class LocalSecretFetcher:
+    def fetch(self, secret_name: str) -> dict:
+        return {"secrets": {secret_name: os.getenv(secret_name)}}
+
+
+@pytest.fixture
+def local_secret_fetcher():
+    with secret_fetcher_context(LocalSecretFetcher()):
+        yield
+
+
 @pytest.fixture
 def trace_server(
-    request, get_ch_trace_server, get_sqlite_trace_server
+    request, local_secret_fetcher, get_ch_trace_server, get_sqlite_trace_server
 ) -> TestOnlyUserInjectingExternalTraceServer:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
