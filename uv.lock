@@ -9223,7 +9223,6 @@ wandb = [
 
 [package.dev-dependencies]
 autogen-tests = [
-    { name = "autogen-agentchat", marker = "python_full_version >= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "autogen-ext", extra = ["openai"], marker = "python_full_version >= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
 dev = [
@@ -9366,10 +9365,7 @@ requires-dist = [
 provides-extras = ["anthropic", "autogen", "bedrock", "cerebras", "cohere", "dspy", "google-genai", "groq", "huggingface", "instructor", "langchain", "langchain-nvidia-ai-endpoints", "litellm", "llamaindex", "mcp", "mistral", "modal", "notdiamond", "openai", "openai-agents", "presidio", "scorers", "smolagents", "verdict", "vertexai", "video-support", "wandb"]
 
 [package.metadata.requires-dev]
-autogen-tests = [
-    { name = "autogen-agentchat", marker = "python_full_version >= '3.10'", specifier = ">=0.5.7" },
-    { name = "autogen-ext", extras = ["openai"], marker = "python_full_version >= '3.10'", specifier = ">=0.5.7" },
-]
+autogen-tests = [{ name = "autogen-ext", extras = ["openai"], marker = "python_full_version >= '3.10'", specifier = ">=0.5.7" }]
 dev = [
     { name = "python-multipart" },
     { name = "tomlkit" },

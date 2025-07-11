@@ -195,10 +195,7 @@ dev = [
   "python-multipart",
 
 ]
-autogen_tests = [
-  "autogen-agentchat>=0.5.7; python_version >= '3.10'",
-  "autogen-ext[openai]>=0.5.7; python_version >= '3.10'",
-]
+autogen_tests = ["autogen-ext[openai]>=0.5.7; python_version >= '3.10'"]
 trace_server = [
   "ddtrace>=2.7.0",
   # BYOB - S3
