@@ -18,11 +18,11 @@ import pytest
 from pydantic import BaseModel
 
 import weave
-from weave.trace.ref_util import get_ref
-from weave.trace.weave_client import WeaveClient
-from weave.trace_server.run_as_user.cross_process_trace_server import (
+from tests.trace_server.run_as_user.cross_process_trace_server import (
     CrossProcessTraceServerReceiver,
 )
+from weave.trace.ref_util import get_ref
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server.run_as_user.run_as_user import RunAsUser, RunAsUserError
 from weave.trace_server.trace_server_interface import TraceServerInterface
 
@@ -260,13 +260,13 @@ async def test_project_isolation(client):
     ):
         # Each runner should see its own project context
         req1 = TestRequest(
-            value="test", expected_project="project1", expected_entity="test_entity"
+            value="test", expected_project="project1", expected_entity=client.entity
         )
         result1 = await runner1.execute(check_isolation_function, req1)
         assert "Isolation verified" in result1.result
 
         req2 = TestRequest(
-            value="test", expected_project="project2", expected_entity="test_entity"
+            value="test", expected_project="project2", expected_entity=client.entity
         )
         result2 = await runner2.execute(check_isolation_function, req2)
         assert "Isolation verified" in result2.result

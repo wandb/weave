@@ -22,6 +22,14 @@ from weave.trace_server import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
 
+# Constants for better maintainability
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 10
+DEFAULT_STREAMING_TIMEOUT_SECONDS = 5
+WORKER_LOOP_TIMEOUT_SECONDS = 1.0
+WORKER_SHUTDOWN_TIMEOUT_SECONDS = 5.0
+STREAM_END_SIGNAL = "STREAM_END"
+STOP_SIGNAL = "STOP"
+
 
 # Protocol for trace server methods to improve type safety
 class TraceServerMethod(Protocol):
@@ -111,6 +119,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
 
     @contextmanager
     def lock(self) -> Generator[None, None, None]:
+        """Context manager for thread-safe access to shared resources."""
         self._lock.acquire()
         try:
             yield
@@ -122,6 +131,41 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         with self.lock():
             self._request_id_counter += 1
             return f"req_{self._request_id_counter}_{uuid.uuid4().hex[:8]}"
+
+    def _wait_for_response(
+        self, request_id: str, method: str, timeout: int
+    ) -> ResponseQueueItem:
+        """
+        Wait for a specific response, handling out-of-order delivery.
+
+        Args:
+            request_id: The request ID to wait for
+            method: The method name for error reporting
+            timeout: Timeout in seconds
+
+        Returns:
+            The response item for the given request ID
+
+        Raises:
+            TimeoutError: If timeout occurs
+        """
+        try:
+            response_item = self.response_queue.get(timeout=timeout)
+        except Empty as e:
+            # Check if response was cached while we were waiting
+            with self.lock():
+                response_item = self._pending_requests.pop(request_id, None)
+            if response_item is None:
+                raise TimeoutError(f"Timeout waiting for response to {method}") from e
+
+        if response_item.request_id == request_id:
+            return response_item
+        else:
+            # Out-of-order response - cache it for later
+            with self.lock():
+                self._pending_requests[response_item.request_id] = response_item
+            # Recursively wait for the correct response
+            return self._wait_for_response(request_id, method, timeout)
 
     def _send_request(self, method: str, payload: BaseModel) -> BaseModel:
         """
@@ -152,37 +196,18 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         self.request_queue.put(request_item)
 
         # Wait for response, handling out-of-order delivery
-        while True:
-            # TODO: Add configurable timeout instead of hard-coded 30 seconds
-            # TODO: Consider exponential backoff for retries on queue operations
-            try:
-                try:
-                    response_item = self.response_queue.get(
-                        timeout=10
-                    )  # 30 second timeout
-                except Empty as e:
-                    # hopefully it was cached
-                    with self.lock():
-                        response_item = self._pending_requests.pop(request_id, None)
-                    if response_item is None:
-                        raise TimeoutError(
-                            f"Timeout waiting for response to {method}"
-                        ) from e
+        try:
+            response_item = self._wait_for_response(
+                request_id, method, DEFAULT_REQUEST_TIMEOUT_SECONDS
+            )
 
-                if response_item.request_id == request_id:
-                    # This is our response
-                    if response_item.error:
-                        raise CrossProcessTraceServerError(response_item.error)
-                    return response_item.payload
-                else:
-                    # Out-of-order response - cache it for later
-                    with self.lock():
-                        self._pending_requests[response_item.request_id] = response_item
-                    continue
+            if response_item.error:
+                raise CrossProcessTraceServerError(response_item.error)
+            return response_item.payload
 
-            except Exception as e:
-                logger.exception(f"Error waiting for response to {method}")
-                raise
+        except Exception as e:
+            logger.exception(f"Error waiting for response to {method}")
+            raise
 
     def _send_streaming_request(self, method: str, payload: BaseModel) -> Iterator[Any]:
         """
@@ -214,33 +239,18 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
 
         # Receive streaming responses until termination
         while True:
-            # TODO: Add configurable timeout instead of hard-coded 30 seconds
-            # TODO: Consider implementing flow control to prevent unbounded memory growth
             try:
-                try:
-                    response_item = self.response_queue.get(timeout=5)
-                except Empty as e:
-                    # hopefully it was cached
-                    with self.lock():
-                        response_item = self._pending_requests.pop(request_id, None)
-                    if response_item is None:
-                        raise TimeoutError(
-                            f"Timeout waiting for response to {method}"
-                        ) from e
+                response_item = self._wait_for_response(
+                    request_id, method, DEFAULT_STREAMING_TIMEOUT_SECONDS
+                )
 
-                if response_item.request_id == request_id:
-                    if response_item.error:
-                        if response_item.error == "STREAM_END":
-                            # Normal termination of stream
-                            break
-                        # Error during streaming
-                        raise CrossProcessTraceServerError(response_item.error)
-                    yield response_item.payload
-                else:
-                    # Out-of-order response - cache for later
-                    with self.lock():
-                        self._pending_requests[response_item.request_id] = response_item
-                    continue
+                if response_item.error:
+                    if response_item.error == STREAM_END_SIGNAL:
+                        # Normal termination of stream
+                        break
+                    # Error during streaming
+                    raise CrossProcessTraceServerError(response_item.error)
+                yield response_item.payload
 
             except Exception as e:
                 logger.exception(f"Error in streaming response for {method}")
@@ -251,7 +261,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         try:
             self.request_queue.put(
                 RequestQueueItem(
-                    request_id="STOP", method="STOP", payload=EmptyPayload()
+                    request_id=STOP_SIGNAL, method=STOP_SIGNAL, payload=EmptyPayload()
                 )
             )
         except Exception as e:
@@ -265,6 +275,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         # This method has a different signature, so we need to create a payload
         raise NotImplementedError("ensure_project_exists is not implemented")
 
+    # Regular method implementations (reduced duplication)
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         """Export OTEL traces."""
         return self._send_request("otel_export", req)
@@ -284,10 +295,6 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         """Query calls."""
         return self._send_request("calls_query", req)
-
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        """Query calls with streaming."""
-        return self._send_streaming_request("calls_query_stream", req)
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         """Delete calls."""
@@ -357,12 +364,6 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Query a table."""
         return self._send_request("table_query", req)
 
-    def table_query_stream(
-        self, req: tsi.TableQueryReq
-    ) -> Iterator[tsi.TableRowSchema]:
-        """Query a table with streaming."""
-        return self._send_streaming_request("table_query_stream", req)
-
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         """Query table statistics."""
         return self._send_request("table_query_stats", req)
@@ -417,15 +418,26 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Create completions."""
         return self._send_request("completions_create", req)
 
+    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        """Get project statistics."""
+        return self._send_request("project_stats", req)
+
+    # Streaming method implementations
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        """Query calls with streaming."""
+        return self._send_streaming_request("calls_query_stream", req)
+
+    def table_query_stream(
+        self, req: tsi.TableQueryReq
+    ) -> Iterator[tsi.TableRowSchema]:
+        """Query a table with streaming."""
+        return self._send_streaming_request("table_query_stream", req)
+
     def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
         """Create completions with streaming."""
         return self._send_streaming_request("completions_create_stream", req)
-
-    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        """Get project statistics."""
-        return self._send_request("project_stats", req)
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
@@ -491,13 +503,15 @@ class CrossProcessTraceServerReceiver:
             try:
                 # Get request with timeout so we can check stop event periodically
                 try:
-                    request_item = self.request_queue.get(timeout=1.0)
+                    request_item = self.request_queue.get(
+                        timeout=WORKER_LOOP_TIMEOUT_SECONDS
+                    )
                 except Empty:
                     # Timeout, check stop event and continue
                     continue  # Timeout, check stop event and continue
 
                 # Check for stop signal
-                if request_item.request_id == "STOP":
+                if request_item.request_id == STOP_SIGNAL:
                     break
 
                 try:
@@ -517,16 +531,20 @@ class CrossProcessTraceServerReceiver:
                     logger.exception(
                         f"Error processing request {request_item.request_id}"
                     )
-                    response_item = ResponseQueueItem(
-                        request_id=request_item.request_id,
-                        error=str(e),
-                    )
-                    self.response_queue.put(response_item)
+                    self._send_error_response(request_item.request_id, str(e))
 
             except Exception as e:
                 # Log and continue on any unexpected errors
                 logger.exception("Error in worker loop")
                 continue
+
+    def _send_error_response(self, request_id: str, error_message: str) -> None:
+        """Send an error response for a failed request."""
+        response_item = ResponseQueueItem(
+            request_id=request_id,
+            error=error_message,
+        )
+        self.response_queue.put(response_item)
 
     def _handle_regular_method(
         self, request_item: RequestQueueItem, method: TraceServerMethod
@@ -541,11 +559,7 @@ class CrossProcessTraceServerReceiver:
             self.response_queue.put(response_item)
         except Exception as e:
             logger.exception(f"Error in method {request_item.method}")
-            response_item = ResponseQueueItem(
-                request_id=request_item.request_id,
-                error=str(e),
-            )
-            self.response_queue.put(response_item)
+            self._send_error_response(request_item.request_id, str(e))
 
     def _handle_streaming_method(
         self,
@@ -566,17 +580,13 @@ class CrossProcessTraceServerReceiver:
             # Signal end of stream with special error code
             response_item = ResponseQueueItem(
                 request_id=request_item.request_id,
-                error="STREAM_END",
+                error=STREAM_END_SIGNAL,
             )
             self.response_queue.put(response_item)
 
         except Exception as e:
             logger.exception(f"Error in streaming method {request_item.method}")
-            response_item = ResponseQueueItem(
-                request_id=request_item.request_id,
-                error=str(e),
-            )
-            self.response_queue.put(response_item)
+            self._send_error_response(request_item.request_id, str(e))
 
     def get_sender_trace_server(self) -> CrossProcessTraceServerSender:
         """
@@ -595,4 +605,4 @@ class CrossProcessTraceServerReceiver:
         """
         self._stop_event.set()
         if self._worker_thread and self._worker_thread.is_alive():
-            self._worker_thread.join(timeout=5.0)
+            self._worker_thread.join(timeout=WORKER_SHUTDOWN_TIMEOUT_SECONDS)

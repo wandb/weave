@@ -48,6 +48,12 @@ from weave.trace.weave_init import InitializedClient
 
 logger = logging.getLogger(__name__)
 
+# Constants for better maintainability
+DEFAULT_EXECUTION_TIMEOUT_SECONDS = 30.0
+DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 600.0  # Also used as trace server flush timeout
+RESPONSE_POLL_INTERVAL_SECONDS = 0.1
+PROCESS_TERMINATION_TIMEOUT_SECONDS = 5.0
+
 T = TypeVar("T", bound=BaseModel)
 R = TypeVar("R", bound=BaseModel)
 
@@ -95,7 +101,7 @@ class RunAsUser:
         self,
         client_factory: Callable[[FC], WeaveClient],
         client_factory_config: FC,
-        timeout_seconds: float = 30.0,
+        timeout_seconds: float = DEFAULT_EXECUTION_TIMEOUT_SECONDS,
     ):
         """
         Initialize the RunAsUser with a client factory.
@@ -164,13 +170,15 @@ class RunAsUser:
         assert self._response_queue is not None
         assert self._process is not None
 
+        effective_timeout = timeout_seconds or self.timeout_seconds
+
         try:
             # Send the request
             self._request_queue.put(("EXEC", func, request))
 
             # Wait for response with timeout
             start_time = time.time()
-            while time.time() - start_time < (timeout_seconds or self.timeout_seconds):
+            while time.time() - start_time < effective_timeout:
                 if not self._response_queue.empty():
                     result = self._response_queue.get()
 
@@ -187,11 +195,11 @@ class RunAsUser:
                         f"Worker process terminated unexpectedly with exit code: {exit_code}"
                     )
 
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(RESPONSE_POLL_INTERVAL_SECONDS)
 
             # Timeout occurred
             raise RunAsUserError(
-                f"Function execution timed out after {timeout_seconds or self.timeout_seconds} seconds"
+                f"Function execution timed out after {effective_timeout} seconds"
             )
 
         except Exception as e:
@@ -201,8 +209,9 @@ class RunAsUser:
                 raise
             raise RunAsUserError(f"Execution failed: {e}") from e
 
-    def stop(self, timeout_seconds: float = 600.0) -> None:
-        """Stop the worker process gracefully.
+    def stop(self, timeout_seconds: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS) -> None:
+        """
+        Stop the worker process gracefully.
 
         Args:
             timeout_seconds: Maximum time to wait for the process to stop.
@@ -227,7 +236,9 @@ class RunAsUser:
         )
         self._process.start()
 
-    def _stop_process(self, timeout_seconds: float = 600.0) -> None:
+    def _stop_process(
+        self, timeout_seconds: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS
+    ) -> None:
         """Stop the worker process."""
         if self._process is None:
             return
@@ -246,7 +257,7 @@ class RunAsUser:
                         "Worker process did not stop gracefully, terminating..."
                     )
                     self._process.terminate()
-                    self._process.join(timeout=5.0)
+                    self._process.join(timeout=PROCESS_TERMINATION_TIMEOUT_SECONDS)
 
                 if self._process.is_alive():
                     logger.error("Worker process did not terminate, killing...")
@@ -306,6 +317,7 @@ class RunAsUser:
                                 # Send exception back to parent
                                 response_queue.put(e)
                         else:
+                            # TODO: Consider making this more extensible for future signal types
                             raise ValueError(f"Unknown signal: {signal}")
 
                     except KeyboardInterrupt:
