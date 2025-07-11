@@ -52,7 +52,6 @@ INTEGRATION_SHARDS = [
     "mcp",
     "verdict",
     "autogen",
-    "pandas",
 ]
 
 
@@ -85,6 +84,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "trace_server",
         "trace_server_bindings",
         "trace_no_server",
+        "pandas",
         *INTEGRATION_SHARDS,
         *trace_server_shards,
     ],
