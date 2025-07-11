@@ -52,6 +52,7 @@ INTEGRATION_SHARDS = [
     "mcp",
     "verdict",
     "autogen",
+    "pandas",
 ]
 
 
@@ -80,14 +81,12 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
     "shard",
     [
         "flow",
+        "trace",
         "trace_server",
         "trace_server_bindings",
-        "pandas",
-        "autogen",
-        "trace",
+        "trace_no_server",
         *INTEGRATION_SHARDS,
         *trace_server_shards,
-        "trace_no_server",
     ],
 )
 def tests(session, shard):
