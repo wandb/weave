@@ -99,21 +99,19 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 def non_server_tests(session):
-    pytest_args = [
-        *get_default_pytest_args(),
-        "-m",
-        "not trace_server",
-    ]
-    test_dirs = ["trace/"]
-
     run_uv_sync_command_with_args(
         "--group=test",
         session=session,
     )
     session.chdir("tests")
+
+    pytest_args = get_default_pytest_args()
+    if not (posargs := session.posargs):
+        posargs = ["-m", "not trace_server"]
+    test_dirs = ["trace/"]
     session.run(
         *pytest_args,
-        *session.posargs,
+        *posargs,
         *test_dirs,
     )
 
@@ -122,12 +120,6 @@ def non_server_tests(session):
 @nox.parametrize(
     "shard",
     [
-        # The `custom` shard is included if you want to run your own tests.  By default,
-        # no tests are specified, which means ALL tests will run.  To run just your own
-        # subset, you can pass `-- test_your_thing.py` to nox.
-        # For example,
-        #   nox -e "tests-3.12(shard='custom')" -- test_your_thing.py
-        "custom",
         "flow",
         "trace_server",
         "trace_server_bindings",
