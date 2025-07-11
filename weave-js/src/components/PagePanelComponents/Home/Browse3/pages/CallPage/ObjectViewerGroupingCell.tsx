@@ -8,15 +8,19 @@ import {Tooltip} from '../../../../../Tooltip';
 import {CursorBox} from './CursorBox';
 import {maybeGetDeletedRefValuePlaceholderFromRow} from './ObjectViewer';
 
-const INSET_SPACING = 40;
+const DEFAULT_INSET_SPACING = 40;
 
 /**
  * Utility component for the ObjectViewer to allow expanding/collapsing of keys.
  */
 export const ObjectViewerGroupingCell: FC<
-  GridRenderCellParams & {onClick?: (event: MouseEvent) => void}
+  GridRenderCellParams & {
+    insetSpacing?: number;
+    onClick?: (event: MouseEvent) => void;
+  }
 > = props => {
   const {id, field, rowNode, row} = props;
+  const insetSpacing = props.insetSpacing ?? DEFAULT_INSET_SPACING;
   const isGroup = rowNode.type === 'group';
   const isExpandableRef = row.isExpandableRef;
   const apiRef = useGridApiContext();
@@ -53,8 +57,8 @@ export const ObjectViewerGroupingCell: FC<
           <Box
             key={i}
             sx={{
-              flex: `0 0 ${INSET_SPACING / 2}px`,
-              width: `${INSET_SPACING / 2}px`,
+              flex: `0 0 ${insetSpacing / 2}px`,
+              width: `${insetSpacing / 2}px`,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
@@ -66,8 +70,8 @@ export const ObjectViewerGroupingCell: FC<
       })}
       <Box
         sx={{
-          flex: `0 0 ${INSET_SPACING}px`,
-          width: `${INSET_SPACING}px`,
+          flex: `0 0 ${insetSpacing}px`,
+          width: `${insetSpacing}px`,
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
