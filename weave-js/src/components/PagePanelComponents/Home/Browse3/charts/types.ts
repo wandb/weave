@@ -115,6 +115,7 @@ export type ChartConfig = {
   binCount?: number; // For line plots and bar charts
   aggregation?: AggregationMethod; // For line plots and bar charts
   groupKeys?: string[]; // For grouping by multiple keys (op_name and user-selected fields)
+  customName?: string; // For custom chart names
 };
 
 export type ChartsState = {

@@ -761,6 +761,8 @@ const WeaveflowRouteContext = createContext<{
 
 export const WeaveflowPeekContext = createContext<{
   isPeeking?: boolean;
+  previousUrl?: string;
+  setPreviousUrl?: (url: string) => void;
 }>({
   isPeeking: false,
 });
@@ -774,6 +776,26 @@ export const useClosePeek = () => {
       history.replace({
         search: queryParams.toString(),
       });
+    }
+  };
+};
+
+export const useBackNavigation = () => {
+  const history = useHistory();
+  const {previousUrl} = useContext(WeaveflowPeekContext);
+
+  return () => {
+    if (previousUrl) {
+      history.push(previousUrl);
+    } else {
+      // Fallback to closing peek if no previous URL
+      const queryParams = new URLSearchParams(history.location.search);
+      if (queryParams.has(PEEK_PARAM)) {
+        queryParams.delete(PEEK_PARAM);
+        history.replace({
+          search: queryParams.toString(),
+        });
+      }
     }
   };
 };

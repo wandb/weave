@@ -17,6 +17,40 @@ import {ScatterPlot} from './ScatterPlot';
 import {chartContentStyle} from './styling';
 import {AggregationMethod, ExtractedCallData} from './types';
 
+// Utility function to generate auto-names for charts
+export const generateChartAutoName = (
+  yAxis: string,
+  plotType: 'scatter' | 'line' | 'bar',
+  aggregation: AggregationMethod,
+  xAxis: string,
+  data: ExtractedCallData[]
+): string => {
+  // Get the y-axis field to access its label
+  const yField = getYAxisFields(data).find(f => f.key === yAxis);
+  const yLabel = yField?.label || yAxis;
+
+  // Get the x-axis field for scatter plots
+  const xField =
+    plotType === 'scatter'
+      ? getScatterXAxisFields(data).find(f => f.key === xAxis)
+      : undefined;
+
+  // For scatter plots, include x-axis name if it's not a time-based axis
+  if (
+    plotType === 'scatter' &&
+    xField &&
+    xAxis !== 'started_at' &&
+    xAxis !== 'ended_at'
+  ) {
+    const xLabel = xField.label;
+    return `${yLabel} vs ${xLabel}`;
+  } else if (plotType === 'line' || plotType === 'bar') {
+    return `${aggregation} ${yLabel}`;
+  }
+
+  return yLabel;
+};
+
 export type ChartProps = {
   data: ExtractedCallData[];
   height?: number;
@@ -26,6 +60,7 @@ export type ChartProps = {
   binCount?: number;
   aggregation?: AggregationMethod;
   title?: string;
+  customName?: string;
   onEdit?: () => void;
   onRemove?: () => void;
   className?: string;
@@ -46,6 +81,7 @@ export const Chart: React.FC<ChartProps> = ({
   binCount = 20,
   aggregation = 'average',
   title,
+  customName,
   onEdit,
   onRemove,
   className,
@@ -80,11 +116,6 @@ export const Chart: React.FC<ChartProps> = ({
     return keys.length > 0 ? keys : undefined;
   }, [hasMultipleOperations, groupKeys]);
 
-  // Get the y-axis field to access its units
-  const yField = React.useMemo(() => {
-    return getYAxisFields(data).find(f => f.key === yAxis);
-  }, [yAxis, data]);
-
   // Get the x-axis field and label
   const xAxisLabel = React.useMemo(() => {
     if (plotType === 'scatter') {
@@ -94,38 +125,16 @@ export const Chart: React.FC<ChartProps> = ({
     return 'Time';
   }, [plotType, xAxis, data]);
 
-  // Get the x-axis field for scatter plots (used in title generation)
-  const xField = React.useMemo(() => {
-    if (plotType === 'scatter') {
-      return getScatterXAxisFields(data).find(f => f.key === xAxis);
-    }
-    return undefined;
-  }, [plotType, xAxis, data]);
-
-  // Format the title with units and aggregation method if available
-  const formattedTitle = React.useMemo(() => {
-    if (!title) return '';
-
-    let formattedTitle = title;
-
-    // For scatter plots, include x-axis name if it's not a time-based axis
-    if (
-      plotType === 'scatter' &&
-      xField &&
-      xAxis !== 'started_at' &&
-      xAxis !== 'ended_at'
-    ) {
-      const yAxisLabel = yField?.label || title;
-      const xAxisLabel = xField.label;
-      formattedTitle = `${yAxisLabel} vs ${xAxisLabel}`;
-    } else {
-      if (plotType === 'line' || plotType === 'bar') {
-        formattedTitle = `${aggregation} ${title}`;
-      }
+  // Generate the final title to display
+  const displayTitle = React.useMemo(() => {
+    // Use custom name if provided, otherwise generate auto-name
+    if (customName) {
+      return customName;
     }
 
-    return formattedTitle;
-  }, [title, yField?.label, plotType, aggregation, xField, xAxis]);
+    // Generate auto-name based on chart configuration
+    return generateChartAutoName(yAxis, plotType, aggregation, xAxis, data);
+  }, [customName, yAxis, plotType, aggregation, xAxis, data]);
 
   const PlotComponent =
     plotType === 'line'
@@ -207,7 +216,7 @@ export const Chart: React.FC<ChartProps> = ({
               pointerEvents: 'none',
               maxWidth: 'calc(100% - 60px)',
             }}>
-            {formattedTitle}
+            {displayTitle}
           </span>
         </div>
         <div

@@ -217,6 +217,7 @@ const CallsChartsInner = ({
                 binCount={chart.binCount}
                 aggregation={chart.aggregation}
                 title={chartTitle}
+                customName={chart.customName}
                 chartId={chart.id}
                 entity={entity}
                 project={project}
