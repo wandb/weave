@@ -132,7 +132,7 @@ export type InferenceBillingInfo = {
 // information and methods.
 export type InferenceContextType = {
   isLoggedIn: boolean;
-  isCatalogEnabled?: boolean; // Viewer can see model catalog page
+  isCatalogEnabled: boolean; // Viewer can see model catalog page
   isInferenceEnabled: boolean; // Viewer can call inference service
   availabilityMessage: string;
   playgroundEntity: string;
