@@ -53,6 +53,30 @@ INTEGRATION_SHARDS = [
 ]
 
 
+def get_default_pytest_args(*args):
+    return [
+        "pytest",
+        "--durations=20",
+        "--strict-markers",
+        "--cov=weave",
+        "--cov-report=html",
+        "--cov-branch",
+        *args,
+    ]
+
+
+def run_uv_sync_command_with_args(*args, session):
+    session.run_install(
+        "uv",
+        "sync",
+        *args,
+        # The following is required to make nox use the virtualenv we created
+        # https://nox.thea.codes/en/stable/cookbook.html#using-a-lockfile
+        f"--python={session.virtualenv.location}",
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )
+
+
 @nox.session
 def lint(session):
     session.install("pre-commit", "jupyter")
@@ -76,23 +100,15 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 def non_server_tests(session):
     pytest_args = [
-        "pytest",
-        "--durations=20",
-        "--strict-markers",
-        "--cov=weave",
-        "--cov-report=html",
-        "--cov-branch",
+        *get_default_pytest_args(),
         "-m",
         "not trace_server",
     ]
     test_dirs = ["trace/"]
 
-    session.run_install(
-        "uv",
-        "sync",
+    run_uv_sync_command_with_args(
         "--group=test",
-        f"--python={session.virtualenv.location}",
-        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+        session=session,
     )
     session.chdir("tests")
     session.run(
@@ -201,17 +217,7 @@ def tests(session, shard):
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
 
-    # Add sharding logic for trace1, trace2, trace3
-    pytest_args = [
-        "pytest",
-        "--durations=20",
-        "--strict-markers",
-        "--cov=weave",
-        "--cov-report=html",
-        "--cov-branch",
-    ]
-
-    # Handle trace sharding: run every 3rd test starting at different offsets
+    pytest_args = get_default_pytest_args()
     if shard in trace_server_shards:
         shard_id = int(shard[-1]) - 1
         pytest_args.extend(
