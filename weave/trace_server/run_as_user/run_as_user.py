@@ -191,7 +191,7 @@ class RunAsUser:
         )
         self._process.start()
 
-    def _stop_process(self) -> None:
+    def _stop_process(self, timeout_seconds: float = 600.0) -> None:
         """Stop the worker process."""
         if self._process is None:
             return
@@ -203,7 +203,7 @@ class RunAsUser:
                     self._request_queue.put(("STOP", None, None))
 
                 # Wait for graceful shutdown
-                self._process.join(timeout=5.0)
+                self._process.join(timeout=timeout_seconds)
 
                 if self._process.is_alive():
                     logger.warning(

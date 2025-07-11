@@ -4,6 +4,7 @@ import threading
 import uuid
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
+from queue import Empty
 from typing import Any, Callable
 
 from pydantic import BaseModel
@@ -124,9 +125,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
 
         # Send request to main process
         request_item = RequestQueueItem(
-            request_id=request_id,
-            method=method,
-            payload=payload,
+            request_id=request_id, method=method, payload=payload
         )
         self.request_queue.put(request_item)
 
@@ -135,7 +134,18 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
             # TODO: Add configurable timeout instead of hard-coded 30 seconds
             # TODO: Consider exponential backoff for retries on queue operations
             try:
-                response_item = self.response_queue.get(timeout=30)  # 30 second timeout
+                try:
+                    response_item = self.response_queue.get(
+                        timeout=10
+                    )  # 30 second timeout
+                except Empty as e:
+                    # hopefully it was cached
+                    with self.lock():
+                        response_item = self._pending_requests.pop(request_id, None)
+                    if response_item is None:
+                        raise TimeoutError(
+                            f"Timeout waiting for response to {method}"
+                        ) from e
 
                 if response_item.request_id == request_id:
                     # This is our response
@@ -185,7 +195,16 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
             # TODO: Add configurable timeout instead of hard-coded 30 seconds
             # TODO: Consider implementing flow control to prevent unbounded memory growth
             try:
-                response_item = self.response_queue.get(timeout=30)
+                try:
+                    response_item = self.response_queue.get(timeout=5)
+                except Empty as e:
+                    # hopefully it was cached
+                    with self.lock():
+                        response_item = self._pending_requests.pop(request_id, None)
+                    if response_item is None:
+                        raise TimeoutError(
+                            f"Timeout waiting for response to {method}"
+                        ) from e
 
                 if response_item.request_id == request_id:
                     if response_item.error:
@@ -447,7 +466,8 @@ class CrossProcessTraceServerReceiver:
                 # Get request with timeout so we can check stop event periodically
                 try:
                     request_item = self.request_queue.get(timeout=1.0)
-                except Exception:
+                except Empty:
+                    # Timeout, check stop event and continue
                     continue  # Timeout, check stop event and continue
 
                 # Check for stop signal

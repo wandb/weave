@@ -860,6 +860,9 @@ class WeaveKeyDict(dict):
     def __setitem__(self, key: Any, value: Any) -> None:
         raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
 
+    def unwrap(self) -> dict:
+        return dict(self)
+
 
 class AttributesDict(dict):
     """A dict representing the attributes of a call.
@@ -913,6 +916,12 @@ class AttributesDict(dict):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"
+
+    def unwrap(self) -> dict:
+        unwrapped = dict(self)
+        if "weave" in unwrapped and isinstance(unwrapped["weave"], WeaveKeyDict):
+            unwrapped["weave"] = unwrapped["weave"].unwrap()
+        return unwrapped
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
@@ -1348,7 +1357,7 @@ class WeaveClient:
                     started_at=started_at,
                     parent_id=parent_id,
                     inputs=inputs_json,
-                    attributes=attributes_dict,
+                    attributes=attributes_dict.unwrap(),
                     wb_run_id=current_wb_run_id,
                     wb_run_step=current_wb_run_step,
                     thread_id=thread_id,
