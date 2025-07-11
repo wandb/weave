@@ -118,6 +118,8 @@ export type InferenceBillingInfo = {
   billingPeriodStart: Date;
   billingPeriodEnd: Date;
   usage: number;
+
+  inferenceFreeLimit?: number;
   inferenceSafetyLimit: number;
 
   formatAsDollar: (value: number) => string;
