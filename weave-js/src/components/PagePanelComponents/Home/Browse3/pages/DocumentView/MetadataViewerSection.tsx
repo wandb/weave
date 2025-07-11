@@ -158,7 +158,7 @@ const MetadataViewerSectionInner = ({
 
   const headerSection = (
     <div>
-      <div className="tw-style min-h-32 flex">
+      <div className="tw-style h-32 flex">
         <Button
           onClick={() => {
             setIsOpen(!isOpen);
