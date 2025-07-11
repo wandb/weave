@@ -259,6 +259,7 @@ jobs:
             "13",
             #
           ]
+        nox-shard: ["trace_no_server"]
       fail-fast: false
     steps:
       - name: Checkout
@@ -273,7 +274,7 @@ jobs:
           pip install nox uv
       - name: Run nox (Non Trace Server)
         run: |
-          nox -e "non_server_tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}" -- \
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "not trace_server"
 
   trace-tests:
