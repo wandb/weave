@@ -7,7 +7,7 @@
   data points within each bin.
 */
 
-import {AggregationMethod, BinnedPoint, DataPoint} from './types';
+import {AggregationMethod, BinnedPoint, BinningMode, DataPoint} from './types';
 
 export const aggregateValues = (
   values: number[],
@@ -37,11 +37,91 @@ export const aggregateValues = (
   }
 };
 
+/**
+ * Creates time-based bins for the given binning mode.
+ */
+export const createTimeBins = (
+  xMin: number,
+  xMax: number,
+  binningMode: BinningMode
+): Array<{x: number; binStart: number; binEnd: number}> => {
+  const bins: Array<{x: number; binStart: number; binEnd: number}> = [];
+  
+  if (binningMode === 'absolute') {
+    // This shouldn't be called for absolute mode, but handle it gracefully
+    return [];
+  }
+
+  const startDate = new Date(xMin);
+  const endDate = new Date(xMax);
+  
+  let current = new Date(startDate);
+  
+  // Align to appropriate boundary based on binning mode
+  switch (binningMode) {
+    case 'hour':
+      current.setMinutes(0, 0, 0);
+      break;
+    case 'day':
+      current.setHours(0, 0, 0, 0);
+      break;
+    case 'month':
+      current.setDate(1);
+      current.setHours(0, 0, 0, 0);
+      break;
+    case 'year':
+      current.setMonth(0, 1);
+      current.setHours(0, 0, 0, 0);
+      break;
+  }
+  
+  while (current <= endDate) {
+    const binStart = current.getTime();
+    const next = new Date(current);
+    
+    // Advance to next boundary
+    switch (binningMode) {
+      case 'hour':
+        next.setHours(next.getHours() + 1);
+        break;
+      case 'day':
+        next.setDate(next.getDate() + 1);
+        break;
+      case 'month':
+        next.setMonth(next.getMonth() + 1);
+        break;
+      case 'year':
+        next.setFullYear(next.getFullYear() + 1);
+        break;
+    }
+    
+    const binEnd = next.getTime();
+    const binCenter = binStart + (binEnd - binStart) / 2;
+    
+    bins.push({
+      x: binCenter,
+      binStart,
+      binEnd,
+    });
+    
+    current = next;
+    
+    // Safety check to prevent infinite loops
+    if (bins.length > 10000) {
+      console.warn('Time binning created too many bins, stopping at 10000');
+      break;
+    }
+  }
+  
+  return bins;
+};
+
 export const binDataPoints = (
   points: DataPoint[],
   binCount: number = 20,
   aggregation: AggregationMethod = 'average',
-  useGroups: boolean = false
+  useGroups: boolean = false,
+  binningMode: BinningMode = 'absolute'
 ): Record<string, BinnedPoint[]> => {
   if (!binCount || binCount < 1 || points.length === 0) {
     if (!useGroups) {
@@ -92,28 +172,70 @@ export const binDataPoints = (
       };
     }
 
-    const binSize = (xMax - xMin) / binCount;
-    const bins: {
+    // Create bins based on binning mode
+    let bins: {
       x: number;
       binStart: number;
       binEnd: number;
       yVals: number[];
       originalValues: number[];
-    }[] = Array.from({length: binCount}, (_, i) => ({
-      x: xMin + binSize * (i + 0.5),
-      binStart: xMin + binSize * i,
-      binEnd: xMin + binSize * (i + 1),
-      yVals: [],
-      originalValues: [],
-    }));
+    }[];
+
+    if (binningMode === 'absolute') {
+      // Original absolute binning logic
+      const binSize = (xMax - xMin) / binCount;
+      bins = Array.from({length: binCount}, (_, i) => ({
+        x: xMin + binSize * (i + 0.5),
+        binStart: xMin + binSize * i,
+        binEnd: xMin + binSize * (i + 1),
+        yVals: [],
+        originalValues: [],
+      }));
+    } else {
+      // Time-based binning
+      const timeBins = createTimeBins(xMin, xMax, binningMode);
+      bins = timeBins.map(bin => ({
+        x: bin.x,
+        binStart: bin.binStart,
+        binEnd: bin.binEnd,
+        yVals: [],
+        originalValues: [],
+      }));
+    }
 
     points.forEach(pt => {
-      const binIndex = Math.min(
-        Math.floor((pt.x - xMin) / binSize),
-        binCount - 1
-      );
-      bins[binIndex].yVals.push(pt.y);
-      bins[binIndex].originalValues.push(pt.y);
+      let binIndex: number;
+      
+      if (binningMode === 'absolute') {
+        const binSize = (xMax - xMin) / binCount;
+        binIndex = Math.min(
+          Math.floor((pt.x - xMin) / binSize),
+          binCount - 1
+        );
+      } else {
+        // For time-based binning, find the appropriate bin
+        binIndex = bins.findIndex(bin => pt.x >= bin.binStart && pt.x < bin.binEnd);
+        // Handle edge case where point is exactly at the end
+        if (binIndex === -1 && bins.length > 0) {
+          const lastBin = bins[bins.length - 1];
+          if (pt.x >= lastBin.binStart && pt.x <= lastBin.binEnd) {
+            binIndex = bins.length - 1;
+          }
+        }
+        // Fallback to first or last bin if still not found
+        if (binIndex === -1) {
+          if (pt.x < bins[0].binStart) {
+            binIndex = 0;
+          } else {
+            binIndex = bins.length - 1;
+          }
+        }
+      }
+      
+      if (binIndex >= 0 && binIndex < bins.length) {
+        bins[binIndex].yVals.push(pt.y);
+        bins[binIndex].originalValues.push(pt.y);
+      }
     });
 
     return {
@@ -147,35 +269,72 @@ export const binDataPoints = (
     return grouped;
   }
 
-  const globalBinSize = (globalXMax - globalXMin) / binCount;
-
-  // Create shared bin structure
-  const sharedBins: {
+  // Create shared bin structure based on binning mode
+  let sharedBins: {
     x: number;
     binStart: number;
     binEnd: number;
     groupData: Record<string, {yVals: number[]; originalValues: number[]}>;
-  }[] = Array.from({length: binCount}, (_, i) => ({
-    x: globalXMin + globalBinSize * (i + 0.5),
-    binStart: globalXMin + globalBinSize * i,
-    binEnd: globalXMin + globalBinSize * (i + 1),
-    groupData: {},
-  }));
+  }[];
+
+  if (binningMode === 'absolute') {
+    const globalBinSize = (globalXMax - globalXMin) / binCount;
+    sharedBins = Array.from({length: binCount}, (_, i) => ({
+      x: globalXMin + globalBinSize * (i + 0.5),
+      binStart: globalXMin + globalBinSize * i,
+      binEnd: globalXMin + globalBinSize * (i + 1),
+      groupData: {},
+    }));
+  } else {
+    // Time-based binning for groups
+    const timeBins = createTimeBins(globalXMin, globalXMax, binningMode);
+    sharedBins = timeBins.map(bin => ({
+      x: bin.x,
+      binStart: bin.binStart,
+      binEnd: bin.binEnd,
+      groupData: {},
+    }));
+  }
 
   // Assign each point to the correct global bin and group
   points.forEach(pt => {
     const group = pt.group || 'Other';
-    const binIndex = Math.min(
-      Math.floor((pt.x - globalXMin) / globalBinSize),
-      binCount - 1
-    );
-
-    if (!sharedBins[binIndex].groupData[group]) {
-      sharedBins[binIndex].groupData[group] = {yVals: [], originalValues: []};
+    let binIndex: number;
+    
+    if (binningMode === 'absolute') {
+      const globalBinSize = (globalXMax - globalXMin) / binCount;
+      binIndex = Math.min(
+        Math.floor((pt.x - globalXMin) / globalBinSize),
+        binCount - 1
+      );
+    } else {
+      // For time-based binning, find the appropriate bin
+      binIndex = sharedBins.findIndex(bin => pt.x >= bin.binStart && pt.x < bin.binEnd);
+      // Handle edge case where point is exactly at the end
+      if (binIndex === -1 && sharedBins.length > 0) {
+        const lastBin = sharedBins[sharedBins.length - 1];
+        if (pt.x >= lastBin.binStart && pt.x <= lastBin.binEnd) {
+          binIndex = sharedBins.length - 1;
+        }
+      }
+      // Fallback to first or last bin if still not found
+      if (binIndex === -1) {
+        if (pt.x < sharedBins[0].binStart) {
+          binIndex = 0;
+        } else {
+          binIndex = sharedBins.length - 1;
+        }
+      }
     }
 
-    sharedBins[binIndex].groupData[group].yVals.push(pt.y);
-    sharedBins[binIndex].groupData[group].originalValues.push(pt.y);
+    if (binIndex >= 0 && binIndex < sharedBins.length) {
+      if (!sharedBins[binIndex].groupData[group]) {
+        sharedBins[binIndex].groupData[group] = {yVals: [], originalValues: []};
+      }
+
+      sharedBins[binIndex].groupData[group].yVals.push(pt.y);
+      sharedBins[binIndex].groupData[group].originalValues.push(pt.y);
+    }
   });
 
   // Generate output grouped by series, but all using the same x coordinates
@@ -274,7 +433,8 @@ export const createBinnedPointsByGroup = (
   currentXDomain: [number, number],
   dataRanges: {xMin: number; xMax: number},
   groupKeys?: string[],
-  useStackedBinning: boolean = false
+  useStackedBinning: boolean = false,
+  binningMode: BinningMode = 'absolute'
 ): Record<string, BinnedPoint[]> => {
   if (!transformedPoints || transformedPoints.length === 0) {
     return {};
@@ -320,32 +480,70 @@ export const createBinnedPointsByGroup = (
       return grouped;
     }
 
-    // Create shared bins across all groups
-    const binSize = (xMax - xMin) / binCount;
-    const sharedBins: {
+    // Create shared bins across all groups based on binning mode
+    let sharedBins: {
       x: number;
       binStart: number;
       binEnd: number;
       groups: Record<string, number[]>;
-    }[] = Array.from({length: binCount}, (_, i) => ({
-      x: xMin + binSize * (i + 0.5),
-      binStart: xMin + binSize * i,
-      binEnd: xMin + binSize * (i + 1),
-      groups: {},
-    }));
+    }[];
+
+    if (binningMode === 'absolute') {
+      const binSize = (xMax - xMin) / binCount;
+      sharedBins = Array.from({length: binCount}, (_, i) => ({
+        x: xMin + binSize * (i + 0.5),
+        binStart: xMin + binSize * i,
+        binEnd: xMin + binSize * (i + 1),
+        groups: {},
+      }));
+    } else {
+      // Time-based binning for stacked groups
+      const timeBins = createTimeBins(xMin, xMax, binningMode);
+      sharedBins = timeBins.map(bin => ({
+        x: bin.x,
+        binStart: bin.binStart,
+        binEnd: bin.binEnd,
+        groups: {},
+      }));
+    }
 
     // Assign points to shared bins
     pointsToUse.forEach(pt => {
       const group = pt.group || 'Other';
-      const binIndex = Math.min(
-        Math.floor((pt.x - xMin) / binSize),
-        binCount - 1
-      );
-
-      if (!sharedBins[binIndex].groups[group]) {
-        sharedBins[binIndex].groups[group] = [];
+      let binIndex: number;
+      
+      if (binningMode === 'absolute') {
+        const binSize = (xMax - xMin) / binCount;
+        binIndex = Math.min(
+          Math.floor((pt.x - xMin) / binSize),
+          binCount - 1
+        );
+      } else {
+        // For time-based binning, find the appropriate bin
+        binIndex = sharedBins.findIndex(bin => pt.x >= bin.binStart && pt.x < bin.binEnd);
+        // Handle edge case where point is exactly at the end
+        if (binIndex === -1 && sharedBins.length > 0) {
+          const lastBin = sharedBins[sharedBins.length - 1];
+          if (pt.x >= lastBin.binStart && pt.x <= lastBin.binEnd) {
+            binIndex = sharedBins.length - 1;
+          }
+        }
+        // Fallback to first or last bin if still not found
+        if (binIndex === -1) {
+          if (pt.x < sharedBins[0].binStart) {
+            binIndex = 0;
+          } else {
+            binIndex = sharedBins.length - 1;
+          }
+        }
       }
-      sharedBins[binIndex].groups[group].push(pt.y);
+
+      if (binIndex >= 0 && binIndex < sharedBins.length) {
+        if (!sharedBins[binIndex].groups[group]) {
+          sharedBins[binIndex].groups[group] = [];
+        }
+        sharedBins[binIndex].groups[group].push(pt.y);
+      }
     });
 
     // Aggregate values in each bin by group
@@ -370,5 +568,5 @@ export const createBinnedPointsByGroup = (
   }
 
   // For simple binning (line plots) or non-grouped bar charts
-  return binDataPoints(pointsToUse, binCount, aggregation, hasGrouping);
+  return binDataPoints(pointsToUse, binCount, aggregation, hasGrouping, binningMode);
 };
