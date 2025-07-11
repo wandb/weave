@@ -9,29 +9,41 @@ spawning and isolation. The timeout tests are particularly important for
 ensuring the system can handle stuck processes.
 """
 
-import logging
+import os
+import time
 from contextlib import asynccontextmanager
+from typing import Optional
 
 import pytest
+from pydantic import BaseModel
 
 from weave.trace.weave_client import WeaveClient
-
-logger = logging.getLogger(__name__)
-# Import test functions from separate module to ensure they're pickleable
-from tests.trace_server.run_as_user.test_functions import (
-    TestRequest,
-    check_isolation_function,
-    exit_code_function,
-    failing_function,
-    multi_arg_function,
-    successful_function,
-    timeout_function,
-)
 from weave.trace_server.run_as_user.cross_process_trace_server import (
     CrossProcessTraceServerReceiver,
 )
 from weave.trace_server.run_as_user.run_as_user import RunAsUser, RunAsUserError
 from weave.trace_server.trace_server_interface import TraceServerInterface
+
+
+class TestResponse(BaseModel):
+    """Simple response model for tests."""
+
+    result: str
+    process_id: Optional[int] = None
+
+
+class TestRequest(BaseModel):
+    """Simple request model for tests."""
+
+    value: str
+    sleep_time: Optional[float] = None
+    exit_code: Optional[int] = None
+    expected_project: Optional[str] = None
+    expected_entity: Optional[str] = None
+    # For multi-arg test
+    arg_a: Optional[str] = None
+    arg_b: Optional[int] = None
+    arg_c: Optional[str] = "default"
 
 
 class WeaveClientFactoryConfig:
@@ -96,15 +108,8 @@ def create_test_client_factory_and_cleanup(
     # Create a cleanup function that handles the receiver
     def cleanup():
         """Cleanup function that stops the cross-process communication."""
-        try:
-            sender_trace_server.stop()
-        except Exception as e:
-            logger.exception("Error stopping sender")
-
-        try:
-            receiver.stop()
-        except Exception as e:
-            logger.exception("Error stopping receiver")
+        sender_trace_server.stop()
+        receiver.stop()
 
     return factory_config, cleanup
 
@@ -146,159 +151,232 @@ async def runner_with_cleanup(
         cleanup()
 
 
-class TestRunAsUser:
-    """Test cases for RunAsUser class."""
+@pytest.mark.asyncio
+async def test_successful_execution(client):
+    """Test successful function execution in isolated process."""
+    async with runner_with_cleanup(client.server) as runner:
+        req = TestRequest(value="test_value")
+        result = await runner.execute(successful_function, req)
 
-    @pytest.mark.asyncio
-    async def test_successful_execution(self, client):
-        """Test successful function execution in isolated process."""
-        async with runner_with_cleanup(client.server) as runner:
-            req = TestRequest(value="test_value")
-            result = await runner.execute(successful_function, req)
+        assert result.result == "Success: test_value"
+        assert result.process_id is not None
+        # Verify it ran in a different process
+        import os
 
-            assert result.result == "Success: test_value"
-            assert result.process_id is not None
-            # Verify it ran in a different process
-            import os
+        assert result.process_id != os.getpid()
 
-            assert result.process_id != os.getpid()
 
-    @pytest.mark.asyncio
-    async def test_exception_in_child_process(self, client):
-        """Test handling of exceptions thrown in child process."""
-        async with runner_with_cleanup(client.server) as runner:
-            req = TestRequest(value="test_error")
-            with pytest.raises(RunAsUserError, match="Function execution failed"):
-                await runner.execute(failing_function, req)
+async def failing_function(req: TestRequest) -> TestResponse:
+    """A function that raises an exception."""
+    raise ValueError(f"Intentional test failure: {req.value}")
 
-    @pytest.mark.asyncio
-    async def test_process_timeout(self, client):
-        """Test handling of process timeout."""
-        # Create runner with very short timeout
-        async with runner_with_cleanup(client.server, timeout_seconds=0.5) as runner:
-            req = TestRequest(value="timeout_test", sleep_time=2.0)
-            with pytest.raises(RunAsUserError, match="timed out after 0.5 seconds"):
-                await runner.execute(timeout_function, req)
 
-    @pytest.mark.asyncio
-    async def test_process_exit_code(self, client):
-        """Test handling of process that exits with specific code."""
-        async with runner_with_cleanup(client.server) as runner:
-            req = TestRequest(value="exit_test", exit_code=42)
-            with pytest.raises(RunAsUserError, match="exit code: 42"):
-                await runner.execute(exit_code_function, req)
+@pytest.mark.asyncio
+async def test_exception_in_child_process(client):
+    """Test handling of exceptions thrown in child process."""
+    async with runner_with_cleanup(client.server) as runner:
+        req = TestRequest(value="test_error")
+        with pytest.raises(RunAsUserError, match="Function execution failed"):
+            await runner.execute(failing_function, req)
 
-    @pytest.mark.asyncio
-    async def test_project_isolation(self, client):
-        """Test that different projects are properly isolated."""
-        # Use two separate context managers for different projects
-        async with (
-            runner_with_cleanup(client.server, project="project1") as runner1,
-            runner_with_cleanup(client.server, project="project2") as runner2,
-        ):
-            # Each runner should see its own project context
-            req1 = TestRequest(
-                value="test", expected_project="project1", expected_entity="test_entity"
-            )
-            result1 = await runner1.execute(check_isolation_function, req1)
-            assert "Isolation verified" in result1.result
 
-            req2 = TestRequest(
-                value="test", expected_project="project2", expected_entity="test_entity"
-            )
-            result2 = await runner2.execute(check_isolation_function, req2)
-            assert "Isolation verified" in result2.result
+async def timeout_function(req: TestRequest) -> TestResponse:
+    """A function that times out."""
+    if req.sleep_time:
+        time.sleep(req.sleep_time)
+    return TestResponse(result="Should not reach here")
 
-    @pytest.mark.asyncio
-    async def test_entity_isolation(self, client):
-        """Test that different entities are properly isolated."""
-        # Use two separate context managers for different entities
-        async with (
-            runner_with_cleanup(client.server, entity="entity1") as runner1,
-            runner_with_cleanup(client.server, entity="entity2") as runner2,
-        ):
-            # Each runner should work with its own entity context
-            req1 = TestRequest(
-                value="test", expected_project="test_project", expected_entity="entity1"
-            )
-            result1 = await runner1.execute(check_isolation_function, req1)
-            assert "Isolation verified" in result1.result
 
-            req2 = TestRequest(
-                value="test", expected_project="test_project", expected_entity="entity2"
-            )
-            result2 = await runner2.execute(check_isolation_function, req2)
-            assert "Isolation verified" in result2.result
+@pytest.mark.asyncio
+async def test_process_timeout(client):
+    """Test handling of process timeout."""
+    # Create runner with very short timeout
+    async with runner_with_cleanup(client.server, timeout_seconds=0.5) as runner:
+        req = TestRequest(value="timeout_test", sleep_time=2.0)
+        with pytest.raises(RunAsUserError, match="timed out after 0.5 seconds"):
+            await runner.execute(timeout_function, req)
 
-    @pytest.mark.asyncio
-    async def test_multiple_args(self, client):
-        """Test passing multiple arguments via request object."""
-        async with runner_with_cleanup(client.server) as runner:
-            req = TestRequest(
-                value="unused",
-                arg_a="hello",
-                arg_b=42,
-                arg_c="custom",
-            )
-            result = await runner.execute(multi_arg_function, req)
-            assert result.result == "a=hello, b=42, c=custom"
 
-    @pytest.mark.asyncio
-    async def test_reuse_runner(self, client):
-        """Test that a runner can be reused for multiple executions."""
-        async with runner_with_cleanup(client.server) as runner:
-            # First execution
-            req1 = TestRequest(value="first")
-            result1 = await runner.execute(successful_function, req1)
-            assert result1.result == "Success: first"
+async def exit_code_function(req: TestRequest) -> TestResponse:
+    """A function that exits with a specific code."""
+    import sys
 
-            # Second execution
-            req2 = TestRequest(value="second")
-            result2 = await runner.execute(successful_function, req2)
-            assert result2.result == "Success: second"
+    sys.exit(req.exit_code or 1)
 
-            # Both should have run in the same process
-            assert result1.process_id == result2.process_id
 
-    @pytest.mark.asyncio
-    async def test_process_restart_after_crash(self, client):
-        """Test that the process is restarted after a crash."""
-        async with runner_with_cleanup(client.server) as runner:
-            # First execution should succeed
-            req1 = TestRequest(value="success")
-            result1 = await runner.execute(successful_function, req1)
-            assert result1.result == "Success: success"
-            first_pid = result1.process_id
+@pytest.mark.asyncio
+async def test_process_exit_code(client):
+    """Test handling of process that exits with specific code."""
+    async with runner_with_cleanup(client.server) as runner:
+        req = TestRequest(value="exit_test", exit_code=42)
+        with pytest.raises(RunAsUserError, match="exit code: 42"):
+            await runner.execute(exit_code_function, req)
 
-            # Second execution should crash the process
-            req2 = TestRequest(value="crash", exit_code=1)
-            with pytest.raises(RunAsUserError):
-                await runner.execute(exit_code_function, req2)
 
-            # Third execution should succeed with a new process
-            req3 = TestRequest(value="after_crash")
-            result3 = await runner.execute(successful_function, req3)
-            assert result3.result == "Success: after_crash"
-            # Should be a different process
-            assert result3.process_id != first_pid
+async def check_isolation_function(req: TestRequest) -> TestResponse:
+    """A function that checks the current context matches expectations."""
+    from weave.trace.context.weave_client_context import get_weave_client
 
-    @pytest.mark.asyncio
-    async def test_context_manager_cleanup(self, client):
-        """Test that resources are properly cleaned up."""
-        async with runner_with_cleanup(client.server) as runner:
-            # Execute a function to start the process
-            req = TestRequest(value="test")
-            result = await runner.execute(successful_function, req)
-            assert result.result == "Success: test"
+    client = get_weave_client()
+    if client is None:
+        return TestResponse(result="No client in context")
 
-            # Get the process reference
-            process = runner._process
-            assert process is not None
-            assert process.is_alive()
+    # Get the actual entity and project from the client
+    actual_entity = client.entity
+    actual_project = client.project
 
-            # Stop the runner
-            runner.stop()
+    # Check entity matches if expected
+    if req.expected_entity and actual_entity != req.expected_entity:
+        return TestResponse(
+            result=f"Entity mismatch: expected {req.expected_entity}, got {actual_entity}"
+        )
 
-            # Process should be stopped
-            assert not process.is_alive()
-            assert runner._process is None
+    # Check project matches if expected
+    if req.expected_project and actual_project != req.expected_project:
+        return TestResponse(
+            result=f"Project mismatch: expected {req.expected_project}, got {actual_project}"
+        )
+
+    return TestResponse(
+        result=f"Isolation verified for {actual_entity}/{actual_project}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_project_isolation(client):
+    """Test that different projects are properly isolated."""
+    # Use two separate context managers for different projects
+    async with (
+        runner_with_cleanup(client.server, project="project1") as runner1,
+        runner_with_cleanup(client.server, project="project2") as runner2,
+    ):
+        # Each runner should see its own project context
+        req1 = TestRequest(
+            value="test", expected_project="project1", expected_entity="test_entity"
+        )
+        result1 = await runner1.execute(check_isolation_function, req1)
+        assert "Isolation verified" in result1.result
+
+        req2 = TestRequest(
+            value="test", expected_project="project2", expected_entity="test_entity"
+        )
+        result2 = await runner2.execute(check_isolation_function, req2)
+        assert "Isolation verified" in result2.result
+
+
+@pytest.mark.asyncio
+async def test_entity_isolation(client):
+    """Test that different entities are properly isolated."""
+    # Use two separate context managers for different entities
+    async with (
+        runner_with_cleanup(client.server, entity="entity1") as runner1,
+        runner_with_cleanup(client.server, entity="entity2") as runner2,
+    ):
+        # Each runner should work with its own entity context
+        req1 = TestRequest(
+            value="test", expected_project="test_project", expected_entity="entity1"
+        )
+        result1 = await runner1.execute(check_isolation_function, req1)
+        assert "Isolation verified" in result1.result
+
+        req2 = TestRequest(
+            value="test", expected_project="test_project", expected_entity="entity2"
+        )
+        result2 = await runner2.execute(check_isolation_function, req2)
+        assert "Isolation verified" in result2.result
+
+
+async def multi_arg_function(req: TestRequest) -> TestResponse:
+    """A function that uses multiple arguments."""
+    return TestResponse(result=f"a={req.arg_a}, b={req.arg_b}, c={req.arg_c}")
+
+
+@pytest.mark.asyncio
+async def test_multiple_args(client):
+    """Test passing multiple arguments via request object."""
+    async with runner_with_cleanup(client.server) as runner:
+        req = TestRequest(
+            value="unused",
+            arg_a="hello",
+            arg_b=42,
+            arg_c="custom",
+        )
+        result = await runner.execute(multi_arg_function, req)
+        assert result.result == "a=hello, b=42, c=custom"
+
+
+@pytest.mark.asyncio
+async def test_reuse_runner(client):
+    """Test that a runner can be reused for multiple executions."""
+    async with runner_with_cleanup(client.server) as runner:
+        # First execution
+        req1 = TestRequest(value="first")
+        result1 = await runner.execute(successful_function, req1)
+        assert result1.result == "Success: first"
+
+        # Second execution
+        req2 = TestRequest(value="second")
+        result2 = await runner.execute(successful_function, req2)
+        assert result2.result == "Success: second"
+
+        # Both should have run in the same process
+        assert result1.process_id == result2.process_id
+
+
+@pytest.mark.asyncio
+async def test_process_restart_after_crash(client):
+    """Test that the process is restarted after a crash."""
+    async with runner_with_cleanup(client.server) as runner:
+        # First execution should succeed
+        req1 = TestRequest(value="success")
+        result1 = await runner.execute(successful_function, req1)
+        assert result1.result == "Success: success"
+        first_pid = result1.process_id
+
+        # Second execution should crash the process
+        req2 = TestRequest(value="crash", exit_code=1)
+        with pytest.raises(RunAsUserError):
+            await runner.execute(exit_code_function, req2)
+
+        # Third execution should succeed with a new process
+        req3 = TestRequest(value="after_crash")
+        result3 = await runner.execute(successful_function, req3)
+        assert result3.result == "Success: after_crash"
+        # Should be a different process
+        assert result3.process_id != first_pid
+
+
+async def successful_function(req: TestRequest) -> TestResponse:
+    """A function that executes successfully."""
+    return TestResponse(result=f"Success: {req.value}", process_id=os.getpid())
+
+
+@pytest.mark.asyncio
+async def test_context_manager_cleanup(client):
+    """Test that resources are properly cleaned up."""
+    async with runner_with_cleanup(client.server) as runner:
+        # Execute a function to start the process
+        req = TestRequest(value="test")
+        result = await runner.execute(successful_function, req)
+        assert result.result == "Success: test"
+
+        # Get the process reference
+        process = runner._process
+        assert process is not None
+        assert process.is_alive()
+
+        # Stop the runner
+        runner.stop()
+
+        # Process should be stopped
+        assert not process.is_alive()
+        assert runner._process is None
+
+
+@pytest.mark.asyncio
+async def test_ensure_project_exists(client):
+    """Test that the project is created if it doesn't exist."""
+    async with runner_with_cleanup(client.server) as runner:
+        req = TestRequest(value="test")
+        result = await runner.execute(successful_function, req)
+        assert result.result == "Success: test"
