@@ -53,30 +53,6 @@ INTEGRATION_SHARDS = [
 ]
 
 
-def get_default_pytest_args(*args):
-    return [
-        "pytest",
-        "--durations=20",
-        "--strict-markers",
-        "--cov=weave",
-        "--cov-report=html",
-        "--cov-branch",
-        *args,
-    ]
-
-
-def run_uv_sync_command_with_args(*args, session):
-    session.run_install(
-        "uv",
-        "sync",
-        *args,
-        # The following is required to make nox use the virtualenv we created
-        # https://nox.thea.codes/en/stable/cookbook.html#using-a-lockfile
-        f"--python={session.virtualenv.location}",
-        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
-    )
-
-
 @nox.session
 def lint(session):
     session.install("pre-commit", "jupyter")
@@ -99,13 +75,13 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 def non_server_tests(session):
-    run_uv_sync_command_with_args(
+    _run_uv_sync_command_with_args(
         "--group=test",
         session=session,
     )
     session.chdir("tests")
 
-    pytest_args = get_default_pytest_args()
+    pytest_args = _get_default_pytest_args()
     if not (posargs := session.posargs):
         posargs = ["-m", "not trace_server", "trace/"]
     session.run(
@@ -152,13 +128,14 @@ def tests(session, shard):
         groups.append("trace_server")
 
     # Sync dependencies
-    run_uv_sync_command_with_args(
+    _run_uv_sync_command_with_args(
         _make_extras(extras),
         _make_groups(groups),
         session=session,
     )
     session.chdir("tests")
 
+    # Set environment variables
     env = {
         k: session.env.get(k) or os.getenv(k)
         for k in [
@@ -170,14 +147,12 @@ def tests(session, shard):
             "DD_TRACE_ENABLED",
         ]
     }
-    # Add the GOOGLE_API_KEY environment variable for the "google" shard
     if shard in ["google_ai_studio", "google_genai"]:
         env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
 
     if shard == "google_ai_studio":
         env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
 
-    # Add the NVIDIA_API_KEY environment variable for the "langchain_nvidia_ai_endpoints" shard
     if shard == "langchain_nvidia_ai_endpoints":
         env["NVIDIA_API_KEY"] = os.getenv("NVIDIA_API_KEY", "MISSING")
 
@@ -212,7 +187,7 @@ def tests(session, shard):
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
 
-    pytest_args = get_default_pytest_args()
+    pytest_args = _get_default_pytest_args()
     if shard in trace_server_shards:
         shard_id = int(shard[-1]) - 1
         pytest_args.extend(
@@ -231,27 +206,35 @@ def tests(session, shard):
     )
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS)
-def autogen(session):
-    run_uv_sync_command_with_args(
-        "--extra=autogen",
-        "--group=autogen_tests",
-        session=session,
-    )
-    session.chdir("tests")
-
-    pytest_args = get_default_pytest_args()
-    if not (posargs := session.posargs):
-        posargs = ["-m", "trace_server", "integrations/autogen/"]
-    session.run(
-        *pytest_args,
-        *posargs,
-    )
-
-
 def _make_extras(extras: list[str]) -> str:
     return " ".join(f"--extra={extra}" for extra in extras)
 
 
 def _make_groups(groups: list[str]) -> str:
     return " ".join(f"--group={group}" for group in groups)
+
+
+def _get_default_pytest_args(*args):
+    return [
+        "pytest",
+        "--durations=20",
+        "--strict-markers",
+        "--cov=weave",
+        "--cov-report=html",
+        "--cov-branch",
+        *args,
+    ]
+
+
+def _run_uv_sync_command_with_args(*args, session):
+    non_blank_args = [arg for arg in args if arg not in ("", None)]
+
+    session.run_install(
+        "uv",
+        "sync",
+        *non_blank_args,
+        # The following is required to make nox use the virtualenv we created
+        # https://nox.thea.codes/en/stable/cookbook.html#using-a-lockfile
+        f"--python={session.virtualenv.location}",
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+    )

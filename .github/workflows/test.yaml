@@ -291,7 +291,8 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
+        nox-shard:
+          [
             "trace1",
             "trace2",
             "trace3",
@@ -306,7 +307,6 @@ jobs:
             "crewai",
             "dspy",
             "groq",
-            # "huggingface",
             "google_ai_studio",
             "google_genai",
             "instructor",
@@ -317,10 +317,10 @@ jobs:
             "notdiamond",
             "openai",
             "vertexai",
-            "pandas-test",
+            "pandas",
             "mcp",
             "smolagents",
-            "autogen_tests",
+            "autogen",
           ]
       fail-fast: false
     services:
