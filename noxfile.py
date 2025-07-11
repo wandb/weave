@@ -5,6 +5,7 @@ import nox
 nox.options.default_venv_backend = "uv"
 nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True
+nox.options.sessions = ["lint", "non_server_tests-3.12"]
 
 
 SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
@@ -137,21 +138,15 @@ def tests(session, shard):
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
 
     if shard in INTEGRATION_SHARDS:
-        session.run_install(
-            "uv",
-            "sync",
+        run_uv_sync_command_with_args(
             f"--extra={shard}",
             "--group=test",
-            f"--python={session.virtualenv.location}",
-            env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+            session=session,
         )
     else:
-        session.run_install(
-            "uv",
-            "sync",
+        run_uv_sync_command_with_args(
             "--group=test",
-            f"--python={session.virtualenv.location}",
-            env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
+            session=session,
         )
 
     session.chdir("tests")
