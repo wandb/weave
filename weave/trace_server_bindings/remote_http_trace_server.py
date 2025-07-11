@@ -113,10 +113,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
-    def get(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+    def _build_dynamic_request_headers(self) -> dict[str, str]:
+        """Build headers for HTTP requests, including extra headers and retry ID."""
         headers = dict(self._extra_headers) if self._extra_headers else {}
         if retry_id := get_current_retry_id():
             headers["X-Weave-Retry-Id"] = retry_id
+        return headers
+
+    def get(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        headers = self._build_dynamic_request_headers()
 
         return requests.get(
             self.trace_server_url + url,
@@ -126,9 +131,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
-        headers = dict(self._extra_headers) if self._extra_headers else {}
-        if retry_id := get_current_retry_id():
-            headers["X-Weave-Retry-Id"] = retry_id
+        headers = self._build_dynamic_request_headers()
 
         return requests.post(
             self.trace_server_url + url,
