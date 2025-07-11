@@ -11,7 +11,6 @@ ensuring the system can handle stuck processes.
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Callable
 
 import pytest
 
@@ -21,7 +20,6 @@ logger = logging.getLogger(__name__)
 # Import test functions from separate module to ensure they're pickleable
 from tests.trace_server.run_as_user.test_functions import (
     TestRequest,
-    TestResponse,
     check_isolation_function,
     exit_code_function,
     failing_function,
@@ -36,8 +34,37 @@ from weave.trace_server.run_as_user.run_as_user import RunAsUser, RunAsUserError
 from weave.trace_server.trace_server_interface import TraceServerInterface
 
 
+class WeaveClientFactoryConfig:
+    entity: str
+    project: str
+    server: TraceServerInterface
+    ensure_project_exists: bool = False
+
+    def __init__(
+        self,
+        entity: str,
+        project: str,
+        server: TraceServerInterface,
+        ensure_project_exists: bool = False,
+    ):
+        self.entity = entity
+        self.project = project
+        self.server = server
+        self.ensure_project_exists = ensure_project_exists
+
+
+def weave_client_factory(config: WeaveClientFactoryConfig):
+    """Factory function that creates a WeaveClient - completely self-contained."""
+    return WeaveClient(
+        entity=config.entity,
+        project=config.project,
+        server=config.server,
+        ensure_project_exists=config.ensure_project_exists,
+    )
+
+
 def create_test_client_factory_and_cleanup(
-    trace_server_factory: Callable[[], TraceServerInterface],
+    trace_server: TraceServerInterface,
     entity: str = "test_entity",
     project: str = "test_project",
 ):
@@ -55,24 +82,16 @@ def create_test_client_factory_and_cleanup(
     Returns:
         A tuple of (factory_function, cleanup_function)
     """
-    # Create the main process trace server
-    main_trace_server = trace_server_factory()
-
     # Create a cross-process receiver that wraps the main trace server
-    receiver = CrossProcessTraceServerReceiver(main_trace_server)
+    receiver = CrossProcessTraceServerReceiver(trace_server)
 
     # Get a sender that can be used in the child process
     sender_trace_server = receiver.get_sender_trace_server()
 
     # Create a completely self-contained factory function
-    def factory():
-        """Factory function that creates a WeaveClient - completely self-contained."""
-        return WeaveClient(
-            entity=entity,
-            project=project,
-            server=sender_trace_server,
-            ensure_project_exists=False,
-        )
+    factory_config = WeaveClientFactoryConfig(
+        entity=entity, project=project, server=sender_trace_server
+    )
 
     # Create a cleanup function that handles the receiver
     def cleanup():
@@ -87,12 +106,12 @@ def create_test_client_factory_and_cleanup(
         except Exception as e:
             logger.exception("Error stopping receiver")
 
-    return factory, cleanup
+    return factory_config, cleanup
 
 
 @asynccontextmanager
 async def runner_with_cleanup(
-    trace_server_factory: Callable[[], TraceServerInterface],
+    trace_server: TraceServerInterface,
     entity: str = "test_entity",
     project: str = "test_project",
     **runner_kwargs,
@@ -111,10 +130,14 @@ async def runner_with_cleanup(
     Yields:
         RunAsUser: Configured runner instance
     """
-    client_factory, cleanup = create_test_client_factory_and_cleanup(
-        trace_server_factory, entity=entity, project=project
+    factory_config, cleanup = create_test_client_factory_and_cleanup(
+        trace_server, entity=entity, project=project
     )
-    runner = RunAsUser(client_factory=client_factory, **runner_kwargs)
+    runner = RunAsUser(
+        client_factory=weave_client_factory,
+        client_factory_config=factory_config,
+        **runner_kwargs,
+    )
 
     try:
         yield runner
@@ -127,9 +150,9 @@ class TestRunAsUser:
     """Test cases for RunAsUser class."""
 
     @pytest.mark.asyncio
-    async def test_successful_execution(self, trace_server_factory):
+    async def test_successful_execution(self, client):
         """Test successful function execution in isolated process."""
-        async with runner_with_cleanup(trace_server_factory) as runner:
+        async with runner_with_cleanup(client.server) as runner:
             req = TestRequest(value="test_value")
             result = await runner.execute(successful_function, req)
 
@@ -141,39 +164,37 @@ class TestRunAsUser:
             assert result.process_id != os.getpid()
 
     @pytest.mark.asyncio
-    async def test_exception_in_child_process(self, trace_server_factory):
+    async def test_exception_in_child_process(self, client):
         """Test handling of exceptions thrown in child process."""
-        async with runner_with_cleanup(trace_server_factory) as runner:
+        async with runner_with_cleanup(client.server) as runner:
             req = TestRequest(value="test_error")
             with pytest.raises(RunAsUserError, match="Function execution failed"):
                 await runner.execute(failing_function, req)
 
     @pytest.mark.asyncio
-    async def test_process_timeout(self, trace_server_factory):
+    async def test_process_timeout(self, client):
         """Test handling of process timeout."""
         # Create runner with very short timeout
-        async with runner_with_cleanup(
-            trace_server_factory, timeout_seconds=0.5
-        ) as runner:
+        async with runner_with_cleanup(client.server, timeout_seconds=0.5) as runner:
             req = TestRequest(value="timeout_test", sleep_time=2.0)
             with pytest.raises(RunAsUserError, match="timed out after 0.5 seconds"):
                 await runner.execute(timeout_function, req)
 
     @pytest.mark.asyncio
-    async def test_process_exit_code(self, trace_server_factory):
+    async def test_process_exit_code(self, client):
         """Test handling of process that exits with specific code."""
-        async with runner_with_cleanup(trace_server_factory) as runner:
+        async with runner_with_cleanup(client.server) as runner:
             req = TestRequest(value="exit_test", exit_code=42)
             with pytest.raises(RunAsUserError, match="exit code: 42"):
                 await runner.execute(exit_code_function, req)
 
     @pytest.mark.asyncio
-    async def test_project_isolation(self, trace_server_factory):
+    async def test_project_isolation(self, client):
         """Test that different projects are properly isolated."""
         # Use two separate context managers for different projects
         async with (
-            runner_with_cleanup(trace_server_factory, project="project1") as runner1,
-            runner_with_cleanup(trace_server_factory, project="project2") as runner2,
+            runner_with_cleanup(client.server, project="project1") as runner1,
+            runner_with_cleanup(client.server, project="project2") as runner2,
         ):
             # Each runner should see its own project context
             req1 = TestRequest(
@@ -189,12 +210,12 @@ class TestRunAsUser:
             assert "Isolation verified" in result2.result
 
     @pytest.mark.asyncio
-    async def test_entity_isolation(self, trace_server_factory):
+    async def test_entity_isolation(self, client):
         """Test that different entities are properly isolated."""
         # Use two separate context managers for different entities
         async with (
-            runner_with_cleanup(trace_server_factory, entity="entity1") as runner1,
-            runner_with_cleanup(trace_server_factory, entity="entity2") as runner2,
+            runner_with_cleanup(client.server, entity="entity1") as runner1,
+            runner_with_cleanup(client.server, entity="entity2") as runner2,
         ):
             # Each runner should work with its own entity context
             req1 = TestRequest(
@@ -210,9 +231,9 @@ class TestRunAsUser:
             assert "Isolation verified" in result2.result
 
     @pytest.mark.asyncio
-    async def test_multiple_args(self, trace_server_factory):
+    async def test_multiple_args(self, client):
         """Test passing multiple arguments via request object."""
-        async with runner_with_cleanup(trace_server_factory) as runner:
+        async with runner_with_cleanup(client.server) as runner:
             req = TestRequest(
                 value="unused",
                 arg_a="hello",
@@ -223,40 +244,9 @@ class TestRunAsUser:
             assert result.result == "a=hello, b=42, c=custom"
 
     @pytest.mark.asyncio
-    async def test_invalid_client_factory(self):
-        """Test that invalid client factories are rejected."""
-        # Test non-callable factory
-        with pytest.raises(TypeError, match="client_factory must be callable"):
-            RunAsUser(client_factory="not_callable")
-
-        # Test non-pickleable factory
-        class NonPickleableFactory:
-            def __call__(self):
-                return WeaveClient(entity="test", project="test")
-
-        with pytest.raises(TypeError, match="client_factory must be pickleable"):
-            RunAsUser(client_factory=NonPickleableFactory())
-
-    @pytest.mark.asyncio
-    async def test_invalid_function(self, trace_server_factory):
-        """Test that invalid functions are rejected."""
-        async with runner_with_cleanup(trace_server_factory) as runner:
-            # Test non-callable function
-            with pytest.raises(TypeError, match="func must be callable"):
-                await runner.execute("not_callable", TestRequest(value="test"))
-
-            # Test non-pickleable function
-            class NonPickleableFunction:
-                def __call__(self, req):
-                    return TestResponse(result="test")
-
-            with pytest.raises(TypeError, match="func must be pickleable"):
-                await runner.execute(NonPickleableFunction(), TestRequest(value="test"))
-
-    @pytest.mark.asyncio
-    async def test_reuse_runner(self, trace_server_factory):
+    async def test_reuse_runner(self, client):
         """Test that a runner can be reused for multiple executions."""
-        async with runner_with_cleanup(trace_server_factory) as runner:
+        async with runner_with_cleanup(client.server) as runner:
             # First execution
             req1 = TestRequest(value="first")
             result1 = await runner.execute(successful_function, req1)
@@ -271,9 +261,9 @@ class TestRunAsUser:
             assert result1.process_id == result2.process_id
 
     @pytest.mark.asyncio
-    async def test_process_restart_after_crash(self, trace_server_factory):
+    async def test_process_restart_after_crash(self, client):
         """Test that the process is restarted after a crash."""
-        async with runner_with_cleanup(trace_server_factory) as runner:
+        async with runner_with_cleanup(client.server) as runner:
             # First execution should succeed
             req1 = TestRequest(value="success")
             result1 = await runner.execute(successful_function, req1)
@@ -293,9 +283,9 @@ class TestRunAsUser:
             assert result3.process_id != first_pid
 
     @pytest.mark.asyncio
-    async def test_context_manager_cleanup(self, trace_server_factory):
+    async def test_context_manager_cleanup(self, client):
         """Test that resources are properly cleaned up."""
-        async with runner_with_cleanup(trace_server_factory) as runner:
+        async with runner_with_cleanup(client.server) as runner:
             # Execute a function to start the process
             req = TestRequest(value="test")
             result = await runner.execute(successful_function, req)

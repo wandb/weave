@@ -36,9 +36,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import multiprocessing
-import pickle
 import sys
 import time
+from collections.abc import Coroutine
 from typing import Any, Callable, TypeVar
 
 from pydantic import BaseModel
@@ -49,6 +49,9 @@ from weave.trace.weave_init import InitializedClient
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+R = TypeVar("R", bound=BaseModel)
+
+FC = TypeVar("FC", bound=BaseModel)
 
 
 class RunAsUserError(Exception):
@@ -84,7 +87,8 @@ class RunAsUser:
 
     def __init__(
         self,
-        client_factory: Callable[[], WeaveClient],
+        client_factory: Callable[[FC], WeaveClient],
+        client_factory_config: FC,
         timeout_seconds: float = 30.0,
     ):
         """
@@ -92,22 +96,10 @@ class RunAsUser:
 
         Args:
             client_factory: A callable that returns a configured WeaveClient.
-                           Must be pickleable for process communication.
             timeout_seconds: Maximum time to wait for function execution.
-
-        Raises:
-            TypeError: If client_factory is not callable or pickleable.
         """
-        if not callable(client_factory):
-            raise TypeError("client_factory must be callable")
-
-        # Test if the factory is pickleable
-        try:
-            pickle.dumps(client_factory)
-        except Exception as e:
-            raise TypeError(f"client_factory must be pickleable: {e}") from e
-
         self.client_factory = client_factory
+        self.client_factory_config = client_factory_config
         self.timeout_seconds = timeout_seconds
         self._process: multiprocessing.Process | None = None
         self._request_queue: multiprocessing.Queue[tuple[str, Any, Any]] | None = None
@@ -115,36 +107,24 @@ class RunAsUser:
 
     async def execute(
         self,
-        func: Callable[[T], Any],
+        func: Callable[[T], R],
         request: T,
-        response_type: type[BaseModel] | None = None,
-    ) -> Any:
+        *,
+        timeout_seconds: float | None = None,
+    ) -> R:
         """
         Execute a function in an isolated process with the configured client.
 
         Args:
-            func: The function to execute. Must be pickleable.
+            func: The function to execute.
             request: The request object to pass to the function.
-            response_type: Expected response type (optional, for validation).
 
         Returns:
             The result of the function execution.
 
         Raises:
             RunAsUserError: If execution fails, times out, or process crashes.
-            TypeError: If function is not pickleable.
         """
-        # TODO: Add support for response_type validation
-        # TODO: Consider adding execution metrics (timing, memory usage)
-        if not callable(func):
-            raise TypeError("func must be callable")
-
-        # Test if the function is pickleable
-        try:
-            pickle.dumps(func)
-        except Exception as e:
-            raise TypeError(f"func must be pickleable: {e}") from e
-
         # Start the process if not already running
         if self._process is None or not self._process.is_alive():
             self._start_process()
@@ -160,7 +140,7 @@ class RunAsUser:
 
             # Wait for response with timeout
             start_time = time.time()
-            while time.time() - start_time < self.timeout_seconds:
+            while time.time() - start_time < (timeout_seconds or self.timeout_seconds):
                 if not self._response_queue.empty():
                     result = self._response_queue.get()
 
@@ -197,21 +177,22 @@ class RunAsUser:
 
     def _start_process(self) -> None:
         """Start the worker process."""
-        # TODO: Add support for process pool instead of single process
-        # TODO: Consider adding process health monitoring
         self._request_queue = multiprocessing.Queue()
         self._response_queue = multiprocessing.Queue()
 
         self._process = multiprocessing.Process(
             target=self._worker_loop,
-            args=(self.client_factory, self._request_queue, self._response_queue),
+            args=(
+                self.client_factory,
+                self.client_factory_config,
+                self._request_queue,
+                self._response_queue,
+            ),
         )
         self._process.start()
 
     def _stop_process(self) -> None:
         """Stop the worker process."""
-        # TODO: Add signal handling for more graceful shutdown
-        # TODO: Consider adding process resource usage logging
         if self._process is None:
             return
 
@@ -249,16 +230,15 @@ class RunAsUser:
 
     @staticmethod
     def _worker_loop(
-        client_factory: Callable[[], WeaveClient],
+        client_factory: Callable[[FC], WeaveClient],
+        client_factory_config: FC,
         request_queue: multiprocessing.Queue[tuple[str, Any, Any]],
         response_queue: multiprocessing.Queue[Any],
     ) -> None:
         """Main loop for the worker process."""
-        # TODO: Add support for keep-alive heartbeat to detect stalled processes
-        # TODO: Consider adding memory usage monitoring and limits
         try:
             # Create and initialize the client
-            client = client_factory()
+            client = client_factory(client_factory_config)
             ic = InitializedClient(client)
 
             try:
@@ -275,9 +255,7 @@ class RunAsUser:
                                 result = func(request)
 
                                 # Handle async functions
-                                if hasattr(result, "__await__"):
-                                    import asyncio
-
+                                if isinstance(result, Coroutine):
                                     result = asyncio.run(result)
 
                                 response_queue.put(result)

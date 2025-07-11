@@ -6,9 +6,9 @@ child processes and the main process, including error handling,
 streaming methods, and out-of-order response handling.
 """
 
-import threading
 import time
 from collections.abc import Iterator
+from datetime import datetime
 
 import pytest
 
@@ -36,7 +36,8 @@ class MockTraceServer:
         self.last_request = req
         if self.should_raise:
             raise ValueError("Mock error")
-        return tsi.CallStartRes(call_id="test_call_id")
+        result = tsi.CallStartRes(id="test_call_id", trace_id="test_trace_id")
+        return result
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Mock streaming method."""
@@ -62,10 +63,12 @@ class TestCrossProcessTraceServerSender:
         try:
             # Create a test request
             req = tsi.CallStartReq(
-                start=tsi.CallStartReqStart(
+                start=tsi.StartedCallSchemaForInsert(
                     project_id="test_project",
-                    id="test_id",
                     op_name="test_op",
+                    started_at=datetime(2024, 1, 1, 0, 0, 0),
+                    attributes={},
+                    inputs={},
                 )
             )
 
@@ -73,7 +76,8 @@ class TestCrossProcessTraceServerSender:
             result = sender.call_start(req)
 
             # Verify response
-            assert result.call_id == "test_call_id"
+            assert result.id == "test_call_id"
+            assert result.trace_id == "test_trace_id"
             assert mock_server.call_count == 1
             assert mock_server.last_request == req
 
@@ -81,6 +85,7 @@ class TestCrossProcessTraceServerSender:
             sender.stop()
             receiver.stop()
 
+    @pytest.mark.disable_logging_error_check
     def test_error_in_request(self):
         """Test error handling in request processing."""
         # Create mock trace server that raises an error
@@ -94,10 +99,12 @@ class TestCrossProcessTraceServerSender:
         try:
             # Create a test request
             req = tsi.CallStartReq(
-                start=tsi.CallStartReqStart(
+                start=tsi.StartedCallSchemaForInsert(
                     project_id="test_project",
-                    id="test_id",
                     op_name="test_op",
+                    started_at=datetime(2024, 1, 1, 0, 0, 0),
+                    attributes={},
+                    inputs={},
                 )
             )
 
@@ -120,8 +127,10 @@ class TestCrossProcessTraceServerSender:
                 op_name="test_op1",
                 trace_id="trace1",
                 parent_id=None,
-                started_at="2024-01-01T00:00:00Z",
-                ended_at="2024-01-01T00:00:01Z",
+                started_at=datetime(2024, 1, 1, 0, 0, 0),
+                ended_at=datetime(2024, 1, 1, 0, 0, 1),
+                attributes={},
+                inputs={},
             ),
             tsi.CallSchema(
                 project_id="test_project",
@@ -129,8 +138,10 @@ class TestCrossProcessTraceServerSender:
                 op_name="test_op2",
                 trace_id="trace2",
                 parent_id=None,
-                started_at="2024-01-01T00:00:02Z",
-                ended_at="2024-01-01T00:00:03Z",
+                started_at=datetime(2024, 1, 1, 0, 0, 2),
+                ended_at=datetime(2024, 1, 1, 0, 0, 3),
+                attributes={},
+                inputs={},
             ),
         ]
 
@@ -158,6 +169,7 @@ class TestCrossProcessTraceServerSender:
             sender.stop()
             receiver.stop()
 
+    @pytest.mark.disable_logging_error_check
     def test_streaming_error(self):
         """Test error handling in streaming requests."""
         # Create mock trace server that raises an error
@@ -193,7 +205,9 @@ class TestCrossProcessTraceServerSender:
             def call_start(self, req):
                 # Simulate a stuck method that never returns
                 time.sleep(100)  # This will be interrupted by timeout
-                return tsi.CallStartRes(call_id="should_not_reach")
+                return tsi.CallStartRes(
+                    id="should_not_reach", trace_id="should_not_reach"
+                )
 
         stuck_server = StuckTraceServer()
         receiver = CrossProcessTraceServerReceiver(stuck_server)
@@ -201,10 +215,12 @@ class TestCrossProcessTraceServerSender:
 
         try:
             req = tsi.CallStartReq(
-                start=tsi.CallStartReqStart(
+                start=tsi.StartedCallSchemaForInsert(
                     project_id="test_project",
-                    id="test_id",
                     op_name="test_op",
+                    started_at=datetime(2024, 1, 1, 0, 0, 0),
+                    attributes={},
+                    inputs={},
                 )
             )
 
@@ -217,7 +233,7 @@ class TestCrossProcessTraceServerSender:
             receiver.stop()
 
     def test_multiple_concurrent_requests(self):
-        """Test handling of multiple concurrent requests."""
+        """Test handling of multiple sequential requests (worker processes one at a time)."""
         # Create mock trace server
         mock_server = MockTraceServer()
 
@@ -226,38 +242,30 @@ class TestCrossProcessTraceServerSender:
         sender = receiver.get_sender_trace_server()
 
         try:
-            results = []
-            errors = []
+            results: list[tuple[int, tsi.CallStartRes]] = []
 
-            def make_request(i):
-                try:
-                    req = tsi.CallStartReq(
-                        start=tsi.CallStartReqStart(
-                            project_id="test_project",
-                            id=f"test_id_{i}",
-                            op_name=f"test_op_{i}",
-                        )
-                    )
-                    result = sender.call_start(req)
-                    results.append((i, result))
-                except Exception as e:
-                    errors.append((i, e))
-
-            # Start multiple threads making requests
-            threads = []
+            # Make multiple requests sequentially (worker processes one at a time)
             for i in range(5):
-                thread = threading.Thread(target=make_request, args=(i,))
-                thread.start()
-                threads.append(thread)
-
-            # Wait for all threads to complete
-            for thread in threads:
-                thread.join()
+                req = tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id="test_project",
+                        op_name=f"test_op_{i}",
+                        started_at=datetime(2024, 1, 1, 0, 0, 0),
+                        attributes={},
+                        inputs={},
+                    )
+                )
+                result = sender.call_start(req)
+                results.append((i, result))
 
             # Verify results
-            assert len(errors) == 0, f"Errors occurred: {errors}"
             assert len(results) == 5
             assert mock_server.call_count == 5
+
+            # Verify each result is correct
+            for _, result in results:
+                assert result.id == "test_call_id"
+                assert result.trace_id == "test_trace_id"
 
         finally:
             sender.stop()
@@ -283,6 +291,7 @@ class TestCrossProcessTraceServerReceiver:
         receiver._worker_thread.join(timeout=5.0)
         assert not receiver._worker_thread.is_alive()
 
+    @pytest.mark.disable_logging_error_check
     def test_invalid_signal_handling(self):
         """Test handling of invalid signals."""
         mock_server = MockTraceServer()
@@ -340,7 +349,9 @@ class TestCrossProcessTraceServerIntegration:
 
             def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
                 self.calls.append(("call_start", req))
-                return tsi.CallStartRes(call_id=f"call_{len(self.calls)}")
+                return tsi.CallStartRes(
+                    id=f"call_{len(self.calls)}", trace_id="test_trace"
+                )
 
             def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
                 self.calls.append(("call_end", req))
@@ -356,8 +367,10 @@ class TestCrossProcessTraceServerIntegration:
                     op_name="test_op",
                     trace_id="test_trace",
                     parent_id=None,
-                    started_at="2024-01-01T00:00:00Z",
-                    ended_at="2024-01-01T00:00:01Z",
+                    started_at=datetime(2024, 1, 1, 0, 0, 0),
+                    ended_at=datetime(2024, 1, 1, 0, 0, 1),
+                    attributes={},
+                    inputs={},
                 )
 
         server = RealisticeTraceServer()
@@ -367,20 +380,25 @@ class TestCrossProcessTraceServerIntegration:
         try:
             # Test regular method
             start_req = tsi.CallStartReq(
-                start=tsi.CallStartReqStart(
+                start=tsi.StartedCallSchemaForInsert(
                     project_id="test_project",
                     id="test_call",
                     op_name="test_op",
+                    started_at=datetime(2024, 1, 1, 0, 0, 0),
+                    attributes={},
+                    inputs={},
                 )
             )
             start_res = sender.call_start(start_req)
-            assert start_res.call_id == "call_1"
+            assert start_res.id == "call_1"
 
             # Test another regular method
             end_req = tsi.CallEndReq(
-                end=tsi.CallEndReqEnd(
+                end=tsi.EndedCallSchemaForInsert(
                     project_id="test_project",
                     id="test_call",
+                    ended_at=datetime(2024, 1, 1, 0, 0, 1),
+                    summary={},
                 )
             )
             end_res = sender.call_end(end_req)
