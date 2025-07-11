@@ -161,6 +161,7 @@ def tests(session, shard):
         "autogen_tests": ["integrations/autogen/"],
         "trace": ["trace/"],
         **{shard: ["trace/"] for shard in trace_server_shards},
+        "trace_no_server": ["trace/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
