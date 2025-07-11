@@ -50,7 +50,6 @@ INTEGRATION_SHARDS = [
     "smolagents",
     "mcp",
     "verdict",
-    "autogen_tests",
 ]
 
 
@@ -108,12 +107,10 @@ def non_server_tests(session):
 
     pytest_args = get_default_pytest_args()
     if not (posargs := session.posargs):
-        posargs = ["-m", "not trace_server"]
-    test_dirs = ["trace/"]
+        posargs = ["-m", "not trace_server", "trace/"]
     session.run(
         *pytest_args,
         *posargs,
-        *test_dirs,
     )
 
 
@@ -220,4 +217,22 @@ def tests(session, shard):
         *session.posargs,
         *test_dirs,
         env=env,
+    )
+
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS)
+def autogen(session):
+    run_uv_sync_command_with_args(
+        "--extra=autogen",
+        "--group=autogen_tests",
+        session=session,
+    )
+    session.chdir("tests")
+
+    pytest_args = get_default_pytest_args()
+    if not (posargs := session.posargs):
+        posargs = ["-m", "trace_server", "integrations/autogen/"]
+    session.run(
+        *pytest_args,
+        *posargs,
     )
