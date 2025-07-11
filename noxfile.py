@@ -177,10 +177,6 @@ def tests(session, shard):
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
 
-    # seems to resolve ci issues
-    if shard == "llamaindex":
-        session.posargs.insert(0, "-n4")
-
     pytest_args = _get_default_pytest_args()
     if shard in trace_server_shards:
         shard_id = int(shard[-1]) - 1
