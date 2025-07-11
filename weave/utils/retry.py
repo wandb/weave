@@ -36,18 +36,12 @@ def with_retry(func: Callable[..., T]) -> Callable[..., T]:
         retry_id = generate_id()
         retry_id_token = _retry_id.set(retry_id)
 
-        def before_sleep_callback(retry_state: tenacity.RetryCallState) -> None:
-            _log_retry(retry_state)
-
-        def retry_error_callback(retry_state: tenacity.RetryCallState) -> Any:
-            return _log_failure(retry_state)
-
         retry = tenacity.Retrying(
             stop=tenacity.stop_after_attempt(retry_max_attempts()),
             wait=tenacity.wait_exponential_jitter(initial=1, max=retry_max_interval()),
             retry=tenacity.retry_if_exception(_is_retryable_exception),
-            before_sleep=before_sleep_callback,
-            retry_error_callback=retry_error_callback,
+            before_sleep=_log_retry,
+            retry_error_callback=_log_failure,
             reraise=True,
         )
 
