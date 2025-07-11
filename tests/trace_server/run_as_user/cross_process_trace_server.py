@@ -203,11 +203,12 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
 
             if response_item.error:
                 raise CrossProcessTraceServerError(response_item.error)
-            return response_item.payload
 
         except Exception as e:
             logger.exception(f"Error waiting for response to {method}")
             raise
+
+        return response_item.payload
 
     def _send_streaming_request(self, method: str, payload: BaseModel) -> Iterator[Any]:
         """
