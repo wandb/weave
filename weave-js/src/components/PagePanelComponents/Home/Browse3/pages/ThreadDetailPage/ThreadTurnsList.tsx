@@ -1,7 +1,14 @@
+import {Button} from '@wandb/weave/components/Button';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import React, {FC, useMemo} from 'react';
+import React, {FC, useCallback, useContext, useMemo} from 'react';
+import {useHistory} from 'react-router-dom';
 import {clsx} from 'yet-another-react-lightbox';
 
+import {
+  useEntityProject,
+  useWeaveflowRouteContext,
+  WeaveflowPeekContext,
+} from '../../context';
 import {StatusChip} from '../common/StatusChip';
 import {ComputedCallStatusType} from '../wfReactInterface/traceServerClientTypes';
 import {
@@ -45,11 +52,55 @@ export const ThreadTurnsList: FC<ThreadTurnsListProps> = ({
   selectedTurnId,
   onTurnSelect,
 }) => {
-  const handleTurnClick = (index: number) => {
-    if (onTurnSelect) {
-      onTurnSelect(index);
-    }
-  };
+  const {peekingRouter, baseRouter} = useWeaveflowRouteContext();
+  const {entity, project} = useEntityProject();
+  const {setPreviousUrl, isPeeking} = useContext(WeaveflowPeekContext);
+  const history = useHistory();
+
+  const handleTurnClick = useCallback(
+    (index: number) => {
+      if (onTurnSelect) {
+        onTurnSelect(index);
+      }
+    },
+    [onTurnSelect]
+  );
+
+  const handleTraceClick = useCallback(
+    (e: React.MouseEvent, turnId: string) => {
+      e.stopPropagation(); // Prevent triggering the turn click
+
+      if (setPreviousUrl && isPeeking) {
+        // Only store previousUrl if we're in a peek view
+        const currentUrl = window.location.pathname + window.location.search;
+        setPreviousUrl(currentUrl);
+      }
+
+      // If we're already in a peek view, use peekingRouter to open another peek
+      // If we're not in a peek view, use baseRouter for normal navigation
+      const router = isPeeking ? peekingRouter : baseRouter;
+      const link = router.callUIUrl(
+        entity,
+        project,
+        '',
+        turnId,
+        turnId,
+        false,
+        false
+      );
+
+      history.push(link);
+    },
+    [
+      setPreviousUrl,
+      isPeeking,
+      peekingRouter,
+      baseRouter,
+      entity,
+      project,
+      history,
+    ]
+  );
 
   const turns = useMemo(() => {
     if (turnsState.loading || !turnsState.value) {
@@ -84,11 +135,12 @@ export const ThreadTurnsList: FC<ThreadTurnsListProps> = ({
     <div className="h-full overflow-y-auto">
       {turns.map((turn, index) => {
         const isSelected = turn.id === selectedTurnId;
+
         return (
           <div
             key={turn.id}
             className={clsx(
-              'h-64 cursor-pointer border border-b border-solid border-moon-150 p-12 px-8 py-7 transition-colors',
+              'group relative h-64 cursor-pointer border border-b border-solid border-moon-150 p-12 px-8 py-7 transition-colors',
               isSelected && 'bg-moon-100',
               !isSelected && 'hover:bg-moon-100'
             )}
@@ -109,6 +161,17 @@ export const ThreadTurnsList: FC<ThreadTurnsListProps> = ({
                 {turn.input}
               </div>
             )}
+
+            {/* Floating button - only visible on hover */}
+            <Button
+              size="small"
+              variant="secondary"
+              className="absolute bottom-2 right-2 bg-moon-150 opacity-0 shadow-lg transition-opacity duration-200 hover:bg-blue-300 group-hover:opacity-100"
+              onClick={e => handleTraceClick(e, turn.id)}
+              title="Turn actions"
+              endIcon={'open-new-tab'}>
+              Trace
+            </Button>
           </div>
         );
       })}
