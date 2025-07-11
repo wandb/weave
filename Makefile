@@ -1,6 +1,7 @@
 .PHONY: docs build
 
 setup-docs-ci:
+	pip install --upgrade pip
 	pip install -e . --group docs
 	playwright install
 
