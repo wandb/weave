@@ -2066,6 +2066,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._insert_call, chunk_iter, start_call, model_name, req.project_id
         )
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise NotImplementedError("Evaluate model is not implemented")
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        raise NotImplementedError("Evaluation status is not implemented")
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
