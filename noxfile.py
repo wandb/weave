@@ -23,6 +23,7 @@ PY39_INCOMPATIBLE_SHARDS = [
     "smolagents",
     "dspy",
     "autogen",
+    "notdiamond",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
 INTEGRATION_SHARDS = [
@@ -50,6 +51,7 @@ INTEGRATION_SHARDS = [
     "smolagents",
     "mcp",
     "verdict",
+    "autogen",
 ]
 
 
@@ -126,6 +128,8 @@ def tests(session, shard):
         groups.append("autogen_tests")
     if shard == "trace_server":
         groups.append("trace_server")
+    if shard == "litellm":
+        groups.append("litellm_tests")
 
     # Sync dependencies
     _run_uv_sync_command_with_args(

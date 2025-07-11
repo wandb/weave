@@ -145,7 +145,7 @@ scorers = [
   "presidio-analyzer>=2.2.0",
   "presidio-anonymizer>=2.2.0",
 ]
-notdiamond = ["notdiamond>=0.3.21"]
+notdiamond = ["notdiamond>=0.3.21; python_version >= '3.10'"]
 openai = ["openai>=1.0.0,<1.92.0"]
 openai_agents = ["openai-agents>=0.0.4"]
 presidio = ["presidio-analyzer==2.2.357", "presidio-anonymizer==2.2.357"]
@@ -224,6 +224,7 @@ docs = [
   "nbconvert",
   "weave[trace_server]",
 ]
+litellm_tests = ["litellm>=1.74.2"]
 
 [project.urls]
 Company = "https://wandb.com"
