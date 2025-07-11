@@ -274,6 +274,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     The test creates a model, dataset, scorer, and evaluation, then runs
     the evaluation through the evaluate_model API.
     """
+    is_sqlite = client_is_sqlite(client)
     project_id = client._project_id()
     entity, project = project_id.split("/")
 
@@ -336,7 +337,13 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     #          complete
     # summary
     #    scorer summary
-    assert len(calls_res.calls) == 9
+    # Note: SQLite does not support calling the LLM, so it is not correct.
+    # I want to keep the sqlite tests here however as we are more interested
+    # in testing the overal flow, not LLMs in particular.
+    if is_sqlite:
+        assert len(calls_res.calls) == 5
+    else:
+        assert len(calls_res.calls) == 9
 
     # Query for the specific evaluation call
     eval_calls_res = client.server.calls_query(
@@ -356,13 +363,24 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         f"weave:///{project_id}/op/Evaluation.evaluate:"
     )
     assert isinstance(eval_call.summary, dict)
-    assert eval_call.summary["status_counts"] == {
-        TraceStatus.SUCCESS: 7,
-        TraceStatus.ERROR: 0,
-    }
-    assert eval_call.summary["weave"]["status"] == TraceStatus.SUCCESS
-    assert eval_call.output == {
-        "output": {"score": {"mean": 9.0}},
-        "LLMAsAJudgeScorer": {"score": {"mean": 9.0}},
-        "model_latency": {"mean": pytest.approx(0, abs=1)},
-    }
+    if is_sqlite:
+        assert eval_call.summary["status_counts"] == {
+            TraceStatus.SUCCESS: 4,
+            TraceStatus.ERROR: 1,
+        }
+        assert eval_call.summary["weave"]["status"] == TraceStatus.DESCENDANT_ERROR
+        assert eval_call.output == {
+            "LLMAsAJudgeScorer": None,
+            "model_latency": {"mean": pytest.approx(0, abs=1)},
+        }
+    else:
+        assert eval_call.summary["status_counts"] == {
+            TraceStatus.SUCCESS: 7,
+            TraceStatus.ERROR: 0,
+        }
+        assert eval_call.summary["weave"]["status"] == TraceStatus.SUCCESS
+        assert eval_call.output == {
+            "output": {"score": {"mean": 9.0}},
+            "LLMAsAJudgeScorer": {"score": {"mean": 9.0}},
+            "model_latency": {"mean": pytest.approx(0, abs=1)},
+        }
