@@ -121,31 +121,42 @@ def non_server_tests(session):
         "flow",
         "trace_server",
         "trace_server_bindings",
-        "pandas-test",
+        "pandas",
+        "autogen",
         "trace",
         *INTEGRATION_SHARDS,
         *trace_server_shards,
     ],
 )
 def tests(session, shard):
+    extras: list[str] = []
+    groups: list[str] = ["test"]
+
+    # Skip shards that are not compatible with the current Python version
     if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
 
     if session.python.startswith("3.9") and shard in PY39_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
 
+    # Define extras
     if shard in INTEGRATION_SHARDS:
-        run_uv_sync_command_with_args(
-            f"--extra={shard}",
-            "--group=test",
-            session=session,
-        )
-    else:
-        run_uv_sync_command_with_args(
-            "--group=test",
-            session=session,
-        )
+        extras.append(shard)
 
+    # Define groups
+    if shard == "pandas":
+        groups.append("pandas_tests")
+    if shard == "autogen":
+        groups.append("autogen_tests")
+    if shard == "trace_server":
+        groups.append("trace_server")
+
+    # Sync dependencies
+    run_uv_sync_command_with_args(
+        _make_extras(extras),
+        _make_groups(groups),
+        session=session,
+    )
     session.chdir("tests")
 
     env = {
@@ -236,3 +247,11 @@ def autogen(session):
         *pytest_args,
         *posargs,
     )
+
+
+def _make_extras(extras: list[str]) -> str:
+    return " ".join(f"--extra={extra}" for extra in extras)
+
+
+def _make_groups(groups: list[str]) -> str:
+    return " ".join(f"--group={group}" for group in groups)
