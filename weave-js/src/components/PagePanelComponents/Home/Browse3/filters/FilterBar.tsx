@@ -325,6 +325,7 @@ export const FilterBar = ({
   const handleCancelDelete = useCallback(() => {
     setShowDeleteWarning(false);
     setFilterToDelete(null);
+    setAnchorEl(refBar.current); // Reopen popover after cancel
   }, []);
 
   const onSetSelected = useCallback(() => {
