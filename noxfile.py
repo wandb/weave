@@ -129,8 +129,8 @@ def tests(session, shard):
 
     # Sync dependencies
     _run_uv_sync_command_with_args(
-        _make_extras(extras),
-        _make_groups(groups),
+        *_make_extras(extras),
+        *_make_groups(groups),
         session=session,
     )
     session.chdir("tests")
@@ -206,12 +206,12 @@ def tests(session, shard):
     )
 
 
-def _make_extras(extras: list[str]) -> str:
-    return " ".join(f"--extra={extra}" for extra in extras)
+def _make_extras(extras: list[str]) -> list[str]:
+    return [f"--extra={extra}" for extra in extras]
 
 
-def _make_groups(groups: list[str]) -> str:
-    return " ".join(f"--group={group}" for group in groups)
+def _make_groups(groups: list[str]) -> list[str]:
+    return [f"--group={group}" for group in groups]
 
 
 def _get_default_pytest_args(*args):
