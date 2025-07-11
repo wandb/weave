@@ -104,6 +104,7 @@ def non_server_tests(session):
         "trace",
         *INTEGRATION_SHARDS,
         *trace_server_shards,
+        "trace_no_server",
     ],
 )
 def tests(session, shard):
