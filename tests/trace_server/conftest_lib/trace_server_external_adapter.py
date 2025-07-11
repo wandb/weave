@@ -1,5 +1,6 @@
 import base64
 import typing
+from typing import Optional
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
@@ -132,7 +133,9 @@ class TestOnlyUserInjectingExternalTraceServer(
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface,
     user_id: str = "test_user",
-    id_converter: external_to_internal_trace_server_adapter.IdConverter | None = None,
+    id_converter: Optional[
+        external_to_internal_trace_server_adapter.IdConverter
+    ] = None,
 ) -> TestOnlyUserInjectingExternalTraceServer:
     return TestOnlyUserInjectingExternalTraceServer(
         trace_server,
