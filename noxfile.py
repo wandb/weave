@@ -148,25 +148,19 @@ def tests(session, shard):
         ]
     }
     if shard in ["google_ai_studio", "google_genai"]:
-        env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
-
-    if shard == "google_ai_studio":
-        env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
-
+        _load_from_env(env, "GOOGLE_API_KEY")
     if shard == "langchain_nvidia_ai_endpoints":
-        env["NVIDIA_API_KEY"] = os.getenv("NVIDIA_API_KEY", "MISSING")
-
+        _load_from_env(env, "NVIDIA_API_KEY")
+    if shard == "openai_agents":
+        _load_from_env(env, "OPENAI_API_KEY")
     # we are doing some integration test in test_llm_integrations.py that requires
     # setting some environment variables for the LLM providers
     if shard == "scorers":
-        env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
-        env["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "MISSING")
-        env["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY", "MISSING")
-        env["MISTRAL_API_KEY"] = os.getenv("MISTRAL_API_KEY", "MISSING")
-        env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
-
-    if shard == "openai_agents":
-        env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
+        _load_from_env(env, "GOOGLE_API_KEY")
+        _load_from_env(env, "GEMINI_API_KEY")
+        _load_from_env(env, "ANTHROPIC_API_KEY")
+        _load_from_env(env, "MISTRAL_API_KEY")
+        _load_from_env(env, "OPENAI_API_KEY")
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
@@ -212,6 +206,10 @@ def _make_extras(extras: list[str]) -> list[str]:
 
 def _make_groups(groups: list[str]) -> list[str]:
     return [f"--group={group}" for group in groups]
+
+
+def _load_from_env(env: dict[str, str], key: str) -> None:
+    env[key] = os.getenv(key, "MISSING")
 
 
 def _get_default_pytest_args(*args):
