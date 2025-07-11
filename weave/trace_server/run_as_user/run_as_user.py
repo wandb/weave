@@ -38,8 +38,8 @@ import logging
 import multiprocessing
 import sys
 import time
-from collections.abc import Coroutine
-from typing import Any, Callable, TypeVar
+from collections.abc import Awaitable, Coroutine
+from typing import Any, Callable, TypeVar, Union, overload
 
 from pydantic import BaseModel
 
@@ -51,7 +51,13 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 R = TypeVar("R", bound=BaseModel)
 
-FC = TypeVar("FC", bound=BaseModel)
+# Remove the bound=BaseModel constraint as client factory configs can be any type
+FC = TypeVar("FC")
+
+# Type aliases for better readability
+SyncCallable = Callable[[T], R]
+AsyncCallable = Callable[[T], Awaitable[R]]
+AnyCallable = Union[SyncCallable[T, R], AsyncCallable[T, R]]
 
 
 class RunAsUserError(Exception):
@@ -96,6 +102,7 @@ class RunAsUser:
 
         Args:
             client_factory: A callable that returns a configured WeaveClient.
+            client_factory_config: Configuration object to pass to the client factory.
             timeout_seconds: Maximum time to wait for function execution.
         """
         self.client_factory = client_factory
@@ -105,9 +112,28 @@ class RunAsUser:
         self._request_queue: multiprocessing.Queue[tuple[str, Any, Any]] | None = None
         self._response_queue: multiprocessing.Queue[Any] | None = None
 
+    # Overloads to provide better type safety for sync vs async callables
+    @overload
     async def execute(
         self,
-        func: Callable[[T], R],
+        func: SyncCallable[T, R],
+        request: T,
+        *,
+        timeout_seconds: float | None = None,
+    ) -> R: ...
+
+    @overload
+    async def execute(
+        self,
+        func: AsyncCallable[T, R],
+        request: T,
+        *,
+        timeout_seconds: float | None = None,
+    ) -> R: ...
+
+    async def execute(
+        self,
+        func: AnyCallable[T, R],
         request: T,
         *,
         timeout_seconds: float | None = None,
@@ -115,9 +141,13 @@ class RunAsUser:
         """
         Execute a function in an isolated process with the configured client.
 
+        This method supports both synchronous and asynchronous functions.
+        Async functions will be properly awaited in the worker process.
+
         Args:
-            func: The function to execute.
+            func: The function to execute (sync or async).
             request: The request object to pass to the function.
+            timeout_seconds: Override the default timeout for this execution.
 
         Returns:
             The result of the function execution.
@@ -161,7 +191,7 @@ class RunAsUser:
 
             # Timeout occurred
             raise RunAsUserError(
-                f"Function execution timed out after {self.timeout_seconds} seconds"
+                f"Function execution timed out after {timeout_seconds or self.timeout_seconds} seconds"
             )
 
         except Exception as e:
@@ -171,9 +201,15 @@ class RunAsUser:
                 raise
             raise RunAsUserError(f"Execution failed: {e}") from e
 
-    def stop(self) -> None:
-        """Stop the worker process gracefully."""
-        self._stop_process()
+    def stop(self, timeout_seconds: float = 600.0) -> None:
+        """Stop the worker process gracefully.
+
+        Args:
+            timeout_seconds: Maximum time to wait for the process to stop.
+            Important: this is also the flush timeout for the trace server!
+            Big workloads may need to increase this.
+        """
+        self._stop_process(timeout_seconds)
 
     def _start_process(self) -> None:
         """Start the worker process."""
@@ -235,7 +271,11 @@ class RunAsUser:
         request_queue: multiprocessing.Queue[tuple[str, Any, Any]],
         response_queue: multiprocessing.Queue[Any],
     ) -> None:
-        """Main loop for the worker process."""
+        """
+        Main loop for the worker process.
+
+        Handles both synchronous and asynchronous function execution.
+        """
         try:
             # Create and initialize the client
             client = client_factory(client_factory_config)
@@ -254,8 +294,11 @@ class RunAsUser:
                                 # Execute the function
                                 result = func(request)
 
-                                # Handle async functions
+                                # Handle async functions - check for both Coroutine and Awaitable
                                 if isinstance(result, Coroutine):
+                                    result = asyncio.run(result)
+                                elif hasattr(result, "__await__"):
+                                    # Handle other awaitable types
                                     result = asyncio.run(result)
 
                                 response_queue.put(result)

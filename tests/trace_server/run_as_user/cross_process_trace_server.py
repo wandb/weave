@@ -1,3 +1,12 @@
+"""
+This module implements a cross-process trace server that can be used to
+communicate with a trace server running in a different process.
+
+IMPORTANT: this is only intended to be used for testing purposes.
+If you want to use this in production, we should think about
+how to make it more robust.
+"""
+
 import logging
 import multiprocessing
 import threading
@@ -5,13 +14,26 @@ import uuid
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 from queue import Empty
-from typing import Any, Callable
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
+
+
+# Protocol for trace server methods to improve type safety
+class TraceServerMethod(Protocol):
+    """Protocol for trace server methods that take a BaseModel and return a BaseModel."""
+
+    def __call__(self, request: BaseModel) -> BaseModel: ...
+
+
+class StreamingTraceServerMethod(Protocol):
+    """Protocol for streaming trace server methods that return an Iterator."""
+
+    def __call__(self, request: BaseModel) -> Iterator[Any]: ...
 
 
 class EmptyPayload(BaseModel):
@@ -437,8 +459,12 @@ class CrossProcessTraceServerReceiver:
 
     def __init__(self, trace_server: tsi.TraceServerInterface):
         self.trace_server = trace_server
-        self.request_queue: multiprocessing.Queue = multiprocessing.Queue()
-        self.response_queue: multiprocessing.Queue = multiprocessing.Queue()
+        self.request_queue: multiprocessing.Queue[RequestQueueItem] = (
+            multiprocessing.Queue()
+        )
+        self.response_queue: multiprocessing.Queue[ResponseQueueItem] = (
+            multiprocessing.Queue()
+        )
         self._stop_event = threading.Event()
         self._worker_thread: threading.Thread | None = None
         self._start_worker()
@@ -503,7 +529,7 @@ class CrossProcessTraceServerReceiver:
                 continue
 
     def _handle_regular_method(
-        self, request_item: RequestQueueItem, method: Callable[[BaseModel], Any]
+        self, request_item: RequestQueueItem, method: TraceServerMethod
     ) -> None:
         """Handle a regular (non-streaming) method call."""
         try:
@@ -524,7 +550,7 @@ class CrossProcessTraceServerReceiver:
     def _handle_streaming_method(
         self,
         request_item: RequestQueueItem,
-        method: Callable[[BaseModel], Iterator[Any]],
+        method: StreamingTraceServerMethod,
     ) -> None:
         """Handle a streaming method call that yields multiple responses."""
         try:

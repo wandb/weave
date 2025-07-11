@@ -12,13 +12,13 @@ from datetime import datetime
 
 import pytest
 
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.run_as_user.cross_process_trace_server import (
+from tests.trace_server.run_as_user.cross_process_trace_server import (
     CrossProcessTraceServerError,
     CrossProcessTraceServerReceiver,
     EmptyPayload,
     RequestQueueItem,
 )
+from weave.trace_server import trace_server_interface as tsi
 
 
 class MockTraceServer:
