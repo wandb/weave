@@ -5,7 +5,13 @@ import nox
 nox.options.default_venv_backend = "uv"
 nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True
-nox.options.sessions = ["lint", "non_server_tests-3.12"]
+nox.options.sessions = [
+    "lint",
+    "tests-3.13(shard='trace_no_server')",
+    "tests-3.13(shard='trace_server')",
+    "tests-3.13(shard='trace_server_bindings')",
+    "tests-3.13(shard='trace')",
+]
 
 
 SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
