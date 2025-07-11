@@ -76,23 +76,6 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
-def non_server_tests(session):
-    _run_uv_sync_command_with_args(
-        "--group=test",
-        session=session,
-    )
-    session.chdir("tests")
-
-    pytest_args = _get_default_pytest_args()
-    if not (posargs := session.posargs):
-        posargs = ["-m", "not trace_server", "trace/"]
-    session.run(
-        *pytest_args,
-        *posargs,
-    )
-
-
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 @nox.parametrize(
     "shard",
     [
@@ -192,6 +175,8 @@ def tests(session, shard):
                 "-m trace_server",
             ]
         )
+    if shard == "trace_no_server":
+        pytest_args.extend(["-m", "not trace_server"])
 
     session.run(
         *pytest_args,
