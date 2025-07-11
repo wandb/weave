@@ -3411,7 +3411,7 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.61.6"
+version = "1.74.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -3427,9 +3427,9 @@ dependencies = [
     { name = "tiktoken", version = "0.9.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version <= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/14/18de26bb3b9f2427f4296b8110fdcefa2389079f8090d4a96fd938288f0d/litellm-1.61.6.tar.gz", hash = "sha256:2c613823f86ce2aa7956e2458857ab6aa62258dc7da9816bfdac90735be270be", size = 6477831, upload-time = "2025-02-16T08:42:08.328Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/38/10/63cdae1b1d581ad1db51153dfd06c4e18394a3ba8de495f73f2d797ece3b/litellm-1.74.2.tar.gz", hash = "sha256:cbacffe93976c60ca674fec0a942c70b900b4ad1c8069395174049a162f255bf", size = 9230641, upload-time = "2025-07-11T03:31:07.925Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/27/c44a6de2bb1c46eaf52da2750cf84ad20e56d8d8454459905a253b299f3d/litellm-1.61.6-py3-none-any.whl", hash = "sha256:eef4c4a84a2c93de4c6d5a05a785f9b0cc61f63bafb3b3dc83d977db649e1b13", size = 6783058, upload-time = "2025-02-16T08:42:05.136Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/f7/67689245f48b9e79bcd2f3a10a3690cb1918fb99fffd5a623ed2496bca66/litellm-1.74.2-py3-none-any.whl", hash = "sha256:29bb555b45128e4cc696e72921a6ec24e97b14e9b69e86eed6f155124ad629b1", size = 8587065, upload-time = "2025-07-11T03:31:05.598Z" },
 ]
 
 [[package]]
@@ -4516,18 +4516,14 @@ resolution-markers = [
     "python_full_version == '3.10' and platform_python_implementation != 'PyPy' and sys_platform == 'linux'",
     "python_full_version == '3.10' and platform_python_implementation == 'PyPy' and sys_platform != 'linux'",
     "python_full_version == '3.10' and platform_python_implementation != 'PyPy' and sys_platform != 'linux'",
-    "python_full_version < '3.10' and platform_python_implementation == 'PyPy' and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_python_implementation != 'PyPy' and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_python_implementation == 'PyPy' and sys_platform != 'linux'",
-    "python_full_version < '3.10' and platform_python_implementation != 'PyPy' and sys_platform != 'linux'",
 ]
 dependencies = [
-    { name = "aiohttp", marker = "python_full_version <= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "litellm", marker = "python_full_version <= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "pandas", marker = "python_full_version <= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "pydantic-partial", marker = "python_full_version <= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "python-dotenv", marker = "python_full_version <= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "requests", marker = "python_full_version <= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "aiohttp", marker = "python_full_version == '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "litellm", marker = "python_full_version == '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "pandas", marker = "python_full_version == '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "pydantic-partial", marker = "python_full_version == '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "python-dotenv", marker = "python_full_version == '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "requests", marker = "python_full_version == '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/74/19/fd42859c00784835d879e7dc698cb7eb99086c764148d37975b46f3468dd/notdiamond-0.3.24.tar.gz", hash = "sha256:018a3192f50b5bc93d14a6d383826c15ea1d557f0a3cb327753132a0e42d1c3f", size = 49738, upload-time = "2024-11-07T20:42:27.443Z" }
 wheels = [
@@ -6345,7 +6341,7 @@ name = "pydantic-partial"
 version = "0.5.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pydantic" },
+    { name = "pydantic", marker = "python_full_version >= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3f/a0/605813c761cd71fe9b9c2138f064adeea6b733c3756e3a61b32edde4caab/pydantic_partial-0.5.5.tar.gz", hash = "sha256:a903bdf6b2b30c850865843645432537eae81713fba59ee03bae567eb4c4ff3b", size = 6323, upload-time = "2024-04-17T07:41:28.836Z" }
 wheels = [
@@ -9171,7 +9167,7 @@ modal = [
     { name = "python-dotenv" },
 ]
 notdiamond = [
-    { name = "notdiamond", version = "0.3.24", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version <= '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "notdiamond", version = "0.3.24", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "notdiamond", version = "0.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version > '3.10' or (extra == 'extra-5-weave-google-genai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-instructor' and extra == 'extra-5-weave-verdict') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
 openai = [
@@ -9236,6 +9232,9 @@ docs = [
     { name = "nbformat" },
     { name = "playwright" },
     { name = "weave" },
+]
+litellm-tests = [
+    { name = "litellm" },
 ]
 pandas-tests = [
     { name = "pandas" },
@@ -9327,7 +9326,7 @@ requires-dist = [
     { name = "moto", extras = ["bedrock"], marker = "extra == 'bedrock'", specifier = ">=5.0.24" },
     { name = "moviepy", marker = "extra == 'video-support'", specifier = "<=1.0.3" },
     { name = "nest-asyncio", specifier = "==1.6.0" },
-    { name = "notdiamond", marker = "extra == 'notdiamond'", specifier = ">=0.3.21" },
+    { name = "notdiamond", marker = "python_full_version >= '3.10' and extra == 'notdiamond'", specifier = ">=0.3.21" },
     { name = "numpy", marker = "extra == 'scorers'", specifier = ">1.21.0" },
     { name = "onnxruntime", marker = "python_full_version >= '3.10' and extra == 'langchain'", specifier = ">1.19.2" },
     { name = "onnxruntime", marker = "python_full_version < '3.10' and extra == 'langchain'", specifier = "<=1.19.2" },
@@ -9377,6 +9376,7 @@ docs = [
     { name = "playwright" },
     { name = "weave", extras = ["trace-server"] },
 ]
+litellm-tests = [{ name = "litellm", specifier = ">=1.74.2" }]
 pandas-tests = [{ name = "pandas", specifier = ">=2.2.3" }]
 test = [
     { name = "azure-storage-blob", specifier = ">=12.24.0" },
