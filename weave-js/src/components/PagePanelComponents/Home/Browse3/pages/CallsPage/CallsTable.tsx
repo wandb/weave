@@ -435,11 +435,8 @@ export const CallsTable: FC<{
           const op = operator ?? getDefaultOperatorForValue(value);
           if (expandedRef != null) {
             setExpandedRefCols(prevState => {
-              const newSet = new Set(prevState);
-              // Remove the default
-              newSet.delete('inputs.example');
-              newSet.add(expandedRef.field);
-              return newSet;
+              prevState.add(expandedRef.field);
+              return prevState;
             });
           }
 

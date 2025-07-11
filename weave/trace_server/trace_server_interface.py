@@ -417,18 +417,31 @@ class CallsQueryReq(BaseModel):
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
     columns: Optional[list[str]] = None
-    # columns to expand, i.e. refs to other objects, can be nested
+
+    # Columns to expand, i.e. refs to other objects, can be nested
+    # Also used to provide a list of refs to expand when filtering or sorting.
+    # Requests to filter or order calls by sub fields in columns that have
+    # refs in their path must provide paths to all refs in the expand_columns.
+    # When filtering and ordering, expand_columns can include paths to objects
+    # that are stored in the table_rows table.
+    # TODO: support expand_columns for refs to objects in table_rows (dataset rows)
     expand_columns: Optional[list[str]] = Field(
         default=None,
         examples=[["inputs.self.message", "inputs.model.prompt"]],
         description="Columns to expand, i.e. refs to other objects",
     )
-    # Internal flag used for playing nice with the recursive object ref handling
-    # alreadly implemented in the frontend.
+    # Controls whether or not to return expanded ref columns. In most clients,
+    # refs are resolved recursively by making additional api calls, either for
+    # performance or convenience reasons. In that case, we do not want to return
+    # resolved refs. However, expand_columns still must contain paths to all
+    # refs when filtering or sorting. Set this value to false to filter/order
+    # by refs but rely on client methods for actually resolving the values. The
+    # default is to resolve and return expanded values when expand_columns is set.
     return_expanded_column_values: Optional[bool] = Field(
         default=True,
-        description="If true, the response will include the expanded columns. "
-        "If false, the response expand_columns will only be used for filtering and ordering. ",
+        description="If true, the response will include raw values for expanded columns. "
+        "If false, the response expand_columns will only be used for filtering and ordering. "
+        "This is useful for clients that want to resolve refs themselves, e.g. for performance reasons.",
     )
 
 

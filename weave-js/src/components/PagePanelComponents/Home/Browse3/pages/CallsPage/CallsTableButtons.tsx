@@ -294,6 +294,37 @@ export const ExportSelector = ({
   );
 };
 
+/**
+ * Determines which expandable columns are actually needed based on current filters and sorting.
+ *
+ * This function optimizes column expansion by only including columns that are referenced
+ * in the current query's filters or sorting criteria, rather than expanding all possible
+ * columns. It also includes intermediate path levels when deeper nested fields are accessed.
+ *
+ * @param refColumnsToExpand - Array of column paths that can be expanded (e.g., ['output', 'inputs', 'summary.usage'])
+ * @param filterBy - Query object containing filter conditions that may reference expandable columns
+ * @param sortBy - Array of sort criteria that may reference expandable columns
+ * @returns Array of column paths that should actually be expanded
+ *
+ * @example
+ * // Given these expandable columns:
+ * const refColumnsToExpand = ['output', 'inputs', 'summary.usage', 'summary.costs'];
+ *
+ * // And these query conditions:
+ * const sortBy = [{ field: 'output.result.score', direction: 'asc' }];
+ * const filterBy = {
+ *   $and: [
+ *     {$eq: [{ $getField: 'inputs.prompt' }, {$literal: 1}]}
+ *     {$contians: [{ $getField: 'summary.model.x' }, {$literal: True}]}
+ *   ]
+ * };
+ *
+ * // The function returns:
+ * // ['output', 'output.result', 'inputs', 'summary.model']
+ * //
+ * // Note: 'summary.costs' is excluded since it's not referenced
+ * // Note: 'output.result' is included as an intermediate level for 'output.result.score'
+ */
 function getUsedExpandColumns(
   refColumnsToExpand: string[],
   filterBy: Query | undefined,
