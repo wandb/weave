@@ -4,6 +4,7 @@ from unittest import mock
 import pytest
 
 import weave
+from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient, generate_id
 from weave.trace_server.trace_server_interface import (
@@ -19,7 +20,6 @@ from weave.trace_server.trace_server_interface import (
     TraceStatus,
 )
 from weave.trace_server.workers.evaluate_model_worker import evaluate_model_worker
-from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 
 
 @pytest.mark.asyncio
