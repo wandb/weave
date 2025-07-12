@@ -1,8 +1,13 @@
 import {Box} from '@mui/material';
-import React, {useState} from 'react';
-import {useParams} from 'react-router-dom';
+import {useOrgName} from '@wandb/weave/common/hooks/useOrganization';
+import {useViewerUserInfo2} from '@wandb/weave/common/hooks/useViewerUserInfo';
+import React, {useEffect, useState} from 'react';
+
+import {useEntityProject} from '../../context';
 
 import {TargetBlank} from '../../../../../../common/util/links';
+import {TrackedTargetBlank} from '../../../../../../common/util/TrackedTargetBlank';
+import * as viewEvents from '../../../../../../integrations/analytics/viewEvents';
 import {Button} from '../../../../../Button';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
@@ -12,7 +17,7 @@ import {Link} from './Links';
 
 const NewDatasetButton: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const {entity, project} = useParams<{entity: string; project: string}>();
+  const {entity, project} = useEntityProject();
   const {isCreatingDataset, handleSaveDataset} = useDatasetSaving({
     entity,
     project,
@@ -39,6 +44,68 @@ const NewDatasetButton: React.FC = () => {
   );
 };
 
+const TracesMoreInformation: React.FC = () => {
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {entity: entityName, project: projectName} = useEntityProject();
+  const {orgName} = useOrgName({
+    entityName,
+    skip: viewerLoading || !entityName,
+  });
+
+  // Log empty state view event for analytics
+  useEffect(() => {
+    if (!userInfoLoaded || !entityName || !projectName) {
+      return;
+    }
+    viewEvents.emptyStateViewed({
+      userId: userInfoLoaded.id,
+      organizationName: orgName,
+      entityName,
+      projectName,
+      emptyStateType: 'traces',
+    });
+  }, [userInfoLoaded, orgName, entityName, projectName]);
+
+  const COLAB_URL =
+    'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb';
+
+  return (
+    <>
+      Learn{' '}
+      <TrackedTargetBlank
+        href="http://wandb.me/weave_traces"
+        trackedName="tracing_basics"
+        source="traces_empty_state"
+        docType="empty_state_tracing_basics"
+        trackingType="doc">
+        tracing basics
+      </TrackedTargetBlank>{' '}
+      or see traces in action by{' '}
+      <TrackedTargetBlank
+        href="http://wandb.me/weave_quickstart"
+        trackedName="quickstart_guide"
+        source="traces_empty_state"
+        docType="empty_state_quickstart_guide"
+        trackingType="doc">
+        following our quickstart guide
+      </TrackedTargetBlank>
+      .
+      <Box sx={{mt: 2}}>
+        <TrackedTargetBlank
+          href={COLAB_URL}
+          trackedName="colab_traces"
+          source="traces_empty_state"
+          trackingType="colab">
+          <Button variant="secondary" icon="logo-colab">
+            Get started with Colab
+          </Button>
+        </TrackedTargetBlank>
+      </Box>
+    </>
+  );
+};
+
 const NewMonitorButton: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -60,57 +127,81 @@ const NewMonitorButton: React.FC = () => {
   );
 };
 
+const EvaluationsMoreInformation: React.FC = () => {
+  const {loading: viewerLoading, userInfo} = useViewerUserInfo2();
+  const userInfoLoaded = !viewerLoading ? userInfo : null;
+  const {entity: entityName, project: projectName} = useEntityProject();
+  const {orgName} = useOrgName({
+    entityName,
+    skip: viewerLoading || !entityName,
+  });
+
+  // Log empty state view event for analytics
+  useEffect(() => {
+    if (!userInfoLoaded || !entityName || !projectName) {
+      return;
+    }
+    viewEvents.emptyStateViewed({
+      userId: userInfoLoaded.id,
+      organizationName: orgName,
+      entityName,
+      projectName,
+      emptyStateType: 'evaluations',
+    });
+  }, [userInfoLoaded, orgName, entityName, projectName]);
+
+  const COLAB_URL =
+    'https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Eval.ipynb';
+
+  return (
+    <>
+      Learn{' '}
+      <TrackedTargetBlank
+        href="https://wandb.me/weave_evals"
+        trackedName="evaluation_basics"
+        source="evaluations_empty_state"
+        docType="empty_state_evaluation_basics"
+        trackingType="doc">
+        evaluation basics
+      </TrackedTargetBlank>{' '}
+      or follow our tutorial to{' '}
+      <TrackedTargetBlank
+        href="http://wandb.me/weave_eval_tut"
+        trackedName="evaluation_tutorial"
+        source="evaluations_empty_state"
+        docType="empty_state_evaluation_tutorial"
+        trackingType="doc">
+        set up an evaluation pipeline
+      </TrackedTargetBlank>
+      .
+      <Box sx={{mt: 2}}>
+        <TrackedTargetBlank
+          href={COLAB_URL}
+          trackedName="colab_evaluations"
+          source="evaluations_empty_state"
+          trackingType="colab">
+          <Button variant="secondary" icon="logo-colab">
+            Get started with Colab
+          </Button>
+        </TrackedTargetBlank>
+      </Box>
+    </>
+  );
+};
+
 export const EMPTY_PROPS_TRACES: EmptyProps = {
   icon: 'layout-tabs' as const,
   heading: 'Create your first trace',
   description:
     'Use traces to track all inputs & outputs of functions within your application. Debug, monitor or drill-down into tricky examples.',
-  moreInformation: (
-    <>
-      Learn{' '}
-      <TargetBlank href="http://wandb.me/weave_traces">
-        tracing basics
-      </TargetBlank>{' '}
-      or see traces in action by{' '}
-      <TargetBlank href="http://wandb.me/weave_quickstart">
-        following our quickstart guide
-      </TargetBlank>
-      .
-      <Box sx={{mt: 2}}>
-        <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb">
-          <Button variant="secondary" icon="logo-colab">
-            Get started with Colab
-          </Button>
-        </TargetBlank>
-      </Box>
-    </>
-  ),
+  moreInformation: <TracesMoreInformation />,
 };
 
 export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
   icon: 'type-boolean' as const,
   heading: 'Create your first evaluation',
   description: 'Use evaluations to track the performance of your application.',
-  moreInformation: (
-    <>
-      Learn{' '}
-      <TargetBlank href="https://wandb.me/weave_evals">
-        evaluation basics
-      </TargetBlank>{' '}
-      or follow our tutorial to{' '}
-      <TargetBlank href="http://wandb.me/weave_eval_tut">
-        set up an evaluation pipeline
-      </TargetBlank>
-      .
-      <Box sx={{mt: 2}}>
-        <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Eval.ipynb">
-          <Button variant="secondary" icon="logo-colab">
-            Get started with Colab
-          </Button>
-        </TargetBlank>
-      </Box>
-    </>
-  ),
+  moreInformation: <EvaluationsMoreInformation />,
 };
 
 export const EMPTY_PROPS_LEADERBOARD: EmptyProps = {
