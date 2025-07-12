@@ -34,6 +34,10 @@ export const operationConverter = (
         },
       ],
     };
+  } else if (item.operator === '(any): isNull') {
+    return {
+      $eq: [{$getField: item.field}, {$literal: 'null'}],
+    };
   } else if (item.operator === '(string): contains') {
     return {
       $contains: {
