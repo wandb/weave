@@ -174,45 +174,43 @@ make update_playground_models
 
 This regenerates the model list section automatically.
 
+### llms.txt
 
-### LLM context doc generation
+We generate a machine-readable summary of the `weave/docs/` folder to help AI tools understand and retrieve relevant documentation context efficiently.
 
-To make Weave documentation usable by AI tools like Cursor, GPT, or Claude, we generate special machine-readable files that summarize the full documentation set.
+The script [`docs/scripts/generate_llmstxt.py`](https://github.com/wandb/weave/blob/main/docs/scripts/generate_llmstxt.py) uses the open-source tool [gitingest](https://github.com/cyclotruc/gitingest) to generate a file `docs/static/llms.txt`, which is a LLM-friendly text file of the entire `weave\docs` folder and its subfolders.
 
-- Script: `docs/scripts/generate_llmstxt.py`
+#### When to use
 
-This script produces two types of files:
-
-* `llms-full.txt`: A single Markdown file with all documentation content.
-* `llms-full.json`: A structured JSON file for use in RAG pipelines or embeddings.
-* Optionally: Per-category `.txt` files (e.g., `llms-integrations.txt`, `llms-api.txt`). These are useful for asking targeted questions, as `llms-full.txt` is too large for most context windows.
+Run this script if you update or add any documentation content (Markdown or MDX).
 
 #### Usage
 
-Run the script from the project root:
+From the root of the repo, run the script directly:
 
 ```bash
 python docs/scripts/generate_llmstxt.py
 ```
 
-This will generate:
-
-* `static/llms-full.txt`
-* `static/llms-full.json`
-
-To also generate per-category `.txt` files (recommended for LLM tools like Cursor with context limits):
+Or as part of the Makefile:
 
 ```bash
-python docs/scripts/generate_llmstxt.py --categories
+make generate_llms_docs
 ```
 
-These files can be used by developers and agents to quickly access documentation content without navigating the full site.
+This will:
 
-> **Important:** These files are not used by the docs site directly but may be used in downstream applications or LLM pipelines.
+- Run `gitingest` scoped only to `weave/docs/`
+- Rename the default output `digest.txt` to `llms.txt`
+- Save it to: `weave/docs/static/llms.txt`
 
-#### Regeneration checklist
+#### Makefile integration
 
-Run this script if:
+The Makefile includes a shortcut target:
 
-- You’ve added or edited any docs that should be used by an LLM.
-- You want to verify how your content will be surfaced in tools like Cursor or GPT.
+```makefile
+generate_llms_docs:
+	python docs/scripts/generate_llmstxt.py
+```
+
+This step is also safe to add to `generate_all` if you'd like it to run whenever full documentation is built.
