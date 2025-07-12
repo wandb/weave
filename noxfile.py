@@ -5,6 +5,13 @@ import nox
 nox.options.default_venv_backend = "uv"
 nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True
+nox.options.sessions = [
+    "lint",
+    "tests-3.13(shard='trace_no_server')",
+    "tests-3.13(shard='trace_server')",
+    "tests-3.13(shard='trace_server_bindings')",
+    "tests-3.13(shard='trace')",
+]
 
 
 SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
@@ -21,9 +28,37 @@ PY39_INCOMPATIBLE_SHARDS = [
     "mcp",
     "smolagents",
     "dspy",
-    "autogen_tests",
+    "autogen",
+    "notdiamond",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
+INTEGRATION_SHARDS = [
+    "anthropic",
+    "cerebras",
+    "cohere",
+    "crewai",
+    "dspy",
+    "google_ai_studio",
+    "google_genai",
+    "groq",
+    "instructor",
+    "langchain_nvidia_ai_endpoints",
+    "langchain",
+    "litellm",
+    "llamaindex",
+    "mistral",
+    "notdiamond",
+    "openai",
+    "openai_agents",
+    "vertexai",
+    "bedrock",
+    "scorers",
+    "huggingface",
+    "smolagents",
+    "mcp",
+    "verdict",
+    "autogen",
+]
 
 
 @nox.session
@@ -50,56 +85,50 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
 @nox.parametrize(
     "shard",
     [
-        # The `custom` shard is included if you want to run your own tests.  By default,
-        # no tests are specified, which means ALL tests will run.  To run just your own
-        # subset, you can pass `-- test_your_thing.py` to nox.
-        # For example,
-        #   nox -e "tests-3.12(shard='custom')" -- test_your_thing.py
-        "custom",
         "flow",
+        "trace",
         "trace_server",
         "trace_server_bindings",
-        "anthropic",
-        "cerebras",
-        "cohere",
-        "crewai",
-        "dspy",
-        "google_ai_studio",
-        "google_genai",
-        "groq",
-        "instructor",
-        "langchain_nvidia_ai_endpoints",
-        "langchain",
-        "litellm",
-        "llamaindex",
-        "mistral",
-        "notdiamond",
-        "openai",
-        "openai_agents",
-        "vertexai",
-        "bedrock",
-        "scorers",
-        "pandas-test",
-        "huggingface",
-        "smolagents",
-        "mcp",
-        "verdict",
-        "autogen_tests",
-        "trace",
-        *trace_server_shards,
         "trace_no_server",
+        "pandas",
+        *INTEGRATION_SHARDS,
+        *trace_server_shards,
     ],
 )
 def tests(session, shard):
+    extras: list[str] = []
+    groups: list[str] = ["test"]
+
+    # Skip shards that are not compatible with the current Python version
     if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
 
     if session.python.startswith("3.9") and shard in PY39_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
 
-    session.install("-e", f".[{shard},test]")
+    # Define extras
+    if shard in INTEGRATION_SHARDS:
+        extras.append(shard)
+
+    # Define groups
+    if shard == "pandas":
+        groups.append("pandas_tests")
+    if shard == "autogen":
+        groups.append("autogen_tests")
+    if shard == "trace_server":
+        groups.append("trace_server")
+    if shard == "litellm":
+        groups.append("litellm_tests")
+
+    # Sync dependencies
+    _run_uv_sync_command_with_args(
+        *_make_extras(extras),
+        *_make_groups(groups),
+        session=session,
+    )
     session.chdir("tests")
 
+    # Set environment variables
     env = {
         k: session.env.get(k) or os.getenv(k)
         for k in [
@@ -111,28 +140,20 @@ def tests(session, shard):
             "DD_TRACE_ENABLED",
         ]
     }
-    # Add the GOOGLE_API_KEY environment variable for the "google" shard
     if shard in ["google_ai_studio", "google_genai"]:
-        env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
-
-    if shard == "google_ai_studio":
-        env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
-
-    # Add the NVIDIA_API_KEY environment variable for the "langchain_nvidia_ai_endpoints" shard
+        _load_from_env(env, "GOOGLE_API_KEY")
     if shard == "langchain_nvidia_ai_endpoints":
-        env["NVIDIA_API_KEY"] = os.getenv("NVIDIA_API_KEY", "MISSING")
-
+        _load_from_env(env, "NVIDIA_API_KEY")
+    if shard == "openai_agents":
+        _load_from_env(env, "OPENAI_API_KEY")
     # we are doing some integration test in test_llm_integrations.py that requires
     # setting some environment variables for the LLM providers
     if shard == "scorers":
-        env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
-        env["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "MISSING")
-        env["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY", "MISSING")
-        env["MISTRAL_API_KEY"] = os.getenv("MISTRAL_API_KEY", "MISSING")
-        env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
-
-    if shard == "openai_agents":
-        env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
+        _load_from_env(env, "GOOGLE_API_KEY")
+        _load_from_env(env, "GEMINI_API_KEY")
+        _load_from_env(env, "ANTHROPIC_API_KEY")
+        _load_from_env(env, "MISTRAL_API_KEY")
+        _load_from_env(env, "OPENAI_API_KEY")
 
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
@@ -150,21 +171,7 @@ def tests(session, shard):
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
 
-    # seems to resolve ci issues
-    if shard == "llamaindex":
-        session.posargs.insert(0, "-n4")
-
-    # Add sharding logic for trace1, trace2, trace3
-    pytest_args = [
-        "pytest",
-        "--durations=20",
-        "--strict-markers",
-        "--cov=weave",
-        "--cov-report=html",
-        "--cov-branch",
-    ]
-
-    # Handle trace sharding: run every 3rd test starting at different offsets
+    pytest_args = _get_default_pytest_args()
     if shard in trace_server_shards:
         shard_id = int(shard[-1]) - 1
         pytest_args.extend(
@@ -174,7 +181,6 @@ def tests(session, shard):
                 "-m trace_server",
             ]
         )
-
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
 
@@ -183,4 +189,42 @@ def tests(session, shard):
         *session.posargs,
         *test_dirs,
         env=env,
+    )
+
+
+def _make_extras(extras: list[str]) -> list[str]:
+    return [f"--extra={extra}" for extra in extras]
+
+
+def _make_groups(groups: list[str]) -> list[str]:
+    return [f"--group={group}" for group in groups]
+
+
+def _load_from_env(env: dict[str, str], key: str) -> None:
+    env[key] = os.getenv(key, "MISSING")
+
+
+def _get_default_pytest_args(*args):
+    return [
+        "pytest",
+        "--durations=20",
+        "--strict-markers",
+        "--cov=weave",
+        "--cov-report=html",
+        "--cov-branch",
+        *args,
+    ]
+
+
+def _run_uv_sync_command_with_args(*args, session):
+    non_blank_args = [arg for arg in args if arg not in ("", None)]
+
+    session.run_install(
+        "uv",
+        "sync",
+        *non_blank_args,
+        # The following is required to make nox use the virtualenv we created
+        # https://nox.thea.codes/en/stable/cookbook.html#using-a-lockfile
+        f"--python={session.virtualenv.location}",
+        env={"UV_PROJECT_ENVIRONMENT": session.virtualenv.location},
     )
