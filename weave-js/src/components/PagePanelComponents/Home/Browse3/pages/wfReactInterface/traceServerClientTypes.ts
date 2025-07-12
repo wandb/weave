@@ -553,6 +553,7 @@ export type ThreadSchema = {
 export type ThreadsQueryFilter = {
   after_datetime?: string;
   before_datetime?: string;
+  thread_ids?: string[];
 };
 
 export type ThreadsQueryReq = {
