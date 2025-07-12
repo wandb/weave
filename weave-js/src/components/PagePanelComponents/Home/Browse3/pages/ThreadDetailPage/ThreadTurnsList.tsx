@@ -107,7 +107,7 @@ export const ThreadTurnsList: FC<ThreadTurnsListProps> = ({
       return [];
     }
 
-    return turnsState.value.map((traceCall): Turn => {
+    return turnsState.value.turnCalls.map((traceCall): Turn => {
       // Convert inputs object to a string preview
       const inputPreview = traceCall.inputs
         ? JSON.stringify(traceCall.inputs).substring(0, 100) + '...'
@@ -122,6 +122,15 @@ export const ThreadTurnsList: FC<ThreadTurnsListProps> = ({
     });
   }, [turnsState]);
 
+  const firstTurnIndex = useMemo(() => {
+    if (turnsState.value) {
+      const totalTurns = turnsState.value.thread.turn_count;
+      const firstTurnIndex = totalTurns - turnsState.value.turnCalls.length;
+      return firstTurnIndex;
+    }
+    return 0;
+  }, [turnsState]);
+
   // Show a loading state if the turnsState is loading
   if (turnsState.loading) {
     return (
@@ -133,6 +142,11 @@ export const ThreadTurnsList: FC<ThreadTurnsListProps> = ({
 
   return (
     <div className="h-full overflow-y-auto">
+      {firstTurnIndex !== 0 && (
+        <div className="flex items-center justify-center text-sm text-moon-800">
+          ... Turn 1 to {firstTurnIndex} are omitted ...
+        </div>
+      )}
       {turns.map((turn, index) => {
         const isSelected = turn.id === selectedTurnId;
 
@@ -148,7 +162,7 @@ export const ThreadTurnsList: FC<ThreadTurnsListProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6 text-sm text-moon-800">
                 <span className=" flex h-18 w-18 items-center justify-center rounded-[20px] bg-moon-200 font-bold ">
-                  {index + 1}
+                  {firstTurnIndex + index + 1}
                 </span>
                 <span className="truncate font-semibold">{turn.opName}</span>
               </div>
