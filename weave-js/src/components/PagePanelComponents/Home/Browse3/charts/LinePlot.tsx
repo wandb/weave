@@ -30,7 +30,7 @@ import {
   tooltipHeaderStyle,
   tooltipRowStyle,
 } from './styling';
-import {AggregationMethod, ChartAxisField, ExtractedCallData} from './types';
+import {AggregationMethod, BinningMode, ChartAxisField, ExtractedCallData} from './types';
 import {useChartZoom} from './useChartZoom';
 
 export type LinePlotProps = {
@@ -38,6 +38,7 @@ export type LinePlotProps = {
   initialXAxis?: string;
   initialYAxis?: string;
   binCount?: number;
+  binningMode?: BinningMode;
   aggregation?: AggregationMethod;
   groupKeys?: string[];
   xAxisLabel?: string;
@@ -172,6 +173,7 @@ export const LinePlot: React.FC<LinePlotProps> = ({
   initialXAxis = 'started_at',
   initialYAxis = 'latency',
   binCount = 20,
+  binningMode = 'absolute',
   aggregation = 'average',
   groupKeys,
   xAxisLabel,
@@ -293,12 +295,14 @@ export const LinePlot: React.FC<LinePlotProps> = ({
       domainXDomain,
       dataRanges,
       groupKeys,
-      false // useStackedBinning = false for line plots
+      false, // useStackedBinning = false for line plots
+      binningMode
     );
   }, [
     data,
     points,
     binCount,
+    binningMode,
     aggregation,
     groupKeys,
     currentXDomain,

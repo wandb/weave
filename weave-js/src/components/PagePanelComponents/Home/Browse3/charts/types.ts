@@ -107,12 +107,20 @@ export type AggregationMethod =
   | 'p95'
   | 'p99';
 
+export type BinningMode =
+  | 'absolute'  // Fixed number of bins
+  | 'hour'      // Bin by hour boundaries
+  | 'day'       // Bin by day boundaries
+  | 'month'     // Bin by month boundaries
+  | 'year';     // Bin by year boundaries
+
 export type ChartConfig = {
   id: string;
   xAxis: string;
   yAxis: string;
   plotType?: 'scatter' | 'line' | 'bar';
-  binCount?: number; // For line plots and bar charts
+  binningMode?: BinningMode; // How to bin the data (default: 'absolute')
+  binCount?: number; // For line plots and bar charts (used only when binningMode is 'absolute')
   aggregation?: AggregationMethod; // For line plots and bar charts
   groupKeys?: string[]; // For grouping by multiple keys (op_name and user-selected fields)
   customName?: string; // For custom chart names

@@ -29,6 +29,7 @@ import {LinePlot} from './LinePlot';
 import {ScatterPlot} from './ScatterPlot';
 import {
   AggregationMethod,
+  BinningMode,
   ChartAxisField,
   ChartConfig,
   ExtractedCallData,
@@ -267,6 +268,14 @@ export const ChartModal: React.FC<ChartModalProps> = ({
     {value: 'p99', label: 'p99'},
   ];
 
+  const binningModeOptions: {value: BinningMode; label: string}[] = [
+    {value: 'absolute', label: 'Absolute (fixed count)'},
+    {value: 'hour', label: 'Hour'},
+    {value: 'day', label: 'Day'},
+    {value: 'month', label: 'Month'},
+    {value: 'year', label: 'Year'},
+  ];
+
   // Generate grouping options for scatter plots, line plots, and bar charts
   const colorGroupGroupedOptions = React.useMemo((): GroupedFieldOptions[] => {
     if (
@@ -368,6 +377,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                   initialXAxis={localConfig.xAxis}
                   initialYAxis={localConfig.yAxis}
                   binCount={localConfig.binCount}
+                  binningMode={localConfig.binningMode}
                   aggregation={localConfig.aggregation}
                   groupKeys={effectiveGroupKeys}
                   isFullscreen={true}
@@ -378,6 +388,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({
                   initialXAxis={localConfig.xAxis}
                   initialYAxis={localConfig.yAxis}
                   binCount={localConfig.binCount}
+                  binningMode={localConfig.binningMode}
                   aggregation={localConfig.aggregation}
                   groupKeys={effectiveGroupKeys}
                   isFullscreen={true}
@@ -560,20 +571,43 @@ export const ChartModal: React.FC<ChartModalProps> = ({
             {!isScatterPlot && (
               <>
                 <SectionHeader>Binning</SectionHeader>
-                <NumberInput
-                  min={1}
-                  max={200}
-                  value={localConfig.binCount ?? 20}
-                  onChange={val =>
+                <CustomSelect
+                  value={
+                    binningModeOptions.find(
+                      opt => opt.value === (localConfig.binningMode || 'absolute')
+                    ) || binningModeOptions[0]
+                  }
+                  onChange={option =>
                     setLocalConfig(prev => ({
                       ...prev,
-                      binCount: val ?? 20,
+                      binningMode: option
+                        ? (option.value as BinningMode)
+                        : 'absolute',
                     }))
                   }
-                  stepper
-                  useStepperPlusMinus
-                  containerStyle={{}}
+                  options={binningModeOptions}
+                  size="medium"
                 />
+
+                {(localConfig.binningMode || 'absolute') === 'absolute' && (
+                  <>
+                    <SectionHeader>Number of Bins</SectionHeader>
+                    <NumberInput
+                      min={1}
+                      max={200}
+                      value={localConfig.binCount ?? 20}
+                      onChange={val =>
+                        setLocalConfig(prev => ({
+                          ...prev,
+                          binCount: val ?? 20,
+                        }))
+                      }
+                      stepper
+                      useStepperPlusMinus
+                      containerStyle={{}}
+                    />
+                  </>
+                )}
 
                 <SectionHeader>Aggregation</SectionHeader>
                 <CustomSelect
