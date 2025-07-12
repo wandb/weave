@@ -282,9 +282,9 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
                     AND (calls_merged.inputs_dump LIKE {pb_8:String} OR calls_merged.inputs_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
-                AND
-                ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) = {pb_3:String}))
+                                    ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
+                    AND
+                    ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') = {pb_3:String}))
                 AND
                 ((any(calls_merged.wb_user_id) = {pb_4:String}))
                 AND
@@ -512,12 +512,12 @@ def test_query_with_simple_feedback_sort() -> None:
                 feedback.feedback_type = {pb_0:String}),
                 {pb_1:String},
                 {pb_2:String}) IS NULL)) desc,
-            toFloat64OrNull(JSON_VALUE(anyIf(feedback.payload_dump,
+            toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_0:String}),
-            {pb_3:String})) DESC,
-            toString(JSON_VALUE(anyIf(feedback.payload_dump,
+            {pb_3:String}), 'null'), '')) DESC,
+            toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_0:String}),
-            {pb_3:String})) DESC
+            {pb_3:String}), 'null'), '')) DESC
         """,
         {
             "pb_0": "wandb.runnable.my_op",
@@ -572,12 +572,12 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
                 feedback.feedback_type = {pb_1:String}),
                 {pb_2:String},
                 {pb_3:String}) IS NULL)) desc,
-            toFloat64OrNull(JSON_VALUE(anyIf(feedback.payload_dump,
+            toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_1:String}),
-            {pb_4:String})) DESC,
-            toString(JSON_VALUE(anyIf(feedback.payload_dump,
+            {pb_4:String}), 'null'), '')) DESC,
+            toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_1:String}),
-            {pb_4:String})) DESC
+            {pb_4:String}), 'null'), '')) DESC
         )
         SELECT
             calls_merged.id AS id
@@ -604,12 +604,12 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
                 feedback.feedback_type = {pb_1:String}),
                 {pb_2:String},
                 {pb_3:String}) IS NULL)) desc,
-            toFloat64OrNull(JSON_VALUE(anyIf(feedback.payload_dump,
+            toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_1:String}),
-            {pb_4:String})) DESC,
-            toString(JSON_VALUE(anyIf(feedback.payload_dump,
+            {pb_4:String}), 'null'), '')) DESC,
+            toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_1:String}),
-            {pb_4:String})) DESC
+            {pb_4:String}), 'null'), '')) DESC
         """,
         {
             "pb_0": ["weave-trace-internal:///project/op/my_op:1234567890"],
@@ -658,11 +658,11 @@ def test_query_with_simple_feedback_filter() -> None:
             (calls_merged.project_id,
             calls_merged.id)
         HAVING
-            (((JSON_VALUE(anyIf(feedback.payload_dump,
+            (((coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_0:String}),
-            {pb_1:String}) > JSON_VALUE(anyIf(feedback.payload_dump,
+            {pb_1:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_0:String}),
-            {pb_2:String})))
+            {pb_2:String}), 'null'), '')))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                     AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
@@ -710,9 +710,9 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
             (calls_merged.project_id,
             calls_merged.id)
         HAVING
-            (((JSON_VALUE(anyIf(feedback.payload_dump,
+            (((coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_0:String}),
-            {pb_1:String}) = {pb_2:String}))
+            {pb_1:String}), 'null'), '') = {pb_2:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                     AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         ORDER BY
@@ -724,12 +724,12 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
                 feedback.feedback_type = {pb_0:String}),
                 {pb_3:String},
                 {pb_4:String}) IS NULL)) desc,
-            toFloat64OrNull(JSON_VALUE(anyIf(feedback.payload_dump,
+            toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_0:String}),
-            {pb_5:String})) DESC,
-            toString(JSON_VALUE(anyIf(feedback.payload_dump,
+            {pb_5:String}), 'null'), '')) DESC,
+            toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
             feedback.feedback_type = {pb_0:String}),
-            {pb_5:String})) DESC
+            {pb_5:String}), 'null'), '')) DESC
         """,
         {
             "pb_0": "wandb.runnable.my_op",
@@ -814,7 +814,7 @@ def test_calls_query_with_predicate_filters() -> None:
                 AND ((calls_merged.inputs_dump LIKE {pb_3:String} OR calls_merged.inputs_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
                 AND ((any(calls_merged.wb_user_id) = {pb_2:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
@@ -874,7 +874,7 @@ def test_query_with_summary_weave_status_sort() -> None:
             WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
             WHEN IFNULL(
                 toInt64OrNull(
-                    JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String})
+                    coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')
                 ),
                 0
             ) > 0 THEN {pb_4:String}
@@ -923,7 +923,7 @@ def test_query_with_summary_weave_status_sort_and_filter() -> None:
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((CASE
                 WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-                WHEN IFNULL(toInt64OrNull(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String})), 0) > 0 THEN {pb_4:String}
+                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
                 WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
                 ELSE {pb_3:String}
             END = {pb_3:String}))
@@ -931,7 +931,7 @@ def test_query_with_summary_weave_status_sort_and_filter() -> None:
         AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         ORDER BY CASE
             WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_1:String}
-            WHEN IFNULL(toInt64OrNull(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String})), 0) > 0 THEN {pb_4:String}
+            WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(any(calls_merged.summary_dump), {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
             WHEN any(calls_merged.ended_at) IS NULL THEN {pb_2:String}
             ELSE {pb_3:String}
         END DESC
@@ -987,9 +987,9 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
                     AND (calls_merged.output_dump LIKE {pb_6:String} OR calls_merged.output_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
                 AND
-                ((JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}) = {pb_3:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}), 'null'), '') = {pb_3:String}))
                 AND
                 ((any(calls_merged.wb_user_id) = {pb_4:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
@@ -1058,9 +1058,9 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
                 OR (calls_merged.output_dump LIKE {pb_5:String} OR calls_merged.output_dump IS NULL)))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING ((
-            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String})
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String})
             OR
-            (JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}) = {pb_3:String})))
+            (coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_2:String}), 'null'), '') = {pb_3:String})))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         """,
@@ -1140,11 +1140,11 @@ def test_calls_query_with_complex_heavy_filters() -> None:
                     OR (lower(calls_merged.inputs_dump) LIKE {pb_11:String} OR calls_merged.inputs_dump IS NULL)))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
                 AND
-                ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) > {pb_3:UInt64}))
-                AND (((JSON_VALUE(any(calls_merged.output_dump), {pb_4:String}) = {pb_5:String})
-                  OR positionCaseInsensitive(JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}), {pb_7:String}) > 0))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') > {pb_3:UInt64}))
+                AND (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_4:String}), 'null'), '') = {pb_5:String})
+                  OR positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_6:String}), 'null'), ''), {pb_7:String}) > 0))
                 AND
                 ((any(calls_merged.wb_user_id) = {pb_8:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
@@ -1206,7 +1206,7 @@ def test_calls_query_with_like_optimization() -> None:
             ((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
@@ -1248,7 +1248,7 @@ def test_calls_query_with_like_optimization_contains() -> None:
             ((lower(calls_merged.inputs_dump) LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            (positionCaseInsensitive(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), {pb_1:String}) > 0)
+            (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
@@ -1290,7 +1290,7 @@ def test_query_with_json_value_in_condition() -> None:
                 OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) IN ({pb_1:String},{pb_2:String})))
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
@@ -1370,11 +1370,11 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
                         OR calls_merged.attributes_dump IS NULL))
             GROUP BY (calls_merged.project_id, calls_merged.id)
             HAVING (
-                ((JSON_VALUE(any(calls_merged.attributes_dump), {pb_0:String}) = {pb_1:String}))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
                 AND
-                (positionCaseInsensitive(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), {pb_3:String}) > 0)
+                (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), ''), {pb_3:String}) > 0)
                 AND
-                ((JSON_VALUE(any(calls_merged.attributes_dump), {pb_4:String}) IN ({pb_5:String},{pb_6:String})))
+                ((coalesce(nullIf(JSON_VALUE(any(calls_merged.attributes_dump), {pb_4:String}), 'null'), '') IN ({pb_5:String},{pb_6:String})))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))
             )
@@ -1434,8 +1434,8 @@ def test_calls_query_with_unoptimizable_or_condition() -> None:
             calls_merged.project_id = {pb_5:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((
-            (JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String})
-            OR (JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}) > {pb_3:UInt64})))
+            (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String})
+            OR (coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_2:String}), 'null'), '') > {pb_3:UInt64})))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
@@ -1472,7 +1472,7 @@ def test_calls_query_filter_by_empty_string() -> None:
         WHERE calls_merged.project_id = {pb_2:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}) = {pb_1:String}))
+            ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), '') = {pb_1:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
@@ -1985,9 +1985,9 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
                     OR calls_merged.inputs_dump IS NULL))
             GROUP BY (calls_merged.project_id,
                         calls_merged.id)
-            HAVING (((JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_1:String}) > JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_2:String})))
+            HAVING (((coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_1:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_2:String}), 'null'), '')))
                 AND ((any(calls_merged.started_at) > {pb_3:UInt64}))
-                AND ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) = {pb_5:String}))
+                AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') = {pb_5:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
         SELECT calls_merged.id AS id
