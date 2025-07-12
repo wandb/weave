@@ -14,7 +14,7 @@ def make_threads_query(
     sort_by: Optional[list[tsi.SortBy]] = None,
     sortable_datetime_after: Optional[datetime.datetime] = None,
     sortable_datetime_before: Optional[datetime.datetime] = None,
-    thread_id: Optional[str] = None,
+    thread_ids: Optional[list[str]] = None,
 ) -> str:
     """
     Generate a query to fetch threads with aggregated statistics from turn calls only.
@@ -51,7 +51,7 @@ def make_threads_query(
                                 Uses sortable_datetime column for efficient granule filtering.
         sortable_datetime_before: Only include calls with sortable_datetime before this timestamp.
                                  Uses sortable_datetime column for efficient granule filtering.
-        thread_id: Only include calls with this specific thread_id
+        thread_ids: Only include threads with thread_ids in this list
 
     Returns:
         SQL query string for threads aggregation
@@ -79,11 +79,39 @@ def make_threads_query(
 
     sortable_datetime_filter_clause = " ".join(sortable_datetime_filter_clauses)
 
-    # Build optional thread_id filter clause
-    thread_id_filter_clause = ""
-    if thread_id is not None:
-        thread_id_param = pb.add_param(thread_id)
-        thread_id_filter_clause = f"AND thread_id = {{{thread_id_param}: String}}"
+    # Build thread filtering clauses for WHERE and HAVING
+    # When thread_ids are specified:
+    #   - WHERE: Include NULL rows (partial data) + rows matching thread_ids (optimization)
+    #   - HAVING: Filter final aggregated thread_id to only specified thread_ids
+    # When thread_ids are not specified:
+    #   - WHERE: No additional filtering needed
+    #   - HAVING: Filter out NULL/empty thread_ids
+    where_thread_filter_clause = ""
+    having_thread_filter_clause = ""
+
+    if thread_ids is not None and len(thread_ids) > 0:
+        # Create parameterized IN clause for multiple thread IDs
+        thread_id_params = []
+        for thread_id in thread_ids:
+            thread_id_param = pb.add_param(thread_id)
+            thread_id_params.append(f"{{{thread_id_param}: String}}")
+
+        thread_ids_in_clause = f"({', '.join(thread_id_params)})"
+
+        # WHERE: Include NULL (incomplete rows) OR matching thread_ids (optimization)
+        where_thread_filter_clause = (
+            f"AND (thread_id IS NULL OR thread_id IN {thread_ids_in_clause})"
+        )
+
+        # HAVING: Filter final aggregated thread_id to specified thread_ids only
+        having_thread_filter_clause = (
+            f"AND aggregated_thread_id IN {thread_ids_in_clause}"
+        )
+    else:
+        # Filter out NULL and empty thread_ids when no specific thread_ids are requested
+        having_thread_filter_clause = (
+            "AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
+        )
 
     # Two-level aggregation to handle ClickHouse materialized view partial merges
     #
@@ -109,7 +137,7 @@ def make_threads_query(
     # - Filter to turn calls only
     query = f"""
     SELECT
-        thread_id,
+        aggregated_thread_id AS thread_id,
         COUNT(*) AS turn_count,
         min(call_start_time) AS start_time,
         max(call_end_time) AS last_updated,
@@ -120,7 +148,7 @@ def make_threads_query(
     FROM (
         SELECT
             id,
-            any(thread_id) AS thread_id,
+            any(thread_id) AS aggregated_thread_id,
             min(started_at) AS call_start_time,
             max(ended_at) AS call_end_time,
             CASE
@@ -131,10 +159,11 @@ def make_threads_query(
         FROM calls_merged
         WHERE project_id = {{{project_id_param}: String}}
             {sortable_datetime_filter_clause}
-        GROUP BY id
-        HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id) {thread_id_filter_clause}
+            {where_thread_filter_clause}
+        GROUP BY (project_id, id)
+        HAVING id = any(turn_id) {having_thread_filter_clause}
     ) AS properly_merged_calls
-    GROUP BY thread_id
+    GROUP BY aggregated_thread_id
     """
 
     # Add sorting
@@ -169,7 +198,7 @@ def make_threads_query_sqlite(
     sort_by: Optional[list[tsi.SortBy]] = None,
     sortable_datetime_after: Optional[datetime.datetime] = None,
     sortable_datetime_before: Optional[datetime.datetime] = None,
-    thread_id: Optional[str] = None,
+    thread_ids: Optional[list[str]] = None,
 ) -> tuple[str, list]:
     """
     Generate a SQLite query to fetch threads with aggregated statistics from turn calls only.
@@ -186,7 +215,7 @@ def make_threads_query_sqlite(
                                 SQLite uses started_at since it doesn't have sortable_datetime column.
         sortable_datetime_before: Only include calls that started before this timestamp.
                                  SQLite uses started_at since it doesn't have sortable_datetime column.
-        thread_id: Only include calls with this specific thread_id
+        thread_ids: Only include threads with thread_ids in this list
 
     Returns:
         Tuple of (SQL query string, parameters list) for SQLite
@@ -206,11 +235,18 @@ def make_threads_query_sqlite(
 
     timestamp_filter_clause = " ".join(timestamp_filter_clauses)
 
-    # Build optional thread_id filter clause
-    thread_id_filter_clause = ""
-    if thread_id is not None:
-        thread_id_filter_clause = "AND thread_id = ?"
-        parameters.append(thread_id)
+    # Build thread filtering clause
+    # When thread_ids are specified, use IN clause (which already filters out NULL/empty)
+    # When thread_ids are not specified, filter out NULL/empty thread_ids
+    thread_filter_clause = ""
+    if thread_ids is not None and len(thread_ids) > 0:
+        # Create a parameterized IN clause for multiple thread IDs
+        placeholders = ",".join("?" * len(thread_ids))
+        thread_filter_clause = f"AND thread_id IN ({placeholders})"
+        parameters.extend(thread_ids)
+    else:
+        # Filter out NULL and empty thread_ids when no specific thread_ids are requested
+        thread_filter_clause = "AND thread_id IS NOT NULL AND thread_id != ''"
 
     # Base query - group by thread_id and collect statistics from turn calls only
     # - thread_id: The thread identifier
@@ -244,11 +280,9 @@ def make_threads_query_sqlite(
         -1 AS p99_turn_duration_ms
     FROM calls c1
     WHERE project_id = ?
-        AND thread_id IS NOT NULL
-        AND thread_id != ''
         AND id = turn_id
         {timestamp_filter_clause}
-        {thread_id_filter_clause}
+        {thread_filter_clause}
     GROUP BY thread_id
     """
 
