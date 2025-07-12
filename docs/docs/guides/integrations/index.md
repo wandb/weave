@@ -42,6 +42,7 @@ Frameworks help orchestrate the actual execution pipelines in AI applications. T
 - **[PydanticAI](/guides/integrations/pydantic_ai)**
 - **[Google Agent Development Kit (ADK)](/guides/integrations/google_adk.md)**
 - **[TypeScript SDK](/guides/integrations/js.md)**
+- **[Agno](/guides/integrations/agno.md)**
 
 ## Protocols
 
