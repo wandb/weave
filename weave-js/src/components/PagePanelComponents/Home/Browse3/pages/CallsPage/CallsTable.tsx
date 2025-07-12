@@ -1058,6 +1058,43 @@ export const CallsTable: FC<{
                       columnInfo={columns}
                       columnVisibilityModel={columnVisibilityModel}
                       setColumnVisibilityModel={setColumnVisibilityModel}
+                      pinnedColumns={
+                        new Set([
+                          ...(pinModel?.left || []),
+                          ...(pinModel?.right || []),
+                        ])
+                      }
+                      onToggleColumnPin={
+                        setPinModel
+                          ? columnId => {
+                              const currentLeft = pinModel?.left || [];
+                              const currentRight = pinModel?.right || [];
+
+                              // Check if column is currently pinned
+                              const isCurrentlyPinned =
+                                currentLeft.includes(columnId) ||
+                                currentRight.includes(columnId);
+
+                              if (isCurrentlyPinned) {
+                                // Unpin the column
+                                setPinModel({
+                                  left: currentLeft.filter(
+                                    col => col !== columnId
+                                  ),
+                                  right: currentRight.filter(
+                                    col => col !== columnId
+                                  ),
+                                });
+                              } else {
+                                // Pin the column to the left
+                                setPinModel({
+                                  ...pinModel,
+                                  left: [...currentLeft, columnId],
+                                });
+                              }
+                            }
+                          : undefined
+                      }
                     />
                   </div>
                 )}
