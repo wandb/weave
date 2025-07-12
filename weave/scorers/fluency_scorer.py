@@ -6,7 +6,7 @@ import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.scorer_types import HuggingFacePipelineScorer
-from weave.scorers.utils import load_hf_model_weights
+from weave.scorers.utils import load_local_model_weights
 
 FLUENCY_SCORER_THRESHOLD = 0.5
 
@@ -45,7 +45,7 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
         """Loads the _pipeline attribute using HF utilities"""
         from transformers import pipeline
 
-        self._local_model_path = load_hf_model_weights(
+        self._local_model_path = load_local_model_weights(
             self.model_name_or_path, MODEL_PATHS["fluency_scorer"]
         )
         self._pipeline = pipeline(
