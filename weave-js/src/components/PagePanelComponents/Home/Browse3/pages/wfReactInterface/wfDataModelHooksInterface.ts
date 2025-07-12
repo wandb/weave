@@ -203,6 +203,7 @@ export interface UseCallsStatsParams {
   skip?: boolean;
   refetchOnDelete?: boolean;
   includeTotalStorageSize?: boolean;
+  expandColumns?: Set<string>;
 }
 
 export interface UseProjectHasCallsParams {

@@ -458,6 +458,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "summary_dump",
             ]
 
+        if req.expand_columns is not None:
+            cq.set_expand_columns(req.expand_columns)
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -477,10 +479,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(
-            cq.as_sql(pb),
-            pb.get_params(),
-        )
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
@@ -503,7 +502,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         for batch in batch_processor.make_batches(raw_res):
             call_dicts = [row_to_call_schema_dict(row) for row in batch]
-            if expand_columns:
+            if expand_columns and req.return_expanded_column_values:
                 self._expand_call_refs(
                     req.project_id, call_dicts, expand_columns, ref_cache
                 )
