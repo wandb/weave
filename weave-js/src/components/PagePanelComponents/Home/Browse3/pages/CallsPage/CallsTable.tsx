@@ -109,7 +109,6 @@ const DEFAULT_TABLE_WIDTH_WHEN_PEEK_OPEN_PX = 340; // Default table width when p
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
-  'summary.weave.feedback',
   'summary.status_counts',
   // attributes.python was logged for a short period of time
   // accidentally in v0.51.47. We can hide it for a while

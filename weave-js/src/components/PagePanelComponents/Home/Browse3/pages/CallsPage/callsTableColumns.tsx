@@ -342,7 +342,7 @@ function buildCallsTableColumns(
       },
     },
     {
-      field: 'feedback',
+      field: 'summary.weave.feedback',
       headerName: 'Feedback',
       width: 150,
       sortable: false,
@@ -353,9 +353,17 @@ function buildCallsTableColumns(
         );
         const callId = rowParams.row.id;
         const weaveRef = makeRefCall(entity, project, callId);
+        // Extract wandb feedback reactions and notes
+        const feedbackKeys = Object.keys(rowParams.row).filter(key =>
+          key.startsWith('summary.weave.feedback.wandb')
+        );
+        const feedbackData = feedbackKeys.flatMap(key => {
+          return rowParams.row[key];
+        });
         return (
           <Reactions
             weaveRef={weaveRef}
+            feedbackData={feedbackData}
             forceVisible={rowIndex === 0}
             twWrapperStyles={{
               width: '100%',

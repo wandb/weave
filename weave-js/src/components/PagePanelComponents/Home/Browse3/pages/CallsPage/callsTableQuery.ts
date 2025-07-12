@@ -333,15 +333,39 @@ const getFeedbackMerged = (calls: CallSchema[]) => {
     }
     const feedback = c.traceCall?.summary?.weave?.feedback?.reduce(
       (acc: Record<string, any>, curr: Record<string, any>) => {
-        // keep most recent feedback of each type
-        if (acc[curr.feedback_type]?.created_at > curr.created_at) {
-          return acc;
+        const feedbackType = curr.feedback_type;
+
+        // For reaction and note types, keep all feedbacks in an array
+        if (
+          feedbackType.startsWith('wandb.reaction') ||
+          feedbackType.startsWith('wandb.note')
+        ) {
+          if (!acc[feedbackType]) {
+            acc[feedbackType] = [];
+          }
+          acc[feedbackType].push(curr);
+        } else {
+          // For other types, keep most recent feedback
+          if (acc[feedbackType]?.created_at > curr.created_at) {
+            return acc;
+          }
+          acc[feedbackType] = curr;
         }
-        acc[curr.feedback_type] = curr;
         return acc;
       },
       {}
     );
+
+    // Sort reaction and note arrays by created_at for consistent ordering
+    Object.keys(feedback).forEach(key => {
+      if (Array.isArray(feedback[key])) {
+        feedback[key].sort(
+          (a: any, b: any) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      }
+    });
+
     c.traceCall = {
       ...c.traceCall,
       summary: {

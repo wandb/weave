@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {v4 as uuidv4} from 'uuid';
 
 import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {parseRef} from '../../../../../react';
@@ -12,6 +13,7 @@ import {ReactionsLoaded} from './ReactionsLoaded';
 
 type ReactionsProps = {
   weaveRef: string;
+  feedbackData?: Feedback[];
   readonly?: boolean;
 
   // By default show controls on mouse over or if feedback exists.
@@ -25,12 +27,16 @@ const SORT_BY: SortBy[] = [{field: 'created_at', direction: 'asc'}];
 
 export const Reactions = ({
   weaveRef,
+  feedbackData,
   readonly = false,
   forceVisible,
   twWrapperStyles = {},
 }: ReactionsProps) => {
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
-  const [feedback, setFeedback] = useState<Feedback[] | null>(null);
+  const [feedback, setFeedback] = useState<Feedback[] | null>(
+    feedbackData ?? []
+  );
+  const [useServerState, setUseServerState] = useState(false);
 
   const parsedRef = parseRef(weaveRef);
   if (parsedRef.scheme !== 'weave') {
@@ -46,49 +52,128 @@ export const Reactions = ({
       project,
       weaveRef,
     },
+    skip: feedbackData !== undefined && !useServerState,
     sortBy: SORT_BY,
   });
   const getTsClient = useGetTraceServerClientContext();
+
   useEffect(() => {
     return getTsClient().registerOnFeedbackListener(weaveRef, query.refetch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Handle initial data setup and server state management
   useEffect(() => {
-    if (query.result) {
-      setFeedback(query.result);
+    if (useServerState) {
+      // In server mode, use query result directly
+      if (query.result !== undefined) {
+        setFeedback(query.result);
+      }
+    } else {
+      // In initial mode
+      if (feedbackData !== undefined) {
+        // Use provided feedbackData
+        setFeedback(feedbackData);
+      } else if (query.result !== undefined) {
+        // No feedbackData provided, use query result
+        setFeedback(query.result);
+      }
     }
-  }, [query.result]);
+  }, [query.result, feedbackData, useServerState]);
 
-  const onAddEmoji = (emoji: string) => {
-    const req = {
+  const createFeedbackOptimistically = async (
+    feedbackType: string,
+    payload: Record<string, any>
+  ) => {
+    // Switch to server state mode on first mutation
+    if (!useServerState) {
+      setUseServerState(true);
+    }
+
+    // Create optimistic feedback item
+    // @ts-ignore - wb_user_id will be filled by server response
+    const optimisticFeedback: Feedback = {
+      id: uuidv4(),
       project_id: projectId,
       weave_ref: weaveRef,
       creator: null,
-      feedback_type: 'wandb.reaction.1',
-      payload: {emoji},
+      created_at: new Date().toISOString(),
+      feedback_type: feedbackType,
+      payload,
     };
-    getTsClient().feedbackCreate(req);
-  };
-  const onAddNote = (note: string) => {
-    const req = {
-      project_id: projectId,
-      weave_ref: weaveRef,
-      creator: null,
-      feedback_type: 'wandb.note.1',
-      payload: {note},
-    };
-    getTsClient().feedbackCreate(req);
+
+    // Optimistically update local state
+    setFeedback(prevFeedback =>
+      prevFeedback
+        ? [...prevFeedback, optimisticFeedback]
+        : [optimisticFeedback]
+    );
+
+    // Make API call
+    try {
+      const req = {
+        project_id: projectId,
+        weave_ref: weaveRef,
+        creator: null,
+        feedback_type: feedbackType,
+        payload,
+      };
+      await getTsClient().feedbackCreate(req);
+
+      // The server state will be updated via the query refetch triggered by the feedback listener
+      // We don't need to manually update the state here as the useEffect will handle it
+    } catch (error) {
+      // Revert optimistic update on error
+      setFeedback(
+        prevFeedback =>
+          prevFeedback?.filter(f => f.id !== optimisticFeedback.id) || null
+      );
+      console.error('Failed to create feedback:', error);
+    }
   };
 
-  const onRemoveFeedback = (id: string) => {
-    getTsClient().feedbackPurge({
-      project_id: projectId,
-      query: {
-        $expr: {
-          $eq: [{$getField: 'id'}, {$literal: id}],
+  const onAddEmoji = async (emoji: string) => {
+    await createFeedbackOptimistically('wandb.reaction.1', {emoji});
+  };
+
+  const onAddNote = async (note: string) => {
+    await createFeedbackOptimistically('wandb.note.1', {note});
+  };
+
+  const onRemoveFeedback = async (id: string) => {
+    // Switch to server state mode on first mutation
+    if (!useServerState) {
+      setUseServerState(true);
+    }
+
+    // Store the item being removed for potential rollback
+    const itemToRemove = feedback?.find(f => f.id === id);
+
+    // Optimistically remove from local state
+    setFeedback(prevFeedback => prevFeedback?.filter(f => f.id !== id) || null);
+
+    // Make API call
+    try {
+      await getTsClient().feedbackPurge({
+        project_id: projectId,
+        query: {
+          $expr: {
+            $eq: [{$getField: 'id'}, {$literal: id}],
+          },
         },
-      },
-    });
+      });
+
+      // The server state will be updated via the query refetch triggered by the feedback listener
+      // We don't need to manually update the state here as the useEffect will handle it
+    } catch (error) {
+      // Revert optimistic update on error
+      if (itemToRemove) {
+        setFeedback(prevFeedback =>
+          prevFeedback ? [...prevFeedback, itemToRemove] : [itemToRemove]
+        );
+      }
+      console.error('Failed to remove feedback:', error);
+    }
   };
 
   if (loadingUserInfo || feedback === null) {
