@@ -1210,6 +1210,8 @@ def op(
     """
     A decorator to weave op-ify a function or method. Works for both sync and async.
     Automatically detects iterator functions and applies appropriate behavior.
+
+    Note on type checking:
     """
     if not isinstance(tracing_sample_rate, (int, float)):
         raise TypeError("tracing_sample_rate must be a float")
