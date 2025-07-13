@@ -1,0 +1,45 @@
+client: {
+
+}
+
+
+wandb: {
+  weave: {
+    fast_api_trace_server: {}
+    queueing_service: {
+      call_part_queue: {}
+      complete_call_queue: {}
+      score_request_queue: {}
+    }
+
+    call_part_match_worker {}
+    predicate_worker {}
+    scorer_worker {}
+
+  }
+  gorilla: {
+
+  }
+}
+
+clickhouse_db {}
+
+# Flow 1
+client -> wandb.weave.fast_api_trace_server: 1 POST /calls/upsert_batch
+wandb.weave.fast_api_trace_server -> wandb.gorilla: 2 GQL ProjectPermissions
+wandb.weave.fast_api_trace_server -> clickhouse_db: 3 INSERT call_part
+wandb.weave.fast_api_trace_server -> wandb.weave.queueing_service.call_part_queue: 4 PUSH call_part
+wandb.weave.queueing_service.call_part_queue -> wandb.weave.call_part_match_worker: 5 POP call_part
+wandb.weave.call_part_match_worker -> clickhouse_db: 6 SELECT call_part
+wandb.weave.call_part_match_worker -> wandb.weave.queueing_service.complete_call_queue: 7 (if matched) PUSH complete_call
+wandb.weave.queueing_service.complete_call_queue -> wandb.weave.predicate_worker: 8 POP complete_call
+wandb.weave.predicate_worker -> clickhouse_db: 9 SELECT predicates
+wandb.weave.predicate_worker -> wandb.weave.queueing_service.score_request_queue: 10 (if meets predicate) PUSH score_request
+wandb.weave.queueing_service.score_request_queue -> wandb.weave.scorer_worker: 11 POP score_request
+wandb.weave.scorer_worker -> clickhouse_db: 12 SELECT scorer_details
+wandb.weave.scorer_worker ->wandb.weave.fast_api_trace_server: 13 POST /feedback/create
+wandb.weave.fast_api_trace_server -> clickhouse_db: 14 INSERT feedback
+
+# Flow 2
+client -> wandb.weave.fast_api_trace_server: A POST /calls/request_score
+wandb.weave.fast_api_trace_server -> wandb.weave.queueing_service.score_request_queue: B PUSH score_request
