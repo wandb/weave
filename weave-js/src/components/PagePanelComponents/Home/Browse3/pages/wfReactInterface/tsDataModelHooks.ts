@@ -134,15 +134,15 @@ const makeTraceServerEndpointHook = <
         return;
       }
       const client = getTsClient();
-      client[traceServerFnName](req.params as any)
-        .then(res => {
+      (client[traceServerFnName] as any)(req.params as any)
+        .then((res: any) => {
           if (params !== loadingInputRef.current) {
             return;
           }
           const output = postprocessFn(res as any, params);
           setState({loading: false, result: output, error: null});
         })
-        .catch(err => {
+        .catch((err: any) => {
           if (params !== loadingInputRef.current) {
             return;
           }
@@ -179,11 +179,11 @@ const useMakeTraceServerEndpoint = <
   const client = getTsClient();
   const traceServerRequest = useCallback(
     (...input: Input): Promise<Output> => {
-      return client[traceServerFnName](preprocessFn(...input) as any).then(
-        res => {
-          return postprocessFn(res as any);
-        }
-      );
+      return (client[traceServerFnName] as any)(
+        preprocessFn(...input) as any
+      ).then((res: any) => {
+        return postprocessFn(res as any);
+      });
     },
     [client, postprocessFn, preprocessFn, traceServerFnName]
   );
@@ -477,6 +477,207 @@ const useCalls = (
     return {
       loading,
       result: loading ? [] : expandedCalls.map(traceCallToUICallSchema),
+      refetch: calls.refetch,
+      error: calls.error,
+    };
+  }, [calls.refetch, expandedCalls, loading, calls.error]);
+};
+
+const useCallsStreamNoExpansion = (
+  params: UseCallsParams
+): Loadable<CallSchema[]> & Refetchable => {
+  const getTsClient = useGetTraceServerClientContext();
+  const loadingRef = useRef(false);
+  const [callRes, setCallRes] =
+    useState<traceServerTypes.TraceCallsQueryRes | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
+  const deepFilter = useDeepMemo(params.filter);
+
+  const req = useMemo((): traceServerTypes.TraceCallsQueryReq => {
+    return {
+      project_id: projectIdFromParts({
+        entity: params.entity,
+        project: params.project,
+      }),
+      filter: {
+        op_names: deepFilter.opVersionRefs,
+        input_refs: deepFilter.inputObjectVersionRefs,
+        output_refs: deepFilter.outputObjectVersionRefs,
+        parent_ids: deepFilter.parentIds,
+        trace_ids: deepFilter.traceId ? [deepFilter.traceId] : undefined,
+        call_ids: deepFilter.callIds,
+        trace_roots_only: deepFilter.traceRootsOnly,
+        wb_run_ids: deepFilter.runIds,
+        wb_user_ids: deepFilter.userIds,
+      },
+      limit: params.limit,
+      offset: params.offset,
+      sort_by: params.sortBy,
+      query: params.query,
+      columns: params.columns,
+      include_costs: params.includeCosts,
+      include_feedback: params.includeFeedback,
+      ...(params.includeTotalStorageSize
+        ? {include_total_storage_size: true}
+        : null),
+    };
+  }, [
+    params.entity,
+    params.project,
+    deepFilter,
+    params.limit,
+    params.offset,
+    params.sortBy,
+    params.query,
+    params.columns,
+    params.includeCosts,
+    params.includeFeedback,
+    params.includeTotalStorageSize,
+  ]);
+
+  // Keep track of the request we're waiting for, so that we
+  // can ignore requests that are superseded by more recent reqs
+  const expectedRequestRef = useRef(req);
+
+  const doFetch = useCallback(() => {
+    setCallRes(null);
+    setIsComplete(false);
+    loadingRef.current = true;
+    expectedRequestRef.current = req;
+
+    const onPartialResults = (
+      partialResults: traceServerTypes.TraceCallSchema[],
+      complete: boolean
+    ) => {
+      // Only update state if this response matches our current request
+      if (_.isEqual(expectedRequestRef.current, req)) {
+        setCallRes({calls: partialResults});
+        setIsComplete(complete);
+        if (complete) {
+          loadingRef.current = false;
+        }
+      }
+    };
+
+    const onError = (e: any) => {
+      // Only update state if this response matches our current request
+      if (_.isEqual(expectedRequestRef.current, req)) {
+        loadingRef.current = false;
+        console.error(e);
+        setError(e);
+        setCallRes({calls: []});
+        setIsComplete(true);
+      }
+    };
+
+    getTsClient()
+      .callsStreamQueryProgressive(req, onPartialResults)
+      .catch(onError);
+  }, [getTsClient, req]);
+
+  // register doFetch as a callback after deletion
+  useEffect(() => {
+    if (params.refetchOnDelete) {
+      const client = getTsClient();
+      const unregisterDelete = client.registerOnDeleteListener(doFetch);
+      const unregisterRename = client.registerOnRenameListener(doFetch);
+      return () => {
+        unregisterDelete();
+        unregisterRename();
+      };
+    }
+    return () => {};
+  }, [params.refetchOnDelete, getTsClient, doFetch]);
+
+  useEffect(() => {
+    if (params.skip) {
+      return;
+    }
+    doFetch();
+  }, [params.skip, doFetch]);
+
+  const refetch = useCallback(() => {
+    doFetch();
+  }, [doFetch]);
+
+  return useMemo(() => {
+    if (params.skip) {
+      return {
+        loading: false,
+        result: [],
+        refetch,
+      };
+    }
+    const allResults = (callRes?.calls ?? [])
+      .filter(isValidTraceCall)
+      .map(traceCallToUICallSchema);
+    const result = allResults;
+
+    // Return partial results immediately as they arrive, don't wait for completion
+    if (callRes == null && loadingRef.current) {
+      return {
+        loading: true,
+        result: [],
+        refetch,
+      };
+    } else {
+      // Check if the query contained a column request. Only cache calls
+      // if no columns were requested, only then are we guaranteed to get
+      // all the call data
+      if (!params.columns && isComplete) {
+        allResults.forEach(call => {
+          callCache.set(
+            {
+              entity: params.entity,
+              project: params.project,
+              callId: call.callId,
+            },
+            call
+          );
+        });
+      }
+      return {
+        loading: !isComplete,
+        result,
+        refetch,
+        error,
+      };
+    }
+  }, [
+    params.skip,
+    callRes,
+    params.columns,
+    refetch,
+    params.entity,
+    params.project,
+    error,
+    isComplete,
+  ]);
+};
+
+/**
+ * useCallsStream - Progressive streaming version of useCalls
+ *
+ * This hook provides the same interface as useCalls but streams results progressively
+ * as they arrive from the server instead of waiting for the complete response.
+ */
+export const useCallsStream = (
+  params: UseCallsParams
+): Loadable<CallSchema[]> & Refetchable => {
+  const calls = useCallsStreamNoExpansion(params);
+  const {expandedCalls, isExpanding} = useClientSideCallRefExpansion(
+    calls,
+    params.expandedRefColumns,
+    {returnPartialResults: true}
+  );
+
+  const loading = calls.loading || isExpanding;
+  return useMemo(() => {
+    const result = expandedCalls.map(traceCallToUICallSchema);
+    return {
+      loading,
+      result,
       refetch: calls.refetch,
       error: calls.error,
     };
@@ -2669,6 +2870,7 @@ export const convertISOToDate = (iso: string): Date => {
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
+  useCallsStream,
   useCallsStats,
   useProjectHasCalls,
   useCallsDeleteFunc,
