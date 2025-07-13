@@ -371,13 +371,7 @@ def stddev(self):
     return pc.stddev(array).as_py()
 
 
-@arrow_op(
-    name="ArrowWeaveListNumber-toTimestamp",
-    input_type=unary_input_type,
-    output_type=ArrowWeaveListType(types.Timestamp()),
-)
-def to_timestamp(self):
-    data = self._arrow_data
+def adjust_timestamp(data):
     try:
         data = data.cast("float64")
     except pa.ArrowInvalid:
@@ -400,6 +394,16 @@ def to_timestamp(self):
         adjusted_data = pc.divide(data, 1000)
         data = pc.if_else(mask, adjusted_data, data)
         mask = adjustment_mask()
+    
+    return data
+
+@arrow_op(
+    name="ArrowWeaveListNumber-toTimestamp",
+    input_type=unary_input_type,
+    output_type=ArrowWeaveListType(types.Timestamp()),
+)
+def to_timestamp(self):
+    data = adjust_timestamp(self._arrow_data)
 
     data_as_timestamp = (
         pc.floor(data).cast("int64").cast(pa.timestamp("ms", tz=datetime.timezone.utc))
@@ -410,6 +414,22 @@ def to_timestamp(self):
         self._artifact,
     )
 
+@arrow_op(
+    name="ArrowWeaveListNumber-toTimestampFloored",
+    input_type=unary_input_type,
+    output_type=ArrowWeaveListType(types.Timestamp()),
+)
+def to_timestamp_floored(self):
+    data = adjust_timestamp(self._arrow_data)
+
+    data_as_timestamp = (
+        pc.floor_temporal(pc.floor(data).cast("int64").cast(pa.timestamp("ms", tz=datetime.timezone.utc)))
+    )
+    return ArrowWeaveList(
+        data_as_timestamp,
+        types.Timestamp(),
+        self._artifact,
+    )
 
 @arrow_op(
     name="ArrowWeaveListNumber-toString",
