@@ -1,0 +1,7 @@
+tasks:
+    hello:
+        name: Hello World
+        command: |
+            echo "Hello, World!"
+        triggeredBy:
+        - manual
