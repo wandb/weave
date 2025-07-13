@@ -1,0 +1,11 @@
+evaluation:
+  query_keywords: ["evaluation", "evaluate", "metrics"]
+  preferred_files: ["evaluations.md", "scorers.md", "datasets.md"]
+
+scorers:
+  query_keywords: ["scorers", "predefined scorers"]
+  preferred_files: ["evaluations.md", "scorers.md"]
+
+rag:
+  query_keywords: ["rag", "retrieval", "context", "chunks"]
+  preferred_files: ["tutorial-rag.md"]
