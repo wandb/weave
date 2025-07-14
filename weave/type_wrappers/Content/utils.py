@@ -35,6 +35,7 @@ class ContentArgs(TypedDict):
     extra: dict[str, Any]
 
 
+# use discriminated unions instead of typedict
 class ContentKeywordArgs(TypedDict, total=False):
     extension: str
     mimetype: str
@@ -55,12 +56,12 @@ def is_valid_path(input: str | Path) -> bool:
 
 
 def default_filename(
-    extension: str,
+    extension: str | None,
 ) -> str:
     now = datetime.now()
     datetime_str = now.strftime("%Y%m%d_%H%M%S")
     # Do not give the file an empty extension. Prefer none
-    if len(extension) == 0:
+    if extension is None or len(extension) == 0:
         return datetime_str
 
     return datetime_str + "." + extension
