@@ -26,7 +26,7 @@ valid_edge_names = (
 )
 
 
-class InvalidInternalRef(ValueError):
+class InvalidInternalRefError(ValueError):
     pass
 
 
@@ -43,7 +43,7 @@ def validate_extra(extra: list[str]) -> None:
     edge value is purely user-defined and can be any string.
     """
     if len(extra) % 2 != 0:
-        raise InvalidInternalRef("Extra fields must be key-value pairs.")
+        raise InvalidInternalRefError("Extra fields must be key-value pairs.")
 
     for i, e in enumerate(extra):
         if i % 2 == 0:
@@ -54,7 +54,7 @@ def validate_extra(extra: list[str]) -> None:
                 OBJECT_ATTR_EDGE_NAME,
                 TABLE_ROW_ID_EDGE_NAME,
             ):
-                raise InvalidInternalRef(
+                raise InvalidInternalRefError(
                     f"Invalid extra edge name at index {i}: {extra}"
                 )
         else:
@@ -64,7 +64,7 @@ def validate_extra(extra: list[str]) -> None:
                 try:
                     int(e)
                 except ValueError:
-                    raise InvalidInternalRef(
+                    raise InvalidInternalRefError(
                         f"Invalid list edge value at index {i}: {extra}"
                     ) from None
             pass
@@ -72,12 +72,12 @@ def validate_extra(extra: list[str]) -> None:
 
 def validate_no_slashes(s: str, field_name: str) -> None:
     if "/" in s:
-        raise InvalidInternalRef(f"{field_name} cannot contain '/'")
+        raise InvalidInternalRefError(f"{field_name} cannot contain '/'")
 
 
 def validate_no_colons(s: str, field_name: str) -> None:
     if ":" in s:
-        raise InvalidInternalRef(f"{field_name} cannot contain ':'")
+        raise InvalidInternalRefError(f"{field_name} cannot contain ':'")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -170,20 +170,24 @@ def parse_internal_uri(
         path = uri[len(f"{WEAVE_INTERNAL_SCHEME}:///") :]
         parts = path.split("/")
         if len(parts) < 2:
-            raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 2 parts")
+            raise InvalidInternalRefError(
+                f"Invalid URI: {uri}. Must have at least 2 parts"
+            )
         project_id, kind = parts[:2]
         remaining = parts[2:]
     elif uri.startswith(f"{ARTIFACT_REF_SCHEME}:///"):
         path = uri[len(f"{ARTIFACT_REF_SCHEME}:///") :]
         parts = path.split("/")
         if len(parts) < 3:
-            raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 3 parts")
+            raise InvalidInternalRefError(
+                f"Invalid URI: {uri}. Must have at least 3 parts"
+            )
         entity, project = parts[:2]
         project_id = f"{entity}/{project}"
         kind = "artifact"
         remaining = parts[2:]
     else:
-        raise InvalidInternalRef(
+        raise InvalidInternalRefError(
             f"Invalid URI: {uri}. Must start with {WEAVE_INTERNAL_SCHEME}:/// or {WEAVE_SCHEME}:/// "
             f"or {ARTIFACT_REF_SCHEME}:///"
         )
@@ -212,7 +216,7 @@ def parse_internal_uri(
         id_ = remaining[0]
         return InternalArtifactRef(project_id=project_id, id=id_)
     else:
-        raise InvalidInternalRef(f"Unknown ref kind: {kind}")
+        raise InvalidInternalRefError(f"Unknown ref kind: {kind}")
 
 
 def _parse_remaining(remaining: list[str]) -> tuple[str, str, list[str]]:

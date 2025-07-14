@@ -4,7 +4,7 @@ from datetime import datetime
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHCallSchema
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import InvalidRequestError
 from weave.trace_server.orm import (
     Column,
     ColumnType,
@@ -512,10 +512,10 @@ def validate_cost_purge_req(req: tsi.CostPurgeReq) -> None:
     expr = req.query.expr_.model_dump()
     keys = list(expr.keys())
     if len(keys) != 1:
-        raise InvalidRequest(MESSAGE_INVALID_COST_PURGE)
+        raise InvalidRequestError(MESSAGE_INVALID_COST_PURGE)
     if keys[0] in ["eq_", "in_"]:
         validate_purge_req_one(expr, MESSAGE_INVALID_COST_PURGE, keys[0])
     elif keys[0] == "or_":
         validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_COST_PURGE)
     else:
-        raise InvalidRequest(MESSAGE_INVALID_COST_PURGE)
+        raise InvalidRequestError(MESSAGE_INVALID_COST_PURGE)

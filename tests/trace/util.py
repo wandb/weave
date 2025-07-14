@@ -72,7 +72,7 @@ class DatetimeMatcher:
         return isinstance(other, datetime.datetime)
 
 
-class DummyTestException(Exception):
+class DummyTestError(Exception):
     pass
 
 
@@ -123,7 +123,7 @@ def capture_output(callbacks: list[Callable[[], None]]):
 
     try:
         yield captured_logs
-    except DummyTestException:
+    except DummyTestError:
         pass
     finally:
         for callback in callbacks:
