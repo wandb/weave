@@ -7,9 +7,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Annotated, Any, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Unpack
 
 from weave.type_wrappers.Content.utils import (
@@ -22,22 +22,22 @@ from weave.type_wrappers.Content.utils import (
 
 logger = logging.getLogger(__name__)
 
-
 class BaseContentHandler(BaseModel):
     size: int
     filename: str
     mimetype: str
     extension: str
     data: bytes
-    extra: dict
+    extra: Annotated[
+        dict,
+        Field(
+            description="Extra metadata to associate with the content",
+            examples=[{"number of cats": 1}]
+        )]
     encoding: str
     path: str | None = None
     model_config = ConfigDict(extra="allow")
 
-    def __init__(self, data: bytes, /, **values: Any):
-        # Default here so when a factory calls a factory we can safely do the existence check
-        values["encoding"] = values.get("encoding") or "utf-8"
-        super().__init__(data=data, **values)
 
     @property
     def metadata(self) -> dict[str, Any]:
