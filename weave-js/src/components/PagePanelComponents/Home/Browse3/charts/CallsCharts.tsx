@@ -7,12 +7,9 @@ import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
 import React from 'react';
 
 import {Button} from '../../../../../components/Button';
+import {Select} from '../../../../Form/Select';
 import {WFHighLevelCallFilter} from '../pages/CallsPage/callsTableFilter';
-import {
-  callsChartsStyles,
-  createDropdownOptionStyle,
-  getDropdownTriggerHoverColor,
-} from './CallsCharts.styles';
+import {callsChartsStyles} from './CallsCharts.styles';
 import {Chart} from './Chart';
 import {ChartModal} from './ChartModal';
 import {
@@ -33,6 +30,11 @@ type CallsChartsProps = {
   sortModel?: GridSortModel;
 };
 
+type PageSizeOption = {
+  readonly value: number;
+  readonly label: string;
+};
+
 const CallsChartsInner = ({
   entity,
   project,
@@ -41,11 +43,6 @@ const CallsChartsInner = ({
   sortModel,
 }: CallsChartsProps) => {
   const [pageSize, setPageSize] = React.useState(250);
-  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
-  const [hoveredOption, setHoveredOption] = React.useState<number | null>(null);
-  const [isDropdownTriggerHovered, setIsDropdownTriggerHovered] =
-    React.useState(false);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const pageSizeOptions = React.useMemo(
     () => [
@@ -60,26 +57,11 @@ const CallsChartsInner = ({
     []
   );
 
-  // Close dropdown when clicking outside the dropdown for selecting number of calls to show
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  const handlePageSizeSelect = (option: {value: number; label: string}) => {
-    setPageSize(option.value);
-    setIsDropdownOpen(false);
+  const pageSizeValue = pageSizeOptions.find(o => o.value === pageSize);
+  const onPageSizeChange = (option: PageSizeOption | null) => {
+    if (option) {
+      setPageSize(option.value);
+    }
   };
 
   const {data: callData, isLoading} = useChartsData({
@@ -193,35 +175,14 @@ const CallsChartsInner = ({
             <span style={callsChartsStyles.headerText}>
               Charts showing data for
             </span>
-            <div style={callsChartsStyles.dropdownContainer} ref={dropdownRef}>
-              <span
-                style={{
-                  ...callsChartsStyles.dropdownTrigger,
-                  color: getDropdownTriggerHoverColor(isDropdownTriggerHovered),
-                }}
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                onMouseEnter={() => setIsDropdownTriggerHovered(true)}
-                onMouseLeave={() => setIsDropdownTriggerHovered(false)}>
-                {pageSize}
-              </span>
-              {isDropdownOpen && (
-                <div style={callsChartsStyles.dropdownMenu}>
-                  {pageSizeOptions.map(option => (
-                    <div
-                      key={option.value}
-                      style={createDropdownOptionStyle(
-                        pageSize === option.value,
-                        hoveredOption === option.value
-                      )}
-                      onMouseEnter={() => setHoveredOption(option.value)}
-                      onMouseLeave={() => setHoveredOption(null)}
-                      onClick={() => handlePageSizeSelect(option)}>
-                      {option.label}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <Select<PageSizeOption>
+              size="small"
+              menuPlacement="bottom"
+              options={pageSizeOptions}
+              value={pageSizeValue}
+              isSearchable={false}
+              onChange={onPageSizeChange}
+            />
             <span style={callsChartsStyles.headerText}>calls</span>
           </div>
           <Button
@@ -256,6 +217,7 @@ const CallsChartsInner = ({
                 binCount={chart.binCount}
                 aggregation={chart.aggregation}
                 title={chartTitle}
+                customName={chart.customName}
                 chartId={chart.id}
                 entity={entity}
                 project={project}

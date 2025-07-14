@@ -156,51 +156,38 @@ export const MessagePanelPart = ({
     const lastPartIndex = parts.length - 1;
 
     return (
-      <>
-        <style>
-          {`
-            @keyframes blink {
-              0%, 100% { opacity: 1; }
-              50% { opacity: 0; }
-            }
-            .cursor-blink {
-              animation: blink 1s ease-in-out infinite;
-            }
-          `}
-        </style>
-        <div>
-          {parts.map((part, index) => {
-            const isLastPart = index === lastPartIndex;
-            if (part.type === 'thinking') {
-              const isExpanded = expandedThinking[index] ?? showCursor;
-              return (
-                <ThinkingPart
-                  key={index}
-                  content={part.content}
-                  index={index}
-                  isExpanded={isExpanded}
-                  showCursor={showCursor}
-                  isLastPart={isLastPart}
-                  onToggleExpanded={idx =>
-                    setExpandedThinking(prev => ({
-                      ...prev,
-                      [idx]: !isExpanded,
-                    }))
-                  }
-                />
-              );
-            }
+      <div>
+        {parts.map((part, index) => {
+          const isLastPart = index === lastPartIndex;
+          if (part.type === 'thinking') {
+            const isExpanded = expandedThinking[index] ?? showCursor;
             return (
-              <TextPart
+              <ThinkingPart
                 key={index}
                 content={part.content}
+                index={index}
+                isExpanded={isExpanded}
                 showCursor={showCursor}
                 isLastPart={isLastPart}
+                onToggleExpanded={idx =>
+                  setExpandedThinking(prev => ({
+                    ...prev,
+                    [idx]: !isExpanded,
+                  }))
+                }
               />
             );
-          })}
-        </div>
-      </>
+          }
+          return (
+            <TextPart
+              key={index}
+              content={part.content}
+              showCursor={showCursor}
+              isLastPart={isLastPart}
+            />
+          );
+        })}
+      </div>
     );
   }
   if (value.type === 'text' && 'text' in value) {

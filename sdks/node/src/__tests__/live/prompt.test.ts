@@ -66,23 +66,27 @@ describe('Prompt persistence', () => {
 
     const prompt = new StringPrompt({
       content: 'Hello, {name}!',
+      name: 'test-prompt',
+      description: 'test-description',
     });
 
     const ref = await client.publish(prompt);
 
     expect(ref.uri()).toBe(
-      'weave:///test-entity/test-project/object/StringPrompt:test-digest'
+      'weave:///test-entity/test-project/object/test-prompt:test-digest'
     );
 
     expect(mockObjCreateObjCreatePost).toHaveBeenCalledWith({
       obj: {
         project_id: 'test-entity/test-project',
-        object_id: 'StringPrompt',
+        object_id: 'test-prompt',
         val: {
           _type: 'StringPrompt',
           _class_name: 'StringPrompt',
           _bases: ['Prompt', 'Object', 'BaseModel'],
           content: 'Hello, {name}!',
+          name: 'test-prompt',
+          description: 'test-description',
         },
       },
     });
@@ -127,6 +131,21 @@ describe('Prompt persistence', () => {
     expect(ref.uri()).toBe(
       'weave:///test-entity/test-project/object/MessagesPrompt:test-digest'
     );
+
+    expect(mockObjCreateObjCreatePost).toHaveBeenCalledWith({
+      obj: {
+        project_id: 'test-entity/test-project',
+        object_id: 'MessagesPrompt',
+        val: {
+          _type: 'MessagesPrompt',
+          _class_name: 'MessagesPrompt',
+          _bases: ['Prompt', 'Object', 'BaseModel'],
+          messages: [{role: 'user', content: 'Hello, {name}!'}],
+          name: undefined,
+          description: undefined,
+        },
+      },
+    });
 
     const retrievedObj = await ref.get();
 

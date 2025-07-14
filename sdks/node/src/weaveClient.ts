@@ -300,10 +300,10 @@ export class WeaveClient {
     if (t == 'StringPrompt') {
       const {StringPrompt} = await import('./prompt');
 
-      const {content, description} = val;
+      const {content, description, name} = val;
 
       let obj = new StringPrompt({
-        id: dataObj.id,
+        name,
         description,
         content,
       });
@@ -316,10 +316,10 @@ export class WeaveClient {
     if (t == 'MessagesPrompt') {
       const {MessagesPrompt} = await import('./prompt');
 
-      const {description, messages} = val;
+      const {description, messages, name} = val;
 
       let obj = new MessagesPrompt({
-        id: dataObj.id,
+        name,
         description,
         messages,
       });
@@ -333,10 +333,10 @@ export class WeaveClient {
       // Avoid circular dependency
       const {Dataset} = await import('./dataset');
 
-      const {description, rows} = val;
+      const {description, rows, name} = val;
 
       let obj = new Dataset({
-        id: dataObj.id,
+        name: name || dataObj.id,
         description,
         rows,
       });
@@ -430,7 +430,7 @@ export class WeaveClient {
       const classChain = getClassChain(obj);
       const className = classChain[0];
       if (!objId) {
-        objId = sanitizeObjectName(obj.id);
+        objId = objectNameToId(obj.name);
       }
 
       let saveAttrs = obj.saveAttrs();
@@ -905,7 +905,7 @@ async function maybeFormatCode(code: string) {
   //   }
 }
 
-function sanitizeObjectName(name: string): string {
+function objectNameToId(name: string): string {
   // Replaces any non-alphanumeric characters with a single dash and removes
   // any leading or trailing dashes. This is more restrictive than the DB
   // constraints and can be relaxed if needed.
