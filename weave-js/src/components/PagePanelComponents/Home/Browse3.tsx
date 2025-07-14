@@ -15,6 +15,8 @@ import useMousetrap from 'react-hook-mousetrap';
 import {Redirect, Route, Switch, useHistory, useParams} from 'react-router-dom';
 
 import {URL_BROWSE3} from '../../../urls';
+import {MagicianContextProvider} from '../../../WBMagician/Magician';
+import {MagicianComponent} from '../../../WBMagician/MagicianComponent';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {ComparePage} from './Browse3/compare/ComparePage';
@@ -69,8 +71,6 @@ import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/t
 import {getParamArray, queryGetDict} from './Browse3/urlQueryUtil';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
-import {MagicianContextProvider} from './WBMagician/Magician';
-import {MagicianComponent} from './WBMagician/MagicianComponent';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
