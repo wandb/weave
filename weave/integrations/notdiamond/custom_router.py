@@ -78,7 +78,7 @@ def evaluate_router(
         )
 
     model_results = _get_model_results(best_provider)
-    nd_results = _get_model_results("notdiamond")
+    and_results = _get_model_results("notdiamond")
 
     class _DummyEvalModel(weave.Model):
         model_results: pd.DataFrame
@@ -105,9 +105,9 @@ def evaluate_router(
     best_provider_model = BestRoutedModel(
         model_name=best_provider, model_results=model_results
     )
-    nd_model = NotDiamondRoutedModel(model_results=nd_results)
+    and_model = NotDiamondRoutedModel(model_results=and_results)
 
-    return best_provider_model, nd_model
+    return best_provider_model, and_model
 
 
 def _get_score_column(
@@ -124,14 +124,14 @@ def _get_score_column(
         )
 
     score_column, score_val = next(iter(scores.items()))
-    _nd_score_column = f"{score_column}_score"
-    if score_col_name is not None and _nd_score_column != score_col_name:
+    _and_score_column = f"{score_column}_score"
+    if score_col_name is not None and _and_score_column != score_col_name:
         raise ValueError(
-            f"Multiple eval scores for {model}: {score_col_name} and {_nd_score_column}. "
+            f"Multiple eval scores for {model}: {score_col_name} and {_and_score_column}. "
             "Please specify a single score column."
         )
 
-    return _nd_score_column, score_val
+    return _and_score_column, score_val
 
 
 def _build_dataframe(

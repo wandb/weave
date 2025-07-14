@@ -101,7 +101,7 @@ MESSAGE_INVALID_PURGE = "Can only purge by specifying one or more ids"
 
 
 # Validate a dictionary only has one specific key
-def validate_dict_one_key(d: dict, key: str, typ: type) -> Any:
+def validate_dict_one_key(d: dict, key: str, _type: type) -> Any:
     if not isinstance(d, dict):
         raise InvalidRequest(f"Expected a dictionary, got {d}")
     keys = list(d.keys())
@@ -110,8 +110,8 @@ def validate_dict_one_key(d: dict, key: str, typ: type) -> Any:
     if keys[0] != key:
         raise InvalidRequest(f"Expected key {key}, got {keys[0]}")
     val = d[key]
-    if not isinstance(val, typ):
-        raise InvalidRequest(f"Expected value of type {typ}, got {type(val)}")
+    if not isinstance(val, _type):
+        raise InvalidRequest(f"Expected value of type {_type}, got {type(val)}")
     return val
 
 

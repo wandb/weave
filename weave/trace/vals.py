@@ -887,7 +887,7 @@ def make_trace_obj(
     if isinstance(box_val, pydantic_v1.BaseModel) or is_op(val):
         box_val.__dict__["ref"] = new_ref
     elif box_val is None or isinstance(box_val, bool):
-        # We intentionally don't box None and bools because it's imposible to
+        # We intentionally don't box None and bools because it's impossible to
         # make them behave like the underlying True/False/None objects in python.
         # This is unlike other objects (dict, list, int) that can be inherited
         # from and compared.

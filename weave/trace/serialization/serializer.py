@@ -93,13 +93,13 @@ class Serializer:
     instance_check: Callable[[Any], bool] | None = None
 
     def id(self) -> str:
-        ser_id = self.target_class.__module__ + "." + self.target_class.__name__
+        set_id = self.target_class.__module__ + "." + self.target_class.__name__
         # Special case for weave.Op (which is currently weave.trace.op.Op).
         # The id is just Op, since we've already stored this as
         # "Op" in the database.
-        if ser_id.startswith("weave.") and ser_id.endswith(".Op"):
+        if set_id.startswith("weave.") and set_id.endswith(".Op"):
             return "Op"
-        return ser_id
+        return set_id
 
 
 SERIALIZERS = []
