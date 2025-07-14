@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import weave
-from tests.trace.util import DummyTestException
+from tests.trace.util import DummyTestError
 from tests.trace_server.conftest import *  # noqa: F401
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import autopatch, weave_client, weave_init
@@ -95,93 +95,93 @@ def pytest_sessionfinish(session, exitstatus):
 class ThrowingServer(tsi.TraceServerInterface):
     # Call API
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        raise DummyTestException("FAILURE - call_start, req:", req)
+        raise DummyTestError("FAILURE - call_start, req:", req)
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        raise DummyTestException("FAILURE - call_end, req:", req)
+        raise DummyTestError("FAILURE - call_end, req:", req)
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        raise DummyTestException("FAILURE - call_read, req:", req)
+        raise DummyTestError("FAILURE - call_read, req:", req)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        raise DummyTestException("FAILURE - calls_query, req:", req)
+        raise DummyTestError("FAILURE - calls_query, req:", req)
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        raise DummyTestException("FAILURE - calls_query_stream, req:", req)
+        raise DummyTestError("FAILURE - calls_query_stream, req:", req)
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        raise DummyTestException("FAILURE - calls_delete, req:", req)
+        raise DummyTestError("FAILURE - calls_delete, req:", req)
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        raise DummyTestException("FAILURE - calls_query_stats, req:", req)
+        raise DummyTestError("FAILURE - calls_query_stats, req:", req)
 
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        raise DummyTestException("FAILURE - call_update, req:", req)
+        raise DummyTestError("FAILURE - call_update, req:", req)
 
     # Op API
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise DummyTestException("FAILURE - op_create, req:", req)
+        raise DummyTestError("FAILURE - op_create, req:", req)
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        raise DummyTestException("FAILURE - op_read, req:", req)
+        raise DummyTestError("FAILURE - op_read, req:", req)
 
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        raise DummyTestException("FAILURE - ops_query, req:", req)
+        raise DummyTestError("FAILURE - ops_query, req:", req)
 
     # Cost API
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        raise DummyTestException("FAILURE - cost_create, req:", req)
+        raise DummyTestError("FAILURE - cost_create, req:", req)
 
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        raise DummyTestException("FAILURE - cost_query, req:", req)
+        raise DummyTestError("FAILURE - cost_query, req:", req)
 
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        raise DummyTestException("FAILURE - cost_purge, req:", req)
+        raise DummyTestError("FAILURE - cost_purge, req:", req)
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        raise DummyTestException("FAILURE - obj_create, req:", req)
+        raise DummyTestError("FAILURE - obj_create, req:", req)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        raise DummyTestException("FAILURE - obj_read, req:", req)
+        raise DummyTestError("FAILURE - obj_read, req:", req)
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        raise DummyTestException("FAILURE - objs_query, req:", req)
+        raise DummyTestError("FAILURE - objs_query, req:", req)
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        raise DummyTestException("FAILURE - table_create, req:", req)
+        raise DummyTestError("FAILURE - table_create, req:", req)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        raise DummyTestException("FAILURE - table_update, req:", req)
+        raise DummyTestError("FAILURE - table_update, req:", req)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        raise DummyTestException("FAILURE - table_query, req:", req)
+        raise DummyTestError("FAILURE - table_query, req:", req)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        raise DummyTestException("FAILURE - refs_read_batch, req:", req)
+        raise DummyTestError("FAILURE - refs_read_batch, req:", req)
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        raise DummyTestException("FAILURE - file_create, req:", req)
+        raise DummyTestError("FAILURE - file_create, req:", req)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        raise DummyTestException("FAILURE - file_content_read, req:", req)
+        raise DummyTestError("FAILURE - file_content_read, req:", req)
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        raise DummyTestException("FAILURE - feedback_create, req:", req)
+        raise DummyTestError("FAILURE - feedback_create, req:", req)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        raise DummyTestException("FAILURE - feedback_query, req:", req)
+        raise DummyTestError("FAILURE - feedback_query, req:", req)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
-        raise DummyTestException("FAILURE - feedback_purge, req:", req)
+        raise DummyTestError("FAILURE - feedback_purge, req:", req)
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        raise DummyTestException("FAILURE - evaluate_model, req:", req)
+        raise DummyTestError("FAILURE - evaluate_model, req:", req)
 
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
-        raise DummyTestException("FAILURE - evaluation_status, req:", req)
+        raise DummyTestError("FAILURE - evaluation_status, req:", req)
 
 
 @pytest.fixture
