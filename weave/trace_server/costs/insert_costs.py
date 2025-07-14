@@ -56,7 +56,7 @@ def load_costs_from_json(file_name: str = COST_FILE) -> dict[str, list[CostDetai
         with open(file_path) as file:
             data = json.load(file)
     except json.JSONDecodeError as e:
-        logger.exception("JSON decode error: %s", e)
+        logger.exception("JSON decode error")
         raise
     return data
 
@@ -154,7 +154,7 @@ def insert_costs(client: Client, target_db: str) -> None:
     try:
         new_costs = load_costs_from_json()
     except Exception as e:
-        logger.exception("Failed to load costs from json, %s", e)
+        logger.exception("Failed to load costs from json")
         return
     logger.info("Loaded %d costs from json", sum_costs(new_costs))
 
@@ -162,7 +162,7 @@ def insert_costs(client: Client, target_db: str) -> None:
     try:
         new_costs = filter_out_current_costs(client, new_costs)
     except Exception as e:
-        logger.exception("Failed to filter out current costs, %s", e)
+        logger.exception("Failed to filter out current costs")
         return
 
     logger.info(
@@ -177,7 +177,7 @@ def insert_costs(client: Client, target_db: str) -> None:
     try:
         insert_costs_into_db(client, new_costs)
     except Exception as e:
-        logger.exception("Failed to insert costs into db, %s", e)
+        logger.exception("Failed to insert costs into db")
         return
     logger.info("Inserted %d costs", sum_costs(new_costs))
 
