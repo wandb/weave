@@ -241,7 +241,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
 
     @classmethod
-    def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
+    def from_env(
+        cls, use_async_insert: bool = False, **kwargs: Any
+    ) -> "ClickHouseTraceServer":
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
         return ClickHouseTraceServer(
@@ -251,6 +253,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
+            **kwargs,
         )
 
     @property
