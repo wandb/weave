@@ -74,9 +74,7 @@ else:
         ref: Ref | None = None
 
         def __init__(self, *args: Any, **kwargs: Any) -> None:
-            raise ImportError(
-                "numpy is required for BoxedANDArray but is not installed"
-            )
+            raise ImportError("numpy is required for BoxedNDArray but is not installed")
 
 
 def box(

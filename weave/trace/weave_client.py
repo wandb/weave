@@ -1107,7 +1107,7 @@ class WeaveClient:
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
-            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are ANDead.
+            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
