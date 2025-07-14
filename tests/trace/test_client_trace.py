@@ -5183,22 +5183,22 @@ def test_turn_id_functionality(client):
         return x + 1
 
     @weave.op
-    def turn_op_A(x: int) -> int:
+    def turn_op_a(x: int) -> int:
         return child_op(x) * 2
 
     @weave.op
-    def turn_op_B(x: int) -> int:
+    def turn_op_b(x: int) -> int:
         return x * 3
 
     @weave.op
-    def turn_op_C(x: int) -> int:
+    def turn_op_c(x: int) -> int:
         return child_op(x) * 4
 
     # Test with thread context - sibling turns
     with weave.thread("test_turns"):
-        result_a = turn_op_A(10)  # Should be a turn
-        result_b = turn_op_B(5)  # Should be a turn
-        result_c = turn_op_C(3)  # Should be a turn
+        result_a = turn_op_a(10)  # Should be a turn
+        result_b = turn_op_b(5)  # Should be a turn
+        result_c = turn_op_c(3)  # Should be a turn
 
     assert result_a == 22  # (10 + 1) * 2
     assert result_b == 15  # 5 * 3
@@ -5253,30 +5253,30 @@ def test_nested_thread_contexts_turn_lineage(client):
         return x + 1
 
     @weave.op
-    def outer_turn_A(x: int) -> int:
+    def outer_turn_a(x: int) -> int:
         return child_op(x) * 2
 
     @weave.op
-    def inner_turn_B(x: int) -> int:
+    def inner_turn_b(x: int) -> int:
         return x * 3
 
     @weave.op
-    def inner_turn_C(x: int) -> int:
+    def inner_turn_c(x: int) -> int:
         return child_op(x) * 4
 
     @weave.op
-    def outer_turn_D(x: int) -> int:
+    def outer_turn_d(x: int) -> int:
         return x * 5
 
     # Test nested thread contexts
     with weave.thread("outer_thread"):
-        result_a = outer_turn_A(10)  # Should be turn in outer_thread
+        result_a = outer_turn_a(10)  # Should be turn in outer_thread
 
         with weave.thread("inner_thread"):
-            result_b = inner_turn_B(5)  # Should be turn in inner_thread
-            result_c = inner_turn_C(3)  # Should be turn in inner_thread
+            result_b = inner_turn_b(5)  # Should be turn in inner_thread
+            result_c = inner_turn_c(3)  # Should be turn in inner_thread
 
-        result_d = outer_turn_D(2)  # Should be turn in outer_thread again
+        result_d = outer_turn_d(2)  # Should be turn in outer_thread again
 
     assert result_a == 22  # (10 + 1) * 2
     assert result_b == 15  # 5 * 3
@@ -5342,7 +5342,7 @@ def test_thread_id_none_turn_id_none(client):
         return x + 1
 
     @weave.op
-    def turn_op_A(x: int) -> int:
+    def turn_op_a(x: int) -> int:
         return child_op(x) * 2
 
     @weave.op
@@ -5351,7 +5351,7 @@ def test_thread_id_none_turn_id_none(client):
 
     # First, create a call within a thread context to set up turn context
     with weave.thread("test_thread"):
-        result_a = turn_op_A(10)  # Should be a turn with turn_id
+        result_a = turn_op_a(10)  # Should be a turn with turn_id
 
     # After exiting thread context, both thread_id and turn_id should be None
     assert call_context.get_thread_id() is None
@@ -5398,7 +5398,7 @@ def test_nested_thread_disable_with_none(client):
     from weave.trace.context import call_context
 
     @weave.op
-    def turn_A(x: int) -> int:
+    def turn_a(x: int) -> int:
         return x * 2
 
     @weave.op
@@ -5406,7 +5406,7 @@ def test_nested_thread_disable_with_none(client):
         return x * 3
 
     @weave.op
-    def turn_C(x: int) -> int:
+    def turn_c(x: int) -> int:
         return x * 4
 
     # Test the realistic edge case: nested thread with thread_id=None
@@ -5416,7 +5416,7 @@ def test_nested_thread_disable_with_none(client):
     with weave.thread("main_thread") as t:
         main_thread_context = t
         assert t.thread_id == "main_thread"
-        result_a = turn_A(10)  # Should be a turn with turn_id
+        result_a = turn_a(10)  # Should be a turn with turn_id
 
         # Verify we're in thread context (turn_id is reset after call finishes)
         assert call_context.get_thread_id() == "main_thread"
@@ -5436,7 +5436,7 @@ def test_nested_thread_disable_with_none(client):
         # Back in main thread - should create a new turn
         # ThreadContext shows we're back in main thread
         assert t.thread_id == "main_thread"
-        result_c = turn_C(3)  # Should be a new turn
+        result_c = turn_c(3)  # Should be a new turn
 
     # Verify ThreadContext objects maintained correct state throughout
     assert main_thread_context.thread_id == "main_thread"
