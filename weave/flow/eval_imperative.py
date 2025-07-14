@@ -251,15 +251,15 @@ class ScoreLogger(BaseModel):
                 import nest_asyncio
 
                 nest_asyncio.apply()
-                return loop.run_until_complete(self.along_score(scorer, score))
+                return loop.run_until_complete(self.alog_score(scorer, score))
             else:
                 # We're not in an async context, but a loop exists
-                return loop.run_until_complete(self.along_score(scorer, score))
+                return loop.run_until_complete(self.alog_score(scorer, score))
         except RuntimeError:
             # No event loop exists, create one with asyncio.run
-            return asyncio.run(self.along_score(scorer, score))
+            return asyncio.run(self.alog_score(scorer, score))
 
-    async def along_score(
+    async def alog_score(
         self,
         scorer: Annotated[
             Scorer | dict | str,
