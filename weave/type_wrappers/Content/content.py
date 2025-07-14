@@ -1,312 +1,239 @@
-# content.py
 from __future__ import annotations
 
-import base64
 import logging
 import os
 import subprocess
 import sys
+import base64
+import hashlib
+import uuid
 from pathlib import Path
-from typing import Annotated, Any, Generic, TypeVar
-
-from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import Unpack
-
-from weave.type_wrappers.Content.utils import (
-    ContentArgs,
-    ContentKeywordArgs,
-    default_filename,
+from typing import Annotated, Any, Type
+from pydantic import Field, BaseModel
+from utils import (
     get_mime_and_extension,
+    default_filename,
     is_valid_path,
+)
+from content_types import (
+    ContentType,
+    MetadataType,
+    ResolvedContentArgs,
 )
 
 logger = logging.getLogger(__name__)
 
 class BaseContentHandler(BaseModel):
-    size: int
-    filename: str
-    mimetype: str
-    extension: str
+    id: str
     data: bytes
-    extra: Annotated[
-        dict,
-        Field(
-            description="Extra metadata to associate with the content",
-            examples=[{"number of cats": 1}]
-        )]
-    encoding: str
+    size: int
+    mimetype: str
+    digest: str
+    filename: str
+    content_type: ContentType
+    input_type: str
+
+    extra: Annotated[MetadataType, Field(
+        description="Extra metadata to associate with the content",
+        examples=[{"number of cats": 1}]
+    )] = {}
+    encoding: str | None = "utf-8"
     path: str | None = None
-    model_config = ConfigDict(extra="allow")
+    extension: str | None = None
 
 
-    @property
-    def metadata(self) -> dict[str, Any]:
-        return self.model_dump(exclude={"data"})
-
-
-def create_bytes_content(
-    input: bytes, /, **values: Unpack[ContentArgs]
-) -> BaseContentHandler:
-    values["size"] = values["size"] or len(input)
-    values["extra"]["input_type"] = values["extra"].get("input_type", str(type(input)))
-    values["extra"]["input_category"] = values["extra"].get("input_category", "data")
-    # Raw binary data has no encoding unless explicitly provided
-    if values["mimetype"] is None or values["extension"] is None:
-        mimetype, extension = get_mime_and_extension(
-            buffer=input,
-            filename=values["filename"],
-            extension=values["extension"],
-            mimetype=values["mimetype"],
-        )
-        values["mimetype"] = mimetype
-        values["extension"] = extension
-
-    values["filename"] = values["filename"] or default_filename(
-        str(values["extension"])
-    )
-
-    return BaseContentHandler(input, **values)
-
-
-def create_file_content(
-    input: str, /, **values: Unpack[ContentArgs]
-) -> BaseContentHandler:
-    if not is_valid_path(input):
-        raise ValueError(f"Input {input} is not a valid file path.")
-
-    path = Path(input)
-    values["path"] = str(path)
-    values["size"] = path.stat().st_size
-    values["filename"] = path.name
-    values["extra"]["original_path"] = values["extra"].get("original_path", str(path))
-    values["extra"]["input_type"] = values["extra"].get("input_type", str(type(input)))
-    values["extra"]["input_category"] = values["extra"].get("input_category", "path")
-    data = path.read_bytes()
-    return create_bytes_content(data, **values)
-
-
-def create_b64_content(
-    input: str | bytes, /, **values: Unpack[ContentArgs]
-) -> BaseContentHandler:
-    try:
-        data = base64.b64decode(input, validate=True)
-        values["extra"]["input_type"] = values["extra"].get(
-            "input_type", str(type(input))
-        )
-        values["extra"]["input_category"] = values["extra"].get(
-            "input_category", "base64"
-        )
-        # Set encoding to 'base64' for base64 encoded data
-        values["encoding"] = "base64"
-        result = create_bytes_content(data, **values)
-    except Exception as e:
-        raise ValueError(f"Invalid base64 string: {e}") from e
-
-    return result
-
-
-T = TypeVar("T", bound=str)
-
-
-class Content(Generic[T]):
+class Content(BaseContentHandler):
     """
-    A container for content, such as files, raw bytes, or base64 encoded strings.
+    A class to represent content from various sources, resolving them
+    to a unified byte-oriented representation with associated metadata.
 
-    The primary constructor `Content()` accepts raw bytes. For other data types,
-    use the appropriate classmethod constructors:
-    - `Content.from_path()` for file paths.
-    - `Content.from_bytes()` for binary data (alias for the constructor).
-    - `Content.from_b64()` for base64 encoded strings.
-
-    This class abstracts away the handling of different content sources, providing
-    a uniform interface to access the data and its metadata.
+    The default constructor initializes content from a file path.
     """
-
-    content_handler: BaseContentHandler
-    _last_saved_path: str | None
 
     def __init__(
         self,
-        data: bytes,
-        type_hint: str | None = None,
-        /,
-        **values: Unpack[ContentKeywordArgs],
-    ):
-        """
-        Initializes Content from raw bytes. This is the primary constructor.
-
-        Args:
-            data: The binary data.
-            type_hint: An optional hint for the mimetype or extension.
-            **values: Additional keyword arguments for content properties.
-        """
-        content_args = self._prepare_content_args(type_hint, values)
-        self.content_handler = create_bytes_content(data, **content_args)
-        self._last_saved_path = None
-
-    @staticmethod
-    def _prepare_content_args(
-        type_hint: str | None, values: ContentKeywordArgs
-    ) -> ContentArgs:
-        """Helper to process common constructor arguments."""
-        if type_hint:
-            if "/" in type_hint:
-                values["mimetype"] = type_hint
-            else:
-                values["extension"] = type_hint.lstrip(".")
-
-        extra = values.get("extra", {})
-
-        return {
-            "filename": values.get("filename", None),
-            "path": values.get("path", None),
-            "extension": values.get("extension", None),
-            "mimetype": values.get("mimetype", None),
-            "size": values.get("size", None),
-            "encoding": values.get("encoding", None),
-            "extra": extra,
-        }
-
-    @classmethod
-    def from_path(
-        cls,
         path: str | Path,
-        type_hint: str | None = None,
         /,
-        **values: Unpack[ContentKeywordArgs],
-    ) -> Content:
-        """
-        Creates a Content object from a file path.
-
-        Args:
-            path: The path to the file.
-            type_hint: An optional hint for the mimetype or extension.
-            **values: Additional keyword arguments for content properties.
-
-        Returns:
-            A new Content instance.
-
-        Raises:
-            FileNotFoundError: If the path does not exist or is not a file.
-        """
-        if not is_valid_path(path):
-            raise FileNotFoundError(f"File not found or is not a file: {path}")
-
+        encoding: str = "utf-8",
+        mimetype: str | None = None,
+        metadata: MetadataType = {},
+    ):
+        """Initializes Content from a local file path."""
         path_obj = Path(path)
+        if not is_valid_path(path_obj):
+            raise FileNotFoundError(f"File not found at path: {path_obj}")
+
         data = path_obj.read_bytes()
+        file_name = path_obj.name
+        file_size = path_obj.stat().st_size
+        digest = hashlib.sha256(data).hexdigest()
 
-        # Populate values with path-specific metadata if not already provided
-        values.setdefault("filename", path_obj.name)
-        values.setdefault("path", str(path_obj))
-        values.setdefault("size", path_obj.stat().st_size)
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype,
+            extension=path_obj.suffix.lstrip('.'),
+            filename=file_name,
+            buffer=data
+        )
 
-        extra = values.setdefault("extra", {})
-        extra.setdefault("original_path", str(path_obj))
-        extra.setdefault("input_type", str(type(path)))
-        extra.setdefault("input_category", "path")
-
-        return cls(data, type_hint, **values)
+        # We gather all the resolved arguments...
+        resolved_args: ResolvedContentArgs = {
+            "id": uuid.uuid4().hex,
+            "data": data,
+            "size": file_size,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": file_name,
+            "content_type": 'file',
+            "input_type": str(type(path)),
+            "extra": metadata,
+            "path": str(path_obj.resolve()),
+            "extension": extension,
+            "encoding": encoding,
+        }
+        super().__init__(**resolved_args)
 
     @classmethod
     def from_bytes(
-        cls,
+        cls: Type["Content"],
         data: bytes,
-        type_hint: str | None = None,
         /,
-        **values: Unpack[ContentKeywordArgs],
-    ) -> Content:
-        """
-        Creates a Content object from raw bytes. Alias for `Content()`.
+        extension: str | None = None,
+        mimetype: str | None = None,
+        metadata: MetadataType = {},
+        encoding: str = "utf-8",
+    ) -> "Content":
+        """Initializes Content from raw bytes."""
+        digest = hashlib.sha256(data).hexdigest()
+        size = len(data)
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype,
+            extension=extension,
+            filename=None,
+            buffer=data
+        )
+        filename = default_filename(extension or "")
 
-        Args:
-            data: The binary data.
-            type_hint: An optional hint for the mimetype or extension.
-            **values: Additional keyword arguments for content properties.
-
-        Returns:
-            A new Content instance.
-        """
-        return cls(data, type_hint, **values)
+        resolved_args: ResolvedContentArgs = {
+            "id": uuid.uuid4().hex,
+            "data": data,
+            "size": size,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": filename,
+            "content_type": 'bytes',
+            "input_type": str(type(data)),
+            "extra": metadata or {},
+            "path": None,
+            "extension": extension,
+            "encoding": encoding or "utf-8",
+        }
+        # Use model_construct to bypass our custom __init__
+        return cls.model_construct(**resolved_args)
 
     @classmethod
-    def from_b64(
-        cls,
-        b64_string: str | bytes,
-        type_hint: str | None = None,
+    def from_text(
+        cls: Type["Content"],
+        text: str,
         /,
-        **values: Unpack[ContentKeywordArgs],
-    ) -> Content:
-        """
-        Creates a Content object from a base64 encoded string.
+        extension: str | None = None,
+        mimetype: str | None = None,
+        metadata: MetadataType = {},
+        encoding: str = "utf-8",
+    ) -> "Content":
+        """Initializes Content from a string of text."""
+        data = text.encode(encoding)
+        digest = hashlib.sha256(data).hexdigest()
+        size = len(data)
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype,
+            extension=extension,
+            filename=None,
+            buffer=data
+        )
+        filename = default_filename(extension or "")
 
-        Args:
-            b64_string: The base64 encoded string or bytes.
-            type_hint: An optional hint for the mimetype or extension.
-            **values: Additional keyword arguments for content properties.
+        resolved_args: ResolvedContentArgs = {
+            "id": uuid.uuid4().hex,
+            "data": data,
+            "size": size,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": filename,
+            "content_type": 'text',
+            "input_type": str(type(text)),
+            "extra": metadata,
+            "path": None,
+            "extension": extension,
+            "encoding": encoding,
+        }
+        # Use model_construct to bypass our custom __init__
+        return cls.model_construct(**resolved_args)
 
-        Returns:
-            A new Content instance.
-        """
+    @classmethod
+    def from_base64(
+        cls: Type["Content"],
+        b64_data: str | bytes,
+        /,
+        extension: str | None = None,
+        mimetype: str | None = None,
+        metadata: MetadataType = {},
+    ) -> "Content":
+        """Initializes Content from a base64 encoded string or bytes."""
+        if isinstance(b64_data, str):
+            b64_data = b64_data.encode('ascii')
+
         try:
-            data = base64.b64decode(b64_string, validate=True)
-        except Exception as e:
-            raise ValueError(f"Invalid base64 string: {e}") from e
+            data = base64.b64decode(b64_data, validate=True)
+        except (ValueError, TypeError) as e:
+            raise ValueError("Invalid base64 data provided.") from e
 
-        # Populate values with b64-specific metadata
-        extra = values.setdefault("extra", {})
-        extra.setdefault("input_type", str(type(b64_string)))
-        extra.setdefault("input_category", "base64")
-        values.setdefault("encoding", "base64")
-        return cls(data, type_hint, **values)
+        digest = hashlib.sha256(data).hexdigest()
+        size = len(data)
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype,
+            extension=extension,
+            filename=None,
+            buffer=data
+        )
+        filename = default_filename(extension or "")
 
-    @property
-    def metadata(self) -> dict[str, Any]:
-        return self.content_handler.metadata
+        resolved_args: ResolvedContentArgs = {
+            "id": uuid.uuid4().hex,
+            "data": data,
+            "size": size,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": filename,
+            "content_type": 'base64',
+            "input_type": str(type(b64_data)),
+            "extra": metadata,
+            "path": None,
+            "extension": extension,
+            "encoding": "base64",
+        }
+        # Use model_construct to bypass our custom __init__
+        return cls.model_construct(**resolved_args)
 
-    @property
-    def input_type(self) -> str | None:
-        # type or instance of the input - bytes, str, class instance
-        # We keep this in extra because we never want to expose it directly to the user
-        # This should be computed by first factory function and loaded from extra when deserializing
-        return self.content_handler.extra.get("input_type")
+    @classmethod
+    def from_path(
+        cls: Type["Content"],
+        path: str | Path,
+        /,
+        encoding: str = "utf-8",
+        mimetype: str | None = None,
+        metadata: MetadataType = {},
+    ) -> "Content":
+        """Initializes Content from a local file path."""
+        # This classmethod delegates to the main constructor
+        return cls(path, encoding=encoding, mimetype=mimetype, metadata=metadata)
 
-    @property
-    def input_category(self) -> str | None:
-        # Category of the input - base64, path, data, object
-        # We keep this in extra because we never want to expose it directly to the user
-        # This should be computed by first factory function and loaded from extra when deserializing
-        return self.content_handler.extra.get("input_category")
-
-    @property
-    def data(self) -> bytes:
-        return self.content_handler.data
-
-    @property
-    def size(self) -> int:
-        return self.content_handler.size
-
-    @property
-    def filename(self) -> str:
-        return self.content_handler.filename
-
-    @property
-    def extension(self) -> str:
-        return self.content_handler.extension
-
-    @property
-    def mimetype(self) -> str:
-        return self.content_handler.mimetype
-
-    @property
-    def encoding(self) -> str:
-        return self.content_handler.encoding
-
-    @property
-    def path(self) -> str | None:
-        return self.content_handler.path
-
-    def as_string(self) -> str:
-        return self.data.decode(self.encoding)
+    @classmethod
+    def _from_resolved_args(cls: Type["Content"], /, args: ResolvedContentArgs) -> Content:
+        """
+        Initializes Content from pre-existing ResolvedContentArgs
+        This is for internal use to reconstruct the Content object by the serialization layer
+        """
+        return cls.model_construct(**args)
 
     def open(self) -> bool:
         """Open the file using the operating system's default application.

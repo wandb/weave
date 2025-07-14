@@ -1,18 +1,15 @@
 from __future__ import annotations
 
+import logging
+import os
+import subprocess
+import sys
 import base64
 import hashlib
 import uuid
 from pathlib import Path
-from typing import Annotated, Generic, Type, TypeVar, TypedDict
-# NotRequired is the modern way to specify optional keys in a TypedDict
-from typing import NotRequired
-from typing_extensions import Unpack
-
+from typing import Annotated, Any, Type
 from pydantic import Field, BaseModel
-
-# Assuming utils.py and content_types.py are in the same directory
-# and contain the code provided in the problem description.
 from utils import (
     get_mime_and_extension,
     default_filename,
@@ -21,10 +18,10 @@ from utils import (
 from content_types import (
     ContentType,
     MetadataType,
-    # The original ...ContentArgs are used to name the input_type
     ResolvedContentArgs,
 )
 
+logger = logging.getLogger(__name__)
 
 class BaseContentHandler(BaseModel):
     id: str
@@ -44,16 +41,56 @@ class BaseContentHandler(BaseModel):
     path: str | None = None
     extension: str | None = None
 
-T = TypeVar("T", bound=str)
 
-class Content(Generic[T], BaseContentHandler):
+class Content(BaseContentHandler):
     """
     A class to represent content from various sources, resolving them
     to a unified byte-oriented representation with associated metadata.
 
-    This class provides several factory class methods to handle different
-    input types and normalize them into a consistent `Content` object.
+    The default constructor initializes content from a file path.
     """
+
+    def __init__(
+        self,
+        path: str | Path,
+        /,
+        encoding: str = "utf-8",
+        mimetype: str | None = None,
+        metadata: MetadataType = {},
+    ):
+        """Initializes Content from a local file path."""
+        path_obj = Path(path)
+        if not is_valid_path(path_obj):
+            raise FileNotFoundError(f"File not found at path: {path_obj}")
+
+        data = path_obj.read_bytes()
+        file_name = path_obj.name
+        file_size = path_obj.stat().st_size
+        digest = hashlib.sha256(data).hexdigest()
+
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype,
+            extension=path_obj.suffix.lstrip('.'),
+            filename=file_name,
+            buffer=data
+        )
+
+        # We gather all the resolved arguments...
+        resolved_args: ResolvedContentArgs = {
+            "id": uuid.uuid4().hex,
+            "data": data,
+            "size": file_size,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": file_name,
+            "content_type": 'file',
+            "input_type": str(type(path)),
+            "extra": metadata,
+            "path": str(path_obj.resolve()),
+            "extension": extension,
+            "encoding": encoding,
+        }
+        super().__init__(**resolved_args)
 
     @classmethod
     def from_bytes(
@@ -90,24 +127,23 @@ class Content(Generic[T], BaseContentHandler):
             "extension": extension,
             "encoding": encoding or "utf-8",
         }
-        return cls(**resolved_args)
+        # Use model_construct to bypass our custom __init__
+        return cls.model_construct(**resolved_args)
 
     @classmethod
     def from_text(
         cls: Type["Content"],
         text: str,
-        /
+        /,
         extension: str | None = None,
         mimetype: str | None = None,
         metadata: MetadataType = {},
         encoding: str = "utf-8",
     ) -> "Content":
         """Initializes Content from a string of text."""
-
         data = text.encode(encoding)
         digest = hashlib.sha256(data).hexdigest()
         size = len(data)
-
         mimetype, extension = get_mime_and_extension(
             mimetype=mimetype,
             extension=extension,
@@ -130,7 +166,8 @@ class Content(Generic[T], BaseContentHandler):
             "extension": extension,
             "encoding": encoding,
         }
-        return cls(**resolved_args)
+        # Use model_construct to bypass our custom __init__
+        return cls.model_construct(**resolved_args)
 
     @classmethod
     def from_base64(
@@ -167,14 +204,15 @@ class Content(Generic[T], BaseContentHandler):
             "mimetype": mimetype,
             "digest": digest,
             "filename": filename,
-            "content_type": "base64",
+            "content_type": 'base64',
             "input_type": str(type(b64_data)),
             "extra": metadata,
             "path": None,
             "extension": extension,
             "encoding": "base64",
         }
-        return cls(**resolved_args)
+        # Use model_construct to bypass our custom __init__
+        return cls.model_construct(**resolved_args)
 
     @classmethod
     def from_path(
@@ -186,34 +224,72 @@ class Content(Generic[T], BaseContentHandler):
         metadata: MetadataType = {},
     ) -> "Content":
         """Initializes Content from a local file path."""
-        path_obj = Path(path)
-        if not is_valid_path(path_obj):
-            raise FileNotFoundError(f"File not found at path: {path_obj}")
+        # This classmethod delegates to the main constructor
+        return cls(path, encoding=encoding, mimetype=mimetype, metadata=metadata)
 
-        data = path_obj.read_bytes()
-        file_name = path_obj.name
-        file_size = path_obj.stat().st_size
-        digest = hashlib.sha256(data).hexdigest()
+    @classmethod
+    def _from_resolved_args(cls: Type["Content"], /, args: ResolvedContentArgs) -> Content:
+        """
+        Initializes Content from pre-existing ResolvedContentArgs
+        This is for internal use to reconstruct the Content object by the serialization layer
+        """
+        return cls.model_construct(**args)
 
-        mimetype, extension = get_mime_and_extension(
-            mimetype=mimetype,
-            extension=path_obj.suffix.lstrip('.'),
-            filename=file_name,
-            buffer=data
-        )
+    @property
+    def _weave_metadata(self) -> dict[str, Any]:
+        return self.model_dump(exclude={"data"})
 
-        resolved_args: ResolvedContentArgs = {
-            "id": uuid.uuid4().hex,
-            "data": data,
-            "size": file_size,
-            "mimetype": mimetype,
-            "digest": digest,
-            "filename": file_name,
-            "content_type": "file",
-            "input_type": str(type(path)),
-            "extra": metadata,
-            "path": str(path_obj.resolve()),
-            "extension": extension,
-            "encoding": encoding,
-        }
-        return cls(**resolved_args)
+    def open(self) -> bool:
+        """Open the file using the operating system's default application.
+
+        This method uses the platform-specific mechanism to open the file with
+        the default application associated with the file's type.
+
+        Returns:
+            bool: True if the file was successfully opened, False otherwise.
+        """
+        path = self._last_saved_path or self.path
+
+        if not path:
+            logger.exception(
+                "Opening unsaved files is not supported. Please run Content.save() and try running Content.open() again.",
+                exc_info=False,
+            )
+            return False
+
+        try:
+            if sys.platform == "win32":
+                os.startfile(path)
+            elif sys.platform == "darwin":  # macOS
+                subprocess.call(("open", str(path)))
+            else:  # linux variants
+                subprocess.call(("xdg-open", str(path)))
+        except Exception as e:
+            logger.exception(f"Failed to open file {path}: {e}")
+            return False
+        return True
+
+    def save(self, dest: str | Path) -> None:
+        """Copy the file to the specified destination path.
+        Updates the filename and the path of the content to reflect the last saved copy
+
+        Args:
+            dest: Destination path where the file will be copied to (string or pathlib.Path)
+                  The destination path can be a file or a directory.
+                  If dest has no file extension (e.g. .txt), destination will be considered a directory.
+        """
+        path = Path(dest) if isinstance(dest, str) else dest
+
+        if (path.exists() and path.is_dir()) or not path.suffix:
+            path = path.joinpath(self.filename)
+
+        # Now we know path ends in a filename
+        if not path.parent.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write the data to the path
+        with open(path, "wb") as f:
+            f.write(self.data)
+
+        # Update the last_saved_path to reflect the saved copy. This ensures open works.
+        self._last_saved_path = str(path)

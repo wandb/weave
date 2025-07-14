@@ -52,19 +52,24 @@ ContentArgs = Annotated[
     Field(discriminator='content_type')
 ]
 
-class ResolvedContentArgs(TypedDict):
+# This is what is saved to the 'metadata.json' file by serialization layer
+# It is used to 'restore' an existing content object
+class ResolvedContentArgsWithoutData(TypedDict):
     # Required Fields
     id: str
-    data: bytes
     size: int
     mimetype: str
     digest: str
-    filename: str # Computed
+    filename: str
     content_type: ContentType
-    input_type: str # computed
-    extra: MetadataType # Passed in
+    input_type: str
+    extra: MetadataType
 
     # Optional Fields
     path: str | None
     extension: str | None
     encoding: str | None
+
+class ResolvedContentArgs(ResolvedContentArgsWithoutData):
+    # Required Fields
+    data: bytes
