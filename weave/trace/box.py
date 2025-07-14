@@ -58,10 +58,10 @@ class BoxedTimedelta(datetime.timedelta):
 # See https://numpy.org/doc/stable/user/basics.subclassing.html
 if _NUMPY_AVAILABLE:
 
-    class BoxedANDArray(ndarray):  # pyright: ignore[reportRedeclaration]
+    class BoxedNDArray(ndarray):  # pyright: ignore[reportRedeclaration]
         ref: Ref | None = None
 
-        def __new__(cls, input_array: Any) -> BoxedANDArray:
+        def __new__(cls, input_array: Any) -> BoxedNDArray:
             obj = asarray(input_array).view(cls)
             return obj
 
@@ -70,7 +70,7 @@ if _NUMPY_AVAILABLE:
                 return
 else:
     # Define a placeholder class when numpy is not available
-    class BoxedANDArray:  # type: ignore[no-redef]
+    class BoxedNDArray:  # type: ignore[no-redef]
         ref: Ref | None = None
 
         def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -82,13 +82,7 @@ else:
 def box(
     obj: T,
 ) -> (
-    T
-    | BoxedInt
-    | BoxedFloat
-    | BoxedStr
-    | BoxedANDArray
-    | BoxedDatetime
-    | BoxedTimedelta
+    T | BoxedInt | BoxedFloat | BoxedStr | BoxedNDArray | BoxedDatetime | BoxedTimedelta
 ):
     """
     Box an object to add reference tracking capabilities.
@@ -114,7 +108,7 @@ def box(
     elif type(obj) == str:
         return BoxedStr(obj)
     elif _NUMPY_AVAILABLE and type(obj) == ndarray:
-        return BoxedANDArray(obj)
+        return BoxedNDArray(obj)
     elif type(obj) == datetime.datetime:
         return BoxedDatetime.fromtimestamp(obj.timestamp(), tz=datetime.timezone.utc)
     elif type(obj) == datetime.timedelta:
@@ -148,7 +142,7 @@ def unbox(
         return float(obj)
     elif type(obj) == BoxedStr:
         return str(obj)
-    elif _NUMPY_AVAILABLE and type(obj) == BoxedANDArray:
+    elif _NUMPY_AVAILABLE and type(obj) == BoxedNDArray:
         return array(obj)
     elif type(obj) == BoxedDatetime:
         return datetime.datetime.fromtimestamp(obj.timestamp())
