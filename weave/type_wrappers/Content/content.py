@@ -8,7 +8,7 @@ import base64
 import hashlib
 import uuid
 from pathlib import Path
-from typing import Annotated, Any, Type
+from typing import Annotated, Type
 from pydantic import Field, BaseModel
 from utils import (
     get_mime_and_extension,
@@ -41,6 +41,23 @@ class BaseContentHandler(BaseModel):
     path: str | None = None
     extension: str | None = None
 
+ValidContentInput = str | bytes | Path
+
+def _is_file_input(input: str | Path):
+    if isinstance(input, Path):
+        return True
+    return is_valid_path(input)
+
+def _is_base64_input(input: str | bytes):
+    # Normalize to bytes
+    if isinstance(input, str):
+        input = input.encode('ascii')
+    try:
+       _ = base64.b64decode(input, validate=True)
+    except (ValueError, TypeError) as _:
+        return False
+
+    return True
 
 class Content(BaseContentHandler):
     """
@@ -52,45 +69,44 @@ class Content(BaseContentHandler):
 
     def __init__(
         self,
-        path: str | Path,
+        input: ValidContentInput,
         /,
         encoding: str = "utf-8",
         mimetype: str | None = None,
+        extension: str | None = None,
         metadata: MetadataType = {},
     ):
-        """Initializes Content from a local file path."""
-        path_obj = Path(path)
-        if not is_valid_path(path_obj):
-            raise FileNotFoundError(f"File not found at path: {path_obj}")
+        if isinstance(input, (Path, str)) and _is_file_input(input):
+            return self.from_path(
+                input,
+                mimetype=mimetype,
+                metadata=metadata,
+                encoding=encoding
+            )
+        elif isinstance(input, (bytes, str)) and _is_base64_input(input):
+            return self.from_base64(
+                input,
+                extension=extension,
+                mimetype=mimetype,
+                metadata=metadata
+            )
+        elif isinstance(input, str): # If string -> we know it is not a path or base64 so must be text
+            return self.from_text(
+                input,
+                extension=extension,
+                mimetype=mimetype,
+                metadata=metadata
+            )
+        elif isinstance(input, bytes): # If bytes -> we know it is not a base64 so must be bytes
+            return self.from_bytes(
+                input,
+                extension=extension,
+                mimetype=mimetype,
+                metadata=metadata
+            )
+        else:
+            raise TypeError(f"Unsupported input type: {type(input)}")
 
-        data = path_obj.read_bytes()
-        file_name = path_obj.name
-        file_size = path_obj.stat().st_size
-        digest = hashlib.sha256(data).hexdigest()
-
-        mimetype, extension = get_mime_and_extension(
-            mimetype=mimetype,
-            extension=path_obj.suffix.lstrip('.'),
-            filename=file_name,
-            buffer=data
-        )
-
-        # We gather all the resolved arguments...
-        resolved_args: ResolvedContentArgs = {
-            "id": uuid.uuid4().hex,
-            "data": data,
-            "size": file_size,
-            "mimetype": mimetype,
-            "digest": digest,
-            "filename": file_name,
-            "content_type": 'file',
-            "input_type": str(type(path)),
-            "extra": metadata,
-            "path": str(path_obj.resolve()),
-            "extension": extension,
-            "encoding": encoding,
-        }
-        super().__init__(**resolved_args)
 
     @classmethod
     def from_bytes(
@@ -224,8 +240,39 @@ class Content(BaseContentHandler):
         metadata: MetadataType = {},
     ) -> "Content":
         """Initializes Content from a local file path."""
-        # This classmethod delegates to the main constructor
-        return cls(path, encoding=encoding, mimetype=mimetype, metadata=metadata)
+        path_obj = Path(path)
+        if not is_valid_path(path_obj):
+            raise FileNotFoundError(f"File not found at path: {path_obj}")
+
+        data = path_obj.read_bytes()
+        file_name = path_obj.name
+        file_size = path_obj.stat().st_size
+        digest = hashlib.sha256(data).hexdigest()
+
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype,
+            extension=path_obj.suffix.lstrip('.'),
+            filename=file_name,
+            buffer=data
+        )
+
+        # We gather all the resolved arguments...
+        resolved_args: ResolvedContentArgs = {
+            "id": uuid.uuid4().hex,
+            "data": data,
+            "size": file_size,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": file_name,
+            "content_type": 'file',
+            "input_type": str(type(path)),
+            "extra": metadata,
+            "path": str(path_obj.resolve()),
+            "extension": extension,
+            "encoding": encoding,
+        }
+        # Use model_construct to bypass our custom __init__
+        return cls.model_construct(**resolved_args)
 
     @classmethod
     def _from_resolved_args(cls: Type["Content"], /, args: ResolvedContentArgs) -> Content:
