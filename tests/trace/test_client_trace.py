@@ -5293,13 +5293,13 @@ def test_nested_thread_contexts_turn_lineage(client):
     child_calls = []
 
     for call in calls:
-        if "outer_turn_A" in call.op_name:
+        if "outer_turn_a" in call.op_name:
             outer_a_call = call
-        elif "inner_turn_B" in call.op_name:
+        elif "inner_turn_b" in call.op_name:
             inner_b_call = call
-        elif "inner_turn_C" in call.op_name:
+        elif "inner_turn_c" in call.op_name:
             inner_c_call = call
-        elif "outer_turn_D" in call.op_name:
+        elif "outer_turn_d" in call.op_name:
             outer_d_call = call
         elif "child_op" in call.op_name:
             child_calls.append(call)
