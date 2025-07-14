@@ -273,6 +273,7 @@ select = [
   "TRY004",  # https://docs.astral.sh/ruff/rules/type-check-without-type-error/
   "TRY300",  # https://docs.astral.sh/ruff/rules/try-consider-else/
   "TRY400",  # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
+  "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
   "B006",    # https://docs.astral.sh/ruff/rules/mutable-argument-default/
