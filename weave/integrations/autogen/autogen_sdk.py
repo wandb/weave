@@ -483,7 +483,7 @@ def _get_class_and_subclass_patchers(
                     patchers.append(patcher)
 
     except AttributeError as e:
-        logger.warning(f"Class {class_name} not found in {module_path}, skipping")
+        logger.warning(f"Class {class_name} not found in {module_path}, skipping: {e}")
         return patchers
     except Exception as e:
         logger.exception(
