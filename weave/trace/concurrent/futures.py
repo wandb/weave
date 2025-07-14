@@ -249,7 +249,7 @@ class FutureExecutor:
             res = f(*args, **kwargs)
             fut.set_result(res)
         except Exception as e:
-            logger.exception(f"Task failed: {_format_exception(e)}")
+            logger.exception(f"Task failed: {_format_exception(e)}")  # noqa: TRY401
             fut.set_exception(e)
         return fut
 

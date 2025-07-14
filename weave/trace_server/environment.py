@@ -71,9 +71,7 @@ def wf_clickhouse_max_memory_usage() -> Optional[int]:
     try:
         return int(mem)
     except ValueError as e:
-        logger.exception(
-            f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not a valid. Error: {str(e)}"
-        )
+        logger.exception(f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not a valid")
         return None
 
 
@@ -86,7 +84,7 @@ def wf_clickhouse_max_execution_time() -> Optional[int]:
         return int(time)
     except ValueError as e:
         logger.exception(
-            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not a valid. Error: {str(e)}"
+            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not a valid"
         )
         return None
 
