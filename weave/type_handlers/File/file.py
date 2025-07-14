@@ -63,7 +63,7 @@ class File:
             else:  # linux variants
                 subprocess.call(("xdg-open", str(self.path)))
         except Exception as e:
-            logger.exception(f"Failed to open file {self.path}: {e}")
+            logger.exception("Failed to open file %s", self.path)
             return False
         return True
 
