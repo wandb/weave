@@ -69,6 +69,8 @@ import {useHasTraceServerClientContext} from './Browse3/pages/wfReactInterface/t
 import {getParamArray, queryGetDict} from './Browse3/urlQueryUtil';
 import {TableRowSelectionProvider} from './TableRowSelectionContext';
 import {useDrawerResize} from './useDrawerResize';
+import {MagicianContextProvider} from './WBMagician/Magician';
+import {MagicianComponent} from './WBMagician/MagicianComponent';
 
 LicenseInfo.setLicenseKey(
   'c3f549c76a1e054e5e314b2f1ecfca1cTz05OTY3MixFPTE3NjAxMTM3NDAwMDAsUz1wcm8sTE09c3Vic2NyaXB0aW9uLFBWPWluaXRpYWwsS1Y9Mg=='
@@ -156,19 +158,21 @@ export const Browse3: FC<{
   return (
     <ApolloProvider client={apolloClient}>
       <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
-        <Switch>
-          <Route
-            path={[
-              ...browse3Paths(props.projectRoot(':entity', ':project')),
-              `/${URL_BROWSE3}/:entity`,
-              `/${URL_BROWSE3}`,
-            ]}>
-            <Browse3Mounted
-              headerOffset={props.headerOffset}
-              navigateAwayFromProject={props.navigateAwayFromProject}
-            />
-          </Route>
-        </Switch>
+        <MagicianContextProvider>
+          <Switch>
+            <Route
+              path={[
+                ...browse3Paths(props.projectRoot(':entity', ':project')),
+                `/${URL_BROWSE3}/:entity`,
+                `/${URL_BROWSE3}`,
+              ]}>
+              <Browse3Mounted
+                headerOffset={props.headerOffset}
+                navigateAwayFromProject={props.navigateAwayFromProject}
+              />
+            </Route>
+          </Switch>
+        </MagicianContextProvider>
       </Browse3WeaveflowRouteContextProvider>
     </ApolloProvider>
   );
@@ -180,6 +184,7 @@ const Browse3Mounted: FC<{
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
   const hasTSContext = useHasTraceServerClientContext();
+  const params = useParamsDecoded<Browse3Params>();
   return (
     <Box
       sx={{
@@ -203,10 +208,13 @@ const Browse3Mounted: FC<{
                 width: '100%',
                 overflow: 'hidden',
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection: 'row',
               }}>
               <ErrorBoundary>
                 <MainPeekingLayout />
+                <MagicianComponent
+                  projectId={params.entity! + '/' + params.project!}
+                />
               </ErrorBoundary>
             </Box>
           </Route>
