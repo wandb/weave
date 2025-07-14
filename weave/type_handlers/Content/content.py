@@ -8,6 +8,7 @@ import logging
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 from weave.type_wrappers import Content
+from weave.type_wrappers.Content.content_types import ResolvedContentArgs, ResolvedContentArgsWithoutData
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +18,24 @@ def save(obj: Content, artifact: MemTraceFilesArtifact, name: str) -> None:
         f.write(obj.data)
 
     with artifact.new_file("metadata.json", binary=False) as f:
-        json.dump(obj.metadata, f)
+        metadata = obj.model_dump(exclude={"data"})
+        json.dump(metadata, f)
 
 
 def load(artifact: MemTraceFilesArtifact, name: str) -> Content:
     metadata_path = artifact.path("metadata.json")
     with open(metadata_path) as f:
-        metadata = json.load(f)
+        metadata: ResolvedContentArgsWithoutData = json.load(f)
 
     with open(artifact.path("content"), "rb") as f:
         data = f.read()
-    return Content(data, **metadata)
+
+    resolved_args: ResolvedContentArgs = {
+        'data': data,
+        **metadata
+    }
+
+    return Content._from_resolved_args(resolved_args)
 
 
 def register() -> None:
