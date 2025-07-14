@@ -15,7 +15,7 @@ class InvalidExternalRefError(ValueError):
     pass
 
 
-class InvalidInternalRefError(ValueError):
+class InvalidInternalRefErrorError(ValueError):
     pass
 
 
@@ -98,7 +98,7 @@ def universal_int_to_ext_ref_converter(
         rest = ref_str[len(weave_internal_prefix) :]
         parts = rest.split("/", 1)
         if len(parts) != 2:
-            raise InvalidInternalRefError(f"Invalid URI: {ref_str}")
+            raise InvalidInternalRefErrorError(f"Invalid URI: {ref_str}")
         project_id, tail = parts
         if project_id not in int_to_ext_project_cache:
             int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
@@ -120,7 +120,7 @@ def universal_int_to_ext_ref_converter(
                 # future that a programming error leads to this situation, in
                 # which case reading this object would consistently fail. We
                 # might want to instead return a private ref in this case.
-                raise InvalidInternalRefError("Encountered unexpected ref format.")
+                raise InvalidInternalRefErrorError("Encountered unexpected ref format.")
         return obj
 
     return _map_values(obj, mapper)
