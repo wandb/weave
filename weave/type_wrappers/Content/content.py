@@ -6,9 +6,10 @@ import subprocess
 import sys
 import base64
 import hashlib
+from typing_extensions import Self
 import uuid
 from pathlib import Path
-from typing import Annotated, Type
+from typing import Annotated, Generic, Type, TypeVar
 from pydantic import Field, BaseModel
 from utils import (
     get_mime_and_extension,
@@ -22,24 +23,6 @@ from content_types import (
 )
 
 logger = logging.getLogger(__name__)
-
-class BaseContentHandler(BaseModel):
-    id: str
-    data: bytes
-    size: int
-    mimetype: str
-    digest: str
-    filename: str
-    content_type: ContentType
-    input_type: str
-
-    extra: Annotated[MetadataType, Field(
-        description="Extra metadata to associate with the content",
-        examples=[{"number of cats": 1}]
-    )] = {}
-    encoding: str | None = "utf-8"
-    path: str | None = None
-    extension: str | None = None
 
 ValidContentInput = str | bytes | Path
 
@@ -59,7 +42,11 @@ def _is_base64_input(input: str | bytes):
 
     return True
 
-class Content(BaseContentHandler):
+# Dummy typevar to allow for passing mimetype/extension through annotated content
+# e.x. Content["pdf"] or Content["application/pdf"]
+T = TypeVar("T", bound=str)
+
+class Content(Generic[T], BaseModel):
     """
     A class to represent content from various sources, resolving them
     to a unified byte-oriented representation with associated metadata.
@@ -67,42 +54,63 @@ class Content(BaseContentHandler):
     The default constructor initializes content from a file path.
     """
 
+    id: str
+    data: bytes
+    size: int
+    mimetype: str
+    digest: str
+    filename: str
+    content_type: ContentType
+    input_type: str
+
+    extra: Annotated[MetadataType, Field(
+        description="Extra metadata to associate with the content",
+        examples=[{"number of cats": 1}]
+    )] = {}
+    encoding: str | None = "utf-8"
+    path: str | None = None
+    extension: str | None = None
+
     def __init__(
         self,
         input: ValidContentInput,
         /,
-        encoding: str = "utf-8",
+        encoding: str | None = None,
         mimetype: str | None = None,
         extension: str | None = None,
         metadata: MetadataType = {},
     ):
         if isinstance(input, (Path, str)) and _is_file_input(input):
+            # Do not pass extension because it should be determined from filename
             return self.from_path(
                 input,
                 mimetype=mimetype,
                 metadata=metadata,
-                encoding=encoding
+                encoding=encoding or "utf-8"
             )
         elif isinstance(input, (bytes, str)) and _is_base64_input(input):
+            # Do not pass encoding because it should be base64
             return self.from_base64(
                 input,
                 extension=extension,
                 mimetype=mimetype,
-                metadata=metadata
+                metadata=metadata,
             )
         elif isinstance(input, str): # If string -> we know it is not a path or base64 so must be text
             return self.from_text(
                 input,
                 extension=extension,
                 mimetype=mimetype,
-                metadata=metadata
+                metadata=metadata,
+                encoding=encoding or "utf-8"
             )
         elif isinstance(input, bytes): # If bytes -> we know it is not a base64 so must be bytes
             return self.from_bytes(
                 input,
                 extension=extension,
                 mimetype=mimetype,
-                metadata=metadata
+                metadata=metadata,
+                encoding=encoding or "utf-8"
             )
         else:
             raise TypeError(f"Unsupported input type: {type(input)}")
@@ -110,14 +118,14 @@ class Content(BaseContentHandler):
 
     @classmethod
     def from_bytes(
-        cls: Type["Content"],
+        cls: Type[Self],
         data: bytes,
         /,
         extension: str | None = None,
         mimetype: str | None = None,
         metadata: MetadataType = {},
         encoding: str = "utf-8",
-    ) -> "Content":
+    ) -> Self:
         """Initializes Content from raw bytes."""
         digest = hashlib.sha256(data).hexdigest()
         size = len(data)
@@ -148,14 +156,14 @@ class Content(BaseContentHandler):
 
     @classmethod
     def from_text(
-        cls: Type["Content"],
+        cls: Type[Self],
         text: str,
         /,
         extension: str | None = None,
         mimetype: str | None = None,
         metadata: MetadataType = {},
         encoding: str = "utf-8",
-    ) -> "Content":
+    ) -> Self:
         """Initializes Content from a string of text."""
         data = text.encode(encoding)
         digest = hashlib.sha256(data).hexdigest()
@@ -187,13 +195,13 @@ class Content(BaseContentHandler):
 
     @classmethod
     def from_base64(
-        cls: Type["Content"],
+        cls: Type[Self],
         b64_data: str | bytes,
         /,
         extension: str | None = None,
         mimetype: str | None = None,
         metadata: MetadataType = {},
-    ) -> "Content":
+    ) -> Self:
         """Initializes Content from a base64 encoded string or bytes."""
         if isinstance(b64_data, str):
             b64_data = b64_data.encode('ascii')
@@ -232,13 +240,13 @@ class Content(BaseContentHandler):
 
     @classmethod
     def from_path(
-        cls: Type["Content"],
+        cls: Type[Self],
         path: str | Path,
         /,
         encoding: str = "utf-8",
         mimetype: str | None = None,
         metadata: MetadataType = {},
-    ) -> "Content":
+    ) -> Self:
         """Initializes Content from a local file path."""
         path_obj = Path(path)
         if not is_valid_path(path_obj):
@@ -275,7 +283,7 @@ class Content(BaseContentHandler):
         return cls.model_construct(**resolved_args)
 
     @classmethod
-    def _from_resolved_args(cls: Type["Content"], /, args: ResolvedContentArgs) -> Content:
+    def _from_resolved_args(cls: Type[Self], /, args: ResolvedContentArgs) -> Self:
         """
         Initializes Content from pre-existing ResolvedContentArgs
         This is for internal use to reconstruct the Content object by the serialization layer
