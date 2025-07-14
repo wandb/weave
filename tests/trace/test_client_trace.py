@@ -42,7 +42,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import (
     ENTITY_TOO_LARGE_PAYLOAD,
 )
-from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
+from weave.trace_server.errors import InsertTooLargeError, InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
@@ -2536,9 +2536,9 @@ def test_read_call_start_with_cost(client):
         pass
     elif isinstance(summary, dict):
         # Check that the costs object was NOT added
-        assert (
-            COST_OBJECT_NAME not in summary.get("weave", {})
-        ), f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+        assert COST_OBJECT_NAME not in summary.get("weave", {}), (
+            f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+        )
     else:
         pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
 
@@ -3324,11 +3324,11 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
 
     original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
 
-    # Patch _insert_call_batch to raise InsertTooLarge
+    # Patch _insert_call_batch to raise InsertTooLargeError
     def mock_insert_call_batch(self, batch):
         # mock raise insert error
         if len(str(batch)) > 10 * 1024:
-            raise InsertTooLarge(
+            raise InsertTooLargeError(
                 "Database insertion failed. Record too large. "
                 "A likely cause is that a single row or cell exceeded "
                 "the limit. If logging images, save them as `Image.PIL`."
@@ -4769,15 +4769,15 @@ def test_thread_id_query_filtering(client):
 
         # Verify we have calls with both thread_ids and None
         thread_ids_found = {call.thread_id for call in our_test_calls}
-        assert (
-            "filter_thread_1" in thread_ids_found
-        ), f"Should find filter_thread_1, got: {thread_ids_found}"
-        assert (
-            "filter_thread_2" in thread_ids_found
-        ), f"Should find filter_thread_2, got: {thread_ids_found}"
-        assert (
-            None in thread_ids_found
-        ), f"Should find None thread_id, got: {thread_ids_found}"
+        assert "filter_thread_1" in thread_ids_found, (
+            f"Should find filter_thread_1, got: {thread_ids_found}"
+        )
+        assert "filter_thread_2" in thread_ids_found, (
+            f"Should find filter_thread_2, got: {thread_ids_found}"
+        )
+        assert None in thread_ids_found, (
+            f"Should find None thread_id, got: {thread_ids_found}"
+        )
 
 
 def test_thread_context_error_handling(client):
@@ -4891,9 +4891,9 @@ def test_threads_query_endpoint(client):
     # 2) thread_test_op("single_call_i") turn
     for thread_id, thread in our_threads.items():
         assert thread.thread_id == thread_id
-        assert (
-            thread.turn_count >= 2
-        ), f"Thread {thread_id} should have at least 2 turns, got {thread.turn_count}"
+        assert thread.turn_count >= 2, (
+            f"Thread {thread_id} should have at least 2 turns, got {thread.turn_count}"
+        )
         assert thread.start_time is not None
         assert thread.last_updated is not None
         assert isinstance(thread.start_time, datetime.datetime)
@@ -5120,12 +5120,12 @@ def test_threads_query_aggregation_fields(client):
             if call.id == test_thread.last_turn_id:
                 latest_call = call
 
-    assert (
-        first_call is not None
-    ), f"Could not find first_turn_id {test_thread.first_turn_id}"
-    assert (
-        latest_call is not None
-    ), f"Could not find last_turn_id {test_thread.last_turn_id}"
+    assert first_call is not None, (
+        f"Could not find first_turn_id {test_thread.first_turn_id}"
+    )
+    assert latest_call is not None, (
+        f"Could not find last_turn_id {test_thread.last_turn_id}"
+    )
 
     # Test that first_turn_id has the earliest start_time
     earliest_start = min(call.started_at for call in thread_calls)
@@ -5136,9 +5136,9 @@ def test_threads_query_aggregation_fields(client):
     assert latest_call.ended_at == latest_end
 
     # Test that we have the expected number of turn calls (5 operations)
-    assert (
-        test_thread.turn_count == 5
-    ), f"Expected 5 turns, got {test_thread.turn_count}"
+    assert test_thread.turn_count == 5, (
+        f"Expected 5 turns, got {test_thread.turn_count}"
+    )
 
     # Test sorting by the new duration percentile fields
     # Test sorting by p50_turn_duration_ms
