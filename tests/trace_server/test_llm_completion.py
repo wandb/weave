@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
-    InvalidRequest,
+    InvalidRequestError,
     MissingLLMApiKeyError,
     NotFoundError,
 )
@@ -166,7 +166,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
         # Set the context to None to simulate missing secret fetcher
         token = _secret_fetcher_context.set(None)
         try:
-            with self.assertRaises(InvalidRequest) as context:
+            with self.assertRaises(InvalidRequestError) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
                     model_name=self.model_name,
@@ -192,7 +192,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
 
         token = _secret_fetcher_context.set(self.mock_secret_fetcher)
         try:
-            with self.assertRaises(InvalidRequest) as context:
+            with self.assertRaises(InvalidRequestError) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
                     model_name=self.model_name,
@@ -227,7 +227,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
 
         token = _secret_fetcher_context.set(self.mock_secret_fetcher)
         try:
-            with self.assertRaises(InvalidRequest) as context:
+            with self.assertRaises(InvalidRequestError) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
                     model_name=self.model_name,
@@ -262,7 +262,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
 
         token = _secret_fetcher_context.set(self.mock_secret_fetcher)
         try:
-            with self.assertRaises(InvalidRequest) as context:
+            with self.assertRaises(InvalidRequestError) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
                     model_name=self.model_name,

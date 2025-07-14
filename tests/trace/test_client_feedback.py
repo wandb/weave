@@ -1,7 +1,7 @@
 import pytest
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import InvalidRequestError
 from weave.trace_server.interface.query import Query
 
 
@@ -182,7 +182,7 @@ def test_feedback_apis(client):
     assert res.result[0]["count(*)"] == 3
 
     # Purging with a different shaped query raises
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         req = tsi.FeedbackPurgeReq(
             project_id=project_id,
             query=Query(
@@ -236,5 +236,5 @@ def test_feedback_create_too_large(client):
         feedback_type="custom",
         payload={"value": value},
     )
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(req)

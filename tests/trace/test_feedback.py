@@ -7,7 +7,7 @@ from tests.trace.util import client_is_sqlite
 from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import InvalidRequestError
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
@@ -91,7 +91,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
     annotation_ref = ref.uri()
 
     # Case 1: Errors with no name in type (dangle or char len 0)
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -102,7 +102,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
             )
         )
 
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -113,7 +113,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
             )
         )
     # Case 2: Errors with incorrect ref string format
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -124,7 +124,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
             )
         )
     # Case 3: Errors with name mismatch
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -135,7 +135,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
             )
         )
     # Case 4: Errors if annotation ref is present but incorrect type
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -147,7 +147,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         )
 
     # Case 5: Invalid payload
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -209,7 +209,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
     payload = {"output": 1}
 
     # Case 1: Errors with no name in type (dangle or char len 0)
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -220,7 +220,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
             )
         )
 
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -232,7 +232,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         )
 
     # Case 2: Errors with incorrect ref string format
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -244,7 +244,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         )
 
     # Case 3: Errors with name mismatch
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -256,7 +256,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         )
 
     # Case 4: Errors if runnable ref is present but incorrect type
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -268,7 +268,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         )
 
     # Case 5: Errors if call ref is present but incorrect type
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -280,7 +280,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         )
 
     # Case 6: Errors if trigger ref is present but incorrect type
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -292,7 +292,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         )
 
     # Case 7: Invalid payload
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             tsi.FeedbackCreateReq(
                 project_id=project_id,
@@ -419,9 +419,9 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == asc_ids
-        ), f"Sorting by {fields} ascending failed, expected {asc_ids}, got {found_ids}"
+        assert found_ids == asc_ids, (
+            f"Sorting by {fields} ascending failed, expected {asc_ids}, got {found_ids}"
+        )
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -438,9 +438,9 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == asc_ids[::-1]
-        ), f"Sorting by {fields} descending failed, expected {asc_ids[::-1]}, got {found_ids}"
+        assert found_ids == asc_ids[::-1], (
+            f"Sorting by {fields} descending failed, expected {asc_ids[::-1]}, got {found_ids}"
+        )
 
 
 @pytest.mark.asyncio
@@ -487,9 +487,9 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == eq_ids
-        ), f"Filtering by {field} == {value} failed, expected {eq_ids}, got {found_ids}"
+        assert found_ids == eq_ids, (
+            f"Filtering by {field} == {value} failed, expected {eq_ids}, got {found_ids}"
+        )
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -507,9 +507,9 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == gt_ids
-        ), f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
+        assert found_ids == gt_ids, (
+            f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
+        )
 
 
 class MatchAnyDatetime:

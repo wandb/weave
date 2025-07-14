@@ -4,7 +4,7 @@ import pytest
 
 from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import InvalidRequestError
 from weave.trace_server.interface.query import Query
 
 
@@ -165,7 +165,7 @@ def test_purge_only_ids(client):
     cost_ids = res.ids
     assert len(cost_ids) == 1
 
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.cost_purge(
             tsi.CostPurgeReq(
                 project_id=project_id,

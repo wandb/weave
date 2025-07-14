@@ -34,7 +34,7 @@ def ensure_ref_is_valid(
         The parsed internal reference object
 
     Raises:
-        InvalidRequest: If the reference is invalid or doesn't match expected_type
+        InvalidRequestError: If the reference is invalid or doesn't match expected_type
     """
     try:
         parsed_ref = ri.parse_internal_uri(ref)
