@@ -9,18 +9,23 @@
 export type {MagicFillProps} from './MagicDialog';
 export {MagicFill} from './MagicDialog';
 
-// Hooks and utilities
+export type {MagicButtonProps} from './MagicButton';
+export {MagicButton} from './MagicButton';
+
+export type {MagicFillTooltipProps} from './MagicFillTooltip';
+export {MagicFillTooltip} from './MagicFillTooltip';
+
+// Chat completion hooks
 export {
-  ChatClientProvider,
   useChatCompletion,
   useChatCompletionStream,
+  ChatClientProvider,
 } from './chatCompletionClient';
 
-// Types
 export type {
-  ChatCompletionParams,
   EntityProject,
   Message,
+  ChatCompletionParams,
   ResponseFormat,
   Tool,
 } from './chatCompletionClient';
