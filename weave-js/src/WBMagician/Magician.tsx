@@ -109,15 +109,22 @@ import type {
   RetrieveContextResponse,
   ForgetContextParams,
   ForgetContextResponse,
+  StreamingResponse,
 } from './types';
+
+// Import implementations
+import { InMemoryAppState } from './implementations/InMemoryAppState';
+import { DemoMagicianService } from './implementations/DemoMagicianService';
+import { CoreMagician } from './implementations/CoreMagician';
 
 const MagicianContext = React.createContext<MagicianReactAdapter | null>(null);
 
 export const MagicianContextProvider: React.FC<{children: React.ReactNode}> = props => {
   const magicianContext = React.useMemo(() => {
-    return new MagicianReactAdapter(
-      new Magician(new MagicianAppState(), new DemoOnlyMagicianService())
-    );
+    const appState = new InMemoryAppState();
+    const service = new DemoMagicianService();
+    const magician = new CoreMagician(appState, service);
+    return new MagicianReactAdapter(magician);
   }, []);
 
   return (
@@ -138,78 +145,200 @@ export const useMagician = (): MagicianReactAdapter => {
 };
 
 class MagicianReactAdapter {
-  private magician: Magician;
+  constructor(private magician: CoreMagician) {}
 
-  constructor(magician: Magician) {
-    this.magician = magician;
+  async respond(params: RespondParams): Promise<RespondResponse> {
+    return this.magician.respond(params);
   }
 
-  respond(params: RespondParams): RespondResponse {
-    throw new Error('Not implemented');
-  }
-
-  useRespond(params: UseRespondParams): UseRespondResponse {
-    throw new Error('Not implemented');
-  }
-
-  useRegisterComponentContext(
-    params: UseRegisterComponentContextParams
-  ): UseRegisterComponentContextResponse {
-    throw new Error('Not implemented');
-  }
-
-  useRegisterComponentTool(
-    params: UseRegisterComponentToolParams
-  ): UseRegisterComponentToolResponse {
-    throw new Error('Not implemented');
+  // Return the magician instance for hook usage
+  getMagician(): CoreMagician {
+    return this.magician;
   }
 }
 
-class Magician {
-  private state: MagicianAppState;
-  private service: MagicianServiceInterface;
+// Hook implementations
+export function useRespond(params: UseRespondParams): UseRespondResponse {
+  const magician = useMagician();
+  const [loading, setLoading] = React.useState(false);
+  const [data, setData] = React.useState<StreamingResponse | null>(null);
+  const [error, setError] = React.useState<Error | null>(null);
+  const responseRef = React.useRef<RespondResponse | null>(null);
 
-  constructor(state: MagicianAppState, service: MagicianServiceInterface) {
-    this.state = state;
-    this.service = service;
-  }
+  const refetch = React.useCallback(async (overrideParams?: Partial<RespondParams>) => {
+    setLoading(true);
+    setError(null);
+    setData(null);
 
-  respond(params: RespondParams): RespondResponse {
-    throw new Error('Not implemented');
-  }
+    try {
+      const mergedParams = { ...params, ...overrideParams };
+      const response = await magician.respond(mergedParams);
+      responseRef.current = response;
+
+      // Accumulate streaming data
+      const streamingData: StreamingResponse = {
+        content: '',
+        isComplete: false,
+        toolCalls: [],
+        conversationId: response.conversationId,
+      };
+
+      for await (const chunk of response.getStream()) {
+        if (chunk.type === 'content') {
+          streamingData.content += chunk.content || '';
+          setData({ ...streamingData });
+        } else if (chunk.type === 'tool_call' && chunk.toolCall) {
+          streamingData.toolCalls.push(chunk.toolCall);
+          setData({ ...streamingData });
+        } else if (chunk.type === 'done') {
+          streamingData.isComplete = true;
+          setData({ ...streamingData });
+        } else if (chunk.type === 'error') {
+          throw chunk.error;
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setLoading(false);
+    }
+  }, [params, magician]);
+
+  const cancel = React.useCallback(() => {
+    responseRef.current?.cancel();
+  }, []);
+
+  // Auto-fetch on mount if params are complete
+  React.useEffect(() => {
+    if (params.input) {
+      refetch();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { loading, data, error, refetch, cancel };
 }
 
-class MagicianAppState {
-  addContext(params: AddContextParams): AddContextResponse {
-    throw new Error('Not implemented');
-  }
+export function useRegisterComponentContext(
+  params: UseRegisterComponentContextParams
+): UseRegisterComponentContextResponse {
+  const magician = useMagician();
+  const [isRegistered, setIsRegistered] = React.useState(false);
+  const componentPath = React.useRef<string[]>([]);
 
-  removeContext(params: RemoveContextParams): RemoveContextResponse {
-    throw new Error('Not implemented');
-  }
+  React.useEffect(() => {
+    // TODO: Get component path from React tree
+    componentPath.current = ['component', 'path']; // Placeholder
 
-  listContexts(params: ListContextsParams): ListContextsResponse {
-    throw new Error('Not implemented');
-  }
+    // Serialize data if needed
+    const serialize = async () => {
+      let serializedData: string | undefined;
+      if (params.serialize) {
+        serializedData = await params.serialize(params.data);
+      }
 
-  addTool(params: AddToolParams): AddToolResponse {
-    throw new Error('Not implemented');
-  }
+      const result = magician.getMagician().getState().addContext({
+        context: {
+          key: params.key,
+          displayName: params.displayName,
+          description: params.description,
+          autoInclude: params.autoInclude,
+          componentPath: componentPath.current,
+          data: params.data,
+          serializedData,
+        },
+      });
 
-  removeTool(params: RemoveToolParams): RemoveToolResponse {
-    throw new Error('Not implemented');
-  }
+      setIsRegistered(result.success);
+    };
 
-  listTools(params: ListToolsParams): ListToolsResponse {
-    throw new Error('Not implemented');
-  }
+    serialize();
 
-  invokeTool(params: InvokeToolParams): InvokeToolResponse {
-    throw new Error('Not implemented');
-  }
+    // Cleanup on unmount
+    return () => {
+      magician.getMagician().getState().removeContext({ key: params.key });
+      setIsRegistered(false);
+    };
+  }, [params.key, params.data, params.serialize, params.displayName, params.description, params.autoInclude, magician]);
+
+  const update = React.useCallback((data: any) => {
+    // Remove and re-add with new data
+    magician.getMagician().getState().removeContext({ key: params.key });
+    const result = magician.getMagician().getState().addContext({
+      context: {
+        key: params.key,
+        displayName: params.displayName,
+        description: params.description,
+        autoInclude: params.autoInclude,
+        componentPath: componentPath.current,
+        data,
+      },
+    });
+    setIsRegistered(result.success);
+  }, [params.key, params.displayName, params.description, params.autoInclude, magician]);
+
+  const remove = React.useCallback(() => {
+    magician.getMagician().getState().removeContext({ key: params.key });
+    setIsRegistered(false);
+  }, [params.key, magician]);
+
+  return { isRegistered, update, remove };
 }
 
-abstract class MagicianServiceInterface {
+export function useRegisterComponentTool(
+  params: UseRegisterComponentToolParams
+): UseRegisterComponentToolResponse {
+  const magician = useMagician();
+  const [isRegistered, setIsRegistered] = React.useState(false);
+  const componentPath = React.useRef<string[]>([]);
+
+  React.useEffect(() => {
+    // TODO: Get component path from React tree
+    componentPath.current = ['component', 'path']; // Placeholder
+
+    const result = magician.getMagician().getState().addTool({
+      tool: {
+        key: params.key,
+        displayName: params.displayName,
+        description: params.description,
+        autoExecutable: params.autoExecutable,
+        schema: params.schema,
+        componentPath: componentPath.current,
+      },
+      implementation: params.tool,
+      approvalUI: params.onApprovalRequired,
+    });
+
+    setIsRegistered(result.success);
+
+    // Cleanup on unmount
+    return () => {
+      magician.getMagician().getState().removeTool({ key: params.key });
+      setIsRegistered(false);
+    };
+  }, [params.key, params.displayName, params.description, params.autoExecutable, params.schema, params.tool, params.onApprovalRequired, magician]);
+
+  const remove = React.useCallback(() => {
+    magician.getMagician().getState().removeTool({ key: params.key });
+    setIsRegistered(false);
+  }, [params.key, magician]);
+
+  const execute = React.useCallback(async (args: any) => {
+    const result = await magician.getMagician().getState().invokeTool({
+      key: params.key,
+      arguments: args,
+    });
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    return result.result;
+  }, [params.key, magician]);
+
+  return { isRegistered, remove, execute };
+}
+
+export abstract class MagicianServiceInterface {
   /**
    * Create a new response. This API is inspired by the OpenAI Responses API.
    * https://platform.openai.com/docs/api-reference/responses/create, but adapted
@@ -238,40 +367,4 @@ abstract class MagicianServiceInterface {
   abstract retrieveContext(params: RetrieveContextParams): Promise<RetrieveContextResponse>;
 
   abstract forgetContext(params: ForgetContextParams): Promise<ForgetContextResponse>;
-}
-
-class DemoOnlyMagicianService extends MagicianServiceInterface {
-  async createResponse(params: CreateResponseParams): Promise<RespondResponse> {
-    throw new Error('Not implemented');
-  }
-
-  // Conversation API
-  async listConversations(
-    params: ListConversationsParams
-  ): Promise<ListConversationsResponse> {
-    throw new Error('Not implemented');
-  }
-
-  async getConversation(params: GetConversationParams): Promise<GetConversationResponse> {
-    throw new Error('Not implemented');
-  }
-
-  async updateConversation(
-    params: UpdateConversationParams
-  ): Promise<UpdateConversationResponse> {
-    throw new Error('Not implemented');
-  }
-
-  // Context API
-  async persistContext(params: PersistContextParams): Promise<PersistContextResponse> {
-    throw new Error('Not implemented');
-  }
-
-  async retrieveContext(params: RetrieveContextParams): Promise<RetrieveContextResponse> {
-    throw new Error('Not implemented');
-  }
-
-  async forgetContext(params: ForgetContextParams): Promise<ForgetContextResponse> {
-    throw new Error('Not implemented');
-  }
 }
