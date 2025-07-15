@@ -3,6 +3,7 @@ import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {MOON_100, TEAL_600} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon, IconName} from '@wandb/weave/components/Icon';
+import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
 import {
@@ -801,7 +802,7 @@ const UserTraceCountsChart: React.FC<UserTraceCountsChartProps> = ({
             height: '100%',
             minHeight: 200,
           }}>
-          <span>Loading...</span>
+          <WaveLoader size="small" />
         </div>
       ) : barData.length === 0 ? (
         <div
@@ -832,7 +833,7 @@ const UserTraceCountsChart: React.FC<UserTraceCountsChartProps> = ({
             <VerticalBarSeries
               data={barData}
               color={TEAL_600}
-              barWidth={1}
+              barWidth={0.8} // Add padding between bars
               onValueMouseOver={v => setHintValue(v)}
               onValueMouseOut={() => setHintValue(null)}
             />

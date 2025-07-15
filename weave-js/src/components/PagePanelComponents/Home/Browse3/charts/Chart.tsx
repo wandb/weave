@@ -15,7 +15,7 @@ import {getScatterXAxisFields, getYAxisFields} from './extractData';
 import {LinePlot} from './LinePlot';
 import {ScatterPlot} from './ScatterPlot';
 import {chartContentStyle} from './styling';
-import {AggregationMethod, ChartConfig, ExtractedCallData} from './types';
+import {AggregationMethod, ExtractedCallData} from './types';
 
 // Utility function to generate auto-names for charts
 export const generateChartAutoName = (
@@ -70,7 +70,7 @@ export type ChartProps = {
   project?: string;
   groupKeys?: string[];
   isLoading?: boolean;
-  addChart?: (chart: ChartConfig) => void;
+  addChart?: () => void;
 };
 
 export const Chart: React.FC<ChartProps> = ({
@@ -238,7 +238,7 @@ export const Chart: React.FC<ChartProps> = ({
               icon="add-new"
               variant="ghost"
               size="small"
-              onClick={() => addChart?.({})}
+              onClick={() => addChart?.()}
             />
           )}
           <Button
