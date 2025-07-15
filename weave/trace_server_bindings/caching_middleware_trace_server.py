@@ -36,13 +36,13 @@ class CacheRecorder(TypedDict):
 
 def digest_is_cacheable(digest: str) -> bool:
     """
-    Check if a digest is cachable.
+    Check if a digest is cacheable.
 
     Examples:
     - v1 -> False
     - oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8 -> True
     """
-    # If it looks like a version, it is not cachable
+    # If it looks like a version, it is not cacheable
     if digest.startswith("v"):
         try:
             int(digest[1:])

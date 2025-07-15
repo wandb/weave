@@ -260,7 +260,7 @@ class Span:
             resource=resource,
         )
 
-    # The full OTEL Span as it is recieved
+    # The full OTEL Span as it is received
     def as_dict(self) -> dict[str, Any]:
         return to_json_serializable(
             {
@@ -335,7 +335,7 @@ class Span:
 
         has_attributes = len(attributes) > 0
         has_inputs = len(inputs) > 0
-        # Ouputs might be str, int, bytes
+        # Outputs might be str, int, bytes
         has_outputs = isinstance(outputs, int) or len(outputs) > 0
         has_usage = len(usage) > 0
 
