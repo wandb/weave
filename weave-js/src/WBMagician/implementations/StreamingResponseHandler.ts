@@ -3,9 +3,8 @@ import type {
   StreamChunk,
   ChatCompletionChunk,
   ToolCall,
-  MagicianError,
-  ErrorCodes,
 } from '../types';
+import { MagicianError, ErrorCodes } from '../types';
 
 /**
  * Handles streaming responses from the chat completions API.
@@ -131,8 +130,21 @@ export class StreamingResponseHandler implements RespondResponse {
   /**
    * Set the actual stream iterator (called by the service)
    */
-  setStreamIterator(iterator: AsyncIterableIterator<StreamChunk>) {
-    this.streamIterator = iterator;
+  setStreamIterator(iterator: AsyncIterableIterator<StreamChunk> | AsyncIterable<StreamChunk>) {
+    if ('next' in iterator && Symbol.asyncIterator in iterator) {
+      // It's already a proper AsyncIterableIterator
+      this.streamIterator = iterator as AsyncIterableIterator<StreamChunk>;
+    } else if ('next' in iterator) {
+      // It's an AsyncIterator without Symbol.asyncIterator, wrap it
+      const iter = iterator as AsyncIterator<StreamChunk>;
+      this.streamIterator = {
+        ...iter,
+        [Symbol.asyncIterator]() { return this; }
+      };
+    } else {
+      // It's an AsyncIterable, get the iterator
+      this.streamIterator = iterator[Symbol.asyncIterator]();
+    }
   }
 
   /**

@@ -115,17 +115,41 @@ import type {
 // Import implementations
 import { InMemoryAppState } from './implementations/InMemoryAppState';
 import { DemoMagicianService } from './implementations/DemoMagicianService';
+import { OpenAIMagicianService } from './implementations/OpenAIMagicianService';
 import { CoreMagician } from './implementations/CoreMagician';
 
 const MagicianContext = React.createContext<MagicianReactAdapter | null>(null);
 
-export const MagicianContextProvider: React.FC<{children: React.ReactNode}> = props => {
+export interface MagicianContextProviderProps {
+  children: React.ReactNode;
+  service?: 'demo' | 'openai';
+  openAIKey?: string;
+  openAIBaseURL?: string;
+}
+
+export const MagicianContextProvider: React.FC<MagicianContextProviderProps> = props => {
   const magicianContext = React.useMemo(() => {
     const appState = new InMemoryAppState();
-    const service = new DemoMagicianService();
+    
+    // Determine which service to use
+    // @ts-ignore - Vite environment variables
+    const serviceType = props.service || import.meta.env?.VITE_MAGICIAN_SERVICE || 'demo';
+    
+    let service;
+    if (serviceType === 'openai') {
+      try {
+        service = new OpenAIMagicianService(props.openAIKey, props.openAIBaseURL);
+      } catch (error) {
+        console.error('Failed to initialize OpenAI service, falling back to demo:', error);
+        service = new DemoMagicianService();
+      }
+    } else {
+      service = new DemoMagicianService();
+    }
+    
     const magician = new CoreMagician(appState, service);
     return new MagicianReactAdapter(magician);
-  }, []);
+  }, [props.service, props.openAIKey, props.openAIBaseURL]);
 
   return (
     <MagicianContext.Provider value={magicianContext}>

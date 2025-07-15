@@ -5,3 +5,5 @@ build/
 src/generated
 .eslintcache
 tsconfig.tsbuildinfo
+.env
+.env.local

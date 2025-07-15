@@ -12,6 +12,11 @@
   - ✅ CoreMagician orchestration layer
   - ✅ React hooks (useRespond, useRegisterComponentContext, useRegisterComponentTool)
   - ✅ Clean module exports in index.ts
+- **[2024-01-XX]** - Added OpenAI implementation:
+  - ✅ OpenAIMagicianService with real OpenAI API integration
+  - ✅ Environment-based service switching (demo vs openai)
+  - ✅ Proper error handling for API failures
+  - ✅ ENV_SETUP.md documentation
 - **TODO**: Implement Phase 3 - Chat Interface (MagicianComponent)
 - **TODO**: Set up backend endpoint integration (cookies → API keys)
 - **TODO**: Add real component path detection for context hierarchy
@@ -388,6 +393,20 @@ function PromptBuilder() {
 
 ## Quick Start
 
+### Setup (Choose One)
+
+#### Option 1: OpenAI (Real Responses)
+```bash
+# Create .env file in weave-js directory
+VITE_OPENAI_API_KEY=sk-your-api-key
+VITE_MAGICIAN_SERVICE=openai
+```
+
+#### Option 2: Demo Mode (Mock Responses)
+No setup needed - works out of the box!
+
+### Usage
+
 ```tsx
 // 1. Wrap your app
 import { MagicianContextProvider } from '@wandb/weave/WBMagician';
@@ -417,6 +436,8 @@ function MyComponent() {
   return <div>{response.data?.content}</div>;
 }
 ```
+
+See [ENV_SETUP.md](./ENV_SETUP.md) for detailed configuration options.
 
 ## Success Metrics
 - Developer adoption: 3+ teams using Magician within 1 month
