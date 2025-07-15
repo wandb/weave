@@ -1,5 +1,4 @@
 // Remove openai dependency - use direct fetch API
-import {MagicianServiceInterface} from '../Magician';
 import {
   ChatCompletionChunk,
   ChatCompletionRequest,
@@ -12,6 +11,7 @@ import {
   ListConversationsParams,
   ListConversationsResponse,
   MagicianError,
+  MagicianServiceInterface,
   PersistContextParams,
   PersistContextResponse,
   RespondResponse,

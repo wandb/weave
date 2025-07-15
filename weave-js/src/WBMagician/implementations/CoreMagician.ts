@@ -1,4 +1,4 @@
-import {MagicianServiceInterface} from '../Magician';
+import {MagicianServiceInterface} from '../types';
 import type {
   ChatCompletionRequest,
   ChatMessage,
