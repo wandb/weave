@@ -16,9 +16,29 @@
       "priceCentsPerBillionTokensOutput": 22000,
       "apiStyle": "chat",
       "modalities": ["Text"],
-      "likesHuggingFace": 4112,
-      "downloadsHuggingFace": 5386403,
+      "likesHuggingFace": 4292,
+      "downloadsHuggingFace": 5540925,
       "license": "llama3.1"
+    },
+    {
+      "provider": "coreweave",
+      "id": "cw_moonshotai_Kimi-K2-Instruct",
+      "idPlayground": "moonshotai/Kimi-K2-Instruct",
+      "idHuggingFace": "moonshotai/Kimi-K2-Instruct",
+      "label": "MoonshotAI Kimi K2",
+      "status": "hosted",
+      "descriptionShort": "Mixture-of-Experts model optimized for complex tool use, reasoning, and code synthesis.",
+      "descriptionMedium": "Kimi K2 is a large-scale Mixture-of-Experts (MoE) language model developed by Moonshot AI, featuring 1 trillion total parameters with 32 billion active per forward pass. It is optimized for agentic capabilities, including advanced tool use, reasoning, and code synthesis. Kimi K2 excels across a broad range of benchmarks, particularly in coding (LiveCodeBench, SWE-bench), reasoning (ZebraLogic, GPQA), and tool-use (Tau2, AceBench) tasks. It supports long-context inference up to 128K tokens and is designed with a novel training stack that includes the MuonClip optimizer for stable large-scale MoE training.",
+      "launchDate": "2025-07-14T09:00:00Z",
+      "parameterCountTotal": 1000000000000,
+      "contextWindow": 128000,
+      "priceCentsPerBillionTokensInput": 160000,
+      "priceCentsPerBillionTokensOutput": 410000,
+      "apiStyle": "chat",
+      "modalities": ["Text"],
+      "likesHuggingFace": 985,
+      "downloadsHuggingFace": 19331,
+      "license": "other"
     },
     {
       "provider": "coreweave",
@@ -37,8 +57,8 @@
       "priceCentsPerBillionTokensOutput": 540000,
       "apiStyle": "chat",
       "modalities": ["Text"],
-      "likesHuggingFace": 1990,
-      "downloadsHuggingFace": 125669,
+      "likesHuggingFace": 2256,
+      "downloadsHuggingFace": 298738,
       "license": "mit"
     },
     {
@@ -58,8 +78,8 @@
       "priceCentsPerBillionTokensOutput": 275000,
       "apiStyle": "chat",
       "modalities": ["Text"],
-      "likesHuggingFace": 2967,
-      "downloadsHuggingFace": 446443,
+      "likesHuggingFace": 3000,
+      "downloadsHuggingFace": 503980,
       "license": "mit"
     },
     {
@@ -78,8 +98,8 @@
       "priceCentsPerBillionTokensOutput": 71000,
       "apiStyle": "chat",
       "modalities": ["Text"],
-      "likesHuggingFace": 2372,
-      "downloadsHuggingFace": 943960,
+      "likesHuggingFace": 2433,
+      "downloadsHuggingFace": 473768,
       "license": "llama3.3"
     },
     {
@@ -99,8 +119,8 @@
       "priceCentsPerBillionTokensOutput": 66000,
       "apiStyle": "chat",
       "modalities": ["Text", "Vision"],
-      "likesHuggingFace": 944,
-      "downloadsHuggingFace": 548064,
+      "likesHuggingFace": 994,
+      "downloadsHuggingFace": 539116,
       "license": "other"
     },
     {
@@ -119,8 +139,8 @@
       "priceCentsPerBillionTokensOutput": 35000,
       "apiStyle": "chat",
       "modalities": ["Text"],
-      "likesHuggingFace": 507,
-      "downloadsHuggingFace": 235092,
+      "likesHuggingFace": 545,
+      "downloadsHuggingFace": 247266,
       "license": "mit"
     }
   ]
