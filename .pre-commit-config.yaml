@@ -19,6 +19,7 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=2048"]
       - id: check-json
+        exclude: (.*pyi$)|(weave_query)|(tests)|(examples)
   - repo: https://github.com/crate-ci/typos
     rev: v1.34.0
     hooks:
