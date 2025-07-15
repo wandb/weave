@@ -273,6 +273,7 @@ select = [
   "TRY004",  # https://docs.astral.sh/ruff/rules/type-check-without-type-error/
   "TRY300",  # https://docs.astral.sh/ruff/rules/try-consider-else/
   "TRY400",  # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
+  "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
   "B006",    # https://docs.astral.sh/ruff/rules/mutable-argument-default/
@@ -285,6 +286,7 @@ select = [
   "B904",    # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
   "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
   "N801",    # https://docs.astral.sh/ruff/rules/invalid-class-name/
+  "N802",    # https://docs.astral.sh/ruff/rules/invalid-function-name/
   "N803",    # https://docs.astral.sh/ruff/rules/invalid-argument-name/
   "N804",    # https://docs.astral.sh/ruff/rules/non-lowercase-variable-in-class/
   "N805",    # https://docs.astral.sh/ruff/rules/invalid-first-argument-name-for-method/
@@ -293,6 +295,7 @@ select = [
   "T20",     # https://docs.astral.sh/ruff/rules/#flake8-print-t20
   "PT001",   # https://docs.astral.sh/ruff/rules/pytest-fixture-incorrect-parentheses-style/
   "PT006",   # https://docs.astral.sh/ruff/rules/pytest-parametrize-names-wrong-type/
+  "PT008",   # https://docs.astral.sh/ruff/rules/pytest-parametrize-values-wrong-type/
   "PT018",   # https://docs.astral.sh/ruff/rules/pytest-composite-assertion/
   "PT022",   # https://docs.astral.sh/ruff/rules/pytest-useless-yield-fixture/
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/

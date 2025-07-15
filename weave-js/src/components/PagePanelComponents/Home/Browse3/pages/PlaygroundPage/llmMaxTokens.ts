@@ -41,6 +41,12 @@ export const LLM_MAX_TOKENS = {
     max_tokens: 1000,
     supports_function_calling: false,
   },
+  'cw_moonshotai_Kimi-K2-Instruct': {
+    label: 'Kimi K2',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
+  },
   // End hosted models
   'gpt-4.1-mini-2025-04-14': {
     provider: 'openai',
