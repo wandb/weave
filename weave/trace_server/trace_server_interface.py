@@ -1042,6 +1042,32 @@ class ProjectStatsRes(BaseModel):
     files_storage_size_bytes: int
 
 
+class ProjectStatsExtended(BaseModel):
+    num_traces: int
+    trace_storage_size: int
+    object_storage_size: int
+    table_storage_size: int
+    file_storage_size: int
+    time_start: datetime.datetime
+    time_end: datetime.datetime
+
+
+class ProjectUserStats(BaseModel):
+    stats_by_user: list[dict[str, ProjectStatsExtended]]
+    stats_totals: list[ProjectStatsExtended]
+
+
+class QueryExtendedProjectStatsReq(BaseModel):
+    project_id: str
+    time_start: Optional[datetime.datetime] = None
+    time_end: Optional[datetime.datetime] = None
+    time_delta: datetime.timedelta = datetime.timedelta(days=1)
+
+
+class QueryExtendedProjectStatsRes(BaseModel):
+    stats: ProjectUserStats
+
+
 # Thread API
 
 
@@ -1231,6 +1257,9 @@ class TraceServerInterface(Protocol):
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
+    def query_extended_project_stats(
+        self, req: QueryExtendedProjectStatsReq
+    ) -> QueryExtendedProjectStatsRes: ...
 
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...

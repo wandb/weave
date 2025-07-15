@@ -468,6 +468,40 @@ export type ProjectStatsRes = {
   files_storage_size_bytes: number;
 };
 
+export type ProjectStatsExtended = {
+  num_traces: number;
+  trace_storage_size: number;
+  object_storage_size: number;
+  table_storage_size: number;
+  file_storage_size: number;
+  time_start: string; // ISO 8601 datetime string
+  time_end: string; // ISO 8601 datetime string
+};
+
+export type ProjectUserStats = {
+  stats_by_user: Array<{[wb_user_id: string]: ProjectStatsExtended[]}>;
+  stats_totals: ProjectStatsExtended[];
+};
+
+export type QueryExtendedProjectStatsReq = {
+  project_id: string;
+  time_start?: string; // ISO 8601 datetime string
+  time_end?: string; // ISO 8601 datetime string
+  time_delta: {
+    days?: number;
+    seconds?: number;
+    microseconds?: number;
+    milliseconds?: number;
+    minutes?: number;
+    hours?: number;
+    weeks?: number;
+  };
+};
+
+export type QueryExtendedProjectStatsRes = {
+  stats: ProjectUserStats;
+};
+
 export enum ContentType {
   csv = 'text/csv',
   tsv = 'text/tab-separated-values',

@@ -48,6 +48,9 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.extended_project_stats_query_builder import (
+    make_extended_project_stats_query,
+)
 from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
@@ -1180,6 +1183,93 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise RuntimeError("Unexpected number of results", query_result)
 
         return tsi.ProjectStatsRes(**dict(zip(columns, query_result.result_rows[0])))
+
+    def query_extended_project_stats(
+        self, req: tsi.QueryExtendedProjectStatsReq
+    ) -> tsi.QueryExtendedProjectStatsRes:
+        pb = ParamBuilder()
+        
+        # Build and execute the query
+        query = make_extended_project_stats_query(
+            project_id=req.project_id,
+            pb=pb,
+            time_start=req.time_start,
+            time_end=req.time_end,
+            time_delta=req.time_delta,
+        )
+        
+        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        
+        # Process results into the required format
+        stats_by_user: dict[str, list[tsi.ProjectStatsExtended]] = defaultdict(list)
+        stats_totals: dict[tuple[datetime.datetime, datetime.datetime], tsi.ProjectStatsExtended] = {}
+        
+        for row in query_result.result_rows:
+            (
+                time_start,
+                time_end,
+                wb_user_id,
+                num_traces,
+                trace_storage_size,
+                object_storage_size,
+                file_storage_size,
+                table_storage_size,
+                total_num_traces,
+                total_trace_storage_size,
+                total_object_storage_size,
+                total_file_storage_size,
+                total_table_storage_size,
+            ) = row
+            
+            # Ensure datetimes have timezone info
+            time_start_with_tz = _ensure_datetimes_have_tz(time_start)
+            time_end_with_tz = _ensure_datetimes_have_tz(time_end)
+            
+            if time_start_with_tz is None or time_end_with_tz is None:
+                continue
+            
+            # Create user stats entry
+            user_stats = tsi.ProjectStatsExtended(
+                num_traces=num_traces,
+                trace_storage_size=trace_storage_size,
+                object_storage_size=object_storage_size,
+                table_storage_size=table_storage_size,
+                file_storage_size=file_storage_size,
+                time_start=time_start_with_tz,
+                time_end=time_end_with_tz,
+            )
+            
+            if wb_user_id and wb_user_id != 'unknown':
+                stats_by_user[wb_user_id].append(user_stats)
+            
+            # Create or update totals entry for this time bin
+            time_key = (time_start_with_tz, time_end_with_tz)
+            if time_key not in stats_totals:
+                stats_totals[time_key] = tsi.ProjectStatsExtended(
+                    num_traces=total_num_traces,
+                    trace_storage_size=total_trace_storage_size,
+                    object_storage_size=total_object_storage_size,
+                    table_storage_size=total_table_storage_size,
+                    file_storage_size=total_file_storage_size,
+                    time_start=time_start_with_tz,
+                    time_end=time_end_with_tz,
+                )
+        
+        # Convert stats_by_user to the required format
+        formatted_stats_by_user = []
+        for user_id, user_stats_list in stats_by_user.items():
+            user_entry = {user_id: user_stats_list}
+            formatted_stats_by_user.append(user_entry)
+        
+        # Convert stats_totals to list
+        formatted_stats_totals = list(stats_totals.values())
+        
+        return tsi.QueryExtendedProjectStatsRes(
+            stats=tsi.ProjectUserStats(
+                stats_by_user=formatted_stats_by_user,
+                stats_totals=formatted_stats_totals,
+            )
+        )
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
