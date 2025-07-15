@@ -1416,6 +1416,7 @@ def process_calls_filter_to_conditions(
     return conditions
 
 
+# Griffins Hack
 def optimized_project_contains_call_query(
     project_id: str,
     param_builder: ParamBuilder,
