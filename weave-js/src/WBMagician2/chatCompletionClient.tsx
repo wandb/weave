@@ -328,7 +328,50 @@ const chatCompleteStream = async (
   params: ChatCompletionParams,
   onChunk: (chunk: Chunk) => void
 ): Promise<Completion> => {
-  const res = await client.completionsCreateStream(
+  // Process raw chunks to extract content
+  const processedChunks: unknown[] = [];
+
+  const processChunk = (rawChunk: unknown) => {
+    processedChunks.push(rawChunk);
+
+    // Type guard for OpenAI-style chunks
+    const isOpenAIChunk = (
+      chunk: unknown
+    ): chunk is {
+      choices: Array<{
+        delta: {
+          content?: string;
+        };
+      }>;
+    } => {
+      return (
+        typeof chunk === 'object' &&
+        chunk !== null &&
+        'choices' in chunk &&
+        Array.isArray((chunk as any).choices) &&
+        (chunk as any).choices.length > 0 &&
+        'delta' in (chunk as any).choices[0]
+      );
+    };
+
+    if (isOpenAIChunk(rawChunk)) {
+      const content = rawChunk.choices[0]?.delta?.content;
+      if (content) {
+        onChunk({content});
+      }
+    } else if (
+      typeof rawChunk === 'object' &&
+      rawChunk !== null &&
+      'content' in rawChunk
+    ) {
+      const content = (rawChunk as any).content;
+      if (typeof content === 'string') {
+        onChunk({content});
+      }
+    }
+  };
+
+  await client.completionsCreateStream(
     {
       project_id: `${entity}/${project}`,
       inputs: {
@@ -340,10 +383,10 @@ const chatCompleteStream = async (
       },
       track_llm_call: false,
     },
-    onChunk
+    processChunk
   );
 
-  return combineChunks(res.chunks);
+  return combineChunks(processedChunks);
 };
 
 const EntityProjectContext = createContext<EntityProject | undefined>(
@@ -390,7 +433,17 @@ export const useChatCompletion = (entityProject?: EntityProject) => {
   );
 };
 
-export const useChatCompletionStream = (entity: string, project: string) => {
+export const useChatCompletionStream = (entityProject?: EntityProject) => {
+  const entityProjectContext = useEntityProjectContext();
+  const {entity, project} = useMemo(() => {
+    if (entityProject) {
+      return entityProject;
+    }
+    if (entityProjectContext) {
+      return entityProjectContext;
+    }
+    throw new Error('No entity project found');
+  }, [entityProject, entityProjectContext]);
   const getClient = useGetTraceServerClientContext();
   return useCallback(
     (params: ChatCompletionParams, onChunk: (chunk: Chunk) => void) => {

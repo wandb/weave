@@ -80,22 +80,35 @@ export const PlaygroundMessagePanelEditor: React.FC<
       />
       {/* 6px vs. 8px to make up for extra padding from textarea field */}
       <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
-        <MagicFill
-          open={showMagicDialog}
-          onClose={() => setShowMagicDialog(false)}
-          onAccept={() => setShowMagicDialog(false)}
-          title="Magic Fill"
-          details="This is a magic fill dialog"
-          systemPrompt={''}
-          userInstructionPlaceholder={''}
-        />
-        <Button
-          variant="outline"
-          size="medium"
-          onClick={() => setShowMagicDialog(true)}
-          icon="magic-wand-star"
-        />
-        <div className="flex-1"></div>
+        {index === 0 && message.role === 'system' && (
+          <>
+            <MagicFill
+              open={showMagicDialog}
+              onClose={() => setShowMagicDialog(false)}
+              onAccept={newContent => {
+                setEditedContent(newContent);
+                setShowMagicDialog(false);
+              }}
+              // title="Magic Fill"
+              // details="This is a magic fill dialog"
+              systemPrompt={
+                'You are an expert LLM developer & researcher. Your objective is to help the user create a "system prompt" for their own LLM. They are going to provide you with some description or context of what they are interested in build. Assume that may not be perfect. Always produce a useful and clear system prompt that address the user need. NEVER say anything before or after the system prompt. ONLY emit the system prompt.'
+              }
+              userInstructionPlaceholder={
+                'Describe the system prompt you want to create - for example: "A system prompt for a LLM that can help me build a new website."'
+              }
+              useStreaming
+            />
+
+            <Button
+              variant="outline"
+              size="medium"
+              onClick={() => setShowMagicDialog(true)}
+              icon="magic-wand-star"
+            />
+            <div className="flex-1"></div>
+          </>
+        )}
         <Button variant="ghost" size="medium" onClick={handleCancel}>
           Cancel
         </Button>
