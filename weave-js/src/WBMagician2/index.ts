@@ -5,27 +5,28 @@
  * through reusable components and hooks.
  */
 
-// Components
-export type {MagicFillProps} from './MagicDialog';
-export {MagicFill} from './MagicDialog';
-
+// Main UI Components
 export type {MagicButtonProps} from './MagicButton';
 export {MagicButton} from './MagicButton';
+export type {MagicTooltipProps} from './MagicTooltip';
+export {MagicTooltip} from './MagicTooltip';
 
-export type {MagicFillTooltipProps} from './MagicFillTooltip';
-export {MagicFillTooltip} from './MagicFillTooltip';
-
-// Chat completion hooks
+// Chat Completion Client
+export type {
+  ChatCompletionParams,
+  Chunk,
+  Completion,
+  EntityProject,
+  JsonObjectResponseFormat,
+  JsonSchemaResponseFormat,
+  Message,
+  ResponseFormat,
+  TextResponseFormat,
+  Tool,
+} from './chatCompletionClient';
 export {
+  ChatClientProvider,
+  useAvailableModels,
   useChatCompletion,
   useChatCompletionStream,
-  ChatClientProvider,
-} from './chatCompletionClient';
-
-export type {
-  EntityProject,
-  Message,
-  ChatCompletionParams,
-  ResponseFormat,
-  Tool,
 } from './chatCompletionClient';

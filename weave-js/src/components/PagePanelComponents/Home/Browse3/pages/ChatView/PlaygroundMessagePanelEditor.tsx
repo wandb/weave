@@ -1,5 +1,5 @@
 import {Button} from '@wandb/weave/components/Button';
-import {MagicFill} from '@wandb/weave/WBMagician2/MagicDialog';
+import {MagicButton, MagicTooltip} from '@wandb/weave/WBMagician2';
 import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
@@ -45,7 +45,8 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setEditedContent(initialContent);
   }, [initialContent]);
 
-  const [showMagicDialog, setShowMagicDialog] = useState(false);
+  const [magicAnchorEl, setMagicAnchorEl] = useState<HTMLElement | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleSave = () => {
     if (choiceIndex !== undefined) {
@@ -67,6 +68,28 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setEditorHeight(null);
   };
 
+  const handleMagicStream = (content: string, isComplete: boolean) => {
+    setEditedContent(content);
+    if (isComplete) {
+      setIsGenerating(false);
+      setMagicAnchorEl(null);
+    } else if (!isGenerating) {
+      setIsGenerating(true);
+    }
+  };
+
+  const handleMagicError = (error: Error) => {
+    console.error('Magic generation error:', error);
+    setIsGenerating(false);
+  };
+
+  // Determine magic button state
+  const getMagicButtonState = () => {
+    if (isGenerating) return 'generating';
+    if (magicAnchorEl) return 'tooltipOpen';
+    return 'default';
+  };
+
   return (
     <div
       className={classNames(
@@ -82,30 +105,29 @@ export const PlaygroundMessagePanelEditor: React.FC<
       <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
         {index === 0 && message.role === 'system' && (
           <>
-            <MagicFill
-              open={showMagicDialog}
-              onClose={() => setShowMagicDialog(false)}
-              onAccept={newContent => {
-                setEditedContent(newContent);
-                setShowMagicDialog(false);
-              }}
-              // title="Magic Fill"
-              // details="This is a magic fill dialog"
+            <MagicButton
+              variant="outline"
+              size="medium"
+              onClick={e => setMagicAnchorEl(e.currentTarget)}
+              state={getMagicButtonState()}
+              onCancel={() => setMagicAnchorEl(null)}
+              iconOnly
+            />
+
+            <MagicTooltip
+              anchorEl={magicAnchorEl}
+              open={Boolean(magicAnchorEl)}
+              onClose={() => setMagicAnchorEl(null)}
+              onStream={handleMagicStream}
+              onError={handleMagicError}
               systemPrompt={
                 'You are an expert LLM developer & researcher. Your objective is to help the user create a "system prompt" for their own LLM. They are going to provide you with some description or context of what they are interested in build. Assume that may not be perfect. Always produce a useful and clear system prompt that address the user need. NEVER say anything before or after the system prompt. ONLY emit the system prompt.'
               }
-              userInstructionPlaceholder={
+              placeholder={
                 'Describe the system prompt you want to create - for example: "A system prompt for a LLM that can help me build a new website."'
               }
-              useStreaming
             />
 
-            <Button
-              variant="outline"
-              size="medium"
-              onClick={() => setShowMagicDialog(true)}
-              icon="magic-wand-star"
-            />
             <div className="flex-1"></div>
           </>
         )}

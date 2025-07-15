@@ -1,261 +1,201 @@
 # WBMagician2 Requirements
 
-## 📋 Implementation Status & Next Steps
+## 🎯 Module Overview
 
-### ✅ Completed in This Session (Latest Updates)
+WBMagician is a module for adding "Magic moments" to the W&B application. It provides dead-simple access to LLM capabilities through a developer-friendly API and consistent UI components.
 
-1. **MagicFillTooltip Component**
-   - Created lightweight tooltip mode for inline AI assistance
-   - Attaches to any element via `anchorEl` prop
-   - Single-shot generation (no regeneration UI)
-   - Streams content directly to parent component
-   - 300px wide, 5 lines tall as specified
-   - Auto-positioning with MUI Popover
-   - Enter key to submit, Escape or click outside to close
+### Core Components
 
-2. **MagicButton Component** 
-   - Unified button with sparkle (✨) icon
-   - Loading state transforms into spinner with cancel functionality
-   - Host button becomes the cancel control during generation
-   - Consistent styling across all magic features
-   - Supports icon-only mode for compact layouts
+1. **Query/Request Layer**
+   - Methods and hooks that simplify calling backend completion endpoints
+   - Developers focus on content, not API complexity
+   - Context management for global state (entity/project, model selection)
+   - List available models functionality (to be added)
 
-3. **Integration Pattern**
-   - Parent component manages the generated content
-   - Errors passed to parent for handling
-   - Streaming updates with completion flag
-   - Clean separation of concerns
+2. **UI Components**
+   - Create a "Magic Moment" design language
+   - Components: Buttons, Tooltips, and other key elements
+   - Visually consistent, delightful experiences
+   - Real-time streaming feel
 
-### ✅ Previously Completed
+## 🏗️ Architecture
 
-1. **Fixed Modal Rendering Bug**
-   - Replaced raw Radix UI imports with Weave's Dialog component system
-   - Added Portal and Overlay components for proper modal popup behavior
-   - Modal now correctly overlays the UI instead of rendering inline
+### Query Layer (`chatCompletionClient.tsx`)
+- ✅ `useChatCompletion` - Hook for single completions
+- ✅ `useChatCompletionStream` - Hook for streaming completions
+- ✅ `ChatClientProvider` - Context provider for entity/project
+- 🔲 `useAvailableModels` - Hook to list available models (TODO)
+- ✅ Response parsing for multiple provider formats (OpenAI, Anthropic, etc.)
+- ✅ Streaming chunk processing
 
-2. **Implemented Response Parsing**
-   - Created `extractMessageContent()` with type guards for multiple LLM providers
-   - Implemented `combineChunks()` for streaming response support
-   - Supports OpenAI, Anthropic, and generic response formats
-   - Falls back gracefully for unknown formats with console warnings
+### UI Components
 
-3. **Modernized UI Design**
-   - Implemented clean, minimalist interface using Weave's design system
-   - Added dark mode support with proper color tokens
-   - Included sparkle animation for generation state
-   - Better spacing, typography, and visual hierarchy
+#### MagicButton (`MagicButton.tsx`)
+Button component with sparkle (✨) icon that supports multiple states:
+- **States**: `default`, `tooltipOpen`, `generating`, `error`
+- Loading state shows spinner with cancel functionality
+- Consistent styling across all magic features
 
-4. **Improved Type Safety**
-   - Eliminated all `any` types
-   - Used `unknown` with proper type guards
-   - Added comprehensive JSDoc documentation
+#### MagicTooltip (`MagicTooltip.tsx`) - Primary Component
+Simplified tooltip for AI-assisted content generation:
+- **Design**: Minimal, blank tooltip with full-size textarea
+- **Features**:
+  - Text area for user input
+  - Single "Generate" button at bottom
+  - Button becomes loading/cancel during generation
+  - Model selection dropdown (under-emphasized)
+  - Parent handles streaming consumption and display
+- **Behavior**:
+  - Enter key to submit
+  - Escape or click outside to close
+  - Streams content to parent component
 
-### 🎯 Immediate Next Steps
+## 🎨 Design Principles
 
-1. **Test Streaming with Different Models**
-   - Verify streaming works with various providers (OpenAI, Anthropic, etc.)
-   - Adjust chunk processing if needed for different formats
-   - Test error handling during streaming
+1. **Developer Simplicity**: APIs should be intuitive with minimal boilerplate
+2. **Real-time Feel**: Emphasize streaming and immediate feedback
+3. **Minimal UI**: Dead-simple design, no unnecessary styling
+4. **Parent Control**: Parent components orchestrate content display and further actions
+5. **Flexibility**: Support multiple models and providers transparently
 
-2. **Performance Optimization**
-   - Consider debouncing the streaming updates for smoother UI
-   - Add abort controller for cancelling in-progress generations
-   - Optimize re-renders during streaming
+## 📋 Implementation Plan
 
-3. **Additional UI Polish**
-   - Add keyboard shortcuts (Cmd+Enter to generate)
-   - Consider adding a progress indicator for long generations
-   - Add copy button for generated content
+### Phase 1: Core Simplification ✅
+- [x] Remove MagicDialog/MagicFill components (no longer needed)
+- [ ] Simplify MagicTooltip to minimal design
+- [ ] Update MagicButton to support new states
+- [ ] Add model selection to tooltip
 
-4. **More Integrations**
-   - Find other places in the UI that could benefit from MagicFill
-   - Create specialized system prompts for different use cases
-   - Build a library of common prompts
+### Phase 2: API Enhancement
+- [ ] Add `useAvailableModels` hook
+- [ ] Improve streaming performance
+- [ ] Add proper TypeScript types for all responses
+- [ ] Create helper utilities for common patterns
 
-### 💡 Usage Example
+### Phase 3: Developer Experience
+- [ ] Create comprehensive examples
+- [ ] Build component playground
+- [ ] Add storybook stories
+- [ ] Write integration guide
+
+## 💻 Usage Examples
+
+### Basic Tooltip Integration
 ```typescript
-import { MagicFill } from '@/WBMagician2';
+import { MagicTooltip, MagicButton } from '@/WBMagician2';
 
-<MagicFill
-  open={showMagicDialog}
-  onClose={() => setShowMagicDialog(false)}
-  onAccept={(content) => setContent(content)}
-  // Optional title/details
-  title="Generate Description"
-  systemPrompt="You are a helpful assistant..."
-  userInstructionPlaceholder="What would you like help with?"
-  useStreaming={true} // Default: true
-/>
+function MyComponent() {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [content, setContent] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleStream = (chunk: string, isComplete: boolean) => {
+    setContent(chunk);
+    if (isComplete) {
+      setIsGenerating(false);
+      setAnchorEl(null);
+    }
+  };
+
+  return (
+    <>
+      <MagicButton
+        onClick={(e) => setAnchorEl(e.currentTarget)}
+        isGenerating={isGenerating}
+        state={anchorEl ? 'tooltipOpen' : 'default'}
+      >
+        Generate
+      </MagicButton>
+      
+      <MagicTooltip
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+        onStream={handleStream}
+        systemPrompt="You are a helpful assistant..."
+        placeholder="What would you like to generate?"
+      />
+      
+      {content && <div>{content}</div>}
+    </>
+  );
+}
 ```
 
-### 📝 API Changes in This Update
-
-- `title` and `details` props are now optional
-- Added `useStreaming` prop (defaults to true)
-- Streaming implementation processes chunks in real-time
-- More compact UI with single-row button layout
-
----
-
-## 🚨 Quick Start for Next Developer
-
-### Current State
-- ✅ Basic MagicFill UI implemented and working
-- ✅ Chat completion client structure in place
-- ✅ Response parsing implemented (supports OpenAI, Anthropic, and generic formats)
-- ✅ Modal properly renders as a popup with Portal and Overlay
-- ✅ Modern minimalist UI implemented with Weave design system
-- ✅ Type safety improved - no `any` types used
-
-### Recent Updates (Latest)
-1. **Fixed Modal Rendering** (2024-01-XX):
-   - Switched from raw Radix UI to Weave's Dialog component
-   - Added Portal and Overlay for proper modal behavior
-   - Modal now correctly pops out instead of rendering inline
-
-2. **Implemented Response Parsing**:
-   - `extractMessageContent()` handles multiple provider formats (OpenAI, Anthropic, generic)
-   - `combineChunks()` supports streaming response combination
-   - Type guards ensure safe handling of unknown response formats
-
-3. **Modernized UI**:
-   - Clean, minimalist design using Weave's design system colors and components
-   - Proper dark mode support with `night-aware` classes
-   - Smooth animations and sparkle icon for generation
-   - Better spacing and typography
-
-### Testing the Current Implementation
+### With Context Provider
 ```typescript
-// You can test MagicFill by importing and using it:
-import { MagicFill } from '@/WBMagician2';
+import { ChatClientProvider } from '@/WBMagician2';
 
-<MagicFill
-  open={true}
-  onClose={() => console.log('closed')}
-  onAccept={(content) => console.log('accepted:', content)}
-  title="Generate Description"
-  details="Help me write a description"
-  systemPrompt="You are a helpful assistant"
-  userInstructionPlaceholder="What would you like to describe?"
-/>
+function App() {
+  return (
+    <ChatClientProvider value={{ entity: 'my-org', project: 'my-project' }}>
+      <MyComponent />
+    </ChatClientProvider>
+  );
+}
 ```
 
-### Known Response Formats Supported
-The response parser handles:
-- **OpenAI Format**: `{choices: [{message: {content: "text"}}]}`
-- **Anthropic Format**: `{content: [{type: "text", text: "content"}]}`
-- **Simple Format**: `{content: "text"}` or plain string
-- **Unknown Formats**: Falls back to JSON stringification with console warning
+### Using Completion Hooks Directly
+```typescript
+import { useChatCompletionStream } from '@/WBMagician2';
 
----
+function MyComponent() {
+  const complete = useChatCompletionStream();
+  
+  const generate = async () => {
+    await complete(
+      {
+        modelId: 'gpt-4o-mini',
+        messages: 'Write a haiku about coding',
+        temperature: 0.7
+      },
+      (chunk) => console.log(chunk.content)
+    );
+  };
+}
+```
 
-## Module Overview
+## 🚀 Migration Guide
 
-WBMagician2 is a simplified LLM integration module for Weave's frontend, designed to provide dead-simple access to language models for frontend engineers. This module offers patterns, hooks, and components that streamline AI-assisted interactions within the UI.
+For developers migrating from MagicFill/MagicDialog:
 
-This is a rewrite of WBMagician (v1) which became overly complicated. WBMagician2 will eventually be renamed to WBMagician once stable.
+1. Replace `MagicFill` with `MagicTooltip`
+2. Move content display logic to parent component
+3. Use streaming callbacks instead of waiting for complete response
+4. Update button to use new `MagicButton` with state management
 
-## Core Purpose
+## 📝 API Reference
 
-Provide frontend engineers with easy-to-use components and hooks for integrating LLM capabilities into user workflows, starting with form filling and expanding to chat and agent-based actions.
+### MagicTooltip Props
+```typescript
+interface MagicTooltipProps {
+  anchorEl: HTMLElement | null;
+  open: boolean;
+  onClose: () => void;
+  onStream: (content: string, isComplete: boolean) => void;
+  onError?: (error: Error) => void;
+  systemPrompt: string;
+  placeholder?: string;
+  modelId?: string;
+  showModelSelector?: boolean;
+}
+```
 
-## Components
+### MagicButton Props
+```typescript
+interface MagicButtonProps {
+  state?: 'default' | 'tooltipOpen' | 'generating' | 'error';
+  isGenerating?: boolean;
+  onCancel?: () => void;
+  iconOnly?: boolean;
+  // ... extends Button props
+}
+```
 
-### 1. MagicFill (Current Implementation)
-A dialog component for AI-assisted content generation and form filling.
+## ✅ Success Metrics
 
-**Primary Use Cases:**
-- Generating descriptions
-- Completing code snippets
-- Revising existing text
-- Filling out structured forms
-- First integration: Helping users fill out prompts in the playground
-
-**Key Features:**
-- Simple, minimal UI design
-- System prompt configuration (hidden from user)
-- Optional content revision mode
-- Customizable placeholders and prompts
-- Accept/Cancel workflow
-
-### 2. MagicChat (Planned)
-A global chat interface for conversational AI interactions.
-
-### 3. MagicTool/MagicAct (Future)
-Components enabling agents to call React hooks and perform actions within the UI.
-
-## Design Principles
-
-1. **Simplicity First**: Clean, minimal UI inspired by modern AI interfaces
-2. **Developer Control**: Frontend engineers configure models, prompts, and response formats
-3. **User Transparency**: Clear indication of AI assistance, simple accept/reject flow
-4. **Flexibility**: Support multiple models, providers, and response formats
-
-## Technical Architecture
-
-### Chat Completion Client
-- Supports multiple model providers (OpenAI, Anthropic, CoreWeave, etc.)
-- Configurable response formats (text, JSON, structured data)
-- Streaming support (for future use)
-- Integration with Weave's TraceServerClient
-
-### Response Handling
-- Extract clean agent responses, stripping completion metadata
-- Support different response formats based on use case
-- Developer-specified response schemas
-
-## Integration Guidelines
-
-### Triggering MagicFill
-- Typically via buttons or UI elements
-- Future: keyboard shortcuts, context menus
-
-### Content Updates
-- Form fields
-- Code editors
-- Markdown editors
-- Structured data objects
-
-## Remaining Tasks
-
-### Immediate (P0)
-- [x] Fix response parsing in `chatCompletionClient.tsx` - implement `prepareResponseFormat` and `combineChunks`
-- [x] Update MagicFill to properly extract message content from completion response
-- [x] Fix modal rendering issue - add Portal and Overlay components
-- [x] Implement modern minimalist UI design
-- [ ] Add basic error handling for network failures and API errors
-- [ ] Implement first integration: Playground prompt helper
-
-### Short-term (P1)
-- [ ] Create MagicChat component
-- [ ] Add support for structured response formats (JSON Schema)
-- [ ] Implement streaming support for better UX on longer generations
-- [ ] Add basic usage examples and documentation
-
-### Medium-term (P2)
-- [ ] Design and implement MagicTool/MagicAct pattern
-- [ ] Add provider-specific optimizations
-- [ ] Create reusable prompt templates
-- [ ] Build component library of common magic patterns
-
-### Future Considerations (P3)
-- Iterative refinement workflows
-- Generation history
-- Keyboard shortcuts and accessibility
-- Usage analytics and tracking
-- Custom styling and theming
-
-## Out of Scope (for now)
-- Content validation (optional, up to developer)
-- Iterative refinement UI
-- Generation history
-- Complex styling/branding
-- Accessibility features beyond basics
-- Usage tracking/analytics
-
-## Success Criteria
-
-1. Frontend engineers can add AI assistance to any form/input in < 5 minutes
-2. Users understand and trust the AI assistance workflow
-3. Components are reusable across different parts of the Weave UI
-4. Module remains simple and doesn't become overly complex like v1 
+1. **Developer Adoption**: Increased usage across W&B codebase
+2. **Integration Speed**: < 5 minutes to add magic to any UI element
+3. **User Satisfaction**: Positive feedback on magic moment experiences
+4. **Performance**: Streaming feels instantaneous (< 100ms to first token)
+5. **Simplicity**: Reduced lines of code needed for integration 

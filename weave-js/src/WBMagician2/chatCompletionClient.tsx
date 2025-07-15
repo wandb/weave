@@ -453,3 +453,28 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
     [entity, project, getClient]
   );
 };
+
+/**
+ * Hook to get available models for the current entity/project.
+ * Returns a list of model options that can be used for completions.
+ *
+ * @param entityProject Optional entity/project override
+ * @returns List of available models
+ */
+export const useAvailableModels = (entityProject?: EntityProject) => {
+  // For now, return a static list of models
+  // In the future, this should fetch from an API endpoint
+  return useMemo(
+    () => [
+      {id: 'gpt-4o-mini', name: 'GPT-4 Mini', provider: 'openai'},
+      {id: 'gpt-4', name: 'GPT-4', provider: 'openai'},
+      {id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'openai'},
+      {id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'anthropic'},
+      {id: 'claude-3-sonnet', name: 'Claude 3 Sonnet', provider: 'anthropic'},
+      {id: 'claude-3-haiku', name: 'Claude 3 Haiku', provider: 'anthropic'},
+      {id: 'llama-3-70b', name: 'Llama 3 70B', provider: 'coreweave'},
+      {id: 'llama-3-8b', name: 'Llama 3 8B', provider: 'coreweave'},
+    ],
+    []
+  );
+};
