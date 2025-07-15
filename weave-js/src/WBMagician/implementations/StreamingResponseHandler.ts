@@ -138,12 +138,22 @@ export class StreamingResponseHandler implements RespondResponse {
       // It's an AsyncIterator without Symbol.asyncIterator, wrap it
       const iter = iterator as AsyncIterator<StreamChunk>;
       this.streamIterator = {
-        ...iter,
+        next: () => iter.next(),
+        return: iter.return ? () => iter.return!() : undefined,
+        throw: iter.throw ? (e?: any) => iter.throw!(e) : undefined,
         [Symbol.asyncIterator]() { return this; }
-      };
+      } as AsyncIterableIterator<StreamChunk>;
     } else {
       // It's an AsyncIterable, get the iterator
-      this.streamIterator = iterator[Symbol.asyncIterator]();
+      const asyncIterable = iterator as AsyncIterable<StreamChunk>;
+      const iter = asyncIterable[Symbol.asyncIterator]();
+      // Wrap to ensure it has Symbol.asyncIterator
+      this.streamIterator = {
+        next: () => iter.next(),
+        return: iter.return ? () => iter.return!() : undefined,
+        throw: iter.throw ? (e?: any) => iter.throw!(e) : undefined,
+        [Symbol.asyncIterator]() { return this; }
+      } as AsyncIterableIterator<StreamChunk>;
     }
   }
 

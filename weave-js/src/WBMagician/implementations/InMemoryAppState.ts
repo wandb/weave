@@ -16,9 +16,9 @@ import type {
   RegisteredContext,
   RegisteredTool,
   ToolApprovalParams,
-  MagicianError,
-  ErrorCodes,
 } from '../types';
+
+import { MagicianError, ErrorCodes } from '../types';
 
 /**
  * In-memory implementation of MagicianAppState for development and testing.

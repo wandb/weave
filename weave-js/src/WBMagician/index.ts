@@ -46,4 +46,5 @@ export type {
 } from './types';
 
 // Components
-export { MagicianComponent } from './MagicianComponent'; 
+export { MagicianComponent } from './MagicianComponent';
+export { ToolApprovalCard } from './components/ToolApprovalCard'; 
