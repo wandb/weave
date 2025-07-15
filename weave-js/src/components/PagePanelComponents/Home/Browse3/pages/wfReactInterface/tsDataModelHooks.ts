@@ -2236,6 +2236,32 @@ export const useProjectStats = (projectId: string) => {
   }, [getTsClient, projectId]);
 };
 
+export const useQueryExtendedProjectStats = (
+  projectId: string,
+  timeStart?: string,
+  timeEnd?: string,
+  timeDelta: {
+    days?: number;
+    seconds?: number;
+    microseconds?: number;
+    milliseconds?: number;
+    minutes?: number;
+    hours?: number;
+    weeks?: number;
+  } = {days: 1}
+) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  return useAsync(async () => {
+    return getTsClient().queryExtendedProjectStats({
+      project_id: projectId,
+      time_start: timeStart,
+      time_end: timeEnd,
+      time_delta: timeDelta,
+    });
+  }, [getTsClient, projectId, timeStart, timeEnd, timeDelta]);
+};
+
 // Helper function to process first turn inputs
 const processFirstTurnInputs = async (
   getTsClient: () => traceServerClient.TraceServerClient,

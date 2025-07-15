@@ -35,6 +35,8 @@ import {
   FilesStatsRes,
   ProjectStatsReq,
   ProjectStatsRes,
+  QueryExtendedProjectStatsReq,
+  QueryExtendedProjectStatsRes,
   TableCreateReq,
   TableCreateRes,
   TableUpdateReq,
@@ -487,6 +489,15 @@ export class DirectTraceServerClient {
       '/project/stats',
       req
     );
+  }
+
+  public queryExtendedProjectStats(
+    req: QueryExtendedProjectStatsReq
+  ): Promise<QueryExtendedProjectStatsRes> {
+    return this.makeRequest<
+      QueryExtendedProjectStatsReq,
+      QueryExtendedProjectStatsRes
+    >('/project/query_extended_stats', req);
   }
 
   public async threadsStreamQuery(

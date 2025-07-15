@@ -20,6 +20,7 @@ FEEDBACK_TAG_NAME = "Feedback"
 COST_TAG_NAME = "Costs"
 COMPLETIONS_TAG_NAME = "Completions"
 ACTIONS_TAG_NAME = "Actions"
+PROJECT_TAG_NAME = "Project"
 
 
 class AuthParams(NamedTuple):
@@ -425,5 +426,21 @@ def generate_routes(
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.CompletionsCreateRes:
         return service.trace_server_interface.completions_create(req)
+
+    @router.post("/project/stats", tags=[PROJECT_TAG_NAME])
+    def project_stats(
+        req: tsi.ProjectStatsReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ProjectStatsRes:
+        """Get current project statistics."""
+        return service.trace_server_interface.project_stats(req)
+
+    @router.post("/project/query_extended_stats", tags=[PROJECT_TAG_NAME])
+    def query_extended_project_stats(
+        req: tsi.QueryExtendedProjectStatsReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.QueryExtendedProjectStatsRes:
+        """Get extended project statistics with time binning and user breakdown."""
+        return service.trace_server_interface.query_extended_project_stats(req)
 
     return router
