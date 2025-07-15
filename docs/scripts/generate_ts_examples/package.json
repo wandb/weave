@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start-intro-notebook": "ts-node src/intro-notebook.ts",
-    "generate-ts-docs": "ts-node scripts/generate_ts_docs.ts",
+    "generate-ts-docs": "ts-node scripts/generate_ts_docs.ts"
   },
   "dependencies": {
     "@types/node": "^22.10.2",
