@@ -2,7 +2,7 @@ import React from 'react';
 
 import {Button, ButtonProps} from '../components/Button';
 
-export interface MagicButtonProps extends Omit<ButtonProps, 'icon' | 'startIcon'> {
+export interface MagicButtonProps extends Omit<ButtonProps, 'startIcon'> {
   /**
    * The current state of the magic button.
    */
@@ -25,7 +25,7 @@ export interface MagicButtonProps extends Omit<ButtonProps, 'icon' | 'startIcon'
 /**
  * MagicButton provides a consistent button for AI generation features.
  * It shows a sparkle icon by default and animates during generation.
- * 
+ *
  * @param props Button properties
  * @returns A styled button component with magic sparkle icon
  */
@@ -44,7 +44,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
 }) => {
   // Support legacy isGenerating prop
   const currentState = isGenerating ? 'generating' : state;
-  
+
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (currentState === 'generating' && onCancel) {
       onCancel();
@@ -53,37 +53,17 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
     }
   };
 
-  // Determine button content based on state
-  const getButtonContent = () => {
+  // Determine icon based on state
+  const getIcon = () => {
     switch (currentState) {
       case 'generating':
-        return (
-          <>
-            <span className="inline-block animate-spin">⟳</span>
-            {!iconOnly && <span className="ml-1.5">Cancel</span>}
-          </>
-        );
+        return 'running-repeat';
       case 'error':
-        return (
-          <>
-            <span className="text-red-500">⚠️</span>
-            {!iconOnly && children && <span className="ml-1.5">{children}</span>}
-          </>
-        );
+        return 'warning';
       case 'tooltipOpen':
-        return (
-          <>
-            <span className="animate-pulse">✨</span>
-            {!iconOnly && children && <span className="ml-1.5">{children}</span>}
-          </>
-        );
+      case 'default':
       default:
-        return (
-          <>
-            <span>✨</span>
-            {!iconOnly && children && <span className="ml-1.5">{children}</span>}
-          </>
-        );
+        return 'magic-wand-star';
     }
   };
 
@@ -91,15 +71,17 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   const getButtonVariant = () => {
     if (currentState === 'error') return 'destructive';
     if (currentState === 'tooltipOpen') return 'primary';
+    if (currentState === 'default') return 'ghost';
+    if (currentState === 'generating') return 'secondary';
     return variant;
   };
 
   // Add state-specific classes
   const stateClasses = {
-    generating: 'opacity-100',
-    error: 'shake-animation',
-    tooltipOpen: 'ring-2 ring-blue-500 ring-offset-2',
-    default: ''
+    generating: '',
+    error: '',
+    tooltipOpen: '',
+    default: '',
   };
 
   return (
@@ -108,9 +90,10 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
       disabled={disabled && currentState !== 'generating'}
       size={size}
       variant={getButtonVariant()}
-      className={`transition-all ${stateClasses[currentState] || ''} ${className}`}
-      {...restProps}>
-      {getButtonContent()}
-    </Button>
+      icon={getIcon()}
+      className={`transition-all ${
+        stateClasses[currentState] || ''
+      } ${className}`}
+      {...restProps}></Button>
   );
-}; 
+};

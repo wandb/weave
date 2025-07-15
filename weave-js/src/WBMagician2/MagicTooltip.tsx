@@ -63,7 +63,7 @@ export interface MagicTooltipProps {
 /**
  * MagicTooltip provides a minimal tooltip interface for AI content generation.
  * It appears attached to an anchor element and streams results to the parent.
- * 
+ *
  * @param props Tooltip configuration
  * @returns A positioned tooltip component
  */
@@ -126,6 +126,12 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     setIsGenerating(true);
     abortControllerRef.current = new AbortController();
 
+    // Immediately trigger loading state
+    onStream('', false);
+
+    // Close the tooltip immediately
+    onClose();
+
     try {
       const messages: Message[] = [
         {
@@ -147,10 +153,10 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
       }
 
       let accumulatedContent = '';
-      
+
       const onChunk = (chunk: Chunk) => {
         if (abortControllerRef.current?.signal.aborted) return;
-        
+
         accumulatedContent += chunk.content;
         onStream(accumulatedContent, false);
       };
@@ -167,7 +173,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
       // Signal completion
       if (!abortControllerRef.current?.signal.aborted) {
         onStream(accumulatedContent, true);
-        onClose();
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== 'AbortError') {
@@ -195,11 +200,11 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
       onClose={isGenerating ? undefined : onClose}
       anchorOrigin={{
         vertical: 'bottom',
-        horizontal: 'center',
+        horizontal: 'left',
       }}
       transformOrigin={{
         vertical: 'top',
-        horizontal: 'center',
+        horizontal: 'left',
       }}
       disableAutoFocus
       disableEnforceFocus
@@ -211,13 +216,13 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
         },
       }}>
       <Tailwind>
-        <div className="w-[320px] bg-white dark:bg-gray-900 p-3">
+        <div className="dark:bg-gray-900 w-[320px] bg-white p-3">
           {/* Model selector (if enabled) */}
           {showModelSelector && (
-            <select 
-              className="mb-2 w-full rounded border border-gray-200 bg-transparent px-2 py-1 text-xs text-gray-600 dark:border-gray-700 dark:text-gray-400"
+            <select
+              className="border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400 mb-2 w-full rounded border bg-transparent px-2 py-1 text-xs"
               value={selectedModelId}
-              onChange={(e) => setSelectedModelId(e.target.value)}
+              onChange={e => setSelectedModelId(e.target.value)}
               disabled={isGenerating}>
               {availableModels.map(model => (
                 <option key={model.id} value={model.id}>
@@ -226,7 +231,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
               ))}
             </select>
           )}
-          
+
           {/* Text area */}
           <textarea
             ref={textareaRef}
@@ -235,9 +240,9 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={isGenerating}
-            className="h-32 w-full resize-none rounded border border-gray-200 bg-transparent p-2 text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50 dark:border-gray-700 dark:text-white"
+            className="border-gray-200 dark:border-gray-700 h-32 w-full resize-none rounded border bg-transparent p-2 text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50 dark:text-white"
           />
-          
+
           {/* Generate button */}
           <div className="mt-2 flex justify-end">
             <Button
@@ -252,4 +257,4 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
       </Tailwind>
     </Popover>
   );
-}; 
+};

@@ -72,8 +72,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setEditedContent(content);
     if (isComplete) {
       setIsGenerating(false);
-      setMagicAnchorEl(null);
-    } else if (!isGenerating) {
+    } else {
       setIsGenerating(true);
     }
   };
@@ -106,7 +105,6 @@ export const PlaygroundMessagePanelEditor: React.FC<
         {index === 0 && message.role === 'system' && (
           <>
             <MagicButton
-              variant="outline"
               size="medium"
               onClick={e => setMagicAnchorEl(e.currentTarget)}
               state={getMagicButtonState()}
