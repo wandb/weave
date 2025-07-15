@@ -17,7 +17,7 @@ import type {
   RemoveToolResponse,
   ToolApprovalParams,
 } from '../types';
-import {ErrorCodes,MagicianError} from '../types';
+import {ErrorCodes, MagicianError} from '../types';
 
 /**
  * In-memory implementation of MagicianAppState for development and testing.

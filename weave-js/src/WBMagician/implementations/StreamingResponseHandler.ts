@@ -4,7 +4,7 @@ import type {
   StreamChunk,
   ToolCall,
 } from '../types';
-import {ErrorCodes,MagicianError} from '../types';
+import {ErrorCodes, MagicianError} from '../types';
 
 /**
  * Handles streaming responses from the chat completions API.

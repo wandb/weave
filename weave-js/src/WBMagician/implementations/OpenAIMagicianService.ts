@@ -19,7 +19,7 @@ import type {
   UpdateConversationParams,
   UpdateConversationResponse,
 } from '../types';
-import {ErrorCodes,MagicianError} from '../types';
+import {ErrorCodes, MagicianError} from '../types';
 import {InMemoryConversationStore} from './InMemoryConversationStore';
 import {StreamingResponseHandler} from './StreamingResponseHandler';
 
