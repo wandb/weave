@@ -19,8 +19,6 @@ from weave.trace.env import weave_trace_server_url
 from weave.trace_server import trace_server_interface as tsi
 from weave.utils.retry import _is_retryable_exception
 
-from .base_client import AsyncAPIClient
-
 logger = logging.getLogger(__name__)
 
 REMOTE_REQUEST_BYTES_LIMIT = (
@@ -43,16 +41,18 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.remote_request_bytes_limit = remote_request_bytes_limit
-        self._client = AsyncAPIClient(
+        self._auth = auth
+        self._extra_headers = extra_headers or {}
+        self._client = httpx.AsyncClient(
             base_url=trace_server_url,
             auth=auth,
-            extra_headers=extra_headers,
+            headers=self._extra_headers,
             timeout=httpx.Timeout(timeout=timeout),
         )
 
     async def close(self) -> None:
         """Close the HTTP client."""
-        await self._client.close()
+        await self._client.aclose()
 
     async def __aenter__(self) -> AsyncRemoteHTTPTraceServer:
         return self
@@ -60,20 +60,44 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def __aexit__(self, *args: Any) -> None:
         await self.close()
 
-    # Helper methods for retry logic
+    # Helper methods for making requests
+    async def _make_request(
+        self,
+        method: str,
+        url: str,
+        *,
+        json: Optional[dict[str, Any]] = None,
+        files: Optional[dict[str, Any]] = None,
+        stream: bool = False,
+    ) -> httpx.Response:
+        """Make an HTTP request."""
+        response = await self._client.request(
+            method=method,
+            url=url,
+            json=json,
+            files=files,
+        )
+        response.raise_for_status()
+        return response
+
     async def _retry_request(
         self,
-        func: Any,
-        *args: Any,
+        method: str,
+        url: str,
+        *,
+        json: Optional[dict[str, Any]] = None,
+        files: Optional[dict[str, Any]] = None,
         max_retries: int = 3,
-        **kwargs: Any,
     ) -> Any:
         """Retry a request with exponential backoff."""
         import asyncio
 
         for attempt in range(max_retries):
             try:
-                return await func(*args, **kwargs)
+                response = await self._make_request(method, url, json=json, files=files)
+                if response.headers.get("content-type", "").startswith("application/json"):
+                    return response.json()
+                return response.content
             except Exception as e:
                 if not _is_retryable_exception(e) or attempt == max_retries - 1:
                     raise
@@ -90,7 +114,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EnsureProjectExistsRes:
         """Ensure project exists."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/ensure_project_exists",
             json={"entity": entity, "project": project},
         )
@@ -99,7 +123,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         """Export OpenTelemetry traces."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/otel/export",
             json=req.model_dump(),
         )
@@ -109,7 +133,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         """Start a call."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/call/start",
             json=req.model_dump(exclude_none=True),
         )
@@ -118,7 +142,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         """End a call."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/call/end",
             json=req.model_dump(exclude_none=True),
         )
@@ -127,7 +151,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         """Read a call."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/call/read",
             json=req.model_dump(),
         )
@@ -136,7 +160,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         """Query calls."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/calls/query",
             json=req.model_dump(exclude_none=True),
         )
@@ -165,7 +189,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         """Delete calls."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/calls/delete",
             json=req.model_dump(),
         )
@@ -176,7 +200,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CallsQueryStatsRes:
         """Query call statistics."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/calls/query_stats",
             json=req.model_dump(),
         )
@@ -185,7 +209,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         """Update a call."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/call/update",
             json=req.model_dump(exclude_none=True),
         )
@@ -196,7 +220,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CallCreateBatchRes:
         """Start a batch of calls."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/call/start_batch",
             json=req.model_dump(),
         )
@@ -206,7 +230,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         """Create an operation."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/op/create",
             json=req.model_dump(),
         )
@@ -215,7 +239,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         """Read an operation."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/op/read",
             json=req.model_dump(),
         )
@@ -224,7 +248,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         """Query operations."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/ops/query",
             json=req.model_dump(),
         )
@@ -234,7 +258,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         """Create cost entry."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/cost/create",
             json=req.model_dump(),
         )
@@ -243,7 +267,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         """Query costs."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/cost/query",
             json=req.model_dump(),
         )
@@ -252,7 +276,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         """Purge costs."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/cost/purge",
             json=req.model_dump(),
         )
@@ -262,7 +286,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         """Create an object."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/obj/create",
             json=req.model_dump(),
         )
@@ -271,7 +295,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         """Read an object."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/obj/read",
             json=req.model_dump(),
         )
@@ -280,7 +304,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         """Query objects."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/objs/query",
             json=req.model_dump(),
         )
@@ -289,7 +313,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         """Delete an object."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/obj/delete",
             json=req.model_dump(),
         )
@@ -299,7 +323,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         """Create a table."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/table/create",
             json=req.model_dump(),
         )
@@ -308,7 +332,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         """Update a table."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/table/update",
             json=req.model_dump(),
         )
@@ -317,7 +341,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         """Query tables."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/table/query",
             json=req.model_dump(),
         )
@@ -348,7 +372,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.TableQueryStatsRes:
         """Query table statistics."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/table/query_stats",
             json=req.model_dump(),
         )
@@ -359,7 +383,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.TableQueryStatsBatchRes:
         """Query table statistics in batch."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/table/query_stats_batch",
             json=req.model_dump(),
         )
@@ -369,7 +393,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         """Read references in batch."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/refs/read_batch",
             json=req.model_dump(),
         )
@@ -380,7 +404,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         """Create a file."""
         files = {"file": ("file", req.content)}
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/file/create",
             files=files,
         )
@@ -389,7 +413,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         """Read file content."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/file/content_read",
             json=req.model_dump(),
         )
@@ -399,7 +423,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         """Create feedback."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/feedback/create",
             json=req.model_dump(),
         )
@@ -408,7 +432,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         """Query feedback."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/feedback/query",
             json=req.model_dump(),
         )
@@ -417,7 +441,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
         """Replace feedback."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/feedback/replace",
             json=req.model_dump(),
         )
@@ -426,7 +450,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
     async def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         """Purge feedback."""
         response = await self._retry_request(
-            self._client.post,
+            "POST",
             "/feedback/purge",
             json=req.model_dump(),
         )
