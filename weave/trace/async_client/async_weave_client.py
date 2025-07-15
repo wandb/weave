@@ -104,7 +104,12 @@ if TYPE_CHECKING:
     from weave.trace.run import Run
     from weave.trace.weave_init import InitializedClient
 
-from .async_http_trace_server import AsyncRemoteHTTPTraceServer
+try:
+    from .async_http_trace_server import AsyncRemoteHTTPTraceServer
+except ImportError:
+    raise ImportError(
+        "The async WeaveClient requires httpx. Install it with: pip install httpx"
+    )
 
 logger = logging.getLogger(__name__)
 

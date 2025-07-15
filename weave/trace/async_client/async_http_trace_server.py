@@ -5,10 +5,14 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from typing import Any, Optional
 
-import httpx
+try:
+    import httpx
+except ImportError:
+    raise ImportError(
+        "The async WeaveClient requires httpx. Install it with: pip install httpx"
+    )
 from pydantic import BaseModel
 
 from weave.trace.env import weave_trace_server_url
