@@ -20,7 +20,7 @@ repos:
         exclude: "(weave_query|weave-js|cassettes|examples|sdks|tests|tools|docs)"
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.10.0"
+    rev: "v1.17.0"
     hooks:
       - id: mypy
         additional_dependencies:
