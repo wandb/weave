@@ -73,7 +73,7 @@ class UserSettings(BaseModel):
     """Toggles PII redaction using Microsoft Presidio.
 
     If True, redacts PII from trace data before sending to the server.
-    Can be overriden with the environment variable `WEAVE_REDACT_PII`
+    Can be overridden with the environment variable `WEAVE_REDACT_PII`
     """
 
     redact_pii_fields: list[str] = []
@@ -84,7 +84,7 @@ class UserSettings(BaseModel):
     If this list is left empty, the default fields will be redacted.
 
     A list of supported fields can be found here: https://microsoft.github.io/presidio/supported_entities/
-    Can be overriden with the environment variable `WEAVE_REDACT_PII_FIELDS`
+    Can be overridden with the environment variable `WEAVE_REDACT_PII_FIELDS`
     """
 
     capture_client_info: bool = True

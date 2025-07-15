@@ -888,7 +888,7 @@ class SavedView:
         columns = self.get_table_columns()
         grid = Grid()
         for col in columns:
-            # TODO: Should we have a sort indictor in the column header?
+            # TODO: Should we have a sort indicator in the column header?
             grid.add_column(col["label"])
         for call in calls:
             row = []
