@@ -437,7 +437,36 @@ function MyComponent() {
 }
 ```
 
-See [ENV_SETUP.md](./ENV_SETUP.md) for detailed configuration options.
+## Configuration
+
+### Configuration Options
+
+There are two ways to configure the Magician:
+
+#### Option 1: Quick Setup (For Testing)
+Edit `src/WBMagician/env.js` directly and set `MAGICIAN_SERVICE` to `'openai'` and add your API key. 
+**Note**: Don't commit your API key!
+
+#### Option 2: Local Configuration (Recommended)
+This keeps your API key safe from being committed:
+
+1. Copy `env.local.example.js` to `env.local.js`
+2. Add your OpenAI API key to `env.local.js`
+3. In `Magician.tsx` (line 77), change:
+   ```javascript
+   import {ENV} from './env';
+   ```
+   to:
+   ```javascript
+   import {ENV} from './env.local';
+   ```
+
+The `env.local.js` file is gitignored and won't be committed.
+
+### What Each File Does
+- `env.js` - Default configuration (set to demo mode) that gets committed
+- `env.local.js` - Your personal configuration with API keys (not committed)
+- `env.local.example.js` - Template showing how to create env.local.js
 
 ## Success Metrics
 - Developer adoption: 3+ teams using Magician within 1 month

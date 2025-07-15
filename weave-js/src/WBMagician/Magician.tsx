@@ -74,6 +74,10 @@ return <MagicianSelectionContext context={...}>
 
 import React from 'react';
 
+// For demo mode or committed configuration, use:
+import {ENV} from './env';
+// For local development with your own API key, change to:
+// import {ENV} from './env.local';
 import {CoreMagician} from './implementations/CoreMagician';
 import {DemoMagicianService} from './implementations/DemoMagicianService';
 // Import implementations
@@ -134,16 +138,14 @@ export const MagicianContextProvider: React.FC<
     const appState = new InMemoryAppState();
 
     // Determine which service to use
-    // @ts-ignore - Vite environment variables
-    const serviceType =
-      props.service || import.meta.env?.VITE_MAGICIAN_SERVICE || 'demo';
+    const serviceType = props.service || ENV.MAGICIAN_SERVICE || 'demo';
 
     let service;
     if (serviceType === 'openai') {
       try {
         service = new OpenAIMagicianService(
-          props.openAIKey,
-          props.openAIBaseURL
+          props.openAIKey || ENV.OPENAI_API_KEY,
+          props.openAIBaseURL || ENV.OPENAI_BASE_URL
         );
       } catch (error) {
         console.error(
