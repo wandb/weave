@@ -144,6 +144,8 @@ print(response)
 
 In LlamaIndex, an agent is powered by an LLM to solve a task by executing a series of steps. It is given a set of tools, which can be anything from arbitrary functions up to full LlamaIndex query engines.
 
+Agentic flow is bidirectional, meaning that the agent can go back to the user to get more information/clarification or call tool which in turn call another agent. The flow can go back and forth between the user and the potential output of the system. W&B Weave will trace the agentic flow and the tool calls. Learn more about building agents with LlamaIndex [here](https://docs.llamaindex.ai/en/stable/understanding/agent/).
+
 ```python
 import asyncio
 import weave
@@ -168,17 +170,22 @@ memory = ChatMemoryBuffer.from_defaults(token_limit=40000)
 
 # highlight-next-line
 @weave.op()
-async def main():
-    response = await agent.run("What is 1234 * 4567?", memory=memory)
-    print(response)
+async def main(query: str):
+    response = await agent.run(query, memory=memory)
+    return str(response)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    response = asyncio.run(main("What is 1234 * 4567?"))
+    print(response)
 ```
+
+In the example above, notice that the `main` function is decorated with `@weave.op()`. This is a [Weave decorator](/tutorial-tracing_2) that allows us to trace the function and is a recommended practice for tracing arbitrary/custom functions. The image below shows the [flame graph](/guides/tracking/trace-tree#flame-graph) view of the trace timeline.
+
+![LlamaIndex Agent](imgs/llamaindex/agent_trace.png)
 
 ### Workflows
 
-A workflow is an event-driven, step-based way to control the execution flow of an application. This paradigm allows you to create arbitrarily complex flows that encapsulate logic and make your application more maintainable and easier to understand.
+A workflow is an event-driven, step-based way to control the execution flow of an application. This paradigm allows you to create arbitrarily complex flows that encapsulate logic and make your application more maintainable and easier to understand. Learn more about LlamaIndex workflow [here](https://docs.llamaindex.ai/en/stable/understanding/workflows/).
 
 ```python
 import weave
@@ -217,7 +224,13 @@ result = await workflow.run(first_input="Start the workflow")
 print(result)
 ```
 
+W&B Weave will trace the steps of the workflow and the events that are passed between them. This is especially useful for workflows with branches and loops or complex workflows in general.
+
+![LlamaIndex Workflow](imgs/llamaindex/workflow_trace.png)
+
 ### RAG Pipelines
+
+Retrieval Augmented Generation (RAG) pipelines are common LLM applications where an LLM is provided with relevant context based on a user query. The LLM thus generates a response in-line with the context improving the factual correctness and relevance of the response. LlamaIndex's query engine is a quick way to build a RAG pipeline. Learn more about RAG pipelines with LlamaIndex [here](https://docs.llamaindex.ai/en/stable/understanding/rag/).
 
 ```python
 import weave
@@ -242,6 +255,14 @@ response = query_engine.query("What did the author do growing up?")
 print(response)
 ```
 
+You will see three separate Weave trace URLs. This is by design because the code snippet above first performs node parsing followed by index creation where embeddings are computed for each node. In the final query stage, the user query is passed to the query engine which performs a similarity search over the index and returns the synthesized response. 
+
+![LlamaIndex RAG](imgs/llamaindex/step_rag_trace.png)
+
+One can also bring them under a single trace by putting the code in a single function decorated with `@weave.op()`. Note however that node parsing and vector index creation are a one time operation. Shown below is the trace for query stage.
+
+![LlamaIndex RAG](imgs/llamaindex/single_rag_trace.png)
+
 ## Comprehensive Agent Example
 
 Here's a complete example combining multiple components:
@@ -260,18 +281,15 @@ documents = SimpleDirectoryReader("data").load_data()
 index = VectorStoreIndex.from_documents(documents)
 query_engine = index.as_query_engine()
 
-# highlight-next-line
 def multiply(a: float, b: float) -> float:
     """Useful for multiplying two numbers."""
     return a * b
 
-# highlight-next-line
 async def search_documents(query: str) -> str:
     """Useful for answering questions about documents."""
     response = await query_engine.aquery(query)
     return str(response)
 
-# highlight-next-line
 # Create an agent with both tools
 agent = FunctionAgent(
     tools=[multiply, search_documents],
@@ -286,6 +304,8 @@ response = await agent.run(
 )
 print(response)
 ```
+
+![LlamaIndex Final Demo](imgs/llamaindex/complete.png)
 
 ## Automatic Tracing Features
 
