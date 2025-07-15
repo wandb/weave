@@ -1,4 +1,3 @@
-import {MagicianServiceInterface} from '../types';
 import type {
   ChatCompletionChunk,
   CreateResponseParams,
@@ -17,6 +16,7 @@ import type {
   UpdateConversationParams,
   UpdateConversationResponse,
 } from '../types';
+import {MagicianServiceInterface} from '../types';
 import {InMemoryConversationStore} from './InMemoryConversationStore';
 import {StreamingResponseHandler} from './StreamingResponseHandler';
 

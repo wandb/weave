@@ -27,6 +27,7 @@ import {
   IconSortDescending,
 } from '@wandb/weave/components/Icon';
 import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
+import {useMagician} from '@wandb/weave/WBMagician';
 import React, {
   FC,
   useCallback,
@@ -227,6 +228,8 @@ export const CallsTable: FC<{
   allowedColumnPatterns,
   currentViewId,
 }) => {
+  const magician = useMagician();
+  console.log('magician', magician);
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const [isMetricsChecked, setMetricsChecked] = useState(false);
 

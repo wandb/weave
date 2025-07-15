@@ -2,6 +2,7 @@ import {Box, Button, Paper, TextField, Typography} from '@mui/material';
 import React, {useState} from 'react';
 
 import {
+  MagicianComponent,
   useMagician,
   useRegisterComponentContext,
   useRegisterComponentTool,
@@ -169,6 +170,23 @@ export const MagicianDemoComponent: React.FC = () => {
           Try asking the AI to "update the generated text field with a haiku
           about coding"
         </Typography>
+      </Box>
+
+      <Box sx={{mt: 4}}>
+        <Typography variant="h6" gutterBottom>
+          Chat Interface Example
+        </Typography>
+        <Typography variant="body2" color="text.secondary" gutterBottom>
+          The chat interface below takes up the full width and a fixed height.
+          You can browse conversation history using the settings button.
+        </Typography>
+        <Box sx={{height: '500px', width: '100%', mt: 2}}>
+          <MagicianComponent
+            projectId="demo-project"
+            height="100%"
+            width="100%"
+          />
+        </Box>
       </Box>
     </Paper>
   );

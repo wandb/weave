@@ -16,6 +16,7 @@ export class StreamingResponseHandler implements RespondResponse {
 
   private abortController: AbortController;
   private streamIterator?: AsyncIterableIterator<StreamChunk>;
+  private streamConsumed: boolean = false;
   private accumulatedContent: string = '';
   private accumulatedToolCalls: Map<
     number,
@@ -30,6 +31,7 @@ export class StreamingResponseHandler implements RespondResponse {
     this.requestId = requestId;
     this.conversationId = conversationId;
     this.abortController = new AbortController();
+    console.log('[StreamingResponseHandler] Created new handler:', requestId);
   }
 
   /**
@@ -130,11 +132,44 @@ export class StreamingResponseHandler implements RespondResponse {
     // Return a wrapper that ensures single consumption
     return {
       [Symbol.asyncIterator]: () => {
-        if (this.streamIterator) {
-          throw new Error('Stream already consumed');
+        console.log(
+          '[StreamingResponseHandler] Getting stream iterator, consumed:',
+          this.streamConsumed,
+          'requestId:',
+          this.requestId
+        );
+        if (this.streamConsumed) {
+          console.error(
+            '[StreamingResponseHandler] Stream already consumed for request:',
+            this.requestId
+          );
+          // Return an empty iterator with an error chunk instead of throwing
+          return (async function* () {
+            yield {
+              type: 'error' as const,
+              error: new Error(
+                'Stream already consumed - this is a bug, please report it'
+              ),
+            };
+            yield {
+              type: 'done' as const,
+            };
+          })();
         }
-        // Note: The actual stream will be set by the service
-        return this.streamIterator!;
+        if (!this.streamIterator) {
+          console.error(
+            '[StreamingResponseHandler] Stream not initialized for request:',
+            this.requestId
+          );
+          throw new Error('Stream not yet initialized');
+        }
+        // Mark as consumed when iterator is accessed
+        this.streamConsumed = true;
+        console.log(
+          '[StreamingResponseHandler] Stream marked as consumed for request:',
+          this.requestId
+        );
+        return this.streamIterator;
       },
     };
   }

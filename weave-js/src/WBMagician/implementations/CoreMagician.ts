@@ -1,4 +1,3 @@
-import {MagicianServiceInterface} from '../types';
 import type {
   ChatCompletionRequest,
   ChatMessage,
@@ -8,6 +7,7 @@ import type {
   RespondParams,
   RespondResponse,
 } from '../types';
+import {MagicianServiceInterface} from '../types';
 import {InMemoryAppState} from './InMemoryAppState';
 
 /**

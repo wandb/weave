@@ -64,9 +64,7 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
     this.conversationStore = new InMemoryConversationStore();
   }
 
-  async createResponse(
-    params: CreateResponseParams
-  ): Promise<RespondResponse> {
+  async createResponse(params: CreateResponseParams): Promise<RespondResponse> {
     const {request, conversationId, onStream} = params;
     const requestId = `req_${Date.now()}`;
     const finalConversationId = conversationId || `conv_${Date.now()}`;
@@ -91,7 +89,10 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
     }
 
     // Create response handler
-    const handler = new StreamingResponseHandler(requestId, finalConversationId);
+    const handler = new StreamingResponseHandler(
+      requestId,
+      finalConversationId
+    );
 
     // Create abort controller for this request
     const abortController = new AbortController();
@@ -112,114 +113,115 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
     const service = this;
 
     // Create an async generator for chunks
-    async function* createChunkStream(): AsyncIterable<ChatCompletionChunk> {
-      try {
-        // Make the API call
-        // eslint-disable-next-line wandb/no-unprefixed-urls
-        const response = await fetch(`${service.baseURL}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${service.apiKey}`,
-          },
-          body: JSON.stringify(apiRequest),
-          signal: abortController.signal,
-        });
+    const createChunkStream =
+      async function* (): AsyncIterable<ChatCompletionChunk> {
+        try {
+          // Make the API call
+          // eslint-disable-next-line wandb/no-unprefixed-urls
+          const response = await fetch(`${service.baseURL}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${service.apiKey}`,
+            },
+            body: JSON.stringify(apiRequest),
+            signal: abortController.signal,
+          });
 
-        if (!response.ok) {
-          const errorBody = await response.text();
-          throw new MagicianError(
-            `API request failed: ${response.statusText} - ${errorBody}`,
-            ErrorCodes.NETWORK_ERROR
-          );
-        }
-
-        if (!apiRequest.stream) {
-          // Non-streaming response
-          const data = await response.json();
-
-          // Convert to chunk format
-          const chunk: ChatCompletionChunk = {
-            id: data.id,
-            object: 'chat.completion.chunk',
-            created: data.created,
-            model: data.model,
-            choices: data.choices.map((choice: any) => ({
-              index: choice.index,
-              delta: {
-                role: choice.message.role,
-                content: choice.message.content,
-                tool_calls: choice.message.tool_calls,
-              },
-              finish_reason: choice.finish_reason,
-            })),
-          };
-
-          yield chunk;
-
-          // Call onStream callback if provided
-          if (onStream) {
-            onStream(chunk);
-          }
-        } else {
-          // Streaming response
-          const reader = response.body?.getReader();
-          if (!reader) {
+          if (!response.ok) {
+            const errorBody = await response.text();
             throw new MagicianError(
-              'Response body is not readable',
+              `API request failed: ${response.statusText} - ${errorBody}`,
               ErrorCodes.NETWORK_ERROR
             );
           }
 
-          const decoder = new TextDecoder();
-          let buffer = '';
+          if (!apiRequest.stream) {
+            // Non-streaming response
+            const data = await response.json();
 
-          while (true) {
-            const {done, value} = await reader.read();
-            if (done) break;
+            // Convert to chunk format
+            const chunk: ChatCompletionChunk = {
+              id: data.id,
+              object: 'chat.completion.chunk',
+              created: data.created,
+              model: data.model,
+              choices: data.choices.map((choice: any) => ({
+                index: choice.index,
+                delta: {
+                  role: choice.message.role,
+                  content: choice.message.content,
+                  tool_calls: choice.message.tool_calls,
+                },
+                finish_reason: choice.finish_reason,
+              })),
+            };
 
-            buffer += decoder.decode(value, {stream: true});
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+            yield chunk;
 
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed) continue;
-              
-              if (trimmed === 'data: [DONE]') {
-                // Stream is complete
-                break;
-              }
+            // Call onStream callback if provided
+            if (onStream) {
+              onStream(chunk);
+            }
+          } else {
+            // Streaming response
+            const reader = response.body?.getReader();
+            if (!reader) {
+              throw new MagicianError(
+                'Response body is not readable',
+                ErrorCodes.NETWORK_ERROR
+              );
+            }
 
-              if (trimmed.startsWith('data: ')) {
-                try {
-                  const json = JSON.parse(trimmed.slice(6));
-                  const chunk = json as ChatCompletionChunk;
-                  yield chunk;
-                  
-                  // Call onStream callback if provided
-                  if (onStream) {
-                    onStream(chunk);
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+              const {done, value} = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, {stream: true});
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+
+                if (trimmed === 'data: [DONE]') {
+                  // Stream is complete
+                  break;
+                }
+
+                if (trimmed.startsWith('data: ')) {
+                  try {
+                    const json = JSON.parse(trimmed.slice(6));
+                    const chunk = json as ChatCompletionChunk;
+                    yield chunk;
+
+                    // Call onStream callback if provided
+                    if (onStream) {
+                      onStream(chunk);
+                    }
+                  } catch (e) {
+                    console.error('Failed to parse SSE chunk:', e);
                   }
-                } catch (e) {
-                  console.error('Failed to parse SSE chunk:', e);
                 }
               }
             }
           }
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            throw new MagicianError(
+              'Request was cancelled',
+              ErrorCodes.NETWORK_ERROR
+            );
+          }
+          throw error;
+        } finally {
+          service.abortControllers.delete(requestId);
         }
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          throw new MagicianError(
-            'Request was cancelled',
-            ErrorCodes.NETWORK_ERROR
-          );
-        }
-        throw error;
-      } finally {
-        service.abortControllers.delete(requestId);
-      }
-    }
+      };
 
     // Start processing the stream
     const streamIterator = handler.processStream(createChunkStream());
@@ -284,7 +286,7 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
       // eslint-disable-next-line wandb/no-unprefixed-urls
       const response = await fetch(`${this.baseURL}/models`, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
         },
       });
       return response.ok;

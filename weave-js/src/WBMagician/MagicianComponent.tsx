@@ -1,8 +1,10 @@
 import {
+  Add as AddIcon,
   Check as CheckIcon,
   Close as CloseIcon,
   Code as CodeIcon,
   ContentCopy as CopyIcon,
+  History as HistoryIcon,
   Person as PersonIcon,
   Send as SendIcon,
   Settings as SettingsIcon,
@@ -17,6 +19,8 @@ import {
   Divider,
   Fade,
   IconButton,
+  ListItemIcon,
+  ListItemText,
   Menu,
   MenuItem,
   Paper,
@@ -29,9 +33,11 @@ import React, {FC, useCallback, useEffect, useRef, useState} from 'react';
 import {ToolApprovalCard} from './components/ToolApprovalCard';
 import {useMagician} from './Magician';
 import type {
+  Conversation,
   Message,
   RegisteredContext,
   RegisteredTool,
+  RespondResponse,
   StreamingResponse,
   ToolCall,
 } from './types';
@@ -39,12 +45,14 @@ import type {
 interface MagicianComponentProps {
   projectId?: string;
   height?: string | number;
+  width?: string | number;
   placeholder?: string;
 }
 
 export const MagicianComponent: FC<MagicianComponentProps> = ({
   projectId,
-  height = '600px',
+  height = '100%',
+  width = '100%',
   placeholder = 'Ask me anything... (@ to mention contexts/tools)',
 }) => {
   const magician = useMagician();
@@ -56,8 +64,53 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
   const [showMentions, setShowMentions] = useState(false);
   const [mentionSearch, setMentionSearch] = useState('');
   const [mentionAnchor, setMentionAnchor] = useState<HTMLElement | null>(null);
+  const [settingsAnchor, setSettingsAnchor] = useState<HTMLElement | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const processingRef = useRef<boolean>(false);
+
+  // Load conversations on mount and when conversationId changes
+  useEffect(() => {
+    loadConversations();
+  }, [conversationId]);
+
+  // Load conversations from service
+  const loadConversations = async () => {
+    try {
+      const service = magician.getMagician().getService();
+      const result = await service.listConversations({
+        limit: 20,
+        offset: 0,
+      });
+      setConversations(result.conversations || []);
+    } catch (error) {
+      console.error('Failed to load conversations:', error);
+    }
+  };
+
+  // Load a specific conversation
+  const loadConversation = async (convId: string) => {
+    try {
+      const service = magician.getMagician().getService();
+      const result = await service.getConversation({ id: convId });
+      if (result.conversation) {
+        setConversationId(convId);
+        setMessages(result.conversation.messages);
+        setSettingsAnchor(null); // Close menu
+      }
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+    }
+  };
+
+  // Start a new conversation
+  const startNewConversation = () => {
+    setConversationId(undefined);
+    setMessages([]);
+    setInput('');
+    setSettingsAnchor(null); // Close menu
+  };
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -104,7 +157,10 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
 
   // Send message
   const handleSend = async () => {
-    if (!input.trim() || isStreaming) return;
+    if (!input.trim() || isStreaming || processingRef.current) return;
+
+    // Set processing flag immediately
+    processingRef.current = true;
 
     const userMessage: Message = {
       id: `msg_${Date.now()}`,
@@ -118,10 +174,12 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
     setIsStreaming(true);
     setStreamingContent('');
 
+    let response: RespondResponse | null = null;
+
     try {
-      const response = await magician.respond({
+      response = await magician.respond({
         input: userMessage.content,
-        projectId,
+      projectId,
         conversationId,
       });
 
@@ -132,8 +190,12 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
       let currentContent = '';
       const pendingToolCalls: ToolCall[] = [];
 
-      // Process stream
-      for await (const chunk of response.getStream()) {
+      // Process stream - only call getStream() once
+      console.log('[MagicianComponent] Getting stream from response');
+      const stream = response.getStream();
+      console.log('[MagicianComponent] Got stream, starting iteration');
+      
+      for await (const chunk of stream) {
         if (chunk.type === 'content') {
           currentContent += chunk.content || '';
           setStreamingContent(currentContent);
@@ -166,6 +228,7 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
           };
           setMessages(prev => [...prev, errorMessage]);
           setStreamingContent('');
+          break; // Exit the stream loop on error
         }
       }
     } catch (error) {
@@ -174,12 +237,23 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
       const errorMessage: Message = {
         id: `msg_${Date.now()}`,
         role: 'assistant',
-        content: 'Sorry, I encountered an error processing your request.',
+        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
+      
+      // Cancel the response if it exists
+      if (response) {
+        try {
+          response.cancel();
+        } catch (cancelError) {
+          // Ignore cancel errors
+        }
+      }
     } finally {
       setIsStreaming(false);
+      setStreamingContent('');
+      processingRef.current = false;
     }
   };
 
@@ -310,178 +384,275 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
     t.displayName.toLowerCase().includes(mentionSearch.toLowerCase())
   );
 
+  // Format conversation date
+  const formatConversationDate = (date: Date) => {
+    const now = new Date();
+    const conversationDate = new Date(date);
+    const diffMs = now.getTime() - conversationDate.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return conversationDate.toLocaleDateString();
+  };
+
   return (
-    <Paper
+    <Box
       sx={{
         height,
+        width,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
-        bgcolor: 'background.default',
-        borderRadius: 2,
-        border: 1,
-        borderColor: 'divider',
+        position: 'relative',
       }}>
-      {/* Header */}
-      <Box
-        sx={{
-          px: 3,
-          py: 2,
-          borderBottom: 1,
-          borderColor: 'divider',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-        <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
-          <AIIcon sx={{color: 'primary.main'}} />
-          <Typography variant="h6" sx={{fontWeight: 500}}>
-            Magician
-          </Typography>
-          {conversationId && (
-            <Chip
-              label="Active Session"
-              size="small"
-              sx={{
-                bgcolor: alpha('#4CAF50', 0.1),
-                color: '#4CAF50',
-                fontWeight: 500,
-              }}
-            />
-          )}
-        </Box>
-        <IconButton size="small">
-          <SettingsIcon fontSize="small" />
-        </IconButton>
-      </Box>
-
-      {/* Messages */}
-      <Box
+      <Paper
         sx={{
           flex: 1,
-          overflow: 'auto',
-          px: 3,
-          py: 2,
           display: 'flex',
           flexDirection: 'column',
-          gap: 3,
-        }}>
-        {messages.map(message => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            onCopy={copyMessage}
-            tools={tools}
-            onToolApprove={handleToolApprove}
-            onToolReject={handleToolReject}
-          />
-        ))}
-
-        {/* Streaming message */}
-        {isStreaming && streamingContent && (
-          <MessageBubble
-            message={{
-              id: 'streaming',
-              role: 'assistant',
-              content: streamingContent,
-              timestamp: new Date(),
-            }}
-            isStreaming
-            onCopy={copyMessage}
-          />
-        )}
-
-        {/* Loading indicator */}
-        {isStreaming && !streamingContent && (
-          <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
-            <Avatar sx={{width: 32, height: 32, bgcolor: 'primary.main'}}>
-              <AIIcon sx={{fontSize: 18}} />
-            </Avatar>
-            <Box sx={{display: 'flex', gap: 0.5}}>
-              <CircularProgress size={8} sx={{color: 'text.secondary'}} />
-              <CircularProgress
-                size={8}
-                sx={{color: 'text.secondary', animationDelay: '0.2s'}}
-              />
-              <CircularProgress
-                size={8}
-                sx={{color: 'text.secondary', animationDelay: '0.4s'}}
-              />
-            </Box>
-          </Box>
-        )}
-
-        <div ref={messagesEndRef} />
-      </Box>
-
-      {/* Input */}
-      <Box
-        sx={{
-          p: 2,
-          borderTop: 1,
+          overflow: 'hidden',
+          bgcolor: 'background.default',
+          borderRadius: 2,
+          border: 1,
           borderColor: 'divider',
-          bgcolor: 'background.paper',
+          width: '100%',
+          maxWidth: '100%',
         }}>
-        <Box sx={{display: 'flex', gap: 1, alignItems: 'flex-end'}}>
-          <TextField
-            ref={inputRef}
-            fullWidth
-            multiline
-            maxRows={4}
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder={placeholder}
-            disabled={isStreaming}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 3,
-                bgcolor: 'background.default',
-              },
-            }}
-          />
-          <IconButton
-            onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
-            sx={{
-              bgcolor: 'primary.main',
-              color: 'white',
-              '&:hover': {
-                bgcolor: 'primary.dark',
-              },
-              '&.Mui-disabled': {
-                bgcolor: 'action.disabledBackground',
-              },
-            }}>
-            <SendIcon />
+        {/* Header */}
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            borderBottom: 1,
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
+          }}>
+          <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
+            <AIIcon sx={{color: 'primary.main'}} />
+            <Typography variant="h6" sx={{fontWeight: 500}}>
+              Magician
+            </Typography>
+            {conversationId && (
+              <Chip
+                label="Active Session"
+                size="small"
+                sx={{
+                  bgcolor: alpha('#4CAF50', 0.1),
+                  color: '#4CAF50',
+                  fontWeight: 500,
+                }}
+              />
+            )}
+          </Box>
+          <IconButton 
+            size="small"
+            onClick={(e) => setSettingsAnchor(e.currentTarget)}
+          >
+            <SettingsIcon fontSize="small" />
           </IconButton>
         </Box>
 
-        {/* Active contexts */}
-        {contexts.filter(c => c.autoInclude).length > 0 && (
-          <Box sx={{mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap'}}>
-            <Typography variant="caption" sx={{color: 'text.secondary', mr: 1}}>
-              Active context:
-            </Typography>
-            {contexts
-              .filter(c => c.autoInclude)
-              .map(context => (
-                <Chip
-                  key={context.key}
-                  label={context.displayName}
-                  size="small"
-                  variant="outlined"
-                  sx={{height: 20, fontSize: '0.75rem'}}
+        {/* Messages */}
+        <Box
+          sx={{
+            flex: 1,
+            overflow: 'auto',
+            px: 3,
+            py: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 3,
+            minHeight: 0, // Important for flex overflow
+          }}>
+          {messages.map(message => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              onCopy={copyMessage}
+              tools={tools}
+              onToolApprove={handleToolApprove}
+              onToolReject={handleToolReject}
+            />
+          ))}
+
+          {/* Streaming message */}
+          {isStreaming && streamingContent && (
+            <MessageBubble
+              message={{
+                id: 'streaming',
+                role: 'assistant',
+                content: streamingContent,
+                timestamp: new Date(),
+              }}
+              isStreaming
+              onCopy={copyMessage}
+            />
+          )}
+
+          {/* Loading indicator */}
+          {isStreaming && !streamingContent && (
+            <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+              <Avatar sx={{width: 32, height: 32, bgcolor: 'primary.main'}}>
+                <AIIcon sx={{fontSize: 18}} />
+              </Avatar>
+              <Box sx={{display: 'flex', gap: 0.5}}>
+                <CircularProgress size={8} sx={{color: 'text.secondary'}} />
+                <CircularProgress
+                  size={8}
+                  sx={{color: 'text.secondary', animationDelay: '0.2s'}}
                 />
-              ))}
+                <CircularProgress
+                  size={8}
+                  sx={{color: 'text.secondary', animationDelay: '0.4s'}}
+                />
+              </Box>
+            </Box>
+          )}
+
+          <div ref={messagesEndRef} />
+        </Box>
+
+        {/* Input */}
+        <Box
+          sx={{
+            p: 2,
+            borderTop: 1,
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            flexShrink: 0,
+          }}>
+          <Box sx={{display: 'flex', gap: 1, alignItems: 'flex-end'}}>
+            <TextField
+              ref={inputRef}
+              fullWidth
+              multiline
+              maxRows={4}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder={placeholder}
+              disabled={isStreaming}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 3,
+                  bgcolor: 'background.default',
+                },
+              }}
+            />
+            <IconButton
+              onClick={handleSend}
+              disabled={!input.trim() || isStreaming}
+              sx={{
+                bgcolor: 'primary.main',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: 'primary.dark',
+                },
+                '&.Mui-disabled': {
+                  bgcolor: 'action.disabledBackground',
+                },
+              }}>
+              <SendIcon />
+            </IconButton>
           </Box>
+
+          {/* Active contexts */}
+          {contexts.filter(c => c.autoInclude).length > 0 && (
+            <Box sx={{mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap'}}>
+              <Typography variant="caption" sx={{color: 'text.secondary', mr: 1}}>
+                Active context:
+              </Typography>
+              {contexts
+                .filter(c => c.autoInclude)
+                .map(context => (
+                  <Chip
+                    key={context.key}
+                    label={context.displayName}
+                    size="small"
+                    variant="outlined"
+                    sx={{height: 20, fontSize: '0.75rem'}}
+                  />
+                ))}
+            </Box>
+          )}
+        </Box>
+      </Paper>
+
+      {/* Settings Menu */}
+      <Menu
+        open={Boolean(settingsAnchor)}
+        anchorEl={settingsAnchor}
+        onClose={() => setSettingsAnchor(null)}
+        anchorOrigin={{vertical: 'bottom', horizontal: 'right'}}
+        transformOrigin={{vertical: 'top', horizontal: 'right'}}
+        PaperProps={{
+          sx: {
+            maxHeight: 400,
+            width: 280,
+          },
+        }}>
+        <MenuItem onClick={startNewConversation}>
+          <ListItemIcon>
+            <AddIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText primary="New Conversation" />
+        </MenuItem>
+        <Divider />
+        <Typography
+          variant="caption"
+          sx={{px: 2, py: 1, color: 'text.secondary', display: 'block'}}
+        >
+          Recent Conversations
+        </Typography>
+        {conversations.length > 0 ? (
+          conversations.map((conv) => (
+            <MenuItem
+              key={conv.id}
+              onClick={() => loadConversation(conv.id)}
+              selected={conv.id === conversationId}
+              sx={{py: 1}}
+            >
+              <ListItemIcon>
+                <HistoryIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  conv.title || 
+                  (conv.messages.length > 0 
+                    ? conv.messages[0].content.slice(0, 30) + '...'
+                    : 'Untitled')
+                }
+                secondary={formatConversationDate(conv.updatedAt)}
+                primaryTypographyProps={{
+                  fontSize: '0.875rem',
+                  noWrap: true,
+                }}
+                secondaryTypographyProps={{
+                  fontSize: '0.75rem',
+                }}
+              />
+            </MenuItem>
+          ))
+        ) : (
+          <MenuItem disabled>
+            <Typography variant="body2" color="text.secondary">
+              No conversations yet
+            </Typography>
+          </MenuItem>
         )}
-      </Box>
+      </Menu>
 
       {/* Mentions menu */}
       <Menu
@@ -552,7 +723,7 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
           </>
         )}
       </Menu>
-    </Paper>
+    </Box>
   );
 };
 
