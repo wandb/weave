@@ -419,9 +419,9 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == asc_ids
-        ), f"Sorting by {fields} ascending failed, expected {asc_ids}, got {found_ids}"
+        assert found_ids == asc_ids, (
+            f"Sorting by {fields} ascending failed, expected {asc_ids}, got {found_ids}"
+        )
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -438,9 +438,9 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == asc_ids[::-1]
-        ), f"Sorting by {fields} descending failed, expected {asc_ids[::-1]}, got {found_ids}"
+        assert found_ids == asc_ids[::-1], (
+            f"Sorting by {fields} descending failed, expected {asc_ids[::-1]}, got {found_ids}"
+        )
 
 
 @pytest.mark.asyncio
@@ -487,9 +487,9 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == eq_ids
-        ), f"Filtering by {field} == {value} failed, expected {eq_ids}, got {found_ids}"
+        assert found_ids == eq_ids, (
+            f"Filtering by {field} == {value} failed, expected {eq_ids}, got {found_ids}"
+        )
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -507,9 +507,9 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert (
-            found_ids == gt_ids
-        ), f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
+        assert found_ids == gt_ids, (
+            f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
+        )
 
 
 class MatchAnyDatetime:

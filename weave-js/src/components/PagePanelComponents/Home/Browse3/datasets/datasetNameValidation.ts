@@ -9,43 +9,29 @@ export function validateDatasetName(
   if (!value.trim()) {
     return {
       isValid: false,
-      error: null,
+      error: 'Dataset name cannot be empty',
     };
   }
 
-  try {
-    // First check if it starts with a letter or number
-    if (!/^[a-zA-Z0-9]/.test(value)) {
-      return {
-        isValid: false,
-        error: 'Dataset name must start with a letter or number',
-      };
-    }
-
-    // Then check if it only contains allowed characters
-    if (!/^[a-zA-Z0-9\-_]+$/.test(value)) {
-      const invalidChars = [
-        ...new Set(
-          value
-            .split('')
-            .filter(c => !/[a-zA-Z0-9\-_]/.test(c))
-            .map(c => (c === ' ' ? '<space>' : c))
-        ),
-      ].join(', ');
-      return {
-        isValid: false,
-        error: `Invalid characters found: ${invalidChars}`,
-      };
-    }
-
-    return {
-      isValid: true,
-      error: null,
-    };
-  } catch (e) {
+  // Use simpler regex matching backend: check for any invalid characters
+  const invalidRegex = /[^\w.-]/;
+  if (invalidRegex.test(value)) {
+    const invalidChars = [
+      ...new Set(
+        value
+          .split('')
+          .filter(c => invalidRegex.test(c))
+          .map(c => (c === ' ' ? '&lt;space&gt;' : c))
+      ),
+    ].join(', ');
     return {
       isValid: false,
-      error: e instanceof Error ? e.message : 'Invalid dataset name',
+      error: `Invalid characters found: ${invalidChars}`,
     };
   }
+
+  return {
+    isValid: true,
+    error: null,
+  };
 }
