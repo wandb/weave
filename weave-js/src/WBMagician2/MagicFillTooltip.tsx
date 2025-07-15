@@ -6,6 +6,8 @@ import {
   Message,
   useChatCompletionStream,
 } from './chatCompletionClient';
+import {Button} from '../components/Button';
+import {Tailwind} from '../components/Tailwind';
 
 export interface MagicFillTooltipProps {
   /**
@@ -192,67 +194,115 @@ export const MagicFillTooltip: React.FC<MagicFillTooltipProps> = ({
         '& .MuiPopover-paper': {
           marginTop: '8px',
           borderRadius: '8px',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-          border: '1px solid rgba(0, 0, 0, 0.08)',
+          backgroundColor: 'transparent',
+          boxShadow: 'none',
           overflow: 'visible',
         },
       }}>
-      <div
-        className="relative w-[300px] overflow-hidden rounded-lg"
-        style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-        }}>
-        {/* Arrow pointing up */}
+      <Tailwind>
         <div
-          className="absolute -top-[6px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t"
+          className="relative w-[320px] overflow-hidden rounded-lg backdrop-blur-xl backdrop-saturate-150"
           style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            borderColor: 'rgba(0, 0, 0, 0.08)',
-          }}
-        />
-        
-        {/* Input area */}
-        <div className="relative z-10 p-3">
-          <textarea
-            ref={textareaRef}
-            value={userInstructions}
-            onChange={e => setUserInstructions(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            disabled={isGenerating}
-            className="h-[100px] w-full resize-none rounded-md border border-moon-200/50 bg-white/50 px-3 py-2 text-sm text-moon-850 placeholder-moon-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:border-moon-750/50 dark:bg-moon-900/50 dark:text-moon-150 dark:placeholder-moon-500"
+            background: 'linear-gradient(to bottom right, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.75))',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.2)',
+          }}>
+          {/* Dark mode background */}
+          <div 
+            className="pointer-events-none absolute inset-0 hidden rounded-lg dark:block"
             style={{
-              lineHeight: '20px',
+              background: 'linear-gradient(to bottom right, rgba(30, 30, 30, 0.95), rgba(20, 20, 20, 0.9))',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
             }}
           />
           
-          {/* Generate button */}
-          <div className="mt-2 flex justify-end">
-            <button
-              onClick={isGenerating ? handleCancel : handleGenerate}
-              disabled={!isGenerating && !userInstructions.trim()}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
-                isGenerating
-                  ? 'bg-red-500 text-white hover:bg-red-600'
-                  : 'bg-teal-500 text-white hover:bg-teal-600 disabled:cursor-not-allowed disabled:opacity-50'
-              }`}>
-              {isGenerating ? (
-                <>
-                  <span className="inline-block animate-spin text-sm">⟳</span>
-                  <span>Cancel</span>
-                </>
-              ) : (
-                <>
-                  <span>Generate</span>
-                  <span className="text-sm">✨</span>
-                </>
-              )}
-            </button>
+          {/* Arrow pointing up */}
+          <div
+            className="absolute -top-[6px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 rounded-sm"
+            style={{
+              background: 'linear-gradient(to top left, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.9))',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderBottom: 'none',
+              borderRight: 'none',
+              boxShadow: '-2px -2px 4px 0 rgba(31, 38, 135, 0.05)',
+            }}
+          />
+          
+          {/* Dark mode arrow */}
+          <div
+            className="absolute -top-[6px] left-1/2 hidden h-3 w-3 -translate-x-1/2 rotate-45 rounded-sm dark:block"
+            style={{
+              background: 'linear-gradient(to top left, rgba(20, 20, 20, 0.9), rgba(30, 30, 30, 0.85))',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderBottom: 'none',
+              borderRight: 'none',
+            }}
+          />
+          
+          {/* Content wrapper */}
+          <div className="relative z-10">
+            {/* Header gradient */}
+            <div 
+              className="absolute inset-x-0 top-0 h-12 opacity-50"
+              style={{
+                background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0.5), transparent)',
+              }}
+            />
+            
+            {/* Input area */}
+            <div className="relative p-3">
+              <textarea
+                ref={textareaRef}
+                value={userInstructions}
+                onChange={e => setUserInstructions(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholder}
+                disabled={isGenerating}
+                className="h-[100px] w-full resize-none rounded-md border border-moon-200/30 bg-white/40 px-3 py-2.5 text-sm leading-relaxed text-moon-850 placeholder-moon-500 backdrop-blur-sm transition-colors focus:border-teal-500/50 focus:outline-none focus:ring-1 focus:ring-teal-500/50 disabled:opacity-50 dark:border-moon-750/30 dark:bg-moon-900/40 dark:text-moon-150 dark:placeholder-moon-400"
+              />
+              
+              {/* Subtle gradient accent at bottom of input */}
+              <div className="absolute bottom-2 left-3 right-3 h-px bg-gradient-to-r from-transparent via-teal-400/20 to-transparent" />
+            </div>
+            
+            {/* Footer with generate button */}
+            <div 
+              className="relative border-t border-moon-200/30 px-3 py-2 dark:border-moon-750/30"
+              style={{
+                background: 'linear-gradient(to top, rgba(255, 255, 255, 0.6), transparent)',
+              }}>
+              <div className="absolute inset-0 dark:hidden" style={{
+                background: 'linear-gradient(to top, rgba(255, 255, 255, 0.3), transparent)',
+              }} />
+              
+              <div className="relative flex items-center justify-between">
+                <p className="text-xs text-moon-500 dark:text-moon-400">
+                  {isGenerating ? 'Generating...' : 'Enter to generate'}
+                </p>
+                
+                <Button
+                  onClick={isGenerating ? handleCancel : handleGenerate}
+                  disabled={!isGenerating && !userInstructions.trim()}
+                  size="small"
+                  variant="primary"
+                  className="shadow-sm transition-all hover:shadow-md">
+                  {isGenerating ? (
+                    <>
+                      <span className="mr-1.5">Cancel</span>
+                      <span className="inline-block animate-spin">⟳</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="mr-1.5">Generate</span>
+                      <span>✨</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </Tailwind>
     </Popover>
   );
 }; 
