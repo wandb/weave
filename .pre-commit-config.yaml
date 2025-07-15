@@ -48,7 +48,7 @@ repos:
     rev: v9.1.5
     hooks:
       - id: oxipng
-        args: ["-o", "4", "--strip", "safe", "--alpha"]
+        args: ["-o", "2", "--strip", "safe", "--alpha"]
         exclude: (weave_query|weave-js)
   # This is legacy Weave when we were building a notebook product - should be removed
   - repo: local
