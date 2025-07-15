@@ -1,21 +1,32 @@
 # LlamaIndex
 
-Weave provides seamless integration with [LlamaIndex](https://docs.llamaindex.ai/en/stable/), a powerful framework for building LLM-powered applications such as retrieval-augmented generation (RAG), chatbots, and autonomous agents. The integration automatically captures detailed traces of all LlamaIndex operations, making it easy to monitor, debug, and optimize your LLM workflows.
+Weave integrates with [LlamaIndex](https://docs.llamaindex.ai/en/stable/), a powerful framework for building LLM-driven applications like RAG systems, chatbots, and agents.
 
-When working with LLMs, debugging is inevitable. Whether a model call fails, an output is misformatted, or nested model calls create confusion, pinpointing issues can be challenging. LlamaIndex applications often consist of multiple steps and LLM call invocations, making it crucial to understand the inner workings of your chains and agents.
+Using [LlamaIndex’s instrumentation system](https://docs.llamaindex.ai/en/stable/module_guides/observability/instrumentation/), the Weave integration automatically captures:
 
-Weave simplifies this process by automatically capturing traces for your LlamaIndex applications through LlamaIndex's built-in instrumentation system. This enables you to monitor and analyze your application's performance, making it easier to debug and optimize your LLM workflows.
+- _Execution time_: Duration of each operation
+- _Token usage_: Input and output token counts
+- _Cost tracking_: Estimated costs for API calls
+- _Inputs and outputs_: Full request and response data
+- _Error handling_: Detailed error traces and stack traces
+- _Nested operations_: Complete trace hierarchy showing parent-child relationships
+- _Streaming data_: Accumulated streaming responses
 
-## Getting Started
+All trace data is viewable in the Weave UI, making it easy to debug and optimize your LlamaIndex applications.
 
-To get started, simply call `weave.init()` at the beginning of your script. The integration will automatically start tracing all LlamaIndex operations.
+For a basic usage example, see [Get started](#get-started). For more examples demonstrating advanced usage, see [Advanced usage](#advanced-usage) and the [Complete example: Tracking agents](#complete-example-tracking-agents).
+
+## Get started
+
+To get started, call `weave.init()` in your LLM application. The integration will begin tracing all LlamaIndex operations automatically.
+
+The example below initializes a Weave project `llamaindex-demo`, sends a prompt to `gpt-4o-mini`, and prints the result.
 
 ```python
 import weave
 from llama_index.llms.openai import OpenAI
 
 # Initialize Weave with your project name
-# highlight-next-line
 weave.init("llamaindex-demo")
 
 # All LlamaIndex operations are now automatically traced
@@ -24,25 +35,22 @@ response = llm.complete("William Shakespeare is ")
 print(response)
 ```
 
-That's it! The integration leverages [LlamaIndex's instrumentation system](https://docs.llamaindex.ai/en/stable/module_guides/observability/instrumentation/) to automatically capture traces for all operations including LLM calls, embeddings, retrievals, and agent steps.
-
 ![LlamaIndex Demo](imgs/llamaindex/simple_trace.png)
 
-## Core LlamaIndex Components
+Next, try out the examples in [Advanced usage](#advanced-usage).
 
-The Weave integration supports [all major LlamaIndex components](https://docs.llamaindex.ai/en/stable/module_guides/) with automatic tracing:
+## Advanced usage
 
-### LLM Operations
+The examples below demonstrate more advanced LlamaIndex features, including streaming, chat, tool calling, and workflows. Each example includes a short description of what it does and how Weave traces it.
 
-Weave automatically traces all LlamaIndex LLM operations including completions, streaming, chat, and tool calling.
+### Synchronous and asynchronous completions
 
-#### Synchronous and Asynchronous Completions
+Use these methods to get text completions either synchronously or with `await`. Weave traces both methods.
 
 ```python
 import weave
 from llama_index.llms.openai import OpenAI
 
-# highlight-next-line
 weave.init("llamaindex-demo")
 
 llm = OpenAI(model="gpt-4o-mini")
@@ -56,13 +64,14 @@ response = await llm.acomplete("William Shakespeare is ")
 print(response)
 ```
 
-#### Streaming Operations
+### Streaming operations
+
+LlamaIndex supports streaming token output from completions. Weave captures the token stream for both sync and async modes.
 
 ```python
 import weave
 from llama_index.llms.openai import OpenAI
 
-# highlight-next-line
 weave.init("llamaindex-demo")
 
 llm = OpenAI(model="gpt-4o-mini")
@@ -78,16 +87,15 @@ async for token in handle:
     print(token.delta, end="", flush=True)
 ```
 
-### Chat Interface
+### Chat interface
 
-The LLM class also implements a chat method, which allows you to have more sophisticated interactions.
+The chat interface allows for back-and-forth message exchanges. This is useful for building assistants or more interactive experiences. Weave traces all chat interactions.
 
 ```python
 import weave
 from llama_index.llms.openai import OpenAI
 from llama_index.core.llms import ChatMessage
 
-# highlight-next-line
 weave.init("llamaindex-demo")
 
 llm = OpenAI(model="gpt-4o-mini")
@@ -110,9 +118,9 @@ for token in handle:
     print(token.delta, end="", flush=True)
 ```
 
-### Tool Calling
+### Tool calling
 
-Tool calling is a central piece for building agents and workflows. Weave automatically traces all tool calls, including synchronous and asynchronous calls.
+Tool calling is commonly used when building agents and workflows. Weave automatically traces each tool call and its result.
 
 ```python
 import weave
@@ -120,7 +128,6 @@ from pydantic import BaseModel
 from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
 
-# highlight-next-line
 weave.init("llamaindex-demo")
 
 class Song(BaseModel):
@@ -128,7 +135,6 @@ class Song(BaseModel):
     artist: str
 
 def generate_song(name: str, artist: str) -> Song:
-    """Generates a song with provided name and artist."""
     return Song(name=name, artist=artist)
 
 tool = FunctionTool.from_defaults(fn=generate_song)
@@ -140,11 +146,9 @@ print(response)
 
 ![LlamaIndex Tool Calling](imgs/llamaindex/tool_call_trace.png)
 
-### Agents
+### Tracking agents
 
-In LlamaIndex, an agent is powered by an LLM to solve a task by executing a series of steps. It is given a set of tools, which can be anything from arbitrary functions up to full LlamaIndex query engines.
-
-Agentic flow is bidirectional, meaning that the agent can go back to the user to get more information/clarification or call tool which in turn call another agent. The flow can go back and forth between the user and the potential output of the system. W&B Weave will trace the agentic flow and the tool calls. Learn more about building agents with LlamaIndex [here](https://docs.llamaindex.ai/en/stable/understanding/agent/).
+Agents in LlamaIndex use LLMs and tools to solve tasks. They can ask clarifying questions or call functions repeatedly. Weave captures every step in the flow.
 
 ```python
 import asyncio
@@ -153,11 +157,9 @@ from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
 from llama_index.core.memory import ChatMemoryBuffer
 
-# highlight-next-line
 weave.init("llamaindex-demo")
 
 def multiply(a: float, b: float) -> float:
-    """Useful for multiplying two numbers."""
     return a * b
 
 agent = FunctionAgent(
@@ -168,7 +170,6 @@ agent = FunctionAgent(
 
 memory = ChatMemoryBuffer.from_defaults(token_limit=40000)
 
-# highlight-next-line
 @weave.op()
 async def main(query: str):
     response = await agent.run(query, memory=memory)
@@ -179,13 +180,13 @@ if __name__ == "__main__":
     print(response)
 ```
 
-In the example above, notice that the `main` function is decorated with `@weave.op()`. This is a [Weave decorator](/tutorial-tracing_2) that allows us to trace the function and is a recommended practice for tracing arbitrary/custom functions. The image below shows the [flame graph](/guides/tracking/trace-tree#flame-graph) view of the trace timeline.
+The `@weave.op()` decorator wraps the `main()` function so it can be traced in Weave. This helps capture custom async workflows clearly in the trace tree.
 
 ![LlamaIndex Agent](imgs/llamaindex/agent_trace.png)
 
 ### Workflows
 
-A workflow is an event-driven, step-based way to control the execution flow of an application. This paradigm allows you to create arbitrarily complex flows that encapsulate logic and make your application more maintainable and easier to understand. Learn more about LlamaIndex workflow [here](https://docs.llamaindex.ai/en/stable/understanding/workflows/).
+LlamaIndex workflows use event-based steps to build structured execution logic. Weave traces each step and the data passed between them.
 
 ```python
 import weave
@@ -197,7 +198,6 @@ from llama_index.core.workflow import (
     Event,
 )
 
-# highlight-next-line
 weave.init("llamaindex-demo")
 
 class FirstEvent(Event):
@@ -224,13 +224,13 @@ result = await workflow.run(first_input="Start the workflow")
 print(result)
 ```
 
-W&B Weave will trace the steps of the workflow and the events that are passed between them. This is especially useful for workflows with branches and loops or complex workflows in general.
+Weave traces each event and transition, which is useful for debugging multi-step flows with conditionals, branches, or loops.
 
 ![LlamaIndex Workflow](imgs/llamaindex/workflow_trace.png)
 
-### RAG Pipelines
+### RAG pipelines
 
-Retrieval Augmented Generation (RAG) pipelines are common LLM applications where an LLM is provided with relevant context based on a user query. The LLM thus generates a response in-line with the context improving the factual correctness and relevance of the response. LlamaIndex's query engine is a quick way to build a RAG pipeline. Learn more about RAG pipelines with LlamaIndex [here](https://docs.llamaindex.ai/en/stable/understanding/rag/).
+RAG (Retrieval Augmented Generation) pipelines use LLMs with external context. This example loads documents, builds an index, and queries it. Weave traces the parsing, indexing, and querying stages.
 
 ```python
 import weave
@@ -238,7 +238,6 @@ from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.llms.openai import OpenAI
 
-# highlight-next-line
 weave.init("llamaindex-demo")
 
 # Load and process documents
@@ -255,17 +254,14 @@ response = query_engine.query("What did the author do growing up?")
 print(response)
 ```
 
-You will see three separate Weave trace URLs. This is by design because the code snippet above first performs node parsing followed by index creation where embeddings are computed for each node. In the final query stage, the user query is passed to the query engine which performs a similarity search over the index and returns the synthesized response. 
+Weave shows separate traces for node parsing, index creation, and querying. To view all steps under a single trace, wrap the logic in a `@weave.op()` function. Note that parsing and indexing are typically one-time setup steps.
 
 ![LlamaIndex RAG](imgs/llamaindex/step_rag_trace.png)
-
-One can also bring them under a single trace by putting the code in a single function decorated with `@weave.op()`. Note however that node parsing and vector index creation are a one time operation. Shown below is the trace for query stage.
-
 ![LlamaIndex RAG](imgs/llamaindex/single_rag_trace.png)
 
-## Comprehensive Agent Example
+## Complete example: Tracking agents
 
-Here's a complete example combining multiple components:
+This end-to-end example shows how to combine a document search tool and a math tool in a single agent. Weave traces the full interaction, including tool calls and the final response.
 
 ```python
 import weave
@@ -273,7 +269,6 @@ from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
 
-# highlight-next-line
 weave.init("llamaindex-demo")
 
 # Create a RAG tool
@@ -282,11 +277,9 @@ index = VectorStoreIndex.from_documents(documents)
 query_engine = index.as_query_engine()
 
 def multiply(a: float, b: float) -> float:
-    """Useful for multiplying two numbers."""
     return a * b
 
 async def search_documents(query: str) -> str:
-    """Useful for answering questions about documents."""
     response = await query_engine.aquery(query)
     return str(response)
 
@@ -298,27 +291,12 @@ agent = FunctionAgent(
     and search through documents to answer questions.""",
 )
 
-# highlight-next-line
 response = await agent.run(
     "What did the author do in college? Also, what's 7 * 8?"
 )
 print(response)
 ```
 
+This combines retrieval and arithmetic tasks. Weave traces the question routing, tool invocations, and agent response timeline.
+
 ![LlamaIndex Final Demo](imgs/llamaindex/complete.png)
-
-## Automatic Tracing Features
-
-The Weave integration automatically captures:
-
-- **Execution Time**: Duration of each operation
-- **Token Usage**: Input and output token counts
-- **Cost Tracking**: Estimated costs for API calls
-- **Inputs and Outputs**: Full request and response data
-- **Error Handling**: Detailed error traces and stack traces
-- **Nested Operations**: Complete trace hierarchy showing parent-child relationships
-- **Streaming Data**: Accumulated streaming responses
-
-All trace data is viewable in the Weave web interface, making it easy to debug and optimize your LlamaIndex applications.
-
-By integrating Weave with LlamaIndex, you get comprehensive observability into your LLM applications with zero additional configuration, making it easier to debug, optimize, and evaluate your workflows.
