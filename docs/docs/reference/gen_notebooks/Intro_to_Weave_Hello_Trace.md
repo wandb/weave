@@ -35,7 +35,7 @@ Before you can begin tracing in Weave, complete the following prerequisites.
 
 
 ```python
-# Install dependancies and imports
+# Install dependencies and imports
 !pip install wandb weave openai -q
 
 import json

@@ -393,7 +393,7 @@ print(f"Anonymized text:\n\t{anonymized_text}")
 You can use `autopatch_settings` to configure PII handling directly during initialization for one or more of the supported LLM integrations. The advantages of this method are:
 
 1. PII handling logic is centralized and scoped at initialization, reducing the need for scattered custom logic.
-2. PII processing workflows can be customized or disabled entirely for specific intergations.
+2. PII processing workflows can be customized or disabled entirely for specific integrations.
 
 To use `autopatch_settings` to configure PII handling, define `postprocess_inputs` and/or `postprocess_output` in `op_settings` for any one of the supported LLM integrations. 
 

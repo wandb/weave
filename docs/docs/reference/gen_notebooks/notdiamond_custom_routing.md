@@ -190,7 +190,7 @@ from weave.integrations.notdiamond.custom_router import evaluate_router
 eval_prompt_column = "prompt"
 eval_response_column = "actual"
 
-best_provider_model, nd_model = evaluate_router(
+best_provider_model, and_model = evaluate_router(
     model_datasets=model_test,
     prompt_column=eval_prompt_column,
     response_column=eval_response_column,
@@ -213,10 +213,10 @@ best_provider_eval = weave.Evaluation(
 )
 await best_provider_eval.evaluate(best_provider_model)
 
-nd_eval = weave.Evaluation(
-    dataset=nd_model.model_results.to_dict(orient="records"), scorers=[is_correct]
+and_eval = weave.Evaluation(
+    dataset=and_model.model_results.to_dict(orient="records"), scorers=[is_correct]
 )
-await nd_eval.evaluate(nd_model)
+await and_eval.evaluate(and_model)
 ```
 
 In this instance, the Not Diamond "meta-model" routes prompts across several different models.

@@ -284,7 +284,7 @@ await evaluation.evaluate(optimized_module.forward)
 
 ![](../../media/dspy_optimization/5.png)
 
-When coomparing the evalution of the baseline program with the optimized one shows that the optimized program answers the causal reasoning questions with siginificantly more accuracy.
+When coomparing the evalution of the baseline program with the optimized one shows that the optimized program answers the causal reasoning questions with significantly more accuracy.
 
 ## Conclusion
 

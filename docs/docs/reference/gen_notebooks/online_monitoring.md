@@ -182,7 +182,7 @@ def process_calls(calls):
             {
                 "Call ID": call.id,
                 "Trace ID": call.trace_id,  # this is a unique ID for the trace that can be used to retrieve it
-                "Display Name": call.display_name,  # this is an optional name you can set in the UI or programatically
+                "Display Name": call.display_name,  # this is an optional name you can set in the UI or programmatically
                 "Latency (ms)": latency,
                 "Thumbs Up": thumbs_up,
                 "Thumbs Down": thumbs_down,
@@ -202,7 +202,7 @@ df_calls.head(3)
 
 ### 2.2.2 Using high-level APIs
 
-Instead of goin through every call Weave also provides high-level APIs to directly access model costs, feedback, and other metrics.
+Instead of going through every call Weave also provides high-level APIs to directly access model costs, feedback, and other metrics.
 For example, for the cost, we'll use the `query_costs` API to fetch the costs of all used LLMs using in project:
 
 
@@ -215,7 +215,7 @@ df_costs["total_cost"] = (
     df_costs["prompt_token_cost"] + df_costs["completion_token_cost"]
 )
 
-# only show the first row for every unqiue llm_id
+# only show the first row for every unique llm_id
 df_costs
 ```
 

@@ -34,7 +34,7 @@ Before you can run a Weave evaluation, complete the following prerequisites.
 
 
 ```python
-# Install dependancies and imports
+# Install dependencies and imports
 !pip install wandb weave openai -q
 
 import os

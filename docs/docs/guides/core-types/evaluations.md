@@ -13,7 +13,7 @@ Once you’ve defined the `Evaluation`, you can run it against a [`Model`](../co
 To get started with evaluations, complete the following steps:
 
 1. [Create an `Evaluation` object](#1-create-an-evaluation-object)
-2. [Define a dataset of examples](#2-define-a-datset-of-test-examples)
+2. [Define a dataset of examples](#2-define-a-dataset-of-test-examples)
 3. [Define scoring functions](#3-define-scoring-functions)
 4. [Define a `Model` to evaluate](#4-define-a-model-to-evaluate)
 5. [Run the evaluation](#5-run-the-evaluation)
@@ -56,7 +56,7 @@ evaluation = Evaluation(
 evaluation.evaluate(model, __weave={"display_name": "My Evaluation Run"})
 ```
 
-## 2. Define a datset of test examples
+## 2. Define a dataset of test examples
 
 First, define a [Dataset](../core-types/datasets.md) object or list of dictionaries with a collection of examples to be evaluated. These examples are often failure cases that you want to test for, these are similar to unit tests in Test-Driven Development (TDD).
 

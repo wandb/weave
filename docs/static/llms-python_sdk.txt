@@ -2088,7 +2088,7 @@ Get a list of calls.
  - `include_feedback`:  If true, feedback info is included at summary.weave.feedback 
  - `columns`:  A list of columns to include in the response. If None,  all columns are included. Specifying fewer columns may be more performant. 
  - `Some columns are always included`:  id, project_id, trace_id, op_name, started_at 
- - `scored_by`:  Accepts a list or single item. Each item is a name or ref uri of a scorer  to filter by. Multiple scorers are ANDed together. If passing in just the name,  then scores for all versions of the scorer are returned. If passing in the full ref  URI, then scores for a specific version of the scorer are returned. 
+ - `scored_by`:  Accepts a list or single item. Each item is a name or ref uri of a scorer  to filter by. Multiple scorers are ANDead together. If passing in just the name,  then scores for all versions of the scorer are returned. If passing in the full ref  URI, then scores for a specific version of the scorer are returned. 
  - `page_size`:  Tune performance by changing the number of calls fetched at a time. 
 
 

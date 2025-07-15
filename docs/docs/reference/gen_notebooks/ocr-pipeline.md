@@ -19,7 +19,7 @@ This guide demonstrates how to:
 1. Track different versions of a system prompts using Weave
 2. Get an image dataset from Weave
 3. Create a NER pipeline
-4. Set up Weave [Scorers](https://weave-docs.wandb.ai/guides/evaluation/scorers) to peform a [Weave Evaluation](https://weave-docs.wandb.ai/guides/core-types/evaluations) on the pipeline
+4. Set up Weave [Scorers](https://weave-docs.wandb.ai/guides/evaluation/scorers) to perform a [Weave Evaluation](https://weave-docs.wandb.ai/guides/core-types/evaluations) on the pipeline
 5. Run an evaluation against our dataset of handwritten notes
 
 ##  Prerequisites
@@ -55,7 +55,7 @@ os.environ["WANDB_API_KEY"] = userdata.get("WANDB_API_KEY")
 # Replace the PROJECT value with your project name
 PROJECT = "vlm-handwritten-ner"
 
-# Initiatlize the Weave project
+# Initialize the Weave project
 weave.init(PROJECT)
 ```
 
@@ -228,14 +228,14 @@ Now that you have created a pipeline to perform NER using a VLM, you can use Wea
 A fundamental part of a Weave Evaluation are [Scorers](https://weave-docs.wandb.ai/guides/evaluation/scorers). Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
 
 In this section, you will create two Scorers to evaluate the pipeline:
-1. Programatic Scorer 
+1. Programmatic Scorer 
 2. LLM-as-a-judge Scorer
 
 
 
-### Programatic scorer
+### Programmatic scorer
 
-The programmatic scorer, `check_for_missing_fields_programatically`, will take the model output (the output of the `named_entity_recognition` function), and identify which `keys` are missing or empty in the results.
+The programmatic scorer, `check_for_missing_fields_programmatically`, will take the model output (the output of the `named_entity_recognition` function), and identify which `keys` are missing or empty in the results.
 
 This check is great for identifying samples where the model missed capturing any fields.
 
@@ -243,7 +243,7 @@ This check is great for identifying samples where the model missed capturing any
 ```python
 # Add weave.op() to track execution of the scorer
 @weave.op()
-def check_for_missing_fields_programatically(model_output):
+def check_for_missing_fields_programmatically(model_output):
     # Required keys for every entry
     required_fields = {"Patient Name", "Date", "Patient ID", "Group Number"}
 
@@ -336,7 +336,7 @@ evaluation = weave.Evaluation(
     dataset=dataset,
     scorers=[
         check_for_missing_fields_with_llm,
-        check_for_missing_fields_programatically,
+        check_for_missing_fields_programmatically,
     ],
     name="Evaluate_4.1_NER",
 )

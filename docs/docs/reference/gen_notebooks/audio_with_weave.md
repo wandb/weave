@@ -29,7 +29,7 @@ For the advanced use case, we leverage the OpenAI Realtime API to stream audio i
 
 ## Setup
 
-Start by installing the OpenAI (`openai`) and Weave (`weave`) dependencies, as well as API key management dependencey `set-env`.
+Start by installing the OpenAI (`openai`) and Weave (`weave`) dependencies, as well as API key management dependency `set-env`.
 
 
 
@@ -92,14 +92,14 @@ weave.init("openai-audio-chat")
 
 Now we will define our OpenAI completions request and add our Weave decorator (op).
 
-Here, we define the function `prompt_endpont_and_log_trace`. This function has three primary steps:
+Here, we define the function `prompt_endpoint_and_log_trace`. This function has three primary steps:
 
 1. We make a completion object using the `GPT 4o Audio Preview` model that supports text and audio inputs and outputs.
 
    - We prompt the model to count to 13 slowly with varying accents.
    - We set the completion to "stream".
 
-2. We open a new output file to which the streamed data is writen chunk by chunk.
+2. We open a new output file to which the streamed data is written chunk by chunk.
 
 3. We return an open file handler to the audio file so Weave logs the audio data in the trace.
 
@@ -1187,7 +1187,7 @@ def record_audio(realtime_model: RTAudioModel) -> pyaudio.Stream:
 
 ## Main Thread (Run me!)
 
-The main thread initiates a Realtime Audio Model with Weave integrated. Next, a reccording is opened and we wait for a keyboard interrupt from the user.
+The main thread initiates a Realtime Audio Model with Weave integrated. Next, a recording is opened and we wait for a keyboard interrupt from the user.
 
 
 

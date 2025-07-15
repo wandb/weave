@@ -1,7 +1,7 @@
 # Not Diamond ¬◇
 
 When building complex LLM workflows users may need to prompt different models according to accuracy,
-cost, or call latency. Users can use [Not Diamond][nd] to route prompts in these workflows to the
+cost, or call latency. Users can use [Not Diamond][and] to route prompts in these workflows to the
 right model for their needs, helping maximize accuracy while saving on model costs.
 
 ## Getting started
@@ -106,7 +106,7 @@ Visit the [docs] or [send us a message][support] for further support.
 [docs]: https://docs.notdiamond.ai
 [evals]: ../../guides/core-types/evaluations.md
 [keys]: https://app.notdiamond.ai/keys
-[nd]: https://www.notdiamond.ai/
+[and]: https://www.notdiamond.ai/
 [ops]: ../../guides/tracking/ops.md
 [python]: https://github.com/Not-Diamond/notdiamond-python
 [quickstart guide]: https://docs.notdiamond.ai/docs/quickstart

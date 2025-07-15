@@ -17,7 +17,7 @@ title: Log Calls from Existing CSV
 
 # Import Traces from 3rd Party Systems
 
-In ocassion, it is not possible to instrument your Python or Javascript code with Weave's simple integration to obtain real-time traces of your GenAI application. It is often the case that these traces are later on available to you in `csv` or `json` format.
+In occasion, it is not possible to instrument your Python or Javascript code with Weave's simple integration to obtain real-time traces of your GenAI application. It is often the case that these traces are later on available to you in `csv` or `json` format.
 
 In this cookbook we explore the lower level Weave Python API to extract data from a CSV file and import it into Weave to drive insights and rigorous evaluations.
 
@@ -104,7 +104,7 @@ weave_client = weave.init(name_of_wandb_project)
 
 # Data Loading
 
-We load the data into a Pandas dataframe, and ensure we sort it by the `conversation_id` and `turn_index` to ensure the parents and childs are correctly ordered.
+We load the data into a Pandas dataframe, and ensure we sort it by the `conversation_id` and `turn_index` to ensure the parents and children are correctly ordered.
 
 This will result in a two column pandas DF with our conversation turns as an array under `conversation_data`.
 
@@ -256,7 +256,7 @@ for single_conv in conversation_traces:
   if single_conv.output['ground_truth'] is not None:
       is_rag = True
 
-  # Once we've identified a converation to have used RAG, we add it to our dataset
+  # Once we've identified a conversation to have used RAG, we add it to our dataset
   if is_rag:
     inputs = []
     ground_truths = []

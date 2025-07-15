@@ -1852,7 +1852,7 @@ The easiest way to get started is to construct a view in the UI, then learn more
 
 
 {/* ## Compare calls
-info[Comming Soon] */}
+info[Coming Soon] */}
 
 ### Call schema
 

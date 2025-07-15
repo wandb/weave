@@ -17,7 +17,7 @@ title: Structured Outputs for Multi-Agent Systems
 
 # Structured Outputs for Multi-Agent Systems
 
-OpenAI relased [Structured Outputs](https://openai.com/index/introducing-structured-outputs-in-the-api/) to enable users to ensure the model will always generate responses that adhere to your supplied JSON Schema without strongly worded prompts. With Structured Outputs, we don't need to validate or retry incorrectly formatted responses.
+OpenAI released [Structured Outputs](https://openai.com/index/introducing-structured-outputs-in-the-api/) to enable users to ensure the model will always generate responses that adhere to your supplied JSON Schema without strongly worded prompts. With Structured Outputs, we don't need to validate or retry incorrectly formatted responses.
 
 By using the new parameter `strict: true`, we are able to guarantee the response abides by a provided schema.
 

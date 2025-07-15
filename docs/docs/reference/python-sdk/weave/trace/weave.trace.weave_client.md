@@ -414,7 +414,7 @@ Performance Tip: Specify `columns` and use `filter` or `query` to reduce result 
  - <b>``include_costs``</b>:  If True, includes token/cost info in `summary.weave`. 
  - <b>``include_feedback``</b>:  If True, includes feedback in `summary.weave.feedback`. 
  - <b>``columns``</b>:  List of fields to return per call. Reducing this can significantly improve performance.  (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.) 
- - <b>``scored_by``</b>:  Filter by one or more scorers (name or ref URI). Multiple scorers are ANDed. 
+ - <b>``scored_by``</b>:  Filter by one or more scorers (name or ref URI). Multiple scorers are ANDead. 
  - <b>``page_size``</b>:  Number of calls fetched per page. Tune this for performance in large queries. 
 
 
