@@ -638,6 +638,7 @@ export function extractCallData(calls: CallSchema[]): ExtractedCallData[] {
       inputs: call.rawSpan.inputs,
       output: call.rawSpan.output as {[key: string]: unknown} | undefined,
       feedback: processFeedback(rawFeedback),
+      wb_user_id: trace?.wb_user_id,
     };
   });
 }

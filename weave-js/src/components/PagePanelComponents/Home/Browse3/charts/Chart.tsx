@@ -242,6 +242,7 @@ export const Chart: React.FC<ChartProps> = ({
             />
           )}
           <Button
+            className="no-drag"
             icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
             variant="ghost"
             size={isFullscreen ? 'large' : 'small'}
@@ -257,6 +258,7 @@ export const Chart: React.FC<ChartProps> = ({
           )}
           {onRemove && !isFullscreen && (
             <Button
+              className="no-drag"
               icon="close"
               variant="ghost"
               size="small"

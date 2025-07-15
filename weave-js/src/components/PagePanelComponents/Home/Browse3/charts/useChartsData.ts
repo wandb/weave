@@ -49,6 +49,7 @@ export const useChartsData = ({
       'id',
       'inputs',
       'output',
+      'wb_user_id',
     ],
     []
   );

@@ -41,6 +41,7 @@ export type ExtractedCallData = {
   output?: {[key: string]: unknown};
   /** Structured feedback data for easy access */
   feedback?: ProcessedFeedback;
+  wb_user_id?: string;
 };
 
 export type ChartAxisField = {
