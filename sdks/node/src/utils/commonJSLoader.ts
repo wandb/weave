@@ -84,12 +84,12 @@ if (typeof module !== 'undefined' && module.exports) {
 
       const version = packageJson.version;
 
-      for (const instrumentationCandiate of instrumentations.get(
+      for (const instrumentationCandidate of instrumentations.get(
         instrumentationLookupKey
       ) || []) {
         // check if the version is compatible with the current version of the module
-        if (semifies(version, instrumentationCandiate.version)) {
-          instrumentation = instrumentationCandiate;
+        if (semifies(version, instrumentationCandidate.version)) {
+          instrumentation = instrumentationCandidate;
           break;
         }
       }
