@@ -1,16 +1,17 @@
-import OpenAI from 'openai';
-
+// Remove openai dependency - use direct fetch API
 import {MagicianServiceInterface} from '../Magician';
-import type {
+import {
   ChatCompletionChunk,
+  ChatCompletionRequest,
   CreateResponseParams,
+  ErrorCodes,
   ForgetContextParams,
   ForgetContextResponse,
   GetConversationParams,
   GetConversationResponse,
   ListConversationsParams,
   ListConversationsResponse,
-  Message,
+  MagicianError,
   PersistContextParams,
   PersistContextResponse,
   RespondResponse,
@@ -19,54 +20,56 @@ import type {
   UpdateConversationParams,
   UpdateConversationResponse,
 } from '../types';
-import {ErrorCodes, MagicianError} from '../types';
 import {InMemoryConversationStore} from './InMemoryConversationStore';
 import {StreamingResponseHandler} from './StreamingResponseHandler';
 
 /**
- * OpenAI implementation of MagicianService.
- * Uses the real OpenAI API for completions while maintaining
- * local conversation storage (to be replaced with backend later).
+ * Lightweight OpenAI-compatible service implementation using fetch.
+ * Supports any OpenAI-compatible API by changing the base URL.
  */
 export class OpenAIMagicianService extends MagicianServiceInterface {
-  private openai: OpenAI;
+  private apiKey: string;
+  private baseURL: string;
   private conversationStore: InMemoryConversationStore;
+  private abortControllers: Map<string, AbortController> = new Map();
 
   constructor(apiKey?: string, baseURL?: string) {
     super();
 
-    // Get API key from constructor or environment
-    // @ts-ignore - Vite uses import.meta.env
-    const finalApiKey =
+    // Try to get API key from various sources
+    const key =
       apiKey ||
       import.meta.env?.VITE_OPENAI_API_KEY ||
       (window as any).VITE_OPENAI_API_KEY;
-    if (!finalApiKey) {
+
+    if (!key) {
       throw new MagicianError(
         'OpenAI API key not found. Set VITE_OPENAI_API_KEY environment variable or pass it to the constructor.',
         ErrorCodes.AUTH_ERROR
       );
     }
 
-    // @ts-ignore - Vite uses import.meta.env
-    const finalBaseURL =
+    this.apiKey = key;
+
+    // Allow custom base URL for OpenAI-compatible services
+    this.baseURL =
       baseURL ||
       import.meta.env?.VITE_OPENAI_BASE_URL ||
-      (window as any).VITE_OPENAI_BASE_URL;
+      (window as any).VITE_OPENAI_BASE_URL ||
+      'https://api.openai.com/v1';
 
-    this.openai = new OpenAI({
-      apiKey: finalApiKey,
-      baseURL: finalBaseURL,
-      dangerouslyAllowBrowser: true, // We're in a browser environment
-    });
+    // Remove trailing slash if present
+    this.baseURL = this.baseURL.replace(/\/$/, '');
 
     this.conversationStore = new InMemoryConversationStore();
-    // Load any persisted data from localStorage
-    this.conversationStore.loadFromLocalStorage();
   }
 
-  async createResponse(params: CreateResponseParams): Promise<RespondResponse> {
+  async createResponse(
+    params: CreateResponseParams
+  ): Promise<RespondResponse> {
     const {request, conversationId, onStream} = params;
+    const requestId = `req_${Date.now()}`;
+    const finalConversationId = conversationId || `conv_${Date.now()}`;
 
     // Get or create conversation
     let conversation;
@@ -76,124 +79,157 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
       });
       conversation = result.conversation;
     } else {
-      conversation = this.conversationStore.createConversation();
+      // Create new conversation
+      await this.conversationStore.updateConversation({
+        id: finalConversationId,
+        title: 'New Conversation',
+      });
+      const result = await this.conversationStore.getConversation({
+        id: finalConversationId,
+      });
+      conversation = result.conversation;
     }
 
     // Create response handler
-    const handler = new StreamingResponseHandler(
-      `req_${Date.now()}`,
-      conversation.id
-    );
+    const handler = new StreamingResponseHandler(requestId, finalConversationId);
 
-    // Add user message to conversation
-    const userMessage: Message = {
-      id: `msg_${Date.now()}_user`,
-      role: 'user',
-      content: request.messages[request.messages.length - 1].content,
-      timestamp: new Date(),
+    // Create abort controller for this request
+    const abortController = new AbortController();
+    this.abortControllers.set(requestId, abortController);
+
+    // Build API request with proper formatting
+    const apiRequest = {
+      model: request.model,
+      messages: request.messages,
+      temperature: request.temperature,
+      max_tokens: request.max_tokens,
+      stream: request.stream !== false, // Default to streaming
+      tools: request.tools,
+      tool_choice: request.tool_choice,
     };
-    await this.conversationStore.updateConversation({
-      id: conversation.id,
-      addMessage: userMessage,
-    });
 
-    // Create the streaming request
-    const streamRequest = async () => {
+    // Store reference to this for use in async generator
+    const service = this;
+
+    // Create an async generator for chunks
+    async function* createChunkStream(): AsyncIterable<ChatCompletionChunk> {
       try {
-        // Convert our message format to OpenAI's format
-        const openAIMessages = request.messages.map(msg => ({
-          role: msg.role as 'system' | 'user' | 'assistant' | 'function',
-          content: msg.content,
-          ...(msg.tool_calls && {tool_calls: msg.tool_calls}),
-          ...(msg.tool_call_id && {tool_call_id: msg.tool_call_id}),
-        }));
-
-        // Convert our tools format to OpenAI's format
-        const openAITools = request.tools?.map(tool => ({
-          type: 'function' as const,
-          function: {
-            name: tool.function.name,
-            description: tool.function.description,
-            parameters: tool.function.parameters as Record<string, any>,
+        // Make the API call
+        // eslint-disable-next-line wandb/no-unprefixed-urls
+        const response = await fetch(`${service.baseURL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${service.apiKey}`,
           },
-        }));
-
-        const stream = await this.openai.chat.completions.create({
-          model: request.model,
-          messages: openAIMessages as any,
-          temperature: request.temperature,
-          max_tokens: request.max_tokens,
-          stream: true,
-          tools: openAITools,
-          tool_choice: request.tool_choice as any,
+          body: JSON.stringify(apiRequest),
+          signal: abortController.signal,
         });
 
-        // Convert OpenAI stream to our format
-        async function* convertStream(): AsyncIterable<ChatCompletionChunk> {
-          for await (const chunk of stream) {
-            // OpenAI's chunk format matches our ChatCompletionChunk type
-            yield chunk as unknown as ChatCompletionChunk;
-          }
-        }
-
-        // Process the stream
-        const streamIterator = handler.processStream(convertStream());
-        handler.setStreamIterator(streamIterator);
-
-        // If onStream callback provided, also send raw chunks
-        if (onStream) {
-          // Create a second stream for the callback
-          const stream2 = await this.openai.chat.completions.create({
-            model: request.model,
-            messages: openAIMessages as any,
-            temperature: request.temperature,
-            max_tokens: request.max_tokens,
-            stream: true,
-            tools: openAITools,
-            tool_choice: request.tool_choice as any,
-          });
-
-          for await (const chunk of stream2) {
-            onStream(chunk as unknown as ChatCompletionChunk);
-          }
-        }
-      } catch (error) {
-        // Handle OpenAI specific errors
-        if (error instanceof OpenAI.APIError) {
-          let errorCode: string = ErrorCodes.NETWORK_ERROR;
-
-          if (error.status === 401) {
-            errorCode = ErrorCodes.AUTH_ERROR;
-          } else if (error.status === 429) {
-            errorCode = ErrorCodes.RATE_LIMIT_EXCEEDED;
-          } else if (error.status === 404) {
-            errorCode = ErrorCodes.MODEL_NOT_AVAILABLE;
-          }
-
+        if (!response.ok) {
+          const errorBody = await response.text();
           throw new MagicianError(
-            error.message || 'OpenAI API error',
-            errorCode,
-            {status: error.status, type: error.type}
+            `API request failed: ${response.statusText} - ${errorBody}`,
+            ErrorCodes.NETWORK_ERROR
           );
         }
 
+        if (!apiRequest.stream) {
+          // Non-streaming response
+          const data = await response.json();
+
+          // Convert to chunk format
+          const chunk: ChatCompletionChunk = {
+            id: data.id,
+            object: 'chat.completion.chunk',
+            created: data.created,
+            model: data.model,
+            choices: data.choices.map((choice: any) => ({
+              index: choice.index,
+              delta: {
+                role: choice.message.role,
+                content: choice.message.content,
+                tool_calls: choice.message.tool_calls,
+              },
+              finish_reason: choice.finish_reason,
+            })),
+          };
+
+          yield chunk;
+
+          // Call onStream callback if provided
+          if (onStream) {
+            onStream(chunk);
+          }
+        } else {
+          // Streaming response
+          const reader = response.body?.getReader();
+          if (!reader) {
+            throw new MagicianError(
+              'Response body is not readable',
+              ErrorCodes.NETWORK_ERROR
+            );
+          }
+
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, {stream: true});
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              
+              if (trimmed === 'data: [DONE]') {
+                // Stream is complete
+                break;
+              }
+
+              if (trimmed.startsWith('data: ')) {
+                try {
+                  const json = JSON.parse(trimmed.slice(6));
+                  const chunk = json as ChatCompletionChunk;
+                  yield chunk;
+                  
+                  // Call onStream callback if provided
+                  if (onStream) {
+                    onStream(chunk);
+                  }
+                } catch (e) {
+                  console.error('Failed to parse SSE chunk:', e);
+                }
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          throw new MagicianError(
+            'Request was cancelled',
+            ErrorCodes.NETWORK_ERROR
+          );
+        }
         throw error;
+      } finally {
+        service.abortControllers.delete(requestId);
       }
-    };
+    }
 
-    // Start the streaming request
-    streamRequest().catch(error => {
-      console.error('Stream error:', error);
-      // The error will be yielded through the stream
-    });
+    // Start processing the stream
+    const streamIterator = handler.processStream(createChunkStream());
+    handler.setStreamIterator(streamIterator);
 
-    // Save to localStorage periodically
-    this.conversationStore.saveToLocalStorage();
-
+    // Return the handler which implements RespondResponse
     return handler;
   }
 
-  // Conversation management - using local storage for now
+  // Conversation management methods
   async listConversations(
     params: ListConversationsParams
   ): Promise<ListConversationsResponse> {
@@ -209,42 +245,51 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
   async updateConversation(
     params: UpdateConversationParams
   ): Promise<UpdateConversationResponse> {
-    const result = await this.conversationStore.updateConversation(params);
-    this.conversationStore.saveToLocalStorage();
-    return result;
+    return this.conversationStore.updateConversation(params);
   }
 
+  // These would typically be backend operations
   async persistContext(
     params: PersistContextParams
   ): Promise<PersistContextResponse> {
-    const result = await this.conversationStore.persistContext(params);
-    this.conversationStore.saveToLocalStorage();
-    return result;
+    throw new MagicianError(
+      'Context persistence not implemented for OpenAI service',
+      ErrorCodes.NETWORK_ERROR
+    );
   }
 
   async retrieveContext(
     params: RetrieveContextParams
   ): Promise<RetrieveContextResponse> {
-    return this.conversationStore.retrieveContext(params);
+    throw new MagicianError(
+      'Context retrieval not implemented for OpenAI service',
+      ErrorCodes.NETWORK_ERROR
+    );
   }
 
   async forgetContext(
     params: ForgetContextParams
   ): Promise<ForgetContextResponse> {
-    const result = await this.conversationStore.forgetContext(params);
-    this.conversationStore.saveToLocalStorage();
-    return result;
+    throw new MagicianError(
+      'Context forgetting not implemented for OpenAI service',
+      ErrorCodes.NETWORK_ERROR
+    );
   }
 
   /**
-   * Test the connection to OpenAI
+   * Test the connection to the API
    */
   async testConnection(): Promise<boolean> {
     try {
-      const response = await this.openai.models.list();
-      return response.data.length > 0;
+      // eslint-disable-next-line wandb/no-unprefixed-urls
+      const response = await fetch(`${this.baseURL}/models`, {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+      });
+      return response.ok;
     } catch (error) {
-      console.error('OpenAI connection test failed:', error);
+      console.error('API connection test failed:', error);
       return false;
     }
   }
