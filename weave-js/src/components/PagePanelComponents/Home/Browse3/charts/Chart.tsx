@@ -15,7 +15,7 @@ import {getScatterXAxisFields, getYAxisFields} from './extractData';
 import {LinePlot} from './LinePlot';
 import {ScatterPlot} from './ScatterPlot';
 import {chartContentStyle} from './styling';
-import {AggregationMethod, ExtractedCallData} from './types';
+import {AggregationMethod, ChartConfig, ExtractedCallData} from './types';
 
 // Utility function to generate auto-names for charts
 export const generateChartAutoName = (
@@ -70,6 +70,7 @@ export type ChartProps = {
   project?: string;
   groupKeys?: string[];
   isLoading?: boolean;
+  addChart?: (chart: ChartConfig) => void;
 };
 
 export const Chart: React.FC<ChartProps> = ({
@@ -90,6 +91,7 @@ export const Chart: React.FC<ChartProps> = ({
   project,
   groupKeys,
   isLoading,
+  addChart,
 }) => {
   const [isChartHovered, setIsChartHovered] = React.useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -231,6 +233,14 @@ export const Chart: React.FC<ChartProps> = ({
             opacity: isChartHovered || isFullscreen ? 1 : 0,
             transition: 'opacity 0.2s ease-in-out',
           }}>
+          {addChart && (
+            <Button
+              icon="add-new"
+              variant="ghost"
+              size="small"
+              onClick={() => addChart?.({})}
+            />
+          )}
           <Button
             icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
             variant="ghost"

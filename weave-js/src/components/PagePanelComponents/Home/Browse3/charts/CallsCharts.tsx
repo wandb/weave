@@ -28,6 +28,7 @@ type CallsChartsProps = {
   filterModelProp: GridFilterModel;
   filter: WFHighLevelCallFilter;
   sortModel?: GridSortModel;
+  addChart?: (chart: ChartConfig) => void;
 };
 
 type PageSizeOption = {
@@ -41,6 +42,7 @@ const CallsChartsInner = ({
   filter,
   filterModelProp,
   sortModel,
+  addChart,
 }: CallsChartsProps) => {
   const [pageSize, setPageSize] = React.useState(250);
 
@@ -226,6 +228,7 @@ const CallsChartsInner = ({
                 onEdit={() => openEditModal(chart.id)}
                 onRemove={() => dispatch({type: 'REMOVE_CHART', id: chart.id})}
                 filter={filter}
+                addChart={() => addChart?.(chart)}
               />
             );
           })

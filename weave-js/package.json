@@ -118,6 +118,7 @@
     "react-diff-viewer": "^3.1.1",
     "react-dom": "^18.3.1",
     "react-flame-graph": "^1.4.0",
+    "react-grid-layout": "^1.5.2",
     "react-hook-mousetrap": "^2.0.4",
     "react-intersection-observer": "^8.31.0",
     "react-json-view-lite": "^2.4.1",
