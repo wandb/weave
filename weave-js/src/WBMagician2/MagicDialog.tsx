@@ -30,7 +30,7 @@ export type MagicFillProps = {
 
 /**
  * MagicFill is a dialog component that helps the user fill in a form using AI.
- *
+ * 
  * @param props Configuration for the magic fill dialog
  * @returns A modal dialog component for AI-assisted content generation
  */
@@ -41,7 +41,7 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
   const [generatedContent, setGeneratedContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  
   // Use streaming by default
   const useStreaming = props.useStreaming ?? true;
 
@@ -95,7 +95,7 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
       if (useStreaming) {
         // Use streaming API
         let accumulatedContent = '';
-
+        
         const onChunk = (chunk: Chunk) => {
           accumulatedContent += chunk.content;
           setGeneratedContent(accumulatedContent);
@@ -130,18 +130,38 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
   return (
     <Dialog.Root open={props.open} onOpenChange={props.onClose}>
       <Dialog.Portal>
-        <Dialog.Overlay />
-        <Dialog.Content className="flex h-auto max-h-[85vh] w-[90vw] max-w-[700px] flex-col overflow-hidden p-0">
+        <Dialog.Overlay className="backdrop-blur-sm" />
+        <Dialog.Content 
+          className="night-aware flex h-auto max-h-[85vh] w-[90vw] max-w-[700px] flex-col overflow-hidden rounded-xl border p-0 backdrop-blur-xl backdrop-saturate-150"
+          style={{
+            background: 'linear-gradient(to bottom right, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.75))',
+            borderColor: 'rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.2)',
+          }}>
+          {/* Add dark mode gradient overlay */}
+          <div 
+            className="pointer-events-none absolute inset-0 hidden rounded-xl dark:block"
+            style={{
+              background: 'linear-gradient(to bottom right, rgba(0, 0, 0, 0.3), transparent)',
+            }}
+          />
+          
           {/* Conditional Header */}
           {showHeader && (
-            <div className="border-b border-moon-250 px-24 py-16 dark:border-moon-750">
+            <div className="relative z-10 px-28 py-20" style={{
+              borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+              background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0.5), transparent)',
+            }}>
+              <div className="absolute inset-0 dark:hidden" style={{
+                background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0.2), transparent)',
+              }} />
               {props.title && (
-                <h2 className="text-lg font-semibold text-moon-850 dark:text-moon-150">
+                <h2 className="relative text-lg font-semibold text-moon-900 dark:text-moon-100">
                   {props.title}
                 </h2>
               )}
               {props.details && (
-                <p className="mt-4 text-sm text-moon-600 dark:text-moon-400">
+                <p className="relative mt-4 text-sm text-moon-600 dark:text-moon-400">
                   {props.details}
                 </p>
               )}
@@ -149,14 +169,14 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
           )}
 
           {/* Content */}
-          <div className="flex flex-1 flex-col gap-16 overflow-y-auto px-24 py-16">
+          <div className="relative z-10 flex flex-1 flex-col overflow-y-auto">
             {/* Original content display (if provided) */}
             {props.contentToRevise && (
-              <div>
-                <label className="mb-6 block text-xs font-medium text-moon-700 dark:text-moon-300">
-                  Original Content
+              <div className="px-28 pt-20 pb-16">
+                <label className="mb-8 block text-xs font-medium uppercase tracking-wider text-moon-600 dark:text-moon-400">
+                  Original
                 </label>
-                <div className="max-h-[100px] overflow-y-auto rounded-md border border-moon-250 bg-moon-50 p-12 dark:border-moon-750 dark:bg-moon-850">
+                <div className="max-h-[100px] overflow-y-auto rounded-lg border border-moon-200/50 bg-moon-50/50 p-12 dark:border-moon-750/50 dark:bg-moon-850/50">
                   <pre className="whitespace-pre-wrap font-mono text-xs text-moon-700 dark:text-moon-300">
                     {props.contentToRevise}
                   </pre>
@@ -164,22 +184,24 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
               </div>
             )}
 
-            {/* User instructions input - no label */}
-            <div>
+            {/* User instructions input - edge to edge */}
+            <div className="relative">
               <textarea
                 value={userInstructions}
                 onChange={e => setUserInstructions(e.target.value)}
                 placeholder={props.userInstructionPlaceholder}
-                className="night-aware h-[100px] w-full resize-none rounded-md border border-moon-250 bg-white p-12 text-sm text-moon-850 placeholder-moon-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:border-moon-750 dark:bg-moon-900 dark:text-moon-150 dark:placeholder-moon-500"
+                className="h-[120px] w-full resize-none border-y border-moon-200/50 bg-transparent px-28 py-20 text-sm text-moon-850 placeholder-moon-400 focus:outline-none dark:border-moon-750/50 dark:text-moon-150 dark:placeholder-moon-500"
                 disabled={isGenerating}
                 autoFocus
               />
+              {/* Subtle gradient overlay at bottom */}
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-teal-400/30 to-transparent" />
             </div>
 
             {/* Error display */}
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 rounded-md border border-red-300 p-12 dark:border-red-700">
-                <p className="text-xs text-red-700 dark:text-red-400">
+              <div className="mx-28 mt-16 mb-8 rounded-lg border border-red-300/50 bg-red-50/50 p-12 dark:border-red-700/50 dark:bg-red-900/20">
+                <p className="text-xs text-red-600 dark:text-red-400">
                   {error}
                 </p>
               </div>
@@ -187,13 +209,13 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
 
             {/* Generated content display */}
             {(generatedContent || isGenerating) && (
-              <div className="flex flex-1 flex-col">
-                <label className="mb-6 block text-xs font-medium text-moon-700 dark:text-moon-300">
-                  Generated Content
+              <div className="flex flex-1 flex-col px-28 py-20">
+                <label className="mb-8 block text-xs font-medium uppercase tracking-wider text-moon-600 dark:text-moon-400">
+                  Generated
                 </label>
-                <div className="flex-1 overflow-y-auto rounded-md border border-moon-250 bg-moon-50 p-12 dark:border-moon-750 dark:bg-moon-850">
-                  <pre className="whitespace-pre-wrap font-mono text-xs text-moon-700 dark:text-moon-300">
-                    {generatedContent || (isGenerating && '▊')}
+                <div className="flex-1 overflow-y-auto rounded-lg border border-teal-300/30 bg-gradient-to-br from-teal-50/30 to-emerald-50/30 p-16 dark:border-teal-700/30 dark:from-teal-900/20 dark:to-emerald-900/20">
+                  <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-moon-800 dark:text-moon-200">
+                    {generatedContent || (isGenerating && <span className="text-teal-600 animate-pulse dark:text-teal-400">▊</span>)}
                   </pre>
                 </div>
               </div>
@@ -201,15 +223,21 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
           </div>
 
           {/* Footer with all buttons in one row */}
-          <div className="border-t border-moon-250 px-24 py-16 dark:border-moon-750">
-            <div className="flex items-center justify-between">
+          <div className="relative z-10 border-t border-moon-200/50 px-28 py-16 dark:border-moon-750/50" style={{
+            background: 'linear-gradient(to top, rgba(255, 255, 255, 0.8), transparent)',
+          }}>
+            <div className="absolute inset-0 dark:hidden" style={{
+              background: 'linear-gradient(to top, rgba(255, 255, 255, 0.4), transparent)',
+            }} />
+            <div className="relative flex items-center justify-between">
               <div className="flex gap-8">
                 {!generatedContent && (
                   <Button
                     onClick={handleGenerate}
                     disabled={isGenerating || !userInstructions.trim()}
                     variant="primary"
-                    size="small">
+                    size="small"
+                    className="shadow-sm transition-all hover:shadow-md">
                     {isGenerating ? (
                       <>
                         <span className="mr-6">Generating</span>
@@ -224,7 +252,7 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
                   </Button>
                 )}
               </div>
-
+              
               <div className="flex gap-8">
                 {generatedContent && (
                   <>
@@ -234,18 +262,24 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
                         setUserInstructions('');
                       }}
                       variant="ghost"
-                      size="small">
+                      size="small"
+                      className="opacity-70 transition-opacity hover:opacity-100">
                       Regenerate
                     </Button>
                     <Button
                       onClick={handleAccept}
                       variant="primary"
-                      size="small">
+                      size="small"
+                      className="shadow-sm transition-all hover:shadow-md">
                       Accept
                     </Button>
                   </>
                 )}
-                <Button onClick={props.onClose} variant="ghost" size="small">
+                <Button 
+                  onClick={props.onClose} 
+                  variant="ghost" 
+                  size="small"
+                  className="opacity-70 transition-opacity hover:opacity-100">
                   {generatedContent ? 'Cancel' : 'Close'}
                 </Button>
               </div>
