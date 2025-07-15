@@ -9,17 +9,15 @@ export type Message = {
   content: string;
 };
 
-type JsonSchemaResponseFormat = {
-  type: 'json_schema';
-  jsonSchema: JSONSchema7;
+export type EntityProject = {
+  entity: string;
+  project: string;
 };
 
-type JsonObjectResponseFormat = {
-  type: 'json_object';
-};
+export type Completion = string;
 
-type TextResponseFormat = {
-  type: 'text';
+export type Chunk = {
+  content: string;
 };
 
 export type ResponseFormat =
@@ -40,9 +38,20 @@ export type Tool = {
   };
 };
 
-type Chunk = unknown;
-
-type Completion = unknown;
+export type JsonObjectResponseFormat = {
+  type: 'json_object';
+};
+export type TextResponseFormat = {
+  type: 'text';
+};
+export type JsonSchemaResponseFormat = {
+  type: 'json_schema';
+  json_schema: {
+    name: string;
+    strict?: boolean;
+    schema: JSONSchema7;
+  };
+};
 
 export type ChatCompletionParams = {
   // `modelId` is a string identifier for the model to use.
@@ -72,6 +81,13 @@ export type ChatCompletionParams = {
   tools?: Array<Tool>;
 };
 
+/**
+ * Prepare the model identifier, handling provider-specific formatting.
+ * 
+ * @param modelId The model identifier
+ * @param modelProvider Optional provider name
+ * @returns Formatted model string
+ */
 const prepareModel = (modelId: string, modelProvider?: string) => {
   if (modelProvider) {
     return `${modelProvider}/${modelId}`;
@@ -79,6 +95,12 @@ const prepareModel = (modelId: string, modelProvider?: string) => {
   return modelId;
 };
 
+/**
+ * Convert messages to the expected format for the API.
+ * 
+ * @param messages String or array of Message objects
+ * @returns Array of Message objects
+ */
 const prepareMessages = (messages: string | Array<Message>) => {
   if (typeof messages === 'string') {
     return [
@@ -92,23 +114,169 @@ const prepareMessages = (messages: string | Array<Message>) => {
   }
 };
 
-const prepareResponseFormat = (responseFormat: ResponseFormat): unknown => {
-  // TODO: Implement response parsing
-  // The trace server likely returns a response in this shape:
-  // {
-  //   response: {
-  //     choices: [{
-  //       message: {
-  //         content: "The actual text content",
-  //         role: "assistant"
-  //       }
-  //     }]
-  //   }
-  // }
-  // We need to extract just the content string from the first choice
-  throw new Error('Not implemented');
+/**
+ * Extract the message content from various LLM provider response formats.
+ * 
+ * @param response Raw response from the completion API
+ * @returns The extracted message content as a string
+ */
+const extractMessageContent = (response: unknown): string => {
+  // Type guard to check if response has expected OpenAI-like structure
+  const isOpenAIResponse = (r: unknown): r is {
+    choices: Array<{
+      message: {
+        content: string;
+        role: string;
+      };
+    }>;
+  } => {
+    return (
+      typeof r === 'object' &&
+      r !== null &&
+      'choices' in r &&
+      Array.isArray((r as any).choices) &&
+      (r as any).choices.length > 0 &&
+      'message' in (r as any).choices[0] &&
+      'content' in (r as any).choices[0].message
+    );
+  };
+
+  // Type guard for Anthropic-like response format
+  const isAnthropicResponse = (r: unknown): r is {
+    content: Array<{
+      type: string;
+      text: string;
+    }>;
+  } => {
+    return (
+      typeof r === 'object' &&
+      r !== null &&
+      'content' in r &&
+      Array.isArray((r as any).content) &&
+      (r as any).content.length > 0 &&
+      'text' in (r as any).content[0]
+    );
+  };
+
+  // Type guard for simple content response
+  const isSimpleContentResponse = (r: unknown): r is {
+    content: string;
+  } => {
+    return (
+      typeof r === 'object' &&
+      r !== null &&
+      'content' in r &&
+      typeof (r as any).content === 'string'
+    );
+  };
+
+  // Try different response formats
+  if (isOpenAIResponse(response)) {
+    return response.choices[0].message.content;
+  } else if (isAnthropicResponse(response)) {
+    // Concatenate all text blocks for Anthropic
+    return response.content
+      .filter(block => block.type === 'text')
+      .map(block => block.text)
+      .join('');
+  } else if (isSimpleContentResponse(response)) {
+    return response.content;
+  } else if (typeof response === 'string') {
+    return response;
+  }
+
+  // Log the unknown format for debugging
+  console.warn('Unknown completion response format:', response);
+  
+  // Last resort: try to stringify the response
+  return JSON.stringify(response, null, 2);
 };
 
+/**
+ * Prepare response format configuration for the API.
+ * Currently not implemented as it depends on provider-specific requirements.
+ * 
+ * @param responseFormat The desired response format
+ * @returns Formatted response configuration
+ */
+const prepareResponseFormat = (responseFormat?: ResponseFormat): {type: string} | undefined => {
+  if (!responseFormat) {
+    return undefined;
+  }
+  
+  // For now, just pass through the response format
+  // Different providers may need different formatting
+  return responseFormat;
+};
+
+/**
+ * Combine streaming chunks into a single completion response.
+ * 
+ * @param chunks Array of streaming chunks
+ * @returns Combined completion string
+ */
+const combineChunks = (chunks: unknown[]): Completion => {
+  if (!Array.isArray(chunks) || chunks.length === 0) {
+    return '';
+  }
+
+  // Type guard for OpenAI-style chunks
+  const isOpenAIChunk = (chunk: unknown): chunk is {
+    choices: Array<{
+      delta: {
+        content?: string;
+      };
+    }>;
+  } => {
+    return (
+      typeof chunk === 'object' &&
+      chunk !== null &&
+      'choices' in chunk &&
+      Array.isArray((chunk as any).choices) &&
+      (chunk as any).choices.length > 0 &&
+      'delta' in (chunk as any).choices[0]
+    );
+  };
+
+  // Type guard for simple content chunks
+  const isContentChunk = (chunk: unknown): chunk is {
+    content: string;
+  } => {
+    return (
+      typeof chunk === 'object' &&
+      chunk !== null &&
+      'content' in chunk &&
+      typeof (chunk as any).content === 'string'
+    );
+  };
+
+  const contentParts: string[] = [];
+
+  for (const chunk of chunks) {
+    if (isOpenAIChunk(chunk)) {
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) {
+        contentParts.push(content);
+      }
+    } else if (isContentChunk(chunk)) {
+      contentParts.push(chunk.content);
+    } else if (typeof chunk === 'string') {
+      contentParts.push(chunk);
+    }
+  }
+
+  return contentParts.join('');
+};
+
+/**
+ * Make a chat completion request to the trace server.
+ * 
+ * @param client The trace server client instance
+ * @param entity The entity (organization) name
+ * @param project The project name
+ * @param params Chat completion parameters
+ * @returns The completion response as a string
+ */
 const chatComplete = async (
   client: TraceServerClient,
   entity: string,
@@ -121,31 +289,26 @@ const chatComplete = async (
       model: prepareModel(params.modelId, params.modelProvider),
       messages: prepareMessages(params.messages),
       temperature: params.temperature || 0.7,
-      response_format: params.responseFormat,
+      response_format: prepareResponseFormat(params.responseFormat),
       tools: params.tools,
     },
     track_llm_call: false,
   });
 
-  // TODO: Fix this - prepareResponseFormat expects ResponseFormat but we're passing the completion
-  // Should be something like: return extractMessageContent(res.response);
-  return prepareResponseFormat(res.response);
+  // Extract the message content from the response
+  return extractMessageContent(res.response);
 };
 
-const combineChunks = (chunks: Array<Chunk>): Completion => {
-  // TODO: Implement streaming response combination
-  // For streaming responses, we need to:
-  // 1. Combine all chunk.choices[0].delta.content strings
-  // 2. Return a complete message object
-  // Example chunk shape:
-  // {
-  //   choices: [{
-  //     delta: { content: "partial text..." }
-  //   }]
-  // }
-  throw new Error('Not implemented');
-};
-
+/**
+ * Make a streaming chat completion request to the trace server.
+ * 
+ * @param client The trace server client instance
+ * @param entity The entity (organization) name
+ * @param project The project name
+ * @param params Chat completion parameters
+ * @param onChunk Callback for each streaming chunk
+ * @returns The complete response as a string
+ */
 const chatCompleteStream = async (
   client: TraceServerClient,
   entity: string,
@@ -160,7 +323,7 @@ const chatCompleteStream = async (
         model: prepareModel(params.modelId, params.modelProvider),
         messages: prepareMessages(params.messages),
         temperature: params.temperature || 0.7,
-        response_format: params.responseFormat,
+        response_format: prepareResponseFormat(params.responseFormat),
         tools: params.tools,
       },
       track_llm_call: false,
@@ -169,11 +332,6 @@ const chatCompleteStream = async (
   );
 
   return combineChunks(res.chunks);
-};
-
-export type EntityProject = {
-  entity: string;
-  project: string;
 };
 
 const EntityProjectContext = createContext<EntityProject | undefined>(

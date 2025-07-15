@@ -1,7 +1,8 @@
 import React, {useEffect, useState} from 'react';
-
+import * as Dialog from '../components/Dialog';
+import {Button} from '../components/Button';
+import {Tailwind} from '../components/Tailwind';
 import {EntityProject, useChatCompletion, Message} from './chatCompletionClient';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@radix-ui/react-dialog';
 
 export type MagicFillProps = {
   entityProject?: EntityProject;
@@ -20,8 +21,10 @@ export type MagicFillProps = {
 };
 
 /**
- * MagicFill is a dialog component that helps the user fill in a form.
- * It uses the `useChatCompletion` hook to invoke an LLM.
+ * MagicFill is a dialog component that helps the user fill in a form using AI.
+ * 
+ * @param props Configuration for the magic fill dialog
+ * @returns A modal dialog component for AI-assisted content generation
  */
 export const MagicFill: React.FC<MagicFillProps> = props => {
   const chatCompletion = useChatCompletion(props.entityProject);
@@ -76,9 +79,10 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
         temperature: 0.7,
       });
 
-      // TODO: Extract actual content from completion once response format is implemented
-      setGeneratedContent(JSON.stringify(completion));
-    } catch (err) {
+      // The completion is now a properly extracted string
+      setGeneratedContent(completion);
+    } catch (err: unknown) {
+      console.error('Generation error:', err);
       setError(
         err instanceof Error ? err.message : 'Failed to generate content'
       );
@@ -95,92 +99,114 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
   };
 
   return (
-    <Dialog open={props.open} onOpenChange={props.onClose}>
-      <DialogContent className="h-[90vh] max-h-[1000px] w-[90vw] max-w-[1000px] rounded-lg bg-white p-6 shadow-lg">
-        <DialogTitle className="mb-2 text-xl font-semibold">
-          {props.title}
-        </DialogTitle>
-        <DialogDescription className="text-gray-600 mb-4">
-          {props.details}
-        </DialogDescription>
+    <Dialog.Root open={props.open} onOpenChange={props.onClose}>
+      <Dialog.Portal>
+        <Dialog.Overlay />
+        <Dialog.Content className="flex h-[85vh] max-h-[800px] w-[90vw] max-w-[800px] flex-col overflow-hidden p-0">
+          {/* Header */}
+          <div className="border-b border-moon-250 px-32 py-24 dark:border-moon-750">
+            <h2 className="text-xl font-semibold text-moon-850 dark:text-moon-150">
+              {props.title}
+            </h2>
+            <p className="mt-8 text-moon-600 dark:text-moon-400">
+              {props.details}
+            </p>
+          </div>
 
-        <div className="flex h-full flex-col gap-4">
-          {/* Original content display (if provided) */}
-          {props.contentToRevise && (
-            <div className="mb-4">
-              <label className="text-gray-700 mb-2 block text-sm font-medium">
-                Original Content
-              </label>
-              <div className="bg-gray-50 border-gray-200 max-h-32 overflow-y-auto rounded border p-3">
-                <pre className="whitespace-pre-wrap text-sm">
-                  {props.contentToRevise}
-                </pre>
+          {/* Content */}
+          <div className="flex flex-1 flex-col gap-24 overflow-y-auto px-32 py-24">
+            {/* Original content display (if provided) */}
+            {props.contentToRevise && (
+              <div>
+                <label className="mb-8 block text-sm font-medium text-moon-700 dark:text-moon-300">
+                  Original Content
+                </label>
+                <div className="max-h-[120px] overflow-y-auto rounded-lg border border-moon-250 bg-moon-50 p-16 dark:border-moon-750 dark:bg-moon-850">
+                  <pre className="whitespace-pre-wrap font-mono text-sm text-moon-700 dark:text-moon-300">
+                    {props.contentToRevise}
+                  </pre>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* User instructions input */}
-          <div className="flex-shrink-0">
-            <label className="text-gray-700 mb-2 block text-sm font-medium">
-              Instructions
-            </label>
-            <textarea
-              value={userInstructions}
-              onChange={e => setUserInstructions(e.target.value)}
-              placeholder={props.userInstructionPlaceholder}
-              className="border-gray-300 w-full rounded-md border p-3 focus:border-blue-500 focus:ring-blue-500"
-              rows={4}
-              disabled={isGenerating}
-            />
-          </div>
-
-          {/* Generate button */}
-          <div className="flex-shrink-0">
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating || !userInstructions.trim()}
-              className="disabled:bg-gray-400 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed">
-              {isGenerating ? 'Generating...' : 'Generate'}
-            </button>
-          </div>
-
-          {/* Error display */}
-          {error && (
-            <div className="bg-red-50 border-red-200 rounded-md border p-3">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
-
-          {/* Generated content display */}
-          {generatedContent && (
-            <div className="flex flex-1 flex-col">
-              <label className="text-gray-700 mb-2 block text-sm font-medium">
-                Generated Content
+            {/* User instructions input */}
+            <div>
+              <label className="mb-8 block text-sm font-medium text-moon-700 dark:text-moon-300">
+                Instructions
               </label>
-              <div className="bg-gray-50 border-gray-200 flex-1 overflow-y-auto rounded border p-3">
-                <pre className="whitespace-pre-wrap text-sm">
-                  {generatedContent}
-                </pre>
-              </div>
+              <textarea
+                value={userInstructions}
+                onChange={e => setUserInstructions(e.target.value)}
+                placeholder={props.userInstructionPlaceholder}
+                className="night-aware h-[120px] w-full resize-none rounded-lg border border-moon-250 bg-white p-16 text-moon-850 placeholder-moon-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:border-moon-750 dark:bg-moon-900 dark:text-moon-150 dark:placeholder-moon-500"
+                disabled={isGenerating}
+                autoFocus
+              />
             </div>
-          )}
 
-          {/* Action buttons */}
-          <div className="flex flex-shrink-0 justify-end gap-3 border-t pt-4">
-            <button
-              onClick={props.onClose}
-              className="border-gray-300 hover:bg-gray-50 rounded-md border px-4 py-2">
-              Cancel
-            </button>
-            <button
-              onClick={handleAccept}
-              disabled={!generatedContent}
-              className="disabled:bg-gray-400 rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed">
-              Accept
-            </button>
+            {/* Generate button */}
+            <div>
+              <Button
+                onClick={handleGenerate}
+                disabled={isGenerating || !userInstructions.trim()}
+                variant="primary"
+                size="medium">
+                {isGenerating ? (
+                  <>
+                    <span className="mr-8">Generating</span>
+                    <span className="inline-block animate-pulse">✨</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="mr-8">Generate</span>
+                    <span>✨</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Error display */}
+            {error && (
+              <div className="rounded-lg border border-red-300 bg-red-50 p-16 dark:border-red-700 dark:bg-red-900/20">
+                <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+              </div>
+            )}
+
+            {/* Generated content display */}
+            {generatedContent && (
+              <div className="flex flex-1 flex-col">
+                <label className="mb-8 block text-sm font-medium text-moon-700 dark:text-moon-300">
+                  Generated Content
+                </label>
+                <div className="flex-1 overflow-y-auto rounded-lg border border-moon-250 bg-moon-50 p-16 dark:border-moon-750 dark:bg-moon-850">
+                  <pre className="whitespace-pre-wrap font-mono text-sm text-moon-700 dark:text-moon-300">
+                    {generatedContent}
+                  </pre>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+
+          {/* Footer */}
+          <div className="border-t border-moon-250 px-32 py-24 dark:border-moon-750">
+            <div className="flex justify-end gap-12">
+              <Button
+                onClick={props.onClose}
+                variant="ghost"
+                size="medium">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAccept}
+                disabled={!generatedContent}
+                variant="primary"
+                size="medium">
+                Accept
+              </Button>
+            </div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 };
