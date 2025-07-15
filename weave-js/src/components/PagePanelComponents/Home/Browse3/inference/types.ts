@@ -41,6 +41,9 @@ export type Model = {
 
   status: ModelStatus;
 
+  // This controls whether we show a "New" badge for the model.
+  isNew?: boolean;
+
   // id used in Weave's playground - this is inconsistently scoped py provider currently.
   // The inference service expects the model string to be consistent with the Hugging Face
   // identifier. However, these values are not necessarily the same. For example, the
