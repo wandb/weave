@@ -1,9 +1,11 @@
 # Magician: AI-Powered Developer Toolkit for W&B
 
 ## Recent Updates
-- **[Date: Current]** - Created initial PRD and project structure
-- **[Date: Current]** - Added .cursorrules for living documentation
-- **TODO**: Set up OpenAI API integration for development
+- **[2024-01-XX]** - Created initial PRD and project structure
+- **[2024-01-XX]** - Added .cursorrules for living documentation  
+- **[2024-01-XX]** - Defined comprehensive type system in types.ts
+- **[2024-01-XX]** - Refactored to use abstract service interface for extensibility
+- **TODO**: Set up backend endpoint integration (cookies → API keys)
 
 ## Overview
 
@@ -58,6 +60,41 @@ useRegisterComponentTool({
 ### 3. Universal Chat Interface
 A global chat interface that ties everything together, similar to Cursor's implementation.
 
+## Design Decisions
+
+### 1. Type-First Development
+We've created a comprehensive type system (`types.ts`) before implementation to:
+- Catch edge cases early
+- Provide excellent developer experience with IntelliSense
+- Ensure consistency across the codebase
+- Make the API self-documenting
+
+### 2. Chat/Completions API Wrapper
+Since our backend only supports the chat/completions API (not OpenAI's Responses API), we're building a wrapper that:
+- Simulates the Responses API experience
+- Handles streaming through Server-Sent Events or chunked responses
+- Manages conversation state client-side initially
+- Provides a migration path to backend persistence
+
+### 3. Abstract Service Interface
+`MagicianServiceInterface` is an abstract class to:
+- Allow easy swapping between demo and production implementations
+- Enable testing with mock services
+- Support multiple LLM providers in the future
+- Keep the core logic provider-agnostic
+
+### 4. Context Management Strategy
+- **Hierarchical Context**: Contexts are namespaced by component path to avoid conflicts
+- **Auto-cleanup**: Contexts and tools are automatically removed when components unmount
+- **Size Limits**: Default 1000 char limit per context to prevent token overflow
+- **Serialization**: Custom serialization functions for complex data types
+
+### 5. Tool Approval Flow
+- Tools marked `autoExecutable: false` require user approval
+- Custom approval UI components can be provided per tool
+- Approval cards appear inline in the chat interface
+- Users can modify arguments before approval
+
 ## Architecture
 
 ### Component Structure
@@ -103,18 +140,29 @@ Handles LLM communication:
 
 ### Response Types
 ```typescript
-type UseRespondResponse = {
+interface UseRespondResponse {
   loading: boolean;
   data: StreamingResponse | null;
   error: Error | null;
-  refetch: () => void;
-};
+  refetch: (params?: Partial<RespondParams>) => void;
+  cancel: () => void;
+}
 
-type StreamingResponse = {
+interface StreamingResponse {
   content: string;
   isComplete: boolean;
-  toolCalls?: ToolCall[];
-};
+  toolCalls: ToolCall[];
+  conversationId: string;
+}
+
+interface ToolCall {
+  id: string;
+  toolKey: MagicianKey;
+  arguments: Record<string, any>;
+  status: 'pending' | 'approved' | 'rejected' | 'executing' | 'completed' | 'failed';
+  result?: any;
+  error?: string;
+}
 ```
 
 ### Context Registration

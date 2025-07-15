@@ -73,12 +73,49 @@ return <MagicianSelectionContext context={...}>
 */
 
 import React from 'react';
+import type {
+  RespondParams,
+  RespondResponse,
+  UseRespondParams,
+  UseRespondResponse,
+  UseRegisterComponentContextParams,
+  UseRegisterComponentContextResponse,
+  UseRegisterComponentToolParams,
+  UseRegisterComponentToolResponse,
+  AddContextParams,
+  AddContextResponse,
+  RemoveContextParams,
+  RemoveContextResponse,
+  ListContextsParams,
+  ListContextsResponse,
+  AddToolParams,
+  AddToolResponse,
+  RemoveToolParams,
+  RemoveToolResponse,
+  ListToolsParams,
+  ListToolsResponse,
+  InvokeToolParams,
+  InvokeToolResponse,
+  CreateResponseParams,
+  ListConversationsParams,
+  ListConversationsResponse,
+  GetConversationParams,
+  GetConversationResponse,
+  UpdateConversationParams,
+  UpdateConversationResponse,
+  PersistContextParams,
+  PersistContextResponse,
+  RetrieveContextParams,
+  RetrieveContextResponse,
+  ForgetContextParams,
+  ForgetContextResponse,
+} from './types';
 
-const MagicianContext = React.createContext<MagitionReactAdapter | null>(null);
+const MagicianContext = React.createContext<MagicianReactAdapter | null>(null);
 
-export const MagicianContextProvider: React.FC<{}> = props => {
+export const MagicianContextProvider: React.FC<{children: React.ReactNode}> = props => {
   const magicianContext = React.useMemo(() => {
-    return new MagitionReactAdapter(
+    return new MagicianReactAdapter(
       new Magician(new MagicianAppState(), new DemoOnlyMagicianService())
     );
   }, []);
@@ -90,7 +127,7 @@ export const MagicianContextProvider: React.FC<{}> = props => {
   );
 };
 
-export const useMagician = (): MagitionReactAdapter => {
+export const useMagician = (): MagicianReactAdapter => {
   const magicianContext = React.useContext(MagicianContext);
 
   if (!magicianContext) {
@@ -100,31 +137,7 @@ export const useMagician = (): MagitionReactAdapter => {
   return magicianContext;
 };
 
-type UseRespondParams = {
-  // ...
-};
-
-type UseRespondResponse = {
-  // ...
-};
-
-type UseRegisterComponentContextParams = {
-  // ...
-};
-
-type UseRegisterComponentContextResponse = {
-  // ...
-};
-
-type UseRegisterComponentToolParams = {
-  // ...
-};
-
-type UseRegisterComponentToolResponse = {
-  // ...
-};
-
-class MagitionReactAdapter {
+class MagicianReactAdapter {
   private magician: Magician;
 
   constructor(magician: Magician) {
@@ -152,14 +165,6 @@ class MagitionReactAdapter {
   }
 }
 
-type RespondParams = {
-  // ...
-};
-
-type RespondResponse = {
-  // ...
-};
-
 class Magician {
   private state: MagicianAppState;
   private service: MagicianServiceInterface;
@@ -173,62 +178,6 @@ class Magician {
     throw new Error('Not implemented');
   }
 }
-
-type AddContextParams = {
-  // ...
-};
-
-type AddContextResponse = {
-  // ...
-};
-
-type RemoveContextParams = {
-  // ...
-};
-
-type RemoveContextResponse = {
-  // ...
-};
-
-type ListContextsParams = {
-  // ...
-};
-
-type ListContextsResponse = {
-  // ...
-};
-
-type AddToolParams = {
-  // ...
-};
-
-type AddToolResponse = {
-  // ...
-};
-
-type RemoveToolParams = {
-  // ...
-};
-
-type RemoveToolResponse = {
-  // ...
-};
-
-type ListToolsParams = {
-  // ...
-};
-
-type ListToolsResponse = {
-  // ...
-};
-
-type InvokeToolParams = {
-  // ...
-};
-
-type InvokeToolResponse = {
-  // ...
-};
 
 class MagicianAppState {
   addContext(params: AddContextParams): AddContextResponse {
@@ -260,141 +209,69 @@ class MagicianAppState {
   }
 }
 
-// Super dumbed down for now
-type ReponseCreateParams = {
-  model: string;
-  input: string;
-};
-
-type Response = {
-  output: Array<{}>;
-};
-
-type ListConversationsParams = {
-  // ...
-};
-
-type ListConversationsResponse = {
-  // ...
-};
-
-type GetConversationParams = {
-  // ...
-};
-
-type GetConversationResponse = {
-  // ...
-};
-
-type UpdateConversationParams = {
-  // ...
-};
-
-type UpdateConversationResponse = {
-  // ...
-};
-
-type PersistContextParams = {
-  // ...
-};
-
-type PersistContextResponse = {
-  // ...
-};
-
-type RetrieveContextParams = {
-  // ...
-};
-
-type RetrieveContextResponse = {
-  // ...
-};
-
-type ForgetContextParams = {
-  // ...
-};
-
-type ForgetContextResponse = {
-  // ...
-};
-
-class MagicianServiceInterface {
+abstract class MagicianServiceInterface {
   /**
    * Create a new response. This API is inspired by the OpenAI Responses API.
    * https://platform.openai.com/docs/api-reference/responses/create, but adapted
    * for our use cases.
    *
-   * TODO: Belnd with Conversations API
+   * TODO: Blend with Conversations API
    *   1. Optionally make a conversation if one does not already exist
    *   2. Allow for history/context window truncation logic
    */
-  createResponse(params: ReponseCreateParams): Response {
-    throw new Error('Not implemented');
-  }
+  abstract createResponse(params: CreateResponseParams): Promise<RespondResponse>;
 
   // Conversation API
-  listConversations(
+  abstract listConversations(
     params: ListConversationsParams
-  ): ListConversationsResponse {
-    throw new Error('Not implemented');
-  }
+  ): Promise<ListConversationsResponse>;
 
-  getConversation(params: GetConversationParams): GetConversationResponse {
-    throw new Error('Not implemented');
-  }
+  abstract getConversation(params: GetConversationParams): Promise<GetConversationResponse>;
 
-  updateConversation(
+  abstract updateConversation(
     params: UpdateConversationParams
-  ): UpdateConversationResponse {
-    throw new Error('Not implemented');
-  }
+  ): Promise<UpdateConversationResponse>;
 
   // Context API
-  persistContext(params: PersistContextParams): PersistContextResponse {
-    throw new Error('Not implemented');
-  }
+  abstract persistContext(params: PersistContextParams): Promise<PersistContextResponse>;
 
-  retrieveContext(params: RetrieveContextParams): RetrieveContextResponse {
-    throw new Error('Not implemented');
-  }
+  abstract retrieveContext(params: RetrieveContextParams): Promise<RetrieveContextResponse>;
 
-  forgetContext(params: ForgetContextParams): ForgetContextResponse {
-    throw new Error('Not implemented');
-  }
+  abstract forgetContext(params: ForgetContextParams): Promise<ForgetContextResponse>;
 }
 
-class DemoOnlyMagicianService implements MagicianServiceInterface {
-  createResponse(params: ReponseCreateParams): Response {
+class DemoOnlyMagicianService extends MagicianServiceInterface {
+  async createResponse(params: CreateResponseParams): Promise<RespondResponse> {
     throw new Error('Not implemented');
   }
 
   // Conversation API
-  listConversations(
+  async listConversations(
     params: ListConversationsParams
-  ): ListConversationsResponse {
+  ): Promise<ListConversationsResponse> {
     throw new Error('Not implemented');
   }
 
-  getConversation(params: GetConversationParams): GetConversationResponse {
+  async getConversation(params: GetConversationParams): Promise<GetConversationResponse> {
     throw new Error('Not implemented');
   }
 
-  updateConversation(
+  async updateConversation(
     params: UpdateConversationParams
-  ): UpdateConversationResponse {
+  ): Promise<UpdateConversationResponse> {
     throw new Error('Not implemented');
   }
 
   // Context API
-  persistContext(params: PersistContextParams): PersistContextResponse {
+  async persistContext(params: PersistContextParams): Promise<PersistContextResponse> {
     throw new Error('Not implemented');
   }
 
-  retrieveContext(params: RetrieveContextParams): RetrieveContextResponse {
+  async retrieveContext(params: RetrieveContextParams): Promise<RetrieveContextResponse> {
     throw new Error('Not implemented');
   }
 
-  forgetContext(params: ForgetContextParams): ForgetContextResponse {
+  async forgetContext(params: ForgetContextParams): Promise<ForgetContextResponse> {
     throw new Error('Not implemented');
   }
 }
