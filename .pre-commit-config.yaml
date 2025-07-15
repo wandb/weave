@@ -18,6 +18,7 @@ repos:
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-added-large-files
       - id: check-added-large-files
         args: ["--maxkb=2048"]
+      - id: check-json
   - repo: https://github.com/crate-ci/typos
     rev: v1.34.0
     hooks:
