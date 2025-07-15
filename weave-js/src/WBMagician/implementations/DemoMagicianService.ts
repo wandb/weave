@@ -1,25 +1,24 @@
+import {MagicianServiceInterface} from '../Magician';
 import type {
+  ChatCompletionChunk,
   CreateResponseParams,
-  RespondResponse,
-  ListConversationsParams,
-  ListConversationsResponse,
-  GetConversationParams,
-  GetConversationResponse,
-  UpdateConversationParams,
-  UpdateConversationResponse,
-  PersistContextParams,
-  PersistContextResponse,
-  RetrieveContextParams,
-  RetrieveContextResponse,
   ForgetContextParams,
   ForgetContextResponse,
-  ChatCompletionChunk,
+  GetConversationParams,
+  GetConversationResponse,
+  ListConversationsParams,
+  ListConversationsResponse,
   Message,
+  PersistContextParams,
+  PersistContextResponse,
+  RespondResponse,
+  RetrieveContextParams,
+  RetrieveContextResponse,
+  UpdateConversationParams,
+  UpdateConversationResponse,
 } from '../types';
-
-import { MagicianServiceInterface } from '../Magician';
-import { StreamingResponseHandler } from './StreamingResponseHandler';
-import { InMemoryConversationStore } from './InMemoryConversationStore';
+import {InMemoryConversationStore} from './InMemoryConversationStore';
+import {StreamingResponseHandler} from './StreamingResponseHandler';
 
 /**
  * Demo implementation of MagicianService for development.
@@ -36,12 +35,14 @@ export class DemoMagicianService extends MagicianServiceInterface {
   }
 
   async createResponse(params: CreateResponseParams): Promise<RespondResponse> {
-    const { request, conversationId, onStream } = params;
-    
+    const {request, conversationId, onStream} = params;
+
     // Get or create conversation
     let conversation;
     if (conversationId) {
-      const result = await this.conversationStore.getConversation({ id: conversationId });
+      const result = await this.conversationStore.getConversation({
+        id: conversationId,
+      });
       conversation = result.conversation;
     } else {
       conversation = this.conversationStore.createConversation();
@@ -66,121 +67,137 @@ export class DemoMagicianService extends MagicianServiceInterface {
     });
 
     // Simulate streaming response
-    const simulateStream = async function* (): AsyncIterable<ChatCompletionChunk> {
-      // Simulate some delay
-      await new Promise(resolve => setTimeout(resolve, 100));
+    const simulateStream =
+      async function* (): AsyncIterable<ChatCompletionChunk> {
+        // Simulate some delay
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Mock response based on the last user message
-      const lastUserMessage = request.messages[request.messages.length - 1].content;
-      let responseText = '';
+        // Mock response based on the last user message
+        const lastUserMessage =
+          request.messages[request.messages.length - 1].content;
+        let responseText = '';
 
-      // Check if this looks like a request for tool use
-      if (lastUserMessage.toLowerCase().includes('create') || 
+        // Check if this looks like a request for tool use
+        if (
+          lastUserMessage.toLowerCase().includes('create') ||
           lastUserMessage.toLowerCase().includes('update') ||
-          lastUserMessage.toLowerCase().includes('generate')) {
-        
-        // Simulate tool call response
-        const toolCallId = `call_${Date.now()}`;
-        
-        // First chunk - start tool call
-        yield {
-          id: `chatcmpl_${Date.now()}`,
-          object: 'chat.completion.chunk',
-          created: Date.now(),
-          model: request.model,
-          choices: [{
-            index: 0,
-            delta: {
-              role: 'assistant',
-              tool_calls: [{
+          lastUserMessage.toLowerCase().includes('generate')
+        ) {
+          // Simulate tool call response
+          const toolCallId = `call_${Date.now()}`;
+
+          // First chunk - start tool call
+          yield {
+            id: `chatcmpl_${Date.now()}`,
+            object: 'chat.completion.chunk',
+            created: Date.now(),
+            model: request.model,
+            choices: [
+              {
                 index: 0,
-                id: toolCallId,
-                type: 'function',
-                function: {
-                  name: 'example-tool',
-                  arguments: '',
+                delta: {
+                  role: 'assistant',
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: toolCallId,
+                      type: 'function',
+                      function: {
+                        name: 'example-tool',
+                        arguments: '',
+                      },
+                    },
+                  ],
                 },
-              }],
-            },
-            finish_reason: null,
-          }],
-        };
+                finish_reason: null,
+              },
+            ],
+          };
 
-        // Stream the arguments
-        const args = JSON.stringify({ action: 'demo', target: 'example' });
-        for (let i = 0; i < args.length; i += 5) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-          yield {
-            id: `chatcmpl_${Date.now()}`,
-            object: 'chat.completion.chunk',
-            created: Date.now(),
-            model: request.model,
-            choices: [{
-              index: 0,
-              delta: {
-                tool_calls: [{
+          // Stream the arguments
+          const args = JSON.stringify({action: 'demo', target: 'example'});
+          for (let i = 0; i < args.length; i += 5) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+            yield {
+              id: `chatcmpl_${Date.now()}`,
+              object: 'chat.completion.chunk',
+              created: Date.now(),
+              model: request.model,
+              choices: [
+                {
                   index: 0,
-                  function: {
-                    arguments: args.slice(i, i + 5),
+                  delta: {
+                    tool_calls: [
+                      {
+                        index: 0,
+                        function: {
+                          arguments: args.slice(i, i + 5),
+                        },
+                      },
+                    ],
                   },
-                }],
-              },
-              finish_reason: null,
-            }],
-          };
-        }
+                  finish_reason: null,
+                },
+              ],
+            };
+          }
 
-        // Finish with tool_calls
-        yield {
-          id: `chatcmpl_${Date.now()}`,
-          object: 'chat.completion.chunk',
-          created: Date.now(),
-          model: request.model,
-          choices: [{
-            index: 0,
-            delta: {},
-            finish_reason: 'tool_calls',
-          }],
-        };
-
-      } else {
-        // Regular text response
-        responseText = `This is a demo response to: "${lastUserMessage}". In production, this would connect to your backend API.`;
-        
-        // Stream the response in chunks
-        const words = responseText.split(' ');
-        for (let i = 0; i < words.length; i++) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-          
+          // Finish with tool_calls
           yield {
             id: `chatcmpl_${Date.now()}`,
             object: 'chat.completion.chunk',
             created: Date.now(),
             model: request.model,
-            choices: [{
-              index: 0,
-              delta: {
-                content: (i > 0 ? ' ' : '') + words[i],
+            choices: [
+              {
+                index: 0,
+                delta: {},
+                finish_reason: 'tool_calls',
               },
-              finish_reason: null,
-            }],
+            ],
+          };
+        } else {
+          // Regular text response
+          responseText = `This is a demo response to: "${lastUserMessage}". In production, this would connect to your backend API.`;
+
+          // Stream the response in chunks
+          const words = responseText.split(' ');
+          for (let i = 0; i < words.length; i++) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            yield {
+              id: `chatcmpl_${Date.now()}`,
+              object: 'chat.completion.chunk',
+              created: Date.now(),
+              model: request.model,
+              choices: [
+                {
+                  index: 0,
+                  delta: {
+                    content: (i > 0 ? ' ' : '') + words[i],
+                  },
+                  finish_reason: null,
+                },
+              ],
+            };
+          }
+
+          // Final chunk
+          yield {
+            id: `chatcmpl_${Date.now()}`,
+            object: 'chat.completion.chunk',
+            created: Date.now(),
+            model: request.model,
+            choices: [
+              {
+                index: 0,
+                delta: {},
+                finish_reason: 'stop',
+              },
+            ],
           };
         }
-
-        // Final chunk
-        yield {
-          id: `chatcmpl_${Date.now()}`,
-          object: 'chat.completion.chunk',
-          created: Date.now(),
-          model: request.model,
-          choices: [{
-            index: 0,
-            delta: {},
-            finish_reason: 'stop',
-          }],
-        };
-      }
-    };
+      };
 
     // Process the stream
     const streamIterator = handler.processStream(simulateStream());
@@ -243,4 +260,4 @@ export class DemoMagicianService extends MagicianServiceInterface {
     this.conversationStore.saveToLocalStorage();
     return result;
   }
-} 
+}

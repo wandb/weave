@@ -1,50 +1,49 @@
 /**
  * Magician - AI-powered developer toolkit for W&B
- * 
+ *
  * Main exports for the Magician toolkit
  */
 
 // Core provider and hook
-export { MagicianContextProvider, useMagician } from './Magician';
+export {MagicianContextProvider, useMagician} from './Magician';
 
 // React hooks
-export { useRespond, useRegisterComponentContext, useRegisterComponentTool } from './Magician';
+export {
+  useRegisterComponentContext,
+  useRegisterComponentTool,
+  useRespond,
+} from './Magician';
 
 // Types
 export type {
+  // Conversation types
+  Conversation,
+  ErrorCodes,
+  // Error types
+  MagicianError,
   // Core types
   MagicianKey,
-  ModelName,
   Message,
-  ToolCall,
-  
+  ModelName,
+  RegisteredContext,
+  RegisteredTool,
   // Response types
   RespondParams,
   RespondResponse,
-  UseRespondResponse,
-  StreamingResponse,
   StreamChunk,
-  
+  StreamingResponse,
+  ToolApprovalParams,
+  ToolCall,
+  ToolSchema,
   // Context types
   UseRegisterComponentContextParams,
   UseRegisterComponentContextResponse,
-  RegisteredContext,
-  
   // Tool types
   UseRegisterComponentToolParams,
   UseRegisterComponentToolResponse,
-  RegisteredTool,
-  ToolSchema,
-  ToolApprovalParams,
-  
-  // Conversation types
-  Conversation,
-  
-  // Error types
-  MagicianError,
-  ErrorCodes,
+  UseRespondResponse,
 } from './types';
 
 // Components
-export { MagicianComponent } from './MagicianComponent';
-export { ToolApprovalCard } from './components/ToolApprovalCard'; 
+export {ToolApprovalCard} from './components/ToolApprovalCard';
+export {MagicianComponent} from './MagicianComponent';

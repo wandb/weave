@@ -1,27 +1,27 @@
 import OpenAI from 'openai';
+
+import {MagicianServiceInterface} from '../Magician';
 import type {
+  ChatCompletionChunk,
   CreateResponseParams,
-  RespondResponse,
-  ListConversationsParams,
-  ListConversationsResponse,
-  GetConversationParams,
-  GetConversationResponse,
-  UpdateConversationParams,
-  UpdateConversationResponse,
-  PersistContextParams,
-  PersistContextResponse,
-  RetrieveContextParams,
-  RetrieveContextResponse,
   ForgetContextParams,
   ForgetContextResponse,
-  ChatCompletionChunk,
+  GetConversationParams,
+  GetConversationResponse,
+  ListConversationsParams,
+  ListConversationsResponse,
   Message,
+  PersistContextParams,
+  PersistContextResponse,
+  RespondResponse,
+  RetrieveContextParams,
+  RetrieveContextResponse,
+  UpdateConversationParams,
+  UpdateConversationResponse,
 } from '../types';
-import { MagicianError, ErrorCodes } from '../types';
-
-import { MagicianServiceInterface } from '../Magician';
-import { StreamingResponseHandler } from './StreamingResponseHandler';
-import { InMemoryConversationStore } from './InMemoryConversationStore';
+import {ErrorCodes,MagicianError} from '../types';
+import {InMemoryConversationStore} from './InMemoryConversationStore';
+import {StreamingResponseHandler} from './StreamingResponseHandler';
 
 /**
  * OpenAI implementation of MagicianService.
@@ -34,10 +34,13 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
 
   constructor(apiKey?: string, baseURL?: string) {
     super();
-    
+
     // Get API key from constructor or environment
     // @ts-ignore - Vite uses import.meta.env
-    const finalApiKey = apiKey || import.meta.env?.VITE_OPENAI_API_KEY || (window as any).VITE_OPENAI_API_KEY;
+    const finalApiKey =
+      apiKey ||
+      import.meta.env?.VITE_OPENAI_API_KEY ||
+      (window as any).VITE_OPENAI_API_KEY;
     if (!finalApiKey) {
       throw new MagicianError(
         'OpenAI API key not found. Set VITE_OPENAI_API_KEY environment variable or pass it to the constructor.',
@@ -46,7 +49,10 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
     }
 
     // @ts-ignore - Vite uses import.meta.env
-    const finalBaseURL = baseURL || import.meta.env?.VITE_OPENAI_BASE_URL || (window as any).VITE_OPENAI_BASE_URL;
+    const finalBaseURL =
+      baseURL ||
+      import.meta.env?.VITE_OPENAI_BASE_URL ||
+      (window as any).VITE_OPENAI_BASE_URL;
 
     this.openai = new OpenAI({
       apiKey: finalApiKey,
@@ -60,12 +66,14 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
   }
 
   async createResponse(params: CreateResponseParams): Promise<RespondResponse> {
-    const { request, conversationId, onStream } = params;
-    
+    const {request, conversationId, onStream} = params;
+
     // Get or create conversation
     let conversation;
     if (conversationId) {
-      const result = await this.conversationStore.getConversation({ id: conversationId });
+      const result = await this.conversationStore.getConversation({
+        id: conversationId,
+      });
       conversation = result.conversation;
     } else {
       conversation = this.conversationStore.createConversation();
@@ -96,8 +104,8 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
         const openAIMessages = request.messages.map(msg => ({
           role: msg.role as 'system' | 'user' | 'assistant' | 'function',
           content: msg.content,
-          ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
-          ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
+          ...(msg.tool_calls && {tool_calls: msg.tool_calls}),
+          ...(msg.tool_call_id && {tool_call_id: msg.tool_call_id}),
         }));
 
         // Convert our tools format to OpenAI's format
@@ -144,7 +152,7 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
             tools: openAITools,
             tool_choice: request.tool_choice as any,
           });
-          
+
           for await (const chunk of stream2) {
             onStream(chunk as unknown as ChatCompletionChunk);
           }
@@ -153,7 +161,7 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
         // Handle OpenAI specific errors
         if (error instanceof OpenAI.APIError) {
           let errorCode: string = ErrorCodes.NETWORK_ERROR;
-          
+
           if (error.status === 401) {
             errorCode = ErrorCodes.AUTH_ERROR;
           } else if (error.status === 429) {
@@ -165,10 +173,10 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
           throw new MagicianError(
             error.message || 'OpenAI API error',
             errorCode,
-            { status: error.status, type: error.type }
+            {status: error.status, type: error.type}
           );
         }
-        
+
         throw error;
       }
     };
@@ -240,4 +248,4 @@ export class OpenAIMagicianService extends MagicianServiceInterface {
       return false;
     }
   }
-} 
+}

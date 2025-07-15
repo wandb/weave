@@ -1,6 +1,6 @@
 /**
  * Magician Type Definitions
- * 
+ *
  * This file contains all type definitions for the Magician toolkit.
  * These types are designed to provide a type-safe, developer-friendly API
  * for integrating AI capabilities into W&B applications.
@@ -18,7 +18,12 @@ export type MagicianKey = string;
 /**
  * Available LLM models - extendable for future providers
  */
-export type ModelName = 'gpt-4' | 'gpt-4o' | 'gpt-3.5-turbo' | 'claude-3' | string;
+export type ModelName =
+  | 'gpt-4'
+  | 'gpt-4o'
+  | 'gpt-3.5-turbo'
+  | 'claude-3'
+  | string;
 
 /**
  * Represents a message in a conversation
@@ -42,7 +47,13 @@ export interface ToolCall {
   id: string;
   toolKey: MagicianKey;
   arguments: Record<string, any>;
-  status: 'pending' | 'approved' | 'rejected' | 'executing' | 'completed' | 'failed';
+  status:
+    | 'pending'
+    | 'approved'
+    | 'rejected'
+    | 'executing'
+    | 'completed'
+    | 'failed';
   result?: any;
   error?: string;
 }
@@ -180,7 +191,7 @@ export interface UseRegisterComponentToolParams {
   // Custom approval UI component
   onApprovalRequired?: (params: ToolApprovalParams) => React.ReactNode;
   // Validation function
-  validate?: (args: any) => { valid: boolean; error?: string };
+  validate?: (args: any) => {valid: boolean; error?: string};
   // Post-execution cleanup
   onComplete?: (result: any) => void;
   onError?: (error: Error) => void;
@@ -306,7 +317,7 @@ export interface ChatCompletionRequest {
   max_tokens?: number;
   stream?: boolean;
   tools?: ChatTool[];
-  tool_choice?: 'auto' | 'none' | { type: 'function'; function: { name: string } };
+  tool_choice?: 'auto' | 'none' | {type: 'function'; function: {name: string}};
 }
 
 /**
@@ -440,11 +451,7 @@ export interface ForgetContextParams {
 // ============================================================================
 
 export class MagicianError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public details?: any
-  ) {
+  constructor(message: string, public code: string, public details?: any) {
     super(message);
     this.name = 'MagicianError';
   }
@@ -485,4 +492,4 @@ export interface ForgetContextResponse {
 // ============================================================================
 
 // For hooks, we use the same params as the direct methods
-export type UseRespondParams = RespondParams; 
+export type UseRespondParams = RespondParams;

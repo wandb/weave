@@ -1,23 +1,23 @@
-import React, {FC, useState} from 'react';
 import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  IconButton,
-  Collapse,
-  TextField,
-  alpha,
-} from '@mui/material';
-import {
-  PlayArrow as PlayIcon,
+  Check as CheckIcon,
   Close as CloseIcon,
   Edit as EditIcon,
-  Check as CheckIcon,
+  PlayArrow as PlayIcon,
 } from '@mui/icons-material';
+import {
+  alpha,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Collapse,
+  IconButton,
+  TextField,
+  Typography,
+} from '@mui/material';
+import React, {FC, useState} from 'react';
 
-import type { ToolCall, RegisteredTool } from '../types';
+import type {RegisteredTool, ToolCall} from '../types';
 
 interface ToolApprovalCardProps {
   toolCall: ToolCall;
@@ -58,30 +58,31 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({
         bgcolor: alpha('#2196F3', 0.05),
         border: 1,
         borderColor: alpha('#2196F3', 0.3),
-      }}
-    >
+      }}>
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle2" sx={{ color: '#2196F3', fontWeight: 600 }}>
+        <Box sx={{display: 'flex', alignItems: 'flex-start', mb: 2}}>
+          <Box sx={{flex: 1}}>
+            <Typography
+              variant="subtitle2"
+              sx={{color: '#2196F3', fontWeight: 600}}>
               Tool Request
             </Typography>
-            <Typography variant="h6" sx={{ mt: 0.5 }}>
+            <Typography variant="h6" sx={{mt: 0.5}}>
               {tool.displayName}
             </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+            <Typography variant="body2" sx={{color: 'text.secondary', mt: 0.5}}>
               {tool.description}
             </Typography>
           </Box>
-          
+
           <IconButton size="small" onClick={() => setIsEditing(!isEditing)}>
             <EditIcon fontSize="small" />
           </IconButton>
         </Box>
 
         <Collapse in={isEditing || Object.keys(toolCall.arguments).length > 0}>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          <Box sx={{mb: 2}}>
+            <Typography variant="caption" sx={{color: 'text.secondary'}}>
               Arguments:
             </Typography>
             {isEditing ? (
@@ -90,7 +91,7 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({
                 multiline
                 rows={4}
                 value={editedArgs}
-                onChange={(e) => setEditedArgs(e.target.value)}
+                onChange={e => setEditedArgs(e.target.value)}
                 sx={{
                   mt: 1,
                   '& .MuiOutlinedInput-root': {
@@ -108,9 +109,8 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({
                   borderRadius: 1,
                   fontFamily: 'monospace',
                   fontSize: '0.875rem',
-                }}
-              >
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                }}>
+                <pre style={{margin: 0, whiteSpace: 'pre-wrap'}}>
                   {JSON.stringify(toolCall.arguments, null, 2)}
                 </pre>
               </Box>
@@ -118,7 +118,7 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({
           </Box>
         </Collapse>
 
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{display: 'flex', gap: 1}}>
           <Button
             variant="contained"
             size="small"
@@ -129,8 +129,7 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({
               '&:hover': {
                 bgcolor: '#1976D2',
               },
-            }}
-          >
+            }}>
             {isEditing ? 'Save & Run' : 'Run Tool'}
           </Button>
           <Button
@@ -141,12 +140,11 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({
             sx={{
               borderColor: 'divider',
               color: 'text.secondary',
-            }}
-          >
+            }}>
             Cancel
           </Button>
         </Box>
       </CardContent>
     </Card>
   );
-}; 
+};

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Box, Button, TextField, Typography, Paper } from '@mui/material';
+import {Box, Button, Paper, TextField, Typography} from '@mui/material';
+import React, {useState} from 'react';
+
 import {
   useMagician,
-  useRespond,
   useRegisterComponentContext,
   useRegisterComponentTool,
+  useRespond,
 } from '../index';
 
 /**
@@ -31,7 +32,7 @@ export const MagicianDemoComponent: React.FC = () => {
   // Register a tool that the AI can use
   const updateGeneratedText = (text: string) => {
     setGeneratedText(text);
-    return { success: true, text };
+    return {success: true, text};
   };
 
   useRegisterComponentTool({
@@ -86,20 +87,19 @@ export const MagicianDemoComponent: React.FC = () => {
   };
 
   return (
-    <Paper sx={{ p: 3, m: 2 }}>
+    <Paper sx={{p: 3, m: 2}}>
       <Typography variant="h5" gutterBottom>
         Magician Demo Component
       </Typography>
 
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{mb: 3}}>
         <TextField
           label="Model"
           value={modelName}
-          onChange={(e) => setModelName(e.target.value)}
+          onChange={e => setModelName(e.target.value)}
           select
           fullWidth
-          sx={{ mb: 2 }}
-        >
+          sx={{mb: 2}}>
           <option value="gpt-4o">GPT-4</option>
           <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
         </TextField>
@@ -107,26 +107,23 @@ export const MagicianDemoComponent: React.FC = () => {
         <TextField
           label="Prompt"
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={e => setPrompt(e.target.value)}
           multiline
           rows={3}
           fullWidth
-          sx={{ mb: 2 }}
+          sx={{mb: 2}}
           placeholder="Enter something to generate a description for..."
         />
 
         <Button
           variant="contained"
           onClick={() => generateDescription.refetch()}
-          disabled={generateDescription.loading || !prompt}
-        >
+          disabled={generateDescription.loading || !prompt}>
           Generate Description
         </Button>
       </Box>
 
-      {generateDescription.loading && (
-        <Typography>Generating...</Typography>
-      )}
+      {generateDescription.loading && <Typography>Generating...</Typography>}
 
       {generateDescription.error && (
         <Typography color="error">
@@ -135,25 +132,24 @@ export const MagicianDemoComponent: React.FC = () => {
       )}
 
       {generateDescription.data && (
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{mb: 3}}>
           <Typography variant="h6">Generated Description:</Typography>
           <Typography>{generateDescription.data.content}</Typography>
         </Box>
       )}
 
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{mb: 3}}>
         <Typography variant="h6" gutterBottom>
           Direct API Example
         </Typography>
         <Button
           variant="outlined"
           onClick={handleDirectQuery}
-          disabled={isLoading}
-        >
+          disabled={isLoading}>
           Ask "What can you help me with?"
         </Button>
         {directResponse && (
-          <Typography sx={{ mt: 2 }}>{directResponse}</Typography>
+          <Typography sx={{mt: 2}}>{directResponse}</Typography>
         )}
       </Box>
 
@@ -163,16 +159,17 @@ export const MagicianDemoComponent: React.FC = () => {
         </Typography>
         <TextField
           value={generatedText}
-          onChange={(e) => setGeneratedText(e.target.value)}
+          onChange={e => setGeneratedText(e.target.value)}
           multiline
           rows={3}
           fullWidth
           placeholder="The AI can update this field using the registered tool..."
         />
-        <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-          Try asking the AI to "update the generated text field with a haiku about coding"
+        <Typography variant="caption" display="block" sx={{mt: 1}}>
+          Try asking the AI to "update the generated text field with a haiku
+          about coding"
         </Typography>
       </Box>
     </Paper>
   );
-}; 
+};

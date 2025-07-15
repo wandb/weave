@@ -1,15 +1,14 @@
+import {MagicianServiceInterface} from '../Magician';
 import type {
-  RespondParams,
-  RespondResponse,
   ChatCompletionRequest,
   ChatMessage,
   ChatTool,
-  Message,
   MagicianKey,
+  Message,
+  RespondParams,
+  RespondResponse,
 } from '../types';
-
-import { MagicianServiceInterface } from '../Magician';
-import { InMemoryAppState } from './InMemoryAppState';
+import {InMemoryAppState} from './InMemoryAppState';
 
 /**
  * Core Magician implementation that orchestrates AI interactions.
@@ -43,10 +42,10 @@ export class CoreMagician {
     // If continuing a conversation, add previous messages
     if (params.conversationId) {
       try {
-        const { conversation } = await this.service.getConversation({
+        const {conversation} = await this.service.getConversation({
           id: params.conversationId,
         });
-        
+
         // Convert our Message format to ChatMessage format
         for (const msg of conversation.messages) {
           if (msg.role === 'user' || msg.role === 'assistant') {
@@ -91,7 +90,7 @@ export class CoreMagician {
       try {
         // Wait a bit for content to accumulate
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         const streamHandler = response as any; // Access protected methods
         const content = streamHandler.getAccumulatedContent?.() || '';
         const toolCalls = streamHandler.getAccumulatedToolCalls?.() || [];
@@ -134,7 +133,9 @@ export class CoreMagician {
     if (params.systemPrompt) {
       parts.push(params.systemPrompt);
     } else {
-      parts.push('You are a helpful AI assistant integrated into the W&B application.');
+      parts.push(
+        'You are a helpful AI assistant integrated into the W&B application.'
+      );
     }
 
     // Add aggregated context
@@ -153,7 +154,7 @@ export class CoreMagician {
    */
   private buildToolsArray(includeTools?: MagicianKey[]): ChatTool[] {
     const tools: ChatTool[] = [];
-    
+
     let toolsList;
     if (includeTools) {
       // Get specific tools
@@ -163,7 +164,7 @@ export class CoreMagician {
         .map(t => t!.tool);
     } else {
       // Get all tools
-      const { tools: allTools } = this.state.listTools({});
+      const {tools: allTools} = this.state.listTools({});
       toolsList = allTools;
     }
 
@@ -195,4 +196,4 @@ export class CoreMagician {
   getService(): MagicianServiceInterface {
     return this.service;
   }
-} 
+}

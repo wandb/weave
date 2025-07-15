@@ -1,38 +1,38 @@
-import React, {FC, useState, useRef, useEffect, useCallback} from 'react';
 import {
-  Box,
-  Paper,
-  TextField,
-  IconButton,
-  Typography,
-  Avatar,
-  Chip,
-  Menu,
-  MenuItem,
-  CircularProgress,
-  Fade,
-  Divider,
-  Tooltip,
-  alpha,
-} from '@mui/material';
-import {
-  Send as SendIcon,
-  SmartToy as AIIcon,
-  Person as PersonIcon,
-  Settings as SettingsIcon,
-  Code as CodeIcon,
   Check as CheckIcon,
   Close as CloseIcon,
+  Code as CodeIcon,
   ContentCopy as CopyIcon,
+  Person as PersonIcon,
+  Send as SendIcon,
+  Settings as SettingsIcon,
+  SmartToy as AIIcon,
 } from '@mui/icons-material';
+import {
+  alpha,
+  Avatar,
+  Box,
+  Chip,
+  CircularProgress,
+  Divider,
+  Fade,
+  IconButton,
+  Menu,
+  MenuItem,
+  Paper,
+  TextField,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import React, {FC, useCallback, useEffect, useRef, useState} from 'react';
 
-import {useMagician} from './Magician';
 import {ToolApprovalCard} from './components/ToolApprovalCard';
+import {useMagician} from './Magician';
 import type {
   Message,
-  StreamingResponse,
   RegisteredContext,
   RegisteredTool,
+  StreamingResponse,
   ToolCall,
 } from './types';
 
@@ -61,7 +61,7 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
   };
 
   useEffect(() => {
@@ -91,11 +91,12 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
   };
 
   // Insert mention
-  const insertMention = (item: RegisteredContext | RegisteredTool, type: 'context' | 'tool') => {
+  const insertMention = (
+    item: RegisteredContext | RegisteredTool,
+    type: 'context' | 'tool'
+  ) => {
     const lastAtIndex = input.lastIndexOf('@');
-    const newInput = 
-      input.slice(0, lastAtIndex) + 
-      `@${item.displayName} `;
+    const newInput = input.slice(0, lastAtIndex) + `@${item.displayName} `;
     setInput(newInput);
     setShowMentions(false);
     inputRef.current?.focus();
@@ -145,9 +146,12 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
             role: 'assistant',
             content: currentContent,
             timestamp: new Date(),
-            metadata: pendingToolCalls.length > 0 ? {
-              toolCalls: pendingToolCalls
-            } : undefined,
+            metadata:
+              pendingToolCalls.length > 0
+                ? {
+                    toolCalls: pendingToolCalls,
+                  }
+                : undefined,
           };
           setMessages(prev => [...prev, assistantMessage]);
           setStreamingContent('');
@@ -185,95 +189,124 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
   };
 
   // Handle tool approval
-  const handleToolApprove = async (toolCall: ToolCall, modifiedArgs?: Record<string, any>) => {
+  const handleToolApprove = async (
+    toolCall: ToolCall,
+    modifiedArgs?: Record<string, any>
+  ) => {
     // Update the tool call status in the message
-    setMessages(prev => prev.map(msg => {
-      if (msg.metadata?.toolCalls?.some(tc => tc.id === toolCall.id)) {
-        return {
-          ...msg,
-          metadata: {
-            ...msg.metadata,
-            toolCalls: msg.metadata.toolCalls.map(tc => 
-              tc.id === toolCall.id 
-                ? { ...tc, status: 'executing' as const, arguments: modifiedArgs || tc.arguments }
-                : tc
-            ),
-          },
-        };
-      }
-      return msg;
-    }));
+    setMessages(prev =>
+      prev.map(msg => {
+        if (msg.metadata?.toolCalls?.some(tc => tc.id === toolCall.id)) {
+          return {
+            ...msg,
+            metadata: {
+              ...msg.metadata,
+              toolCalls: msg.metadata.toolCalls.map(tc =>
+                tc.id === toolCall.id
+                  ? {
+                      ...tc,
+                      status: 'executing' as const,
+                      arguments: modifiedArgs || tc.arguments,
+                    }
+                  : tc
+              ),
+            },
+          };
+        }
+        return msg;
+      })
+    );
 
     // Execute the tool
     try {
-      const result = await magician.getMagician().getState().invokeTool({
-        key: toolCall.toolKey,
-        arguments: modifiedArgs || toolCall.arguments,
-      });
+      const result = await magician
+        .getMagician()
+        .getState()
+        .invokeTool({
+          key: toolCall.toolKey,
+          arguments: modifiedArgs || toolCall.arguments,
+        });
 
       // Update status to completed
-      setMessages(prev => prev.map(msg => {
-        if (msg.metadata?.toolCalls?.some(tc => tc.id === toolCall.id)) {
-          return {
-            ...msg,
-            metadata: {
-              ...msg.metadata,
-              toolCalls: msg.metadata.toolCalls.map(tc => 
-                tc.id === toolCall.id 
-                  ? { ...tc, status: 'completed' as const, result: result.result }
-                  : tc
-              ),
-            },
-          };
-        }
-        return msg;
-      }));
+      setMessages(prev =>
+        prev.map(msg => {
+          if (msg.metadata?.toolCalls?.some(tc => tc.id === toolCall.id)) {
+            return {
+              ...msg,
+              metadata: {
+                ...msg.metadata,
+                toolCalls: msg.metadata.toolCalls.map(tc =>
+                  tc.id === toolCall.id
+                    ? {
+                        ...tc,
+                        status: 'completed' as const,
+                        result: result.result,
+                      }
+                    : tc
+                ),
+              },
+            };
+          }
+          return msg;
+        })
+      );
     } catch (error) {
       // Update status to failed
-      setMessages(prev => prev.map(msg => {
-        if (msg.metadata?.toolCalls?.some(tc => tc.id === toolCall.id)) {
-          return {
-            ...msg,
-            metadata: {
-              ...msg.metadata,
-              toolCalls: msg.metadata.toolCalls.map(tc => 
-                tc.id === toolCall.id 
-                  ? { ...tc, status: 'failed' as const, error: error instanceof Error ? error.message : 'Unknown error' }
-                  : tc
-              ),
-            },
-          };
-        }
-        return msg;
-      }));
+      setMessages(prev =>
+        prev.map(msg => {
+          if (msg.metadata?.toolCalls?.some(tc => tc.id === toolCall.id)) {
+            return {
+              ...msg,
+              metadata: {
+                ...msg.metadata,
+                toolCalls: msg.metadata.toolCalls.map(tc =>
+                  tc.id === toolCall.id
+                    ? {
+                        ...tc,
+                        status: 'failed' as const,
+                        error:
+                          error instanceof Error
+                            ? error.message
+                            : 'Unknown error',
+                      }
+                    : tc
+                ),
+              },
+            };
+          }
+          return msg;
+        })
+      );
     }
   };
 
   // Handle tool rejection
   const handleToolReject = (toolCall: ToolCall) => {
-    setMessages(prev => prev.map(msg => {
-      if (msg.metadata?.toolCalls?.some(tc => tc.id === toolCall.id)) {
-        return {
-          ...msg,
-          metadata: {
-            ...msg.metadata,
-            toolCalls: msg.metadata.toolCalls.map(tc => 
-              tc.id === toolCall.id 
-                ? { ...tc, status: 'rejected' as const }
-                : tc
-            ),
-          },
-        };
-      }
-      return msg;
-    }));
+    setMessages(prev =>
+      prev.map(msg => {
+        if (msg.metadata?.toolCalls?.some(tc => tc.id === toolCall.id)) {
+          return {
+            ...msg,
+            metadata: {
+              ...msg.metadata,
+              toolCalls: msg.metadata.toolCalls.map(tc =>
+                tc.id === toolCall.id
+                  ? {...tc, status: 'rejected' as const}
+                  : tc
+              ),
+            },
+          };
+        }
+        return msg;
+      })
+    );
   };
 
   // Filter mentions
-  const filteredContexts = contexts.filter(c => 
+  const filteredContexts = contexts.filter(c =>
     c.displayName.toLowerCase().includes(mentionSearch.toLowerCase())
   );
-  const filteredTools = tools.filter(t => 
+  const filteredTools = tools.filter(t =>
     t.displayName.toLowerCase().includes(mentionSearch.toLowerCase())
   );
 
@@ -288,8 +321,7 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
         borderRadius: 2,
         border: 1,
         borderColor: 'divider',
-      }}
-    >
+      }}>
       {/* Header */}
       <Box
         sx={{
@@ -300,18 +332,17 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <AIIcon sx={{ color: 'primary.main' }} />
-          <Typography variant="h6" sx={{ fontWeight: 500 }}>
+        }}>
+        <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
+          <AIIcon sx={{color: 'primary.main'}} />
+          <Typography variant="h6" sx={{fontWeight: 500}}>
             Magician
           </Typography>
           {conversationId && (
             <Chip
               label="Active Session"
               size="small"
-              sx={{ 
+              sx={{
                 bgcolor: alpha('#4CAF50', 0.1),
                 color: '#4CAF50',
                 fontWeight: 500,
@@ -334,9 +365,8 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: 3,
-        }}
-      >
-        {messages.map((message) => (
+        }}>
+        {messages.map(message => (
           <MessageBubble
             key={message.id}
             message={message}
@@ -346,7 +376,7 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
             onToolReject={handleToolReject}
           />
         ))}
-        
+
         {/* Streaming message */}
         {isStreaming && streamingContent && (
           <MessageBubble
@@ -360,21 +390,27 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
             onCopy={copyMessage}
           />
         )}
-        
+
         {/* Loading indicator */}
         {isStreaming && !streamingContent && (
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-              <AIIcon sx={{ fontSize: 18 }} />
+          <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+            <Avatar sx={{width: 32, height: 32, bgcolor: 'primary.main'}}>
+              <AIIcon sx={{fontSize: 18}} />
             </Avatar>
-            <Box sx={{ display: 'flex', gap: 0.5 }}>
-              <CircularProgress size={8} sx={{ color: 'text.secondary' }} />
-              <CircularProgress size={8} sx={{ color: 'text.secondary', animationDelay: '0.2s' }} />
-              <CircularProgress size={8} sx={{ color: 'text.secondary', animationDelay: '0.4s' }} />
+            <Box sx={{display: 'flex', gap: 0.5}}>
+              <CircularProgress size={8} sx={{color: 'text.secondary'}} />
+              <CircularProgress
+                size={8}
+                sx={{color: 'text.secondary', animationDelay: '0.2s'}}
+              />
+              <CircularProgress
+                size={8}
+                sx={{color: 'text.secondary', animationDelay: '0.4s'}}
+              />
             </Box>
           </Box>
         )}
-        
+
         <div ref={messagesEndRef} />
       </Box>
 
@@ -385,9 +421,8 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
           borderTop: 1,
           borderColor: 'divider',
           bgcolor: 'background.paper',
-        }}
-      >
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+        }}>
+        <Box sx={{display: 'flex', gap: 1, alignItems: 'flex-end'}}>
           <TextField
             ref={inputRef}
             fullWidth
@@ -395,7 +430,7 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
             maxRows={4}
             value={input}
             onChange={handleInputChange}
-            onKeyDown={(e) => {
+            onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSend();
@@ -422,27 +457,28 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
               '&.Mui-disabled': {
                 bgcolor: 'action.disabledBackground',
               },
-            }}
-          >
+            }}>
             <SendIcon />
           </IconButton>
         </Box>
 
         {/* Active contexts */}
         {contexts.filter(c => c.autoInclude).length > 0 && (
-          <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-            <Typography variant="caption" sx={{ color: 'text.secondary', mr: 1 }}>
+          <Box sx={{mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap'}}>
+            <Typography variant="caption" sx={{color: 'text.secondary', mr: 1}}>
               Active context:
             </Typography>
-            {contexts.filter(c => c.autoInclude).map(context => (
-              <Chip
-                key={context.key}
-                label={context.displayName}
-                size="small"
-                variant="outlined"
-                sx={{ height: 20, fontSize: '0.75rem' }}
-              />
-            ))}
+            {contexts
+              .filter(c => c.autoInclude)
+              .map(context => (
+                <Chip
+                  key={context.key}
+                  label={context.displayName}
+                  size="small"
+                  variant="outlined"
+                  sx={{height: 20, fontSize: '0.75rem'}}
+                />
+              ))}
           </Box>
         )}
       </Box>
@@ -452,31 +488,35 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
         open={showMentions}
         anchorEl={mentionAnchor}
         onClose={() => setShowMentions(false)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        anchorOrigin={{vertical: 'top', horizontal: 'left'}}
+        transformOrigin={{vertical: 'bottom', horizontal: 'left'}}
         PaperProps={{
           sx: {
             maxHeight: 300,
             minWidth: 250,
           },
-        }}
-      >
+        }}>
         {filteredContexts.length > 0 && (
           <>
-            <Typography variant="caption" sx={{ px: 2, py: 1, color: 'text.secondary' }}>
+            <Typography
+              variant="caption"
+              sx={{px: 2, py: 1, color: 'text.secondary'}}>
               Contexts
             </Typography>
             {filteredContexts.map(context => (
               <MenuItem
                 key={context.key}
                 onClick={() => insertMention(context, 'context')}
-                sx={{ py: 1 }}
-              >
-                <CodeIcon sx={{ mr: 1.5, fontSize: 18, color: 'text.secondary' }} />
+                sx={{py: 1}}>
+                <CodeIcon
+                  sx={{mr: 1.5, fontSize: 18, color: 'text.secondary'}}
+                />
                 <Box>
                   <Typography variant="body2">{context.displayName}</Typography>
                   {context.description && (
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{color: 'text.secondary'}}>
                       {context.description}
                     </Typography>
                   )}
@@ -485,24 +525,25 @@ export const MagicianComponent: FC<MagicianComponentProps> = ({
             ))}
           </>
         )}
-        
+
         {filteredContexts.length > 0 && filteredTools.length > 0 && <Divider />}
-        
+
         {filteredTools.length > 0 && (
           <>
-            <Typography variant="caption" sx={{ px: 2, py: 1, color: 'text.secondary' }}>
+            <Typography
+              variant="caption"
+              sx={{px: 2, py: 1, color: 'text.secondary'}}>
               Tools
             </Typography>
             {filteredTools.map(tool => (
               <MenuItem
                 key={tool.key}
                 onClick={() => insertMention(tool, 'tool')}
-                sx={{ py: 1 }}
-              >
-                <CodeIcon sx={{ mr: 1.5, fontSize: 18, color: 'primary.main' }} />
+                sx={{py: 1}}>
+                <CodeIcon sx={{mr: 1.5, fontSize: 18, color: 'primary.main'}} />
                 <Box>
                   <Typography variant="body2">{tool.displayName}</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  <Typography variant="caption" sx={{color: 'text.secondary'}}>
                     {tool.description}
                   </Typography>
                 </Box>
@@ -521,9 +562,19 @@ const MessageBubble: FC<{
   isStreaming?: boolean;
   onCopy: (content: string) => void;
   tools?: RegisteredTool[];
-  onToolApprove?: (toolCall: ToolCall, modifiedArgs?: Record<string, any>) => void;
+  onToolApprove?: (
+    toolCall: ToolCall,
+    modifiedArgs?: Record<string, any>
+  ) => void;
   onToolReject?: (toolCall: ToolCall) => void;
-}> = ({ message, isStreaming, onCopy, tools = [], onToolApprove, onToolReject }) => {
+}> = ({
+  message,
+  isStreaming,
+  onCopy,
+  tools = [],
+  onToolApprove,
+  onToolReject,
+}) => {
   const isUser = message.role === 'user';
   const [showCopy, setShowCopy] = useState(false);
   const toolCalls = message.metadata?.toolCalls || [];
@@ -532,23 +583,25 @@ const MessageBubble: FC<{
     <Fade in>
       <Box>
         <Box
-          sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}
+          sx={{display: 'flex', gap: 1.5, alignItems: 'flex-start'}}
           onMouseEnter={() => setShowCopy(true)}
-          onMouseLeave={() => setShowCopy(false)}
-        >
+          onMouseLeave={() => setShowCopy(false)}>
           <Avatar
             sx={{
               width: 32,
               height: 32,
               bgcolor: isUser ? 'grey.400' : 'primary.main',
-            }}
-          >
-            {isUser ? <PersonIcon sx={{ fontSize: 18 }} /> : <AIIcon sx={{ fontSize: 18 }} />}
+            }}>
+            {isUser ? (
+              <PersonIcon sx={{fontSize: 18}} />
+            ) : (
+              <AIIcon sx={{fontSize: 18}} />
+            )}
           </Avatar>
-          
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+
+          <Box sx={{flex: 1, minWidth: 0}}>
+            <Box sx={{display: 'flex', alignItems: 'center', gap: 1, mb: 0.5}}>
+              <Typography variant="body2" sx={{fontWeight: 500}}>
                 {isUser ? 'You' : 'Magician'}
               </Typography>
               {isStreaming && (
@@ -564,15 +617,14 @@ const MessageBubble: FC<{
                 />
               )}
             </Box>
-            
+
             <Typography
               variant="body1"
               sx={{
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
                 color: isStreaming ? 'text.secondary' : 'text.primary',
-              }}
-            >
+              }}>
               {message.content}
               {isStreaming && (
                 <Box
@@ -585,15 +637,15 @@ const MessageBubble: FC<{
                     ml: 0.5,
                     animation: 'blink 1s infinite',
                     '@keyframes blink': {
-                      '0%, 50%': { opacity: 1 },
-                      '51%, 100%': { opacity: 0 },
+                      '0%, 50%': {opacity: 1},
+                      '51%, 100%': {opacity: 0},
                     },
                   }}
                 />
               )}
             </Typography>
           </Box>
-          
+
           {showCopy && !isStreaming && (
             <Fade in>
               <Tooltip title="Copy message">
@@ -602,23 +654,29 @@ const MessageBubble: FC<{
                   onClick={() => onCopy(message.content)}
                   sx={{
                     opacity: 0.6,
-                    '&:hover': { opacity: 1 },
-                  }}
-                >
+                    '&:hover': {opacity: 1},
+                  }}>
                   <CopyIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             </Fade>
           )}
         </Box>
-        
+
         {/* Tool calls */}
         {toolCalls.length > 0 && (
-          <Box sx={{ mt: 2, ml: 5.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {toolCalls.map((toolCall) => {
+          <Box
+            sx={{
+              mt: 2,
+              ml: 5.5,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+            }}>
+            {toolCalls.map(toolCall => {
               const tool = tools.find(t => t.key === toolCall.toolKey);
               if (!tool) return null;
-              
+
               // Only show approval card for pending tools
               if (toolCall.status === 'pending' && !tool.autoExecutable) {
                 return (
@@ -626,12 +684,14 @@ const MessageBubble: FC<{
                     key={toolCall.id}
                     toolCall={toolCall}
                     tool={tool}
-                    onApprove={(modifiedArgs) => onToolApprove?.(toolCall, modifiedArgs)}
+                    onApprove={modifiedArgs =>
+                      onToolApprove?.(toolCall, modifiedArgs)
+                    }
                     onReject={() => onToolReject?.(toolCall)}
                   />
                 );
               }
-              
+
               // Show status for other states
               if (toolCall.status !== 'pending') {
                 return (
@@ -640,15 +700,17 @@ const MessageBubble: FC<{
                     label={`${tool.displayName}: ${toolCall.status}`}
                     size="small"
                     color={
-                      toolCall.status === 'completed' ? 'success' :
-                      toolCall.status === 'failed' ? 'error' :
-                      'default'
+                      toolCall.status === 'completed'
+                        ? 'success'
+                        : toolCall.status === 'failed'
+                        ? 'error'
+                        : 'default'
                     }
                     variant="outlined"
                   />
                 );
               }
-              
+
               return null;
             })}
           </Box>

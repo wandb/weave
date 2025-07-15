@@ -1,10 +1,10 @@
 import type {
+  ChatCompletionChunk,
   RespondResponse,
   StreamChunk,
-  ChatCompletionChunk,
   ToolCall,
 } from '../types';
-import { MagicianError, ErrorCodes } from '../types';
+import {ErrorCodes,MagicianError} from '../types';
 
 /**
  * Handles streaming responses from the chat completions API.
@@ -17,11 +17,14 @@ export class StreamingResponseHandler implements RespondResponse {
   private abortController: AbortController;
   private streamIterator?: AsyncIterableIterator<StreamChunk>;
   private accumulatedContent: string = '';
-  private accumulatedToolCalls: Map<number, {
-    id?: string;
-    name?: string;
-    arguments: string;
-  }> = new Map();
+  private accumulatedToolCalls: Map<
+    number,
+    {
+      id?: string;
+      name?: string;
+      arguments: string;
+    }
+  > = new Map();
 
   constructor(requestId: string, conversationId: string) {
     this.requestId = requestId;
@@ -38,12 +41,15 @@ export class StreamingResponseHandler implements RespondResponse {
     try {
       for await (const chunk of chunks) {
         if (this.abortController.signal.aborted) {
-          throw new MagicianError('Request cancelled', ErrorCodes.NETWORK_ERROR);
+          throw new MagicianError(
+            'Request cancelled',
+            ErrorCodes.NETWORK_ERROR
+          );
         }
 
         // Process each choice in the chunk
         for (const choice of chunk.choices) {
-          const { delta, finish_reason } = choice;
+          const {delta, finish_reason} = choice;
 
           // Handle content updates
           if (delta.content) {
@@ -57,7 +63,9 @@ export class StreamingResponseHandler implements RespondResponse {
           // Handle tool calls
           if (delta.tool_calls) {
             for (const toolCallDelta of delta.tool_calls) {
-              const existing = this.accumulatedToolCalls.get(toolCallDelta.index) || {
+              const existing = this.accumulatedToolCalls.get(
+                toolCallDelta.index
+              ) || {
                 arguments: '',
               };
 
@@ -75,7 +83,11 @@ export class StreamingResponseHandler implements RespondResponse {
               this.accumulatedToolCalls.set(toolCallDelta.index, existing);
 
               // Check if we have enough info to yield a tool call
-              if (existing.id && existing.name && finish_reason === 'tool_calls') {
+              if (
+                existing.id &&
+                existing.name &&
+                finish_reason === 'tool_calls'
+              ) {
                 try {
                   const parsedArgs = JSON.parse(existing.arguments);
                   const toolCall: ToolCall = {
@@ -99,7 +111,7 @@ export class StreamingResponseHandler implements RespondResponse {
 
           // Handle completion
           if (finish_reason === 'stop' || finish_reason === 'length') {
-            yield { type: 'done' };
+            yield {type: 'done'};
           }
         }
       }
@@ -130,7 +142,9 @@ export class StreamingResponseHandler implements RespondResponse {
   /**
    * Set the actual stream iterator (called by the service)
    */
-  setStreamIterator(iterator: AsyncIterableIterator<StreamChunk> | AsyncIterable<StreamChunk>) {
+  setStreamIterator(
+    iterator: AsyncIterableIterator<StreamChunk> | AsyncIterable<StreamChunk>
+  ) {
     if ('next' in iterator && Symbol.asyncIterator in iterator) {
       // It's already a proper AsyncIterableIterator
       this.streamIterator = iterator as AsyncIterableIterator<StreamChunk>;
@@ -141,7 +155,9 @@ export class StreamingResponseHandler implements RespondResponse {
         next: () => iter.next(),
         return: iter.return ? () => iter.return!() : undefined,
         throw: iter.throw ? (e?: any) => iter.throw!(e) : undefined,
-        [Symbol.asyncIterator]() { return this; }
+        [Symbol.asyncIterator]() {
+          return this;
+        },
       } as AsyncIterableIterator<StreamChunk>;
     } else {
       // It's an AsyncIterable, get the iterator
@@ -152,7 +168,9 @@ export class StreamingResponseHandler implements RespondResponse {
         next: () => iter.next(),
         return: iter.return ? () => iter.return!() : undefined,
         throw: iter.throw ? (e?: any) => iter.throw!(e) : undefined,
-        [Symbol.asyncIterator]() { return this; }
+        [Symbol.asyncIterator]() {
+          return this;
+        },
       } as AsyncIterableIterator<StreamChunk>;
     }
   }
@@ -202,4 +220,4 @@ export class StreamingResponseHandler implements RespondResponse {
 
     return toolCalls;
   }
-} 
+}

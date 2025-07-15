@@ -1,24 +1,23 @@
 import type {
   AddContextParams,
   AddContextResponse,
-  RemoveContextParams,
-  RemoveContextResponse,
-  ListContextsParams,
-  ListContextsResponse,
   AddToolParams,
   AddToolResponse,
-  RemoveToolParams,
-  RemoveToolResponse,
-  ListToolsParams,
-  ListToolsResponse,
   InvokeToolParams,
   InvokeToolResponse,
+  ListContextsParams,
+  ListContextsResponse,
+  ListToolsParams,
+  ListToolsResponse,
   RegisteredContext,
   RegisteredTool,
+  RemoveContextParams,
+  RemoveContextResponse,
+  RemoveToolParams,
+  RemoveToolResponse,
   ToolApprovalParams,
 } from '../types';
-
-import { MagicianError, ErrorCodes } from '../types';
+import {ErrorCodes,MagicianError} from '../types';
 
 /**
  * In-memory implementation of MagicianAppState for development and testing.
@@ -26,16 +25,20 @@ import { MagicianError, ErrorCodes } from '../types';
  */
 export class InMemoryAppState {
   private contexts: Map<string, RegisteredContext> = new Map();
-  private tools: Map<string, {
-    tool: RegisteredTool;
-    implementation: Function;
-    approvalUI?: (params: ToolApprovalParams) => React.ReactNode;
-  }> = new Map();
+  private tools: Map<
+    string,
+    {
+      tool: RegisteredTool;
+      implementation: Function;
+      approvalUI?: (params: ToolApprovalParams) => React.ReactNode;
+    }
+  > = new Map();
 
   addContext(params: AddContextParams): AddContextResponse {
     try {
-      const { context } = params;
-      const serializedData = context.serializedData || JSON.stringify(context.data);
+      const {context} = params;
+      const serializedData =
+        context.serializedData || JSON.stringify(context.data);
       const sizeInChars = serializedData.length;
 
       // Check size limit
@@ -44,7 +47,7 @@ export class InMemoryAppState {
         throw new MagicianError(
           `Context size (${sizeInChars}) exceeds maximum (${maxSize})`,
           ErrorCodes.CONTEXT_TOO_LARGE,
-          { actual: sizeInChars, max: maxSize }
+          {actual: sizeInChars, max: maxSize}
         );
       }
 
@@ -57,7 +60,7 @@ export class InMemoryAppState {
 
       this.contexts.set(context.key, registeredContext);
 
-      return { success: true };
+      return {success: true};
     } catch (error) {
       return {
         success: false,
@@ -79,22 +82,24 @@ export class InMemoryAppState {
 
     // Filter by autoInclude if requested
     if (params.includeAutoInclude !== undefined) {
-      contexts = contexts.filter(c => c.autoInclude === params.includeAutoInclude);
+      contexts = contexts.filter(
+        c => c.autoInclude === params.includeAutoInclude
+      );
     }
 
     // Filter by component path if provided
     if (params.componentPath) {
-      contexts = contexts.filter(c => 
+      contexts = contexts.filter(c =>
         c.componentPath.join('/').startsWith(params.componentPath!.join('/'))
       );
     }
 
-    return { contexts };
+    return {contexts};
   }
 
   addTool(params: AddToolParams): AddToolResponse {
     try {
-      const { tool, implementation, approvalUI } = params;
+      const {tool, implementation, approvalUI} = params;
 
       const registeredTool: RegisteredTool = {
         ...tool,
@@ -107,7 +112,7 @@ export class InMemoryAppState {
         approvalUI,
       });
 
-      return { success: true };
+      return {success: true};
     } catch (error) {
       return {
         success: false,
@@ -129,22 +134,24 @@ export class InMemoryAppState {
 
     // Filter by autoExecutable if requested
     if (params.includeAutoExecutable !== undefined) {
-      tools = tools.filter(t => t.autoExecutable === params.includeAutoExecutable);
+      tools = tools.filter(
+        t => t.autoExecutable === params.includeAutoExecutable
+      );
     }
 
     // Filter by component path if provided
     if (params.componentPath) {
-      tools = tools.filter(t => 
+      tools = tools.filter(t =>
         t.componentPath.join('/').startsWith(params.componentPath!.join('/'))
       );
     }
 
-    return { tools };
+    return {tools};
   }
 
   async invokeTool(params: InvokeToolParams): Promise<InvokeToolResponse> {
     const toolEntry = this.tools.get(params.key);
-    
+
     if (!toolEntry) {
       return {
         error: new MagicianError(
@@ -158,9 +165,9 @@ export class InMemoryAppState {
     try {
       // Validate arguments against schema
       // TODO: Implement JSON Schema validation
-      
+
       const result = await toolEntry.implementation(params.arguments);
-      
+
       return {
         result,
         status: 'completed',
@@ -201,8 +208,7 @@ export class InMemoryAppState {
         .filter((c): c is RegisteredContext => c !== undefined);
     } else {
       // Get all auto-include contexts
-      contexts = Array.from(this.contexts.values())
-        .filter(c => c.autoInclude);
+      contexts = Array.from(this.contexts.values()).filter(c => c.autoInclude);
     }
 
     // Sort by component path depth (deeper components have higher priority)
@@ -218,4 +224,4 @@ export class InMemoryAppState {
 
     return JSON.stringify(aggregated, null, 2);
   }
-} 
+}

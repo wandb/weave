@@ -1,18 +1,18 @@
 import type {
   Conversation,
-  Message,
-  ListConversationsParams,
-  ListConversationsResponse,
+  ForgetContextParams,
+  ForgetContextResponse,
   GetConversationParams,
   GetConversationResponse,
-  UpdateConversationParams,
-  UpdateConversationResponse,
+  ListConversationsParams,
+  ListConversationsResponse,
+  Message,
   PersistContextParams,
   PersistContextResponse,
   RetrieveContextParams,
   RetrieveContextResponse,
-  ForgetContextParams,
-  ForgetContextResponse,
+  UpdateConversationParams,
+  UpdateConversationResponse,
 } from '../types';
 
 /**
@@ -21,7 +21,8 @@ import type {
  */
 export class InMemoryConversationStore {
   private conversations: Map<string, Conversation> = new Map();
-  private persistedContexts: Map<string, { data: any; scope: string }> = new Map();
+  private persistedContexts: Map<string, {data: any; scope: string}> =
+    new Map();
   private nextConversationId = 1;
 
   /**
@@ -59,7 +60,9 @@ export class InMemoryConversationStore {
 
     // Filter by project if specified
     if (params.projectId) {
-      conversations = conversations.filter(c => c.projectId === params.projectId);
+      conversations = conversations.filter(
+        c => c.projectId === params.projectId
+      );
     }
 
     // Sort by most recent first
@@ -83,12 +86,12 @@ export class InMemoryConversationStore {
     params: GetConversationParams
   ): Promise<GetConversationResponse> {
     const conversation = this.conversations.get(params.id);
-    
+
     if (!conversation) {
       throw new Error(`Conversation ${params.id} not found`);
     }
 
-    return { conversation };
+    return {conversation};
   }
 
   /**
@@ -98,7 +101,7 @@ export class InMemoryConversationStore {
     params: UpdateConversationParams
   ): Promise<UpdateConversationResponse> {
     const conversation = this.conversations.get(params.id);
-    
+
     if (!conversation) {
       throw new Error(`Conversation ${params.id} not found`);
     }
@@ -116,7 +119,7 @@ export class InMemoryConversationStore {
     // Update timestamp
     conversation.updatedAt = new Date();
 
-    return { conversation };
+    return {conversation};
   }
 
   /**
@@ -130,7 +133,7 @@ export class InMemoryConversationStore {
       scope: params.scope,
     });
 
-    return { success: true };
+    return {success: true};
   }
 
   /**
@@ -140,12 +143,12 @@ export class InMemoryConversationStore {
     params: RetrieveContextParams
   ): Promise<RetrieveContextResponse> {
     const context = this.persistedContexts.get(params.key);
-    
+
     if (!context) {
-      return { data: null, found: false };
+      return {data: null, found: false};
     }
 
-    return { data: context.data, found: true };
+    return {data: context.data, found: true};
   }
 
   /**
@@ -155,7 +158,7 @@ export class InMemoryConversationStore {
     params: ForgetContextParams
   ): Promise<ForgetContextResponse> {
     const existed = this.persistedContexts.delete(params.key);
-    
+
     return {
       success: existed,
       error: existed ? undefined : `Context ${params.key} not found`,
@@ -192,7 +195,7 @@ export class InMemoryConversationStore {
 
     try {
       const data = JSON.parse(stored);
-      
+
       // Restore conversations with proper Date objects
       this.conversations = new Map(
         data.conversations.map(([id, conv]: [string, any]) => [
@@ -215,4 +218,4 @@ export class InMemoryConversationStore {
       console.error('Failed to load from localStorage:', error);
     }
   }
-} 
+}
