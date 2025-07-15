@@ -91,7 +91,7 @@ export const getModelLogo = (model: Model) => {
 };
 
 export const getModelLabel = (model: Model) => {
-  return model.label ?? model.id.split('/').pop();
+  return model.label ?? model.idHuggingFace?.split('/').pop() ?? model.id;
 };
 
 export const getLaunchDateString = (model: Model) => {
@@ -173,16 +173,17 @@ export const getShortNumberString = (
   count: number,
   fractionDigits?: number
 ): string => {
-  if (count >= 1000000000000) {
+  const magnitude = Math.abs(count);
+  if (magnitude >= 1000000000000) {
     return divideAndRound(count, 1000000000000, 'T', fractionDigits);
-  } else if (count >= 1000000000) {
+  } else if (magnitude >= 1000000000) {
     return divideAndRound(count, 1000000000, 'B', fractionDigits);
-  } else if (count >= 1000000) {
+  } else if (magnitude >= 1000000) {
     return divideAndRound(count, 1000000, 'M', fractionDigits);
-  } else if (count >= 1000) {
+  } else if (magnitude >= 1000) {
     return divideAndRound(count, 1000, 'K', fractionDigits);
   }
-  return `${count}`;
+  return count.toLocaleString();
 };
 
 export const getContextWindowString = (model: Model): string => {

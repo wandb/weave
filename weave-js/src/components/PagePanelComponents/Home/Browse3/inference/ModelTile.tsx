@@ -28,6 +28,7 @@ type ModelTileProps = {
   selected?: SelectedState;
   onClick?: (modelId: ModelId) => void;
   onOpenPlayground?: (modelId: ModelId | null) => void;
+  onCompare?: () => void;
   inferenceContext?: InferenceContextType;
 
   // Small text to display at the bottom of the tile.
@@ -39,6 +40,7 @@ export const ModelTile = ({
   selected,
   onClick,
   onOpenPlayground,
+  onCompare,
   inferenceContext,
   hint,
 }: ModelTileProps) => {
@@ -87,6 +89,13 @@ export const ModelTile = ({
             ? model.id
             : null
         );
+      }
+    : undefined;
+
+  const onClickCompare = onCompare
+    ? (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onCompare();
       }
     : undefined;
 
@@ -169,6 +178,11 @@ export const ModelTile = ({
             tooltip={tooltipPlayground}>
             {textPlayground}
           </Button>
+          {selected && selected.selected.length >= 2 && (
+            <Button size="small" variant="secondary" onClick={onClickCompare}>
+              <span>Compare {selected.selected.length} models</span>
+            </Button>
+          )}
           <Link to={urlDetails}>
             <Button size="small" variant="secondary">
               Learn more

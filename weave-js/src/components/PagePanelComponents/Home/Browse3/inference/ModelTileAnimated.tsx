@@ -14,6 +14,7 @@ type ModelTileAnimatedProps = {
   selected?: SelectedState;
   onClick?: (modelId: ModelId) => void;
   onOpenPlayground?: (modelId: ModelId | null) => void;
+  onCompare?: () => void;
   inferenceContext?: InferenceContextType;
 };
 

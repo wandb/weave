@@ -25,6 +25,14 @@ export type ApiStyle = 'chat' | 'embedding';
 
 export type Modality = 'Text' | 'Vision' | 'Embedding';
 
+export type ArtificialAnalysis = {
+  // TODO: Incomplete
+  evaluations: Record<string, number>;
+  median_output_tokens_per_second: number;
+  median_time_to_first_token_seconds: number;
+  median_time_to_first_answer_token: number;
+};
+
 // TODO: Fix snake case to camel case
 // TODO: Maybe use name ModelData or something so we can save Model for an object that has attached logic
 export type Model = {
@@ -54,6 +62,11 @@ export type Model = {
 
   // TODO: Decide how we want to handle this - right now we are constructing urlHuggingFace from it
   idHuggingFace?: string;
+
+  // For connecting to Artificial Analysis
+  idArtificialAnalysis?: string;
+
+  artificialAnalysis?: ArtificialAnalysis;
 
   // What we want to show in the UI, e.g. maybe "DeepSeek R1" instead of "DeepSeek-R1"
   label?: string;

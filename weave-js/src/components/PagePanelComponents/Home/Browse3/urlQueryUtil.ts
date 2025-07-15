@@ -141,3 +141,16 @@ export const getParamArray = (
   }
   return [d[key]];
 };
+
+export const queryToggleArrayValue = (
+  history: History,
+  key: string,
+  value: string
+) => {
+  const query = queryGetDict(history);
+  const values = getParamArray(query, key);
+  const newValues = values.includes(value)
+    ? values.filter(v => v !== value)
+    : [...values, value];
+  querySetArray(history, key, newValues);
+};

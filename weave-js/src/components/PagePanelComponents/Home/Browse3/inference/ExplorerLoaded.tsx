@@ -1,6 +1,7 @@
 import {ToggleButtonGroup} from '@wandb/weave/components/ToggleButtonGroup';
 import {AnimatePresence} from 'motion/react';
 import React, {useEffect, useState} from 'react';
+import useMousetrap from 'react-hook-mousetrap';
 import {useHistory} from 'react-router-dom';
 
 import {DropdownSelectSort, ModelTileSortOrder} from './DropdownSelectSort';
@@ -39,6 +40,7 @@ export const ExplorerLoaded = ({
     selectedWithPlayground: [],
   });
 
+  collectionId = 'coreweave';
   const [models, setModels] = useState<Model[]>([]);
   useEffect(() => {
     let filteredModels = [...modelInfo.models];
@@ -130,6 +132,32 @@ export const ExplorerLoaded = ({
     setSelectedState({selected: [], selectedWithPlayground: []});
   };
 
+  useMousetrap('command+a', (e: any) => {
+    e.preventDefault();
+    console.log('select all');
+    const filteredModels = models; // TODO
+    const isAllSelected =
+      selectedState.selected.length === filteredModels.length;
+    if (isAllSelected) {
+      // TODO: operate on filteredModels
+      setSelectedState({selected: [], selectedWithPlayground: []});
+    } else {
+      const newSelected = filteredModels.map(m => m.id);
+      const newSelectedWithPlayground = filteredModels
+        .filter(m => m.idPlayground)
+        .map(m => m.id);
+      setSelectedState({
+        selected: newSelected,
+        selectedWithPlayground: newSelectedWithPlayground,
+      });
+    }
+  });
+  useMousetrap('command+i', (e: any) => {
+    e.preventDefault();
+    console.log('select inverse');
+    // setSelectedState({selected: models.map(m => m.id), selectedWithPlayground: []});
+  });
+
   const history = useHistory();
   const onOpenPlayground = (modelId: ModelId | null) => {
     // If modelId is null, open the selected models.
@@ -137,6 +165,14 @@ export const ExplorerLoaded = ({
       history,
       modelId ?? selectedState.selectedWithPlayground,
       inferenceContext
+    );
+  };
+
+  const onCompare = () => {
+    history.push(
+      `/inference-compare?${new URLSearchParams(
+        selectedState.selected.map(modelId => ['model', modelId])
+      )}`
     );
   };
 
@@ -194,6 +230,7 @@ export const ExplorerLoaded = ({
                 selected={selectedState}
                 onClick={onClickTile}
                 onOpenPlayground={onOpenPlayground}
+                onCompare={onCompare}
                 inferenceContext={inferenceContext}
               />
             );

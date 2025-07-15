@@ -1,7 +1,5 @@
 /**
- * A small colored pill indicating the delta between two numbers,
- * allowing cycling between different representations such as absolute
- * or percentage difference.
+ * A small colored pill indicating the delta between two values.
  */
 
 import React, {useState} from 'react';
@@ -9,17 +7,19 @@ import React, {useState} from 'react';
 import {Pill, TagColorName} from '../../../../Tag';
 import {Tooltip} from '../../../../Tooltip';
 
-type CompareGridPillNumberProps = {
+type DiffPillProps = {
   value: any;
-  valueType: any;
   compareValue: any;
-  compareValueType: any;
+  valueFormatter?: (value: any) => string;
+  lowerIsBetter?: boolean;
 };
 
-export const CompareGridPillNumber = ({
+export const DiffPill = ({
   value,
   compareValue,
-}: CompareGridPillNumberProps) => {
+  valueFormatter,
+  lowerIsBetter,
+}: DiffPillProps) => {
   const [diffModeIdx, setDiffModeIdx] = useState(0);
   const difference = value - compareValue;
   const isIncrease = difference > 0;
@@ -28,6 +28,10 @@ export const CompareGridPillNumber = ({
     modes.push('ratio');
   }
   const mode = modes[diffModeIdx];
+
+  if (!valueFormatter) {
+    valueFormatter = (value: any) => value.toLocaleString();
+  }
 
   const onClick = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -38,7 +42,7 @@ export const CompareGridPillNumber = ({
   if (mode === 'absolute') {
     const sign = isIncrease ? '+' : '';
     pillColor = isIncrease ? 'green' : 'red';
-    pillText = `${sign}${difference.toLocaleString()}`;
+    pillText = `${sign}${valueFormatter?.(difference)}`;
   } else if (mode === 'percentage') {
     const percentage =
       compareValue !== 0 ? (difference / compareValue) * 100 : NaN;
@@ -55,6 +59,11 @@ export const CompareGridPillNumber = ({
         : 'undefined';
     pillColor = 'green';
     pillText = ratio;
+  }
+
+  // Invert the colors if lower is better
+  if (pillColor !== 'moon' && lowerIsBetter) {
+    pillColor = pillColor === 'green' ? 'red' : 'green';
   }
 
   return (
