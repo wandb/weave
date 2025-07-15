@@ -87,7 +87,7 @@ def dataclass_object_record(obj: Any) -> ObjectRecord:
     for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
         attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
-    attrs["_bases"] = class_all_bases_names(obj.__class__)
+    attrs["_bases"] = class_all_bases_names(obj.__class__)  # type: ignore[arg-type]
     return ObjectRecord(attrs)
 
 

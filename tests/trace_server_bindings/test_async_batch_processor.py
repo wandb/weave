@@ -411,12 +411,12 @@ def test_log_rotation_and_disk_fallback():
                 )
 
             # Verify file exists and is large enough before testing rename failure
-            assert (
-                log_path.exists()
-            ), "Log file should exist before testing rename failure"
-            assert (
-                log_path.stat().st_size > 200
-            ), "Log file should be large enough to trigger rotation"
+            assert log_path.exists(), (
+                "Log file should exist before testing rename failure"
+            )
+            assert log_path.stat().st_size > 200, (
+                "Log file should be large enough to trigger rotation"
+            )
 
             # Mock pathlib.Path.rename at the class level to simulate a rename failure
             with (
@@ -445,9 +445,9 @@ def test_log_rotation_and_disk_fallback():
                 "test_nested", "Directory creation test"
             )
             assert nested_log_path.exists(), "Should create nested directories"
-            assert (
-                nested_log_path.parent.exists()
-            ), "Parent directories should be created"
+            assert nested_log_path.parent.exists(), (
+                "Parent directories should be created"
+            )
 
             processor.stop_accepting_new_work_and_flush_queue()
             processor_nested.stop_accepting_new_work_and_flush_queue()

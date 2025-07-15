@@ -21,12 +21,12 @@ def assert_clickhouse_sql(expected_query: str, expected_params: dict, **kwargs):
     expected_formatted = sqlparse.format(expected_query, reindent=True)
     found_formatted = sqlparse.format(query, reindent=True)
 
-    assert (
-        expected_formatted == found_formatted
-    ), f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
-    assert (
-        expected_params == params
-    ), f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
+    assert expected_formatted == found_formatted, (
+        f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
+    )
+    assert expected_params == params, (
+        f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
+    )
 
 
 def assert_sqlite_sql(expected_query: str, expected_params: list, **kwargs):
@@ -36,12 +36,12 @@ def assert_sqlite_sql(expected_query: str, expected_params: list, **kwargs):
     expected_formatted = sqlparse.format(expected_query, reindent=True)
     found_formatted = sqlparse.format(query, reindent=True)
 
-    assert (
-        expected_formatted == found_formatted
-    ), f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
-    assert (
-        expected_params == params
-    ), f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
+    assert expected_formatted == found_formatted, (
+        f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
+    )
+    assert expected_params == params, (
+        f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
+    )
 
 
 # Basic Functionality Tests

@@ -90,9 +90,9 @@ def get_gcp_credentials() -> Optional[GCPCredentials]:
         raise ValueError(f"Invalid GCP credentials JSON: {e}") from e
 
 
-def get_azure_credentials() -> (
-    Union[AzureConnectionCredentials, AzureAccountCredentials]
-):
+def get_azure_credentials() -> Union[
+    AzureConnectionCredentials, AzureAccountCredentials
+]:
     """Retrieves Azure credentials from environment variables.
     Supports both connection string and account-based authentication.
 

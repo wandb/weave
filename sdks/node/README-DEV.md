@@ -3,7 +3,7 @@
 1. Setup your env
 
    ```sh
-   make boostrap
+   make bootstrap
 
    pnpm install
    pnpm link --global

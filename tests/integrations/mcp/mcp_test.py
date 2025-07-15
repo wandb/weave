@@ -106,9 +106,9 @@ def test_mcp_client(client: WeaveClient) -> None:
     ]
 
     for name in expected_call_names:
-        assert any(
-            name in call_name for call_name in call_names
-        ), f"Expected call {name} not found in calls"
+        assert any(name in call_name for call_name in call_names), (
+            f"Expected call {name} not found in calls"
+        )
 
     # Assert data within the calls
     call_tool_call = next(
@@ -129,9 +129,9 @@ def test_mcp_client(client: WeaveClient) -> None:
         call for call, _ in flattened_calls if "get_prompt.review_code" in call.op_name
     )
     prompt_text = prompt_call.output.messages[0].content.text
-    assert (
-        "Please review this code" in prompt_text
-    ), "Expected prompt to contain 'Please review this code'"
+    assert "Please review this code" in prompt_text, (
+        "Expected prompt to contain 'Please review this code'"
+    )
 
 
 @pytest.mark.skip_clickhouse_client

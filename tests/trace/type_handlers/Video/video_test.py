@@ -345,32 +345,32 @@ def test_videos_in_load_of_dataset(client):
 
     dataset = ref.get()
     for i, (gotten_row, local_row) in enumerate(zip(dataset.rows, rows)):
-        assert isinstance(
-            gotten_row["video"], VideoClip
-        ), f"Row {i} video is not a VideoClip"
+        assert isinstance(gotten_row["video"], VideoClip), (
+            f"Row {i} video is not a VideoClip"
+        )
 
         # Handle difference in size representation (list vs tuple)
         gotten_size = gotten_row["video"].size
         local_size = local_row["video"].size
 
         if isinstance(gotten_size, list) and isinstance(local_size, tuple):
-            assert (
-                tuple(gotten_size) == local_size
-            ), f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            assert tuple(gotten_size) == local_size, (
+                f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            )
         elif isinstance(gotten_size, tuple) and isinstance(local_size, list):
-            assert gotten_size == tuple(
-                local_size
-            ), f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            assert gotten_size == tuple(local_size), (
+                f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            )
         else:
-            assert (
-                gotten_size == local_size
-            ), f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            assert gotten_size == local_size, (
+                f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            )
 
         # Duration may be rounded due to encoding limitations, especially with small durations
         # Allow some tolerance in comparison
-        assert (
-            abs(gotten_row["video"].duration - videos[i].duration) < 0.05
-        ), f"Row {i} duration too different: {gotten_row['video'].duration} != {videos[i].duration}"
+        assert abs(gotten_row["video"].duration - videos[i].duration) < 0.05, (
+            f"Row {i} duration too different: {gotten_row['video'].duration} != {videos[i].duration}"
+        )
 
 
 def test_video_format_from_filename():
