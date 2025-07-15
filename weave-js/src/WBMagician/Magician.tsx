@@ -1,5 +1,75 @@
 /**
 Magician is a module that allows W&B application developers to leverage LLMs easily.
+
+
+
+1. Top-level context provider at the app lev el that allows all components to interact with the "Magician" Agent.
+* Settings: auth, connection, etc...
+* user-preferences: prefferred model
+
+Simple features:
+2. any component can now execute quick llm calls.
+```tsx
+const {respond} = useMagician();
+const response = respond({
+    projectId: 'wandb/weave',
+    modelName: 'gpt-4o',
+    input: 'Hello, how are you?',
+});
+
+if (response.loading) {...}
+```
+
+CoPoliot-Features
+3. A global chat GUI interface: conversation starting, resuming, chat, etc..
+
+4. Component developer can "register" component context / tools.
+
+```tsx
+// Existing callback:
+const createPrompt({
+    // ... prompt creation params
+})
+
+// New:
+const {useRegisterComponentTool} = useMagician();
+useRegisterComponentTool({
+  tool: createPrompt,
+  // ... tool specifications
+  // TODO: Add an approval card option here.
+  // TODO: rollback if possible.
+})
+
+
+const {useRegisterComponentContext} = useMagician();
+useRegisterComponentContext({
+  currentPrompt: {
+    //.. prompt vars
+  }
+})
+
+// ... below
+// on click event calls create Prompt!
+
+```
+
+Acdvanced features out of scope:
+1. Saving entity/project/user rules/preferences
+2. backend tools/queries (things you wouldn'twant the frontend to know about or have to do.)
+3. Advanced context adding tools (@ dropdown, dom component selector - screenshot by default, but data extension, etc...)
+
+
+```tsx
+
+return <MagicianSelectionContext context={...}>
+    // ... whatever normally went here
+</MagicianSelectionContext>
+```
+
+
+
+
+
 */
 
 import React from 'react';
