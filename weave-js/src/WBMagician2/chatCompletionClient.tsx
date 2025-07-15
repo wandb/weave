@@ -83,7 +83,7 @@ export type ChatCompletionParams = {
 
 /**
  * Prepare the model identifier, handling provider-specific formatting.
- * 
+ *
  * @param modelId The model identifier
  * @param modelProvider Optional provider name
  * @returns Formatted model string
@@ -97,7 +97,7 @@ const prepareModel = (modelId: string, modelProvider?: string) => {
 
 /**
  * Convert messages to the expected format for the API.
- * 
+ *
  * @param messages String or array of Message objects
  * @returns Array of Message objects
  */
@@ -116,13 +116,15 @@ const prepareMessages = (messages: string | Array<Message>) => {
 
 /**
  * Extract the message content from various LLM provider response formats.
- * 
+ *
  * @param response Raw response from the completion API
  * @returns The extracted message content as a string
  */
 const extractMessageContent = (response: unknown): string => {
   // Type guard to check if response has expected OpenAI-like structure
-  const isOpenAIResponse = (r: unknown): r is {
+  const isOpenAIResponse = (
+    r: unknown
+  ): r is {
     choices: Array<{
       message: {
         content: string;
@@ -142,7 +144,9 @@ const extractMessageContent = (response: unknown): string => {
   };
 
   // Type guard for Anthropic-like response format
-  const isAnthropicResponse = (r: unknown): r is {
+  const isAnthropicResponse = (
+    r: unknown
+  ): r is {
     content: Array<{
       type: string;
       text: string;
@@ -159,7 +163,9 @@ const extractMessageContent = (response: unknown): string => {
   };
 
   // Type guard for simple content response
-  const isSimpleContentResponse = (r: unknown): r is {
+  const isSimpleContentResponse = (
+    r: unknown
+  ): r is {
     content: string;
   } => {
     return (
@@ -187,7 +193,7 @@ const extractMessageContent = (response: unknown): string => {
 
   // Log the unknown format for debugging
   console.warn('Unknown completion response format:', response);
-  
+
   // Last resort: try to stringify the response
   return JSON.stringify(response, null, 2);
 };
@@ -195,15 +201,17 @@ const extractMessageContent = (response: unknown): string => {
 /**
  * Prepare response format configuration for the API.
  * Currently not implemented as it depends on provider-specific requirements.
- * 
+ *
  * @param responseFormat The desired response format
  * @returns Formatted response configuration
  */
-const prepareResponseFormat = (responseFormat?: ResponseFormat): {type: string} | undefined => {
+const prepareResponseFormat = (
+  responseFormat?: ResponseFormat
+): {type: string} | undefined => {
   if (!responseFormat) {
     return undefined;
   }
-  
+
   // For now, just pass through the response format
   // Different providers may need different formatting
   return responseFormat;
@@ -211,7 +219,7 @@ const prepareResponseFormat = (responseFormat?: ResponseFormat): {type: string} 
 
 /**
  * Combine streaming chunks into a single completion response.
- * 
+ *
  * @param chunks Array of streaming chunks
  * @returns Combined completion string
  */
@@ -221,7 +229,9 @@ const combineChunks = (chunks: unknown[]): Completion => {
   }
 
   // Type guard for OpenAI-style chunks
-  const isOpenAIChunk = (chunk: unknown): chunk is {
+  const isOpenAIChunk = (
+    chunk: unknown
+  ): chunk is {
     choices: Array<{
       delta: {
         content?: string;
@@ -239,7 +249,9 @@ const combineChunks = (chunks: unknown[]): Completion => {
   };
 
   // Type guard for simple content chunks
-  const isContentChunk = (chunk: unknown): chunk is {
+  const isContentChunk = (
+    chunk: unknown
+  ): chunk is {
     content: string;
   } => {
     return (
@@ -270,7 +282,7 @@ const combineChunks = (chunks: unknown[]): Completion => {
 
 /**
  * Make a chat completion request to the trace server.
- * 
+ *
  * @param client The trace server client instance
  * @param entity The entity (organization) name
  * @param project The project name
@@ -301,7 +313,7 @@ const chatComplete = async (
 
 /**
  * Make a streaming chat completion request to the trace server.
- * 
+ *
  * @param client The trace server client instance
  * @param entity The entity (organization) name
  * @param project The project name

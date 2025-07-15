@@ -1,8 +1,12 @@
 import React, {useEffect, useState} from 'react';
-import * as Dialog from '../components/Dialog';
+
 import {Button} from '../components/Button';
-import {Tailwind} from '../components/Tailwind';
-import {EntityProject, useChatCompletion, Message} from './chatCompletionClient';
+import * as Dialog from '../components/Dialog';
+import {
+  EntityProject,
+  Message,
+  useChatCompletion,
+} from './chatCompletionClient';
 
 export type MagicFillProps = {
   entityProject?: EntityProject;
@@ -22,7 +26,7 @@ export type MagicFillProps = {
 
 /**
  * MagicFill is a dialog component that helps the user fill in a form using AI.
- * 
+ *
  * @param props Configuration for the magic fill dialog
  * @returns A modal dialog component for AI-assisted content generation
  */
@@ -167,8 +171,10 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
 
             {/* Error display */}
             {error && (
-              <div className="rounded-lg border border-red-300 bg-red-50 p-16 dark:border-red-700 dark:bg-red-900/20">
-                <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+              <div className="bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-300 p-16 dark:border-red-700">
+                <p className="text-sm text-red-700 dark:text-red-400">
+                  {error}
+                </p>
               </div>
             )}
 
@@ -190,10 +196,7 @@ export const MagicFill: React.FC<MagicFillProps> = props => {
           {/* Footer */}
           <div className="border-t border-moon-250 px-32 py-24 dark:border-moon-750">
             <div className="flex justify-end gap-12">
-              <Button
-                onClick={props.onClose}
-                variant="ghost"
-                size="medium">
+              <Button onClick={props.onClose} variant="ghost" size="medium">
                 Cancel
               </Button>
               <Button
