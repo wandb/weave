@@ -92,8 +92,21 @@ const prepareMessages = (messages: string | Array<Message>) => {
   }
 };
 
-const prepareResponse = (response: Completion): unknown => {
-  return response.choices[0].message.content;
+const prepareResponseFormat = (responseFormat: ResponseFormat): unknown => {
+  // TODO: Implement response parsing
+  // The trace server likely returns a response in this shape:
+  // {
+  //   response: {
+  //     choices: [{
+  //       message: {
+  //         content: "The actual text content",
+  //         role: "assistant"
+  //       }
+  //     }]
+  //   }
+  // }
+  // We need to extract just the content string from the first choice
+  throw new Error('Not implemented');
 };
 
 const chatComplete = async (
@@ -114,12 +127,22 @@ const chatComplete = async (
     track_llm_call: false,
   });
 
-  return prepareResponse(res.response);
+  // TODO: Fix this - prepareResponseFormat expects ResponseFormat but we're passing the completion
+  // Should be something like: return extractMessageContent(res.response);
+  return prepareResponseFormat(res.response);
 };
 
 const combineChunks = (chunks: Array<Chunk>): Completion => {
-  console.log('chunks', chunks);
-
+  // TODO: Implement streaming response combination
+  // For streaming responses, we need to:
+  // 1. Combine all chunk.choices[0].delta.content strings
+  // 2. Return a complete message object
+  // Example chunk shape:
+  // {
+  //   choices: [{
+  //     delta: { content: "partial text..." }
+  //   }]
+  // }
   throw new Error('Not implemented');
 };
 

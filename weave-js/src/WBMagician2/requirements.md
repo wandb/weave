@@ -1,5 +1,51 @@
 # WBMagician2 Requirements
 
+## 🚨 Quick Start for Next Developer
+
+### Current State
+- ✅ Basic MagicFill UI implemented and working
+- ✅ Chat completion client structure in place
+- ❌ **BLOCKER**: Response parsing not implemented (see Critical TODOs below)
+- ❌ The LLM responses return raw completion objects, not clean text
+
+### Critical TODOs (Do These First!)
+1. **Fix Response Parsing** in `chatCompletionClient.tsx`:
+   ```typescript
+   // Line 91: prepareResponseFormat() throws "Not implemented"
+   // Line 117: combineChunks() throws "Not implemented"
+   ```
+   The API returns a completion object, but we need to extract just the message content.
+
+2. **Update MagicFill** to handle the actual response format:
+   ```typescript
+   // Line 76 in MagicDialog.tsx
+   // Currently: setGeneratedContent(JSON.stringify(completion));
+   // Should be: setGeneratedContent(completion.content); // or similar
+   ```
+
+### Where to Look for API Details
+- The trace server client is imported from: `../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClient`
+- Check the `completionsCreate` method to understand the actual response shape
+- The response format might differ from standard OpenAI format
+
+### Testing the Current Implementation
+```typescript
+// You can test MagicFill by importing and using it:
+import { MagicFill } from '@/WBMagician2';
+
+<MagicFill
+  open={true}
+  onClose={() => console.log('closed')}
+  onAccept={(content) => console.log('accepted:', content)}
+  title="Generate Description"
+  details="Help me write a description"
+  systemPrompt="You are a helpful assistant"
+  userInstructionPlaceholder="What would you like to describe?"
+/>
+```
+
+---
+
 ## Module Overview
 
 WBMagician2 is a simplified LLM integration module for Weave's frontend, designed to provide dead-simple access to language models for frontend engineers. This module offers patterns, hooks, and components that streamline AI-assisted interactions within the UI.
