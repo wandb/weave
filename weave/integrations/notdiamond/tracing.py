@@ -10,7 +10,7 @@ from weave.trace.autopatch import IntegrationSettings, OpSettings
 _notdiamond_patcher: MultiPatcher | None = None
 
 
-def nd_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
+def not_diamond_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)

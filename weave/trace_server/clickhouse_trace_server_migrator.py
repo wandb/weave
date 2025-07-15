@@ -65,7 +65,7 @@ class ClickHouseTraceServerMigrator:
         return re.sub(pattern, replace_engine, sql_query, flags=re.IGNORECASE)
 
     def _create_db_sql(self, db_name: str) -> str:
-        """Geneate SQL database create string for normal and replicated databases."""
+        """Generate SQL database create string for normal and replicated databases."""
         if not self._is_safe_identifier(db_name):
             raise MigrationError(f"Invalid database name: {db_name}")
 
