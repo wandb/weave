@@ -145,9 +145,9 @@ class HuggingFaceScorer(weave.Scorer):
             logger.info("Using user-provided tokenizer.")
 
         assert self._model is not None, "Model must be loaded, implement `load_model`"
-        assert (
-            self._tokenizer is not None
-        ), "Tokenizer must be loaded, implement `load_tokenizer`"
+        assert self._tokenizer is not None, (
+            "Tokenizer must be loaded, implement `load_tokenizer`"
+        )
 
     def load_model(self) -> None:
         raise NotImplementedError("Subclasses must implement the `load_model` method.")
