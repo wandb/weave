@@ -4,7 +4,7 @@ import React, {createContext, useCallback, useContext, useMemo} from 'react';
 import {TraceServerClient} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
 
-type Message = {
+export type Message = {
   role: 'user' | 'assistant' | 'system';
   content: string;
 };
@@ -22,12 +22,12 @@ type TextResponseFormat = {
   type: 'text';
 };
 
-type ResponseFormat =
+export type ResponseFormat =
   | JsonSchemaResponseFormat
   | JsonObjectResponseFormat
   | TextResponseFormat;
 
-type Tool = {
+export type Tool = {
   type: 'function';
   function: {
     name: string;
@@ -44,7 +44,7 @@ type Chunk = unknown;
 
 type Completion = unknown;
 
-type ChatCompletionParams = {
+export type ChatCompletionParams = {
   // `modelId` is a string identifier for the model to use.
   //
   // A special case is a ref (a special weave/wandb URI) which
@@ -92,8 +92,8 @@ const prepareMessages = (messages: string | Array<Message>) => {
   }
 };
 
-const prepareResponseFormat = (responseFormat: ResponseFormat): unknown => {
-  throw new Error('Not implemented');
+const prepareResponse = (response: Completion): unknown => {
+  return response.choices[0].message.content;
 };
 
 const chatComplete = async (
@@ -114,10 +114,12 @@ const chatComplete = async (
     track_llm_call: false,
   });
 
-  return prepareResponseFormat(res.response);
+  return prepareResponse(res.response);
 };
 
 const combineChunks = (chunks: Array<Chunk>): Completion => {
+  console.log('chunks', chunks);
+
   throw new Error('Not implemented');
 };
 

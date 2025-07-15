@@ -155,11 +155,12 @@ export const Browse3: FC<{
     () => makeGorillaApolloClient(props.gorillaApolloEndpoint),
     [props.gorillaApolloEndpoint]
   );
+
   return (
     <ApolloProvider client={apolloClient}>
       <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
         <ChatClientProvider
-          value={{entity: params.entity!, project: params.project!}}>
+          value={{entity: params.entityName!, project: params.projectName!}}>
           <Switch>
             <Route
               path={[
