@@ -258,9 +258,7 @@ const CreateDatasetProviderInner: React.FC<{
   // Handle drawer close
   const handleCloseDrawer = useCallback(() => {
     dispatch({type: CREATE_DATASET_ACTIONS.SET_IS_OPEN, payload: false});
-    dispatch({type: CREATE_DATASET_ACTIONS.SET_PARSED_DATA, payload: null});
-    editorContext.resetEditState();
-  }, [editorContext]);
+  }, []);
 
   // Handle publish dataset
   const handlePublishDataset = useCallback(() => {
@@ -279,9 +277,8 @@ const CreateDatasetProviderInner: React.FC<{
 
   // Handle clear dataset
   const clearDataset = useCallback(() => {
-    dispatch({type: CREATE_DATASET_ACTIONS.SET_PARSED_DATA, payload: null});
-    editorContext.resetEditState();
-  }, [editorContext]);
+    dispatch({type: CREATE_DATASET_ACTIONS.RESET});
+  }, []);
 
   return (
     <CreateDatasetContext.Provider
