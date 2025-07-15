@@ -19,6 +19,7 @@
   {
     "provider": "coreweave",
     "id": "cw_moonshotai_Kimi-K2-Instruct",
+    "isNew": true,
     "idPlayground": "moonshotai/Kimi-K2-Instruct",
     "idHuggingFace": "moonshotai/Kimi-K2-Instruct",
     "label": "MoonshotAI Kimi K2",
@@ -29,8 +30,8 @@
     "parameterCountTotal": 1000000000000,
     "parameterCountActive": 32000000000,
     "contextWindow": 128000,
-    "priceCentsPerBillionTokensInput": 160000,
-    "priceCentsPerBillionTokensOutput": 410000,
+    "priceCentsPerBillionTokensInput": 135000,
+    "priceCentsPerBillionTokensOutput": 400000,
     "apiStyle": "chat",
     "modalities": ["Text"]
   },

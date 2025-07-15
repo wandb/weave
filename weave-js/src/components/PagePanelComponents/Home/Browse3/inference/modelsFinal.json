@@ -16,13 +16,14 @@
       "priceCentsPerBillionTokensOutput": 22000,
       "apiStyle": "chat",
       "modalities": ["Text"],
-      "likesHuggingFace": 4292,
-      "downloadsHuggingFace": 5540925,
+      "likesHuggingFace": 4299,
+      "downloadsHuggingFace": 5763207,
       "license": "llama3.1"
     },
     {
       "provider": "coreweave",
       "id": "cw_moonshotai_Kimi-K2-Instruct",
+      "isNew": true,
       "idPlayground": "moonshotai/Kimi-K2-Instruct",
       "idHuggingFace": "moonshotai/Kimi-K2-Instruct",
       "label": "MoonshotAI Kimi K2",
@@ -33,12 +34,12 @@
       "parameterCountTotal": 1000000000000,
       "parameterCountActive": 32000000000,
       "contextWindow": 128000,
-      "priceCentsPerBillionTokensInput": 160000,
-      "priceCentsPerBillionTokensOutput": 410000,
+      "priceCentsPerBillionTokensInput": 135000,
+      "priceCentsPerBillionTokensOutput": 400000,
       "apiStyle": "chat",
       "modalities": ["Text"],
-      "likesHuggingFace": 985,
-      "downloadsHuggingFace": 19331,
+      "likesHuggingFace": 1140,
+      "downloadsHuggingFace": 25070,
       "license": "other"
     },
     {
@@ -58,8 +59,8 @@
       "priceCentsPerBillionTokensOutput": 540000,
       "apiStyle": "chat",
       "modalities": ["Text"],
-      "likesHuggingFace": 2256,
-      "downloadsHuggingFace": 298738,
+      "likesHuggingFace": 2265,
+      "downloadsHuggingFace": 312351,
       "license": "mit"
     },
     {
@@ -80,7 +81,7 @@
       "apiStyle": "chat",
       "modalities": ["Text"],
       "likesHuggingFace": 3000,
-      "downloadsHuggingFace": 503980,
+      "downloadsHuggingFace": 530927,
       "license": "mit"
     },
     {
@@ -100,7 +101,7 @@
       "apiStyle": "chat",
       "modalities": ["Text"],
       "likesHuggingFace": 2433,
-      "downloadsHuggingFace": 473768,
+      "downloadsHuggingFace": 473530,
       "license": "llama3.3"
     },
     {
@@ -120,8 +121,8 @@
       "priceCentsPerBillionTokensOutput": 66000,
       "apiStyle": "chat",
       "modalities": ["Text", "Vision"],
-      "likesHuggingFace": 994,
-      "downloadsHuggingFace": 539116,
+      "likesHuggingFace": 996,
+      "downloadsHuggingFace": 540504,
       "license": "other"
     },
     {
@@ -140,8 +141,8 @@
       "priceCentsPerBillionTokensOutput": 35000,
       "apiStyle": "chat",
       "modalities": ["Text"],
-      "likesHuggingFace": 545,
-      "downloadsHuggingFace": 247266,
+      "likesHuggingFace": 547,
+      "downloadsHuggingFace": 250397,
       "license": "mit"
     }
   ]
