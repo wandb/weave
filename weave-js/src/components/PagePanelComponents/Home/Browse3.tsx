@@ -2,6 +2,7 @@ import {ApolloProvider} from '@apollo/client';
 import {Box, Drawer} from '@mui/material';
 import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
+import {ChatClientProvider} from '@wandb/weave/WBMagician2/chatCompletionClient';
 import {debounce} from 'lodash';
 import React, {
   FC,
@@ -141,6 +142,7 @@ export const Browse3: FC<{
   navigateAwayFromProject?: () => void;
   projectRoot(entityName: string, projectName: string): string;
 }> = props => {
+  const params = useParamsDecoded<Browse3ProjectMountedParams>();
   // const weaveContext = useWeaveContext();
   // useEffect(() => {
   //   const previousPolling = weaveContext.client.isPolling();
@@ -156,19 +158,22 @@ export const Browse3: FC<{
   return (
     <ApolloProvider client={apolloClient}>
       <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
-        <Switch>
-          <Route
-            path={[
-              ...browse3Paths(props.projectRoot(':entity', ':project')),
-              `/${URL_BROWSE3}/:entity`,
-              `/${URL_BROWSE3}`,
-            ]}>
-            <Browse3Mounted
-              headerOffset={props.headerOffset}
-              navigateAwayFromProject={props.navigateAwayFromProject}
-            />
-          </Route>
-        </Switch>
+        <ChatClientProvider
+          value={{entity: params.entity!, project: params.project!}}>
+          <Switch>
+            <Route
+              path={[
+                ...browse3Paths(props.projectRoot(':entity', ':project')),
+                `/${URL_BROWSE3}/:entity`,
+                `/${URL_BROWSE3}`,
+              ]}>
+              <Browse3Mounted
+                headerOffset={props.headerOffset}
+                navigateAwayFromProject={props.navigateAwayFromProject}
+              />
+            </Route>
+          </Switch>
+        </ChatClientProvider>
       </Browse3WeaveflowRouteContextProvider>
     </ApolloProvider>
   );

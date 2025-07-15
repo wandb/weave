@@ -1,4 +1,5 @@
 import {Button} from '@wandb/weave/components/Button';
+import {MagicFill} from '@wandb/weave/WBMagician2/MagicDialog';
 import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
@@ -44,6 +45,8 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setEditedContent(initialContent);
   }, [initialContent]);
 
+  const [showMagicDialog, setShowMagicDialog] = useState(false);
+
   const handleSave = () => {
     if (choiceIndex !== undefined) {
       editChoice?.(choiceIndex, {
@@ -77,6 +80,22 @@ export const PlaygroundMessagePanelEditor: React.FC<
       />
       {/* 6px vs. 8px to make up for extra padding from textarea field */}
       <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
+        <MagicFill
+          open={showMagicDialog}
+          onClose={() => setShowMagicDialog(false)}
+          onAccept={() => setShowMagicDialog(false)}
+          title="Magic Fill"
+          details="This is a magic fill dialog"
+          systemPrompt={''}
+          userInstructionPlaceholder={''}
+        />
+        <Button
+          variant="outline"
+          size="medium"
+          onClick={() => setShowMagicDialog(true)}
+          icon="magic-wand-star"
+        />
+        <div className="flex-1"></div>
         <Button variant="ghost" size="medium" onClick={handleCancel}>
           Cancel
         </Button>
