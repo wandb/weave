@@ -972,7 +972,7 @@ class WeaveClient:
         # the underlying implementation of the specific server to get the call processor.
         # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
         # some client-side flushing mechanics. We should move this to the interface layer. However,
-        # we don't really want the server-side implementaitons to need to define no-ops as that is
+        # we don't really want the server-side implementations to need to define no-ops as that is
         # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
         # to define no-ops.
         if hasattr(self.server, "get_call_processor"):
@@ -996,7 +996,7 @@ class WeaveClient:
         # Adding a second comment line for developers that is not a docstring:
         # Save an object to the weave server and return a deserialized version of it.
 
-        # Note: This is sort of a weird method becuase:
+        # Note: This is sort of a weird method because:
         # 1. It returns a deserialized version of the object (which will often not pass type-checks)
         # 2. It is slow (because it re-downloads the object from the weave server)
         # 3. It explicitly filters out non ObjectRefs, which seems like a useless constraint.
@@ -1107,7 +1107,7 @@ class WeaveClient:
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
-            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are ANDed.
+            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:

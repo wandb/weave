@@ -31,6 +31,13 @@ type ObjectViewerSectionProps = {
   error?: string;
 };
 
+enum ViewerMode {
+  Collapsed,
+  Expanded,
+  Hidden,
+  Json,
+}
+
 const TitleRow = styled.div`
   display: flex;
   align-items: center;
@@ -64,22 +71,22 @@ const ObjectViewerSectionNonEmpty = ({
   isExpanded,
 }: ObjectViewerSectionProps) => {
   const apiRef = useGridApiRef();
-  const [mode, setMode] = useState('collapsed');
+  const [mode, setMode] = useState(ViewerMode.Collapsed);
   const [expandedIds, setExpandedIds] = useState<GridRowId[]>([]);
 
   const body = useMemo(() => {
-    if (mode === 'collapsed' || mode === 'expanded') {
+    if (mode === ViewerMode.Collapsed || mode === ViewerMode.Expanded) {
       return (
         <ObjectViewer
           apiRef={apiRef}
           data={data}
-          isExpanded={mode === 'expanded'}
+          isExpanded={mode === ViewerMode.Expanded}
           expandedIds={expandedIds}
           setExpandedIds={setExpandedIds}
         />
       );
     }
-    if (mode === 'json') {
+    if (mode === ViewerMode.Json) {
       return (
         <CodeEditor
           value={JSON.stringify(data, null, 2)}
@@ -115,10 +122,10 @@ const ObjectViewerSectionNonEmpty = ({
 
   // Re-clicking the button will reapply collapse/expand
   const onClickCollapsed = useCallback(() => {
-    if (mode === 'collapsed') {
+    if (mode === ViewerMode.Collapsed) {
       setTreeExpanded(false);
     }
-    setMode('collapsed');
+    setMode(ViewerMode.Collapsed);
     setExpandedIds([]);
   }, [mode, setTreeExpanded]);
 
@@ -130,10 +137,10 @@ const ObjectViewerSectionNonEmpty = ({
   }, [apiRef, expandedIds.length, getGroupIds]);
 
   const onClickExpanded = useCallback(() => {
-    if (mode === 'expanded') {
+    if (mode === ViewerMode.Expanded) {
       setTreeExpanded(true);
     }
-    setMode('expanded');
+    setMode(ViewerMode.Expanded);
     if (isExpandAllSmall) {
       setExpandedIds(getGroupIds());
     } else {
@@ -156,14 +163,14 @@ const ObjectViewerSectionNonEmpty = ({
         <Button
           variant="ghost"
           icon="row-height-small"
-          active={mode === 'collapsed'}
+          active={mode === ViewerMode.Collapsed}
           onClick={onClickCollapsed}
           tooltip="View collapsed"
         />
         <Button
           variant="ghost"
           icon="expand-uncollapse"
-          active={mode === 'expanded'}
+          active={mode === ViewerMode.Expanded}
           onClick={onClickExpanded}
           tooltip={
             isExpandAllSmall
@@ -174,16 +181,16 @@ const ObjectViewerSectionNonEmpty = ({
         <Button
           variant="ghost"
           icon="code-alt"
-          active={mode === 'json'}
-          onClick={() => setMode('json')}
+          active={mode === ViewerMode.Json}
+          onClick={() => setMode(ViewerMode.Json)}
           tooltip="View as JSON"
         />
         {!noHide && (
           <Button
             variant="ghost"
             icon="hide-hidden"
-            active={mode === 'hidden'}
-            onClick={() => setMode('hidden')}
+            active={mode === ViewerMode.Hidden}
+            onClick={() => setMode(ViewerMode.Hidden)}
             tooltip="Hide"
           />
         )}
