@@ -262,10 +262,6 @@ export const DatasetVersionPage: React.FC<{
                 </ObjectVersionsLink>
               </div>
               <div className="block">
-                <p className="text-moon-500">Version</p>
-                <p>{objectVersionIndex}</p>
-              </div>
-              <div className="block">
                 <p className="text-moon-500">Created</p>
                 <p>
                   <Timestamp value={createdAtMs / 1000} format="relative" />
