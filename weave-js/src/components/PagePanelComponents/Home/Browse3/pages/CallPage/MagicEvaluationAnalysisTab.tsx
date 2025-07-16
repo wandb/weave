@@ -30,7 +30,7 @@ const Header = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 8px 24px;
   border-bottom: 1px solid ${Colors.MOON_200};
   flex-shrink: 0;
   flex-direction: row;
@@ -67,14 +67,13 @@ const IconCircle = styled.div`
 const ContentContainer = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 0px 24px;
   display: flex;
   flex-direction: column;
 `;
 
 const MarkdownContainer = styled.div`
   max-width: 1000px;
-  margin: 0 auto;
 
   /* Style for better markdown display */
   h1,
@@ -169,7 +168,7 @@ export const MagicEvaluationAnalysisTab: FC<{
   evaluationCallId: string;
 }> = props => {
   return (
-    <Tailwind style={{height: '100%'}}>
+    <Tailwind style={{height: '100%', width: '100%'}}>
       <MagicEvaluationAnalysisTabInner {...props} />
     </Tailwind>
   );
@@ -412,7 +411,7 @@ const MagicEvaluationAnalysisTabInner: FC<{
               showModelSelector={true}
               width={450}
               textareaLines={4}>
-              <MagicButton size="small" variant="secondary">
+              <MagicButton size="medium" variant="secondary">
                 Regenerate
               </MagicButton>
             </MagicTooltip>

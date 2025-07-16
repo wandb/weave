@@ -57,7 +57,8 @@ RULES:
 - NO questions or conversation
 - Focus on actionable fixes
 - Keep under 250 words total
-- Use varied markdown elements for visual hierarchy
+- Use varied markdown elements for visual hierarchy. 
+- For lists, always use valid markdown list syntax, never use special characters like •.
 
 Format using these headers:
 
