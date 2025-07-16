@@ -4,9 +4,15 @@ import * as Colors from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
+import {makeRefCall} from '@wandb/weave/util/refs';
 import {MagicButton, MagicTooltip} from '@wandb/weave/WBMagician2';
-import React, {FC, useState} from 'react';
+import React, {FC, useEffect,useState} from 'react';
 import styled from 'styled-components';
+
+import {TraceServerClient} from '../wfReactInterface/traceServerClient';
+import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
+import {Feedback} from '../wfReactInterface/traceServerClientTypes';
+import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
 
 const Container = styled.div`
   display: flex;
@@ -144,9 +150,38 @@ export const MagicEvaluationAnalysis: FC<{
   const [magicSummary, setMagicSummary] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const llmContext = useEvaluationAnalysisLLMContext();
+  const getTsClient = useGetTraceServerClientContext();
 
-  const handleMagicStream = (content: string, isComplete: boolean) => {
+  // Load existing analysis on mount
+  useEffect(() => {
+    const loadExistingAnalysis = async () => {
+      try {
+        const client = getTsClient();
+        const existingFeedback = await getMagicAnalysis(
+          client,
+          entity,
+          project,
+          evaluationCallId
+        );
+        if (existingFeedback.length > 0 && existingFeedback[0].payload) {
+          const analysis = (existingFeedback[0].payload as any).analysis;
+          if (analysis) {
+            setMagicSummary(analysis);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load existing analysis:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadExistingAnalysis();
+  }, [getTsClient, entity, project, evaluationCallId]);
+
+  const handleMagicStream = async (content: string, isComplete: boolean) => {
     if (!isComplete) {
       setIsGenerating(true);
       setError(null);
@@ -155,11 +190,26 @@ export const MagicEvaluationAnalysis: FC<{
     } else {
       setMagicSummary(content);
       setIsGenerating(false);
+
+      // Save the analysis when generation is complete
+      try {
+        const client = getTsClient();
+        await saveMagicAnalysis(
+          client,
+          entity,
+          project,
+          evaluationCallId,
+          content
+        );
+      } catch (error) {
+        console.error('Failed to save analysis:', error);
+        // Don't show error to user as the analysis was still generated successfully
+      }
     }
   };
 
-  const handleError = (errorMessage: string) => {
-    setError(errorMessage);
+  const handleError = (error: Error) => {
+    setError(error.message);
     setIsGenerating(false);
   };
 
@@ -167,6 +217,19 @@ export const MagicEvaluationAnalysis: FC<{
     setMagicSummary(null);
     setError(null);
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Container>
+        <EmptyStateContainer>
+          <Tailwind>
+            <div className="text-moon-600">Loading analysis...</div>
+          </Tailwind>
+        </EmptyStateContainer>
+      </Container>
+    );
+  }
 
   // Empty state
   if (!magicSummary && !isGenerating && !error) {
@@ -286,4 +349,63 @@ Evaluation context: ${llmContext}`}
       </ContentContainer>
     </Container>
   );
+};
+
+const MAGIC_ANALYSIS_FEEDBACK_TYPE = 'wandb.magic_analysis';
+
+const getMagicAnalysis = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  evaluationCallId: string
+): Promise<Feedback[]> => {
+  const res = await client.feedbackQuery({
+    project_id: projectIdFromParts({
+      entity: entity,
+      project: project,
+    }),
+    query: {
+      $expr: {
+        $and: [
+          {
+            $eq: [
+              {$getField: 'weave_ref'},
+              {$literal: makeRefCall(entity, project, evaluationCallId)},
+            ],
+          },
+          {
+            $eq: [
+              {$getField: 'feedback_type'},
+              {$literal: MAGIC_ANALYSIS_FEEDBACK_TYPE},
+            ],
+          },
+        ],
+      },
+    },
+    sort_by: [{field: 'created_at', direction: 'desc'}],
+  });
+  if ('result' in res) {
+    return res.result;
+  }
+  return [];
+};
+
+const saveMagicAnalysis = async (
+  client: TraceServerClient,
+  entity: string,
+  project: string,
+  evaluationCallId: string,
+  analysis: string
+) => {
+  await client.feedbackCreate({
+    project_id: projectIdFromParts({
+      entity: entity,
+      project: project,
+    }),
+    weave_ref: makeRefCall(entity, project, evaluationCallId),
+    feedback_type: MAGIC_ANALYSIS_FEEDBACK_TYPE,
+    payload: {
+      analysis: analysis,
+    },
+  });
 };
