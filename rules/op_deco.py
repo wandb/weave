@@ -3,6 +3,11 @@ from fixit import InvalidTestCase, LintRule, ValidTestCase
 
 
 class OpDecoRule(LintRule):
+    """
+    This rule converts @weave.op() to @weave.op.
+
+    This is a stylistic rule that we prefer to use the decorator without parentheses.
+    """
     VALID = [ValidTestCase("@weave.op")]
     INVALID = [InvalidTestCase("@weave.op()")]
 
