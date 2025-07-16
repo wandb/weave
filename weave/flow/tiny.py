@@ -11,6 +11,9 @@ from py_irt.dataset import Dataset as PyIrtDataset
 import pandas as pd
 from weave.flow.scorer import Scorer
 from uuid import uuid4
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.metrics import pairwise_distances
 
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import WeaveClient
@@ -149,10 +152,47 @@ def train_irt_model(evaluation_results: dict[str, list[float]], **kwargs: Any) -
 
     return trainer
 
-def tiny_dataset(dataset: Dataset, irt_model: IrtModelTrainer) -> Dataset:
-    # TODO: extract anchor points from irt_model.best_params
-    # TODO: create a new dataset with the anchor points
+def make_dataset(dataset, anchor_ids, A, B, anchor_weights, name = None, description = None):
+    """
+    A,B are of shape (.., .., len(dataset))
+    anchor_ids is of shape (len(tiny_items))
+    anchor_weights is of shape (len(tiny_items)) == len(anchor_ids)
+
+    Adds three keys to the dataset:
+        - A_anchor: the anchor discrimination
+        - B_anchor: the anchor difficulty
+        - w_anchor: the anchor weight
+    """
+    ret_dataset = []
+    for i, anchor in enumerate(anchor_ids):
+        row = dataset[i]
+        ret_dataset.append({
+            **row,
+            "A_anchor": A[:, :, anchor],
+            "B_anchor": B[:, :, anchor],
+            "w_anchor": anchor_weights[i] # w_anchor is of len(anchor_ids)
+        })
+    dataset = Dataset(
+        name=name,
+        description=description,
+        rows=ret_dataset
+    )
     return dataset
+
+
+def tiny_dataset(dataset: Dataset, results: dict[str, list[float]], trained_irt_model: IrtModelTrainer, num_items: int=100) -> Dataset:
+    num_items = min(num_items, len(dataset))
+    # results is the dict from run_all_evaluations
+    balance_weights = np.ones(len(list(results.values())[0])) # we weight each value equally
+    A, B = np.array(trained_irt_model.best_params['disc']).T[None, :, :], np.array(trained_irt_model.best_params['diff']).T[None, :, :]
+    X = np.vstack((A.squeeze(), B.squeeze())).T
+    kmeans = KMeans(n_clusters=num_items, n_init='auto')
+    kmeans.fit(X)
+    anchor_points = pairwise_distances(kmeans.cluster_centers_, X, metric='euclidean').argmin(axis=1)
+    norm_balance_weights = balance_weights / balance_weights.sum()
+    anchor_weights = np.array([np.sum(norm_balance_weights[kmeans.labels_==c]) for c in range(num_items)])
+
+    return make_dataset(dataset, anchor_points, A, B, anchor_weights, name=f"{dataset.name}_tiny_{num_items}", description=f"tiny dataset with {num_items} items")
 
 def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer) -> Ref | None:
     """
@@ -199,7 +239,7 @@ def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer) -> Ref | None
     irt_model = train_irt_model(evaluation_results)
 
     # TODO: produce dataset from irt_model.best_params
-    tiny_dataset = tiny_dataset(dataset, irt_model)
+    teenytiny = tiny_dataset(dataset, irt_model)
 
     # TODO: save dataset to weave
     # TODO: run evaluations for models against tiny dataset
