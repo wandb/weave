@@ -87,6 +87,8 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
       className={`transition-all ${
         stateClasses[currentState] || ''
       } ${className}`}
-      {...restProps}></Button>
+      {...restProps}>
+      {children}
+    </Button>
   );
 };

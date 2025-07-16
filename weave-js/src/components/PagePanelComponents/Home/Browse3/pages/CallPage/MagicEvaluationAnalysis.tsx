@@ -6,7 +6,7 @@ import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import {MagicButton, MagicTooltip} from '@wandb/weave/WBMagician2';
-import React, {FC, useEffect,useState} from 'react';
+import React, {FC, useEffect, useState} from 'react';
 import styled from 'styled-components';
 
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
@@ -26,9 +26,10 @@ const Header = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 8px 12px;
   border-bottom: 1px solid ${Colors.MOON_200};
   flex-shrink: 0;
+  flex-direction: row;
 `;
 
 const EmptyStateContainer = styled.div`
@@ -296,22 +297,26 @@ Evaluation context: ${llmContext}`}
   return (
     <Container>
       <Header>
-        <Tailwind>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-moon-800">
-              Evaluation Analysis
-            </h1>
-            {isGenerating && (
-              <span className="text-sm text-moon-500">Generating...</span>
-            )}
-          </div>
+        <div className="flex items-center gap-3">
+          <p
+            className="mb-10"
+            style={{
+              fontWeight: 600,
+              marginRight: 10,
+              paddingRight: 10,
+            }}>
+            Generated Evaluation Analysis
+          </p>
+        </div>
 
-          <div className="flex items-center gap-2">
-            {!isGenerating && (
-              <MagicTooltip
-                onStream={handleMagicStream}
-                onError={handleError}
-                systemPrompt={`You are an expert ML evaluation analyst. The user wants to regenerate or ask follow-up questions about the evaluation analysis.
+        <div className="flex items-center gap-2">
+          {isGenerating ? (
+            <span className="text-sm text-moon-500">Generating...</span>
+          ) : (
+            <MagicTooltip
+              onStream={handleMagicStream}
+              onError={handleError}
+              systemPrompt={`You are an expert ML evaluation analyst. The user wants to regenerate or ask follow-up questions about the evaluation analysis.
 
 Previous analysis for context:
 ${magicSummary}
@@ -319,27 +324,24 @@ ${magicSummary}
 Provide a fresh analysis or answer their specific question. Format your response in markdown.
 
 Evaluation context: ${llmContext}`}
-                placeholder="Ask follow-up questions or leave empty to regenerate the analysis..."
-                showModelSelector={true}
-                width={450}
-                textareaLines={4}>
-                <MagicButton size="small" variant="secondary">
-                  Regenerate
-                </MagicButton>
-              </MagicTooltip>
-            )}
-          </div>
-        </Tailwind>
+              placeholder="Ask follow-up questions or leave empty to regenerate the analysis..."
+              showModelSelector={true}
+              width={450}
+              textareaLines={4}>
+              <MagicButton size="small" variant="secondary">
+                Regenerate
+              </MagicButton>
+            </MagicTooltip>
+          )}
+        </div>
       </Header>
 
       {error && (
-        <Tailwind>
-          <div className="px-6 pt-4">
-            <Alert severity="error" onClose={handleRegenerate}>
-              Failed to generate analysis: {error}
-            </Alert>
-          </div>
-        </Tailwind>
+        <div className="px-6 pt-4">
+          <Alert severity="error" onClose={handleRegenerate}>
+            Failed to generate analysis: {error}
+          </Alert>
+        </div>
       )}
 
       <ContentContainer>
