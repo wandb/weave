@@ -1,34 +1,25 @@
 import {ApolloProvider} from '@apollo/client';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
-import {MOON_100, TEAL_600} from '@wandb/weave/common/css/color.styles';
+import {MOON_100} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
-import {Icon, IconName} from '@wandb/weave/components/Icon';
-import {WaveLoader} from '@wandb/weave/components/Loaders/WaveLoader';
-import {LoadingDots} from '@wandb/weave/components/LoadingDots';
-import {useWFHooks} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/context';
-import {
-  projectIdFromParts,
-  useProjectStats,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/tsDataModelHooks';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
-import {UserLink, useUsers} from '@wandb/weave/components/UserLink';
-import {convertBytes} from '@wandb/weave/util';
+import {useUsers} from '@wandb/weave/components/UserLink';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
 import {Layouts, Responsive as ResponsiveGridLayout} from 'react-grid-layout';
-import {Link} from 'react-router-dom';
-import {FlexibleXYPlot, Hint, VerticalBarSeries, XAxis, YAxis} from 'react-vis';
 
 import {useLocalStorage} from '../../../../../../util/useLocalStorage';
 import {CallsCharts} from '../../charts/CallsCharts';
-import {Chart} from '../../charts/Chart';
-import {chartAxisFields} from '../../charts/extractData';
-import {ExtractedCallData} from '../../charts/types';
 import {ChartConfig} from '../../charts/types';
 import {useChartsData} from '../../charts/useChartsData';
 import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {DEFAULT_FILTER_CALLS} from '../CallsPage/callsTableQuery';
 import {ResizableDrawer} from '../common/ResizableDrawer';
+import CallChartsWidget from './CallChartsWidget';
+import ProjectAccessItem from './ProjectAccessItem';
+import StatsWidget from './StatsWidget';
+import UserLinkItem from './UserLinkItem';
+import UserTraceCountsChart from './UserTraceCountsChart';
 
 export enum AccessOption {
   Restricted = 'RESTRICTED',
@@ -95,14 +86,16 @@ export const WeaveOnlyOverviewInner: React.FC<{
   // Prepare data for the Chart widget (must match ExtractedCallData[] type)
   const userTraceCountsData = useMemo(
     () =>
-      Object.entries(userTraceCounts).map(([user, count]) => ({
-        callId: user, // Use user as unique id
-        traceId: '',
-        started_at: '',
-        wb_user_id: user,
-        user, // for xAxis
-        count, // for yAxis
-      })),
+      Object.entries(userTraceCounts)
+        .map(([user, count]) => ({
+          callId: user, // Use user as unique id
+          traceId: '',
+          started_at: '',
+          wb_user_id: user,
+          user, // for xAxis
+          count, // for yAxis
+        }))
+        .sort((a, b) => b.count - a.count), // Sort descending by count
     [userTraceCounts]
   );
 
@@ -255,18 +248,36 @@ export const WeaveOnlyOverviewInner: React.FC<{
   return (
     <Tailwind className="h-full min-h-screen w-full">
       <div className="mx-32 my-8">
-        <button
-          className="absolute right-8 top-8 z-20 rounded border border-moon-300 bg-white px-4 py-2 text-xs text-moon-400 hover:bg-moon-200"
-          onClick={() => setShowChartsDrawer(true)}>
-          Open Call Charts
-        </button>
-        {!hasUserTraceCountsChart && (
-          <button
-            className="absolute right-44 top-8 z-20 rounded border border-moon-300 bg-white px-4 py-2 text-xs text-moon-400 hover:bg-moon-200"
-            onClick={addUserTraceCountsChartWidget}>
-            Add User Trace Counts Chart
-          </button>
-        )}
+        {/* Floating action buttons bottom right */}
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 36,
+            right: 36,
+            zIndex: 30,
+            display: 'flex',
+            gap: 16,
+          }}>
+          <Button
+            icon="add-new"
+            variant="outline"
+            size="large"
+            tooltip="Open Call Charts"
+            onClick={() => setShowChartsDrawer(true)}
+            className="no-drag shadow-lg"
+          />
+          {!hasUserTraceCountsChart && (
+            <Button
+              icon="chart-vertical-bars"
+              variant="secondary"
+              size="large"
+              tooltip="Add User Trace Counts Chart"
+              onClick={addUserTraceCountsChartWidget}
+              className="no-drag shadow-lg"
+            />
+          )}
+        </div>
+        {/* End floating action buttons */}
         <ResizableDrawer
           open={showChartsDrawer}
           onClose={() => setShowChartsDrawer(false)}
@@ -364,11 +375,11 @@ export const WeaveOnlyOverviewInner: React.FC<{
                     key={config.id}
                     data-grid={usedLayout}
                     className="flex items-center justify-center ">
-                    <div className="flex h-[calc(100%-8px)] w-[calc(100%-8px)] gap-4 rounded border border-moon-300 bg-white p-4">
-                      <div className="flex items-center gap-2">
+                    <div className="flex h-[calc(100%-8px)] w-[calc(100%-8px)] gap-8 rounded border border-moon-300 bg-white p-4">
+                      <div className="flex w-[100px] items-center">
                         <span className="text-sm">Project visibility: </span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center">
                         <ProjectAccessItem
                           access={projectAccess}
                           isTeamProject={project.entity.isTeam}
@@ -384,15 +395,15 @@ export const WeaveOnlyOverviewInner: React.FC<{
                     data-grid={usedLayout}
                     className="flex items-center justify-center ">
                     <div
-                      className="flex gap-4 rounded border border-moon-300 bg-white p-4"
+                      className="flex gap-8 rounded border border-moon-300 bg-white p-4"
                       style={{
                         width: 'calc(100% - 8px)',
                         height: 'calc(100% - 8px)',
                       }}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">Owner </span>
+                      <div className="flex w-[100px] items-center">
+                        <span className="text-sm">Owner: </span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center">
                         <UserLinkItem user={project.user}></UserLinkItem>
                       </div>
                     </div>
@@ -457,460 +468,6 @@ export const WeaveOnlyOverviewInner: React.FC<{
       </div>
     </Tailwind>
   );
-};
-
-interface UserLinkItemProps {
-  user: {
-    username: string;
-    name: string;
-    photoUrl: string | null;
-  };
-}
-
-const UserLinkItem: React.FC<UserLinkItemProps> = ({user}) => {
-  const {username, photoUrl, name} = user;
-  const content = (
-    <div className="flex items-center gap-2">
-      <img
-        src={photoUrl ?? '/default-profile-picture.png'}
-        className="h-24 w-24 rounded-full"
-        alt={name}
-      />
-      <span>{name}</span>
-    </div>
-  );
-
-  return (
-    <Link className="user-link" to={`/${username}`}>
-      {content}
-    </Link>
-  );
-};
-
-export function getIconForProjectAccess(
-  access: AccessOption,
-  isTeamProject: boolean
-): IconName {
-  switch (access) {
-    case AccessOption.Restricted:
-      return 'lock-closed';
-    case AccessOption.Private:
-      return isTeamProject ? 'users-team' : 'lock-closed';
-    case AccessOption.Public:
-      return 'lock-open';
-    case AccessOption.Open:
-      return 'privacy-open';
-  }
-}
-export function getDisplayNameForProjectAccess(
-  access: AccessOption,
-  isTeamProject: boolean
-): string {
-  switch (access) {
-    case AccessOption.Restricted:
-      return 'Restricted';
-    case AccessOption.Private:
-      return isTeamProject ? 'Team' : 'Private';
-    case AccessOption.Public:
-      return 'Public';
-    case AccessOption.Open:
-      return 'Open';
-  }
-}
-
-export function getDescriptionForProjectAccess(
-  access: AccessOption,
-  isTeamProject: boolean
-): string {
-  switch (access) {
-    case AccessOption.Restricted:
-      return 'Only invited members can access this project. Public sharing is disabled.';
-    case AccessOption.Private:
-      return `Only ${
-        isTeamProject ? `your team` : `you`
-      } can view and edit this project.`;
-    case AccessOption.Public:
-      return `Anyone can view this project. Only ${
-        isTeamProject ? `your team` : `you`
-      } can edit.`;
-    case AccessOption.Open:
-      return `Anyone can submit runs or reports (intended for classroom projects or benchmark competitions).`;
-  }
-}
-
-interface ProjectAccessItemProps {
-  access: AccessOption;
-  isTeamProject: boolean;
-}
-
-const ProjectAccessItem: React.FC<ProjectAccessItemProps> = ({
-  access,
-  isTeamProject,
-}) => {
-  const iconName = getIconForProjectAccess(access, isTeamProject);
-  return (
-    <Tailwind>
-      <div className="flex items-center">
-        {iconName && <Icon name={iconName} />}
-        <span className="ml-6">
-          {getDisplayNameForProjectAccess(access, isTeamProject)}
-        </span>
-      </div>
-    </Tailwind>
-  );
-};
-
-interface StatsWidgetProps {
-  project: Project;
-}
-
-const StatsWidget: React.FC<StatsWidgetProps> = ({project}) => {
-  const {useCallsStats} = useWFHooks();
-  const {result, loading: callsStatsLoading} = useCallsStats({
-    entity: project.entityName,
-    project: project.name,
-  });
-
-  const {
-    value: projectStats,
-    loading: projectStatsLoading,
-    error: projectStatsError,
-  } = useProjectStats(
-    projectIdFromParts({entity: project.entityName, project: project.name})
-  );
-
-  const traceCount = useMemo(
-    () => (
-      <div>
-        {callsStatsLoading ? (
-          <LoadingDots />
-        ) : (
-          result?.count.toLocaleString() ?? 0
-        )}
-      </div>
-    ),
-    [callsStatsLoading, result]
-  );
-
-  const [
-    totalIngestionSize,
-    objectsIngestionSize,
-    tablesIngestionSize,
-    filesIngestionSize,
-  ] = useMemo(() => {
-    if (projectStatsLoading) {
-      return Array(4).fill(<LoadingDots />);
-    }
-    return [
-      convertBytes(projectStats?.trace_storage_size_bytes ?? 0),
-      convertBytes(projectStats?.objects_storage_size_bytes ?? 0),
-      convertBytes(projectStats?.tables_storage_size_bytes ?? 0),
-      convertBytes(projectStats?.files_storage_size_bytes ?? 0),
-    ];
-  }, [projectStatsLoading, projectStats]);
-
-  return (
-    <React.Fragment>
-      {projectStatsError ? (
-        <p className="text-red-500">Error loading storage sizes</p>
-      ) : (
-        <div
-          className="grid grid-cols-[150px_1fr] rounded border border-moon-300 bg-white p-4 [&>*:nth-child(odd)]:text-moon-400"
-          style={{
-            width: 'calc(100% - 8px)',
-            height: 'calc(100% - 8px)',
-          }}>
-          <div>Total traces</div>
-          <div>{traceCount}</div>
-          <div>Traces ingestion size</div>
-          <div>{totalIngestionSize}</div>
-          <div>Objects ingestion size</div>
-          <div>{objectsIngestionSize}</div>
-          <div>Tables ingestion size</div>
-          <div>{tablesIngestionSize}</div>
-          <div>Files ingestion size</div>
-          <div>{filesIngestionSize}</div>
-        </div>
-      )}
-    </React.Fragment>
-  );
-};
-
-const CallChartsWidget: React.FC<{
-  callData: ExtractedCallData[];
-  chartConfig: ChartConfig;
-  entity: string;
-  project: string;
-  isLoading: boolean;
-  filter: WFHighLevelCallFilter;
-  index: number;
-  setWidgets: (widgets: Array<React.ReactNode>) => void;
-  widgets: Array<React.ReactNode>;
-}> = ({
-  callData,
-  chartConfig: chart,
-  entity,
-  project,
-  isLoading,
-  filter,
-  index,
-  setWidgets,
-  widgets,
-}) => {
-  const yField = chartAxisFields.find(f => f.key === chart.yAxis);
-  const baseTitle = yField ? yField.label : chart.yAxis;
-  const chartTitle = baseTitle;
-  return (
-    <div className=" w-[calc(100%-8px)]">
-      <Chart
-        key={chart.id}
-        data={callData}
-        height={280}
-        xAxis={chart.xAxis}
-        yAxis={chart.yAxis}
-        plotType={chart.plotType || 'scatter'}
-        binCount={chart.binCount}
-        aggregation={chart.aggregation}
-        title={chartTitle}
-        customName={chart.customName}
-        chartId={chart.id}
-        entity={entity}
-        project={project}
-        groupKeys={chart.groupKeys}
-        isLoading={isLoading}
-        onRemove={() => {
-          console.log('remove', index);
-          setWidgets(widgets.filter((_, i) => i !== index));
-        }}
-        filter={filter}
-      />
-    </div>
-  );
-};
-
-type UserInfo = {
-  id: string;
-  name?: string;
-  photoUrl?: string;
-};
-
-// Add UserTraceCountsChart component (move above usage)
-type UserTraceCountsChartProps = {
-  project: Project;
-  widgetConfigs: WidgetConfig[];
-  setWidgetConfigs: (configs: WidgetConfig[]) => void;
-  userTraceCountsData: any[];
-  isLoading: boolean;
-  userInfo: UserInfo[];
-};
-const UserTraceCountsChart: React.FC<UserTraceCountsChartProps> = ({
-  project,
-  widgetConfigs,
-  setWidgetConfigs,
-  userTraceCountsData,
-  isLoading,
-  userInfo,
-}) => {
-  const [isFullscreen, setIsFullscreen] = React.useState(false);
-  const [isChartHovered, setIsChartHovered] = React.useState(false);
-  const [hintValue, setHintValue] = React.useState<any>(null);
-  const chartHeight = isFullscreen ? window.innerHeight : 280;
-  const chartWidth = isFullscreen ? window.innerWidth : 'calc(100% - 8px)';
-
-  // Prepare data for react-vis
-  const barData = userTraceCountsData.map(d => ({
-    x: d.user,
-    y: d.count,
-    userObj: d.userObj, // pass through if available
-  }));
-
-  const chartContent = (
-    <div
-      style={{
-        border: '1px solid #e0e0e0',
-        borderRadius: 6,
-        background: '#fff',
-        display: 'flex',
-        flexDirection: 'column',
-        height: chartHeight,
-        width: chartWidth || '100%',
-        minHeight: 0,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
-        overflow: 'hidden',
-        zIndex: isFullscreen ? 1001 : 'auto',
-        flexShrink: 0,
-      }}
-      onMouseEnter={() => setIsChartHovered(true)}
-      onMouseLeave={() => setIsChartHovered(false)}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontWeight: 500,
-          userSelect: 'none',
-          position: 'relative',
-          height: 32,
-          flex: '0 0 auto',
-        }}>
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            top: 0,
-            bottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-            zIndex: 0,
-          }}>
-          <span
-            style={{
-              fontWeight: 600,
-              fontSize: isFullscreen ? 20 : 13,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              pointerEvents: 'none',
-              maxWidth: 'calc(100% - 60px)',
-            }}>
-            User Trace Counts
-          </span>
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            gap: 2,
-            flex: '0 0 auto',
-            zIndex: 1,
-            marginLeft: 'auto',
-            marginRight: isFullscreen ? 8 : 4,
-            marginTop: isFullscreen ? 24 : 0,
-            opacity: isChartHovered || isFullscreen ? 1 : 0,
-            transition: 'opacity 0.2s ease-in-out',
-          }}>
-          <Button
-            className="no-drag"
-            icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
-            variant="ghost"
-            size={isFullscreen ? 'large' : 'small'}
-            onClick={() => setIsFullscreen(f => !f)}
-          />
-          <Button
-            className="no-drag"
-            icon="close"
-            variant="ghost"
-            size="small"
-            onClick={() => {
-              setWidgetConfigs(
-                widgetConfigs.filter(c => c.type !== 'userTraceCountsChart')
-              );
-            }}
-          />
-        </div>
-      </div>
-      {isLoading ? (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            minHeight: 200,
-          }}>
-          <WaveLoader size="small" />
-        </div>
-      ) : barData.length === 0 ? (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            color: '#8F8F8F',
-            fontSize: '14px',
-          }}>
-          No data could be found
-        </div>
-      ) : (
-        <div style={{flex: 1, minHeight: 40, minWidth: 40}}>
-          <FlexibleXYPlot
-            xType="ordinal"
-            margin={{left: 60, right: 20, top: 20, bottom: 60}}
-            onMouseLeave={() => setHintValue(null)}>
-            <XAxis
-              tickLabelAngle={0}
-              tickFormat={(userId: string) => {
-                const user = (userInfo ?? []).find(u => u.id === userId);
-                return user ? user.name ?? userId : userId;
-              }}
-            />
-            <YAxis />
-            <VerticalBarSeries
-              data={barData}
-              color={TEAL_600}
-              barWidth={0.8} // Add padding between bars
-              onValueMouseOver={v => setHintValue(v)}
-              onValueMouseOut={() => setHintValue(null)}
-            />
-            {hintValue && (
-              <Hint value={hintValue}>
-                <div
-                  style={{
-                    background: '#fff',
-                    border: '1px solid #ccc',
-                    padding: 8,
-                    borderRadius: 4,
-                    fontSize: 12,
-                  }}>
-                  <div>
-                    <b>User:</b>{' '}
-                    {hintValue.x ? (
-                      <UserLink userId={hintValue.x} includeName={true} />
-                    ) : (
-                      hintValue.x
-                    )}
-                  </div>
-                  <div>
-                    <b>Traces:</b> {hintValue.y}
-                  </div>
-                </div>
-              </Hint>
-            )}
-          </FlexibleXYPlot>
-        </div>
-      )}
-    </div>
-  );
-
-  if (isFullscreen) {
-    return (
-      <div
-        style={{
-          position: 'fixed',
-          top: 40,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-        }}
-        onClick={e => {
-          if (e.target === e.currentTarget) {
-            setIsFullscreen(false);
-          }
-        }}>
-        {chartContent}
-      </div>
-    );
-  }
-
-  return chartContent;
 };
 
 export const WeaveOnlyOverview = ({

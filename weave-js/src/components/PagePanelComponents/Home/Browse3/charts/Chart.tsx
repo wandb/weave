@@ -71,6 +71,7 @@ export type ChartProps = {
   groupKeys?: string[];
   isLoading?: boolean;
   addChart?: () => void;
+  noFullscreen?: boolean;
 };
 
 export const Chart: React.FC<ChartProps> = ({
@@ -92,6 +93,7 @@ export const Chart: React.FC<ChartProps> = ({
   groupKeys,
   isLoading,
   addChart,
+  noFullscreen = false,
 }) => {
   const [isChartHovered, setIsChartHovered] = React.useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -241,13 +243,15 @@ export const Chart: React.FC<ChartProps> = ({
               onClick={() => addChart?.()}
             />
           )}
-          <Button
-            className="no-drag"
-            icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
-            variant="ghost"
-            size={isFullscreen ? 'large' : 'small'}
-            onClick={handleToggleFullscreen}
-          />
+          {!noFullscreen && (
+            <Button
+              className="no-drag"
+              icon={isFullscreen ? 'minimize-mode' : 'full-screen-mode-expand'}
+              variant="ghost"
+              size={isFullscreen ? 'large' : 'small'}
+              onClick={handleToggleFullscreen}
+            />
+          )}
           {onEdit && !isFullscreen && (
             <Button
               icon="settings"
