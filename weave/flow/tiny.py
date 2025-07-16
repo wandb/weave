@@ -2,6 +2,7 @@ from itertools import tee
 import tempfile
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model
+from weave.scorers.tiny import TinyWrapScorer
 from weave.trace.op import Op
 from weave.trace.refs import Ref
 from weave.trace.context.weave_client_context import require_weave_client
@@ -99,7 +100,7 @@ def get_results_in_sorted_order(eval: WeaveObject, scorer_name: str, scorer_key:
     results_ordered = [x.output.unwrap()['scores'][scorer_name][scorer_key] for x in calls_ordered]
     return results_ordered
 
-def marshall_Y_dict_into_pandas(Y: dict) -> tuple[pd.DataFrame, str, list[str]]:
+def marshall_Y_dict_into_pandas(Y: dict[str, list[float]]) -> tuple[pd.DataFrame, str, list[str]]:
     """
     Y is a dict of format: {subject_id: [score1, score2, ...]}
     Return a pandas dataframe of the following format:
@@ -197,30 +198,12 @@ def tiny_dataset(dataset: Dataset, results: dict[str, list[float]], trained_irt_
 
     return make_dataset(dataset, anchor_points, A, B, anchor_weights, name=f"{dataset.name}_tiny_{num_items}", description=f"tiny dataset with {num_items} items")
 
-def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer, num_items: int=100) -> Ref | None:
+async def _tinyify_async(dataset_ref: Ref, models: list[Model], scorer: Scorer, num_items: int=100) -> tuple[Ref, Scorer]:
     """
-    Execute evaluations against the dataset for each model in models concurrently.
-    
-    Args:
-        dataset_ref: The dataset reference to evaluate against.
-        models: List of models to evaluate against the dataset.
-        
-    Returns:
-        A reference to evaluation results, or None if no models provided.
-        
-    Raises:
-        ValueError: If the dataset reference cannot be resolved or models are invalid.
-        
-    Examples:
-        ```python
-        # Execute evaluations for multiple models against a dataset
-        dataset_ref = parse_uri("weave:///entity/project/object/my_dataset:digest")
-        models = [model1, model2]
-        results_ref = tinyify(dataset_ref, models)
-        ```
+    Async implementation of tinyify. This is the core logic that runs evaluations.
     """
     if not models:
-        return None
+        raise ValueError("No models provided")
         
     client = require_weave_client()
     
@@ -232,22 +215,58 @@ def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer, num_items: in
         raise ValueError(f"Failed to retrieve dataset from ref {dataset_ref.uri()}: {e}")
     
     # Execute all evaluations concurrently
-    evaluation_results = asyncio.run(run_all_evaluations(sorted_dataset, models, scorer))
+    evaluation_results = await run_all_evaluations(sorted_dataset, models, scorer)
     
     client.finish()
 
-    # TODO: transform from list of evals
-    # {"model1": [0.3, 1.0, ...], "model2": [1.0, 0.0, ...]}
-    # TODO: train the irt model
     irt_model = train_irt_model(evaluation_results)
 
-    # TODO: produce dataset from irt_model.best_params
     teenytiny = tiny_dataset(dataset, evaluation_results, irt_model, num_items)
 
-    # TODO: save dataset to weave
-    # TODO: run evaluations for models against tiny dataset
-    client._save_object(teenytiny, teenytiny.name, "latest")
+    teenytiny_ref = client._save_object(teenytiny, teenytiny.name, "latest")
 
-    # TODO: return ref to tiny, D eval results, d eval results
-    return None
+    return teenytiny_ref, TinyWrapScorer(child_scorer=scorer)
+
+def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer, num_items: int=100) -> tuple[Ref, Scorer]:
+    """
+    Execute evaluations against the dataset for each model in models concurrently.
+    
+    This function supports being called both from a script (no event loop) and from
+    within an existing event loop.
+    
+    Args:
+        dataset_ref: The dataset reference to evaluate against.
+        models: List of models to evaluate against the dataset.
+        scorer: The scorer to use for evaluation.
+        num_items: Number of items to include in the tiny dataset.
+        
+    Returns:
+        A tuple containing the reference to the tiny dataset and a TinyWrapScorer.
+        
+    Raises:
+        ValueError: If the dataset reference cannot be resolved or models are invalid.
+        
+    Examples:
+        ```python
+        # Execute evaluations for multiple models against a dataset
+        dataset_ref = parse_uri("weave:///entity/project/object/my_dataset:digest")
+        models = [model1, model2]
+        tiny_ref, tiny_scorer = tinyify(dataset_ref, models, scorer)
+        ```
+    """
+    try:
+        # Check if we're already in an event loop
+        loop = asyncio.get_running_loop()
+        if loop.is_running():
+            # We're in an event loop, need to run in a separate thread
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, _tinyify_async(dataset_ref, models, scorer, num_items))
+                return future.result()
+        else:
+            # Event loop exists but not running, use asyncio.run()
+            return asyncio.run(_tinyify_async(dataset_ref, models, scorer, num_items))
+    except RuntimeError:
+        # No event loop is running, we can use asyncio.run()
+        return asyncio.run(_tinyify_async(dataset_ref, models, scorer, num_items))
 
