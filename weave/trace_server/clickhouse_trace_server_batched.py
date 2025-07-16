@@ -546,7 +546,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if not isinstance(ref, ri.InternalObjectRef):
                     continue
 
-                refs_to_resolve[(i, col)] = ref
+                refs_to_resolve[i, col] = ref
         return refs_to_resolve
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._expand_call_refs")
@@ -2186,7 +2186,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_values: dict[tuple[str, str], Any] = {}
         for row in query_result:
             (object_id, digest, val_dump) = row
-            object_values[(object_id, digest)] = val_dump
+            object_values[object_id, digest] = val_dump
 
         # update the val_dump for each object
         for obj in metadata_result:
