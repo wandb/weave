@@ -486,7 +486,7 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
   }, [entityProject, entityProjectContext]);
   const getClient = useGetTraceServerClientContext();
   return useCallback(
-    (params: ChatCompletionParams, onChunk: (chunk: Chunk) => void) => {
+    (params: Omit<ChatCompletionParams, 'modelId'> & {modelId?: string}, onChunk: (chunk: Chunk) => void) => {
       const client = getClient();
       // Use selected model from context if not specified in params
       const modelId = params.modelId || selectedModel;
