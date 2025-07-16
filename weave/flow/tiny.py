@@ -2,6 +2,7 @@ from itertools import tee
 import tempfile
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model
+from weave.trace.op import Op
 from weave.trace.refs import Ref
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.flow.eval import Evaluation
