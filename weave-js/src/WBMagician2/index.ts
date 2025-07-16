@@ -29,4 +29,5 @@ export {
   useAvailableModels,
   useChatCompletion,
   useChatCompletionStream,
+  useSelectedModel,
 } from './chatCompletionClient';

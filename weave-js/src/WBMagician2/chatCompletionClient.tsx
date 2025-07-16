@@ -1,8 +1,16 @@
 import {JSONSchema7} from 'json-schema';
-import React, {createContext, useCallback, useContext, useMemo} from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 
 import {TraceServerClient} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
+
+const DEFAULT_MODEL = 'gpt-4o-mini';
 
 export type Message = {
   role: 'user' | 'assistant' | 'system';
@@ -393,8 +401,26 @@ const EntityProjectContext = createContext<EntityProject | undefined>(
   undefined
 );
 
+const SelectedModelContext = createContext<
+  | {
+      selectedModel: string;
+      setSelectedModel: (model: string) => void;
+    }
+  | undefined
+>(undefined);
+
 const useEntityProjectContext = () => {
   return useContext(EntityProjectContext);
+};
+
+const useSelectedModelContext = () => {
+  const context = useContext(SelectedModelContext);
+  if (!context) {
+    throw new Error(
+      'useSelectedModelContext must be used within ChatClientProvider'
+    );
+  }
+  return context;
 };
 
 export const ChatClientProvider: React.FC<{
@@ -402,18 +428,29 @@ export const ChatClientProvider: React.FC<{
   children: React.ReactNode;
 }> = ({value, children}) => {
   const client = useGetTraceServerClientContext()();
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
+
   if (!client) {
     throw new Error('No trace server client found');
   }
+
   return (
     <EntityProjectContext.Provider value={value}>
-      {children}
+      <SelectedModelContext.Provider value={{selectedModel, setSelectedModel}}>
+        {children}
+      </SelectedModelContext.Provider>
     </EntityProjectContext.Provider>
   );
 };
 
+export const useSelectedModel = () => {
+  const {selectedModel, setSelectedModel} = useSelectedModelContext();
+  return {selectedModel, setSelectedModel};
+};
+
 export const useChatCompletion = (entityProject?: EntityProject) => {
   const entityProjectContext = useEntityProjectContext();
+  const {selectedModel} = useSelectedModelContext();
   const {entity, project} = useMemo(() => {
     if (entityProject) {
       return entityProject;
@@ -427,14 +464,17 @@ export const useChatCompletion = (entityProject?: EntityProject) => {
   return useCallback(
     (params: ChatCompletionParams) => {
       const client = getClient();
-      return chatComplete(client, entity, project, params);
+      // Use selected model from context if not specified in params
+      const modelId = params.modelId || selectedModel;
+      return chatComplete(client, entity, project, {...params, modelId});
     },
-    [entity, project, getClient]
+    [entity, project, getClient, selectedModel]
   );
 };
 
 export const useChatCompletionStream = (entityProject?: EntityProject) => {
   const entityProjectContext = useEntityProjectContext();
+  const {selectedModel} = useSelectedModelContext();
   const {entity, project} = useMemo(() => {
     if (entityProject) {
       return entityProject;
@@ -448,9 +488,17 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
   return useCallback(
     (params: ChatCompletionParams, onChunk: (chunk: Chunk) => void) => {
       const client = getClient();
-      return chatCompleteStream(client, entity, project, params, onChunk);
+      // Use selected model from context if not specified in params
+      const modelId = params.modelId || selectedModel;
+      return chatCompleteStream(
+        client,
+        entity,
+        project,
+        {...params, modelId},
+        onChunk
+      );
     },
-    [entity, project, getClient]
+    [entity, project, getClient, selectedModel]
   );
 };
 

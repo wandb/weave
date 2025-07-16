@@ -23,10 +23,12 @@ WBMagician is a module for adding "Magic moments" to the W&B application. It pro
 ### Query Layer (`chatCompletionClient.tsx`)
 - ✅ `useChatCompletion` - Hook for single completions
 - ✅ `useChatCompletionStream` - Hook for streaming completions
-- ✅ `ChatClientProvider` - Context provider for entity/project
-- 🔲 `useAvailableModels` - Hook to list available models (TODO)
+- ✅ `ChatClientProvider` - Context provider for entity/project and selected model
+- ✅ `useAvailableModels` - Hook to list available models
+- ✅ `useSelectedModel` - Hook to get/set the globally selected model
 - ✅ Response parsing for multiple provider formats (OpenAI, Anthropic, etc.)
 - ✅ Streaming chunk processing
+- ✅ Global model selection with persistence across components
 
 ### UI Components
 
@@ -40,15 +42,17 @@ Button component with sparkle (✨) icon that supports multiple states:
 Simplified tooltip for AI-assisted content generation:
 - **Design**: Minimal, blank tooltip with full-size textarea
 - **Features**:
-  - Text area for user input
+  - Text area for user input (supports multi-line with Enter for newlines)
   - Single "Generate" button at bottom
   - Button becomes loading/cancel during generation
-  - Model selection dropdown (under-emphasized)
+  - Model selection with typeahead search (optional)
+  - Global model selection synced across all components
   - Parent handles streaming consumption and display
 - **Behavior**:
-  - Enter key to submit
+  - Click Generate button to submit
   - Escape or click outside to close
   - Streams content to parent component
+  - Tooltip closes immediately when generation starts
 
 ## 🎨 Design Principles
 
@@ -69,7 +73,8 @@ Simplified tooltip for AI-assisted content generation:
 - [x] Refactor MagicTooltip to manage all UI state internally
 
 ### Phase 2: API Enhancement
-- [ ] Add `useAvailableModels` hook
+- [x] Add `useAvailableModels` hook
+- [x] Global model selection with context
 - [ ] Improve streaming performance
 - [ ] Add proper TypeScript types for all responses
 - [ ] Create helper utilities for common patterns
@@ -111,13 +116,27 @@ function MyComponent() {
 
 ### With Context Provider
 ```typescript
-import { ChatClientProvider } from '@/WBMagician2';
+import { ChatClientProvider, useSelectedModel } from '@/WBMagician2';
 
 function App() {
   return (
     <ChatClientProvider value={{ entity: 'my-org', project: 'my-project' }}>
       <MyComponent />
     </ChatClientProvider>
+  );
+}
+
+// In any component within the provider
+function ModelSelector() {
+  const { selectedModel, setSelectedModel } = useSelectedModel();
+  
+  return (
+    <div>
+      Current model: {selectedModel}
+      <button onClick={() => setSelectedModel('gpt-4')}>
+        Switch to GPT-4
+      </button>
+    </div>
   );
 }
 ```
@@ -162,9 +181,10 @@ interface MagicTooltipProps {
   systemPrompt: string;
   placeholder?: string;
   contentToRevise?: string;
-  modelId?: string;
   showModelSelector?: boolean;
   entityProject?: EntityProject;
+  width?: number; // Tooltip width in pixels (default: 350)
+  textareaLines?: number; // Textarea height in lines (default: 7)
 }
 ```
 

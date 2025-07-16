@@ -15,6 +15,7 @@ import {
   Message,
   useAvailableModels,
   useChatCompletionStream,
+  useSelectedModel,
 } from './chatCompletionClient';
 import {MagicButton} from './MagicButton';
 
@@ -51,10 +52,6 @@ export interface MagicTooltipProps {
    */
   contentToRevise?: string;
   /**
-   * Model ID to use (defaults to gpt-4o-mini).
-   */
-  modelId?: string;
-  /**
    * Whether to show model selector dropdown.
    */
   showModelSelector?: boolean;
@@ -83,24 +80,34 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   systemPrompt,
   placeholder = 'Describe what you need...',
   contentToRevise,
-  modelId: defaultModelId = 'gpt-4o-mini',
-  showModelSelector = false,
+  showModelSelector = true,
   width = 350,
   textareaLines = 7,
 }) => {
   const chatCompletionStream = useChatCompletionStream(entityProject);
   const availableModels = useAvailableModels(entityProject);
+  const {selectedModel, setSelectedModel} = useSelectedModel();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [userInstructions, setUserInstructions] = useState('');
-  const [selectedModelId, setSelectedModelId] = useState(defaultModelId);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [modelSearchQuery, setModelSearchQuery] = useState('');
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const modelInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Update selected model when prop changes
-  useEffect(() => {
-    setSelectedModelId(defaultModelId);
-  }, [defaultModelId]);
+  // Filter models based on search query
+  const filteredModels = modelSearchQuery
+    ? availableModels.filter(
+        model =>
+          model.name.toLowerCase().includes(modelSearchQuery.toLowerCase()) ||
+          model.id.toLowerCase().includes(modelSearchQuery.toLowerCase())
+      )
+    : availableModels;
+
+  // Get current model name
+  const currentModelName =
+    availableModels.find(m => m.id === selectedModel)?.name || selectedModel;
 
   // Focus textarea when opened
   useEffect(() => {
@@ -123,6 +130,8 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     if (!anchorEl) {
       const timeout = setTimeout(() => {
         setUserInstructions('');
+        setModelSearchQuery('');
+        setShowModelDropdown(false);
         if (abortControllerRef.current && !isGenerating) {
           abortControllerRef.current.abort();
           abortControllerRef.current = null;
@@ -195,9 +204,8 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
 
       await chatCompletionStream(
         {
-          modelId: selectedModelId,
+          modelId: selectedModel,
           messages,
-          temperature: 0.7,
         },
         onChunk
       );
@@ -272,17 +280,52 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
             style={{width: `${width}px`}}>
             {/* Model selector (if enabled) */}
             {showModelSelector && (
-              <select
-                className="border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400 mb-3 w-full rounded border bg-transparent px-2 py-1 text-xs"
-                value={selectedModelId}
-                onChange={e => setSelectedModelId(e.target.value)}
-                disabled={isGenerating}>
-                {availableModels.map(model => (
-                  <option key={model.id} value={model.id}>
-                    {model.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative mb-3">
+                <input
+                  ref={modelInputRef}
+                  type="text"
+                  value={
+                    showModelDropdown ? modelSearchQuery : currentModelName
+                  }
+                  onChange={e => setModelSearchQuery(e.target.value)}
+                  onFocus={() => {
+                    setShowModelDropdown(true);
+                    setModelSearchQuery('');
+                  }}
+                  onBlur={() => {
+                    // Delay to allow click on dropdown
+                    setTimeout(() => {
+                      setShowModelDropdown(false);
+                      setModelSearchQuery('');
+                    }, 200);
+                  }}
+                  placeholder="Select a model..."
+                  className="border-gray-200 py-1.5 text-gray-600 dark:border-gray-700 dark:text-gray-400 w-full rounded border bg-transparent px-3 text-xs focus:border-blue-500 focus:outline-none"
+                  disabled={isGenerating}
+                />
+
+                {showModelDropdown && filteredModels.length > 0 && (
+                  <div className="border-gray-200 dark:border-gray-700 dark:bg-gray-800 absolute left-0 right-0 top-full mt-1 max-h-48 overflow-auto rounded border bg-white shadow-lg">
+                    {filteredModels.map(model => (
+                      <button
+                        key={model.id}
+                        className="py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 block w-full px-3 text-left text-xs"
+                        onClick={() => {
+                          setSelectedModel(model.id);
+                          setShowModelDropdown(false);
+                          setModelSearchQuery('');
+                        }}>
+                        <div className="text-gray-700 dark:text-gray-300 font-medium">
+                          {model.name}
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-400">
+                          {model.provider} • {model.id}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Text area */}

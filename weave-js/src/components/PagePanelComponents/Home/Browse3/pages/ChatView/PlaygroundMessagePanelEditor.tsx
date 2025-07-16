@@ -65,8 +65,16 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setEditorHeight(null);
   };
 
+  const [isEditable, setIsEditable] = useState(true);
+
   const handleMagicStream = (content: string, isComplete: boolean) => {
-    setEditedContent(content);
+    if (!isComplete) {
+      setIsEditable(false);
+      setEditedContent(content + '█');
+    } else {
+      setEditedContent(content);
+      setIsEditable(true);
+    }
   };
 
   return (
@@ -79,6 +87,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
         value={editedContent}
         onChange={e => setEditedContent(e.target.value)}
         startHeight={320}
+        disabled={!isEditable}
       />
       {/* 6px vs. 8px to make up for extra padding from textarea field */}
       <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
