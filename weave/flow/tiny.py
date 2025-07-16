@@ -78,27 +78,15 @@ async def run_all_evaluations(dataset: Any, models: list[Model], scorer: Scorer)
     # Run all evaluations concurrently
     results = await asyncio.gather(*evaluation_tasks, return_exceptions=True)
     # results is now a list of URIs
-    evaluations = [get_eval_id_by_uri(uri, client) for uri in results] # this should be broadcast to be faster
+    evaluations = [get_eval_by_uri(uri, client) for uri in results] # this should be broadcast to be faster
 
-    eval_results = {eval: get_eval_results_by_eval_parent(eval, client) for eval in evaluations}
+    eval_results = {eval.id: get_results_in_sorted_order(eval, scorer.name, client) for eval in evaluations}
 
     client.finish()
     return eval_results
 
 
-def get_eval_results_by_eval_parent(call: WeaveObject, client: WeaveClient) -> list[WeaveObject]:
-    """for some reason this doesn't work but the notebook version does."""
-    # calls = client.get_calls(
-    #     filter={"op_names": ["weave:///wandb-designers/winston/op/Evaluation.predict_and_score:ko2eSDI8Yk3HVI59k09zq3Dg12fdNZxI4V6XeeZ2XsI"],"parent_ids": [call.id]},
-    #     sort_by=[{"field":"started_at","direction":"desc"}],
-    # )
-    calls = client.get_calls(
-        filter={"parent_ids": [call.id]},
-        sort_by=[{"field":"started_at","direction":"desc"}],
-    )
-    return [x for x in calls if "predict_and_score" in x.op_name]
-
-def get_eval_id_by_uri(uri: str, client: WeaveClient) -> WeaveObject:
+def get_eval_by_uri(uri: str, client: WeaveClient) -> WeaveObject:
     """
     Get the eval id from the uri.
     """
@@ -109,10 +97,16 @@ def get_eval_id_by_uri(uri: str, client: WeaveClient) -> WeaveObject:
     )
     return calls[0]
 
-def get_results_in_sorted_order(eval_result_calls: list[WeaveObject], scorer_name: str) -> list[WeaveObject]:
+def get_results_in_sorted_order(eval: WeaveObject, scorer_name: str, client: WeaveClient) -> list[WeaveObject]:
     """
     Get the results in sorted order.
     """
+    calls = client.get_calls(
+        filter={"parent_ids": [eval.id]},
+        sort_by=[{"field":"started_at","direction":"desc"}],
+    )
+    eval_result_calls = [x for x in calls if "predict_and_score" in x.op_name] # TODO: this is a hack
+    
     # first I sort the call_order:
     calls_ordered = sorted(eval_result_calls, key=lambda x: x.inputs.unwrap()['example']['_uuid'])
     # then I get the results in the same order:
