@@ -363,10 +363,10 @@ export const WeaveOnlyOverviewInner: React.FC<{
                   <div
                     key={config.id}
                     data-grid={usedLayout}
-                    className="rounded border border-moon-300 bg-white p-4">
-                    <div className="flex gap-4">
+                    className="flex items-center justify-center ">
+                    <div className="flex h-[calc(100%-8px)] w-[calc(100%-8px)] gap-4 rounded border border-moon-300 bg-white p-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm">Project visibility</span>
+                        <span className="text-sm">Project visibility: </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <ProjectAccessItem
@@ -382,10 +382,15 @@ export const WeaveOnlyOverviewInner: React.FC<{
                   <div
                     key={config.id}
                     data-grid={usedLayout}
-                    className="rounded border border-moon-300 bg-white p-4">
-                    <div className="flex gap-4">
+                    className="flex items-center justify-center ">
+                    <div
+                      className="flex gap-4 rounded border border-moon-300 bg-white p-4"
+                      style={{
+                        width: 'calc(100% - 8px)',
+                        height: 'calc(100% - 8px)',
+                      }}>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm">Owner</span>
+                        <span className="text-sm">Owner </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <UserLinkItem user={project.user}></UserLinkItem>
@@ -398,13 +403,16 @@ export const WeaveOnlyOverviewInner: React.FC<{
                   <div
                     key={config.id}
                     data-grid={usedLayout}
-                    className="rounded border border-moon-300 bg-white p-4">
+                    className="flex w-full items-center justify-center">
                     <StatsWidget project={project} />
                   </div>
                 );
               } else if (config.type === 'userTraceCountsChart') {
                 return (
-                  <div key={config.id} data-grid={usedLayout}>
+                  <div
+                    key={config.id}
+                    data-grid={usedLayout}
+                    className="flex w-full items-center justify-center">
                     <UserTraceCountsChart
                       project={project}
                       widgetConfigs={widgetConfigs}
@@ -421,7 +429,10 @@ export const WeaveOnlyOverviewInner: React.FC<{
                 );
               } else if (config.type === 'chart' && config.chartConfig) {
                 return (
-                  <div key={config.id} data-grid={usedLayout}>
+                  <div
+                    key={config.id}
+                    data-grid={usedLayout}
+                    className="flex items-center justify-center">
                     <CallChartsWidget
                       key={config.id}
                       callData={callData}
@@ -603,7 +614,12 @@ const StatsWidget: React.FC<StatsWidgetProps> = ({project}) => {
       {projectStatsError ? (
         <p className="text-red-500">Error loading storage sizes</p>
       ) : (
-        <div className="grid w-min grid-cols-[150px_1fr] [&>*:nth-child(odd)]:text-moon-400">
+        <div
+          className="grid grid-cols-[150px_1fr] rounded border border-moon-300 bg-white p-4 [&>*:nth-child(odd)]:text-moon-400"
+          style={{
+            width: 'calc(100% - 8px)',
+            height: 'calc(100% - 8px)',
+          }}>
           <div>Total traces</div>
           <div>{traceCount}</div>
           <div>Traces ingestion size</div>
@@ -645,28 +661,30 @@ const CallChartsWidget: React.FC<{
   const baseTitle = yField ? yField.label : chart.yAxis;
   const chartTitle = baseTitle;
   return (
-    <Chart
-      key={chart.id}
-      data={callData}
-      height={32 * 9}
-      xAxis={chart.xAxis}
-      yAxis={chart.yAxis}
-      plotType={chart.plotType || 'scatter'}
-      binCount={chart.binCount}
-      aggregation={chart.aggregation}
-      title={chartTitle}
-      customName={chart.customName}
-      chartId={chart.id}
-      entity={entity}
-      project={project}
-      groupKeys={chart.groupKeys}
-      isLoading={isLoading}
-      onRemove={() => {
-        console.log('remove', index);
-        setWidgets(widgets.filter((_, i) => i !== index));
-      }}
-      filter={filter}
-    />
+    <div className=" w-[calc(100%-8px)]">
+      <Chart
+        key={chart.id}
+        data={callData}
+        height={280}
+        xAxis={chart.xAxis}
+        yAxis={chart.yAxis}
+        plotType={chart.plotType || 'scatter'}
+        binCount={chart.binCount}
+        aggregation={chart.aggregation}
+        title={chartTitle}
+        customName={chart.customName}
+        chartId={chart.id}
+        entity={entity}
+        project={project}
+        groupKeys={chart.groupKeys}
+        isLoading={isLoading}
+        onRemove={() => {
+          console.log('remove', index);
+          setWidgets(widgets.filter((_, i) => i !== index));
+        }}
+        filter={filter}
+      />
+    </div>
   );
 };
 
@@ -696,8 +714,8 @@ const UserTraceCountsChart: React.FC<UserTraceCountsChartProps> = ({
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [isChartHovered, setIsChartHovered] = React.useState(false);
   const [hintValue, setHintValue] = React.useState<any>(null);
-  const chartHeight = isFullscreen ? window.innerHeight : 32 * 9;
-  const chartWidth = isFullscreen ? window.innerWidth : null;
+  const chartHeight = isFullscreen ? window.innerHeight : 280;
+  const chartWidth = isFullscreen ? window.innerWidth : 'calc(100% - 8px)';
 
   // Prepare data for react-vis
   const barData = userTraceCountsData.map(d => ({
