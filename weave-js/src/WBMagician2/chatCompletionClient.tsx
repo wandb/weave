@@ -9,14 +9,11 @@ import React, {
 
 import {useLLMDropdownOptions} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/PlaygroundChat/LLMDropdownOptions';
 import {useConfiguredProviders} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/useConfiguredProviders';
-import {
-  useBaseObjectInstances,
-  useLeafObjectInstances,
-} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/objectClassQuery';
+import {useBaseObjectInstances} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/objectClassQuery';
 import {TraceServerClient} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
 
-const DEFAULT_MODEL = 'gpt-4o-mini';
+const DEFAULT_MODEL = 'coreweave/moonshotai/Kimi-K2-Instruct';
 
 export type Message = {
   role: 'user' | 'assistant' | 'system';
@@ -515,7 +512,9 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
  * @param entityProject Optional entity/project override
  * @returns List of available models
  */
-export const useAvailableModels = (entityProject?: EntityProject): Array<{id: string; name: string; provider: string}> => {
+export const useAvailableModels = (
+  entityProject?: EntityProject
+): Array<{id: string; name: string; provider: string}> => {
   const entityProjectContext = useEntityProjectContext();
   const {entity, project} = useMemo(() => {
     if (entityProject) {
@@ -530,21 +529,17 @@ export const useAvailableModels = (entityProject?: EntityProject): Array<{id: st
   const projectId = entity && project ? `${entity}/${project}` : null;
 
   // Get configured providers
-  const {
-    result: configuredProviders,
-    loading: configuredProvidersLoading,
-  } = useConfiguredProviders(entity);
+  const {result: configuredProviders, loading: configuredProvidersLoading} =
+    useConfiguredProviders(entity);
 
   // Get custom providers and models
-  const {
-    result: customProvidersResult,
-    loading: customProvidersLoading,
-  } = useBaseObjectInstances('Provider', {
-    project_id: projectId || '',
-    filter: {
-      latest_only: true,
-    },
-  });
+  const {result: customProvidersResult, loading: customProvidersLoading} =
+    useBaseObjectInstances('Provider', {
+      project_id: projectId || '',
+      filter: {
+        latest_only: true,
+      },
+    });
 
   const {
     result: customProviderModelsResult,
@@ -557,10 +552,11 @@ export const useAvailableModels = (entityProject?: EntityProject): Array<{id: st
   });
 
   // Get saved models
-  const {result: savedModelsResult, loading: savedModelsLoading} =
-    useLeafObjectInstances('LLMStructuredCompletionModel', {
-      project_id: projectId || '',
-    });
+  // Disallow saved models for now here
+  // const {result: savedModelsResult, loading: savedModelsLoading} =
+  //   useLeafObjectInstances('LLMStructuredCompletionModel', {
+  //     project_id: projectId || '',
+  //   });
 
   // Get dropdown options
   const llmDropdownOptions = useLLMDropdownOptions(
@@ -569,8 +565,10 @@ export const useAvailableModels = (entityProject?: EntityProject): Array<{id: st
     customProvidersResult || [],
     customProviderModelsResult || [],
     customProvidersLoading || customProviderModelsLoading,
-    savedModelsResult || [],
-    savedModelsLoading
+    [],
+    false
+    // savedModelsResult || [],
+    // savedModelsLoading
   );
 
   // Transform dropdown options to our simpler format
@@ -603,6 +601,8 @@ export const useAvailableModels = (entityProject?: EntityProject): Array<{id: st
         });
       }
     });
+
+    console.log('models', models);
 
     return models;
   }, [llmDropdownOptions]);
