@@ -2,10 +2,12 @@ import {Alert} from '@mui/material';
 import Markdown from '@wandb/weave/common/components/Markdown';
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
+import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import {MagicButton, MagicTooltip} from '@wandb/weave/WBMagician2';
+import copyToClipboard from 'copy-to-clipboard';
 import React, {FC, useEffect, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
@@ -32,13 +34,14 @@ const Header = styled.div`
   border-bottom: 1px solid ${Colors.MOON_200};
   flex-shrink: 0;
   flex-direction: row;
+  height: 52px;
 `;
 
 const EmptyStateContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  flex: 1;
   width: 100%;
 `;
 
@@ -65,6 +68,8 @@ const ContentContainer = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  display: flex;
+  flex-direction: column;
 `;
 
 const MarkdownContainer = styled.div`
@@ -132,49 +137,42 @@ const MarkdownContainer = styled.div`
   }
 `;
 
-const VersionControls = styled.div`
+const Footer = styled.div`
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-right: 16px;
-`;
-
-const VersionButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: 1px solid ${Colors.MOON_300};
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-top: 1px solid ${Colors.MOON_200};
+  flex-shrink: 0;
   background: white;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover:not(:disabled) {
-    background: ${Colors.MOON_100};
-    border-color: ${Colors.MOON_400};
-  }
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
+  height: 52px;
 `;
 
-const VersionText = styled.span`
+const PaginationContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const PaginationText = styled.span`
   font-size: 14px;
-  color: ${Colors.MOON_600};
-  min-width: 80px;
-  text-align: center;
+  font-weight: 400;
+  color: ${Colors.MOON_500};
+  min-width: 90px;
+  display: flex;
+  justify-content: center;
 `;
 
 export const MagicEvaluationAnalysisTab: FC<{
   entity: string;
   project: string;
   evaluationCallId: string;
-}> = (props) => {
-  return <Tailwind><MagicEvaluationAnalysisTabInner {...props} /></Tailwind>;
+}> = props => {
+  return (
+    <Tailwind style={{height: '100%'}}>
+      <MagicEvaluationAnalysisTabInner {...props} />
+    </Tailwind>
+  );
 };
 
 const MagicEvaluationAnalysisTabInner: FC<{
@@ -196,6 +194,7 @@ const MagicEvaluationAnalysisTabInner: FC<{
   const [isLoading, setIsLoading] = useState(true);
   const [allFeedbacks, setAllFeedbacks] = useState<Feedback[]>([]);
   const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const getTsClient = useGetTraceServerClientContext();
 
@@ -273,7 +272,7 @@ const MagicEvaluationAnalysisTabInner: FC<{
           evaluationCallId,
           content
         );
-        
+
         // Reload feedbacks to include the new one
         const updatedFeedbacks = await getMagicAnalysis(
           client,
@@ -312,13 +311,29 @@ const MagicEvaluationAnalysisTabInner: FC<{
     }
   };
 
+  const handleCopyFeedback = () => {
+    if (allFeedbacks.length > 0 && allFeedbacks[currentVersionIndex]) {
+      const currentFeedback = allFeedbacks[currentVersionIndex];
+      const feedbackData = currentFeedback.payload['analysis'];
+      const success = copyToClipboard(feedbackData);
+      if (success) {
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      }
+    }
+  };
+
   // Loading state
   if (isLoading) {
     return (
       <Container>
-        <EmptyStateContainer>
+        <Header style={{borderBottom: 'none'}} />
+        <ContentContainer>
+          <EmptyStateContainer>
             <div className="text-moon-600">Loading analysis...</div>
-        </EmptyStateContainer>
+          </EmptyStateContainer>
+        </ContentContainer>
+        <Footer style={{borderTop: 'none'}} />
       </Container>
     );
   }
@@ -327,37 +342,45 @@ const MagicEvaluationAnalysisTabInner: FC<{
   if (!magicSummary && !isGenerating && !error) {
     return (
       <Container>
-        <EmptyStateContainer>
-          <EmptyStateContent>
-            <IconCircle>
-              <Icon name="magic-wand-star" size={32} color={Colors.TEAL_500} />
-            </IconCircle>
+        <Header style={{borderBottom: 'none'}} />
+        <ContentContainer>
+          <EmptyStateContainer>
+            <EmptyStateContent>
+              <IconCircle>
+                <Icon
+                  name="magic-wand-star"
+                  size={32}
+                  color={Colors.TEAL_500}
+                />
+              </IconCircle>
 
-            <Tailwind>
-              <h2 className="mb-3 text-2xl font-semibold text-moon-800">
-                Generate Evaluation Analysis
-              </h2>
+              <Tailwind>
+                <h2 className="mb-3 text-2xl font-semibold text-moon-800">
+                  Generate Evaluation Analysis
+                </h2>
 
-              <p className="mb-6 text-moon-600">
-                Use AI to analyze this evaluation run and generate insights
-                about model performance, patterns, and potential improvements.
-              </p>
+                <p className="mb-6 text-moon-600">
+                  Use AI to analyze this evaluation run and generate insights
+                  about model performance, patterns, and potential improvements.
+                </p>
 
-              <MagicTooltip
-                onStream={handleMagicStream}
-                onError={handleError}
-                systemPrompt={systemPrompt}
-                placeholder="Ask specific questions about the evaluation results, or leave empty for a comprehensive analysis..."
-                showModelSelector={true}
-                width={450}
-                textareaLines={6}>
-                <MagicButton size="large" icon="magic-wand-star">
-                  Generate Analysis
-                </MagicButton>
-              </MagicTooltip>
-            </Tailwind>
-          </EmptyStateContent>
-        </EmptyStateContainer>
+                <MagicTooltip
+                  onStream={handleMagicStream}
+                  onError={handleError}
+                  systemPrompt={systemPrompt}
+                  placeholder="Ask specific questions about the evaluation results, or leave empty for a comprehensive analysis..."
+                  showModelSelector={true}
+                  width={450}
+                  textareaLines={6}>
+                  <MagicButton size="large" icon="magic-wand-star">
+                    Generate Analysis
+                  </MagicButton>
+                </MagicTooltip>
+              </Tailwind>
+            </EmptyStateContent>
+          </EmptyStateContainer>
+        </ContentContainer>
+        <Footer style={{borderTop: 'none'}} />
       </Container>
     );
   }
@@ -368,7 +391,6 @@ const MagicEvaluationAnalysisTabInner: FC<{
       <Header>
         <div className="flex items-center gap-3">
           <p
-
             style={{
               fontWeight: 600,
               marginRight: 10,
@@ -379,24 +401,6 @@ const MagicEvaluationAnalysisTabInner: FC<{
         </div>
 
         <div className="flex items-center gap-2">
-          {allFeedbacks.length > 1 && (
-            <VersionControls>
-              <VersionButton
-                onClick={handlePreviousVersion}
-                disabled={currentVersionIndex >= allFeedbacks.length - 1}>
-                <Icon name="chevron-back" size={16} />
-              </VersionButton>
-              <VersionText>
-                {allFeedbacks.length - currentVersionIndex} of {allFeedbacks.length}
-              </VersionText>
-              <VersionButton
-                onClick={handleNextVersion}
-                disabled={currentVersionIndex <= 0}>
-                <Icon name="chevron-next" size={16} />
-              </VersionButton>
-            </VersionControls>
-          )}
-          
           {isGenerating ? (
             <span className="text-sm text-moon-500">Generating...</span>
           ) : (
@@ -429,6 +433,44 @@ const MagicEvaluationAnalysisTabInner: FC<{
           <Markdown content={magicSummary || ''} />
         </MarkdownContainer>
       </ContentContainer>
+
+      <Footer>
+        {allFeedbacks.length > 0 ? (
+          <>
+            <PaginationContainer>
+              <Button
+                variant="ghost"
+                size="medium"
+                onClick={handlePreviousVersion}
+                disabled={currentVersionIndex >= allFeedbacks.length - 1}
+                icon="chevron-back"
+              />
+              <PaginationText>
+                {allFeedbacks.length - currentVersionIndex} of{' '}
+                {allFeedbacks.length} versions
+              </PaginationText>
+              <Button
+                variant="ghost"
+                size="medium"
+                onClick={handleNextVersion}
+                disabled={currentVersionIndex <= 0}
+                icon="chevron-next"
+              />
+            </PaginationContainer>
+
+            <Button
+              variant="ghost"
+              size="medium"
+              onClick={handleCopyFeedback}
+              icon={copySuccess ? 'checkmark' : 'copy'}
+              tooltip={copySuccess ? 'Copied!' : 'Copy raw feedback'}>
+              {copySuccess ? 'Copied' : 'Copy'}
+            </Button>
+          </>
+        ) : (
+          <div />
+        )}
+      </Footer>
     </Container>
   );
 };

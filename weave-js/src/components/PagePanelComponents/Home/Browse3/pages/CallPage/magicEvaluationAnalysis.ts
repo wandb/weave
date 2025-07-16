@@ -144,8 +144,8 @@ const prepareEvaluationContextForLLM = (results: EvaluationComparisonState) => {
  */
 const simplifyEvaluationResults = (results: EvaluationComparisonState) => {
   const simplified: any = {
-    metrics: {},      // Overall performance metrics
-    examples: [],     // Individual test cases with scores
+    metrics: {}, // Overall performance metrics
+    examples: [], // Individual test cases with scores
   };
 
   let totalRows = 0;
