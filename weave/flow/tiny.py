@@ -76,7 +76,7 @@ async def run_all_evaluations(dataset: Any, models: list[Model], scorer: Scorer)
     eval_target = evaluations[-1]
     eval_dict = {call.inputs['self'].name : call for call in eval_target.evaluate.calls()}
     # for every eval in the eval_dict get all the child calls:
-    train_da_fool_input = {eval_id : get_results_in_sorted_order(eval, scorer.__name__, client) for eval_id, eval in eval_dict.items()}
+    train_da_fool_input = {eval_id : get_results_in_sorted_order(eval, type(scorer).__name__, client) for eval_id, eval in eval_dict.items()}
     client.finish()
     return train_da_fool_input
 
