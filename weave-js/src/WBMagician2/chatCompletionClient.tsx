@@ -7,6 +7,12 @@ import React, {
   useState,
 } from 'react';
 
+import {useLLMDropdownOptions} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/PlaygroundChat/LLMDropdownOptions';
+import {useConfiguredProviders} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/useConfiguredProviders';
+import {
+  useBaseObjectInstances,
+  useLeafObjectInstances,
+} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/objectClassQuery';
 import {TraceServerClient} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
 
@@ -509,20 +515,95 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
  * @param entityProject Optional entity/project override
  * @returns List of available models
  */
-export const useAvailableModels = (entityProject?: EntityProject) => {
-  // For now, return a static list of models
-  // In the future, this should fetch from an API endpoint
-  return useMemo(
-    () => [
-      {id: 'gpt-4o-mini', name: 'GPT-4 Mini', provider: 'openai'},
-      {id: 'gpt-4', name: 'GPT-4', provider: 'openai'},
-      {id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'openai'},
-      {id: 'claude-3-opus', name: 'Claude 3 Opus', provider: 'anthropic'},
-      {id: 'claude-3-sonnet', name: 'Claude 3 Sonnet', provider: 'anthropic'},
-      {id: 'claude-3-haiku', name: 'Claude 3 Haiku', provider: 'anthropic'},
-      {id: 'llama-3-70b', name: 'Llama 3 70B', provider: 'coreweave'},
-      {id: 'llama-3-8b', name: 'Llama 3 8B', provider: 'coreweave'},
-    ],
-    []
+export const useAvailableModels = (entityProject?: EntityProject): Array<{id: string; name: string; provider: string}> => {
+  const entityProjectContext = useEntityProjectContext();
+  const {entity, project} = useMemo(() => {
+    if (entityProject) {
+      return entityProject;
+    }
+    if (entityProjectContext) {
+      return entityProjectContext;
+    }
+    return {entity: '', project: ''};
+  }, [entityProject, entityProjectContext]);
+
+  const projectId = entity && project ? `${entity}/${project}` : null;
+
+  // Get configured providers
+  const {
+    result: configuredProviders,
+    loading: configuredProvidersLoading,
+  } = useConfiguredProviders(entity);
+
+  // Get custom providers and models
+  const {
+    result: customProvidersResult,
+    loading: customProvidersLoading,
+  } = useBaseObjectInstances('Provider', {
+    project_id: projectId || '',
+    filter: {
+      latest_only: true,
+    },
+  });
+
+  const {
+    result: customProviderModelsResult,
+    loading: customProviderModelsLoading,
+  } = useBaseObjectInstances('ProviderModel', {
+    project_id: projectId || '',
+    filter: {
+      latest_only: true,
+    },
+  });
+
+  // Get saved models
+  const {result: savedModelsResult, loading: savedModelsLoading} =
+    useLeafObjectInstances('LLMStructuredCompletionModel', {
+      project_id: projectId || '',
+    });
+
+  // Get dropdown options
+  const llmDropdownOptions = useLLMDropdownOptions(
+    configuredProviders || {},
+    configuredProvidersLoading,
+    customProvidersResult || [],
+    customProviderModelsResult || [],
+    customProvidersLoading || customProviderModelsLoading,
+    savedModelsResult || [],
+    savedModelsLoading
   );
+
+  // Transform dropdown options to our simpler format
+  return useMemo(() => {
+    const models: Array<{id: string; name: string; provider: string}> = [];
+
+    llmDropdownOptions.forEach(providerOption => {
+      if (providerOption.llms) {
+        providerOption.llms.forEach(llm => {
+          models.push({
+            id: llm.value,
+            name: llm.label as string,
+            provider: providerOption.label as string,
+          });
+        });
+      }
+
+      // Handle nested providers (for saved models)
+      if (providerOption.providers) {
+        providerOption.providers.forEach(nestedProvider => {
+          if (nestedProvider.llms) {
+            nestedProvider.llms.forEach(llm => {
+              models.push({
+                id: llm.value,
+                name: llm.label as string,
+                provider: nestedProvider.label as string,
+              });
+            });
+          }
+        });
+      }
+    });
+
+    return models;
+  }, [llmDropdownOptions]);
 };
