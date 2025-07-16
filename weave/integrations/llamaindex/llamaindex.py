@@ -452,8 +452,6 @@ if not _import_failed:
                                 )
 
                         gc.finish_call(span_call, outputs, exception=deferred_err)
-                    else:
-                        pass
                 else:
                     # Parent: span call or global root
                     parent_call_for_event = _weave_calls_map.get(event.span_id)
