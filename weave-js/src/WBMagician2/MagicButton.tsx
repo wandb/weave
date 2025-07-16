@@ -8,11 +8,6 @@ export interface MagicButtonProps extends Omit<ButtonProps, 'startIcon'> {
    */
   state?: 'default' | 'tooltipOpen' | 'generating' | 'error';
   /**
-   * Whether the button is in a loading/generating state.
-   * @deprecated Use state="generating" instead
-   */
-  isGenerating?: boolean;
-  /**
    * Callback when clicked during generation (acts as cancel).
    */
   onCancel?: () => void;
@@ -31,7 +26,6 @@ export interface MagicButtonProps extends Omit<ButtonProps, 'startIcon'> {
  */
 export const MagicButton: React.FC<MagicButtonProps> = ({
   state = 'default',
-  isGenerating = false,
   onCancel,
   iconOnly = false,
   children,
@@ -42,8 +36,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   variant = 'ghost',
   ...restProps
 }) => {
-  // Support legacy isGenerating prop
-  const currentState = isGenerating ? 'generating' : state;
+  const currentState = state
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (currentState === 'generating' && onCancel) {

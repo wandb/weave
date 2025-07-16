@@ -98,9 +98,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
                 'Describe the system prompt you want to create - for example: "A system prompt for a LLM that can help me build a new website."'
               }>
               <MagicButton
-                variant="outline"
                 size="medium"
-                iconOnly
               />
             </MagicTooltip>
             
