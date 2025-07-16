@@ -7,6 +7,7 @@ try:
     from weave.scorers.coherence_scorer import WeaveCoherenceScorerV1
     from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorerV1
     from weave.scorers.fluency_scorer import WeaveFluencyScorerV1
+    from weave.scorers.tiny import TinyWrapScorer
     from weave.scorers.hallucination_scorer import (
         HallucinationFreeScorer,
         WeaveHallucinationScorerV1,
@@ -52,6 +53,7 @@ __all__ = [
     "PydanticScorer",
     "StringMatchScorer",
     "SummarizationScorer",
+    "TinyWrapScorer",
     "ValidJSONScorer",
     "ValidXMLScorer",
     "WeaveBiasScorerV1",
