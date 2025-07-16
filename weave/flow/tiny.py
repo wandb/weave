@@ -23,7 +23,7 @@ async def _run_evaluation_for_model(
     model: Model, 
     dataset: Any,
     scorer: Scorer,
-) -> str:
+) -> str | None:
     """
     Run evaluation for a single model.
     
