@@ -303,6 +303,7 @@ select = [
   "RUF013",  # https://docs.astral.sh/ruff/rules/implicit-optional/
   "RUF015",  # https://docs.astral.sh/ruff/rules/unnecessary-iterable-allocation-for-first-element/
   "RUF018",  # https://docs.astral.sh/ruff/rules/assignment-in-assert/
+  "RUF019",  # https://docs.astral.sh/ruff/rules/unnecessary-key-check/
   "RUF022",  # https://docs.astral.sh/ruff/rules/unsorted-dunder-all/
   "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
   "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
