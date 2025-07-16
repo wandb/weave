@@ -57,14 +57,16 @@ Simplified tooltip for AI-assisted content generation:
 3. **Minimal UI**: Dead-simple design, no unnecessary styling
 4. **Parent Control**: Parent components orchestrate content display and further actions
 5. **Flexibility**: Support multiple models and providers transparently
+6. **State Encapsulation**: UI components manage their own state internally - no state leakage to parent
 
 ## 📋 Implementation Plan
 
 ### Phase 1: Core Simplification ✅
 - [x] Remove MagicDialog/MagicFill components (no longer needed)
-- [ ] Simplify MagicTooltip to minimal design
-- [ ] Update MagicButton to support new states
-- [ ] Add model selection to tooltip
+- [x] Simplify MagicTooltip to minimal design
+- [x] Update MagicButton to support new states
+- [x] Add model selection to tooltip
+- [x] Refactor MagicTooltip to manage all UI state internally
 
 ### Phase 2: API Enhancement
 - [ ] Add `useAvailableModels` hook
@@ -85,36 +87,21 @@ Simplified tooltip for AI-assisted content generation:
 import { MagicTooltip, MagicButton } from '@/WBMagician2';
 
 function MyComponent() {
-  const [anchorEl, setAnchorEl] = useState(null);
   const [content, setContent] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleStream = (chunk: string, isComplete: boolean) => {
     setContent(chunk);
-    if (isComplete) {
-      setIsGenerating(false);
-      setAnchorEl(null);
-    }
   };
 
   return (
     <>
-      <MagicButton
-        onClick={(e) => setAnchorEl(e.currentTarget)}
-        isGenerating={isGenerating}
-        state={anchorEl ? 'tooltipOpen' : 'default'}
-      >
-        Generate
-      </MagicButton>
-      
       <MagicTooltip
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={() => setAnchorEl(null)}
         onStream={handleStream}
         systemPrompt="You are a helpful assistant..."
         placeholder="What would you like to generate?"
-      />
+      >
+        <MagicButton>Generate</MagicButton>
+      </MagicTooltip>
       
       {content && <div>{content}</div>}
     </>
@@ -169,15 +156,15 @@ For developers migrating from MagicFill/MagicDialog:
 ### MagicTooltip Props
 ```typescript
 interface MagicTooltipProps {
-  anchorEl: HTMLElement | null;
-  open: boolean;
-  onClose: () => void;
+  children: React.ReactElement; // Trigger element (typically MagicButton)
   onStream: (content: string, isComplete: boolean) => void;
   onError?: (error: Error) => void;
   systemPrompt: string;
   placeholder?: string;
+  contentToRevise?: string;
   modelId?: string;
   showModelSelector?: boolean;
+  entityProject?: EntityProject;
 }
 ```
 

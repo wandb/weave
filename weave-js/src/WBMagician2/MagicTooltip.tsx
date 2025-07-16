@@ -1,15 +1,15 @@
+import React, {cloneElement, isValidElement, useEffect, useRef, useState} from 'react';
 import {Popover} from '@mui/material';
-import React, {useEffect, useRef, useState} from 'react';
-
-import {Button} from '../components/Button';
-import {Tailwind} from '../components/Tailwind';
 import {
   Chunk,
   EntityProject,
   Message,
-  useAvailableModels,
   useChatCompletionStream,
+  useAvailableModels,
 } from './chatCompletionClient';
+import {Button} from '../components/Button';
+import {Tailwind} from '../components/Tailwind';
+import {MagicButton} from './MagicButton';
 
 export interface MagicTooltipProps {
   /**
@@ -17,17 +17,10 @@ export interface MagicTooltipProps {
    */
   entityProject?: EntityProject;
   /**
-   * Reference element to attach the tooltip to.
+   * Trigger element - typically a MagicButton.
+   * Will be cloned with appropriate props for state management.
    */
-  anchorEl: HTMLElement | null;
-  /**
-   * Whether the tooltip is open.
-   */
-  open: boolean;
-  /**
-   * Callback when the tooltip should close.
-   */
-  onClose: () => void;
+  children: React.ReactElement;
   /**
    * Callback for streaming content as it's generated.
    * @param content The content chunk
@@ -62,16 +55,14 @@ export interface MagicTooltipProps {
 
 /**
  * MagicTooltip provides a minimal tooltip interface for AI content generation.
- * It appears attached to an anchor element and streams results to the parent.
- *
+ * It manages all UI state internally and passes appropriate props to the trigger element.
+ * 
  * @param props Tooltip configuration
- * @returns A positioned tooltip component
+ * @returns A tooltip component with trigger
  */
 export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   entityProject,
-  anchorEl,
-  open,
-  onClose,
+  children,
   onStream,
   onError,
   systemPrompt,
@@ -82,6 +73,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
 }) => {
   const chatCompletionStream = useChatCompletionStream(entityProject);
   const availableModels = useAvailableModels(entityProject);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [userInstructions, setUserInstructions] = useState('');
   const [selectedModelId, setSelectedModelId] = useState(defaultModelId);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -95,22 +87,31 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
 
   // Focus textarea when opened
   useEffect(() => {
-    if (open && textareaRef.current) {
+    if (anchorEl && textareaRef.current) {
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
-  }, [open]);
+  }, [anchorEl]);
 
   // Reset state when closed
   useEffect(() => {
-    if (!open) {
+    if (!anchorEl) {
       setUserInstructions('');
-      setIsGenerating(false);
-      if (abortControllerRef.current) {
+      if (abortControllerRef.current && !isGenerating) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
     }
-  }, [open]);
+  }, [anchorEl, isGenerating]);
+
+  const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    if (!isGenerating) {
+      setAnchorEl(null);
+    }
+  };
 
   const handleCancel = () => {
     if (abortControllerRef.current) {
@@ -118,6 +119,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
       abortControllerRef.current = null;
     }
     setIsGenerating(false);
+    setAnchorEl(null);
   };
 
   const handleGenerate = async () => {
@@ -125,12 +127,12 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
 
     setIsGenerating(true);
     abortControllerRef.current = new AbortController();
-
+    
     // Immediately trigger loading state
     onStream('', false);
-
+    
     // Close the tooltip immediately
-    onClose();
+    setAnchorEl(null);
 
     try {
       const messages: Message[] = [
@@ -153,10 +155,10 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
       }
 
       let accumulatedContent = '';
-
+      
       const onChunk = (chunk: Chunk) => {
         if (abortControllerRef.current?.signal.aborted) return;
-
+        
         accumulatedContent += chunk.content;
         onStream(accumulatedContent, false);
       };
@@ -193,68 +195,91 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     }
   };
 
+  // Determine button state
+  const getButtonState = () => {
+    if (isGenerating) return 'generating';
+    if (anchorEl) return 'tooltipOpen';
+    return 'default';
+  };
+
+  // Clone the trigger element with appropriate props
+  const trigger = isValidElement(children)
+    ? cloneElement(children as React.ReactElement<any>, {
+        onClick: isGenerating ? handleCancel : handleOpen,
+        // If it's a MagicButton, pass the state
+        ...(children.type === MagicButton ? {
+          state: getButtonState(),
+          onCancel: handleCancel,
+        } : {}),
+      })
+    : children;
+
   return (
-    <Popover
-      open={open}
-      anchorEl={anchorEl}
-      onClose={isGenerating ? undefined : onClose}
-      anchorOrigin={{
-        vertical: 'bottom',
-        horizontal: 'left',
-      }}
-      transformOrigin={{
-        vertical: 'top',
-        horizontal: 'left',
-      }}
-      disableAutoFocus
-      disableEnforceFocus
-      sx={{
-        '& .MuiPopover-paper': {
-          marginTop: '8px',
-          borderRadius: '8px',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-        },
-      }}>
-      <Tailwind>
-        <div className="dark:bg-gray-900 w-[320px] bg-white p-3">
-          {/* Model selector (if enabled) */}
-          {showModelSelector && (
-            <select
-              className="border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400 mb-2 w-full rounded border bg-transparent px-2 py-1 text-xs"
-              value={selectedModelId}
-              onChange={e => setSelectedModelId(e.target.value)}
-              disabled={isGenerating}>
-              {availableModels.map(model => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* Text area */}
-          <textarea
-            ref={textareaRef}
-            value={userInstructions}
-            onChange={e => setUserInstructions(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            disabled={isGenerating}
-            className="border-gray-200 dark:border-gray-700 h-32 w-full resize-none rounded border bg-transparent p-2 text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50 dark:text-white"
-          />
-
-          {/* Generate button */}
-          <div className="mt-2 flex justify-end">
-            <Button
-              onClick={isGenerating ? handleCancel : handleGenerate}
-              disabled={!isGenerating && !userInstructions.trim()}
-              size="small"
-              variant="primary">
-              {isGenerating ? 'Cancel' : 'Generate'}
-            </Button>
+    <>
+      {trigger}
+      
+      <Popover
+        open={Boolean(anchorEl)}
+        anchorEl={anchorEl}
+        onClose={handleClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        disableAutoFocus
+        disableEnforceFocus
+        sx={{
+          '& .MuiPopover-paper': {
+            marginTop: '8px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+          },
+        }}>
+        <Tailwind>
+          <div className="dark:bg-gray-900 w-[320px] bg-white p-3">
+            {/* Model selector (if enabled) */}
+            {showModelSelector && (
+              <select 
+                className="border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400 mb-2 w-full rounded border bg-transparent px-2 py-1 text-xs"
+                value={selectedModelId}
+                onChange={e => setSelectedModelId(e.target.value)}
+                disabled={isGenerating}>
+                {availableModels.map(model => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            
+            {/* Text area */}
+            <textarea
+              ref={textareaRef}
+              value={userInstructions}
+              onChange={e => setUserInstructions(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              disabled={isGenerating}
+              className="border-gray-200 dark:border-gray-700 h-32 w-full resize-none rounded border bg-transparent p-2 text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50 dark:text-white"
+            />
+            
+            {/* Generate button */}
+            <div className="mt-2 flex justify-end">
+              <Button
+                onClick={isGenerating ? handleCancel : handleGenerate}
+                disabled={!isGenerating && !userInstructions.trim()}
+                size="small"
+                variant="primary">
+                {isGenerating ? 'Cancel' : 'Generate'}
+              </Button>
+            </div>
           </div>
-        </div>
-      </Tailwind>
-    </Popover>
+        </Tailwind>
+      </Popover>
+    </>
   );
 };

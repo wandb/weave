@@ -45,9 +45,6 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setEditedContent(initialContent);
   }, [initialContent]);
 
-  const [magicAnchorEl, setMagicAnchorEl] = useState<HTMLElement | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
   const handleSave = () => {
     if (choiceIndex !== undefined) {
       editChoice?.(choiceIndex, {
@@ -70,23 +67,10 @@ export const PlaygroundMessagePanelEditor: React.FC<
 
   const handleMagicStream = (content: string, isComplete: boolean) => {
     setEditedContent(content);
-    if (isComplete) {
-      setIsGenerating(false);
-    } else {
-      setIsGenerating(true);
-    }
   };
 
   const handleMagicError = (error: Error) => {
     console.error('Magic generation error:', error);
-    setIsGenerating(false);
-  };
-
-  // Determine magic button state
-  const getMagicButtonState = () => {
-    if (isGenerating) return 'generating';
-    if (magicAnchorEl) return 'tooltipOpen';
-    return 'default';
   };
 
   return (
@@ -104,18 +88,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
       <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
         {index === 0 && message.role === 'system' && (
           <>
-            <MagicButton
-              size="medium"
-              onClick={e => setMagicAnchorEl(e.currentTarget)}
-              state={getMagicButtonState()}
-              onCancel={() => setMagicAnchorEl(null)}
-              iconOnly
-            />
-
             <MagicTooltip
-              anchorEl={magicAnchorEl}
-              open={Boolean(magicAnchorEl)}
-              onClose={() => setMagicAnchorEl(null)}
               onStream={handleMagicStream}
               onError={handleMagicError}
               systemPrompt={
@@ -123,9 +96,14 @@ export const PlaygroundMessagePanelEditor: React.FC<
               }
               placeholder={
                 'Describe the system prompt you want to create - for example: "A system prompt for a LLM that can help me build a new website."'
-              }
-            />
-
+              }>
+              <MagicButton
+                variant="outline"
+                size="medium"
+                iconOnly
+              />
+            </MagicTooltip>
+            
             <div className="flex-1"></div>
           </>
         )}
