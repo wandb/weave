@@ -3,7 +3,7 @@ import logging
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
-    InvalidRequest,
+    InvalidRequestError,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ def evaluation_status(
         return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusNotFound())
 
     if "Evaluation.evaluate" not in eval_call.call.op_name:
-        raise InvalidRequest("Call is not an evaluation")
+        raise InvalidRequestError("Call is not an evaluation")
 
     if eval_call.call.exception is not None:
         return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusFailed())
@@ -61,7 +61,7 @@ def evaluation_status(
 
         parsed_eval_def_ref = ri.parse_internal_uri(eval_def_ref)
         if not isinstance(parsed_eval_def_ref, ri.InternalObjectRef):
-            raise InvalidRequest("Evaluation definition is not an Evaluation")
+            raise InvalidRequestError("Evaluation definition is not an Evaluation")
         eval_def_obj = server.obj_read(
             tsi.ObjReadReq(
                 project_id=req.project_id,
@@ -72,7 +72,7 @@ def evaluation_status(
         dataset_ref = eval_def_obj.obj.val["dataset"]
         parsed_dataset_ref = ri.parse_internal_uri(dataset_ref)
         if not isinstance(parsed_dataset_ref, ri.InternalObjectRef):
-            raise InvalidRequest("Dataset is not an object")
+            raise InvalidRequestError("Dataset is not an object")
         dataset_obj = server.obj_read(
             tsi.ObjReadReq(
                 project_id=req.project_id,
@@ -83,7 +83,7 @@ def evaluation_status(
         table_rows_ref = dataset_obj.obj.val["rows"]
         parsed_table_rows_ref = ri.parse_internal_uri(table_rows_ref)
         if not isinstance(parsed_table_rows_ref, ri.InternalTableRef):
-            raise InvalidRequest("Table rows is not a table")
+            raise InvalidRequestError("Table rows is not a table")
         table_rows_stats = server.table_query_stats(
             tsi.TableQueryStatsReq(
                 project_id=req.project_id,

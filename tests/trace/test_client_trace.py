@@ -42,7 +42,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import (
     ENTITY_TOO_LARGE_PAYLOAD,
 )
-from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
+from weave.trace_server.errors import InsertTooLargeError, InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
@@ -3324,11 +3324,11 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
 
     original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
 
-    # Patch _insert_call_batch to raise InsertTooLarge
+    # Patch _insert_call_batch to raise InsertTooLargeError
     def mock_insert_call_batch(self, batch):
         # mock raise insert error
         if len(str(batch)) > 10 * 1024:
-            raise InsertTooLarge(
+            raise InsertTooLargeError(
                 "Database insertion failed. Record too large. "
                 "A likely cause is that a single row or cell exceeded "
                 "the limit. If logging images, save them as `Image.PIL`."
@@ -4452,37 +4452,37 @@ def test_project_stats_clickhouse(client, clickhouse_client):
 
 
 def test_calls_query_with_descendant_error(client):
-    class TestException(Exception):
+    class TestError(Exception):
         pass
 
     @weave.op
     def child_op(val: int):
         if val == 0:
-            raise TestException("Error")
+            raise TestError("Error")
         return val
 
     @weave.op
     def parent_op(val: int):
         if val == 1:
-            raise TestException("Error")
+            raise TestError("Error")
         try:
             return child_op(val)
-        except TestException as e:
+        except TestError as e:
             return val
 
     try:
         parent_op(0)
-    except TestException as e:
+    except TestError as e:
         pass
 
     try:
         parent_op(1)
-    except TestException as e:
+    except TestError as e:
         pass
 
     try:
         parent_op(2)
-    except TestException as e:
+    except TestError as e:
         pass
 
     calls = list(

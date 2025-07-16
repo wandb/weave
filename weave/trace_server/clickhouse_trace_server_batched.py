@@ -72,12 +72,12 @@ from weave.trace_server.clickhouse_schema import (
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
-    InsertTooLarge,
-    InvalidRequest,
+    InsertTooLargeError,
+    InvalidRequestError,
     MissingLLMApiKeyError,
     NotFoundError,
     ObjectDeletedError,
-    RequestTooLarge,
+    RequestTooLargeError,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -602,7 +602,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
-            raise RequestTooLarge(
+            raise RequestTooLargeError(
                 f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
@@ -1831,7 +1831,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.feedback_type == "wandb.reaction.1":
             em = req.payload["emoji"]
             if emoji.emoji_count(em) != 1:
-                raise InvalidRequest(
+                raise InvalidRequestError(
                     "Value of emoji key in payload must be exactly one emoji"
                 )
             req.payload["alias"] = emoji.demojize(em)
@@ -1846,7 +1846,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         payload = _dict_value_to_dump(req.payload)
         max_payload = 1 << 20  # 1 MiB
         if len(payload) > max_payload:
-            raise InvalidRequest("Feedback payload too large")
+            raise InvalidRequestError("Feedback payload too large")
         row: Row = {
             "id": feedback_id,
             "project_id": req.project_id,
@@ -2302,7 +2302,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # │    return 1 << (21 - int(log(row_size, 2)))
                 # │ValueError: negative shift count
                 # when we try to insert something that's too large.
-                raise InsertTooLarge(
+                raise InsertTooLargeError(
                     "Database insertion failed. Record too large. "
                     "A likely cause is that a single row or cell exceeded "
                     "the limit. If logging images, save them as `Image.PIL`."
@@ -2337,7 +2337,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _flush_calls(self) -> None:
         try:
             self._insert_call_batch(self._call_batch)
-        except InsertTooLarge:
+        except InsertTooLargeError:
             logger.info("Retrying with large objects stripped.")
             batch = self._strip_large_values(self._call_batch)
             self._insert_call_batch(batch)
@@ -2902,11 +2902,11 @@ def _setup_completion_model_info(
     if model_info:
         secret_name = model_info.get("api_key_name")
         if not secret_name:
-            raise InvalidRequest(f"No secret name found for model {model_name}")
+            raise InvalidRequestError(f"No secret name found for model {model_name}")
 
         secret_fetcher = _secret_fetcher_context.get()
         if not secret_fetcher:
-            raise InvalidRequest(
+            raise InvalidRequestError(
                 f"No secret fetcher found, cannot fetch API key for model {model_name}"
             )
 

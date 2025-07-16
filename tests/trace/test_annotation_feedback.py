@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave import AnnotationSpec
-from weave.trace_server.clickhouse_trace_server_batched import InvalidRequest
+from weave.trace_server.clickhouse_trace_server_batched import InvalidRequestError
 from weave.trace_server.trace_server_interface import FeedbackCreateReq, ObjQueryReq
 
 
@@ -75,7 +75,7 @@ def test_human_feedback_basic(client):
         )
     )
 
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             FeedbackCreateReq.model_validate(
                 {
@@ -161,7 +161,7 @@ def test_field_schema_with_pydantic_model(client):
         )
     )
 
-    with pytest.raises(InvalidRequest):
+    with pytest.raises(InvalidRequestError):
         client.server.feedback_create(
             FeedbackCreateReq.model_validate(
                 {

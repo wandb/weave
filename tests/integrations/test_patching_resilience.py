@@ -2,7 +2,7 @@ from typing import Callable
 
 import pytest
 
-from tests.trace.util import DummyTestException
+from tests.trace.util import DummyTestError
 from weave.integrations.patcher import MultiPatcher, SymbolPatcher
 from weave.trace.context import call_context
 
@@ -18,7 +18,7 @@ def test_resilience_to_patcher_errors(client, log_collector):
             return 0
 
     def custom_patcher(m: Callable):
-        raise DummyTestException("FAILURE!")
+        raise DummyTestError("FAILURE!")
 
     def do_test():
         test_patcher = MultiPatcher(

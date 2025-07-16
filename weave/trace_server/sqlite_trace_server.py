@@ -19,7 +19,7 @@ from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
-    InvalidRequest,
+    InvalidRequestError,
     NotFoundError,
     ObjectDeletedError,
 )
@@ -1272,7 +1272,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if req.feedback_type == "wandb.reaction.1":
             em = req.payload["emoji"]
             if emoji.emoji_count(em) != 1:
-                raise InvalidRequest(
+                raise InvalidRequestError(
                     "Value of emoji key in payload must be exactly one emoji"
                 )
             req.payload["alias"] = emoji.demojize(em)
@@ -1287,7 +1287,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         payload = json.dumps(req.payload)
         max_payload = 1024
         if len(payload) > max_payload:
-            raise InvalidRequest("Feedback payload too large")
+            raise InvalidRequestError("Feedback payload too large")
         row: Row = {
             "id": feedback_id,
             "project_id": req.project_id,

@@ -283,7 +283,7 @@ def filters_to_query(filters: Filters | None) -> tsi.Query | None:
     return tsi.Query(**{"$expr": expr})
 
 
-class QueryTranslationException(Exception):
+class QueryTranslationError(Exception):
     """Exception raised when a query cannot be translated to or from filters."""
 
     pass
@@ -310,10 +310,10 @@ def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:
         elif isinstance(value, (int, float)):
             operator = "(number): ="
         else:
-            raise QueryTranslationException(f"Could not parse {operand}")
+            raise QueryTranslationError(f"Could not parse {operand}")
         field = first.get_field_
         return Filter(field=field, operator=operator, value=value)
-    raise QueryTranslationException(f"Could not parse {operand}")
+    raise QueryTranslationError(f"Could not parse {operand}")
 
 
 def operand_to_filter_contains(operand: tsi_query.ContainsOperation) -> Filter:
@@ -328,10 +328,10 @@ def operand_to_filter_contains(operand: tsi_query.ContainsOperation) -> Filter:
         if isinstance(value, str):
             operator = "(string): contains"
         else:
-            raise QueryTranslationException(f"Could not parse {operand}")
+            raise QueryTranslationError(f"Could not parse {operand}")
         field = input.get_field_
         return Filter(field=field, operator=operator, value=value)
-    raise QueryTranslationException(f"Could not parse {operand}")
+    raise QueryTranslationError(f"Could not parse {operand}")
 
 
 def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
@@ -349,13 +349,13 @@ def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
         if isinstance(value, (int, float)):
             operator = "(number): >"
         else:
-            raise QueryTranslationException(f"Could not parse {operand}")
+            raise QueryTranslationError(f"Could not parse {operand}")
         field = first.get_field_
         if field == "started_at":
             operator = "(date): after"
             value = datetime.fromtimestamp(value).isoformat()
         return Filter(field=field, operator=operator, value=value)
-    raise QueryTranslationException(f"Could not parse {operand}")
+    raise QueryTranslationError(f"Could not parse {operand}")
 
 
 def operand_to_filter_gte(operand: tsi_query.GteOperation) -> Filter:
@@ -373,10 +373,10 @@ def operand_to_filter_gte(operand: tsi_query.GteOperation) -> Filter:
         if isinstance(value, (int, float)):
             operator = "(number): >="
         else:
-            raise QueryTranslationException(f"Could not parse {operand}")
+            raise QueryTranslationError(f"Could not parse {operand}")
         field = first.get_field_
         return Filter(field=field, operator=operator, value=value)
-    raise QueryTranslationException(f"Could not parse {operand}")
+    raise QueryTranslationError(f"Could not parse {operand}")
 
 
 def operand_to_filter(operand: tsi_query.Operand) -> Filter:
@@ -413,7 +413,7 @@ def operand_to_filter(operand: tsi_query.Operand) -> Filter:
         elif filter.operator == "(any): isNotEmpty":
             filter.operator = "(any): isEmpty"
         else:
-            raise QueryTranslationException(f"Could not parse {filter}")
+            raise QueryTranslationError(f"Could not parse {filter}")
         return filter
     if isinstance(operand, tsi_query.OrOperation) and len(operand.or_) > 0:
         operands = [operand_to_filter(o) for o in operand.or_]
@@ -423,7 +423,7 @@ def operand_to_filter(operand: tsi_query.Operand) -> Filter:
             operator = "(string): in"
             value = [o.value for o in operands]
             return Filter(field=operands[0].field, operator=operator, value=value)
-    raise QueryTranslationException(f"Could not parse {operand}")
+    raise QueryTranslationError(f"Could not parse {operand}")
 
 
 def query_to_filters(query: tsi.Query | None) -> Filters | None:
@@ -446,7 +446,7 @@ def query_to_filters(query: tsi.Query | None) -> Filters | None:
     ):
         return [operand_to_filter(query.expr_)]
 
-    raise QueryTranslationException(f"Could not parse {query}")
+    raise QueryTranslationError(f"Could not parse {query}")
 
 
 def get_object_path(obj: WeaveObject, path: str | ObjectPath) -> Any:
@@ -795,7 +795,7 @@ class SavedView:
                             filter.field, filter.operator, str(filter.value)
                         )
                     table.add_row("Filters", filters_table)
-            except QueryTranslationException:
+            except QueryTranslationError:
                 table.add_row("Query", str(self.base.definition.query))
 
         if self.base.definition.columns is not None:

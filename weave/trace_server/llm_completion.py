@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
-    InvalidRequest,
+    InvalidRequestError,
     MissingLLMApiKeyError,
 )
 from weave.trace_server.interface.builtin_object_classes.provider import (
@@ -64,11 +64,11 @@ def lite_llm_completion(
             error_message = error_message.replace("litellm.", "")
             return tsi.CompletionsCreateRes(response={"error": error_message})
     elif provider == "custom" and not base_url:
-        raise InvalidRequest(
+        raise InvalidRequestError(
             "Invalid provider configuration: must provide base_url if provider is 'custom'"
         )
     elif base_url and provider != "custom":
-        raise InvalidRequest(
+        raise InvalidRequestError(
             f"Invalid provider configuration: provider '{provider}' must be 'custom' if base_url is provided"
         )
 
@@ -94,7 +94,7 @@ def get_bedrock_credentials(
 ) -> tuple[str, str, str]:
     secret_fetcher = _secret_fetcher_context.get()
     if not secret_fetcher:
-        raise InvalidRequest(
+        raise InvalidRequestError(
             f"No secret fetcher found, cannot fetch API key for model {model_name}"
         )
 
@@ -135,7 +135,7 @@ def get_bedrock_credentials(
 def get_azure_credentials(model_name: str) -> tuple[str, str]:
     secret_fetcher = _secret_fetcher_context.get()
     if not secret_fetcher:
-        raise InvalidRequest(
+        raise InvalidRequestError(
             f"No secret fetcher found, cannot fetch API key for model {model_name}"
         )
 
@@ -229,7 +229,7 @@ def get_custom_provider_info(
     """
     secret_fetcher = _secret_fetcher_context.get()
     if not secret_fetcher:
-        raise InvalidRequest(
+        raise InvalidRequestError(
             f"No secret fetcher found, cannot fetch API key for model {model_name}"
         )
 
@@ -237,7 +237,7 @@ def get_custom_provider_info(
     # Format: <provider_id>/<provider_model_id>
     parts = model_name.split("/")
     if len(parts) < 2:
-        raise InvalidRequest(f"Invalid custom provider model format: {model_name}")
+        raise InvalidRequestError(f"Invalid custom provider model format: {model_name}")
 
     provider_id = parts[0]
     provider_model_id = parts[1]
@@ -260,7 +260,7 @@ def get_custom_provider_info(
         provider_obj_res = obj_read_func(provider_obj_req)
 
         if provider_obj_res.obj.base_object_class != "Provider":
-            raise InvalidRequest(
+            raise InvalidRequestError(
                 f"Object {provider_id} is not a Provider, it is a {provider_obj_res.obj.base_object_class}"
             )
 
@@ -272,7 +272,9 @@ def get_custom_provider_info(
         return_type = provider_obj.return_type
 
     except Exception as e:
-        raise InvalidRequest(f"Failed to fetch provider information: {str(e)}") from e
+        raise InvalidRequestError(
+            f"Failed to fetch provider information: {str(e)}"
+        ) from e
 
     try:
         # Fetch the provider model object
@@ -286,7 +288,7 @@ def get_custom_provider_info(
         provider_model_obj_res = obj_read_func(provider_model_obj_req)
 
         if provider_model_obj_res.obj.base_object_class != "ProviderModel":
-            raise InvalidRequest(
+            raise InvalidRequestError(
                 f"Object {provider_model_id} is not a ProviderModel, it is a {provider_model_obj_res.obj.base_object_class}"
             )
 
@@ -298,13 +300,13 @@ def get_custom_provider_info(
         actual_model_name = provider_model_obj.name
 
     except Exception as e:
-        raise InvalidRequest(
+        raise InvalidRequestError(
             f"Failed to fetch provider_model information: {str(e)}"
         ) from e
 
     # Get the API key
     if not secret_name:
-        raise InvalidRequest(f"No secret name found for provider {provider_id}")
+        raise InvalidRequestError(f"No secret name found for provider {provider_id}")
 
     api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
 

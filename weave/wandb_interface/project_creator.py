@@ -28,7 +28,7 @@ else:
     class CommError(wandb_errors.CommError): ...  # type: ignore[no-redef]
 
 
-class UnableToCreateProject(Exception):
+class UnableToCreateProjectError(Exception):
     pass
 
 
@@ -92,7 +92,7 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
                 else:
                     raise exception
             else:
-                raise UnableToCreateProject(
+                raise UnableToCreateProjectError(
                     f"Failed to create project {entity_name}/{project_name}"
                 )
     return {"project_name": project["name"]}

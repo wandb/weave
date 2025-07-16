@@ -42,7 +42,7 @@ def get_username() -> str | None:
         return None
 
 
-class WeaveWandbAuthenticationException(Exception): ...
+class WeaveWandbAuthenticationError(Exception): ...
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
@@ -53,7 +53,7 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
         api = wandb_api.get_wandb_api_sync()
         entity_name = api.default_entity_name()
         if entity_name is None:
-            raise WeaveWandbAuthenticationException(
+            raise WeaveWandbAuthenticationError(
                 'weave init requires wandb. Run "wandb login"'
             )
         project_name = fields[0]

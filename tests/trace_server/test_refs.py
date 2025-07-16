@@ -33,7 +33,7 @@ def string_with_every_char(disallowed_chars=None):
 
 
 def test_ref_parsing_external_invalid():
-    with pytest.raises(refs_internal.InvalidInternalRef):
+    with pytest.raises(refs_internal.InvalidInternalRefError):
         ref_start = refs.ObjectRef(
             entity="entity",
             project="project",
@@ -61,7 +61,7 @@ def test_ref_parsing_external_sanitized():
 
 
 def test_ref_parsing_internal_invalid():
-    with pytest.raises(refs_internal.InvalidInternalRef):
+    with pytest.raises(refs_internal.InvalidInternalRefError):
         ref_start = refs_internal.InternalObjectRef(
             project_id="project",
             name=string_with_every_char(),

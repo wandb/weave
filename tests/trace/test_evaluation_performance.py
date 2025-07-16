@@ -8,7 +8,7 @@ import PIL
 import pytest
 
 import weave
-from tests.trace.util import DummyTestException
+from tests.trace.util import DummyTestError
 from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -161,7 +161,7 @@ async def test_evaluation_resilience(
     evaluation, predict = build_evaluation()
 
     with raise_on_captured_errors(True):
-        with pytest.raises(DummyTestException):
+        with pytest.raises(DummyTestError):
             res = await evaluation.evaluate(predict)
 
     client_with_throwing_server.finish()
@@ -169,8 +169,8 @@ async def test_evaluation_resilience(
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     assert len(ag_res) == 2
-    assert ag_res["Task failed: DummyTestException: ('FAILURE - obj_create"] <= 2
-    assert ag_res["Task failed: DummyTestException: ('FAILURE - file_create"] <= 2
+    assert ag_res["Task failed: DummyTestError: ('FAILURE - obj_create"] <= 2
+    assert ag_res["Task failed: DummyTestError: ('FAILURE - file_create"] <= 2
 
     # We should gracefully handle the error and return a value
     with raise_on_captured_errors(False):
