@@ -283,7 +283,6 @@ export const CostsTable: React.FC<CostsTableProps> = ({
       paginationMode="client"
       paginationModel={paginationModel}
       onPaginationModelChange={onPaginationModelChange}
-      rowCount={totalCount}
       pageSizeOptions={[25, 50, 100]}
       // Sorting
       sortingMode="server"

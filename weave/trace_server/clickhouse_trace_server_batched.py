@@ -1905,7 +1905,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="clickhouse")
-        print(prepared.sql, prepared.parameters)
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
             query_result.result_rows, prepared.fields
