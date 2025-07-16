@@ -1,3 +1,4 @@
+import tempfile
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model
 from weave.trace.refs import Ref
@@ -146,8 +147,8 @@ def train_irt_model(evaluation_results: dict[str, list[float]], **kwargs: Any) -
     }
     config_dict.update(kwargs)
     configuration = IrtConfig(**config_dict)
-
-    trainer = IrtModelTrainer(config=configuration, dataset=pyirt_dataset, data_path="")
+    data_path = tempfile.TemporaryDirectory()
+    trainer = IrtModelTrainer(config=configuration, dataset=pyirt_dataset, data_path=data_path.name)
     trainer.train()
 
     return trainer
@@ -194,7 +195,7 @@ def tiny_dataset(dataset: Dataset, results: dict[str, list[float]], trained_irt_
 
     return make_dataset(dataset, anchor_points, A, B, anchor_weights, name=f"{dataset.name}_tiny_{num_items}", description=f"tiny dataset with {num_items} items")
 
-def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer) -> Ref | None:
+def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer, num_items: int=100) -> Ref | None:
     """
     Execute evaluations against the dataset for each model in models concurrently.
     
@@ -239,7 +240,7 @@ def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer) -> Ref | None
     irt_model = train_irt_model(evaluation_results)
 
     # TODO: produce dataset from irt_model.best_params
-    teenytiny = tiny_dataset(dataset, irt_model)
+    teenytiny = tiny_dataset(dataset, evaluation_results, irt_model, num_items)
 
     # TODO: save dataset to weave
     # TODO: run evaluations for models against tiny dataset
