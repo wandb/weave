@@ -23,6 +23,10 @@ repos:
         exclude: (.*pyi$)|(weave_query)|(tests)|(examples)
       # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-yaml
       - id: check-yaml
+      # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#detect-private-key
+      - id: detect-private-key
+      # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#debug-statements
+      - id: debug-statements
   - repo: https://github.com/crate-ci/typos
     rev: v1.34.0
     hooks:

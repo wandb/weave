@@ -304,6 +304,8 @@ select = [
   "RUF015",  # https://docs.astral.sh/ruff/rules/unnecessary-iterable-allocation-for-first-element/
   "RUF018",  # https://docs.astral.sh/ruff/rules/assignment-in-assert/
   "RUF022",  # https://docs.astral.sh/ruff/rules/unsorted-dunder-all/
+  "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
+  "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
 ]
 ignore = [
   # we use Google style
@@ -330,6 +332,7 @@ exclude = ["weave_query"]
 
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
+"!/tests/**/*.py" = ["RUF059"]
 
 [tool.pyright]
 include = ["weave"]

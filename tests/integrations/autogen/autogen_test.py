@@ -840,8 +840,6 @@ async def test_workflows_singlethreaded_runtime(
                 await self.publish_message(
                     Message(content=message.content), DefaultTopicId()
                 )
-            else:
-                pass
 
     # NOTE: this is a special case where you need to use the weave decorator
     # if you want the messages in the pubsub to be captured under a single trace
