@@ -147,7 +147,7 @@ def train_irt_model(evaluation_results: dict[str, list[float]], **kwargs: Any) -
     config_dict.update(kwargs)
     configuration = IrtConfig(**config_dict)
 
-    trainer = IrtModelTrainer(config=configuration, dataset=pyirt_dataset)
+    trainer = IrtModelTrainer(config=configuration, dataset=pyirt_dataset, data_path="")
     trainer.train()
 
     return trainer
@@ -243,7 +243,7 @@ def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer) -> Ref | None
 
     # TODO: save dataset to weave
     # TODO: run evaluations for models against tiny dataset
-
+    teenytiny.publish()
 
     # TODO: return ref to tiny, D eval results, d eval results
     return None
