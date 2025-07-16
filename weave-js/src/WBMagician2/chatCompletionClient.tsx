@@ -401,7 +401,12 @@ const chatCompleteStream = async (
 
   const res = combineChunks(processedChunks);
 
-  await dangerouslyLogCallToWeave('chatCompletionStream', args, res, _dangerousExtraAttributesToLog);
+  await dangerouslyLogCallToWeave(
+    'chatCompletionStream',
+    args,
+    res,
+    _dangerousExtraAttributesToLog
+  );
 
   return res;
 };

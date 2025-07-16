@@ -34,6 +34,7 @@ import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
+import {MagicCallAnalysisTab} from './MagicCallAnalysisTab';
 import {MagicEvaluationAnalysisTab} from './MagicEvaluationAnalysisTab';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
@@ -259,10 +260,11 @@ const useCallTabs = (call: CallSchema): Array<SimplePageLayoutTab> => {
         </ScrollableTabContent>
       ),
     },
+
     ...(isEvaluateOp(call.spanName)
       ? [
           {
-            label: 'Analysis',
+            label: 'Eval Analysis',
             icon: IconNames.MagicWandStar,
             content: (
               <MagicEvaluationAnalysisTab
@@ -273,7 +275,19 @@ const useCallTabs = (call: CallSchema): Array<SimplePageLayoutTab> => {
             ),
           },
         ]
-      : []),
+      : [
+          {
+            label: 'Analysis',
+            icon: IconNames.MagicWandStar,
+            content: (
+              <MagicCallAnalysisTab
+                entity={call.entity}
+                project={call.project}
+                callId={call.callId}
+              />
+            ),
+          },
+        ]),
   ];
 };
 
