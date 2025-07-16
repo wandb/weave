@@ -237,7 +237,7 @@ def test_model_predict(
         model: str
         temperature: float
 
-        @weave.op()
+        @weave.op
         def predict(self, text: str, target_language: str) -> str:
             response = litellm.completion(
                 api_key=os.environ.get("ANTHROPIC_API_KEY", "sk-ant-DUMMY_API_KEY"),
