@@ -304,6 +304,7 @@ select = [
   "RUF015",  # https://docs.astral.sh/ruff/rules/unnecessary-iterable-allocation-for-first-element/
   "RUF018",  # https://docs.astral.sh/ruff/rules/assignment-in-assert/
   "RUF022",  # https://docs.astral.sh/ruff/rules/unsorted-dunder-all/
+  "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
 ]
 ignore = [
   # we use Google style
