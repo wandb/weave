@@ -132,6 +132,43 @@ const MarkdownContainer = styled.div`
   }
 `;
 
+const VersionControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 16px;
+`;
+
+const VersionButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid ${Colors.MOON_300};
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: ${Colors.MOON_100};
+    border-color: ${Colors.MOON_400};
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+`;
+
+const VersionText = styled.span`
+  font-size: 14px;
+  color: ${Colors.MOON_600};
+  min-width: 80px;
+  text-align: center;
+`;
+
 export const MagicEvaluationAnalysisTab: FC<{
   entity: string;
   project: string;
@@ -149,6 +186,8 @@ export const MagicEvaluationAnalysisTab: FC<{
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [allFeedbacks, setAllFeedbacks] = useState<Feedback[]>([]);
+  const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
 
   const getTsClient = useGetTraceServerClientContext();
 
@@ -174,10 +213,13 @@ export const MagicEvaluationAnalysisTab: FC<{
           project,
           evaluationCallId
         );
-        if (existingFeedback.length > 0 && existingFeedback[0].payload) {
-          const analysis = (existingFeedback[0].payload as any).analysis;
-          if (analysis) {
-            setMagicSummary(analysis);
+        if (existingFeedback.length > 0) {
+          setAllFeedbacks(existingFeedback);
+          if (existingFeedback[0].payload) {
+            const analysis = (existingFeedback[0].payload as any).analysis;
+            if (analysis) {
+              setMagicSummary(analysis);
+            }
           }
         }
       } catch (error) {
@@ -189,6 +231,19 @@ export const MagicEvaluationAnalysisTab: FC<{
 
     loadExistingAnalysis();
   }, [getTsClient, entity, project, evaluationCallId]);
+
+  // Update displayed analysis when version changes
+  useEffect(() => {
+    if (allFeedbacks.length > 0 && allFeedbacks[currentVersionIndex]) {
+      const feedback = allFeedbacks[currentVersionIndex];
+      if (feedback.payload) {
+        const analysis = (feedback.payload as any).analysis;
+        if (analysis) {
+          setMagicSummary(analysis);
+        }
+      }
+    }
+  }, [currentVersionIndex, allFeedbacks]);
 
   const handleMagicStream = async (content: string, isComplete: boolean) => {
     if (!isComplete) {
@@ -210,6 +265,16 @@ export const MagicEvaluationAnalysisTab: FC<{
           evaluationCallId,
           content
         );
+        
+        // Reload feedbacks to include the new one
+        const updatedFeedbacks = await getMagicAnalysis(
+          client,
+          entity,
+          project,
+          evaluationCallId
+        );
+        setAllFeedbacks(updatedFeedbacks);
+        setCurrentVersionIndex(0); // Show the latest version
       } catch (error) {
         console.error('Failed to save analysis:', error);
         // Don't show error to user as the analysis was still generated successfully
@@ -225,6 +290,18 @@ export const MagicEvaluationAnalysisTab: FC<{
   const handleRegenerate = () => {
     setMagicSummary(null);
     setError(null);
+  };
+
+  const handlePreviousVersion = () => {
+    if (currentVersionIndex < allFeedbacks.length - 1) {
+      setCurrentVersionIndex(currentVersionIndex + 1);
+    }
+  };
+
+  const handleNextVersion = () => {
+    if (currentVersionIndex > 0) {
+      setCurrentVersionIndex(currentVersionIndex - 1);
+    }
   };
 
   // Loading state
@@ -296,6 +373,24 @@ export const MagicEvaluationAnalysisTab: FC<{
         </div>
 
         <div className="flex items-center gap-2">
+          {allFeedbacks.length > 1 && (
+            <VersionControls>
+              <VersionButton
+                onClick={handlePreviousVersion}
+                disabled={currentVersionIndex >= allFeedbacks.length - 1}>
+                <Icon name="chevron-back" size={16} />
+              </VersionButton>
+              <VersionText>
+                Version {allFeedbacks.length - currentVersionIndex} of {allFeedbacks.length}
+              </VersionText>
+              <VersionButton
+                onClick={handleNextVersion}
+                disabled={currentVersionIndex <= 0}>
+                <Icon name="chevron-next" size={16} />
+              </VersionButton>
+            </VersionControls>
+          )}
+          
           {isGenerating ? (
             <span className="text-sm text-moon-500">Generating...</span>
           ) : (
