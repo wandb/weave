@@ -9,9 +9,6 @@ from py_irt.training import IrtModelTrainer
 from py_irt.config import IrtConfig
 from py_irt.dataset import Dataset as PyIrtDataset
 import pandas as pd
-import json
-import os
-from collections import defaultdict
 from weave.flow.scorer import Scorer
 from uuid import uuid4
 
@@ -96,6 +93,35 @@ def get_results_in_sorted_order(eval: WeaveObject, scorer_name: str, scorer_key:
     results_ordered = [x.output.unwrap()['scores'][scorer_name][scorer_key] for x in calls_ordered]
     return results_ordered
 
+def marshall_Y_dict_into_pandas(Y: dict) -> tuple[pd.DataFrame, str, list[str]]:
+    """
+    Y is a dict of format: {subject_id: [score1, score2, ...]}
+    Return a pandas dataframe of the following format:
+        df = pd.DataFrame({
+            'user_id': ["joe", "sarah", "juan", "julia"],
+            'item_1': [0, 1, 1, 1],
+            'item_2': [0, 1, 0, 1],
+            'item_3': [1, 0, 1, 0],
+        })
+    where item_1 is the *first* index of the score list (and so on)
+
+    RETURNS:
+        - df: pandas dataframe
+        - subject_column_name: name of the subject column
+        - item_ids: list of item ids
+    """
+    # user_ids are the keys of Y
+    user_ids = list(Y.keys())
+    # Find the max number of items (score list length)
+    max_items = max(len(scores) for scores in Y.values()) if Y else 0
+    # Build a dict for DataFrame
+    data = {'user_id': user_ids}
+    for i in range(max_items):
+        data[f'item_{i+1}'] = [Y[user_id][i] if i < len(Y[user_id]) else None for user_id in user_ids]
+    df = pd.DataFrame(data)
+    return df, "user_id", [f'item_{i+1}' for i in range(max_items)]
+
+
 def train_irt_model(evaluation_results: dict[str, list[float]], **kwargs: Any) -> IrtModelTrainer:
     """
     Y is a dict of format: {subject_id: [score1, score2, ...]}
@@ -103,8 +129,8 @@ def train_irt_model(evaluation_results: dict[str, list[float]], **kwargs: Any) -
     kwargs are passed to the IrtConfig constructor
     """
 
-    df = pd.DataFrame(evaluation_results)
-    pyirt_dataset = PyIrtDataset.from_pandas(df, subject_column_name="subject_id", item_ids=["item_id"])
+    df, subject_column_name, item_ids = marshall_Y_dict_into_pandas(evaluation_results)
+    pyirt_dataset = PyIrtDataset.from_pandas(df, subject_column_name, item_ids)
 
     config_dict = {
         "model_type": "multidim_2pl",
