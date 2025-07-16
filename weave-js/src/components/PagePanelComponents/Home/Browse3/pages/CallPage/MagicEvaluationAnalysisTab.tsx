@@ -143,8 +143,8 @@ const VersionButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   border: 1px solid ${Colors.MOON_300};
   background: white;
   border-radius: 4px;
@@ -170,6 +170,14 @@ const VersionText = styled.span`
 `;
 
 export const MagicEvaluationAnalysisTab: FC<{
+  entity: string;
+  project: string;
+  evaluationCallId: string;
+}> = (props) => {
+  return <Tailwind><MagicEvaluationAnalysisTabInner {...props} /></Tailwind>;
+};
+
+const MagicEvaluationAnalysisTabInner: FC<{
   entity: string;
   project: string;
   evaluationCallId: string;
@@ -309,9 +317,7 @@ export const MagicEvaluationAnalysisTab: FC<{
     return (
       <Container>
         <EmptyStateContainer>
-          <Tailwind>
             <div className="text-moon-600">Loading analysis...</div>
-          </Tailwind>
         </EmptyStateContainer>
       </Container>
     );
@@ -362,7 +368,7 @@ export const MagicEvaluationAnalysisTab: FC<{
       <Header>
         <div className="flex items-center gap-3">
           <p
-            className="mb-10"
+
             style={{
               fontWeight: 600,
               marginRight: 10,
@@ -381,7 +387,7 @@ export const MagicEvaluationAnalysisTab: FC<{
                 <Icon name="chevron-back" size={16} />
               </VersionButton>
               <VersionText>
-                Version {allFeedbacks.length - currentVersionIndex} of {allFeedbacks.length}
+                {allFeedbacks.length - currentVersionIndex} of {allFeedbacks.length}
               </VersionText>
               <VersionButton
                 onClick={handleNextVersion}

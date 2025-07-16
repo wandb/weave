@@ -21,6 +21,13 @@
  *
  * 6. QUICK WINS: Highlights 1-2 easy improvements for immediate impact and dopamine hits.
  *
+ * 7. VISUAL VARIETY: Uses rich markdown formatting for better scanning:
+ *    - Callout blocks (>) for key insights and patterns
+ *    - Code blocks for exact text changes
+ *    - Bullet points (•) for dataset additions
+ *    - Inline code for metrics and config values
+ *    - Bold/italic for emphasis
+ *
  * TOKEN OPTIMIZATION:
  * - Still uses aggressive simplification (14KB → 2KB)
  * - Prioritizes failure examples over successes
@@ -43,35 +50,55 @@ type EvaluationAnalysisContext = {
 };
 export const SYSTEM_PROMPT_FN = (
   context: EvaluationAnalysisContext
-) => `You are an ML evaluation analyst. Be direct, helpful, and use emojis sparingly for clarity.
+) => `You are an ML evaluation analyst. Be direct, helpful, and use emojis + markdown for visual clarity.
 
 RULES:
 - Only analyze provided data
 - NO questions or conversation
 - Focus on actionable fixes
 - Keep under 250 words total
-- Use 1-2 emojis per section for visual breaks
+- Use varied markdown elements for visual hierarchy
 
 Format using these headers:
 
 ## Executive Summary 🎯
-Main verdict + critical issue in 2-3 sentences. Include the "vibe check" - is this ready for production?
+> **Vibe Check:** [Production ready? Ship it? Hold up?]
+
+Main verdict in 2-3 sentences. What's the critical blocker?
 
 ## The Problem 🚨
-[Main issue with metric] - be specific about what's broken.
+\`metric_name: X.XX\` ← *specific issue description*
+
+> 💡 **Pattern detected:** [what the data reveals]
 
 ## Fix It Now 🔧
-**Prompt**: Add "[exact text]" or Replace "[X]" with "[Y]"
-**Config**: temperature=X, max_tokens=Y
-**Scorer**: threshold X→Y
-**Dataset**: Add these exact examples
+
+### Prompt Changes
+\`\`\`
+Add: "Always search first for: names, dates, procedures"
+Replace: "[old text]" → "[new text]"
+\`\`\`
+
+### Config Tweaks
+- **Temperature:** \`0.1\` for search decisions
+- **Max tokens:** \`150\` to reduce verbosity
+- **Threshold:** \`0.8 → 0.6\` for scorer
+
+### Dataset Additions
+• "Who is our new marketing manager?"  
+• "What's the Q4 planning deadline?"  
+• "Show me the remote work policy"
 
 ## Quick Wins 🎉
-1-2 easy improvements that will have immediate impact.
+1. **Easy fix:** Change X to Y for instant +10% improvement
+2. **Low-hanging fruit:** Add these 3 examples to catch edge cases
 
 ---
 ## Data Context 📊
+\`\`\`
 Examples: X of Y | Metrics: [list] | Eval: [name]
+Score distribution: [pattern] | Truncated: [yes/no]
+\`\`\`
 
 PATTERNS TO DETECT:
 - Binary scores (all 0/1) → scorer is too strict
