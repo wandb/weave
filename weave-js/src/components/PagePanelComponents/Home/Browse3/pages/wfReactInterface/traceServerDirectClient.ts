@@ -42,6 +42,8 @@ import {
   ThreadSchema,
   ThreadsQueryReq,
   ThreadsQueryRes,
+  TraceCallEndReq,
+  TraceCallEndRes,
   TraceCallReadReq,
   TraceCallReadRes,
   TraceCallSchema,
@@ -50,6 +52,8 @@ import {
   TraceCallsQueryRes,
   TraceCallsQueryStatsReq,
   TraceCallsQueryStatsRes,
+  TraceCallStartReq,
+  TraceCallStartRes,
   TraceCallUpdateReq,
   TraceFileContentReadReq,
   TraceFileContentReadRes,
@@ -81,10 +85,12 @@ export class DirectTraceServerClient {
       }>
     >
   > = {};
+  private unsafe_api_key: string;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, unsafe_api_key: string) {
     this.inFlightFetchesRequests = {};
     this.baseUrl = baseUrl;
+    this.unsafe_api_key = unsafe_api_key;
   }
 
   public callsDelete(req: TraceCallsDeleteReq): Promise<void> {
@@ -182,6 +188,17 @@ export class DirectTraceServerClient {
     });
   }
 
+  public callStart(req: TraceCallStartReq): Promise<TraceCallStartRes> {
+    return this.makeRequest<TraceCallStartReq, TraceCallStartRes>(
+      '/call/start',
+      req
+    );
+  }
+
+  public callEnd(req: TraceCallEndReq): Promise<TraceCallEndRes> {
+    return this.makeRequest<TraceCallEndReq, TraceCallEndRes>('/call/end', req);
+  }
+
   /*
   This implementation of the calls stream query is a convenience in order
   to explicitly handle large streams of data. It should be kept in close
@@ -200,7 +217,9 @@ export class DirectTraceServerClient {
       // This is a dummy auth header, the trace server requires
       // that we send a basic auth header, but it uses cookies for
       // authentication.
-      Authorization: 'Basic ' + btoa(':'),
+      Authorization:
+        'Basic ' +
+        (this.unsafe_api_key ? btoa('api:' + this.unsafe_api_key) : btoa(':')),
       Accept: contentType,
     };
     const useAdminPrivileges = getCookie('use_admin_privileges') === 'true';

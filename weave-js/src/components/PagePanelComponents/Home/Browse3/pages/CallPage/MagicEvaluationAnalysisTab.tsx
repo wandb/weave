@@ -370,7 +370,13 @@ const MagicEvaluationAnalysisTabInner: FC<{
                   placeholder="Ask specific questions about the evaluation results, or leave empty for a comprehensive analysis..."
                   showModelSelector={true}
                   width={450}
-                  textareaLines={6}>
+                  textareaLines={6}
+                  _dangerousExtraAttributesToLog={{
+                    entity,
+                    project,
+                    evaluationCallId,
+                    evalLink: `https://wandb.ai/${entity}/${project}/weave/calls/${evaluationCallId}`,
+                  }}>
                   <MagicButton size="large" icon="magic-wand-star">
                     Generate Analysis
                   </MagicButton>
@@ -410,7 +416,13 @@ const MagicEvaluationAnalysisTabInner: FC<{
               placeholder="Ask follow-up questions or leave empty to regenerate the analysis..."
               showModelSelector={true}
               width={450}
-              textareaLines={4}>
+              textareaLines={4}
+              _dangerousExtraAttributesToLog={{
+                entity,
+                project,
+                evaluationCallId,
+                evalLink: `https://wandb.ai/${entity}/${project}/weave/calls/${evaluationCallId}`,
+              }}>
               <MagicButton size="medium" variant="secondary">
                 Regenerate
               </MagicButton>

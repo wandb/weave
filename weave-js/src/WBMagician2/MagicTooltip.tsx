@@ -63,6 +63,10 @@ export interface MagicTooltipProps {
    * Height of the textarea in lines (defaults to 7).
    */
   textareaLines?: number;
+  /**
+   * Extra attributes to log to Weave.
+   */
+  _dangerousExtraAttributesToLog?: Record<string, any>;
 }
 
 /**
@@ -83,6 +87,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   showModelSelector = true,
   width = 350,
   textareaLines = 7,
+  _dangerousExtraAttributesToLog,
 }) => {
   const chatCompletionStream = useChatCompletionStream(entityProject);
   const {selectedModel, setSelectedModel} = useSelectedModel();
@@ -188,7 +193,8 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
           modelId: selectedModel,
           messages,
         },
-        onChunk
+        onChunk,
+        _dangerousExtraAttributesToLog
       );
 
       // Signal completion

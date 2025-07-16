@@ -9,6 +9,7 @@ import React, {
 
 import {TraceServerClient} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
+import {dangerouslyLogCallToWeave} from './magicianWeaveLogger';
 
 const DEFAULT_MODEL = 'coreweave/moonshotai/Kimi-K2-Instruct';
 
@@ -334,7 +335,8 @@ const chatCompleteStream = async (
   entity: string,
   project: string,
   params: ChatCompletionParams,
-  onChunk: (chunk: Chunk) => void
+  onChunk: (chunk: Chunk) => void,
+  _dangerousExtraAttributesToLog?: Record<string, any>
 ): Promise<Completion> => {
   // Process raw chunks to extract content
   const processedChunks: unknown[] = [];
@@ -379,22 +381,29 @@ const chatCompleteStream = async (
     }
   };
 
+  const args = {
+    project_id: `${entity}/${project}`,
+    inputs: {
+      model: prepareModel(params.modelId, params.modelProvider),
+      messages: prepareMessages(params.messages),
+      temperature: params.temperature || 0.7,
+      response_format: prepareResponseFormat(params.responseFormat),
+      tools: params.tools,
+    },
+  };
   await client.completionsCreateStream(
     {
-      project_id: `${entity}/${project}`,
-      inputs: {
-        model: prepareModel(params.modelId, params.modelProvider),
-        messages: prepareMessages(params.messages),
-        temperature: params.temperature || 0.7,
-        response_format: prepareResponseFormat(params.responseFormat),
-        tools: params.tools,
-      },
+      ...args,
       track_llm_call: false,
     },
     processChunk
   );
 
-  return combineChunks(processedChunks);
+  const res = combineChunks(processedChunks);
+
+  await dangerouslyLogCallToWeave('chatCompletionStream', args, res, _dangerousExtraAttributesToLog);
+
+  return res;
 };
 
 const EntityProjectContext = createContext<EntityProject | undefined>(
@@ -486,7 +495,11 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
   }, [entityProject, entityProjectContext]);
   const getClient = useGetTraceServerClientContext();
   return useCallback(
-    (params: Omit<ChatCompletionParams, 'modelId'> & {modelId?: string}, onChunk: (chunk: Chunk) => void) => {
+    (
+      params: Omit<ChatCompletionParams, 'modelId'> & {modelId?: string},
+      onChunk: (chunk: Chunk) => void,
+      _dangerousExtraAttributesToLog?: Record<string, any>
+    ) => {
       const client = getClient();
       // Use selected model from context if not specified in params
       const modelId = params.modelId || selectedModel;
@@ -495,7 +508,8 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
         entity,
         project,
         {...params, modelId},
-        onChunk
+        onChunk,
+        _dangerousExtraAttributesToLog
       );
     },
     [entity, project, getClient, selectedModel]

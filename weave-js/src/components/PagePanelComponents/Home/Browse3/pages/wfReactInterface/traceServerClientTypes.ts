@@ -52,6 +52,7 @@ export type LLMCostSchema = LLMUsageSchema & {
 
 type SummaryInsertMap = {
   usage?: {[key: string]: LLMUsageSchema};
+  status_counts?: Record<TraceStatus, number>;
 } & ExtraKeysAllowed;
 
 type SummaryMap = {
@@ -129,6 +130,54 @@ export type TraceCallsQueryReq = {
   include_storage_size?: boolean;
   include_total_storage_size?: boolean;
 };
+
+type StartedCallSchemaForInsert = {
+  project_id: string;
+  id?: string | null;
+
+  op_name: string;
+  display_name?: string | null;
+
+  trace_id?: string | null;
+  parent_id?: string | null;
+  thread_id?: string | null;
+  turn_id?: string | null;
+
+  started_at: string;
+  attributes: Record<string, any>;
+
+  inputs: Record<string, any>;
+
+  wb_user_id?: string | null;
+  wb_run_id?: string | null;
+  wb_run_step?: number | null;
+};
+
+export type TraceCallStartReq = {
+  start: StartedCallSchemaForInsert;
+};
+
+export type TraceCallStartRes = {
+  id: string;
+  trace_id: string;
+};
+
+export type TraceStatus = 'success' | 'error' | 'running' | 'descendant_error';
+
+type EndedCallSchemaForInsert = {
+  project_id: string;
+  id: string;
+  ended_at: string;
+  exception?: string | null;
+  output: unknown;
+  summary?: SummaryMap;
+};
+
+export type TraceCallEndReq = {
+  end: EndedCallSchemaForInsert;
+};
+
+export type TraceCallEndRes = {};
 
 export type TraceCallsQueryRes = {
   calls: TraceCallSchema[];
