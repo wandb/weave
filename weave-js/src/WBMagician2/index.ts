@@ -26,7 +26,7 @@ export type {
 } from './chatCompletionClient';
 export {
   ChatClientProvider,
-  useAvailableModels,
+  // useAvailableModels,
   useChatCompletion,
   useChatCompletionStream,
   useSelectedModel,

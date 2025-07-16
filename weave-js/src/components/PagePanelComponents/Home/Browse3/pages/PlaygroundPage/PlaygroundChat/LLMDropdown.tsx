@@ -1,4 +1,4 @@
-import {Select} from '@wandb/weave/components/Form/Select';
+import {Select, SelectSize} from '@wandb/weave/components/Form/Select';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -41,6 +41,7 @@ interface LLMDropdownProps {
   customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
   selectFirstAvailable?: boolean;
   direction: OpenDirection;
+  size?: SelectSize;
   className?: string;
 }
 
@@ -57,7 +58,8 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   customProvidersResult,
   selectFirstAvailable,
   direction,
-  className,
+  size,
+  className,  
 }) => {
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
   const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
@@ -213,7 +215,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
             />
           ),
         }}
-        size="medium"
+        size={size || 'medium'}
         isSearchable
         filterOption={(option, inputValue) => {
           const searchTerm = inputValue.toLowerCase();
@@ -262,6 +264,7 @@ interface LLMDropdownLoadedProps {
   direction: OpenDirection;
   selectFirstAvailable?: boolean;
   excludeSavedModels?: boolean;
+  size?: SelectSize;
 }
 
 export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
@@ -272,6 +275,7 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
   direction,
   selectFirstAvailable = false,
   excludeSavedModels = false,
+  size,
 }) => {
   const {entity, project, projectId} = useEntityProject();
 
@@ -348,6 +352,7 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
       areProvidersLoading={areProvidersLoading}
       customProvidersResult={customProvidersResult || []}
       className={className}
+      size={size}
     />
   );
 };

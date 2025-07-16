@@ -259,22 +259,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
           <div
             className="dark:bg-gray-900 bg-white p-6"
             style={{width: `${width}px`}}>
-            {/* Model selector (if enabled) */}
-            {showModelSelector && (
-              <div className="mb-3">
-                <LLMDropdownLoaded
-                  value={selectedModel}
-                  onChange={(modelId, maxTokens) => {
-                    setSelectedModel(modelId);
-                  }}
-                  isTeamAdmin={false}
-                  className="w-full"
-                  direction={{horizontal: 'left'}}
-                  excludeSavedModels={true}
-                />
-              </div>
-            )}
-
             {/* Text area */}
             <textarea
               ref={textareaRef}
@@ -286,8 +270,30 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
               style={{height: `${textareaHeight}px`}}
             />
 
-            {/* Generate button */}
-            <div className="mt-2 flex justify-end">
+            {/* Bottom bar with model selector and generate button */}
+            <div className="mt-2 flex items-center justify-between gap-3  ">
+              {/* Model selector (if enabled) */}
+              {showModelSelector ? (
+                <div className="flex-1 mr-3">
+                  <div className="[&_>_div]:text-xs">
+                    <LLMDropdownLoaded
+                      value={selectedModel}
+                      onChange={(modelId, maxTokens) => {
+                        setSelectedModel(modelId);
+                      }}
+                      isTeamAdmin={false}
+                      className="[&_.Select__control]:min-h-[32px] [&_.Select__control]:text-xs"
+                      direction={{horizontal: 'left'}}
+                      excludeSavedModels={true}
+                      size="small"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1" />
+              )}
+              
+              {/* Generate button */}
               <Button
                 onClick={isGenerating ? handleCancel : handleGenerate}
                 disabled={!isGenerating && !userInstructions.trim()}
