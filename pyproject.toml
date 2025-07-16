@@ -331,6 +331,7 @@ exclude = ["weave_query"]
 
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
+"!/tests/**/*.py" = ["RUF059"]
 
 [tool.pyright]
 include = ["weave"]
