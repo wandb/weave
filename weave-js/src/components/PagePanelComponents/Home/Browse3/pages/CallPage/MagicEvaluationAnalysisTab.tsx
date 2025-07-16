@@ -6,13 +6,15 @@ import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import {MagicButton, MagicTooltip} from '@wandb/weave/WBMagician2';
-import React, {FC, useEffect, useState} from 'react';
+import React, {FC, useEffect, useMemo, useState} from 'react';
 import styled from 'styled-components';
 
+import {useEvaluationComparisonState} from '../CompareEvaluationsPage/ecpState';
 import {TraceServerClient} from '../wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../wfReactInterface/traceServerClientContext';
 import {Feedback} from '../wfReactInterface/traceServerClientTypes';
 import {projectIdFromParts} from '../wfReactInterface/tsDataModelHooks';
+import {SYSTEM_PROMPT_FN} from './magicEvaluationAnalysis';
 
 const Container = styled.div`
   display: flex;
@@ -130,12 +132,7 @@ const MarkdownContainer = styled.div`
   }
 `;
 
-const useEvaluationAnalysisLLMContext = () => {
-  // TODO: Implement actual context gathering from evaluation data
-  return 'TODO: Evaluation context will be gathered here';
-};
-
-export const MagicEvaluationAnalysis: FC<{
+export const MagicEvaluationAnalysisTab: FC<{
   entity: string;
   project: string;
   evaluationCallId: string;
@@ -152,8 +149,19 @@ export const MagicEvaluationAnalysis: FC<{
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const llmContext = useEvaluationAnalysisLLMContext();
+
   const getTsClient = useGetTraceServerClientContext();
+
+  const evaluationComparisonStateQuery = useEvaluationComparisonState(
+    entity,
+    project,
+    [evaluationCallId]
+  );
+  const systemPrompt = useMemo(() => {
+    return SYSTEM_PROMPT_FN({
+      evaluationState: evaluationComparisonStateQuery.result,
+    });
+  }, [evaluationComparisonStateQuery.result]);
 
   // Load existing analysis on mount
   useEffect(() => {
@@ -255,29 +263,7 @@ export const MagicEvaluationAnalysis: FC<{
               <MagicTooltip
                 onStream={handleMagicStream}
                 onError={handleError}
-                systemPrompt={`You are an expert ML evaluation analyst. Analyze the provided evaluation data and provide clear, actionable insights.
-
-Format your response in markdown with the following sections:
-
-## Summary
-A brief overview of the evaluation results.
-
-## Key Metrics
-- List important metrics and their values
-- Highlight any significant changes or patterns
-
-## Strengths
-What the model does well based on the evaluation.
-
-## Areas for Improvement
-Specific weaknesses or areas where performance could be enhanced.
-
-## Recommendations
-Actionable suggestions for improving model performance.
-
-Be concise but thorough. Use bullet points and clear formatting.
-
-Evaluation context: ${llmContext}`}
+                systemPrompt={systemPrompt}
                 placeholder="Ask specific questions about the evaluation results, or leave empty for a comprehensive analysis..."
                 showModelSelector={true}
                 width={450}
@@ -316,14 +302,7 @@ Evaluation context: ${llmContext}`}
             <MagicTooltip
               onStream={handleMagicStream}
               onError={handleError}
-              systemPrompt={`You are an expert ML evaluation analyst. The user wants to regenerate or ask follow-up questions about the evaluation analysis.
-
-Previous analysis for context:
-${magicSummary}
-
-Provide a fresh analysis or answer their specific question. Format your response in markdown.
-
-Evaluation context: ${llmContext}`}
+              systemPrompt={systemPrompt}
               placeholder="Ask follow-up questions or leave empty to regenerate the analysis..."
               showModelSelector={true}
               width={450}
