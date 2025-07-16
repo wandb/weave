@@ -69,10 +69,6 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setEditedContent(content);
   };
 
-  const handleMagicError = (error: Error) => {
-    console.error('Magic generation error:', error);
-  };
-
   return (
     <div
       className={classNames(
@@ -90,18 +86,15 @@ export const PlaygroundMessagePanelEditor: React.FC<
           <>
             <MagicTooltip
               onStream={handleMagicStream}
-              onError={handleMagicError}
               systemPrompt={
                 'You are an expert LLM developer & researcher. Your objective is to help the user create a "system prompt" for their own LLM. They are going to provide you with some description or context of what they are interested in build. Assume that may not be perfect. Always produce a useful and clear system prompt that address the user need. NEVER say anything before or after the system prompt. ONLY emit the system prompt.'
               }
               placeholder={
                 'Describe the system prompt you want to create - for example: "A system prompt for a LLM that can help me build a new website."'
               }>
-              <MagicButton
-                size="medium"
-              />
+              <MagicButton size="medium" />
             </MagicTooltip>
-            
+
             <div className="flex-1"></div>
           </>
         )}

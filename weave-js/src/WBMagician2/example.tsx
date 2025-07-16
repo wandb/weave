@@ -1,6 +1,6 @@
 /**
  * Example usage of WBMagician2 components
- * 
+ *
  * This demonstrates how to integrate the simplified Magic components
  * into your React application.
  */
@@ -37,13 +37,11 @@ export function BasicMagicExample() {
         systemPrompt="You are a helpful assistant that generates clear, concise descriptions."
         placeholder="What would you like me to describe?"
         showModelSelector={true}>
-        <MagicButton>
-          Generate Description
-        </MagicButton>
+        <MagicButton>Generate Description</MagicButton>
       </MagicTooltip>
 
       {generatedContent && (
-        <div style={{ marginTop: 20, padding: 10, border: '1px solid #ccc' }}>
+        <div style={{marginTop: 20, padding: 10, border: '1px solid #ccc'}}>
           <h4>Generated Content:</h4>
           <p>{generatedContent}</p>
         </div>
@@ -56,7 +54,9 @@ export function BasicMagicExample() {
  * Example with content revision
  */
 export function RevisionExample() {
-  const [originalContent] = useState('The quick brown fox jumps over the lazy dog.');
+  const [originalContent] = useState(
+    'The quick brown fox jumps over the lazy dog.'
+  );
   const [revisedContent, setRevisedContent] = useState('');
 
   const handleStream = (content: string, isComplete: boolean) => {
@@ -66,20 +66,16 @@ export function RevisionExample() {
   return (
     <div>
       <p>Original: {originalContent}</p>
-      
+
       <MagicTooltip
         onStream={handleStream}
         systemPrompt="You are a helpful assistant that revises text based on user instructions."
         placeholder="How should I revise this text?"
         contentToRevise={originalContent}>
-        <MagicButton>
-          Revise Text
-        </MagicButton>
+        <MagicButton>Revise Text</MagicButton>
       </MagicTooltip>
 
-      {revisedContent && (
-        <p>Revised: {revisedContent}</p>
-      )}
+      {revisedContent && <p>Revised: {revisedContent}</p>}
     </div>
   );
 }
@@ -95,7 +91,7 @@ export function DirectHookExample() {
   const generateHaiku = async () => {
     setIsLoading(true);
     setOutput('');
-    
+
     try {
       await complete(
         {
@@ -129,21 +125,21 @@ export function DirectHookExample() {
  */
 export function MagicApp() {
   return (
-    <ChatClientProvider value={{ entity: 'my-org', project: 'my-project' }}>
-      <div style={{ padding: 20 }}>
+    <ChatClientProvider value={{entity: 'my-org', project: 'my-project'}}>
+      <div style={{padding: 20}}>
         <h1>WBMagician2 Examples</h1>
-        
-        <section style={{ marginBottom: 40 }}>
+
+        <section style={{marginBottom: 40}}>
           <h2>Basic Magic Button + Tooltip</h2>
           <BasicMagicExample />
         </section>
 
-        <section style={{ marginBottom: 40 }}>
+        <section style={{marginBottom: 40}}>
           <h2>Text Revision</h2>
           <RevisionExample />
         </section>
 
-        <section style={{ marginBottom: 40 }}>
+        <section style={{marginBottom: 40}}>
           <h2>Direct Hook Usage</h2>
           <DirectHookExample />
         </section>

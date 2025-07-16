@@ -36,7 +36,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   variant = 'ghost',
   ...restProps
 }) => {
-  const currentState = state
+  const currentState = state;
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (currentState === 'generating' && onCancel) {

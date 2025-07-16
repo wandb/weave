@@ -1,14 +1,21 @@
-import React, {cloneElement, isValidElement, useEffect, useRef, useState} from 'react';
 import {Popover} from '@mui/material';
+import React, {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
+import {Button} from '../components/Button';
+import {Tailwind} from '../components/Tailwind';
 import {
   Chunk,
   EntityProject,
   Message,
-  useChatCompletionStream,
   useAvailableModels,
+  useChatCompletionStream,
 } from './chatCompletionClient';
-import {Button} from '../components/Button';
-import {Tailwind} from '../components/Tailwind';
 import {MagicButton} from './MagicButton';
 
 export interface MagicTooltipProps {
@@ -51,12 +58,20 @@ export interface MagicTooltipProps {
    * Whether to show model selector dropdown.
    */
   showModelSelector?: boolean;
+  /**
+   * Width of the tooltip (defaults to 350px).
+   */
+  width?: number;
+  /**
+   * Height of the textarea in lines (defaults to 7).
+   */
+  textareaLines?: number;
 }
 
 /**
  * MagicTooltip provides a minimal tooltip interface for AI content generation.
  * It manages all UI state internally and passes appropriate props to the trigger element.
- * 
+ *
  * @param props Tooltip configuration
  * @returns A tooltip component with trigger
  */
@@ -70,6 +85,8 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   contentToRevise,
   modelId: defaultModelId = 'gpt-4o-mini',
   showModelSelector = false,
+  width = 350,
+  textareaLines = 7,
 }) => {
   const chatCompletionStream = useChatCompletionStream(entityProject);
   const availableModels = useAvailableModels(entityProject);
@@ -92,15 +109,28 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     }
   }, [anchorEl]);
 
-  // Reset state when closed
+  /**
+   * Resets state when the tooltip is closed, with a 500ms delay.
+   *
+   * This effect waits 500ms after the tooltip is closed before resetting user instructions
+   * and aborting any ongoing request (if not generating).
+   *
+   * Examples:
+   *   // Closes the tooltip and resets state after 500ms
+   *   setAnchorEl(null);
+   */
   useEffect(() => {
     if (!anchorEl) {
-      setUserInstructions('');
-      if (abortControllerRef.current && !isGenerating) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
+      const timeout = setTimeout(() => {
+        setUserInstructions('');
+        if (abortControllerRef.current && !isGenerating) {
+          abortControllerRef.current.abort();
+          abortControllerRef.current = null;
+        }
+      }, 500);
+      return () => clearTimeout(timeout);
     }
+    return () => {};
   }, [anchorEl, isGenerating]);
 
   const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -127,10 +157,10 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
 
     setIsGenerating(true);
     abortControllerRef.current = new AbortController();
-    
+
     // Immediately trigger loading state
     onStream('', false);
-    
+
     // Close the tooltip immediately
     setAnchorEl(null);
 
@@ -155,10 +185,10 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
       }
 
       let accumulatedContent = '';
-      
+
       const onChunk = (chunk: Chunk) => {
         if (abortControllerRef.current?.signal.aborted) return;
-        
+
         accumulatedContent += chunk.content;
         onStream(accumulatedContent, false);
       };
@@ -187,13 +217,8 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     }
   };
 
-  // Handle Enter key
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleGenerate();
-    }
-  };
+  // Calculate textarea height based on lines
+  const textareaHeight = textareaLines * 24; // Approximate line height
 
   // Determine button state
   const getButtonState = () => {
@@ -207,17 +232,19 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     ? cloneElement(children as React.ReactElement<any>, {
         onClick: isGenerating ? handleCancel : handleOpen,
         // If it's a MagicButton, pass the state
-        ...(children.type === MagicButton ? {
-          state: getButtonState(),
-          onCancel: handleCancel,
-        } : {}),
+        ...(children.type === MagicButton
+          ? {
+              state: getButtonState(),
+              onCancel: handleCancel,
+            }
+          : {}),
       })
     : children;
 
   return (
     <>
       {trigger}
-      
+
       <Popover
         open={Boolean(anchorEl)}
         anchorEl={anchorEl}
@@ -240,11 +267,13 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
           },
         }}>
         <Tailwind>
-          <div className="dark:bg-gray-900 w-[320px] bg-white p-3">
+          <div
+            className="dark:bg-gray-900 bg-white p-6"
+            style={{width: `${width}px`}}>
             {/* Model selector (if enabled) */}
             {showModelSelector && (
-              <select 
-                className="border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400 mb-2 w-full rounded border bg-transparent px-2 py-1 text-xs"
+              <select
+                className="border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400 mb-3 w-full rounded border bg-transparent px-2 py-1 text-xs"
                 value={selectedModelId}
                 onChange={e => setSelectedModelId(e.target.value)}
                 disabled={isGenerating}>
@@ -255,18 +284,18 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
                 ))}
               </select>
             )}
-            
+
             {/* Text area */}
             <textarea
               ref={textareaRef}
               value={userInstructions}
               onChange={e => setUserInstructions(e.target.value)}
-              onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={isGenerating}
-              className="border-gray-200 dark:border-gray-700 h-32 w-full resize-none rounded border bg-transparent p-2 text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50 dark:text-white"
+              className="dark:border-gray-700 w-full resize-none rounded bg-transparent p-2 text-sm focus:outline-none disabled:opacity-50 dark:text-white"
+              style={{height: `${textareaHeight}px`}}
             />
-            
+
             {/* Generate button */}
             <div className="mt-2 flex justify-end">
               <Button
