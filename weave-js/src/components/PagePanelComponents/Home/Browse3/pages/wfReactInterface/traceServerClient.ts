@@ -10,6 +10,12 @@ import {
   CompletionsCreateRes,
   CompletionsCreateStreamReq,
   CompletionsCreateStreamRes,
+  CostCreateReq,
+  CostCreateRes,
+  CostPurgeReq,
+  CostPurgeRes,
+  CostQueryReq,
+  CostQueryRes,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
@@ -185,6 +191,18 @@ export class TraceServerClient extends CachingTraceServerClient {
     req: CompletionsCreateReq
   ): Promise<CompletionsCreateRes> {
     return super.completionsCreate(req);
+  }
+
+  public costQuery(req: CostQueryReq): Promise<CostQueryRes> {
+    return super.costQuery(req);
+  }
+
+  public costCreate(req: CostCreateReq): Promise<CostCreateRes> {
+    return super.costCreate(req);
+  }
+
+  public costPurge(req: CostPurgeReq): Promise<CostPurgeRes> {
+    return super.costPurge(req);
   }
 
   public completionsCreateStream(

@@ -2692,6 +2692,96 @@ export const convertISOToDate = (iso: string): Date => {
   return new Date(iso);
 };
 
+// --- Cost Hooks Implementation ---
+
+export const useCosts = (params: {
+  projectId: string;
+  fields?: string[];
+  query?: any;
+  sortBy?: {field: string; direction: 'asc' | 'desc'}[];
+  limit?: number;
+  offset?: number;
+  skip?: boolean;
+}): Loadable<traceServerTypes.CostQueryOutput[]> & Refetchable => {
+  const getTsClient = useGetTraceServerClientContext();
+  const [result, setResult] = useState<
+    Loadable<traceServerTypes.CostQueryOutput[]>
+  >({
+    loading: false,
+    result: null,
+    error: null,
+  });
+  const [doReload, setDoReload] = useState(false);
+
+  const refetch = useCallback(() => {
+    setDoReload(true);
+  }, []);
+
+  const deepParams = useDeepMemo(params);
+
+  useEffect(() => {
+    let mounted = true;
+    if (doReload) {
+      setDoReload(false);
+    }
+    if (deepParams.skip) {
+      setResult({loading: false, result: null, error: null});
+      return;
+    }
+    setResult({loading: true, result: null, error: null});
+    getTsClient()
+      .costQuery({
+        project_id: deepParams.projectId,
+        fields: deepParams.fields,
+        query: deepParams.query,
+        sort_by: deepParams.sortBy,
+        limit: deepParams.limit,
+        offset: deepParams.offset,
+      })
+      .then(res => {
+        if (!mounted) {
+          return;
+        }
+        setResult({loading: false, result: res.results, error: null});
+      })
+      .catch(err => {
+        if (!mounted) {
+          return;
+        }
+        setResult({loading: false, result: null, error: err});
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [getTsClient, deepParams, doReload]);
+
+  return {...result, refetch};
+};
+
+export const useCostCreate = () => {
+  const getTsClient = useGetTraceServerClientContext();
+  return useCallback(
+    (
+      req: traceServerTypes.CostCreateReq
+    ): Promise<traceServerTypes.CostCreateRes> => {
+      return getTsClient().costCreate(req);
+    },
+    [getTsClient]
+  );
+};
+
+export const useCostDelete = () => {
+  const getTsClient = useGetTraceServerClientContext();
+  return useCallback(
+    (
+      req: traceServerTypes.CostPurgeReq
+    ): Promise<traceServerTypes.CostPurgeRes> => {
+      return getTsClient().costPurge(req);
+    },
+    [getTsClient]
+  );
+};
+
 export const tsWFDataModelHooks: WFDataModelHooksInterface = {
   useCall,
   useCalls,
@@ -2720,4 +2810,7 @@ export const tsWFDataModelHooks: WFDataModelHooksInterface = {
     useRefsType,
     useCodeForOpRef,
   },
+  useCosts,
+  useCostCreate,
+  useCostDelete,
 };

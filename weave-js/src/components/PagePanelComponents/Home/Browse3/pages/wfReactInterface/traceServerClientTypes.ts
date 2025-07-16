@@ -600,3 +600,59 @@ export type ThreadsQueryReq = {
 export type ThreadsQueryRes = {
   threads: ThreadSchema[];
 };
+
+// Cost API Types (Synced with backend trace_server_interface.py)
+
+export type CostCreateInput = {
+  prompt_token_cost: number;
+  completion_token_cost: number;
+  prompt_token_cost_unit?: string; // default 'USD' on backend
+  completion_token_cost_unit?: string; // default 'USD' on backend
+  effective_date?: string; // ISO datetime string, optional
+  provider_id?: string;
+};
+
+export type CostCreateReq = {
+  project_id: string;
+  costs: Record<string, CostCreateInput>;
+  wb_user_id?: string;
+};
+
+export type CostCreateRes = {
+  ids: Array<[string, string]>;
+};
+
+export type CostQueryReq = {
+  project_id: string;
+  fields?: string[];
+  query?: any; // Query type, keep as any for now
+  sort_by?: {field: string; direction: 'asc' | 'desc'}[];
+  limit?: number;
+  offset?: number;
+};
+
+export type CostQueryOutput = {
+  id?: string;
+  llm_id?: string;
+  prompt_token_cost?: number;
+  completion_token_cost?: number;
+  prompt_token_cost_unit?: string;
+  completion_token_cost_unit?: string;
+  effective_date?: string; // ISO datetime string
+  provider_id?: string;
+  pricing_level?: string;
+  pricing_level_id?: string;
+  created_by?: string;
+  created_at?: string; // ISO datetime string
+};
+
+export type CostQueryRes = {
+  results: CostQueryOutput[];
+};
+
+export type CostPurgeReq = {
+  project_id: string;
+  query: any; // Query type, keep as any for now
+};
+
+export type CostPurgeRes = Record<string, never>;

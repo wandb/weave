@@ -25,6 +25,12 @@ import {
   CompletionsCreateStreamReq,
   CompletionsCreateStreamRes,
   ContentType,
+  CostCreateReq,
+  CostCreateRes,
+  CostPurgeReq,
+  CostPurgeRes,
+  CostQueryReq,
+  CostQueryRes,
   FeedbackCreateReq,
   FeedbackCreateRes,
   FeedbackPurgeReq,
@@ -363,6 +369,18 @@ export class DirectTraceServerClient {
       '/files/query_stats',
       req
     );
+  }
+
+  public costQuery(req: CostQueryReq): Promise<CostQueryRes> {
+    return this.makeRequest<CostQueryReq, CostQueryRes>('/cost/query', req);
+  }
+
+  public costCreate(req: CostCreateReq): Promise<CostCreateRes> {
+    return this.makeRequest<CostCreateReq, CostCreateRes>('/cost/create', req);
+  }
+
+  public costPurge(req: CostPurgeReq): Promise<CostPurgeRes> {
+    return this.makeRequest<CostPurgeReq, CostPurgeRes>('/cost/purge', req);
   }
 
   public completionsCreate(

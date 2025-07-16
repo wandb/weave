@@ -13,24 +13,24 @@ def make_extended_project_stats_query(
 ) -> str:
     """
     Build a query to get extended project statistics binned by time intervals.
-    
+
     Returns statistics for:
     - num_traces: Number of unique trace_ids
     - trace_storage_size: Total size of all call data
     - object_storage_size: Total size of all objects
     - table_storage_size: Total size of all table rows
     - file_storage_size: Total size of all files
-    
+
     Grouped by:
     - Time bins based on time_delta
     - User (wb_user_id) where available
     """
     project_id_param = pb.add_param(project_id)
-    
+
     # Convert timedelta to seconds for ClickHouse interval
     interval_seconds = int(time_delta.total_seconds())
     interval_param = pb.add_param(interval_seconds)
-    
+
     # Build time filters
     time_filters = []
     if time_start:
@@ -39,22 +39,26 @@ def make_extended_project_stats_query(
     if time_end:
         time_end_param = pb.add_param(time_end)
         time_filters.append(f"started_at <= {{{time_end_param}: DateTime64(3)}}")
-    
+
     time_where_clause = ""
     if time_filters:
         time_where_clause = " AND " + " AND ".join(time_filters)
-    
+
     # For files and tables, we'll use created_at for time filtering since they don't have started_at
     file_table_time_filters = []
     if time_start:
-        file_table_time_filters.append(f"created_at >= {{{time_start_param}: DateTime64(3)}}")
+        file_table_time_filters.append(
+            f"created_at >= {{{time_start_param}: DateTime64(3)}}"
+        )
     if time_end:
-        file_table_time_filters.append(f"created_at <= {{{time_end_param}: DateTime64(3)}}")
-    
+        file_table_time_filters.append(
+            f"created_at <= {{{time_end_param}: DateTime64(3)}}"
+        )
+
     file_table_time_where = ""
     if file_table_time_filters:
         file_table_time_where = " AND " + " AND ".join(file_table_time_filters)
-    
+
     # Main query that combines all statistics
     query = f"""
     WITH time_bins AS (
@@ -185,5 +189,5 @@ def make_extended_project_stats_query(
     FROM combined_stats
     ORDER BY time_bin, wb_user_id
     """
-    
+
     return query

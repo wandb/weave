@@ -48,9 +48,6 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.extended_project_stats_query_builder import (
-    make_extended_project_stats_query,
-)
 from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
@@ -81,6 +78,9 @@ from weave.trace_server.errors import (
     NotFoundError,
     ObjectDeletedError,
     RequestTooLarge,
+)
+from weave.trace_server.extended_project_stats_query_builder import (
+    make_extended_project_stats_query,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -1188,7 +1188,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.QueryExtendedProjectStatsReq
     ) -> tsi.QueryExtendedProjectStatsRes:
         pb = ParamBuilder()
-        
+
         # Build and execute the query
         query = make_extended_project_stats_query(
             project_id=req.project_id,
@@ -1197,13 +1197,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             time_end=req.time_end,
             time_delta=req.time_delta,
         )
-        
+
         query_result = self.ch_client.query(query, parameters=pb.get_params())
-        
+
         # Process results into the required format
         stats_by_user: dict[str, list[tsi.ProjectStatsExtended]] = defaultdict(list)
-        stats_totals: dict[tuple[datetime.datetime, datetime.datetime], tsi.ProjectStatsExtended] = {}
-        
+        stats_totals: dict[
+            tuple[datetime.datetime, datetime.datetime], tsi.ProjectStatsExtended
+        ] = {}
+
         for row in query_result.result_rows:
             (
                 time_start,
@@ -1220,14 +1222,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 total_file_storage_size,
                 total_table_storage_size,
             ) = row
-            
+
             # Ensure datetimes have timezone info
             time_start_with_tz = _ensure_datetimes_have_tz(time_start)
             time_end_with_tz = _ensure_datetimes_have_tz(time_end)
-            
+
             if time_start_with_tz is None or time_end_with_tz is None:
                 continue
-            
+
             # Create user stats entry
             user_stats = tsi.ProjectStatsExtended(
                 num_traces=num_traces,
@@ -1238,10 +1240,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 time_start=time_start_with_tz,
                 time_end=time_end_with_tz,
             )
-            
-            if wb_user_id and wb_user_id != 'unknown':
+
+            if wb_user_id and wb_user_id != "unknown":
                 stats_by_user[wb_user_id].append(user_stats)
-            
+
             # Create or update totals entry for this time bin
             time_key = (time_start_with_tz, time_end_with_tz)
             if time_key not in stats_totals:
@@ -1254,16 +1256,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     time_start=time_start_with_tz,
                     time_end=time_end_with_tz,
                 )
-        
+
         # Convert stats_by_user to the required format
         formatted_stats_by_user = []
         for user_id, user_stats_list in stats_by_user.items():
             user_entry = {user_id: user_stats_list}
             formatted_stats_by_user.append(user_entry)
-        
+
         # Convert stats_totals to list
         formatted_stats_totals = list(stats_totals.values())
-        
+
         return tsi.QueryExtendedProjectStatsRes(
             stats=tsi.ProjectUserStats(
                 stats_by_user=formatted_stats_by_user,
@@ -1856,17 +1858,42 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 (
                     req.query.expr_
                     if req.query
-                    else {
-                        "$eq": [
-                            {"$getField": "pricing_level_id"},
-                            {"$literal": req.project_id},
-                        ],
-                    }
+                    else {"$eq": [{"$literal": "1"}, {"$literal": "1"}]}
                 ),
                 {
-                    "$eq": [
-                        {"$getField": "pricing_level"},
-                        {"$literal": "project"},
+                    "$or": [
+                        {
+                            "$and": [
+                                {
+                                    "$eq": [
+                                        {"$getField": "pricing_level"},
+                                        {"$literal": "project"},
+                                    ],
+                                },
+                                {
+                                    "$eq": [
+                                        {"$getField": "pricing_level_id"},
+                                        {"$literal": req.project_id},
+                                    ],
+                                },
+                            ]
+                        },
+                        {
+                            "$and": [
+                                {
+                                    "$eq": [
+                                        {"$getField": "pricing_level"},
+                                        {"$literal": "default"},
+                                    ],
+                                },
+                                {
+                                    "$eq": [
+                                        {"$getField": "pricing_level_id"},
+                                        {"$literal": "default"},
+                                    ],
+                                },
+                            ]
+                        },
                     ],
                 },
             ]
@@ -1878,6 +1905,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="clickhouse")
+        print(prepared.sql, prepared.parameters)
         query_result = self.ch_client.query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
             query_result.result_rows, prepared.fields

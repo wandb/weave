@@ -432,6 +432,21 @@ export type WFDataModelHooksInterface = {
   useTableCreate: () => (
     params: traceServerClientTypes.TableCreateReq
   ) => Promise<traceServerClientTypes.TableCreateRes>;
+  useCosts: (params: {
+    projectId: string;
+    fields?: string[];
+    query?: any;
+    sortBy?: {field: string; direction: 'asc' | 'desc'}[];
+    limit?: number;
+    offset?: number;
+    skip?: boolean;
+  }) => Loadable<traceServerClientTypes.CostQueryOutput[]> & Refetchable;
+  useCostCreate: () => (
+    req: traceServerClientTypes.CostCreateReq
+  ) => Promise<traceServerClientTypes.CostCreateRes>;
+  useCostDelete: () => (
+    req: traceServerClientTypes.CostPurgeReq
+  ) => Promise<traceServerClientTypes.CostPurgeRes>;
   derived: {
     useChildCallsForCompare: (
       params: UseChildCallsForCompareParams

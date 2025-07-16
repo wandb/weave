@@ -978,6 +978,8 @@ class CostQueryReq(BaseModel):
                 "completion_token_cost_unit",
                 "effective_date",
                 "provider_id",
+                "pricing_level",
+                "pricing_level_id",
             ]
         ],
     )
@@ -1001,6 +1003,14 @@ class CostQueryOutput(BaseModel):
         default=None, examples=["2024-01-01T00:00:00Z"]
     )
     provider_id: Optional[str] = Field(default=None, examples=["openai"])
+    pricing_level: Optional[str] = Field(default=None, examples=["default", "project"])
+    pricing_level_id: Optional[str] = Field(
+        default=None, examples=["project_name", "default"]
+    )
+    created_by: Optional[str] = Field(default=None, examples=["user@example.com"])
+    created_at: Optional[datetime.datetime] = Field(
+        default=None, examples=["2024-01-01T00:00:00Z"]
+    )
 
 
 class CostQueryRes(BaseModel):
