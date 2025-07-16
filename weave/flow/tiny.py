@@ -23,7 +23,8 @@ async def _run_evaluation_for_model(
     model: Model, 
     dataset: Any,
     scorer: Scorer,
-) -> str | None:
+    name: str,
+) -> Evaluation | None:
     """
     Run evaluation for a single model.
     
@@ -36,25 +37,20 @@ async def _run_evaluation_for_model(
         evaluation uri 
     """
     client = require_weave_client()
-    try:
-        # Create a new evaluation instance for each model for clean separation
-        evaluation = Evaluation(
-            dataset=dataset, 
-            scorers=[scorer],
-            evaluation_name=f"tinyify_eval_{getattr(model, 'name', 'model')}"
-        )
-        
-        # Run the evaluation asynchronously
-        await evaluation.evaluate(model)
+    # Create a new evaluation instance for each model for clean separation
+    evaluation = Evaluation(
+        dataset=dataset, 
+        scorers=[scorer],
+        evaluation_name=f"tinify_eval_{name}",
+    )
+    
+    # Run the evaluation asynchronously
+    await evaluation.evaluate(model)
+    client.flush()
 
-        return evaluation.evaluate.ref.uri()
-    except Exception as e:
-        # Return error information instead of raising
-        return None
-    finally:
-        client.flush()
+    return evaluation
 
-async def _create_dataset_ordering(dataset: Any) -> Dataset:
+def _create_dataset_ordering(dataset: Any) -> Dataset:
     """
     Create a dataset ordering from the dataset.
     """
@@ -62,28 +58,27 @@ async def _create_dataset_ordering(dataset: Any) -> Dataset:
     for row in dataset.rows:
         new_row = {**row, "_uuid": uuid4()}
         new_rows.append(new_row)
+
     new_rows_sorted = sorted(new_rows, key=lambda x: x["_uuid"])
-    return Dataset(rows=new_rows, name=dataset.name, description=dataset.description)
+    return Dataset(rows=new_rows_sorted, name=dataset.name, description=dataset.description)
 
 async def run_all_evaluations(dataset: Any, models: list[Model], scorer: Scorer) -> dict[WeaveObject, list[WeaveObject]]:
     """Run all evaluations concurrently."""
     client = require_weave_client()
 
-    new_dataset = await _create_dataset_ordering(dataset)
+    new_dataset = _create_dataset_ordering(dataset)
     # Create evaluation tasks for all models
-    evaluation_tasks = [
-        _run_evaluation_for_model(model, new_dataset, scorer) for model in models
-    ]
-    
+    evaluation_names = [str(uuid4()) for _ in models]
+    evaluation_tasks = [ _run_evaluation_for_model(model, new_dataset, scorer, name) for model, name in zip(models, evaluation_names)]
     # Run all evaluations concurrently
-    results = await asyncio.gather(*evaluation_tasks, return_exceptions=True)
-    # results is now a list of URIs
-    evaluations = [get_eval_by_uri(uri, client) for uri in results] # this should be broadcast to be faster
-
-    eval_results = {eval.id: get_results_in_sorted_order(eval, scorer.name, client) for eval in evaluations}
-
+    evaluations = await asyncio.gather(*evaluation_tasks, return_exceptions=True)
+    # results is now a list of evaluations
+    eval_target = evaluations[-1]
+    eval_dict = {call.inputs['self'].name for call in eval_target.evaluate.calls()}
+    # for every eval in the eval_dict get all the child calls:
+    train_da_fool_input = {eval_id : get_results_in_sorted_order(eval, scorer.__name__, client) for eval_id, eval in eval_dict.items()}
     client.finish()
-    return eval_results
+    return train_da_fool_input
 
 
 def get_eval_by_uri(uri: str, client: WeaveClient) -> WeaveObject:
