@@ -1,3 +1,4 @@
+from itertools import tee
 import tempfile
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model
@@ -244,7 +245,7 @@ def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer, num_items: in
 
     # TODO: save dataset to weave
     # TODO: run evaluations for models against tiny dataset
-    teenytiny.publish()
+    client._save_object(teenytiny, teenytiny.name, "latest")
 
     # TODO: return ref to tiny, D eval results, d eval results
     return None
