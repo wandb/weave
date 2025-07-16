@@ -89,7 +89,7 @@ def test_content_generation_sync_stream(client):
             else:
                 raise ValueError(f"Unexpected chunk format: {chunk}")
     except Exception as e:
-        raise AssertionError(f"Error processing stream: {str(e)}") from e
+        raise AssertionError(f"Error processing stream: {e!s}") from e
     assert "paris" in response_text.lower()
     call = next(iter(client.calls()))
     assert call.started_at < call.ended_at
@@ -124,7 +124,7 @@ async def test_content_generation_async_stream(client):
             else:
                 raise ValueError(f"Unexpected chunk format: {chunk}")
     except Exception as e:
-        raise AssertionError(f"Error processing stream: {str(e)}") from e
+        raise AssertionError(f"Error processing stream: {e!s}") from e
     assert "paris" in response_text.lower()
     call = next(iter(client.calls()))
     assert call.started_at < call.ended_at

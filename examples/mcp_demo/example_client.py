@@ -398,7 +398,7 @@ class MCPClient:
                     print("Unknown command or invalid arguments")
 
             except Exception as e:
-                print(f"Error: {str(e)}")
+                print(f"Error: {e!s}")
 
     async def cleanup(self):
         """Clean up resources"""
