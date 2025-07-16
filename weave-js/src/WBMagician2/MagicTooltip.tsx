@@ -274,7 +274,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
             <div className="mt-2 flex items-center justify-between gap-3  ">
               {/* Model selector (if enabled) */}
               {showModelSelector ? (
-                <div className="flex-1 mr-3">
+                <div className="mr-3 flex-1">
                   <div className="[&_>_div]:text-xs">
                     <LLMDropdownLoaded
                       value={selectedModel}
@@ -292,7 +292,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
               ) : (
                 <div className="flex-1" />
               )}
-              
+
               {/* Generate button */}
               <Button
                 onClick={isGenerating ? handleCancel : handleGenerate}

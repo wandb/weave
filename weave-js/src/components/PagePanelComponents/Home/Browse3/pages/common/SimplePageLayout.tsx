@@ -1,6 +1,6 @@
 import {Box, SxProps, Theme} from '@mui/material';
 import {MOON_200} from '@wandb/weave/common/css/color.styles';
-import {IconName} from '@wandb/weave/components/Icon';
+import {Icon, IconName} from '@wandb/weave/components/Icon';
 import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import * as Tabs from '@wandb/weave/components/Tabs';
 import _ from 'lodash';
@@ -164,13 +164,15 @@ export const SimplePageLayout: FC<{
   );
 };
 
+export type SimplePageLayoutTab = {
+  label: string;
+  icon?: IconName;
+  content: ReactNode;
+};
+
 export const SimplePageLayoutWithHeader: FC<{
   title?: ReactNode;
-  tabs: Array<{
-    label: string;
-    icon?: IconName;
-    content: ReactNode;
-  }>;
+  tabs: Array<SimplePageLayoutTab>;
   headerExtra?: ReactNode;
   headerContent: ReactNode;
   hideTabsIfSingle?: boolean;
@@ -303,15 +305,18 @@ export const SimplePageLayoutWithHeader: FC<{
   );
 };
 
+export type SimpleTabViewTab = {
+  value: string;
+  label: string;
+  content: ReactNode;
+  loading?: boolean;
+  icon?: IconName;
+};
+
 export const SimpleTabView: FC<{
   headerContent: ReactNode;
   headerContainerSx?: SxProps<Theme>;
-  tabs: Array<{
-    value: string;
-    label: string;
-    content: ReactNode;
-    loading?: boolean;
-  }>;
+  tabs: Array<SimpleTabViewTab>;
   tabValue: string;
   hideTabsIfSingle?: boolean;
   handleTabChange: (newValue: string) => void;
@@ -363,6 +368,7 @@ export const SimpleTabView: FC<{
                 key={tab.label}
                 value={tab.value}
                 className="h-[30px] whitespace-nowrap text-sm">
+                {tab.icon && <Icon name={tab.icon} />}
                 {tab.label}
                 {tab.loading && <LoadingDots />}
               </Tabs.Trigger>

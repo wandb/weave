@@ -59,7 +59,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   selectFirstAvailable,
   direction,
   size,
-  className,  
+  className,
 }) => {
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
   const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
