@@ -7,9 +7,6 @@ import React, {
   useState,
 } from 'react';
 
-import {useLLMDropdownOptions} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/PlaygroundChat/LLMDropdownOptions';
-import {useConfiguredProviders} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/useConfiguredProviders';
-import {useBaseObjectInstances} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/objectClassQuery';
 import {TraceServerClient} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
 
@@ -505,6 +502,10 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
   );
 };
 
+// NOT CURRENTLY USED
+// import {useLLMDropdownOptions} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/PlaygroundChat/LLMDropdownOptions';
+// import {useConfiguredProviders} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/useConfiguredProviders';
+// import {useBaseObjectInstances} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/objectClassQuery';
 // /**
 //  * Hook to get available models for the current entity/project.
 //  * Returns a list of model options that can be used for completions.
