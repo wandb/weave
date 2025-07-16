@@ -8,12 +8,12 @@ import React, {
 } from 'react';
 
 import {Button} from '../components/Button';
+import {LLMDropdownLoaded} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/PlaygroundChat/LLMDropdown';
 import {Tailwind} from '../components/Tailwind';
 import {
   Chunk,
   EntityProject,
   Message,
-  useAvailableModels,
   useChatCompletionStream,
   useSelectedModel,
 } from './chatCompletionClient';
@@ -85,29 +85,12 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   textareaLines = 7,
 }) => {
   const chatCompletionStream = useChatCompletionStream(entityProject);
-  const availableModels = useAvailableModels(entityProject);
   const {selectedModel, setSelectedModel} = useSelectedModel();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [userInstructions, setUserInstructions] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [modelSearchQuery, setModelSearchQuery] = useState('');
-  const [showModelDropdown, setShowModelDropdown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const modelInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Filter models based on search query
-  const filteredModels = modelSearchQuery
-    ? availableModels.filter(
-        model =>
-          model.name.toLowerCase().includes(modelSearchQuery.toLowerCase()) ||
-          model.id.toLowerCase().includes(modelSearchQuery.toLowerCase())
-      )
-    : availableModels;
-
-  // Get current model name
-  const currentModelName =
-    availableModels.find(m => m.id === selectedModel)?.name || selectedModel;
 
   // Focus textarea when opened
   useEffect(() => {
@@ -130,8 +113,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     if (!anchorEl) {
       const timeout = setTimeout(() => {
         setUserInstructions('');
-        setModelSearchQuery('');
-        setShowModelDropdown(false);
         if (abortControllerRef.current && !isGenerating) {
           abortControllerRef.current.abort();
           abortControllerRef.current = null;
@@ -280,51 +261,17 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
             style={{width: `${width}px`}}>
             {/* Model selector (if enabled) */}
             {showModelSelector && (
-              <div className="relative mb-3">
-                <input
-                  ref={modelInputRef}
-                  type="text"
-                  value={
-                    showModelDropdown ? modelSearchQuery : currentModelName
-                  }
-                  onChange={e => setModelSearchQuery(e.target.value)}
-                  onFocus={() => {
-                    setShowModelDropdown(true);
-                    setModelSearchQuery('');
+              <div className="mb-3">
+                <LLMDropdownLoaded
+                  value={selectedModel}
+                  onChange={(modelId, maxTokens) => {
+                    setSelectedModel(modelId);
                   }}
-                  onBlur={() => {
-                    // Delay to allow click on dropdown
-                    setTimeout(() => {
-                      setShowModelDropdown(false);
-                      setModelSearchQuery('');
-                    }, 200);
-                  }}
-                  placeholder="Select a model..."
-                  className="border-gray-200 py-1.5 text-gray-600 dark:border-gray-700 dark:text-gray-400 w-full rounded border bg-transparent px-3 text-xs focus:border-blue-500 focus:outline-none"
-                  disabled={isGenerating}
+                  isTeamAdmin={false}
+                  className="w-full"
+                  direction={{horizontal: 'left'}}
+                  excludeSavedModels={true}
                 />
-
-                {showModelDropdown && filteredModels.length > 0 && (
-                  <div className="border-gray-200 dark:border-gray-700 dark:bg-gray-800 absolute left-0 right-0 top-full mt-1 max-h-48 overflow-auto rounded border bg-white shadow-lg">
-                    {filteredModels.map(model => (
-                      <button
-                        key={model.id}
-                        className="py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 block w-full px-3 text-left text-xs"
-                        onClick={() => {
-                          setSelectedModel(model.id);
-                          setShowModelDropdown(false);
-                          setModelSearchQuery('');
-                        }}>
-                        <div className="text-gray-700 dark:text-gray-300 font-medium">
-                          {model.name}
-                        </div>
-                        <div className="text-gray-500 dark:text-gray-400">
-                          {model.provider} • {model.id}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 

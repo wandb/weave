@@ -45,8 +45,9 @@ Simplified tooltip for AI-assisted content generation:
   - Text area for user input (supports multi-line with Enter for newlines)
   - Single "Generate" button at bottom
   - Button becomes loading/cancel during generation
-  - Model selection with typeahead search (optional)
+  - Model selection using LLMDropdownLoaded component (optional)
   - Global model selection synced across all components
+  - Excludes saved models from selection
   - Parent handles streaming consumption and display
 - **Behavior**:
   - Click Generate button to submit

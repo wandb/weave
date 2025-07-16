@@ -505,105 +505,105 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
   );
 };
 
-/**
- * Hook to get available models for the current entity/project.
- * Returns a list of model options that can be used for completions.
- *
- * @param entityProject Optional entity/project override
- * @returns List of available models
- */
-export const useAvailableModels = (
-  entityProject?: EntityProject
-): Array<{id: string; name: string; provider: string}> => {
-  const entityProjectContext = useEntityProjectContext();
-  const {entity, project} = useMemo(() => {
-    if (entityProject) {
-      return entityProject;
-    }
-    if (entityProjectContext) {
-      return entityProjectContext;
-    }
-    return {entity: '', project: ''};
-  }, [entityProject, entityProjectContext]);
+// /**
+//  * Hook to get available models for the current entity/project.
+//  * Returns a list of model options that can be used for completions.
+//  *
+//  * @param entityProject Optional entity/project override
+//  * @returns List of available models
+//  */
+// export const useAvailableModels = (
+//   entityProject?: EntityProject
+// ): Array<{id: string; name: string; provider: string}> => {
+//   const entityProjectContext = useEntityProjectContext();
+//   const {entity, project} = useMemo(() => {
+//     if (entityProject) {
+//       return entityProject;
+//     }
+//     if (entityProjectContext) {
+//       return entityProjectContext;
+//     }
+//     return {entity: '', project: ''};
+//   }, [entityProject, entityProjectContext]);
 
-  const projectId = entity && project ? `${entity}/${project}` : null;
+//   const projectId = entity && project ? `${entity}/${project}` : null;
 
-  // Get configured providers
-  const {result: configuredProviders, loading: configuredProvidersLoading} =
-    useConfiguredProviders(entity);
+//   // Get configured providers
+//   const {result: configuredProviders, loading: configuredProvidersLoading} =
+//     useConfiguredProviders(entity);
 
-  // Get custom providers and models
-  const {result: customProvidersResult, loading: customProvidersLoading} =
-    useBaseObjectInstances('Provider', {
-      project_id: projectId || '',
-      filter: {
-        latest_only: true,
-      },
-    });
+//   // Get custom providers and models
+//   const {result: customProvidersResult, loading: customProvidersLoading} =
+//     useBaseObjectInstances('Provider', {
+//       project_id: projectId || '',
+//       filter: {
+//         latest_only: true,
+//       },
+//     });
 
-  const {
-    result: customProviderModelsResult,
-    loading: customProviderModelsLoading,
-  } = useBaseObjectInstances('ProviderModel', {
-    project_id: projectId || '',
-    filter: {
-      latest_only: true,
-    },
-  });
+//   const {
+//     result: customProviderModelsResult,
+//     loading: customProviderModelsLoading,
+//   } = useBaseObjectInstances('ProviderModel', {
+//     project_id: projectId || '',
+//     filter: {
+//       latest_only: true,
+//     },
+//   });
 
-  // Get saved models
-  // Disallow saved models for now here
-  // const {result: savedModelsResult, loading: savedModelsLoading} =
-  //   useLeafObjectInstances('LLMStructuredCompletionModel', {
-  //     project_id: projectId || '',
-  //   });
+//   // Get saved models
+//   // Disallow saved models for now here
+//   // const {result: savedModelsResult, loading: savedModelsLoading} =
+//   //   useLeafObjectInstances('LLMStructuredCompletionModel', {
+//   //     project_id: projectId || '',
+//   //   });
 
-  // Get dropdown options
-  const llmDropdownOptions = useLLMDropdownOptions(
-    configuredProviders || {},
-    configuredProvidersLoading,
-    customProvidersResult || [],
-    customProviderModelsResult || [],
-    customProvidersLoading || customProviderModelsLoading,
-    [],
-    false
-    // savedModelsResult || [],
-    // savedModelsLoading
-  );
+//   // Get dropdown options
+//   const llmDropdownOptions = useLLMDropdownOptions(
+//     configuredProviders || {},
+//     configuredProvidersLoading,
+//     customProvidersResult || [],
+//     customProviderModelsResult || [],
+//     customProvidersLoading || customProviderModelsLoading,
+//     [],
+//     false
+//     // savedModelsResult || [],
+//     // savedModelsLoading
+//   );
 
-  // Transform dropdown options to our simpler format
-  return useMemo(() => {
-    const models: Array<{id: string; name: string; provider: string}> = [];
+//   // Transform dropdown options to our simpler format
+//   return useMemo(() => {
+//     const models: Array<{id: string; name: string; provider: string}> = [];
 
-    llmDropdownOptions.forEach(providerOption => {
-      if (providerOption.llms) {
-        providerOption.llms.forEach(llm => {
-          models.push({
-            id: llm.value,
-            name: llm.label as string,
-            provider: providerOption.label as string,
-          });
-        });
-      }
+//     llmDropdownOptions.forEach(providerOption => {
+//       if (providerOption.llms) {
+//         providerOption.llms.forEach(llm => {
+//           models.push({
+//             id: llm.value,
+//             name: llm.label as string,
+//             provider: providerOption.label as string,
+//           });
+//         });
+//       }
 
-      // Handle nested providers (for saved models)
-      if (providerOption.providers) {
-        providerOption.providers.forEach(nestedProvider => {
-          if (nestedProvider.llms) {
-            nestedProvider.llms.forEach(llm => {
-              models.push({
-                id: llm.value,
-                name: llm.label as string,
-                provider: nestedProvider.label as string,
-              });
-            });
-          }
-        });
-      }
-    });
+//       // Handle nested providers (for saved models)
+//       if (providerOption.providers) {
+//         providerOption.providers.forEach(nestedProvider => {
+//           if (nestedProvider.llms) {
+//             nestedProvider.llms.forEach(llm => {
+//               models.push({
+//                 id: llm.value,
+//                 name: llm.label as string,
+//                 provider: nestedProvider.label as string,
+//               });
+//             });
+//           }
+//         });
+//       }
+//     });
 
-    console.log('models', models);
+//     console.log('models', models);
 
-    return models;
-  }, [llmDropdownOptions]);
-};
+//     return models;
+//   }, [llmDropdownOptions]);
+// };

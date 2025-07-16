@@ -261,6 +261,7 @@ interface LLMDropdownLoadedProps {
   className?: string;
   direction: OpenDirection;
   selectFirstAvailable?: boolean;
+  excludeSavedModels?: boolean;
 }
 
 export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
@@ -270,6 +271,7 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
   className,
   direction,
   selectFirstAvailable = false,
+  excludeSavedModels = false,
 }) => {
   const {entity, project, projectId} = useEntityProject();
 
@@ -302,9 +304,13 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
   });
 
   const {result: savedModelsResult, loading: savedModelsLoading} =
-    useLeafObjectInstances('LLMStructuredCompletionModel', {
-      project_id: projectId,
-    });
+    useLeafObjectInstances(
+      'LLMStructuredCompletionModel',
+      {
+        project_id: projectId,
+      },
+      !excludeSavedModels
+    );
 
   const refetchCustomLLMs = useCallback(() => {
     refetchCustomProviders();
@@ -317,8 +323,8 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
     customProvidersResult || [],
     customProviderModelsResult || [],
     customProvidersLoading,
-    savedModelsResult || [],
-    savedModelsLoading
+    excludeSavedModels ? [] : savedModelsResult || [],
+    excludeSavedModels ? false : savedModelsLoading
   );
 
   const areCustomProvidersLoading =

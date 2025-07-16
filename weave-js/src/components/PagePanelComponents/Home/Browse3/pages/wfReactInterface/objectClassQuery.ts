@@ -172,7 +172,8 @@ export const useLeafObjectInstances = <
   C extends BuiltinObjectClassRegistryKeys
 >(
   leafObjectClassName: C,
-  req: TraceObjQueryReq
+  req: TraceObjQueryReq,
+  skip: boolean = false
 ): LeafObjectInstancesResult<C> => {
   const getTsClient = useGetTraceServerClientContext();
   const client = getTsClient();
@@ -199,6 +200,14 @@ export const useLeafObjectInstances = <
       error: null,
     });
     currReq.current = deepReq;
+    if (skip) {
+      setResult({
+        loading: false,
+        result: [],
+        error: null,
+      });
+      return;
+    }
     getLeafObjectInstances(client, leafObjectClassName, deepReq)
       .then(collectionObjects => {
         if (isMounted && currReq.current === deepReq) {
@@ -221,7 +230,7 @@ export const useLeafObjectInstances = <
     return () => {
       isMounted = false;
     };
-  }, [client, leafObjectClassName, deepReq, doReload]);
+  }, [client, leafObjectClassName, deepReq, doReload, skip]);
 
   return {...result, refetch};
 };
