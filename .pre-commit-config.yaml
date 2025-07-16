@@ -48,7 +48,12 @@ repos:
     hooks:
       - id: pyright
         additional_dependencies: [".[tests]"]
-
+  - repo: https://github.com/oxipng/oxipng
+    rev: v9.1.5
+    hooks:
+      - id: oxipng
+        args: ["-o", "2", "--strip", "safe", "--alpha"]
+        exclude: (weave_query|weave-js)
   # This is legacy Weave when we were building a notebook product - should be removed
   - repo: local
     hooks:
