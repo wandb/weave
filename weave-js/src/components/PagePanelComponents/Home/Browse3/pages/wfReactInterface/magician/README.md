@@ -13,13 +13,13 @@ Building AI features shouldn't be hard. Magician gives you:
 ## Quick Start
 
 ```tsx
-import { ChatClientProvider, MagicTooltip, MagicButton } from './magician';
+import { MagicProvider, MagicTooltip, MagicButton } from './magician';
 
 function App() {
   return (
-    <ChatClientProvider value={{ entity: 'my-org', project: 'my-project' }}>
+    <MagicProvider value={{ entity: 'my-org', project: 'my-project' }}>
       <MyComponent />
-    </ChatClientProvider>
+    </MagicProvider>
   );
 }
 
@@ -97,13 +97,13 @@ Button with sparkle icon that supports multiple states.
 
 ### Provider
 
-#### `ChatClientProvider`
+#### `MagicProvider`
 Provides context for entity/project and model selection.
 
 ```tsx
-<ChatClientProvider value={{ entity: 'org', project: 'project' }}>
+<MagicProvider value={{ entity: 'org', project: 'project' }}>
   {/* Your components */}
-</ChatClientProvider>
+</MagicProvider>
 ```
 
 ## Real Example

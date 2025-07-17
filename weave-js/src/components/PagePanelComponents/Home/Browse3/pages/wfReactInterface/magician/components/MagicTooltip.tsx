@@ -18,7 +18,7 @@ import {
   prepareSingleShotMessages,
   useChatCompletionStream,
   useMagicContext,
-} from '../chatCompletionClient';
+} from '../index';
 import {MagicButton} from './MagicButton';
 
 export interface MagicTooltipProps {
