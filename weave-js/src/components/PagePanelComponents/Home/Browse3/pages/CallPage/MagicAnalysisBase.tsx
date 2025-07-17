@@ -2,7 +2,7 @@ import {Alert} from '@mui/material';
 import Markdown from '@wandb/weave/common/components/Markdown';
 import * as Colors from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
-import {MagicButton, MagicTooltip} from '@wandb/weave/common/util/WBMagician2';
+import {MagicButton, MagicTooltip} from '@wandb/weave/common/util/magician';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';

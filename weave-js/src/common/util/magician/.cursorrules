@@ -1,9 +1,9 @@
-# WBMagician2 Project Cursor Rules
+# magician Project Cursor Rules
 
 
 ## Living Documentation
 
-The requirements.md in this directory serves as the single source of truth for the WBMagician2 project. It is a living document that must be kept up to date throughout development.
+The requirements.md in this directory serves as the single source of truth for the magician project. It is a living document that must be kept up to date throughout development.
 
 ### Update requirements.md whenever you:
 
@@ -75,4 +75,4 @@ When implementing or modifying magic components:
 - If unsure about complexity, choose the simpler path
 - Document "why not" decisions as much as "why" decisions
 
-Remember: WBMagician2 exists because v1 became too complex. Every decision should be made with simplicity in mind. 
+Remember: magician exists because v1 became too complex. Every decision should be made with simplicity in mind. 

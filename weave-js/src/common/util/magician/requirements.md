@@ -1,4 +1,4 @@
-# WBMagician2 Requirements
+# magician Requirements
 
 ## 🎯 Module Overview
 
@@ -90,7 +90,7 @@ Simplified tooltip for AI-assisted content generation:
 
 ### Basic Tooltip Integration
 ```typescript
-import { MagicTooltip, MagicButton } from '@/WBMagician2';
+import { MagicTooltip, MagicButton } from '@/magician';
 
 function MyComponent() {
   const [content, setContent] = useState('');
@@ -117,7 +117,7 @@ function MyComponent() {
 
 ### With Context Provider
 ```typescript
-import { ChatClientProvider, useSelectedModel } from '@/WBMagician2';
+import { ChatClientProvider, useSelectedModel } from '@/magician';
 
 function App() {
   return (
@@ -144,7 +144,7 @@ function ModelSelector() {
 
 ### Using Completion Hooks Directly
 ```typescript
-import { useChatCompletionStream } from '@/WBMagician2';
+import { useChatCompletionStream } from '@/magician';
 
 function MyComponent() {
   const complete = useChatCompletionStream();

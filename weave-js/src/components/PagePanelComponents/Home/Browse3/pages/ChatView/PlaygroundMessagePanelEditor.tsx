@@ -1,4 +1,4 @@
-import {MagicButton, MagicTooltip} from '@wandb/weave/common/util/WBMagician2';
+import {MagicButton, MagicTooltip} from '@wandb/weave/common/util/magician';
 import {Button} from '@wandb/weave/components/Button';
 import classNames from 'classnames';
 import _ from 'lodash';

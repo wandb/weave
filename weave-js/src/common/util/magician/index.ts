@@ -1,5 +1,5 @@
 /**
- * WBMagician2 - Simple LLM integration for Weave frontend
+ * magician - Simple LLM integration for Weave frontend
  *
  * This module provides dead-simple access to LLMs for frontend engineers
  * through reusable components and hooks.

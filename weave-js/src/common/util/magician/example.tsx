@@ -1,5 +1,5 @@
 /**
- * Example usage of WBMagician2 components
+ * Example usage of magician components
  *
  * This demonstrates how to integrate the simplified Magic components
  * into your React application.
@@ -127,7 +127,7 @@ export function MagicApp() {
   return (
     <ChatClientProvider value={{entity: 'my-org', project: 'my-project'}}>
       <div style={{padding: 20}}>
-        <h1>WBMagician2 Examples</h1>
+        <h1>magician Examples</h1>
 
         <section style={{marginBottom: 40}}>
           <h2>Basic Magic Button + Tooltip</h2>
