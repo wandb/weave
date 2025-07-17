@@ -16,6 +16,7 @@ import {WFHighLevelCallFilter} from '../CallsPage/callsTableFilter';
 import {DEFAULT_FILTER_CALLS} from '../CallsPage/callsTableQuery';
 import {ResizableDrawer} from '../common/ResizableDrawer';
 import CallChartsWidget from './CallChartsWidget';
+import CostsBarChart from './CostsBarChart';
 import ProjectAccessItem from './ProjectAccessItem';
 import StatsWidget from './StatsWidget';
 import UserLinkItem from './UserLinkItem';
@@ -30,7 +31,13 @@ export enum AccessOption {
 
 type WidgetConfig = {
   id: string;
-  type: 'projectInfo' | 'owner' | 'stats' | 'chart' | 'userTraceCountsChart';
+  type:
+    | 'projectInfo'
+    | 'owner'
+    | 'stats'
+    | 'chart'
+    | 'userTraceCountsChart'
+    | 'costsBarChart';
   x: number;
   y: number;
   w: number;
@@ -83,6 +90,39 @@ export const WeaveOnlyOverviewInner: React.FC<{
     return _.mapValues(_.groupBy(filtered, 'wb_user_id'), arr => arr.length);
   }, [callData]);
 
+  // Calculate costs by user
+  const costsData = useMemo(() => {
+    if (!callData) return [];
+
+    // Create a map of user costs
+    const userCosts = new Map<string, {totalCost: number; callCount: number}>();
+
+    // Process call data to calculate costs per user
+    callData.forEach(call => {
+      if (!call.wb_user_id) return;
+
+      const userId = call.wb_user_id;
+      const existing = userCosts.get(userId) || {totalCost: 0, callCount: 0};
+
+      // Use actual cost data from the call (since includeCosts: true is set)
+      const callCost = call.cost || 0;
+
+      userCosts.set(userId, {
+        totalCost: existing.totalCost + callCost,
+        callCount: existing.callCount + 1,
+      });
+    });
+
+    // Convert to array format
+    return Array.from(userCosts.entries())
+      .map(([user, data]) => ({
+        user,
+        totalCost: data.totalCost,
+        callCount: data.callCount,
+      }))
+      .sort((a, b) => b.totalCost - a.totalCost);
+  }, [callData]);
+
   // Prepare data for the Chart widget (must match ExtractedCallData[] type)
   const userTraceCountsData = useMemo(
     () =>
@@ -93,7 +133,7 @@ export const WeaveOnlyOverviewInner: React.FC<{
           started_at: '',
           wb_user_id: user,
           user, // for xAxis
-          count, // for yAxis
+          count: count as number, // for yAxis
         }))
         .sort((a, b) => b.count - a.count), // Sort descending by count
     [userTraceCounts]
@@ -185,6 +225,8 @@ export const WeaveOnlyOverviewInner: React.FC<{
   const hasUserTraceCountsChart = widgetConfigs.some(
     w => w.type === 'userTraceCountsChart'
   );
+  const hasCostsBarChart = widgetConfigs.some(w => w.type === 'costsBarChart');
+
   const addUserTraceCountsChartWidget = () => {
     if (hasUserTraceCountsChart) return;
     const newConfig: WidgetConfig = {
@@ -192,7 +234,38 @@ export const WeaveOnlyOverviewInner: React.FC<{
       type: 'userTraceCountsChart',
       x: 0,
       y: 6,
-      w: 12,
+      w: 11,
+      h: 9,
+      minH: 9,
+      maxH: 9,
+      minW: 4,
+      maxW: 32,
+      isResizable: true,
+    };
+    setAllLayouts((prevLayouts: Layouts) => ({
+      ...prevLayouts,
+      lg: [
+        ...prevLayouts.lg,
+        {
+          i: newConfig.id,
+          x: newConfig.x,
+          y: newConfig.y,
+          w: newConfig.w,
+          h: newConfig.h,
+        },
+      ],
+    }));
+    setWidgetConfigs([...widgetConfigs, newConfig]);
+  };
+
+  const addCostsBarChartWidget = () => {
+    if (hasCostsBarChart) return;
+    const newConfig: WidgetConfig = {
+      id: 'costsBarChart',
+      type: 'costsBarChart',
+      x: 0,
+      y: 15,
+      w: 11,
       h: 9,
       minH: 9,
       maxH: 9,
@@ -276,6 +349,16 @@ export const WeaveOnlyOverviewInner: React.FC<{
               className="no-drag shadow-lg"
             />
           )}
+          {!hasCostsBarChart && (
+            <Button
+              icon="chart-vertical-bars"
+              variant="secondary"
+              size="large"
+              tooltip="Add Costs Bar Chart"
+              onClick={addCostsBarChartWidget}
+              className="no-drag shadow-lg"
+            />
+          )}
         </div>
         {/* End floating action buttons */}
         <ResizableDrawer
@@ -293,7 +376,7 @@ export const WeaveOnlyOverviewInner: React.FC<{
                 type: 'chart',
                 x: 0,
                 y: 0,
-                w: 12,
+                w: 10,
                 h: 9,
                 minH: 9,
                 maxH: 9,
@@ -429,6 +512,26 @@ export const WeaveOnlyOverviewInner: React.FC<{
                       widgetConfigs={widgetConfigs}
                       setWidgetConfigs={setWidgetConfigs}
                       userTraceCountsData={userTraceCountsData}
+                      isLoading={isLoading}
+                      userInfo={
+                        typeof userInfo === 'object' && userInfo !== null
+                          ? userInfo
+                          : []
+                      }
+                    />
+                  </div>
+                );
+              } else if (config.type === 'costsBarChart') {
+                return (
+                  <div
+                    key={config.id}
+                    data-grid={usedLayout}
+                    className="flex w-full items-center justify-center">
+                    <CostsBarChart
+                      project={project}
+                      widgetConfigs={widgetConfigs}
+                      setWidgetConfigs={setWidgetConfigs}
+                      costsData={costsData}
                       isLoading={isLoading}
                       userInfo={
                         typeof userInfo === 'object' && userInfo !== null
