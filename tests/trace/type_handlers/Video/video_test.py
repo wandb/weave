@@ -285,11 +285,11 @@ def test_video_as_file(client: WeaveClient, tmp_path: Path) -> None:
             str(fp), codec="libx264", audio=False, verbose=False, logger=None
         )
 
-    @weave.op()
+    @weave.op
     def return_video_mp4(path: str):
         return VideoFileClip(path)
 
-    @weave.op()
+    @weave.op
     def accept_video_mp4(val):
         width, height = val.size
         return f"Video size: {width}x{height}"

@@ -39,7 +39,7 @@ class Scorer(Object):
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
-    @weave.op()
+    @weave.op
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
 

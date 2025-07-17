@@ -14,7 +14,7 @@ class ExtractFruitsModel(weave.Model):
     model_name: str
     prompt_template: str
 
-    @weave.op()
+    @weave.op
     async def predict(self, sentence: str) -> dict:
         client = openai.AsyncClient()
 
@@ -64,7 +64,7 @@ examples = [
 
 
 # We define a scoring functions to compare our model predictions with a ground truth label.
-@weave.op()
+@weave.op
 def fruit_name_score(target: dict, output: dict) -> dict:
     return {"correct": target["fruit"] == output["fruit"]}
 

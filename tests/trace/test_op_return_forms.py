@@ -6,7 +6,7 @@ from weave.trace_server import trace_server_interface as tsi
 
 
 def test_op_return_sync_empty(client):
-    @weave.op()
+    @weave.op
     def fn():
         return
 
@@ -27,7 +27,7 @@ def test_op_return_sync_empty(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_empty(client):
-    @weave.op()
+    @weave.op
     async def fn():
         return
 
@@ -47,7 +47,7 @@ async def test_op_return_async_empty(client):
 
 
 def test_op_return_sync_obj(client):
-    @weave.op()
+    @weave.op
     def fn():
         return 1
 
@@ -68,7 +68,7 @@ def test_op_return_sync_obj(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_obj(client):
-    @weave.op()
+    @weave.op
     async def fn():
         return 1
 
