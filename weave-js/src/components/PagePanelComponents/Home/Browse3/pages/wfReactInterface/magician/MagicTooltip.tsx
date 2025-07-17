@@ -12,6 +12,7 @@ import React, {
 import {LLMDropdownLoaded} from '../../PlaygroundPage/PlaygroundChat/LLMDropdown';
 import {
   Chunk,
+  Completion,
   CompletionResponseFormat,
   EntityProject,
   prepareSingleShotMessages,
@@ -36,6 +37,10 @@ export interface MagicTooltipProps {
    * @param isComplete Whether generation is complete
    */
   onStream: (content: string, isComplete: boolean) => void;
+  /**
+   * Callback for when generation is complete.
+   */
+  onComplete?: (completion: Completion) => void;
   /**
    * Callback for errors during generation.
    */
@@ -95,6 +100,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   entityProject,
   children,
   onStream,
+  onComplete,
   onError,
   systemPrompt,
   placeholder,
@@ -187,7 +193,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
         onStream(accumulatedContent, false);
       };
 
-      await chatCompletionStream(
+      const res = await chatCompletionStream(
         {
           messages: prepareSingleShotMessages({
             staticSystemPrompt: systemPrompt,
@@ -202,6 +208,8 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
         onChunk,
         _dangerousExtraAttributesToLog
       );
+
+      onComplete?.(res);
 
       // Signal completion
       if (!abortControllerRef.current?.signal.aborted) {

@@ -1,6 +1,5 @@
 export {
   ChatClientProvider,
-  useChatCompletion,
   useChatCompletionStream,
   useSelectedModel,
 } from './chatCompletionClient';

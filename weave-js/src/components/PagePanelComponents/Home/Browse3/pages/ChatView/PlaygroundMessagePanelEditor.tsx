@@ -111,9 +111,10 @@ export const PlaygroundMessagePanelEditor: React.FC<
               systemPrompt={SYSTEM_PROMPT}
               placeholder={'What would you like the model to do?'}
               contentToRevise={contentToRevise}
-              responseFormat={z.object({
-                systemPrompt: z.string().describe('The system prompt to use'),
-              })}>
+              // responseFormat={z.object({
+              //   systemPrompt: z.string().describe('The system prompt to use'),
+              // })}
+            >
               <MagicButton size="medium" />
             </MagicTooltip>
 

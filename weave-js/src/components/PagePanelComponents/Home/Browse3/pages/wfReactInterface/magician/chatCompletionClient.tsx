@@ -27,7 +27,7 @@ export type EntityProject = {
   project: string;
 };
 
-export type Completion = string;
+export type Completion = string | Record<string, unknown>;
 
 export type Chunk = {
   content: string;
@@ -107,90 +107,6 @@ const prepareMessages = (messages: string | Array<Message>) => {
 };
 
 /**
- * Extract the message content from various LLM provider response formats.
- *
- * @param response Raw response from the completion API
- * @returns The extracted message content as a string
- */
-const extractMessageContent = (response: unknown): string => {
-  // Type guard to check if response has expected OpenAI-like structure
-  const isOpenAIResponse = (
-    r: unknown
-  ): r is {
-    choices: Array<{
-      message: {
-        content: string;
-        role: string;
-      };
-    }>;
-  } => {
-    return (
-      typeof r === 'object' &&
-      r !== null &&
-      'choices' in r &&
-      Array.isArray((r as any).choices) &&
-      (r as any).choices.length > 0 &&
-      'message' in (r as any).choices[0] &&
-      'content' in (r as any).choices[0].message
-    );
-  };
-
-  // Type guard for Anthropic-like response format
-  const isAnthropicResponse = (
-    r: unknown
-  ): r is {
-    content: Array<{
-      type: string;
-      text: string;
-    }>;
-  } => {
-    return (
-      typeof r === 'object' &&
-      r !== null &&
-      'content' in r &&
-      Array.isArray((r as any).content) &&
-      (r as any).content.length > 0 &&
-      'text' in (r as any).content[0]
-    );
-  };
-
-  // Type guard for simple content response
-  const isSimpleContentResponse = (
-    r: unknown
-  ): r is {
-    content: string;
-  } => {
-    return (
-      typeof r === 'object' &&
-      r !== null &&
-      'content' in r &&
-      typeof (r as any).content === 'string'
-    );
-  };
-
-  // Try different response formats
-  if (isOpenAIResponse(response)) {
-    return response.choices[0].message.content;
-  } else if (isAnthropicResponse(response)) {
-    // Concatenate all text blocks for Anthropic
-    return response.content
-      .filter(block => block.type === 'text')
-      .map(block => block.text)
-      .join('');
-  } else if (isSimpleContentResponse(response)) {
-    return response.content;
-  } else if (typeof response === 'string') {
-    return response;
-  }
-
-  // Log the unknown format for debugging
-  console.warn('Unknown completion response format:', response);
-
-  // Last resort: try to stringify the response
-  return JSON.stringify(response, null, 2);
-};
-
-/**
  * Prepare response format configuration for the API.
  * Currently not implemented as it depends on provider-specific requirements.
  *
@@ -227,7 +143,7 @@ const prepareResponseFormat = (
  * @param chunks Array of streaming chunks
  * @returns Combined completion string
  */
-const combineChunks = (chunks: unknown[]): Completion => {
+const combineChunks = (chunks: unknown[]): string => {
   if (!Array.isArray(chunks) || chunks.length === 0) {
     return '';
   }
@@ -282,37 +198,6 @@ const combineChunks = (chunks: unknown[]): Completion => {
   }
 
   return contentParts.join('');
-};
-
-/**
- * Make a chat completion request to the trace server.
- *
- * @param client The trace server client instance
- * @param entity The entity (organization) name
- * @param project The project name
- * @param params Chat completion parameters
- * @returns The completion response as a string
- */
-const chatComplete = async (
-  client: TraceServerClient,
-  entity: string,
-  project: string,
-  params: ChatCompletionParams
-): Promise<Completion> => {
-  const res = await client.completionsCreate({
-    project_id: `${entity}/${project}`,
-    inputs: {
-      model: params.weavePlaygroundModelId, //prepareModel(params.weavePlaygroundModelId, params.modelProvider),
-      messages: prepareMessages(params.messages),
-      temperature: params.temperature || 0.7,
-      response_format: prepareResponseFormat(params.responseFormat),
-      tools: params.tools,
-    },
-    track_llm_call: false,
-  });
-
-  // Extract the message content from the response
-  return extractMessageContent(res.response);
 };
 
 type SingleShotMessageRequest = {
@@ -430,7 +315,23 @@ const chatCompleteStream = async (
     processChunk
   );
 
-  const res = combineChunks(processedChunks);
+  const rawRes = combineChunks(processedChunks);
+  let res: Completion;
+  if (params.responseFormat) {
+    if (
+      'type' in params.responseFormat &&
+      params.responseFormat.type === 'text'
+    ) {
+      res = rawRes;
+    } else {
+      res = JSON.parse(rawRes);
+      if ('parse' in params.responseFormat && params.responseFormat.parse) {
+        res = params.responseFormat.parse(res);
+      }
+    }
+  } else {
+    res = rawRes;
+  }
 
   await dangerouslyLogCallToWeave(
     'chatCompletionStream',
@@ -493,33 +394,6 @@ export const useSelectedModel = () => {
   return {selectedModel, setSelectedModel};
 };
 
-export const useChatCompletion = (entityProject?: EntityProject) => {
-  const entityProjectContext = useEntityProjectContext();
-  const {selectedModel} = useSelectedModelContext();
-  const {entity, project} = useMemo(() => {
-    if (entityProject) {
-      return entityProject;
-    }
-    if (entityProjectContext) {
-      return entityProjectContext;
-    }
-    throw new Error('No entity project found');
-  }, [entityProject, entityProjectContext]);
-  const getClient = useGetTraceServerClientContext();
-  return useCallback(
-    (params: ChatCompletionParams) => {
-      const client = getClient();
-      // Use selected model from context if not specified in params
-      const modelId = params.weavePlaygroundModelId || selectedModel;
-      return chatComplete(client, entity, project, {
-        ...params,
-        weavePlaygroundModelId: modelId,
-      });
-    },
-    [entity, project, getClient, selectedModel]
-  );
-};
-
 export const useChatCompletionStream = (entityProject?: EntityProject) => {
   const entityProjectContext = useEntityProjectContext();
   const {selectedModel} = useSelectedModelContext();
@@ -557,110 +431,3 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
     [entity, project, getClient, selectedModel]
   );
 };
-
-// NOT CURRENTLY USED
-// import {useLLMDropdownOptions} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/PlaygroundChat/LLMDropdownOptions';
-// import {useConfiguredProviders} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/useConfiguredProviders';
-// import {useBaseObjectInstances} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/objectClassQuery';
-// /**
-//  * Hook to get available models for the current entity/project.
-//  * Returns a list of model options that can be used for completions.
-//  *
-//  * @param entityProject Optional entity/project override
-//  * @returns List of available models
-//  */
-// export const useAvailableModels = (
-//   entityProject?: EntityProject
-// ): Array<{id: string; name: string; provider: string}> => {
-//   const entityProjectContext = useEntityProjectContext();
-//   const {entity, project} = useMemo(() => {
-//     if (entityProject) {
-//       return entityProject;
-//     }
-//     if (entityProjectContext) {
-//       return entityProjectContext;
-//     }
-//     return {entity: '', project: ''};
-//   }, [entityProject, entityProjectContext]);
-
-//   const projectId = entity && project ? `${entity}/${project}` : null;
-
-//   // Get configured providers
-//   const {result: configuredProviders, loading: configuredProvidersLoading} =
-//     useConfiguredProviders(entity);
-
-//   // Get custom providers and models
-//   const {result: customProvidersResult, loading: customProvidersLoading} =
-//     useBaseObjectInstances('Provider', {
-//       project_id: projectId || '',
-//       filter: {
-//         latest_only: true,
-//       },
-//     });
-
-//   const {
-//     result: customProviderModelsResult,
-//     loading: customProviderModelsLoading,
-//   } = useBaseObjectInstances('ProviderModel', {
-//     project_id: projectId || '',
-//     filter: {
-//       latest_only: true,
-//     },
-//   });
-
-//   // Get saved models
-//   // Disallow saved models for now here
-//   // const {result: savedModelsResult, loading: savedModelsLoading} =
-//   //   useLeafObjectInstances('LLMStructuredCompletionModel', {
-//   //     project_id: projectId || '',
-//   //   });
-
-//   // Get dropdown options
-//   const llmDropdownOptions = useLLMDropdownOptions(
-//     configuredProviders || {},
-//     configuredProvidersLoading,
-//     customProvidersResult || [],
-//     customProviderModelsResult || [],
-//     customProvidersLoading || customProviderModelsLoading,
-//     [],
-//     false
-//     // savedModelsResult || [],
-//     // savedModelsLoading
-//   );
-
-//   // Transform dropdown options to our simpler format
-//   return useMemo(() => {
-//     const models: Array<{id: string; name: string; provider: string}> = [];
-
-//     llmDropdownOptions.forEach(providerOption => {
-//       if (providerOption.llms) {
-//         providerOption.llms.forEach(llm => {
-//           models.push({
-//             id: llm.value,
-//             name: llm.label as string,
-//             provider: providerOption.label as string,
-//           });
-//         });
-//       }
-
-//       // Handle nested providers (for saved models)
-//       if (providerOption.providers) {
-//         providerOption.providers.forEach(nestedProvider => {
-//           if (nestedProvider.llms) {
-//             nestedProvider.llms.forEach(llm => {
-//               models.push({
-//                 id: llm.value,
-//                 name: llm.label as string,
-//                 provider: nestedProvider.label as string,
-//               });
-//             });
-//           }
-//         });
-//       }
-//     });
-
-//     console.log('models', models);
-
-//     return models;
-//   }, [llmDropdownOptions]);
-// };
