@@ -30,9 +30,11 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import Row, quote_json_path
+from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
     digest_is_version_like,
@@ -93,6 +95,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 trace_id TEXT,
                 parent_id TEXT,
                 thread_id TEXT,
+                turn_id TEXT,
                 op_name TEXT,
                 started_at TEXT,
                 ended_at TEXT,
@@ -190,6 +193,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     trace_id,
                     parent_id,
                     thread_id,
+                    turn_id,
                     op_name,
                     display_name,
                     started_at,
@@ -199,13 +203,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     wb_user_id,
                     wb_run_id,
                     wb_run_step
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
                     req.start.trace_id,
                     req.start.parent_id,
                     req.start.thread_id,
+                    req.start.turn_id,
                     req.start.op_name,
                     req.start.display_name,
                     req.start.started_at.isoformat(),
@@ -1457,6 +1462,83 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         raise NotImplementedError(
             "project_stats is not implemented for SQLite trace server"
         )
+
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        """Stream threads with aggregated statistics sorted by last activity."""
+        conn, cursor = get_conn_cursor(self.db_path)
+
+        # Extract filter values
+        after_datetime = None
+        before_datetime = None
+        if req.filter is not None:
+            after_datetime = req.filter.after_datetime
+            before_datetime = req.filter.before_datetime
+
+        # Use the dedicated query builder
+        query, parameters = make_threads_query_sqlite(
+            project_id=req.project_id,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
+            sortable_datetime_after=after_datetime,
+            sortable_datetime_before=before_datetime,
+        )
+
+        cursor.execute(query, parameters)
+        query_result = cursor.fetchall()
+
+        # Use iter() as requested for SQLite implementation
+        for row in iter(query_result):
+            (
+                thread_id,
+                turn_count,
+                start_time_str,
+                last_updated_str,
+                first_turn_id,
+                last_turn_id,
+                p50_turn_duration_ms,
+                p99_turn_duration_ms,
+            ) = row
+
+            # Parse the datetime strings if present
+            if start_time_str and last_updated_str:
+                try:
+                    # SQLite stores datetime as string, parse it
+                    start_time = datetime.datetime.fromisoformat(
+                        start_time_str.replace("Z", "+00:00")
+                    )
+                    last_updated = datetime.datetime.fromisoformat(
+                        last_updated_str.replace("Z", "+00:00")
+                    )
+                except (ValueError, AttributeError):
+                    # Skip threads without valid timestamps
+                    continue
+            else:
+                # Skip threads without valid timestamps
+                continue
+
+            yield tsi.ThreadSchema(
+                thread_id=thread_id,
+                turn_count=turn_count,
+                start_time=start_time,
+                last_updated=last_updated,
+                first_turn_id=first_turn_id,
+                last_turn_id=last_turn_id,
+                p50_turn_duration_ms=p50_turn_duration_ms,
+                p99_turn_duration_ms=p99_turn_duration_ms,
+            )
+
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise NotImplementedError(
+            "evaluate_model is not implemented for SQLite trace server"
+        )
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        return evaluation_status(self, req)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)

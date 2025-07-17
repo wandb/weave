@@ -6,7 +6,7 @@ class YourModel(Model):
     attribute1: str
     attribute2: int
 
-    @weave.op()
+    @weave.op
     def predict(self, input_data: str) -> dict:
         # Model logic goes here
         prediction = self.attribute1 + " " + input_data

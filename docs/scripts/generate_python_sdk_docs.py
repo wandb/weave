@@ -201,8 +201,6 @@ def generate_module_doc_string(module, src_root_path):
             markdown_paragraphs.append(generator.func2md(obj))
         elif isinstance(obj, type):
             markdown_paragraphs.append(generator.class2md(obj))
-        else:
-            pass
 
     if hasattr(module, "__docspec__"):
         for obj in module.__docspec__:

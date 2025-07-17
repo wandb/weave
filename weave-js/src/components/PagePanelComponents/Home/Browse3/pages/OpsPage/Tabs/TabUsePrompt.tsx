@@ -16,6 +16,7 @@ type TabUsePromptProps = {
   entityName: string;
   projectName: string;
   data: Data;
+  versionIndex: number;
 };
 
 export const TabUsePrompt = ({
@@ -24,11 +25,15 @@ export const TabUsePrompt = ({
   entityName,
   projectName,
   data,
+  versionIndex,
 }: TabUsePromptProps) => {
   const pythonName = isValidVarName(name) ? name : 'prompt';
   const ref = parseRef(uri);
   const isParentObject = !ref.artifactRefExtra;
   const label = isParentObject ? 'prompt version' : 'prompt';
+
+  const long = `weave.init('${entityName}/${projectName}')
+${pythonName} = weave.ref('${name}:v${versionIndex}').get()`;
 
   return (
     <Box className="text-sm">
@@ -53,6 +58,8 @@ export const TabUsePrompt = ({
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
           tooltipText="Click to copy unabridged string"
         />
+        <div className="mt-8">or</div>
+        <CopyableText language="python" text={long} />
       </Box>
     </Box>
   );

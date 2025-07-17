@@ -198,7 +198,6 @@ export const PlaygroundChat = ({
           isLoading={isAnyLoading}
           onSend={handleStreamSend}
           onAdd={handleAddMessage}
-          settingsTab={settingsTab}
           hasConfiguredProviders={hasConfiguredProviders}
         />
       </div>
@@ -306,7 +305,6 @@ export const PlaygroundChat = ({
         isLoading={isAnyLoading}
         onSend={handleStreamSend}
         onAdd={handleAddMessage}
-        settingsTab={settingsTab}
         hasConfiguredProviders={hasConfiguredProviders}
       />
     </div>

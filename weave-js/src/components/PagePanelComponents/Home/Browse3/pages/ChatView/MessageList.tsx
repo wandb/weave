@@ -23,6 +23,17 @@ export const MessageList = ({
 
   return (
     <div className="flex flex-col">
+      <style>
+        {`
+            @keyframes blink {
+              0%, 100% { opacity: 1; }
+              50% { opacity: 0; }
+            }
+            .cursor-blink {
+              animation: blink 1s ease-in-out infinite;
+            }
+          `}
+      </style>
       {processedMessages.map((m, i) => (
         <div
           ref={i === processedMessages.length - 1 ? lastMessageRef : null}

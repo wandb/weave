@@ -6,7 +6,6 @@ import {Popover} from '@mui/material';
 import {GridFilterItem, GridFilterModel} from '@mui/x-data-grid-pro';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
-import {useViewerInfo} from '../../../../../common/hooks/useViewerInfo';
 import {Button} from '../../../../Button';
 import {DraggableGrow, DraggableHandle} from '../../../../DraggablePopups';
 import {IconFilterAlt} from '../../../../Icon';
@@ -36,6 +35,12 @@ import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
 export const FILTER_INPUT_DEBOUNCE_MS = 1000;
 
+export type FieldOption = {
+  readonly value: string;
+  readonly label: string;
+  readonly description?: string;
+};
+
 type FilterBarProps = {
   entity: string;
   project: string;
@@ -44,9 +49,9 @@ type FilterBarProps = {
   columnInfo: ColumnInfo;
   selectedCalls: string[];
   clearSelectedCalls: () => void;
-
   width: number;
   height: number;
+  isGrouped?: boolean;
 };
 
 const isFilterIncomplete = (filter: GridFilterItem): boolean => {
@@ -67,6 +72,7 @@ export const FilterBar = ({
   selectedCalls,
   clearSelectedCalls,
   width,
+  isGrouped = false,
 }: FilterBarProps) => {
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
@@ -83,9 +89,6 @@ export const FilterBar = ({
   const [incompleteFilters, setIncompleteFilters] = useState<GridFilterItem[]>(
     []
   );
-
-  const {loading, userInfo} = useViewerInfo();
-  const isWandbAdmin = (!loading && userInfo?.admin) ?? false;
 
   // Merge the parent filter model with our incomplete filters
   useEffect(() => {
@@ -177,11 +180,13 @@ export const FilterBar = ({
       });
     }
   }
-  (options[0] as GroupedOption).options.unshift({
-    value: 'id',
-    label: 'Call ID',
-  });
-  if (isWandbAdmin) {
+
+  if (!isGrouped) {
+    // Add the default filters if the calls are not grouped
+    (options[0] as GroupedOption).options.push({
+      value: 'id',
+      label: 'Call ID',
+    });
     (options[0] as GroupedOption).options.push({
       value: MONITORED_FILTER_VALUE,
       label: 'Monitored',
@@ -197,6 +202,7 @@ export const FilterBar = ({
     ) {
       setFilterToDelete(localFilterModel.items[0].id);
       setShowDeleteWarning(true);
+      setAnchorEl(null); // Close popover to avoid focus trap conflicts
       return;
     }
 
@@ -281,6 +287,7 @@ export const FilterBar = ({
       if (isFirstDatetimeFilter) {
         setFilterToDelete(filterId);
         setShowDeleteWarning(true);
+        setAnchorEl(null); // Close popover to avoid focus trap conflicts
         return;
       }
 
@@ -318,6 +325,7 @@ export const FilterBar = ({
   const handleCancelDelete = useCallback(() => {
     setShowDeleteWarning(false);
     setFilterToDelete(null);
+    setAnchorEl(refBar.current); // Reopen popover after cancel
   }, []);
 
   const onSetSelected = useCallback(() => {

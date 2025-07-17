@@ -12,9 +12,10 @@ import {Chat} from './types';
 
 type ChatViewProps = {
   chat: Chat;
+  showTitle?: boolean;
 };
 
-export const ChatView = ({chat}: ChatViewProps) => {
+export const ChatView = ({chat, showTitle = true}: ChatViewProps) => {
   const outputRef = useRef<HTMLDivElement>(null);
   const playgroundContext = usePlaygroundContext();
 
@@ -62,7 +63,9 @@ export const ChatView = ({chat}: ChatViewProps) => {
 
   return (
     <div className="flex flex-col pb-32">
-      <p className="mb-[8px] text-sm font-semibold text-moon-800">Messages</p>
+      {showTitle && (
+        <p className="mb-[8px] text-sm font-semibold text-moon-800">Messages</p>
+      )}
       <MessageList
         messages={chat.request?.messages || []}
         scrollLastMessage={scrollLastMessage}
@@ -70,9 +73,11 @@ export const ChatView = ({chat}: ChatViewProps) => {
       {/* Show loading state when waiting for response */}
       {shouldShowLoading && (
         <>
-          <span className="mb-[8px] text-sm font-semibold text-moon-800">
-            Response
-          </span>
+          {showTitle && (
+            <span className="mb-[8px] text-sm font-semibold text-moon-800">
+              Response
+            </span>
+          )}
           <div className="flex gap-[16px] py-4">
             <div className="w-32 flex-shrink-0">
               <Callout
@@ -113,9 +118,11 @@ export const ChatView = ({chat}: ChatViewProps) => {
         chatResult.choices &&
         chatResult.choices.length > 0 && (
           <>
-            <span className="mb-[8px] text-sm font-semibold text-moon-800">
-              Response
-            </span>
+            {showTitle && (
+              <span className="mb-[8px] text-sm font-semibold text-moon-800">
+                Response
+              </span>
+            )}
             <div ref={outputRef}>
               <ChoicesView
                 isStructuredOutput={chat.isStructuredOutput}

@@ -8,7 +8,7 @@ import React, {useCallback} from 'react';
 
 import {toast} from '../../../../../common/components/elements/Toast';
 import {Button} from '../../../../Button';
-import {IconOnlyPill} from '../../../../Tag';
+import {IconOnlyPill, Tag} from '../../../../Tag';
 import {Link} from '../pages/common/Links';
 import {Modalities} from './Modalities';
 import {InferenceContextType, Model, ModelId, SelectedState} from './types';
@@ -113,6 +113,8 @@ export const ModelTile = ({
           <Link to={urlDetails}>{label}</Link>
         </div>
         {model.modalities && <Modalities modalities={model.modalities} />}
+        <div className="flex-1" />
+        {model.isNew && <Tag color="teal" label="New" />}
       </div>
       <div className="mb-8 flex items-center gap-16 text-sm">
         {model.launchDate && (

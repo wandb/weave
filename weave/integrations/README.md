@@ -10,7 +10,7 @@ This directory contains various integrations for Weave. As of this writing, ther
 
   - Notes:
 
-    - we might want to expose an `autopatch` method that can be called indpendent of initialization for better code ergonomics.
+    - we might want to expose an `autopatch` method that can be called independent of initialization for better code ergonomics.
     - we will likely (but have not) exposed a way to configure the autopatcher (similar to DataDog's `patch` method)
 
 - `manual`: When patching is not sufficient (or possible), we can expose utilities for the user. For example, with an orchestration framework such as `Langchain`, we will provide a callback to fit into their program architecture more cleanly.
@@ -116,7 +116,7 @@ This directory contains various integrations for Weave. As of this writing, ther
        <vendor>_patcher.undo_patch()
    ```
 9. Now, run the unit test again, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart`. If everything worked, you should now see a PASSING test!
-   - Optional: if you want to see this in the UI, run `MISTRAL_API_KEY=... pytest --weave-server=prod --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` (notice the `--weave-server=prod `). This tells the system to target prod so you can actually see the results of your integration in the UI and make sure everything looks good.
+   - Optional: if you want to see this in the UI, run `MISTRAL_API_KEY=... pytest --trace-server=prod --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` (notice the `--trace-server=prod `). This tells the system to target prod so you can actually see the results of your integration in the UI and make sure everything looks good.
 10. Finally, when you are ready, save the network recordings:
     - Run `MISTRAL_API_KEY=... pytest --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` to generate the recording
     - Run `MISTRAL_API_KEY=... pytest flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` to validate it works!

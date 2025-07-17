@@ -4,10 +4,8 @@
 
 # NOTE: This was copied from the query service and contains way more than it needs to.
 
-import contextlib
 import contextvars
 import dataclasses
-from collections.abc import Generator
 from typing import Any, Optional
 
 import aiohttp
@@ -16,7 +14,13 @@ import graphql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
-from wandb.sdk.internal.internal_api import _thread_local_api_settings
+
+try:
+    from wandb.sdk.internal.internal_api import _thread_local_api_settings
+except ImportError:
+    WANDB_AVAILABLE = False
+else:
+    WANDB_AVAILABLE = True
 
 from weave.trace import env
 
@@ -51,15 +55,10 @@ def set_wandb_thread_local_api_settings(
     cookies: Optional[dict],
     headers: Optional[dict],
 ) -> None:
-    _thread_local_api_settings.api_key = api_key
-    _thread_local_api_settings.cookies = cookies
-    _thread_local_api_settings.headers = headers
-
-
-def reset_wandb_thread_local_api_settings() -> None:
-    _thread_local_api_settings.api_key = None
-    _thread_local_api_settings.cookies = None
-    _thread_local_api_settings.headers = None
+    if WANDB_AVAILABLE:
+        _thread_local_api_settings.api_key = api_key
+        _thread_local_api_settings.cookies = cookies
+        _thread_local_api_settings.headers = headers
 
 
 def set_wandb_api_context(
@@ -78,31 +77,6 @@ def set_wandb_api_context(
     return _wandb_api_context.set(WandbApiContext(user_id, api_key, headers, cookies))
 
 
-def reset_wandb_api_context(
-    token: Optional[contextvars.Token[Optional[WandbApiContext]]],
-) -> None:
-    if token is None:
-        return
-    reset_wandb_thread_local_api_settings()
-    _wandb_api_context.reset(token)
-
-
-# api.py
-@contextlib.contextmanager
-def wandb_api_context(
-    ctx: Optional[WandbApiContext],
-) -> Generator[None, None, None]:
-    if ctx:
-        token = set_wandb_api_context(
-            ctx.user_id, ctx.api_key, ctx.headers, ctx.cookies
-        )
-    try:
-        yield
-    finally:
-        if ctx:
-            reset_wandb_api_context(token)
-
-
 # api.py, weave_init.py
 def get_wandb_api_context() -> Optional[WandbApiContext]:
     return _wandb_api_context.get()
@@ -113,16 +87,6 @@ def init() -> Optional[contextvars.Token[Optional[WandbApiContext]]]:
     if api_key:
         return set_wandb_api_context("admin", api_key, None, None)
     return None
-
-
-@contextlib.contextmanager
-def from_environment() -> Generator[None, None, None]:
-    token = init()
-    try:
-        yield
-    finally:
-        if token:
-            reset_wandb_api_context(token)
 
 
 class WandbApiAsync:
@@ -167,144 +131,6 @@ class WandbApiAsync:
         await transport.session.close()
         return result
 
-    SERVER_INFO_QUERY = gql.gql(
-        """
-        query ServerInfo {
-            serverInfo {
-            frontendHost
-            }
-        }
-        """
-    )
-
-    async def server_info(self) -> Any:
-        return await self.query(self.SERVER_INFO_QUERY)
-
-    ARTIFACT_MANIFEST_QUERY = gql.gql(
-        """
-        query ArtifactManifest(
-            $entityName: String!,
-            $projectName: String!,
-            $name: String!
-        ) {
-            project(name: $projectName, entityName: $entityName) {
-                artifact(name: $name) {
-                    currentManifest {
-                        id
-                        file {
-                            directUrl
-                        }
-                    }
-                }
-            }
-        }
-        """
-    )
-
-    async def artifact_manifest_url(
-        self, entity_name: str, project_name: str, name: str
-    ) -> Optional[str]:
-        try:
-            result = await self.query(
-                self.ARTIFACT_MANIFEST_QUERY,
-                entityName=entity_name,
-                projectName=project_name,
-                name=name,
-            )
-        except gql.transport.exceptions.TransportQueryError as e:
-            return None
-        project = result["project"]
-        if project is None:
-            return None
-        artifact = project["artifact"]
-        if artifact is None:
-            return None
-        current_manifest = artifact["currentManifest"]
-        if current_manifest is None:
-            return None
-        file = current_manifest["file"]
-        if file is None:
-            return None
-        return file["directUrl"]
-
-    ARTIFACT_MANIFEST_FROM_ID_QUERY = gql.gql(
-        """
-        query ArtifactManifestFromID(
-            $artifactID: ID!
-        ) {
-            artifact(id: $artifactID) {
-                currentManifest {
-                    id
-                    file {
-                        directUrl
-                    }
-                }
-            }
-        }
-        """
-    )
-
-    async def artifact_manifest_url_from_id(self, art_id: str) -> Optional[str]:
-        try:
-            result = await self.query(
-                self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id
-            )
-        except gql.transport.exceptions.TransportQueryError as e:
-            return None
-        artifact = result["artifact"]
-        if artifact is None:
-            return None
-        current_manifest = artifact["currentManifest"]
-        if current_manifest is None:
-            return None
-        file = current_manifest["file"]
-        if file is None:
-            return None
-        return file["directUrl"]
-
-    VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
-        """
-        query DefaultEntity {
-            viewer {
-                defaultEntity {
-                    name
-                }
-            }
-        }
-        """
-    )
-
-    async def default_entity_name(self) -> Optional[str]:
-        try:
-            result = await self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
-        except gql.transport.exceptions.TransportQueryError as e:
-            return None
-        try:
-            return result.get("viewer", {}).get("defaultEntity", {}).get("name", None)
-        except AttributeError:
-            return None
-
-    ENTITY_ACCESS_QUERY = gql.gql(
-        """
-        query Entity($entityName: String!) {
-            viewer { username }
-            entity(name: $entityName) { readOnly }
-        }
-        """
-    )
-
-    async def can_access_entity(self, entity: str, api_key: Optional[str]) -> bool:
-        try:
-            result = await self.query(
-                self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key
-            )
-        except gql.transport.exceptions.TransportQueryError as e:
-            return False
-        return (
-            result.get("viewer")
-            and result.get("entity", {}).get("readOnly", True) == False
-        )
-
 
 class WandbApi:
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
@@ -330,99 +156,6 @@ class WandbApi:
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = client.connect_sync()  # type: ignore
         return session.execute(query, kwargs)
-
-    SERVER_INFO_QUERY = gql.gql(
-        """
-        query ServerInfo {
-            serverInfo {
-            frontendHost
-            }
-        }
-        """
-    )
-
-    def server_info(self) -> Any:
-        return self.query(self.SERVER_INFO_QUERY)
-
-    ARTIFACT_MANIFEST_QUERY = gql.gql(
-        """
-        query ArtifactManifest(
-            $entityName: String!,
-            $projectName: String!,
-            $name: String!
-        ) {
-            project(name: $projectName, entityName: $entityName) {
-                artifact(name: $name) {
-                    currentManifest {
-                        id
-                        file {
-                            directUrl
-                        }
-                    }
-                }
-            }
-        }
-        """
-    )
-
-    def artifact_manifest_url(
-        self, entity_name: str, project_name: str, name: str
-    ) -> Optional[str]:
-        try:
-            result = self.query(
-                self.ARTIFACT_MANIFEST_QUERY,
-                entityName=entity_name,
-                projectName=project_name,
-                name=name,
-            )
-        except gql.transport.exceptions.TransportQueryError as e:
-            return None
-        project = result["project"]
-        if project is None:
-            return None
-        artifact = project["artifact"]
-        if artifact is None:
-            return None
-        current_manifest = artifact["currentManifest"]
-        if current_manifest is None:
-            return None
-        file = current_manifest["file"]
-        if file is None:
-            return None
-        return file["directUrl"]
-
-    ARTIFACT_MANIFEST_FROM_ID_QUERY = gql.gql(
-        """
-        query ArtifactManifestFromID(
-            $artifactID: ID!
-        ) {
-            artifact(id: $artifactID) {
-                currentManifest {
-                    id
-                    file {
-                        directUrl
-                    }
-                }
-            }
-        }
-        """
-    )
-
-    def artifact_manifest_url_from_id(self, art_id: str) -> Optional[str]:
-        try:
-            result = self.query(self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id)
-        except gql.transport.exceptions.TransportQueryError as e:
-            return None
-        artifact = result["artifact"]
-        if artifact is None:
-            return None
-        current_manifest = artifact["currentManifest"]
-        if current_manifest is None:
-            return None
-        file = current_manifest["file"]
-        if file is None:
-            return None
-        return file["directUrl"]
 
     VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
         """
@@ -454,6 +187,39 @@ class WandbApi:
             return None
 
         return result.get("viewer", {}).get("username", None)
+
+    UPSERT_PROJECT_MUTATION = gql.gql(
+        """
+    mutation UpsertModel($name: String!, $id: String, $entity: String!, $description: String, $repo: String)  {
+        upsertModel(input: { id: $id, name: $name, entityName: $entity, description: $description, repo: $repo }) {
+            model {
+                name
+                description
+            }
+        }
+    }
+    """
+    )
+
+    def upsert_project(
+        self,
+        project: str,
+        description: Optional[str] = None,
+        entity: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Create a new project.
+
+        Args:
+            project (str): The project to create
+            description (str, optional): A description of this project
+            entity (str, optional): The entity to scope this project to.
+        """
+        return self.query(
+            self.UPSERT_PROJECT_MUTATION,
+            name=project,
+            entity=entity,
+            description=description,
+        )
 
 
 async def get_wandb_api() -> WandbApiAsync:

@@ -242,7 +242,6 @@ def test_crewai_simple_crew_kickoff_for_each(client: WeaveClient) -> None:
     flattened_calls = flatten_calls(calls)
 
     assert len(flattened_calls) == 13
-    print(flattened_calls_to_names(flattened_calls))
 
     assert flattened_calls_to_names(flattened_calls) == [
         ("crewai.Crew.kickoff_for_each", 0),
@@ -323,7 +322,6 @@ async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) ->
 
     calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
-    print(flattened_calls_to_names(flattened_calls))
 
     assert len(flattened_calls) == 15
 
@@ -372,7 +370,7 @@ def test_simple_flow(client: WeaveClient) -> None:
     flattened_calls = flatten_calls(calls)
 
     assert len(flattened_calls) == 6
-    print(flattened_calls_to_names(flattened_calls))
+
     assert flattened_calls_to_names(flattened_calls) == [
         ("crewai.Flow.kickoff", 0),
         ("crewai.Flow.kickoff_async", 1),

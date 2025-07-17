@@ -127,7 +127,7 @@ export const ObjectVersionPage: React.FC<{
     return <NotFoundPanel title="Object not found" />;
   }
   if (objectVersion.result.baseObjectClass === 'Monitor') {
-    return <MonitorPage {...props} />;
+    return <MonitorPage {...props} objectVersion={objectVersion.result} />;
   }
 
   return (
@@ -352,32 +352,6 @@ const ObjectVersionPageInner: React.FC<{
           </div>
         </Tailwind>
       }
-      // menuItems={[
-      //   {
-      //     label: 'Open in Board',
-      //     onClick: () => {
-      //       onMakeBoard();
-      //     },
-      //   },
-      //   {
-      //     label: '(Under Construction) Compare',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Compare');
-      //     },
-      //   },
-      //   {
-      //     label: '(Under Construction) Process with Function',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Process with Function');
-      //     },
-      //   },
-      //   {
-      //     label: '(Coming Soon) Add to Hub',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Add to Hub');
-      //     },
-      //   },
-      // ]}
       tabs={[
         ...(showPromptTab
           ? [
@@ -456,12 +430,15 @@ const ObjectVersionPageInner: React.FC<{
                     entityName={entityName}
                     projectName={projectName}
                     data={viewerDataAsObject}
+                    versionIndex={objectVersionIndex}
                   />
                 ) : baseObjectClass === 'Model' ? (
                   <TabUseModel
                     name={objectName}
                     uri={refUri}
+                    entityName={entityName}
                     projectName={projectName}
+                    versionIndex={objectVersionIndex}
                   />
                 ) : baseObjectClass === 'AnnotationSpec' ? (
                   <TabUseAnnotationSpec
@@ -471,7 +448,13 @@ const ObjectVersionPageInner: React.FC<{
                     data={viewerDataAsObject}
                   />
                 ) : (
-                  <TabUseObject name={objectName} uri={refUri} />
+                  <TabUseObject
+                    name={objectName}
+                    uri={refUri}
+                    entityName={entityName}
+                    projectName={projectName}
+                    versionIndex={objectVersionIndex}
+                  />
                 )}
               </Tailwind>
             </ScrollableTabContent>

@@ -5,7 +5,7 @@ import {getGlobalDomain} from './urls';
 export interface Callable {}
 
 export interface WeaveObjectParameters {
-  id?: string;
+  name?: string;
   description?: string;
 }
 
@@ -55,35 +55,26 @@ export class WeaveObject {
   }
 
   saveAttrs() {
-    const attrs: {[key: string]: any} = {};
+    const attrs: {[key: string]: any} = {
+      name: this._baseParameters?.name,
+      description: this._baseParameters?.description,
+    };
 
-    const nonUnderscoreKeys = Object.keys(this).filter(
-      key => !key.startsWith('_')
-    );
-
-    // Include values first (non-functions)
     for (const key of Object.keys(this)) {
-      // @ts-ignore
-      const value: any = this[key];
-      if (typeof value !== 'function') {
-        attrs[key] = value;
-      }
-    }
-
-    // Then ops
-    for (const key of nonUnderscoreKeys) {
-      // @ts-ignore
-      const value: any = this[key];
-      if (isOp(value)) {
-        attrs[key] = value;
+      if (!key.startsWith('_')) {
+        // @ts-ignore
+        const value: any = this[key];
+        if (isOp(value) || typeof value !== 'function') {
+          attrs[key] = value;
+        }
       }
     }
 
     return attrs;
   }
 
-  get id() {
-    return this._baseParameters.id ?? this.constructor.name;
+  get name() {
+    return this._baseParameters.name ?? this.constructor.name;
   }
 
   get description() {

@@ -58,7 +58,7 @@ def to_json(
                 # the serialized payload. They are attached by the client after
                 # the object is saved and returned from the server. If we encounter
                 # a ref in the serialized payload, this would almost certainly be a
-                # bug. However, we would perfer not to raise and error as that would
+                # bug. However, we would prefer not to raise and error as that would
                 # result in lost data. These refs should be removed before serialization.
                 if v != None:
                     logging.exception(f"Unexpected ref in object record: {obj}")
@@ -320,7 +320,7 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             if cls:
                 # Filter out metadata fields before validation
                 obj_data = {
-                    k: v for k, v in obj.items() if k not in ("_class_name", "_bases")
+                    k: v for k, v in obj.items() if k in cls.model_fields.keys()
                 }
                 return cls.model_validate(obj_data)
 

@@ -2,6 +2,7 @@ import os
 import uuid
 from contextlib import contextmanager
 from datetime import datetime
+from typing import Optional
 from unittest.mock import patch
 
 from litellm.types.utils import ModelResponse
@@ -42,7 +43,7 @@ def create_provider_obj(
     provider_id: str,
     base_url: str = "https://api.example.com",
     api_key_name: str = "EXAMPLE_API_KEY",
-    extra_headers: dict = None,
+    extra_headers: Optional[dict] = None,
     return_type: str = "openai",
 ) -> tsi.ObjSchema:
     """Create a Provider object for testing.
@@ -84,7 +85,7 @@ def create_provider_model_obj(
     project_id: str,
     provider_id: str,
     model_id: str,
-    model_name: str = None,
+    model_name: Optional[str] = None,
     max_tokens: int = 4096,
 ) -> tsi.ObjSchema:
     """Create a ProviderModel object for testing.
@@ -337,16 +338,16 @@ def test_custom_provider_completions_create(client):
                     )
 
             # Verify the response matches our mock
-            assert (
-                res.response == mock_response
-            ), f"Response mismatch. Expected {mock_response}, got {res.response}"
+            assert res.response == mock_response, (
+                f"Response mismatch. Expected {mock_response}, got {res.response}"
+            )
 
             # Verify LiteLLM was called with correct parameters
             mock_completion.assert_called_once()
             call_args = mock_completion.call_args[1]
-            assert (
-                call_args["model"] == model_name
-            ), f"Model name mismatch. Expected '{model_name}', got '{call_args['model']}'"
+            assert call_args["model"] == model_name, (
+                f"Model name mismatch. Expected '{model_name}', got '{call_args['model']}'"
+            )
             assert call_args["messages"] == inputs["messages"], (
                 f"Messages mismatch. Expected {inputs['messages']}, "
                 f"got {call_args['messages']}"
@@ -375,9 +376,9 @@ def test_custom_provider_completions_create(client):
                 f"Usage summary mismatch. Expected {res.response['usage']}, "
                 f"got {calls[0].summary['usage'][model_name]}"
             )
-            assert (
-                calls[0].inputs == inputs
-            ), f"Logged inputs mismatch. Expected {inputs}, got {calls[0].inputs}"
+            assert calls[0].inputs == inputs, (
+                f"Logged inputs mismatch. Expected {inputs}, got {calls[0].inputs}"
+            )
             assert calls[0].op_name == "weave.completions_create", (
                 f"Operation name mismatch. Expected 'weave.completions_create', "
                 f"got {calls[0].op_name}"

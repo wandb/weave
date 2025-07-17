@@ -1,0 +1,153 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"user","name":"user","content":"Hello, how are you?"}],"model":"gpt-4.1-nano-2025-04-14","stream":false}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '125'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.75.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.75.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.11
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: "{\n    \"error\": {\n        \"message\": \"Incorrect API key provided:
+        DUMMY_AP*_KEY. You can find your API key at https://platform.openai.com/account/api-keys.\",\n
+        \       \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\":
+        \"invalid_api_key\"\n    }\n}\n"
+    headers:
+      CF-RAY:
+      - 942b76221d187ea6-MAA
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '263'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 20 May 2025 11:23:21 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=fF.i7END4UFnW6azm5VW7c7u2sDcpWx07tDJT37HX8Q-1747740201-1.0.1.1-vym9AJbwZB5TqmWPWBQVlUElQsct8YGKLzqTLvmeO6eCiJbDLaSeduDZuOP_kQJsv1jjmui.PLmJSQ925AkzWuJHdG081EcqRGyhML0sbEg;
+        path=/; expires=Tue, 20-May-25 11:53:21 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=ZgZVZCW_usD9fd1R6nMf9_pv8DRZ4EMfffrTxJER.iE-1747740201647-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      vary:
+      - Origin
+      x-request-id:
+      - req_94ce9de8fb85a523ccd144e6520a8c75
+    status:
+      code: 401
+      message: Unauthorized
+- request:
+    body: '{"messages":[{"role":"user","name":"user","content":"Hello, how are you?"}],"model":"gpt-4.1-nano-2025-04-14","stream":false}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '125'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=fF.i7END4UFnW6azm5VW7c7u2sDcpWx07tDJT37HX8Q-1747740201-1.0.1.1-vym9AJbwZB5TqmWPWBQVlUElQsct8YGKLzqTLvmeO6eCiJbDLaSeduDZuOP_kQJsv1jjmui.PLmJSQ925AkzWuJHdG081EcqRGyhML0sbEg;
+        _cfuvid=ZgZVZCW_usD9fd1R6nMf9_pv8DRZ4EMfffrTxJER.iE-1747740201647-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.75.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.75.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.11.11
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: "{\n    \"error\": {\n        \"message\": \"Incorrect API key provided:
+        DUMMY_AP*_KEY. You can find your API key at https://platform.openai.com/account/api-keys.\",\n
+        \       \"type\": \"invalid_request_error\",\n        \"param\": null,\n        \"code\":
+        \"invalid_api_key\"\n    }\n}\n"
+    headers:
+      CF-RAY:
+      - 942b762488c97ea6-MAA
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '263'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 20 May 2025 11:23:21 GMT
+      Server:
+      - cloudflare
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      vary:
+      - Origin
+      x-request-id:
+      - req_77e38e0b4058a02cb0b9239502632f27
+    status:
+      code: 401
+      message: Unauthorized
+version: 1

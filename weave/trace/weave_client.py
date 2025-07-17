@@ -14,7 +14,7 @@ import time
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -31,6 +31,8 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
+from weave.chat.chat import Chat
+from weave.chat.inference_models import InferenceModels
 from weave.trace import trace_sentry, urls
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
@@ -141,6 +143,7 @@ from weave.trace_server.trace_server_interface import (
 
 if TYPE_CHECKING:
     import pandas as pd
+    import wandb
 
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
@@ -506,6 +509,8 @@ class CallDict(TypedDict):
     started_at: datetime.datetime | None
     ended_at: datetime.datetime | None
     deleted_at: datetime.datetime | None
+    thread_id: str | None
+    turn_id: str | None
 
 
 @dataclasses.dataclass
@@ -534,6 +539,8 @@ class Call:
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
     deleted_at: datetime.datetime | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
 
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
@@ -741,6 +748,8 @@ class Call:
             started_at=self.started_at,
             ended_at=self.ended_at,
             deleted_at=self.deleted_at,
+            thread_id=self.thread_id,
+            turn_id=self.turn_id,
         )
 
 
@@ -772,6 +781,8 @@ def make_client_call(
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
         deleted_at=server_call.deleted_at,
+        thread_id=server_call.thread_id,
+        turn_id=server_call.turn_id,
     )
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()
@@ -961,7 +972,7 @@ class WeaveClient:
         # the underlying implementation of the specific server to get the call processor.
         # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
         # some client-side flushing mechanics. We should move this to the interface layer. However,
-        # we don't really want the server-side implementaitons to need to define no-ops as that is
+        # we don't really want the server-side implementations to need to define no-ops as that is
         # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
         # to define no-ops.
         if hasattr(self.server, "get_call_processor"):
@@ -985,7 +996,7 @@ class WeaveClient:
         # Adding a second comment line for developers that is not a docstring:
         # Save an object to the weave server and return a deserialized version of it.
 
-        # Note: This is sort of a weird method becuase:
+        # Note: This is sort of a weird method because:
         # 1. It returns a deserialized version of the object (which will often not pass type-checks)
         # 2. It is slow (because it re-downloads the object from the weave server)
         # 3. It explicitly filters out non ObjectRefs, which seems like a useless constraint.
@@ -1096,7 +1107,7 @@ class WeaveClient:
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
-            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are ANDed.
+            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
@@ -1266,7 +1277,24 @@ class WeaveClient:
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
+        # Get thread_id from context
+        thread_id = call_context.get_thread_id()
+        current_turn_id = call_context.get_turn_id()
+
         call_id = generate_id()
+
+        # Determine turn_id: call becomes a turn if thread boundary is crossed
+        if thread_id is None:
+            # No thread context, no turn_id
+            turn_id = None
+        elif parent is None or parent.thread_id != thread_id:
+            # This is a turn call - use its own ID as turn_id
+            turn_id = call_id
+            call_context.set_turn_id(call_id)
+        else:
+            # Inherit turn_id from context
+            turn_id = current_turn_id
+
         call = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
@@ -1276,6 +1304,8 @@ class WeaveClient:
             # It feels like this should be inputs_postprocessed, not the refs.
             inputs=inputs_with_refs,
             attributes=attributes_dict,
+            thread_id=thread_id,
+            turn_id=turn_id,
         )
         # Disallow further modification of attributes after the call is created
         attributes_dict.freeze()
@@ -1321,6 +1351,8 @@ class WeaveClient:
                     attributes=attributes_dict,
                     wb_run_id=current_wb_run_id,
                     wb_run_step=current_wb_run_step,
+                    thread_id=thread_id,
+                    turn_id=turn_id,
                 )
             )
 
@@ -1487,6 +1519,10 @@ class WeaveClient:
             self.server.call_end(call_end_req)
 
         self.future_executor.defer(send_end_call)
+
+        # If a turn call is finishing, reset turn context for next sibling
+        if call.turn_id == call.id and call.thread_id:
+            call_context.set_turn_id(None)
 
         call_context.pop_call(call.id)
 
@@ -2029,7 +2065,7 @@ class WeaveClient:
                 return val
             # Check if existing ref is to current project, if not,
             # remove the ref and recreate it in the current project
-            if val.project == self.project:
+            if val.project == self.project and val.entity == self.entity:
                 return val
             val = orig_val
 
@@ -2215,6 +2251,14 @@ class WeaveClient:
 
         self.send_file_cache.put(req, res)
         return res
+
+    @cached_property
+    def inference_models(self) -> InferenceModels:
+        return InferenceModels(self)
+
+    @cached_property
+    def chat(self) -> Chat:
+        return Chat(self)
 
     @property
     def num_outstanding_jobs(self) -> int:
@@ -2443,33 +2487,41 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
     return parallelism_main, parallelism_fastlane
 
 
-def safe_current_wb_run_id() -> str | None:
+def _safe_get_wandb_run() -> wandb.sdk.wandb_run.Run | None:
+    # Check if wandb is installed.  This will pass even if wandb is not installed
+    # if there is a wandb directory in the user's current directory, so the
+    # second check is required.
     try:
         import wandb
-
-        wandb_run = wandb.run
-        if wandb_run is None:
-            return None
-    except ImportError:
+    except (ImportError, ModuleNotFoundError):
         return None
-    else:
-        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
+
+    # If a wandb directory exists, but wandb is installed, `wandb.run` will raise
+    # AttributeError.  This is an artifact of how python handles imports.
+    try:
+        wandb_run = wandb.run
+    except AttributeError:
+        return None
+
+    return wandb_run
+
+
+def safe_current_wb_run_id() -> str | None:
+    wandb_run = _safe_get_wandb_run()
+    if wandb_run is None:
+        return None
+
+    return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
 
 
 def safe_current_wb_run_step() -> int | None:
-    try:
-        import wandb
-
-        wandb_run = wandb.run
-        if wandb_run is None:
-            return None
-    except ImportError:
+    wandb_run = _safe_get_wandb_run()
+    if wandb_run is None:
         return None
-    else:
-        try:
-            return int(wandb_run.step)
-        except Exception:
-            return None
+    try:
+        return int(wandb_run.step)
+    except Exception:
+        return None
 
 
 def check_wandb_run_matches(

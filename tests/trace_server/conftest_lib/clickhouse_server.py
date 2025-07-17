@@ -8,7 +8,7 @@ import typing
 
 import pytest
 
-from tests.conftest_lib.container_management import check_server_up
+from tests.trace_server.conftest_lib.container_management import check_server_up
 from weave.trace_server import environment as ts_env
 
 
@@ -103,7 +103,7 @@ def ensure_clickhouse_db_process_running(
 
     The fixture handles cleanup by stopping the process when the test session ends.
     """
-    server_up = check_server_up(host, port, 0)
+    server_up = check_server_up(host, port, 1)
     started_process = None
     temp_dir = None
 
@@ -152,7 +152,7 @@ def ensure_clickhouse_db_process_running(
                 )
 
         except Exception as e:
-            pytest.fail(f"Failed to start ClickHouse server process: {str(e)}")
+            pytest.fail(f"Failed to start ClickHouse server process: {e!s}")
 
     def cleanup():
         if (
@@ -186,20 +186,25 @@ def ensure_clickhouse_db_process_running(
 
 
 @pytest.fixture(scope="session")
-def ensure_clickhouse_db(request):
-    host, port = ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
-    if os.environ.get("CI"):
+def ensure_clickhouse_db(
+    request,
+) -> typing.Callable[[], typing.Generator[tuple[str, int], None, None]]:
+    def ensure_clickhouse_db_inner() -> typing.Generator[tuple[str, int], None, None]:
+        host, port = ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
+        if os.environ.get("CI"):
+            yield host, port
+            return
+        if request.config.getoption("--clickhouse-process") == "true":
+            cleanup = ensure_clickhouse_db_process_running(
+                host=host,
+                port=port,
+            )
+        else:
+            cleanup = ensure_clickhouse_db_container_running(
+                host=host,
+                port=port,
+            )
         yield host, port
-        return
-    if request.config.getoption("--clickhouse-process") == "true":
-        cleanup = ensure_clickhouse_db_process_running(
-            host=host,
-            port=port,
-        )
-    else:
-        cleanup = ensure_clickhouse_db_container_running(
-            host=host,
-            port=port,
-        )
-    yield host, port
-    cleanup()
+        cleanup()
+
+    return ensure_clickhouse_db_inner

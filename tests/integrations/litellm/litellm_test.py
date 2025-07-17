@@ -33,7 +33,7 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
     # For some reason pytest's import procedure causes the patching
     # to fail in prod mode. Specifically, the patches get run twice
     # despite the fact that the patcher is a singleton.
-    weave_server_flag = request.config.getoption("--weave-server")
+    weave_server_flag = request.config.getoption("--trace-server")
     if weave_server_flag == ("prod"):
         yield
         return
@@ -237,7 +237,7 @@ def test_model_predict(
         model: str
         temperature: float
 
-        @weave.op()
+        @weave.op
         def predict(self, text: str, target_language: str) -> str:
             response = litellm.completion(
                 api_key=os.environ.get("ANTHROPIC_API_KEY", "sk-ant-DUMMY_API_KEY"),

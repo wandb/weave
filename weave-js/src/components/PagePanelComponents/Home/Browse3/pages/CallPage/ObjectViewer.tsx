@@ -66,6 +66,10 @@ type ObjectViewerProps = {
   isExpanded: boolean;
   expandedIds: GridRowId[];
   setExpandedIds: Dispatch<SetStateAction<GridRowId[]>>;
+  hideHeaders?: boolean;
+  groupingFixedWidth?: number;
+  cellGroupingInset?: number;
+  truncateOverflow?: boolean;
 };
 
 // Traverse the data and find all ref URIs.
@@ -95,6 +99,10 @@ export const ObjectViewer = ({
   isExpanded,
   expandedIds,
   setExpandedIds,
+  hideHeaders,
+  groupingFixedWidth,
+  cellGroupingInset,
+  truncateOverflow,
 }: ObjectViewerProps) => {
   const {useRefsData} = useWFHooks();
 
@@ -157,6 +165,9 @@ export const ObjectViewer = ({
   // `resolvedData`.
   useEffect(() => {
     if (refsData.loading) {
+      // Still update resolvedData with fresh truncated data while loading
+      const {result: freshTruncatedData} = traverseAndTruncate(data);
+      setResolvedData(freshTruncatedData);
       return;
     }
     const resolvedRefData = refsData.result;
@@ -404,6 +415,7 @@ export const ObjectViewer = ({
     () => ({
       headerName: 'Path',
       hideDescendantCount: true,
+      ...(groupingFixedWidth !== undefined && {width: groupingFixedWidth}),
       renderCell: params => {
         const refToExpand = params.row.value;
         const isTruncated = params.row?.value?.[TRUNCATION_KEY];
@@ -414,6 +426,7 @@ export const ObjectViewer = ({
         return (
           <ObjectViewerGroupingCell
             {...params}
+            insetSpacing={cellGroupingInset}
             onClick={() => {
               setExpandedIds(eIds => {
                 if (eIds.includes(params.row.id)) {
@@ -429,7 +442,7 @@ export const ObjectViewer = ({
         );
       },
     }),
-    [addExpandedRef, setExpandedIds]
+    [addExpandedRef, setExpandedIds, groupingFixedWidth, cellGroupingInset]
   );
 
   // Next we define a function that updates the row expansion state. This
@@ -529,8 +542,13 @@ export const ObjectViewer = ({
         isGroupExpandedByDefault={node => {
           return expandedIds.includes(node.id);
         }}
-        columnHeaderHeight={38}
+        columnHeaderHeight={hideHeaders ? 0 : 38}
         rowHeight={DEFAULT_ROW_HEIGHT}
+        {...(hideHeaders && {
+          slots: {
+            columnHeaders: React.forwardRef(() => null),
+          },
+        })}
         getRowHeight={getRowHeight}
         hideFooter
         rowSelection={false}
@@ -546,6 +564,11 @@ export const ObjectViewer = ({
             // only the first column
             '&:first-of-type': {
               paddingRight: '8px',
+              ...(truncateOverflow && {
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }),
             },
           },
 
@@ -569,10 +592,21 @@ export const ObjectViewer = ({
         }}
       />
     );
-  }, [apiRef, rows, columns, getRowHeight, groupingColDef, expandedIds]);
+  }, [
+    apiRef,
+    rows,
+    columns,
+    getRowHeight,
+    groupingColDef,
+    expandedIds,
+    truncateOverflow,
+    hideHeaders,
+  ]);
 
   // Return the inner data grid wrapped in a div with overflow hidden.
-  return <div style={{overflow: 'hidden', height: '100%'}}>{inner}</div>;
+  return (
+    <div style={{overflow: 'hidden', height: '100%', flex: 1}}>{inner}</div>
+  );
 };
 
 // Helper function to build the base ref for a given path. This function is used

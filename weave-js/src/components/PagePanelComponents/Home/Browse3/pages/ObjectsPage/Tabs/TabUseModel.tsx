@@ -11,14 +11,25 @@ import {TabUseBanner} from '../../common/TabUseBanner';
 type TabUseModelProps = {
   name: string;
   uri: string;
+  entityName: string;
   projectName: string;
+  versionIndex: number;
 };
 
-export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
+export const TabUseModel = ({
+  name,
+  uri,
+  entityName,
+  projectName,
+  versionIndex,
+}: TabUseModelProps) => {
   const pythonName = isValidVarName(name) ? name : 'model';
   const ref = parseRef(uri);
   const isParentObject = !ref.artifactRefExtra;
   const label = isParentObject ? 'model version' : 'object';
+
+  const long = `weave.init('${entityName}/${projectName}')
+${pythonName} = weave.ref('${name}:v${versionIndex}').get()`;
 
   return (
     <Box className="text-sm">
@@ -40,6 +51,8 @@ export const TabUseModel = ({name, uri, projectName}: TabUseModelProps) => {
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
           tooltipText="Click to copy unabridged string"
         />
+        <div className="mt-8">or</div>
+        <CopyableText language="python" text={long} />
       </Box>
       {/* Temporarily commenting this out until the serve and deploy features are fixed */}
       {/* {isParentObject && (

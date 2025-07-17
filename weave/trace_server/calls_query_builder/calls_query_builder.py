@@ -414,6 +414,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.trace_roots_only is not None,
                 self.filter.wb_user_ids,
                 self.filter.wb_run_ids,
+                self.filter.turn_ids,
             ]
         )
 
@@ -620,7 +621,7 @@ class CallsQuery(BaseModel):
 
         # Important: We must always filter out calls that have not been started
         # This can occur when there is an out of order call part insertion or worse,
-        # when such occurance happens and the client terminates early.
+        # when such occurrence happens and the client terminates early.
         # Additionally: This condition is also REQUIRED for proper functioning
         # when using pre-group by (WHERE) optimizations
         self.add_condition(
@@ -728,6 +729,11 @@ class CallsQuery(BaseModel):
             table_alias,
         )
         thread_id_sql = process_thread_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        turn_id_sql = process_turn_id_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -841,6 +847,7 @@ class CallsQuery(BaseModel):
         {op_name_sql}
         {trace_id_sql}
         {thread_id_sql}
+        {turn_id_sql}
         {str_filter_opt_sql}
         {ref_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
@@ -862,6 +869,7 @@ ALLOWED_CALL_FIELDS = {
     "trace_id": CallsMergedAggField(field="trace_id", agg_fn="any"),
     "parent_id": CallsMergedAggField(field="parent_id", agg_fn="any"),
     "thread_id": CallsMergedAggField(field="thread_id", agg_fn="any"),
+    "turn_id": CallsMergedAggField(field="turn_id", agg_fn="any"),
     "op_name": CallsMergedAggField(field="op_name", agg_fn="any"),
     "started_at": CallsMergedAggField(field="started_at", agg_fn="any"),
     "attributes_dump": CallsMergedDynamicField(field="attributes_dump", agg_fn="any"),
@@ -1225,6 +1233,41 @@ def process_thread_id_filter_to_sql(
     return f" AND ({thread_cond} OR {thread_id_field_sql} IS NULL)"
 
 
+def process_turn_id_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the turn_id and returns a sql string if there are any turn_ids."""
+    if (
+        hardcoded_filter is None
+        or hardcoded_filter.filter.turn_ids is None
+        or len(hardcoded_filter.filter.turn_ids) == 0
+    ):
+        return ""
+
+    turn_ids = hardcoded_filter.filter.turn_ids
+
+    assert_parameter_length_less_than_max("turn_ids", len(turn_ids))
+
+    turn_id_field = get_field_by_name("turn_id")
+    if not isinstance(turn_id_field, CallsMergedAggField):
+        raise TypeError("turn_id is not an aggregate field")
+    turn_id_field_sql = turn_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    # If there's only one turn_id, use an equality condition for performance
+    if len(turn_ids) == 1:
+        turn_cond = f"{turn_id_field_sql} = {param_slot(param_builder.add_param(turn_ids[0]), 'String')}"
+    elif len(turn_ids) > 1:
+        turn_cond = f"{turn_id_field_sql} IN {param_slot(param_builder.add_param(turn_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({turn_cond} OR {turn_id_field_sql} IS NULL)"
+
+
 def process_trace_roots_only_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
@@ -1352,6 +1395,12 @@ def process_calls_filter_to_conditions(
         assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
         conditions.append(
             f"{get_field_by_name('thread_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
+        )
+
+    if filter.turn_ids is not None:
+        assert_parameter_length_less_than_max("turn_ids", len(filter.turn_ids))
+        conditions.append(
+            f"{get_field_by_name('turn_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.turn_ids), 'Array(String)')}"
         )
 
     if filter.wb_user_ids:

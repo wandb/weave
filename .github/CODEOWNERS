@@ -6,3 +6,4 @@
 /weave-js/src/components/Panel2 @wandb/query-engine-reviewers @wandb/weave-team
 /weave-js/src/core @wandb/query-engine-reviewers @wandb/weave-team
 /weave_query/ @wandb/query-engine-reviewers @wandb/weave-team
+/weave/trace_server/migrations @tssweeney @gtarpenning

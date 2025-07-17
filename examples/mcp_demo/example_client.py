@@ -20,7 +20,7 @@ class MCPClient:
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
 
-    @weave.op()
+    @weave.op
     async def connect_to_server(self, server_script_path: str):
         """Connect to an MCP server
 
@@ -67,7 +67,7 @@ class MCPClient:
             "prompts": prompts_response.prompts,
         }
 
-    @weave.op()
+    @weave.op
     async def call_tool(self, tool_name: str, arguments: dict[str, Any]):
         """Call a tool on the MCP server
 
@@ -91,7 +91,7 @@ class MCPClient:
             return content[0].text
         return content
 
-    @weave.op()
+    @weave.op
     async def read_resource(self, uri: str):
         """Read a resource from the MCP server
 
@@ -107,8 +107,10 @@ class MCPClient:
         result = await self.session.read_resource(AnyUrl(uri))
         return result
 
-    @weave.op()
-    async def get_prompt(self, prompt_name: str, arguments: dict[str, str] = None):
+    @weave.op
+    async def get_prompt(
+        self, prompt_name: str, arguments: dict[str, str] | None = None
+    ):
         """Get a prompt from the MCP server
 
         Args:
@@ -124,7 +126,7 @@ class MCPClient:
         result = await self.session.get_prompt(prompt_name, arguments)
         return result.messages
 
-    @weave.op()
+    @weave.op
     async def demo_all_tools(self):
         """Demonstrate all available tools"""
         if not self.session:
@@ -176,7 +178,7 @@ class MCPClient:
 
         return results
 
-    @weave.op()
+    @weave.op
     async def demo_all_resources(self):
         """Demonstrate all available resources"""
         if not self.session:
@@ -216,7 +218,7 @@ class MCPClient:
 
         return results
 
-    @weave.op()
+    @weave.op
     async def demo_all_prompts(self):
         """Demonstrate all available prompts"""
         if not self.session:
@@ -253,7 +255,7 @@ class MCPClient:
 
         return results
 
-    @weave.op()
+    @weave.op
     async def interactive_session(self):
         """Run an interactive session to use MCP tools and resources"""
         if not self.session:
@@ -396,14 +398,14 @@ class MCPClient:
                     print("Unknown command or invalid arguments")
 
             except Exception as e:
-                print(f"Error: {str(e)}")
+                print(f"Error: {e!s}")
 
     async def cleanup(self):
         """Clean up resources"""
         await self.exit_stack.aclose()
 
 
-@weave.op()
+@weave.op
 async def run_client(server_path: str):
     """Run the MCP client and connect to the specified server"""
     client = MCPClient()

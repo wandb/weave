@@ -31,7 +31,7 @@ def safely_convert_lc_run_to_wb_span(run: Run) -> Optional["trace_tree.Span"]:
         return _convert_lc_run_to_wb_span(run)
     except Exception as e:
         if PRINT_WARNINGS:
-            logging.warn(
+            logging.warning(
                 f"Skipping trace saving - unable to safely convert LangChain Run into W&B Trace due to: {e}"
             )
         return None

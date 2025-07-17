@@ -21,6 +21,12 @@ import {
   normalizeGeminiChatRequest,
 } from './ChatFormats/gemini';
 import {
+  isChatRequestFormatLangchain,
+  isTraceCallChatFormatLangchain,
+  normalizeLangchainChatCompletion,
+  normalizeLangchainChatRequest,
+} from './ChatFormats/langchain';
+import {
   isMistralCompletionFormat,
   isTraceCallChatFormatMistral,
   normalizeMistralChatCompletion,
@@ -39,6 +45,7 @@ import {
   normalizeOTELChatRequest,
 } from './ChatFormats/opentelemetry';
 import {ChatFormat} from './ChatFormats/types';
+import {hasStringProp} from './ChatFormats/utils';
 import {Chat, ChatCompletion, ChatRequest} from './types';
 
 // Traverse input and outputs looking for any ref strings.
@@ -71,9 +78,40 @@ const deref = (object: any, refsMap: Record<string, any>): any => {
   return mapObject(object, mapper);
 };
 
+// Safely validate if normalization will succeed for a call
+const canNormalizeCall = (call: CallSchema): boolean => {
+  if (!('traceCall' in call) || !call.traceCall) {
+    return false;
+  }
+
+  const traceCall = call.traceCall;
+
+  try {
+    // Quick validation based on format type
+    if (isTraceCallChatFormatOTEL(traceCall)) {
+      // Use specialized OTEL handlers
+      const request = normalizeOTELChatRequest(traceCall);
+      if (traceCall.output) {
+        normalizeOTELChatCompletion(traceCall, request);
+      }
+    } else {
+      normalizeChatRequest(traceCall.inputs);
+      normalizeChatCompletion(traceCall.inputs, traceCall.output);
+    }
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
 // Does this call look like a chat formatted object?
 export const isCallChat = (call: CallSchema): boolean => {
-  return getChatFormat(call) !== ChatFormat.None;
+  const format = getChatFormat(call);
+  if (format === ChatFormat.None || !canNormalizeCall(call)) {
+    return false;
+  }
+
+  return true;
 };
 
 export const getChatFormat = (call: CallSchema): ChatFormat => {
@@ -97,6 +135,9 @@ export const getChatFormat = (call: CallSchema): ChatFormat => {
   }
   if (isTraceCallChatFormatOTEL(call.traceCall)) {
     return ChatFormat.OTEL;
+  }
+  if (isTraceCallChatFormatLangchain(call.traceCall)) {
+    return ChatFormat.Langchain;
   }
   return ChatFormat.None;
 };
@@ -141,19 +182,28 @@ const isStructuredOutputCall = (call: TraceCallSchema): boolean => {
 };
 
 export const normalizeChatRequest = (request: any): ChatRequest => {
+  if (isChatRequestFormatLangchain(request)) {
+    return normalizeLangchainChatRequest(request);
+  }
   if (isGeminiRequestFormat(request)) {
     return normalizeGeminiChatRequest(request);
   }
   if (isTraceCallChatFormatOAIResponsesRequest(request)) {
     return normalizeOAIResponsesRequest(request);
   }
-  if (isAnthropicCompletionFormat(request)) {
-    return normalizeAnthropicChatRequest(request);
+  // Anthropic is close but system and nested tool calls handled differently
+  const chatRequest = normalizeAnthropicChatRequest(request) as ChatRequest;
+
+  const validMessages = chatRequest.messages.every((msg: any) => {
+    return hasStringProp(msg, 'role');
+  });
+
+  // Throw this error so the validation check can hide ChatView
+  if (!validMessages) {
+    throw new Error('Invalid message format. Messages missing role');
   }
-  if (isTraceCallChatFormatOTEL(request)) {
-    return normalizeOTELChatRequest(request);
-  }
-  return request as ChatRequest;
+
+  return chatRequest;
 };
 
 export const useCallAsChat = (
@@ -183,6 +233,12 @@ export const useCallAsChat = (
       // Use specialized OTEL handlers
       request = normalizeOTELChatRequest(call);
       result = call.output ? normalizeOTELChatCompletion(call, request) : null;
+    } else if (isTraceCallChatFormatLangchain(call)) {
+      // Use specialized Langchain handlers
+      request = normalizeLangchainChatRequest(deref(call.inputs, refsMap));
+      result = call.output
+        ? normalizeLangchainChatCompletion(deref(call.output, refsMap))
+        : null;
     } else {
       // Use standard handlers
       request = normalizeChatRequest(deref(call.inputs, refsMap));
