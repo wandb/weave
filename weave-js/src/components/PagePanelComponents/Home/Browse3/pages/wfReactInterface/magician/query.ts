@@ -91,10 +91,10 @@ const combineChunks = (chunks: unknown[]): string => {
 };
 
 /**
- * Prepare single-shot messages from a request object.
+ * Prepare single-shot messages from a request object using a standard convention.
  *
- * @param request The single-shot message request
- * @returns Array of Message objects
+ * This utility creates a properly formatted messages array for LLM completions
+ * following a consistent pattern: system prompt → context → user message.
  */
 export const prepareSingleShotMessages = (
   request: SingleShotMessageRequest

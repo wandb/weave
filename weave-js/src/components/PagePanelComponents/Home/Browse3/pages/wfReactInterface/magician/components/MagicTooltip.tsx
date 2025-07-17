@@ -10,15 +10,14 @@ import React, {
 } from 'react';
 
 import {LLMDropdownLoaded} from '../../../PlaygroundPage/PlaygroundChat/LLMDropdown';
+import {useChatCompletionStream, useMagicContext} from '../index';
+import {prepareSingleShotMessages} from '../query';
 import {
   Chunk,
   Completion,
   CompletionResponseFormat,
   EntityProject,
-  prepareSingleShotMessages,
-  useChatCompletionStream,
-  useMagicContext,
-} from '../index';
+} from '../types';
 import {MagicButton} from './MagicButton';
 
 export interface MagicTooltipProps {

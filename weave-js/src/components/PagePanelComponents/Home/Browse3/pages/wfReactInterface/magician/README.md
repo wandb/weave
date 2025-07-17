@@ -66,6 +66,28 @@ Access global magic state (entity, project, selected model).
 const { entity, project, selectedModel, setSelectedModel } = useMagicContext();
 ```
 
+### Utilities
+
+#### `prepareSingleShotMessages`
+Utility for creating properly formatted message arrays using a standard convention.
+
+```tsx
+const messages = prepareSingleShotMessages({
+  staticSystemPrompt: "You are a helpful assistant...",
+  generationSpecificContext: { 
+    userRole: "developer",
+    projectType: "web app" 
+  },
+  additionalUserPrompt: "Write a function to sort an array"
+});
+
+// Use with chat completion
+await complete({
+  messages,
+  temperature: 0.7
+}, onChunk);
+```
+
 ### UI Components
 
 #### `MagicTooltip`
