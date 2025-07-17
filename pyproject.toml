@@ -329,7 +329,7 @@ fixture-parentheses = false
 [tool.ruff]
 line-length = 88
 show-fixes = true
-exclude = ["weave_query"]
+exclude = ["weave_query", "rules"]
 
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
@@ -403,3 +403,7 @@ fasion = "fasion" # Wandb lore
 [tool.typos.default.extend-identifiers]
 alog_score = "alog_score"
 BoxedNDArray = "BoxedNDArray"
+
+[tool.fixit]
+enable = [".rules.op_deco"]
+disable = ["fixit.rules"]

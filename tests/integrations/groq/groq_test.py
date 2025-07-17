@@ -293,7 +293,7 @@ def test_groq_tool_call(
 
     groq_client = Groq(api_key=os.getenv("GROQ_API_KEY", "DUMMY_API_KEY"))
 
-    @weave.op()
+    @weave.op
     def get_game_score(team_name: str) -> str:
         """Get the current score for a given NBA game"""
         if "warriors" in team_name.lower():
@@ -343,7 +343,7 @@ def test_groq_tool_call(
         else:
             return json.dumps({"team_name": team_name, "score": "unknown"})
 
-    @weave.op()
+    @weave.op
     def run_conversation(user_prompt: str) -> Union[str, None]:
         # Step 1: send the conversation and available functions to the model
         messages = [

@@ -192,7 +192,7 @@ class Evaluation(Object):
             "model_latency": model_latency,
         }
 
-    @weave.op()
+    @weave.op
     async def summarize(self, eval_table: EvaluationResults) -> dict:
         eval_table_rows = list(eval_table.rows)
         cols = transpose(eval_table_rows)

@@ -300,7 +300,7 @@ def test_simple_chain_batch_inside_op(client: WeaveClient) -> None:
 
     llm_chain = prompt | llm
 
-    @weave.op()
+    @weave.op
     def run_batch(batch: list) -> None:
         _ = llm_chain.batch(batch)
 

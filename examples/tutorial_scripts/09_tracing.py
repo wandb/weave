@@ -18,7 +18,7 @@ POKEMON = [
 ]
 
 
-@weave.op()
+@weave.op
 def get_pokemon_data(pokemon_name):
     url = f"https://pokeapi.co/api/v2/pokemon/{pokemon_name}"
     response = requests.get(url)
@@ -38,7 +38,7 @@ def get_pokemon_data(pokemon_name):
         return None
 
 
-@weave.op()
+@weave.op
 def pokedex(name: str, prompt: str) -> str:
     client = OpenAI()
     data = get_pokemon_data(name)
@@ -66,7 +66,7 @@ import json
 import weave
 
 
-@weave.op()
+@weave.op
 def extract_fruit(sentence: str) -> dict:
     client = OpenAI()
 
