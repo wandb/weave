@@ -101,6 +101,7 @@ from weave.trace_server.llm_completion import (
     lite_llm_completion,
     lite_llm_completion_stream,
 )
+from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
@@ -1043,7 +1044,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         pb: ParamBuilder,
         *,
         # using the `sql_safe_*` prefix is a way to signal to the caller
-        # that these strings should have been santized by the caller.
+        # that these strings should have been sanitized by the caller.
         sql_safe_conditions: Optional[list[str]] = None,
         sort_fields: Optional[list[OrderField]] = None,
         limit: Optional[int] = None,
@@ -1651,7 +1652,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # The general case where this can occur is when there are multiple
             # writes of the same digest AND the effective `FILE_CHUNK_SIZE`
             # of the most recent write is more than the effective `FILE_CHUNK_SIZE`
-            # of any previous write. In that case, you have something like tthe following:
+            # of any previous write. In that case, you have something like the following:
             # Consider a file of size 500 bytes.
             # Insert Batch 1 (chunk_size=100): C0(0-99), C1(100-199), C2(200-299), C3(300-399), C4(400-499)
             # Insert Batch 2 (chunk_size=50): C0(0-49), C1(50-99), C2(100-149), C3(150-199), C4(200-249), C5(250-299), C6(300-349), C7(350-399), C8(400-449), C9(450-499)
@@ -2065,6 +2066,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return _create_tracked_stream_wrapper(
             self._insert_call, chunk_iter, start_call, model_name, req.project_id
         )
+
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise NotImplementedError("Evaluate model is not implemented")
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        return evaluation_status(self, req)
 
     # Private Methods
     @property

@@ -175,6 +175,14 @@ class ThrowingServer(tsi.TraceServerInterface):
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         raise DummyTestException("FAILURE - feedback_purge, req:", req)
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise DummyTestException("FAILURE - evaluate_model, req:", req)
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        raise DummyTestException("FAILURE - evaluation_status, req:", req)
+
 
 @pytest.fixture
 def client_with_throwing_server(client):

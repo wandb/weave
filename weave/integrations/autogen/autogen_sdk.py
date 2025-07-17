@@ -228,7 +228,7 @@ def _create_wrapper_async_generator(
                     yield value
             except Exception as e:
                 logger.exception(
-                    f"{e}\nError in autogen async gen wrapper for {fn.__name__}",
+                    f"Error in autogen async gen wrapper for {fn.__name__}",
                     stacklevel=2,
                 )
                 # Fall back to the original function if our instrumentation fails
@@ -266,7 +266,7 @@ def _create_wrapper_async(
                 return await op(*args, **kwargs)
             except Exception as e:
                 logger.exception(
-                    f"{e}\nError in autogen async wrapper for {fn.__name__}",
+                    f"Error in autogen async wrapper for {fn.__name__}",
                     stacklevel=2,
                 )
                 # Fall back to the original function if our instrumentation fails
@@ -303,7 +303,7 @@ def _create_wrapper_sync(
                 return op(*args, **kwargs)
             except Exception as e:
                 logger.exception(
-                    f"{e}\nError in autogen sync wrapper for {fn.__name__}",
+                    f"Error in autogen sync wrapper for {fn.__name__}",
                     stacklevel=2,
                 )
                 # Fall back to the original function if our instrumentation fails
@@ -487,7 +487,7 @@ def _get_class_and_subclass_patchers(
         return patchers
     except Exception as e:
         logger.exception(
-            f"Unexpected error creating patchers for {module_path}.{class_name}: {e}",
+            f"Unexpected error creating patchers for {module_path}.{class_name}",
             stacklevel=2,
         )
         return patchers
@@ -523,7 +523,7 @@ def _preload_autogen_extensions() -> None:
             except Exception as e:
                 # Unexpected errors should still be logged as warnings
                 logger.exception(
-                    f"Unexpected error loading extension module {name}: {e}",
+                    f"Unexpected error loading extension module {name}",
                     stacklevel=2,
                 )
 
@@ -560,6 +560,10 @@ def get_autogen_patcher(
         return _autogen_patcher
 
     try:
+        if importlib.util.find_spec("autogen_agentchat") is None:
+            logger.debug("autogen_agentchat package not found, skipping patching")
+            return NoOpPatcher()
+
         # Preload autogen-ext modules to ensure subclasses are properly discovered
         _preload_autogen_extensions()
 
@@ -586,7 +590,7 @@ def get_autogen_patcher(
                     patchers.extend(class_patchers)
                 except Exception as e:
                     logger.exception(
-                        f"{e}\nFailed to create patchers for {module_config['module_path']}.{class_config['class_name']}",
+                        f"Failed to create patchers for {module_config['module_path']}.{class_config['class_name']}",
                         stacklevel=2,
                     )
 

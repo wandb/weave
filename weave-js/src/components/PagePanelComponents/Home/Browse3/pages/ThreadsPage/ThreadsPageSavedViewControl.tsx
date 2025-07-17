@@ -1,7 +1,9 @@
 import {
+  GridColumnVisibilityModel,
   GridFilterModel,
   GridLogicOperator,
   GridPaginationModel,
+  GridPinnedColumnFields,
   GridSortModel,
 } from '@mui/x-data-grid-pro';
 import React, {useCallback, useMemo, useRef} from 'react';
@@ -27,13 +29,22 @@ import {ThreadsPage} from './ThreadsPage';
 
 // Thread-specific defaults
 const DEFAULT_SORT_THREADS: GridSortModel = [
-  {field: 'start_time', sort: 'desc'},
+  {field: 'last_updated', sort: 'desc'},
 ];
 
 // Default filter: Past 1w
 const DEFAULT_FILTER_THREADS: GridFilterModel = {
   items: [makeDateFilter(7)],
   logicOperator: GridLogicOperator.And,
+};
+
+// Default column visibility - show all columns initially
+const DEFAULT_COLUMN_VISIBILITY_THREADS: GridColumnVisibilityModel = {};
+
+// Default pin model - no columns pinned initially
+const DEFAULT_PIN_MODEL_THREADS: GridPinnedColumnFields = {
+  left: [],
+  right: [],
 };
 
 type ThreadsPageLoadedProps = {
@@ -113,6 +124,53 @@ export const ThreadsPageSavedViewControl = ({
     [history, location.search]
   );
 
+  const columnVisibilityModel: GridColumnVisibilityModel = useDeepMemo(
+    useMemo(() => {
+      if (query.cols) {
+        try {
+          return JSON.parse(query.cols) as GridColumnVisibilityModel;
+        } catch {
+          return DEFAULT_COLUMN_VISIBILITY_THREADS;
+        }
+      }
+      return (
+        (viewDef.cols as GridColumnVisibilityModel) ??
+        DEFAULT_COLUMN_VISIBILITY_THREADS
+      );
+    }, [query.cols, viewDef])
+  );
+  const setColumnVisibilityModel = useCallback(
+    (newModel: GridColumnVisibilityModel) => {
+      const newQuery = new URLSearchParams(location.search);
+      newQuery.set('cols', JSON.stringify(newModel));
+      history.push({search: newQuery.toString()});
+    },
+    [history, location.search]
+  );
+
+  const pinModel: GridPinnedColumnFields = useDeepMemo(
+    useMemo(() => {
+      if (query.pin) {
+        try {
+          return JSON.parse(query.pin) as GridPinnedColumnFields;
+        } catch {
+          return DEFAULT_PIN_MODEL_THREADS;
+        }
+      }
+      return (
+        (viewDef.pin as GridPinnedColumnFields) ?? DEFAULT_PIN_MODEL_THREADS
+      );
+    }, [query.pin, viewDef])
+  );
+  const setPinModel = useCallback(
+    (newModel: GridPinnedColumnFields) => {
+      const newQuery = new URLSearchParams(location.search);
+      newQuery.set('pin', JSON.stringify(newModel));
+      history.push({search: newQuery.toString()});
+    },
+    [history, location.search]
+  );
+
   const sortModel: GridSortModel = useDeepMemo(
     useMemo(() => {
       if (query.sort) {
@@ -172,6 +230,10 @@ export const ThreadsPageSavedViewControl = ({
       onRecordLastView={onRecordLastView}
       filterModel={filterModel}
       setFilterModel={setFilterModel}
+      columnVisibilityModel={columnVisibilityModel}
+      setColumnVisibilityModel={setColumnVisibilityModel}
+      pinModel={pinModel}
+      setPinModel={setPinModel}
       sortModel={sortModel}
       setSortModel={setSortModel}
       paginationModel={paginationModel}

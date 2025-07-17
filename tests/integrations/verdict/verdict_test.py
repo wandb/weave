@@ -105,8 +105,6 @@ def test_verdict_layer_tracing(client: WeaveClient) -> None:
     # Check that we have multiple judge calls within the layer
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
 
-    print(got)
-
     # Should have pipeline, layer, multiple judges, and mean pool unit
     pipeline_calls = [call for call in got if "LayerTestPipeline" in call[0]]
     judge_calls = [call for call in got if "Judge" in call[0]]
@@ -358,7 +356,7 @@ def test_verdict_complex_pipeline_tracing(client: WeaveClient) -> None:
 
     # Check for complex structure traces
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
-    print(got)
+
     pipeline_calls = [call for call in got if "ComplexPipeline" in call[0]]
     judge_calls = [call for call in got if "Judge" in call[0]]
     meanpool_calls = [call for call in got if "MeanPool" in call[0]]
