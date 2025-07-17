@@ -1,4 +1,6 @@
 import {Popover} from '@mui/material';
+import {Button} from '@wandb/weave/components';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {
   cloneElement,
   isValidElement,
@@ -7,9 +9,7 @@ import React, {
   useState,
 } from 'react';
 
-import {Button} from '../../../components/Button';
-import {LLMDropdownLoaded} from '../../../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/PlaygroundChat/LLMDropdown';
-import {Tailwind} from '../../../components/Tailwind';
+import {LLMDropdownLoaded} from '../../PlaygroundPage/PlaygroundChat/LLMDropdown';
 import {
   Chunk,
   CompletionResponseFormat,
