@@ -1,7 +1,7 @@
 export {
   ChatClientProvider,
   useChatCompletionStream,
-  useSelectedModel,
+  useMagicContext,
 } from './chatCompletionClient';
 export {MagicButton} from './MagicButton';
 export {MagicTooltip} from './MagicTooltip';

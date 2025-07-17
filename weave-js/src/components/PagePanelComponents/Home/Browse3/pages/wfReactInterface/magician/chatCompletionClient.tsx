@@ -343,28 +343,20 @@ const chatCompleteStream = async (
   return res;
 };
 
-const EntityProjectContext = createContext<EntityProject | undefined>(
-  undefined
-);
-
-const SelectedModelContext = createContext<
-  | {
-      selectedModel: string;
-      setSelectedModel: (model: string) => void;
-    }
-  | undefined
->(undefined);
-
-const useEntityProjectContext = () => {
-  return useContext(EntityProjectContext);
+// Combined Magic Context
+type MagicContextValue = {
+  entity: string;
+  project: string;
+  selectedModel: string;
+  setSelectedModel: (model: string) => void;
 };
 
-const useSelectedModelContext = () => {
-  const context = useContext(SelectedModelContext);
+const MagicContext = createContext<MagicContextValue | undefined>(undefined);
+
+export const useMagicContext = () => {
+  const context = useContext(MagicContext);
   if (!context) {
-    throw new Error(
-      'useSelectedModelContext must be used within ChatClientProvider'
-    );
+    throw new Error('useMagicContext must be used within ChatClientProvider');
   }
   return context;
 };
@@ -380,32 +372,34 @@ export const ChatClientProvider: React.FC<{
     throw new Error('No trace server client found');
   }
 
+  const magicContextValue = useMemo(
+    () => ({
+      entity: value.entity,
+      project: value.project,
+      selectedModel,
+      setSelectedModel,
+    }),
+    [value.entity, value.project, selectedModel]
+  );
+
   return (
-    <EntityProjectContext.Provider value={value}>
-      <SelectedModelContext.Provider value={{selectedModel, setSelectedModel}}>
-        {children}
-      </SelectedModelContext.Provider>
-    </EntityProjectContext.Provider>
+    <MagicContext.Provider value={magicContextValue}>
+      {children}
+    </MagicContext.Provider>
   );
 };
 
-export const useSelectedModel = () => {
-  const {selectedModel, setSelectedModel} = useSelectedModelContext();
-  return {selectedModel, setSelectedModel};
-};
-
 export const useChatCompletionStream = (entityProject?: EntityProject) => {
-  const entityProjectContext = useEntityProjectContext();
-  const {selectedModel} = useSelectedModelContext();
+  const magicContext = useMagicContext();
   const {entity, project} = useMemo(() => {
     if (entityProject) {
       return entityProject;
     }
-    if (entityProjectContext) {
-      return entityProjectContext;
-    }
-    throw new Error('No entity project found');
-  }, [entityProject, entityProjectContext]);
+    return {
+      entity: magicContext.entity,
+      project: magicContext.project,
+    };
+  }, [entityProject, magicContext]);
   const getClient = useGetTraceServerClientContext();
   return useCallback(
     (
@@ -418,7 +412,7 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
       const client = getClient();
       // Use selected model from context if not specified in params
       const weavePlaygroundModelId =
-        params.weavePlaygroundModelId || selectedModel;
+        params.weavePlaygroundModelId || magicContext.selectedModel;
       return chatCompleteStream(
         client,
         entity,
@@ -428,6 +422,6 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
         _dangerousExtraAttributesToLog
       );
     },
-    [entity, project, getClient, selectedModel]
+    [entity, project, getClient, magicContext.selectedModel]
   );
 };

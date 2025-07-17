@@ -22,3 +22,4 @@ tests/weave_models/
 tools/codegen/generate_config.yaml
 .cursor/rules/personal.mdc
 pyrightconfig.json
+weave-js/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician/index.ts

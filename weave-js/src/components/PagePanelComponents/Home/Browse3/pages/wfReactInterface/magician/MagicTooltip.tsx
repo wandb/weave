@@ -17,7 +17,7 @@ import {
   EntityProject,
   prepareSingleShotMessages,
   useChatCompletionStream,
-  useSelectedModel,
+  useMagicContext,
 } from './chatCompletionClient';
 import {MagicButton} from './MagicButton';
 
@@ -114,7 +114,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   _dangerousExtraAttributesToLog,
 }) => {
   const chatCompletionStream = useChatCompletionStream(entityProject);
-  const {selectedModel, setSelectedModel} = useSelectedModel();
+  const {selectedModel, setSelectedModel} = useMagicContext();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [userInstructions, setUserInstructions] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
