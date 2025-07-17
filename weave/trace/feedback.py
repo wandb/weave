@@ -46,9 +46,9 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
     def _item_to_row(self, item: tsi.Feedback) -> list:
         feedback = item
 
-        typ = feedback.feedback_type
-        display_type = typ
-        if typ == "wandb.reaction.1":
+        _type = feedback.feedback_type
+        display_type = _type
+        if _type == "wandb.reaction.1":
             display_type = "reaction"
             if util.is_notebook():
                 # TODO: Emojis mess up table alignment in Jupyter 😢
@@ -56,7 +56,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
                 content = feedback.payload["alias"]
             else:
                 content = feedback.payload["emoji"]
-        elif typ == "wandb.note.1":
+        elif _type == "wandb.note.1":
             display_type = "note"
             content = feedback.payload["note"]
         else:

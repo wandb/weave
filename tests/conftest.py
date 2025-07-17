@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import *  # noqa: F401
+from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import autopatch, weave_client, weave_init
 from weave.trace.context.call_context import set_call_stack
@@ -330,11 +330,11 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     class ServerRecorder(type(server)):  # type: ignore
         attribute_access_log: list[str]
 
-        def __init__(self, server: tsi.TraceServerInterface):  # noqa: N804, type: ignore
+        def __init__(self, server: tsi.TraceServerInterface):
             self.server = server
             self.attribute_access_log = []
 
-        def __getattribute__(self, name):  # noqa: N804
+        def __getattribute__(self, name):
             self_server = super().__getattribute__("server")
             access_log = super().__getattribute__("attribute_access_log")
             if name == "server":
