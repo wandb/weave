@@ -352,7 +352,7 @@ def scorer(request):
     elif request.param == "weave-scorer":
 
         class MyScorer(weave.Scorer):
-            @weave.op()
+            @weave.op
             def score(self, output: int, exp_output: int):
                 return output == exp_output
 

@@ -299,11 +299,16 @@ select = [
   "PT018",   # https://docs.astral.sh/ruff/rules/pytest-composite-assertion/
   "PT022",   # https://docs.astral.sh/ruff/rules/pytest-useless-yield-fixture/
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
+  "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
   "RUF013",  # https://docs.astral.sh/ruff/rules/implicit-optional/
   "RUF015",  # https://docs.astral.sh/ruff/rules/unnecessary-iterable-allocation-for-first-element/
   "RUF018",  # https://docs.astral.sh/ruff/rules/assignment-in-assert/
   "RUF022",  # https://docs.astral.sh/ruff/rules/unsorted-dunder-all/
+  "RUF046",  # https://docs.astral.sh/ruff/rules/unnecessary-cast-to-int/
+  "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
+  "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
+  "RUF100",  # https://docs.astral.sh/ruff/rules/unused-noqa/
 ]
 ignore = [
   # we use Google style
@@ -326,10 +331,11 @@ fixture-parentheses = false
 [tool.ruff]
 line-length = 88
 show-fixes = true
-exclude = ["weave_query"]
+exclude = ["weave_query", "rules"]
 
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
+"!/tests/**/*.py" = ["RUF059"]
 
 [tool.pyright]
 include = ["weave"]
@@ -395,3 +401,11 @@ optional_value = "final"
 
 [tool.typos.default.extend-words]
 fasion = "fasion" # Wandb lore
+
+[tool.typos.default.extend-identifiers]
+alog_score = "alog_score"
+BoxedNDArray = "BoxedNDArray"
+
+[tool.fixit]
+enable = [".rules.op_deco"]
+disable = ["fixit.rules"]

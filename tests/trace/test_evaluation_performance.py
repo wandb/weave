@@ -87,11 +87,11 @@ def build_evaluation():
         },
     ]
 
-    @weave.op()
+    @weave.op
     def predict(question: str):
         return "I don't know"
 
-    @weave.op()
+    @weave.op
     def score(question: str, expected: str, output: str):
         return output == expected
 

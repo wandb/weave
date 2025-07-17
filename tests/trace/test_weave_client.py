@@ -612,13 +612,13 @@ def test_calls_delete(client):
 
 def test_calls_delete_cascade(client):
     # run an evaluation, then delete the evaluation and its children
-    @weave.op()
+    @weave.op
     async def model_predict(input) -> str:
         return eval(input)
 
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
-    @weave.op()
+    @weave.op
     async def score(target, model_output):
         return target == model_output
 
@@ -644,7 +644,7 @@ def test_calls_delete_cascade(client):
 
 
 def test_delete_calls(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a + 1
 
@@ -826,7 +826,7 @@ def test_stable_dataset_row_refs(client):
 
 
 def test_opdef(client):
-    @weave.op()
+    @weave.op
     def add2(x, y):
         return x + y
 
@@ -842,7 +842,7 @@ def test_object_mismatch_project_ref(client):
     class MyModel(weave.Model):
         prompt: str
 
-        @weave.op()
+        @weave.op
         def predict(self, input):
             return self.prompt.format(input=input)
 
@@ -860,7 +860,7 @@ def test_object_mismatch_project_ref(client):
 def test_object_mismatch_project_ref_nested(client):
     client.project = "test-project"
 
-    @weave.op()
+    @weave.op
     def hello_world():
         return "Hello world"
 
@@ -947,7 +947,7 @@ def test_save_model(client):
     class MyModel(weave.Model):
         prompt: str
 
-        @weave.op()
+        @weave.op
         def predict(self, input):
             return self.prompt.format(input=input)
 
@@ -963,7 +963,7 @@ def test_saved_nested_modellike(client):
     class A(weave.Object):
         x: int
 
-        @weave.op()
+        @weave.op
         async def call(self, input):
             return self.x + input
 
@@ -971,7 +971,7 @@ def test_saved_nested_modellike(client):
         a: A
         y: int
 
-        @weave.op()
+        @weave.op
         async def call(self, input):
             return await self.a.call(input - self.y)
 
@@ -983,11 +983,11 @@ def test_saved_nested_modellike(client):
         b: B
         z: int
 
-        @weave.op()
+        @weave.op
         async def call(self, input):
             return await self.b.call(input - 2 * self.z)
 
-    @weave.op()
+    @weave.op
     async def call_model(c, input):
         return await c.call(input)
 
@@ -1005,13 +1005,13 @@ def test_dataset_rows_ref(client):
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 def test_evaluate(client):
-    @weave.op()
+    @weave.op
     async def model_predict(input) -> str:
         return eval(input)
 
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
-    @weave.op()
+    @weave.op
     async def score(target, output):
         return target == output
 
@@ -1121,7 +1121,7 @@ def test_evaluate(client):
 def test_nested_ref_is_inner(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
-    @weave.op()
+    @weave.op
     async def score(target, output):
         return target == output
 
@@ -1147,7 +1147,7 @@ def test_obj_dedupe(client):
 
 
 def test_op_query(client):
-    @weave.op()
+    @weave.op
     def myop(x):
         return x
 
@@ -1280,7 +1280,7 @@ def test_isinstance_checks(client):
 
 
 def test_summary_tokens(client):
-    @weave.op()
+    @weave.op
     def model_a(text):
         result = "a: " + text
         return {
@@ -1292,7 +1292,7 @@ def test_summary_tokens(client):
             },
         }
 
-    @weave.op()
+    @weave.op
     def model_b(text):
         result = "bbbb: " + text
         return {
@@ -1304,7 +1304,7 @@ def test_summary_tokens(client):
             },
         }
 
-    @weave.op()
+    @weave.op
     def models(text):
         return (
             model_a(text)["result"]
@@ -1327,26 +1327,26 @@ def test_summary_tokens(client):
 
 @pytest.mark.skip("descendent error tracking disabled until we fix UI")
 def test_summary_descendents(client):
-    @weave.op()
+    @weave.op
     def model_a(text):
         return "a: " + text
 
-    @weave.op()
+    @weave.op
     def model_b(text):
         return "bbbb: " + text
 
-    @weave.op()
+    @weave.op
     def model_error(text):
         raise ValueError("error: " + text)
 
-    @weave.op()
+    @weave.op
     def model_error_catch(text):
         try:
             model_error(text)
         except ValueError as e:
             return str(e)
 
-    @weave.op()
+    @weave.op
     def models(text):
         return (
             model_a(text)
@@ -1376,7 +1376,7 @@ def test_weave_server(client):
     class MyModel(weave.Model):
         prompt: str
 
-        @weave.op()
+        @weave.op
         def predict(self, input: str) -> str:
             return self.prompt.format(input=input)
 
@@ -1462,7 +1462,7 @@ def test_summary_tokens_cost(client):
         # SQLite does not support costs
         return
 
-    @weave.op()
+    @weave.op
     def gpt4(text):
         result = "a: " + text
         return {
@@ -1474,7 +1474,7 @@ def test_summary_tokens_cost(client):
             },
         }
 
-    @weave.op()
+    @weave.op
     def gpt4o(text):
         result = "bbbb: " + text
         return {
@@ -1486,7 +1486,7 @@ def test_summary_tokens_cost(client):
             },
         }
 
-    @weave.op()
+    @weave.op
     def models(text):
         return (
             gpt4(text)["result"]
@@ -1779,7 +1779,7 @@ def test_object_version_read(client):
 
 @pytest.mark.asyncio
 async def test_op_calltime_display_name(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a
 
@@ -1908,7 +1908,7 @@ def test_recursive_object_deletion(client):
 
 
 def test_delete_op_version(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a
 
@@ -1936,7 +1936,7 @@ def test_delete_op_version(client):
 
 
 def test_global_attributes(client_creator):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a
 
@@ -1953,7 +1953,7 @@ def test_global_attributes(client_creator):
 
 
 def test_global_attributes_with_call_attributes(client_creator):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a
 
@@ -2044,7 +2044,7 @@ def test_calls_query_filter_by_strings(client):
     """Test string filter optimization with nested queries."""
     test_id = str(uuid.uuid4())
 
-    @weave.op()
+    @weave.op
     def test_op(test_id: str, name: str, tags: list[str], value: int, active: bool):
         return {
             "test_id": test_id,
@@ -2753,7 +2753,7 @@ def test_tracing_enabled_context(client):
     """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
     from weave.trace.weave_client import Call
 
-    @weave.op()
+    @weave.op
     def test_op():
         return "test"
 
@@ -3309,15 +3309,15 @@ def test_calls_query_with_non_uuidv7_ids(client):
 
 
 def test_calls_query_filter_by_root_refs(client):
-    @weave.op()
+    @weave.op
     def root_op(x: int):
         return {"n": x, "child": child_op(x)}
 
-    @weave.op()
+    @weave.op
     def child_op(x: int):
         return grandchild_op(x)
 
-    @weave.op()
+    @weave.op
     def grandchild_op(x: int):
         return x + 3
 
@@ -3460,7 +3460,7 @@ def test_files_stats(client):
 
 
 def test_no_400_on_invalid_artifact_url(client):
-    @weave.op()
+    @weave.op
     def test() -> str:
         # This url is too long, should be wandb-artifact:///entity/project/name:version
         return "wandb-artifact:///entity/project/toxic-extra-path/artifact:latest"
@@ -3472,7 +3472,7 @@ def test_no_400_on_invalid_artifact_url(client):
 
 
 def test_no_400_on_invalid_refs(client):
-    @weave.op()
+    @weave.op
     def test() -> str:
         # This ref is too long, should be weave:///entity/project/object/name:version
         return "weave:///entity/project/object/toxic-extra-path/object:latest"

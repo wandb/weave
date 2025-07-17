@@ -1044,7 +1044,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         pb: ParamBuilder,
         *,
         # using the `sql_safe_*` prefix is a way to signal to the caller
-        # that these strings should have been santized by the caller.
+        # that these strings should have been sanitized by the caller.
         sql_safe_conditions: Optional[list[str]] = None,
         sort_fields: Optional[list[OrderField]] = None,
         limit: Optional[int] = None,
@@ -1652,7 +1652,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # The general case where this can occur is when there are multiple
             # writes of the same digest AND the effective `FILE_CHUNK_SIZE`
             # of the most recent write is more than the effective `FILE_CHUNK_SIZE`
-            # of any previous write. In that case, you have something like tthe following:
+            # of any previous write. In that case, you have something like the following:
             # Consider a file of size 500 bytes.
             # Insert Batch 1 (chunk_size=100): C0(0-99), C1(100-199), C2(200-299), C3(300-399), C4(400-499)
             # Insert Batch 2 (chunk_size=50): C0(0-49), C1(50-99), C2(100-149), C3(150-199), C4(200-249), C5(250-299), C6(300-349), C7(350-399), C8(400-449), C9(450-499)
