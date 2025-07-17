@@ -235,9 +235,9 @@ export const WeaveOnlyOverviewInner: React.FC<{
       x: 0,
       y: 6,
       w: 11,
-      h: 9,
-      minH: 9,
-      maxH: 9,
+      h: 10,
+      minH: 10,
+      maxH: 10,
       minW: 4,
       maxW: 32,
       isResizable: true,
@@ -266,9 +266,9 @@ export const WeaveOnlyOverviewInner: React.FC<{
       x: 0,
       y: 15,
       w: 11,
-      h: 9,
-      minH: 9,
-      maxH: 9,
+      h: 10,
+      minH: 10,
+      maxH: 10,
       minW: 4,
       maxW: 32,
       isResizable: true,
@@ -325,7 +325,7 @@ export const WeaveOnlyOverviewInner: React.FC<{
         <div
           style={{
             position: 'fixed',
-            bottom: 36,
+            bottom: 16,
             right: 36,
             zIndex: 30,
             display: 'flex',
@@ -333,11 +333,11 @@ export const WeaveOnlyOverviewInner: React.FC<{
           }}>
           <Button
             icon="add-new"
-            variant="outline"
+            variant="primary"
             size="large"
             tooltip="Open Call Charts"
             onClick={() => setShowChartsDrawer(true)}
-            className="no-drag shadow-lg"
+            className="no-drag rounded-full shadow-lg"
           />
           {!hasUserTraceCountsChart && (
             <Button
@@ -377,9 +377,9 @@ export const WeaveOnlyOverviewInner: React.FC<{
                 x: 0,
                 y: 0,
                 w: 10,
-                h: 9,
-                minH: 9,
-                maxH: 9,
+                h: 10,
+                minH: 10,
+                maxH: 10,
                 minW: 4,
                 maxW: 32,
                 isResizable: true,
@@ -408,10 +408,10 @@ export const WeaveOnlyOverviewInner: React.FC<{
             top: 0,
             left: 0,
             right: 0,
-            transform: 'translate(92px, 220px)',
+            transform: 'translate(92px, 200px)',
             zIndex: 1,
             width: `${windowWidth}px`,
-            height: 'calc(100vh - 250px)',
+            height: 'calc(100vh - 210px)',
             backgroundColor: MOON_100,
           }}>
           <ResponsiveGridLayout
@@ -424,7 +424,7 @@ export const WeaveOnlyOverviewInner: React.FC<{
             }}
             breakpoints={{lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0}}
             cols={{lg: 32, md: 32, sm: 32, xs: 32, xxs: 32}}
-            rowHeight={32}
+            rowHeight={24}
             margin={[0, 0]}
             containerPadding={[0, 0]}
             width={windowWidth}
