@@ -134,7 +134,10 @@ export const PlaygroundMessagePanelEditor: React.FC<
               onCancel={handleMagicCancel}
               systemPrompt={SYSTEM_PROMPT}
               placeholder={'What are you interested in building?'}
-              contentToRevise={contentToRevise}>
+              contentToRevise={contentToRevise}
+              _dangerousExtraAttributesToLog={{
+                feature: 'playground_prompt',
+              }}>
               <MagicButton size="medium" />
             </MagicTooltip>
 

@@ -52,6 +52,7 @@ const MagicEvaluationAnalysisTabInner: FC<{
       project,
       evaluationCallId,
       evalLink: `https://wandb.ai/${entity}/${project}/weave/calls/${evaluationCallId}`,
+      feature: 'evaluation_analysis',
     },
   };
 

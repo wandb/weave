@@ -200,6 +200,13 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
         onStream(accumulatedContent, false);
       };
 
+      const logAttrs = {
+        ..._dangerousExtraAttributesToLog,
+        systemPrompt: systemPrompt,
+        contentToRevise: contentToRevise,
+        additionalContext: additionalContext,
+        userInstructions: userInstructions,
+      };
       const res = await chatCompletionStream(
         {
           messages: prepareSingleShotMessages({
@@ -213,7 +220,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
           responseFormat: responseFormat,
         },
         onChunk,
-        _dangerousExtraAttributesToLog,
+        logAttrs,
         abortControllerRef.current?.signal
       );
 

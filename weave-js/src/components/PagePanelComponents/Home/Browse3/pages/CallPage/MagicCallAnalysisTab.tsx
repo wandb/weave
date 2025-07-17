@@ -62,6 +62,7 @@ const MagicCallAnalysisTabInner: FC<{
       project,
       callId,
       callLink: `https://wandb.ai/${entity}/${project}/weave/calls/${callId}`,
+      feature: 'call_analysis',
     },
   };
 

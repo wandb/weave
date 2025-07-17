@@ -196,7 +196,10 @@ const chatCompleteStream = async (
   }
 
   await dangerouslyLogCallToWeave(
-    'chatCompletionStream',
+    'magic' +
+      (_dangerousExtraAttributesToLog?.feature
+        ? `_${_dangerousExtraAttributesToLog.feature}`
+        : ''),
     args,
     res,
     _dangerousExtraAttributesToLog
