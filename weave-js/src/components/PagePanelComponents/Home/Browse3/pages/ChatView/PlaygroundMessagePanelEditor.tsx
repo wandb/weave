@@ -24,8 +24,24 @@ type PlaygroundMessagePanelEditorProps = {
   setEditorHeight: (height: number | null) => void;
 };
 
-const SYSTEM_PROMPT =
-  'You are an expert LLM developer & researcher. Your objective is to help the user create a "system prompt" for their own LLM. They are going to provide you with some description or context of what they are interested in build. Assume that may not be perfect. Always produce a useful and clear system prompt that address the user need. NEVER say anything before or after the system prompt. ONLY emit the system prompt.';
+const SYSTEM_PROMPT = `
+# Context:
+* You are an expert LLM developer & researcher.
+* Your objective is to help the user create a "system prompt" for their own LLM. 
+
+# Instructions:
+* You will be provided with a description of what the user is interested in building. 
+* Assume that the description may not be perfect. 
+* Always produce a useful and clear system prompt that addresses the user's need.
+* Consider adding structure and organization to the system prompt (personality, instructions, rules, and examples.)
+* Output Markdown format (DO NOT EMIT the \`markdown\` code fence markers)
+
+# Rules:
+* NEVER ask the user for any information.
+* NEVER say anything before or after the system prompt.
+* NEVER include any other text or comments. (for example, do not start with "SYSTEM PROMPT:")
+* ONLY emit the system prompt.
+`;
 
 export const PlaygroundMessagePanelEditor: React.FC<
   PlaygroundMessagePanelEditorProps
@@ -117,13 +133,9 @@ export const PlaygroundMessagePanelEditor: React.FC<
               onStream={handleMagicStream}
               onCancel={handleMagicCancel}
               systemPrompt={SYSTEM_PROMPT}
-              placeholder={'What would you like to generate?'}
-              contentToRevise={contentToRevise}
-              // responseFormat={z.object({
-              //   systemPrompt: z.string()
-              // })}
-            >
-              <MagicButton size="medium"/>
+              placeholder={'What are you interested in building?'}
+              contentToRevise={contentToRevise}>
+              <MagicButton size="medium" />
             </MagicTooltip>
 
             <div className="flex-1"></div>

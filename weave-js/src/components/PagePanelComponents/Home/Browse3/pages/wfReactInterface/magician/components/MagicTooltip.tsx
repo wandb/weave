@@ -1,4 +1,5 @@
 import {Popover} from '@mui/material';
+import {MOON_500} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {
@@ -8,6 +9,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import styled from 'styled-components';
 
 import {LLMDropdownLoaded} from '../../../PlaygroundPage/PlaygroundChat/LLMDropdown';
 import {useChatCompletionStream, useMagicContext} from '../index';
@@ -281,7 +283,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
         }}>
         <Tailwind>
           <div
-            className="dark:bg-gray-900 bg-white p-6"
+            className="dark:bg-gray-900 bg-white p-8"
             style={{width: `${width}px`}}>
             {/* Text area */}
             <textarea
@@ -300,7 +302,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
               {/* Model selector (if enabled) */}
               {showModelSelector ? (
                 <div className="mr-3 flex-1">
-                  <div className="[&_>_div]:text-xs">
+                  <MakeLLMDropdownOutlined className="[&_>_div]:text-xs">
                     <LLMDropdownLoaded
                       value={selectedModel}
                       onChange={(modelId, maxTokens) => {
@@ -311,7 +313,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
                       excludeSavedModels={true}
                       size="small"
                     />
-                  </div>
+                  </MakeLLMDropdownOutlined>
                 </div>
               ) : (
                 <div className="flex-1" />
@@ -336,3 +338,17 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     </>
   );
 };
+
+const MakeLLMDropdownOutlined = styled.div`
+  & .llm-dropdown > div[class$='control'] {
+    outline: none;
+    border: 0px;
+    box-shadow: none;
+    & > div > div {
+      color: ${MOON_500} !important;
+    }
+    // & [class$='indicatorContainer'] {
+    //   display: none;
+    // }
+  }
+`;

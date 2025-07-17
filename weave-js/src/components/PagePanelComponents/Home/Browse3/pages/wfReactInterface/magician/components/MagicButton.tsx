@@ -49,7 +49,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   const getIcon = () => {
     switch (currentState) {
       case 'generating':
-        return 'running-repeat';
+        return 'close'; // Cancel/stop icon when generating
       case 'error':
         return 'warning';
       case 'tooltipOpen':
@@ -64,7 +64,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
     if (currentState === 'error') return 'destructive';
     if (currentState === 'tooltipOpen') return 'secondary';
     if (currentState === 'default') return 'ghost';
-    if (currentState === 'generating') return 'secondary';
+    if (currentState === 'generating') return 'destructive'; // Red color to indicate cancellation
     return variant;
   };
 

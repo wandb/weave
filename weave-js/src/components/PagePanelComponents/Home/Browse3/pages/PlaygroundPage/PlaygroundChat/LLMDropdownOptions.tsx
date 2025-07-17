@@ -324,7 +324,13 @@ const SubMenu = ({
                 }}>
                 {provider.label}
               </Box>
-              <Box sx={{display: 'flex', gap: 1, alignItems: 'center', fontSize: fontSize}}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1,
+                  alignItems: 'center',
+                  fontSize: fontSize,
+                }}>
                 <Button
                   variant="ghost"
                   size="small"

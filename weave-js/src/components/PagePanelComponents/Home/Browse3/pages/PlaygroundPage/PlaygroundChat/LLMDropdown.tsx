@@ -165,6 +165,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   return (
     <div className={className} ref={selectRef}>
       <Select
+        className="llm-dropdown"
         isDisabled={areProvidersLoading}
         placeholder={
           areProvidersLoading ? 'Loading providers...' : 'Select a model'
