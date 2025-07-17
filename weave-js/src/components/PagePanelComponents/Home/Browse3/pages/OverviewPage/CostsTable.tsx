@@ -13,8 +13,8 @@ import {Timestamp} from '@wandb/weave/components/Timestamp';
 import React, {useMemo} from 'react';
 
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {CostQueryOutput} from '../wfReactInterface/traceServerClientTypes';
 import {PaginationButtons} from '../CallsPage/CallsTableButtons';
+import {CostQueryOutput} from '../wfReactInterface/traceServerClientTypes';
 
 const HEADER_BACKGROUND = hexToRGB(OBLIVION, 0.02);
 
