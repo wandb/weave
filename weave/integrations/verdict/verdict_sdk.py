@@ -72,7 +72,7 @@ if not _import_failed:
 
             # Store in call_map for children to find
             if trace_id and verdict_call.call_id:
-                self._call_map[(trace_id, verdict_call.call_id)] = weave_call
+                self._call_map[trace_id, verdict_call.call_id] = weave_call
 
             token: contextvars.Token = current_trace_context.set(
                 TraceContext(trace_id, verdict_call.call_id, parent_id)
