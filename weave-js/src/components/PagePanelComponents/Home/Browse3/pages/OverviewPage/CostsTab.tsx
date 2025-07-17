@@ -23,7 +23,7 @@ const CostsTabInner = ({
   // State for filters and pagination
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
-    pageSize: 100,
+    pageSize: 50,
   });
   const [sortModel, setSortModel] = useState<GridSortModel>([
     {field: 'effective_date', sort: 'desc'},

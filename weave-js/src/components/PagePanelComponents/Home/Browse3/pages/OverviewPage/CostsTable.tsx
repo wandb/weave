@@ -14,6 +14,7 @@ import React, {useMemo} from 'react';
 
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {CostQueryOutput} from '../wfReactInterface/traceServerClientTypes';
+import {PaginationButtons} from '../CallsPage/CallsTableButtons';
 
 const HEADER_BACKGROUND = hexToRGB(OBLIVION, 0.02);
 
@@ -280,9 +281,10 @@ export const CostsTable: React.FC<CostsTableProps> = ({
       autoHeight
       // Pagination
       pagination
-      paginationMode="client"
+      paginationMode="server"
       paginationModel={paginationModel}
       onPaginationModelChange={onPaginationModelChange}
+      rowCount={totalCount}
       pageSizeOptions={[25, 50, 100]}
       // Sorting
       sortingMode="server"
@@ -303,6 +305,10 @@ export const CostsTable: React.FC<CostsTableProps> = ({
       disableRowSelectionOnClick
       hideFooter={false}
       hideFooterSelectedRowCount
+      // Custom pagination component
+      slots={{
+        pagination: () => <PaginationButtons />,
+      }}
       // Styling
       sx={{
         '& .MuiDataGrid-columnHeader': {
