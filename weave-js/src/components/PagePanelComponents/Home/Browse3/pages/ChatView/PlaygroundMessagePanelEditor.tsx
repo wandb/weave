@@ -11,6 +11,7 @@ import z from 'zod';
 import {StyledTextArea} from '../../StyledTextarea';
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {DEFAULT_SYSTEM_MESSAGE_CONTENT} from '../PlaygroundPage/usePlaygroundState';
+import {TYPING_CHAR} from '../wfReactInterface/magician';
 import {Message} from './types';
 
 type PlaygroundMessagePanelEditorProps = {
@@ -78,7 +79,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
   const handleMagicStream = (content: string, isComplete: boolean) => {
     if (!isComplete) {
       setIsEditable(false);
-      setEditedContent(content + '█');
+      setEditedContent(content + TYPING_CHAR);
     } else {
       setEditedContent(content);
       setIsEditable(true);
@@ -109,13 +110,13 @@ export const PlaygroundMessagePanelEditor: React.FC<
             <MagicTooltip
               onStream={handleMagicStream}
               systemPrompt={SYSTEM_PROMPT}
-              placeholder={'What would you like the model to do?'}
+              placeholder={'What would you like to generate?'}
               contentToRevise={contentToRevise}
               // responseFormat={z.object({
               //   systemPrompt: z.string().describe('The system prompt to use'),
               // })}
             >
-              <MagicButton size="medium" />
+              <MagicButton size="medium">Generate</MagicButton>
             </MagicTooltip>
 
             <div className="flex-1"></div>

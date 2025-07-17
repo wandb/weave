@@ -12,6 +12,8 @@ Building AI features shouldn't be hard. Magician gives you:
 
 ## Quick Start
 
+![./magic_tooltip.png](./magic_tooltip.png)
+
 ```tsx
 import { MagicProvider, MagicTooltip, MagicButton } from './magician';
 
@@ -49,11 +51,7 @@ Streaming chat completions with automatic context management.
 const complete = useChatCompletionStream();
 
 const generate = async () => {
-  await complete(
-    {
-      messages: 'Write a haiku about coding',
-      temperature: 0.7
-    },
+  await complete({messages: 'Write a haiku about coding'},
     (chunk) => console.log(chunk.content)
   );
 };
@@ -82,10 +80,7 @@ const messages = prepareSingleShotMessages({
 });
 
 // Use with chat completion
-await complete({
-  messages,
-  temperature: 0.7
-}, onChunk);
+await complete({messages}, onChunk);
 ```
 
 ### UI Components
