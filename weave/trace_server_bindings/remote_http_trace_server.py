@@ -304,7 +304,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
             else:
                 req_as_obj = req
-            if req_as_obj.start.id == None or req_as_obj.start.trace_id == None:
+            if req_as_obj.start.id is None or req_as_obj.start.trace_id is None:
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )

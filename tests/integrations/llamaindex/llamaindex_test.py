@@ -55,7 +55,7 @@ def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
 
     call_0, _ = flattened_calls[0]
     assert call_0.started_at < call_0.ended_at
-    assert call_0.parent_id == None
+    assert call_0.parent_id is None
     assert call_0.inputs["model"] == "gpt-4o-mini"
     assert call_0.inputs["temperature"] == 0.1
     assert len(call_0.output["text"]) > 0

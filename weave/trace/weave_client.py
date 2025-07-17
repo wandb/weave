@@ -445,7 +445,7 @@ def _get_direct_ref(obj: Any) -> Ref | None:
 
 def _remove_empty_ref(obj: ObjectRecord) -> ObjectRecord:
     if hasattr(obj, "ref"):
-        if obj.ref != None:
+        if obj.ref is not None:
             raise ValueError(f"Unexpected ref in object record: {obj}")
         else:
             del obj.__dict__["ref"]
