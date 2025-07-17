@@ -309,6 +309,7 @@ select = [
   "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
   "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
   "RUF100",  # https://docs.astral.sh/ruff/rules/unused-noqa/
+  "E266",    # https://docs.astral.sh/ruff/rules/multiple-leading-hashes-for-block-comment/
 ]
 ignore = [
   # we use Google style
@@ -318,6 +319,7 @@ ignore = [
 
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
+  "E501", # https://docs.astral.sh/ruff/rules/line-too-long/
 ]
 exclude = ["weave_query"]
 
