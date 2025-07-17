@@ -307,8 +307,7 @@ jobs:
             "crewai",
             "dspy",
             "groq",
-            # "huggingface",
-            "google_ai_studio",
+            # "google_ai_studio",
             "google_genai",
             "instructor",
             "langchain",
@@ -318,10 +317,10 @@ jobs:
             "notdiamond",
             "openai",
             "vertexai",
-            "pandas-test",
+            "pandas",
             "mcp",
             "smolagents",
-            "autogen_tests",
+            "autogen",
           ]
       fail-fast: false
     services:
