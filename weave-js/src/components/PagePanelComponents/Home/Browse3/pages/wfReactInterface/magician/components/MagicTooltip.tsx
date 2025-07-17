@@ -61,7 +61,7 @@ export interface MagicTooltipProps {
    */
   contentToRevise?: string;
   /**
-   *
+   * Additional context data to provide to the AI (will be JSON stringified).
    */
   additionalContext?: Record<string, any>;
   /**

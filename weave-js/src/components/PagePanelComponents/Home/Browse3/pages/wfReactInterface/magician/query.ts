@@ -200,9 +200,10 @@ const chatCompleteStream = async (
 
 /**
  * Hook for making streaming chat completion requests.
- *
- * @param entityProject Optional entity/project override
- * @returns Function to make streaming chat completion requests
+ * 
+ * Returns a function that can be used to make streaming chat completion requests.
+ * Uses the selected model from context unless overridden in params.
+ * ```
  */
 export const useChatCompletionStream = (entityProject?: EntityProject) => {
   const {entity, project, selectedModel} = useMagicContext();
