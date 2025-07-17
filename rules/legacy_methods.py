@@ -29,3 +29,32 @@ class ClientCallsRule(LintRule):
                 "Use client.get_calls() instead of client.calls()",
                 replacement=new_call,
             )
+            
+            
+class ClientCallRule(LintRule):
+    """
+    Convert client.call() to client.get_call().
+    
+    This rule matches function calls and checks if they are calling the 'call' method
+    on a 'client' object, then suggests replacing it with 'get_call'.
+    """
+    VALID = [ValidTestCase("client.get_call")]
+    INVALID = [InvalidTestCase("client.call")]
+    
+    def visit_Call(self, node: libcst.Call) -> None:
+        if (
+            isinstance(node.func, libcst.Attribute)
+            and isinstance(node.func.value, libcst.Name)
+            and node.func.value.value == "client"
+            and node.func.attr.value == "call"
+        ):
+            new_call = node.with_changes(
+                func=node.func.with_changes(
+                    attr=libcst.Name("get_call")
+                )
+            )
+            self.report(
+                node,
+                "Use client.get_call() instead of client.call()",
+                replacement=new_call,
+            )
