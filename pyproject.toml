@@ -307,6 +307,7 @@ select = [
   "RUF022",  # https://docs.astral.sh/ruff/rules/unsorted-dunder-all/
   "RUF046",  # https://docs.astral.sh/ruff/rules/unnecessary-cast-to-int/
   "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
+  "RUF052",  # https://docs.astral.sh/ruff/rules/used-dummy-variable/
   "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
   "RUF100",  # https://docs.astral.sh/ruff/rules/unused-noqa/
 ]
