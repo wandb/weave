@@ -4,17 +4,15 @@ from fixit import InvalidTestCase, LintRule, ValidTestCase
 
 class ClientCallsRule(LintRule):
     """
+    Convert client.calls() to client.get_calls().
+    
+    This rule matches function calls and checks if they are calling the 'calls' method
+    on a 'client' object, then suggests replacing it with 'get_calls'.
     """
     VALID = [ValidTestCase("client.get_calls")]
     INVALID = [InvalidTestCase("client.calls")]
     
     def visit_Call(self, node: libcst.Call) -> None:
-        """
-        Convert client.calls() to client.get_calls().
-        
-        This rule matches function calls and checks if they are calling the 'calls' method
-        on a 'client' object, then suggests replacing it with 'get_calls'.
-        """
         if (
             isinstance(node.func, libcst.Attribute)
             and isinstance(node.func.value, libcst.Name)
