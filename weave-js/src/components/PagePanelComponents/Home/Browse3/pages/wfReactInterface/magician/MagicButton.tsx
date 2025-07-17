@@ -1,6 +1,5 @@
+import {Button, ButtonProps} from '@wandb/weave/components/Button';
 import React from 'react';
-
-import {Button, ButtonProps} from '../../../components/Button';
 
 export interface MagicButtonProps extends Omit<ButtonProps, 'startIcon'> {
   /**
