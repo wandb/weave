@@ -9,6 +9,9 @@ import {CodeEditor} from '../../../../../CodeEditor';
 import {StructuredOutputsMessagePart} from './StructuredOutputsMessagePart';
 import {ToolCalls} from './ToolCalls';
 import {MessagePart, ToolCall} from './types';
+import {isLikelyMarkdown} from '@wandb/weave/util/markdown';
+import Markdown from '@wandb/weave/common/components/Markdown';
+import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 
 type MessagePanelPartProps = {
   value: MessagePart;
@@ -128,6 +131,7 @@ export const MessagePanelPart = ({
   const [expandedThinking, setExpandedThinking] = useState<{
     [key: number]: boolean;
   }>({});
+  const playgroundContext = usePlaygroundContext();
 
   const parts = useMemo(() => {
     // Only parse thinking blocks for assistant messages, not user messages
@@ -148,11 +152,16 @@ export const MessagePanelPart = ({
         // This happens when streaming the object, and the current chunk is not valid JSON.
       } catch (error) {}
     }
-    // Markdown is slowing down chat view, disable for now
-    // Bring back if we can find a faster way to render markdown
-    // if (isLikelyMarkdown(value)) {
-    //   return <Markdown content={value} />;
-    // }
+
+    // Check if markdown is enabled in playground context
+    const shouldRenderMarkdown =
+      playgroundContext.isPlayground &&
+      playgroundContext.markdownEnabled &&
+      isLikelyMarkdown(value);
+
+    if (shouldRenderMarkdown) {
+      return <Markdown content={value} />;
+    }
     const lastPartIndex = parts.length - 1;
 
     return (

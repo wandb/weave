@@ -248,6 +248,7 @@ export const PlaygroundChat = ({
                         value={{
                           isPlayground: true,
                           isStreaming: state.loading,
+                          markdownEnabled: state.markdownEnabled,
                           deleteMessage: (messageIndex, responseIndexes) =>
                             deleteMessage(idx, messageIndex, responseIndexes),
                           editMessage: (messageIndex, newMessage) =>

@@ -24,6 +24,7 @@ export type PlaygroundState = {
   selectedChoiceIndex: number;
   maxTokensLimit: number;
   savedModel: SavedPlaygroundModelState;
+  markdownEnabled: boolean;
 } & PlaygroundModelParams;
 
 export type PlaygroundModelParams = {

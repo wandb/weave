@@ -51,6 +51,7 @@ const DEFAULT_PLAYGROUND_STATE = {
   selectedChoiceIndex: 0,
   savedModel: DEFAULT_SAVED_MODEL,
   jsonSchema: undefined,
+  markdownEnabled: true,
 };
 
 type NumericPlaygroundStateKey =

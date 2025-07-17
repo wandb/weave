@@ -242,6 +242,30 @@ export const PlaygroundSettings: React.FC<PlaygroundSettingsProps> = ({
                     Track this LLM call with Weave
                   </label>
                 </div>
+
+                <div className="flex w-full items-center">
+                  <Switch.Root
+                    id="markdownEnabledSwitch"
+                    size="small"
+                    checked={playgroundStates[idx].markdownEnabled}
+                    onCheckedChange={() =>
+                      setPlaygroundStateField(
+                        idx,
+                        'markdownEnabled',
+                        !playgroundStates[idx].markdownEnabled
+                      )
+                    }>
+                    <Switch.Thumb
+                      size="small"
+                      checked={playgroundStates[idx].markdownEnabled}
+                    />
+                  </Switch.Root>
+                  <label
+                    className="ml-[8px] cursor-pointer text-[14px]"
+                    htmlFor="markdownEnabledSwitch">
+                    Enable markdown rendering
+                  </label>
+                </div>
               </div>
             </Tabs.Content>
           ))}

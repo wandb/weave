@@ -4,6 +4,7 @@ const LIKELY_MARKDOWN_PATTERNS: RegExp[] = [
   /```[\s\S]*```/, // Code block
   /\[.+\]\(.+\)/, // Links [text](url)
   /!\[.*\]\(.+\)/, // Images ![alt](url)
+  /^\s*##*/, // Headers
 ];
 
 export const isLikelyMarkdown = (value: string): boolean => {
