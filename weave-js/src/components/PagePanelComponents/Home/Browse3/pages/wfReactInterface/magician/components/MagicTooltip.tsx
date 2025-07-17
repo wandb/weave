@@ -9,7 +9,7 @@ import React, {
   useState,
 } from 'react';
 
-import {LLMDropdownLoaded} from '../../PlaygroundPage/PlaygroundChat/LLMDropdown';
+import {LLMDropdownLoaded} from '../../../PlaygroundPage/PlaygroundChat/LLMDropdown';
 import {
   Chunk,
   Completion,
@@ -18,7 +18,7 @@ import {
   prepareSingleShotMessages,
   useChatCompletionStream,
   useMagicContext,
-} from './chatCompletionClient';
+} from '../chatCompletionClient';
 import {MagicButton} from './MagicButton';
 
 export interface MagicTooltipProps {
