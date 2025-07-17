@@ -994,7 +994,7 @@ async def test_openai_async_embeddings_patching(
     assert inputs["input"] == "embed this"
 
 
-### Responses API
+# Responses API
 
 
 @pytest.mark.skip_clickhouse_client

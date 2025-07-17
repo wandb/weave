@@ -447,7 +447,7 @@ def _pad_output(acc: Response, value: ResponseStreamEvent) -> Response:
     return acc
 
 
-### Responses API
+# Responses API
 def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> Response:
     from openai.types.responses import (
         Response,

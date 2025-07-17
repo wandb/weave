@@ -871,7 +871,7 @@ def test_object_mismatch_project_ref_nested(client):
     assert calls[0].project_id == "shawn/test-project"
     assert "weave:///shawn/test-project/op" in str(calls[0].op_name)
 
-    ### Now change project in client, simulating new init
+    # Now change project in client, simulating new init
     client.project = "test-project2"
     nested = {"a": hello_world}
 

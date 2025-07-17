@@ -116,11 +116,11 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
     return wrapper
 
 
-## This part of the code is for dealing with the other way
-## of streaming, by calling Messages.stream
-## this has 2 options: event based or text based.
-## This code handles both cases by patching the _IteratorWrapper
-## and adding a text_stream property to it.
+# This part of the code is for dealing with the other way
+# of streaming, by calling Messages.stream
+# this has 2 options: event based or text based.
+# This code handles both cases by patching the _IteratorWrapper
+# and adding a text_stream property to it.
 
 
 def anthropic_stream_accumulator(

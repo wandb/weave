@@ -46,7 +46,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         A list of BasePatchModuleConfig objects defining the complete
         patching configuration for autogen components.
     """
-    ## Autogen Agent Chat
+    # Autogen Agent Chat
     # Chat Agent Class
     base_chat_agent_config = BasePatchClassConfig(
         class_name="BaseChatAgent",
@@ -83,7 +83,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         classes=[team_config],
     )
 
-    ## Autogen Core
+    # Autogen Core
     # Base Agent Class
     base_agent_config = BasePatchClassConfig(
         class_name="BaseAgent",
@@ -170,11 +170,11 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
     )
 
     return [
-        ## Autogen Agent Chat Modules
+        # Autogen Agent Chat Modules
         base_chat_agent_module_config,
         task_runner_tool_module_config,
         team_module_config,
-        ## Autogen Core Modules
+        # Autogen Core Modules
         base_agent_module_config,
         agent_runtime_module_config,
         base_tool_module_config,

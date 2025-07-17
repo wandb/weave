@@ -150,7 +150,7 @@ def read_from_bucket(
         ) from e
 
 
-### Everything below here is internal
+# Everything below here is internal
 
 
 def key_for_project_digest(project_id: str, digest: str) -> str:

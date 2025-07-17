@@ -44,7 +44,7 @@ class WandbApiContext:
         return dataclasses.asdict(self)
 
 
-## wandb_api.py context
+# wandb_api.py context
 _wandb_api_context: contextvars.ContextVar[Optional[WandbApiContext]] = (
     contextvars.ContextVar("wandb_api_context", default=None)
 )

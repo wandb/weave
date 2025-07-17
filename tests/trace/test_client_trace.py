@@ -53,7 +53,7 @@ from weave.trace_server.trace_server_interface_util import (
 )
 from weave.trace_server.validation_util import CHValidationError
 
-## Hacky interface compatibility helpers
+# Hacky interface compatibility helpers
 
 
 def extract_weave_refs_from_value(value):
@@ -89,7 +89,7 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
     return client._project_id()
 
 
-## End hacky interface compatibility helpers
+# End hacky interface compatibility helpers
 
 
 def test_simple_op(client):
