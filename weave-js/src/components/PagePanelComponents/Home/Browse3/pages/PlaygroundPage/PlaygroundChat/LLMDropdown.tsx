@@ -212,6 +212,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
               onConfigureProvider={handleConfigureProvider}
               onViewCatalog={handleViewCatalog}
               direction={direction}
+              size={size}
             />
           ),
         }}

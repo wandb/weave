@@ -1,6 +1,6 @@
 /**
  * Type guard for OpenAI-style streaming chunks.
- * 
+ *
  * @param chunk The chunk to check
  * @returns True if the chunk has OpenAI format with choices array containing delta objects
  */
@@ -25,7 +25,7 @@ export const isOpenAIChunk = (
 
 /**
  * Type guard for simple content chunks with a direct 'content' property.
- * 
+ *
  * @param chunk The chunk to check
  * @returns True if the chunk has a 'content' property with a string value
  */
@@ -44,9 +44,9 @@ export const isContentChunk = (
 
 /**
  * Extract content from a chunk, handling different chunk formats.
- * 
+ *
  * Supports OpenAI-style chunks, simple content chunks, and plain strings.
- * 
+ *
  * @param chunk The chunk to extract content from
  * @returns The extracted content string, or null if no content found
  */
@@ -68,9 +68,9 @@ export const extractChunkContent = (chunk: unknown): string | null => {
 
 /**
  * Filter out undefined values from an object.
- * 
+ *
  * Creates a new object containing only properties with defined values.
- * 
+ *
  * @param obj The object to filter
  * @returns A new object with undefined values removed
  */
@@ -84,7 +84,7 @@ export const filterUndefined = <T extends Record<string, any>>(
 
 /**
  * Check if a value is a ResponseFormat object (has a 'type' property).
- * 
+ *
  * @param value The value to check
  * @returns True if the value is an object with a 'type' property
  */

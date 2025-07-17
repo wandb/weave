@@ -11,13 +11,13 @@ const MagicContext = createContext<MagicContextValue | undefined>(undefined);
 
 /**
  * Hook to access the magic context.
- * 
+ *
  * Provides access to entity, project, selected model, and model setter.
  * Must be used within a MagicProvider.
- * 
+ *
  * @returns The magic context value
  * @throws Error if used outside of MagicProvider
- * 
+ *
  * @example
  * ```tsx
  * const { entity, project, selectedModel, setSelectedModel } = useMagicContext();
@@ -33,13 +33,13 @@ export const useMagicContext = () => {
 
 /**
  * Provider component that supplies magic context to its children.
- * 
+ *
  * Manages global state for entity/project and model selection.
  * Must be used at the top level of your magic-enabled components.
- * 
+ *
  * @param value Entity and project configuration
  * @param children React components that will have access to magic context
- * 
+ *
  * @example
  * ```tsx
  * <MagicProvider value={{ entity: 'my-org', project: 'my-project' }}>

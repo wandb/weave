@@ -200,7 +200,7 @@ const chatCompleteStream = async (
 
 /**
  * Hook for making streaming chat completion requests.
- * 
+ *
  * Returns a function that can be used to make streaming chat completion requests.
  * Uses the selected model from context unless overridden in params.
  * ```

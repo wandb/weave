@@ -7,6 +7,7 @@ import {
 } from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
+import {SelectSize} from '@wandb/weave/components/Form/Select';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -76,6 +77,7 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   onViewCatalog?: (path?: string) => void;
   providers?: ProviderOption[];
   direction: OpenDirection;
+  size?: SelectSize;
 }
 
 const SubMenu = ({
@@ -89,6 +91,7 @@ const SubMenu = ({
   onViewCatalog,
   providers,
   direction,
+  size,
 }: {
   value: string;
   llms: Array<LLMOption>;
@@ -104,6 +107,7 @@ const SubMenu = ({
   onViewCatalog?: (path?: string) => void;
   providers?: ProviderOption[];
   direction: OpenDirection;
+  size?: SelectSize;
 }) => {
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
@@ -151,6 +155,8 @@ const SubMenu = ({
     }
     return {};
   }, [direction, position, viewportWidth, viewportHeight]);
+
+  const fontSize = size === 'small' ? '12px' : '16px';
 
   return ReactDOM.createPortal(
     <Tailwind>
@@ -215,7 +221,7 @@ const SubMenu = ({
                   },
                 },
               }}>
-              <Box sx={{flex: 1}}>
+              <Box sx={{flex: 1, fontSize: fontSize}}>
                 {llm.label}
                 {llm.subLabel && (
                   <div className="text-sm text-moon-500">{llm.subLabel}</div>
@@ -312,6 +318,7 @@ const SubMenu = ({
                   wordBreak: 'break-all',
                   wordWrap: 'break-word',
                   whiteSpace: 'normal',
+                  fontSize: fontSize,
                 }}>
                 {provider.label}
               </Box>
@@ -460,6 +467,7 @@ const SubMenuOption = ({
           onConfigureProvider={onConfigureProvider}
           onViewCatalog={onViewCatalog}
           direction={direction}
+          size={props.size}
         />
       )}
     </Box>
@@ -581,7 +589,8 @@ export const CustomOption = ({
       project={project}
       isAdmin={isAdmin}
       onConfigureProvider={onConfigureProvider}
-      onViewCatalog={onViewCatalog}>
+      onViewCatalog={onViewCatalog}
+      size={props.size}>
       {children}
     </SubMenuOption>
   );
