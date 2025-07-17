@@ -1,4 +1,4 @@
-import {Select} from '@wandb/weave/components/Form/Select';
+import {Select, SelectSize} from '@wandb/weave/components/Form/Select';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
@@ -41,6 +41,7 @@ interface LLMDropdownProps {
   customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
   selectFirstAvailable?: boolean;
   direction: OpenDirection;
+  size?: SelectSize;
   className?: string;
 }
 
@@ -57,6 +58,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   customProvidersResult,
   selectFirstAvailable,
   direction,
+  size,
   className,
 }) => {
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
@@ -213,7 +215,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
             />
           ),
         }}
-        size="medium"
+        size={size || 'medium'}
         isSearchable
         filterOption={(option, inputValue) => {
           const searchTerm = inputValue.toLowerCase();
@@ -261,6 +263,8 @@ interface LLMDropdownLoadedProps {
   className?: string;
   direction: OpenDirection;
   selectFirstAvailable?: boolean;
+  excludeSavedModels?: boolean;
+  size?: SelectSize;
 }
 
 export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
@@ -270,6 +274,8 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
   className,
   direction,
   selectFirstAvailable = false,
+  excludeSavedModels = false,
+  size,
 }) => {
   const {entity, project, projectId} = useEntityProject();
 
@@ -302,9 +308,13 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
   });
 
   const {result: savedModelsResult, loading: savedModelsLoading} =
-    useLeafObjectInstances('LLMStructuredCompletionModel', {
-      project_id: projectId,
-    });
+    useLeafObjectInstances(
+      'LLMStructuredCompletionModel',
+      {
+        project_id: projectId,
+      },
+      !excludeSavedModels
+    );
 
   const refetchCustomLLMs = useCallback(() => {
     refetchCustomProviders();
@@ -317,8 +327,8 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
     customProvidersResult || [],
     customProviderModelsResult || [],
     customProvidersLoading,
-    savedModelsResult || [],
-    savedModelsLoading
+    excludeSavedModels ? [] : savedModelsResult || [],
+    excludeSavedModels ? false : savedModelsLoading
   );
 
   const areCustomProvidersLoading =
@@ -342,6 +352,7 @@ export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
       areProvidersLoading={areProvidersLoading}
       customProvidersResult={customProvidersResult || []}
       className={className}
+      size={size}
     />
   );
 };

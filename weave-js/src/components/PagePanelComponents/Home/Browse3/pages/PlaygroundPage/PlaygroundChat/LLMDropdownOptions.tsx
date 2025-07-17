@@ -621,7 +621,7 @@ export const useLLMDropdownOptions = (
   customLoading: boolean,
   savedModelsResult: TraceObjSchemaForBaseObjectClass<'LLMStructuredCompletionModel'>[],
   savedModelsLoading: boolean
-) => {
+): ProviderOption[] => {
   const inferenceContext = useInferenceContext();
   const options: ProviderOption[] = [];
   const disabledOptions: ProviderOption[] = [];

@@ -1,10 +1,16 @@
 import {Button} from '@wandb/weave/components/Button';
+import {
+  MagicButton,
+  MagicTooltip,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
 import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
+import z from 'zod';
 
 import {StyledTextArea} from '../../StyledTextarea';
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
+import {DEFAULT_SYSTEM_MESSAGE_CONTENT} from '../PlaygroundPage/usePlaygroundState';
 import {Message} from './types';
 
 type PlaygroundMessagePanelEditorProps = {
@@ -16,6 +22,9 @@ type PlaygroundMessagePanelEditorProps = {
   choiceIndex?: number;
   setEditorHeight: (height: number | null) => void;
 };
+
+const SYSTEM_PROMPT =
+  'You are an expert LLM developer & researcher. Your objective is to help the user create a "system prompt" for their own LLM. They are going to provide you with some description or context of what they are interested in build. Assume that may not be perfect. Always produce a useful and clear system prompt that address the user need. NEVER say anything before or after the system prompt. ONLY emit the system prompt.';
 
 export const PlaygroundMessagePanelEditor: React.FC<
   PlaygroundMessagePanelEditorProps
@@ -64,6 +73,23 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setEditorHeight(null);
   };
 
+  const [isEditable, setIsEditable] = useState(true);
+
+  const handleMagicStream = (content: string, isComplete: boolean) => {
+    if (!isComplete) {
+      setIsEditable(false);
+      setEditedContent(content + '█');
+    } else {
+      setEditedContent(content);
+      setIsEditable(true);
+    }
+  };
+
+  const contentToRevise =
+    editedContent !== DEFAULT_SYSTEM_MESSAGE_CONTENT
+      ? editedContent
+      : undefined;
+
   return (
     <div
       className={classNames(
@@ -74,9 +100,27 @@ export const PlaygroundMessagePanelEditor: React.FC<
         value={editedContent}
         onChange={e => setEditedContent(e.target.value)}
         startHeight={320}
+        disabled={!isEditable}
       />
       {/* 6px vs. 8px to make up for extra padding from textarea field */}
       <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
+        {index === 0 && message.role === 'system' && (
+          <>
+            <MagicTooltip
+              onStream={handleMagicStream}
+              systemPrompt={SYSTEM_PROMPT}
+              placeholder={'What would you like the model to do?'}
+              contentToRevise={contentToRevise}
+              // responseFormat={z.object({
+              //   systemPrompt: z.string().describe('The system prompt to use'),
+              // })}
+            >
+              <MagicButton size="medium" />
+            </MagicTooltip>
+
+            <div className="flex-1"></div>
+          </>
+        )}
         <Button variant="ghost" size="medium" onClick={handleCancel}>
           Cancel
         </Button>

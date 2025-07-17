@@ -2,6 +2,7 @@ import {ApolloProvider} from '@apollo/client';
 import {Box, Drawer} from '@mui/material';
 import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
+import {MagicProvider} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
 import {debounce} from 'lodash';
 import React, {
   FC,
@@ -141,6 +142,7 @@ export const Browse3: FC<{
   navigateAwayFromProject?: () => void;
   projectRoot(entityName: string, projectName: string): string;
 }> = props => {
+  const params = useParamsDecoded<Browse3ProjectMountedParams>();
   // const weaveContext = useWeaveContext();
   // useEffect(() => {
   //   const previousPolling = weaveContext.client.isPolling();
@@ -153,22 +155,26 @@ export const Browse3: FC<{
     () => makeGorillaApolloClient(props.gorillaApolloEndpoint),
     [props.gorillaApolloEndpoint]
   );
+
   return (
     <ApolloProvider client={apolloClient}>
       <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
-        <Switch>
-          <Route
-            path={[
-              ...browse3Paths(props.projectRoot(':entity', ':project')),
-              `/${URL_BROWSE3}/:entity`,
-              `/${URL_BROWSE3}`,
-            ]}>
-            <Browse3Mounted
-              headerOffset={props.headerOffset}
-              navigateAwayFromProject={props.navigateAwayFromProject}
-            />
-          </Route>
-        </Switch>
+        <MagicProvider
+          value={{entity: params.entityName!, project: params.projectName!}}>
+          <Switch>
+            <Route
+              path={[
+                ...browse3Paths(props.projectRoot(':entity', ':project')),
+                `/${URL_BROWSE3}/:entity`,
+                `/${URL_BROWSE3}`,
+              ]}>
+              <Browse3Mounted
+                headerOffset={props.headerOffset}
+                navigateAwayFromProject={props.navigateAwayFromProject}
+              />
+            </Route>
+          </Switch>
+        </MagicProvider>
       </Browse3WeaveflowRouteContextProvider>
     </ApolloProvider>
   );

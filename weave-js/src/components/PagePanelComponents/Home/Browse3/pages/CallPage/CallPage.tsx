@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import {IconNames} from '@wandb/weave/components/Icon';
 import {urlPrefixed} from '@wandb/weave/config';
 import {useViewTraceEvent} from '@wandb/weave/integrations/analytics/useViewEvents';
 import React, {FC, useCallback, useContext, useEffect, useRef} from 'react';
@@ -21,6 +22,7 @@ import {isEvaluateOp} from '../common/heuristics';
 import {CenteredAnimatedLoader} from '../common/Loader';
 import {
   ScrollableTabContent,
+  SimplePageLayoutTab,
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
@@ -32,6 +34,8 @@ import {CallChat} from './CallChat';
 import {CallDetails} from './CallDetails';
 import {CallOverview} from './CallOverview';
 import {CallSummary} from './CallSummary';
+import {MagicCallAnalysisTab} from './MagicCallAnalysisTab';
+import {MagicEvaluationAnalysisTab} from './MagicEvaluationAnalysisTab';
 import {PaginationControls} from './PaginationControls';
 import {TabUseCall} from './TabUseCall';
 
@@ -117,7 +121,7 @@ export const CallPage: FC<CallPageProps> = props => {
   }
 };
 
-const useCallTabs = (call: CallSchema) => {
+const useCallTabs = (call: CallSchema): Array<SimplePageLayoutTab> => {
   const codeURI = call.opVersionRef;
   const {entity, project, callId} = call;
   const weaveRef = makeRefCall(entity, project, callId);
@@ -256,6 +260,34 @@ const useCallTabs = (call: CallSchema) => {
         </ScrollableTabContent>
       ),
     },
+
+    ...(isEvaluateOp(call.spanName)
+      ? [
+          {
+            label: 'Eval Analysis',
+            icon: IconNames.MagicWandStar,
+            content: (
+              <MagicEvaluationAnalysisTab
+                entity={call.entity}
+                project={call.project}
+                evaluationCallId={call.callId}
+              />
+            ),
+          },
+        ]
+      : [
+          {
+            label: 'Analysis',
+            icon: IconNames.MagicWandStar,
+            content: (
+              <MagicCallAnalysisTab
+                entity={call.entity}
+                project={call.project}
+                callId={call.callId}
+              />
+            ),
+          },
+        ]),
   ];
 };
 

@@ -1,0 +1,78 @@
+# magician Project Cursor Rules
+
+
+## Living Documentation
+
+The requirements.md in this directory serves as the single source of truth for the magician project. It is a living document that must be kept up to date throughout development.
+
+### Update requirements.md whenever you:
+
+1. **Add New Components or Hooks**
+   - Create new magic components (MagicFill, MagicChat, MagicTool/Act)
+   - Add new React hooks for LLM integration
+   - Modify the chatCompletionClient interface
+   - Change component props or behavior
+
+2. **Make Design Decisions**
+   - Choose between UI/UX implementation alternatives
+   - Select model providers or default configurations
+   - Document why simplicity was chosen over features
+   - Record lessons learned from WBMagician v1
+
+3. **Update Implementation Status**
+   - Check off completed tasks in the Remaining Tasks section
+   - Move tasks between priority levels (P0, P1, P2, P3)
+   - Add new tasks discovered during development
+   - Update integration points as they're implemented
+
+4. **Add Integration Examples**
+   - Document how MagicFill is used in specific forms
+   - Show playground prompt helper implementation
+   - Add patterns for different response formats
+   - Include developer-facing configuration examples
+
+5. **Document API Changes**
+   - Update chatCompletionClient capabilities
+   - Note changes to response format handling
+   - Track provider-specific implementations
+   - Document breaking changes from v1
+
+### How to Update
+
+- Make inline updates to relevant sections
+- Keep task lists current - mark completed items with [x]
+- Add date stamps to completed P0 tasks
+- Preserve the "Out of Scope" section to prevent feature creep
+- Update component status: (Current Implementation), (In Progress), (Planned), (Future)
+
+### Simplicity Guidelines
+
+- **Always ask**: Does this make the module simpler or more complex?
+- If adding complexity, document why it's necessary
+- Reference WBMagician v1 mistakes to avoid
+- Keep the API surface minimal
+- Prefer composition over configuration
+
+### Code and Documentation Sync
+
+- Component props in code must match documentation
+- Response format types should align with chatCompletionClient.tsx
+- Example configurations should be tested and working
+- System prompts in examples should be realistic
+
+### Testing Magic Components
+
+When implementing or modifying magic components:
+- Test with real LLM calls (not mocks) during development
+- Document edge cases (empty responses, errors, timeouts)
+- Include fallback behavior in both code and docs
+- Note any provider-specific quirks
+
+### Collaboration Notes
+
+- This project prioritizes developer experience over features
+- The first user is always another frontend engineer
+- If unsure about complexity, choose the simpler path
+- Document "why not" decisions as much as "why" decisions
+
+Remember: magician exists because v1 became too complex. Every decision should be made with simplicity in mind. 
