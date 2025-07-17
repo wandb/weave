@@ -1,3 +1,5 @@
+import {JSONSchema7} from 'json-schema';
+
 import {Query} from './traceServerClientInterface/query';
 type ExtraKeysAllowed = {
   [key: string]: any;
@@ -394,6 +396,26 @@ export type FilesStatsRes = {
   total_size_bytes: number;
 };
 
+type JsonObjectResponseFormat = {
+  type: 'json_object';
+};
+type TextResponseFormat = {
+  type: 'text';
+};
+type JsonSchemaResponseFormat = {
+  type: 'json_schema';
+  json_schema: {
+    name: string;
+    strict?: boolean;
+    schema: JSONSchema7;
+  };
+};
+
+export type ResponseFormat =
+  | JsonSchemaResponseFormat
+  | JsonObjectResponseFormat
+  | TextResponseFormat;
+
 export type CompletionsCreateInputs = {
   model: string;
   messages: any[];
@@ -405,9 +427,7 @@ export type CompletionsCreateInputs = {
   frequency_penalty?: number;
   presence_penalty?: number;
   n?: number;
-  response_format?: {
-    type: string;
-  };
+  response_format?: ResponseFormat;
   tools?: any[];
   // These are optional, o3 accepts max_completion_tokens, others accept max_tokens
   max_tokens?: number;

@@ -63,7 +63,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   // Determine button variant based on state
   const getButtonVariant = () => {
     if (currentState === 'error') return 'destructive';
-    if (currentState === 'tooltipOpen') return 'primary';
+    if (currentState === 'tooltipOpen') return 'secondary';
     if (currentState === 'default') return 'ghost';
     if (currentState === 'generating') return 'secondary';
     return variant;

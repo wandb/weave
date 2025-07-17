@@ -436,7 +436,7 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
               />
               <PaginationText>
                 {allFeedbacks.length - currentVersionIndex} of{' '}
-                {allFeedbacks.length} versions
+                {allFeedbacks.length} generations
               </PaginationText>
               <Button
                 variant="ghost"

@@ -3,9 +3,11 @@ import {MagicButton, MagicTooltip} from '@wandb/weave/WBMagician2';
 import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';
+import z from 'zod';
 
 import {StyledTextArea} from '../../StyledTextarea';
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
+import {DEFAULT_SYSTEM_MESSAGE_CONTENT} from '../PlaygroundPage/usePlaygroundState';
 import {Message} from './types';
 
 type PlaygroundMessagePanelEditorProps = {
@@ -17,6 +19,9 @@ type PlaygroundMessagePanelEditorProps = {
   choiceIndex?: number;
   setEditorHeight: (height: number | null) => void;
 };
+
+const SYSTEM_PROMPT =
+  'You are an expert LLM developer & researcher. Your objective is to help the user create a "system prompt" for their own LLM. They are going to provide you with some description or context of what they are interested in build. Assume that may not be perfect. Always produce a useful and clear system prompt that address the user need. NEVER say anything before or after the system prompt. ONLY emit the system prompt.';
 
 export const PlaygroundMessagePanelEditor: React.FC<
   PlaygroundMessagePanelEditorProps
@@ -77,6 +82,11 @@ export const PlaygroundMessagePanelEditor: React.FC<
     }
   };
 
+  const contentToRevise =
+    editedContent !== DEFAULT_SYSTEM_MESSAGE_CONTENT
+      ? editedContent
+      : undefined;
+
   return (
     <div
       className={classNames(
@@ -95,12 +105,12 @@ export const PlaygroundMessagePanelEditor: React.FC<
           <>
             <MagicTooltip
               onStream={handleMagicStream}
-              systemPrompt={
-                'You are an expert LLM developer & researcher. Your objective is to help the user create a "system prompt" for their own LLM. They are going to provide you with some description or context of what they are interested in build. Assume that may not be perfect. Always produce a useful and clear system prompt that address the user need. NEVER say anything before or after the system prompt. ONLY emit the system prompt.'
-              }
-              placeholder={
-                'Describe the system prompt you want to create - for example: "A system prompt for a LLM that can help me build a new website."'
-              }>
+              systemPrompt={SYSTEM_PROMPT}
+              placeholder={'What would you like the model to do?'}
+              contentToRevise={contentToRevise}
+              responseFormat={z.object({
+                systemPrompt: z.string().describe('The system prompt to use'),
+              })}>
               <MagicButton size="medium" />
             </MagicTooltip>
 

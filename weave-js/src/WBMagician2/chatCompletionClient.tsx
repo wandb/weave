@@ -1,4 +1,5 @@
 import {JSONSchema7} from 'json-schema';
+import _ from 'lodash';
 import React, {
   createContext,
   useCallback,
@@ -6,9 +7,12 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import z from 'zod';
+import {zodToJsonSchema} from 'zod-to-json-schema';
 
 import {TraceServerClient} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClient';
 import {useGetTraceServerClientContext} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
+import {ResponseFormat} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientTypes';
 import {dangerouslyLogCallToWeave} from './magicianWeaveLogger';
 
 const DEFAULT_MODEL = 'coreweave/moonshotai/Kimi-K2-Instruct';
@@ -29,10 +33,7 @@ export type Chunk = {
   content: string;
 };
 
-export type ResponseFormat =
-  | JsonSchemaResponseFormat
-  | JsonObjectResponseFormat
-  | TextResponseFormat;
+export type CompletionResponseFormat = ResponseFormat | z.ZodType;
 
 export type Tool = {
   type: 'function';
@@ -47,34 +48,16 @@ export type Tool = {
   };
 };
 
-export type JsonObjectResponseFormat = {
-  type: 'json_object';
-};
-export type TextResponseFormat = {
-  type: 'text';
-};
-export type JsonSchemaResponseFormat = {
-  type: 'json_schema';
-  json_schema: {
-    name: string;
-    strict?: boolean;
-    schema: JSONSchema7;
-  };
-};
-
 export type ChatCompletionParams = {
-  // `modelId` is a string identifier for the model to use.
-  //
-  // A special case is a ref (a special weave/wandb URI) which
-  // can refer to a specific version of a finetuned / saved model.
-  modelId: string;
-  // `modelProvider` refers to the provider of the model.
-  // for example: `openai`, `anthropic`, etc...
-  // Model provider is optional since many models
-  // have unique providers (eg. `gpt-4o-mini` is provided by `openai`)
-  //
-  // Note: a special provider is `coreweave` which maps to the CoreWeave API.
-  modelProvider?: string;
+  // `weavePlaygroundModelId` is a string identifier for the model to use.
+  weavePlaygroundModelId: string;
+  // // `modelProvider` refers to the provider of the model.
+  // // for example: `openai`, `anthropic`, etc...
+  // // Model provider is optional since many models
+  // // have unique providers (eg. `gpt-4o-mini` is provided by `openai`)
+  // //
+  // // Note: a special provider is `coreweave` which maps to the CoreWeave API.
+  // modelProvider?: string;
   // Prompts coming soon!
   // `promptId` is the id (ref) of a prompt to use
   // promptId?: string
@@ -90,19 +73,19 @@ export type ChatCompletionParams = {
   tools?: Array<Tool>;
 };
 
-/**
- * Prepare the model identifier, handling provider-specific formatting.
- *
- * @param modelId The model identifier
- * @param modelProvider Optional provider name
- * @returns Formatted model string
- */
-const prepareModel = (modelId: string, modelProvider?: string) => {
-  if (modelProvider) {
-    return `${modelProvider}/${modelId}`;
-  }
-  return modelId;
-};
+// /**
+//  * Prepare the model identifier, handling provider-specific formatting.
+//  *
+//  * @param modelId The model identifier
+//  * @param modelProvider Optional provider name
+//  * @returns Formatted model string
+//  */
+// const prepareModel = (modelId: string, modelProvider?: string) => {
+//   if (modelProvider) {
+//     return `${modelProvider}/${modelId}`;
+//   }
+//   return modelId;
+// };
 
 /**
  * Convert messages to the expected format for the API.
@@ -216,14 +199,26 @@ const extractMessageContent = (response: unknown): string => {
  */
 const prepareResponseFormat = (
   responseFormat?: ResponseFormat
-): {type: string} | undefined => {
+): ResponseFormat | undefined => {
   if (!responseFormat) {
     return undefined;
   }
 
-  // For now, just pass through the response format
-  // Different providers may need different formatting
-  return responseFormat;
+  if (typeof responseFormat === 'object' && 'type' in responseFormat) {
+    return responseFormat;
+  }
+
+  return {
+    type: 'json_schema',
+    json_schema: {
+      name: 'response',
+      strict: true,
+      schema: _.omit(zodToJsonSchema(responseFormat), [
+        '$schema',
+        'definitions',
+      ]),
+    },
+  };
 };
 
 /**
@@ -307,7 +302,7 @@ const chatComplete = async (
   const res = await client.completionsCreate({
     project_id: `${entity}/${project}`,
     inputs: {
-      model: prepareModel(params.modelId, params.modelProvider),
+      model: params.weavePlaygroundModelId, //prepareModel(params.weavePlaygroundModelId, params.modelProvider),
       messages: prepareMessages(params.messages),
       temperature: params.temperature || 0.7,
       response_format: prepareResponseFormat(params.responseFormat),
@@ -318,6 +313,42 @@ const chatComplete = async (
 
   // Extract the message content from the response
   return extractMessageContent(res.response);
+};
+
+type SingleShotMessageRequest = {
+  staticSystemPrompt?: string;
+  generationSpecificContext?: Record<string, any>;
+  additionalUserPrompt?: string;
+};
+export const prepareSingleShotMessages = (
+  request: SingleShotMessageRequest
+) => {
+  const messages: Message[] = [];
+  if (request.staticSystemPrompt) {
+    messages.push({
+      role: 'system',
+      content: request.staticSystemPrompt,
+    });
+  }
+  if (request.generationSpecificContext) {
+    // drop undefined values
+    const filteredContext = Object.fromEntries(
+      Object.entries(request.generationSpecificContext).filter(
+        ([_, value]) => value !== undefined
+      )
+    );
+    messages.push({
+      role: 'user',
+      content: JSON.stringify(filteredContext),
+    });
+  }
+  if (request.additionalUserPrompt) {
+    messages.push({
+      role: 'user',
+      content: request.additionalUserPrompt,
+    });
+  }
+  return messages;
 };
 
 /**
@@ -384,7 +415,7 @@ const chatCompleteStream = async (
   const args = {
     project_id: `${entity}/${project}`,
     inputs: {
-      model: prepareModel(params.modelId, params.modelProvider),
+      model: params.weavePlaygroundModelId, // prepareModel(params.weavePlaygroundModelId, params.modelProvider),
       messages: prepareMessages(params.messages),
       temperature: params.temperature || 0.7,
       response_format: prepareResponseFormat(params.responseFormat),
@@ -479,8 +510,11 @@ export const useChatCompletion = (entityProject?: EntityProject) => {
     (params: ChatCompletionParams) => {
       const client = getClient();
       // Use selected model from context if not specified in params
-      const modelId = params.modelId || selectedModel;
-      return chatComplete(client, entity, project, {...params, modelId});
+      const modelId = params.weavePlaygroundModelId || selectedModel;
+      return chatComplete(client, entity, project, {
+        ...params,
+        weavePlaygroundModelId: modelId,
+      });
     },
     [entity, project, getClient, selectedModel]
   );
@@ -501,18 +535,21 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
   const getClient = useGetTraceServerClientContext();
   return useCallback(
     (
-      params: Omit<ChatCompletionParams, 'modelId'> & {modelId?: string},
+      params: Omit<ChatCompletionParams, 'weavePlaygroundModelId'> & {
+        weavePlaygroundModelId?: string;
+      },
       onChunk: (chunk: Chunk) => void,
       _dangerousExtraAttributesToLog?: Record<string, any>
     ) => {
       const client = getClient();
       // Use selected model from context if not specified in params
-      const modelId = params.modelId || selectedModel;
+      const weavePlaygroundModelId =
+        params.weavePlaygroundModelId || selectedModel;
       return chatCompleteStream(
         client,
         entity,
         project,
-        {...params, modelId},
+        {...params, weavePlaygroundModelId: weavePlaygroundModelId},
         onChunk,
         _dangerousExtraAttributesToLog
       );

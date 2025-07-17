@@ -12,8 +12,9 @@ import {LLMDropdownLoaded} from '../components/PagePanelComponents/Home/Browse3/
 import {Tailwind} from '../components/Tailwind';
 import {
   Chunk,
+  CompletionResponseFormat,
   EntityProject,
-  Message,
+  prepareSingleShotMessages,
   useChatCompletionStream,
   useSelectedModel,
 } from './chatCompletionClient';
@@ -48,9 +49,21 @@ export interface MagicTooltipProps {
    */
   placeholder?: string;
   /**
+   * Placeholder text for the revision input.
+   */
+  revisionPlaceholder?: string;
+  /**
    * Optional content to revise.
    */
   contentToRevise?: string;
+  /**
+   *
+   */
+  additionalContext?: Record<string, any>;
+  /**
+   * Response format for the AI.
+   */
+  responseFormat?: CompletionResponseFormat;
   /**
    * Whether to show model selector dropdown.
    */
@@ -69,6 +82,8 @@ export interface MagicTooltipProps {
   _dangerousExtraAttributesToLog?: Record<string, any>;
 }
 
+const DEFAULT_REVISION_PLACEHOLDER = 'What would you like to change?';
+
 /**
  * MagicTooltip provides a minimal tooltip interface for AI content generation.
  * It manages all UI state internally and passes appropriate props to the trigger element.
@@ -82,8 +97,11 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   onStream,
   onError,
   systemPrompt,
-  placeholder = 'Describe what you need...',
+  placeholder,
+  revisionPlaceholder = DEFAULT_REVISION_PLACEHOLDER,
   contentToRevise,
+  additionalContext,
+  responseFormat,
   showModelSelector = true,
   width = 350,
   textareaLines = 7,
@@ -160,25 +178,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     setAnchorEl(null);
 
     try {
-      const messages: Message[] = [
-        {
-          role: 'system' as const,
-          content: systemPrompt,
-        },
-      ];
-
-      if (contentToRevise) {
-        messages.push({
-          role: 'user' as const,
-          content: `Original content:\n${contentToRevise}\n\nInstructions: ${userInstructions}`,
-        });
-      } else {
-        messages.push({
-          role: 'user' as const,
-          content: userInstructions,
-        });
-      }
-
       let accumulatedContent = '';
 
       const onChunk = (chunk: Chunk) => {
@@ -190,8 +189,15 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
 
       await chatCompletionStream(
         {
-          modelId: selectedModel,
-          messages,
+          messages: prepareSingleShotMessages({
+            staticSystemPrompt: systemPrompt,
+            generationSpecificContext: {
+              contentToRevise: contentToRevise,
+              ...additionalContext,
+            },
+            additionalUserPrompt: userInstructions,
+          }),
+          responseFormat: responseFormat,
         },
         onChunk,
         _dangerousExtraAttributesToLog
@@ -252,8 +258,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
           vertical: 'top',
           horizontal: 'left',
         }}
-        disableAutoFocus
-        disableEnforceFocus
         sx={{
           '& .MuiPopover-paper': {
             marginTop: '8px',
@@ -270,8 +274,9 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
               ref={textareaRef}
               value={userInstructions}
               onChange={e => setUserInstructions(e.target.value)}
-              placeholder={placeholder}
+              placeholder={contentToRevise ? revisionPlaceholder : placeholder}
               disabled={isGenerating}
+              autoFocus
               className="dark:border-gray-700 w-full resize-none rounded bg-transparent p-2 text-sm focus:outline-none disabled:opacity-50 dark:text-white"
               style={{height: `${textareaHeight}px`}}
             />
@@ -289,7 +294,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
                       }}
                       isTeamAdmin={false}
                       className="[&_.Select__control]:min-h-[32px] [&_.Select__control]:text-xs"
-                      direction={{horizontal: 'left'}}
+                      direction={{horizontal: 'right'}}
                       excludeSavedModels={true}
                       size="small"
                     />
@@ -305,7 +310,11 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
                 disabled={!isGenerating && !userInstructions.trim()}
                 size="small"
                 variant="primary">
-                {isGenerating ? 'Cancel' : 'Generate'}
+                {isGenerating
+                  ? 'Cancel'
+                  : contentToRevise
+                  ? 'Revise'
+                  : 'Generate'}
               </Button>
             </div>
           </div>
