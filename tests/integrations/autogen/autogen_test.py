@@ -21,7 +21,7 @@ async def test_simple_client_create(
     _ = await openai_model_client.create(
         [UserMessage(content="Hello, how are you?", source="user")]
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     flattened = flatten_calls(calls)
     assert len(flattened) == 3
@@ -63,7 +63,7 @@ async def test_simple_client_create_with_exception(
         _ = await openai_model_client.create(
             [UserMessage(content="Hello, how are you?", source="user")]
         )
-        calls = list(client.calls())
+        calls = list(client.get_calls())
         assert len(calls) == 3
         flattened = flatten_calls(calls)
         assert len(flattened) == 4
@@ -105,7 +105,7 @@ async def test_simple_client_create_stream(
     async for _ in response:
         _
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     flattened = flatten_calls(calls)
     assert len(flattened) == 3
@@ -152,7 +152,7 @@ async def test_simple_cached_client_create(
     await cache_client.create(
         [UserMessage(content="Hello, how are you?", source="user")]
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 9
     flattened = flatten_calls(calls)
     print(len(flattened))
@@ -211,7 +211,7 @@ async def test_simple_cached_client_create_stream(
         [UserMessage(content="Hello, how are you?", source="user")]
     ):
         _
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 9
     flattened = flatten_calls(calls)
     print(len(flattened))
@@ -261,7 +261,7 @@ async def test_agentchat_run_with_tool(
     )
     # Simulate a chat task
     result = await agent.run(task="What is the weather in New York?")
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 8
     call = calls[0]
     assert call.exception is None
@@ -345,7 +345,7 @@ async def test_agentchat_run_stream_with_tool(
     # Simulate a chat task
     async for _ in agent.run_stream(task="What is the weather in New York?"):
         _
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 7
     call = calls[0]
     assert call.exception is None
@@ -437,7 +437,7 @@ async def test_agentchat_group_chat(
     async for _ in team.run_stream(task="Increment the number 1 to 3."):
         _
     await model_client.close()
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
     assert call.exception is None
     assert call.ended_at is not None
@@ -729,7 +729,7 @@ async def test_agent_with_memory(
         await model_client.close()
 
     await _run_agent()
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
     assert call.exception is None
     assert call.ended_at is not None
@@ -867,7 +867,7 @@ async def test_workflows_singlethreaded_runtime(
 
     await run_workflow()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
     assert call.exception is None
     assert call.ended_at is not None

@@ -24,7 +24,7 @@ def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
     exp = "The capital of France is Paris."
     assert response.choices[0].message.content.strip() == exp
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -61,7 +61,7 @@ async def test_cerebras_async(client: weave.trace.weave_client.WeaveClient) -> N
     exp = "The capital of France is Paris."
     assert response.choices[0].message.content.strip() == exp
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 

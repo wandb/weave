@@ -26,6 +26,6 @@ def test_notdiamond_quickstart(
     _, results = nd_client.model_select(
         model=llm_configs, messages=[{"role": "user", "content": "Hello, world!"}]
     )
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     flattened_calls = flattened_calls_to_names(flatten_calls(calls))
     assert len([call for call in flattened_calls if "model_select" in call[0]]) == 1

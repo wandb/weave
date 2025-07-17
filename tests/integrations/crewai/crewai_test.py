@@ -105,7 +105,7 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
     crew = get_crew()
     _ = crew.kickoff()
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     assert len(flattened_calls) == 6
@@ -238,7 +238,7 @@ def test_crewai_simple_crew_kickoff_for_each(client: WeaveClient) -> None:
     crew = get_crew()
     _ = crew.kickoff_for_each(inputs=[{"input1": "input1"}, {"input2": "input2"}])
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     assert len(flattened_calls) == 13
@@ -283,7 +283,7 @@ async def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
 
     result = await crew.kickoff_async()
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     assert len(flattened_calls) == 7
@@ -320,7 +320,7 @@ async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) ->
 
     await asyncio.sleep(1)
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     assert len(flattened_calls) == 15
@@ -366,7 +366,7 @@ def test_simple_flow(client: WeaveClient) -> None:
     flow = get_flow_with_router_or()
     result = flow.kickoff()
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     assert len(flattened_calls) == 6

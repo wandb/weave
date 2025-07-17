@@ -26,7 +26,7 @@ def test_hf_api_model(client):
     response = engine(messages, stop_sequences=["END"])
     assert "paris" in response.content.lower()
 
-    calls = client.calls()
+    calls = client.get_calls()
     assert len(calls) == 2
 
     call = calls[0]
@@ -62,7 +62,7 @@ def test_openai_server_model(client):
     response = engine(messages, stop_sequences=["END"])
     assert "paris" in response.content.lower()
 
-    calls = client.calls()
+    calls = client.get_calls()
     assert len(calls) == 2
 
     call = calls[0]
@@ -96,7 +96,7 @@ def test_tool_calling_agent_search(client):
         "Use the provided tool to answer this question. Get the following page - 'https://weave-docs.wandb.ai/'?"
     )
 
-    calls = client.calls()
+    calls = client.get_calls()
     assert len(calls) == 17
 
     call = calls[0]
@@ -135,7 +135,7 @@ def test_tool_calling_agent_weather(client):
     answer = agent.run("What is the weather in Tokyo?")
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
-    calls = client.calls()
+    calls = client.get_calls()
     assert len(calls) == 10
 
     call = calls[0]
@@ -164,7 +164,7 @@ def test_code_agent_search(client):
         "Use the provided tool to answer this question. Get the following page - 'https://weave-docs.wandb.ai/'?"
     )
 
-    calls = client.calls()
+    calls = client.get_calls()
     assert len(calls) == 10
 
     call = calls[0]
@@ -206,7 +206,7 @@ def test_code_agent_weather(client):
     )
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
-    calls = client.calls()
+    calls = client.get_calls()
     assert len(calls) == 7
 
     call = calls[0]

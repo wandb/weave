@@ -28,7 +28,7 @@ def test_anthropic(
     all_content = message.content[0]
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content.text == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
     assert call.exception is None
@@ -74,7 +74,7 @@ def test_anthropic_stream(
             output_tokens = event.usage.output_tokens
     exp = "Hello there! How can I assist you today?"
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -116,7 +116,7 @@ async def test_async_anthropic(
     all_content = message.content[0]
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content.text == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -167,7 +167,7 @@ async def test_async_anthropic_stream(
             output_tokens = event.usage.output_tokens
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -227,7 +227,7 @@ def test_tools_calling(
     all_content = message.content[0]
     assert all_content.input["location"] == exp
     assert all_content.type == "tool_use"
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -275,7 +275,7 @@ def test_anthropic_messages_stream_ctx_manager(
 
     exp = "Hello there!"
     assert all_content.strip() == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -325,7 +325,7 @@ async def test_async_anthropic_messages_stream_ctx_manager(
     exp = "Hello there!"
     assert all_content.strip() == exp
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -371,7 +371,7 @@ def test_anthropic_messages_stream_ctx_manager_text(
 
     exp = "Hello there!"
     assert all_content.strip() == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -420,7 +420,7 @@ async def test_async_anthropic_messages_stream_ctx_manager_text(
     exp = "Hello there!"
     assert all_content.strip() == exp
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -458,7 +458,7 @@ def test_beta_anthropic(
     all_content = message.content[0]
     exp = "Hello! It's nice to meet you. How can I assist you today?"
     assert all_content.text == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
     assert call.exception is None
@@ -504,7 +504,7 @@ def test_beta_anthropic_stream(
             output_tokens = event.usage.output_tokens
     exp = "Hello! How can I assist you today?"
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -546,7 +546,7 @@ async def test_beta_async_anthropic(
     all_content = message.content[0]
     exp = "Hello! How can I assist you today?"
     assert all_content.text == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -597,7 +597,7 @@ async def test_beta_async_anthropic_stream(
             output_tokens = event.usage.output_tokens
     exp = "Hello! How can I assist you today?"
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 

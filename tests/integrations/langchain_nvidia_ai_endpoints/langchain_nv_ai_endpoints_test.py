@@ -24,7 +24,7 @@ def test_chatnvidia_quickstart(client: weave.trace.weave_client.WeaveClient) -> 
 
     response = nvidia_client.invoke("Hello!")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # need to make 2 because of the langchain integration getting a call in there
     assert len(calls) == 2
     call = calls[1]
@@ -71,7 +71,7 @@ async def test_chatnvidia_async_quickstart(
 
     response = await nvidia_client.ainvoke("Hello!")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # need to make 2 because of the langchain integration getting a call in there
     assert len(calls) == 2
     call = calls[1]
@@ -122,7 +122,7 @@ def test_chatnvidia_stream_quickstart(
         answer += chunk
         answer.usage_metadata = chunk.usage_metadata
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # need to make 2 because of the langchain integration getting a call in there
     assert len(calls) == 2
     call = calls[1]
@@ -173,7 +173,7 @@ async def test_chatnvidia_async_stream_quickstart(
         answer += chunk
         answer.usage_metadata = chunk.usage_metadata
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # need to make 2 because of the langchain integration getting a call in there
     assert len(calls) == 2
     call = calls[1]
@@ -253,7 +253,7 @@ def test_chatnvidia_tool_call(client: weave.trace.weave_client.WeaveClient) -> N
 
     response = nvidia_client.invoke(messages)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # need to make 2 because of the langchain integration getting a call in there
     assert len(calls) == 2
     call = calls[1]
@@ -340,7 +340,7 @@ async def test_chatnvidia_tool_call_async(
 
     response = await nvidia_client.ainvoke(messages)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # need to make 2 because of the langchain integration getting a call in there
     assert len(calls) == 2
     call = calls[1]
@@ -431,7 +431,7 @@ def test_chatnvidia_tool_call_stream(
         answer += chunk
         answer.usage_metadata = chunk.usage_metadata
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # need to make 2 because of the langchain integration getting a call in there
     assert len(calls) == 2
     call = calls[1]
@@ -523,7 +523,7 @@ async def test_chatnvidia_tool_call_async_stream(
         answer += chunk
         answer.usage_metadata = chunk.usage_metadata
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # need to make 2 because of the langchain integration getting a call in there
     assert len(calls) == 2
     call = calls[1]
