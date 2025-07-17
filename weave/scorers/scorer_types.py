@@ -39,7 +39,7 @@ class LLMScorer(weave.Scorer):
 
     def model_post_init(self, __context: Any) -> None:
         try:
-            from litellm import acompletion, aembedding, amoderation  # noqa: F401
+            from litellm import acompletion, aembedding, amoderation
         except ImportError:
             raise ImportError(
                 "litellm is required to use the LLM-powered scorers, please install it with `pip install litellm`"
