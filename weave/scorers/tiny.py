@@ -59,6 +59,7 @@ def estimate_ability_parameters(responses_test, A, B, theta_init=None, eps=1e-10
     
     return optimal_theta
 
+
 class TinyWrapScorer(weave.Scorer):
     weight_key: str = "w_anchor"
     A_key: str = "A_anchor"
@@ -75,12 +76,48 @@ class TinyWrapScorer(weave.Scorer):
         score_dict[self.weight_key] = w_anchor
         return score_dict
 
+    @staticmethod
+    def _to_float_array(val):
+        """Convert `val` to a `np.ndarray` of dtype float64.
+
+        Handles the case where `val` is already an array **or** a string
+        representation such as ``'array([[1.2, 3.4]])'`` that results from
+        ``np.array.__repr__`` during serialization.
+        """
+        if isinstance(val, np.ndarray):
+            return val.astype(np.float64, copy=False)
+        if isinstance(val, (list, tuple)):
+            return np.asarray(val, dtype=np.float64)
+        # If it's a string try to ``eval`` the numpy-style representation.
+        if isinstance(val, str):
+            s = val.strip()
+            try:
+                # Remove the leading ``array(" and trailing ``)`` if present so
+                # that ``ast.literal_eval`` can parse it.
+                if s.startswith("array(") and s.endswith(")"):
+                    # Strip the leading 'array(' and the trailing ')'
+                    s_inner = s[len("array("):-1]
+                else:
+                    s_inner = s
+                import ast
+                parsed = ast.literal_eval(s_inner)
+                return np.asarray(parsed, dtype=np.float64)
+            except Exception:
+                # Fall-through to a simple float conversion (may raise ValueError)
+                return np.asarray(float(val), dtype=np.float64)
+        # Fallback: try casting directly – will raise if impossible
+        return np.asarray(val, dtype=np.float64)
+
     @weave.op
     def summarize(self, score_rows: list[dict]):
         print(score_rows)
         print(score_rows[0].keys())
-        Y, A, B, W = np.array([score_row[self.score_key] for score_row in score_rows]), np.array([score_row[self.A_key] for score_row in score_rows]), np.array([score_row[self.B_key] for score_row in score_rows]), np.array([score_row[self.weight_key] for score_row in score_rows])
-        
+        # Y, A, B, W = np.array([score_row[self.score_key] for score_row in score_rows]), np.array([score_row[self.A_key] for score_row in score_rows]), np.array([score_row[self.B_key] for score_row in score_rows]), np.array([score_row[self.weight_key] for score_row in score_rows])
+
+        Y = np.asarray([row[self.score_key] for row in score_rows], dtype=np.float64)
+        A = np.asarray([self._to_float_array(row[self.A_key]) for row in score_rows], dtype=np.float64)
+        B = np.asarray([self._to_float_array(row[self.B_key]) for row in score_rows], dtype=np.float64)
+        W = np.asarray([self._to_float_array(row[self.weight_key]) for row in score_rows], dtype=np.float64)
         #reshape A, B:
         # Reshape A and B to (1, 2, 100) using transpose and add batch dimension
         A = A.T[None, ...]
@@ -89,6 +126,7 @@ class TinyWrapScorer(weave.Scorer):
         # weighted pred:
         pred = (Y * W).sum()
         # pirt pred:
+        print(A.dtype, B.dtype, Y.dtype, W.dtype)
         theta = estimate_ability_parameters(Y, A, B)
         pirt_lambda = 0.1 # TODO: get this from the dataset
         pirt_pred = pirt_lambda * (Y.mean()) + (1-pirt_lambda) * (item_curve(theta, A, B).mean()) 
