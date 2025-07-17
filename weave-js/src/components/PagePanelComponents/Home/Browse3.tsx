@@ -2,7 +2,7 @@ import {ApolloProvider} from '@apollo/client';
 import {Box, Drawer} from '@mui/material';
 import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
-import {ChatClientProvider} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician/chatCompletionClient';
+import {MagicProvider} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
 import {debounce} from 'lodash';
 import React, {
   FC,
@@ -159,7 +159,7 @@ export const Browse3: FC<{
   return (
     <ApolloProvider client={apolloClient}>
       <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
-        <ChatClientProvider
+        <MagicProvider
           value={{entity: params.entityName!, project: params.projectName!}}>
           <Switch>
             <Route
@@ -174,7 +174,7 @@ export const Browse3: FC<{
               />
             </Route>
           </Switch>
-        </ChatClientProvider>
+        </MagicProvider>
       </Browse3WeaveflowRouteContextProvider>
     </ApolloProvider>
   );
