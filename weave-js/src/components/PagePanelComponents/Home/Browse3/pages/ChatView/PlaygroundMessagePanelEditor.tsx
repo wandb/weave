@@ -5,7 +5,7 @@ import {
 } from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
 import classNames from 'classnames';
 import _ from 'lodash';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import z from 'zod';
 
 import {StyledTextArea} from '../../StyledTextarea';
@@ -55,6 +55,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
   message,
 }) => {
   const {sendMessage, editMessage, editChoice} = usePlaygroundContext();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const initialContent = useMemo(
     () =>
@@ -65,10 +66,19 @@ export const PlaygroundMessagePanelEditor: React.FC<
   );
 
   const [editedContent, setEditedContent] = useState(initialContent);
+  const [isEditable, setIsEditable] = useState(true);
 
   useEffect(() => {
     setEditedContent(initialContent);
   }, [initialContent]);
+
+  // Auto-scroll to bottom when content changes during generation
+  useEffect(() => {
+    if (textareaRef.current && !isEditable) {
+      const textarea = textareaRef.current;
+      textarea.scrollTop = textarea.scrollHeight;
+    }
+  }, [editedContent, isEditable]);
 
   const handleSave = () => {
     if (choiceIndex !== undefined) {
@@ -89,8 +99,6 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setEditedContent(initialContent);
     setEditorHeight(null);
   };
-
-  const [isEditable, setIsEditable] = useState(true);
 
   const handleMagicStream = (content: string, isComplete: boolean) => {
     if (!isComplete) {
@@ -120,6 +128,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
         isNested ? 'px-[4px]' : 'px-[16px]'
       )}>
       <StyledTextArea
+        ref={textareaRef}
         value={editedContent}
         onChange={e => setEditedContent(e.target.value)}
         startHeight={320}
