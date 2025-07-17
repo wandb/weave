@@ -7,9 +7,9 @@ import React, {
   useState,
 } from 'react';
 
-import {Button} from '../components/Button';
-import {LLMDropdownLoaded} from '../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/PlaygroundChat/LLMDropdown';
-import {Tailwind} from '../components/Tailwind';
+import {Button} from '../../../components/Button';
+import {LLMDropdownLoaded} from '../../../components/PagePanelComponents/Home/Browse3/pages/PlaygroundPage/PlaygroundChat/LLMDropdown';
+import {Tailwind} from '../../../components/Tailwind';
 import {
   Chunk,
   CompletionResponseFormat,

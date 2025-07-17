@@ -1,6 +1,6 @@
 import React from 'react';
 
-import {Button, ButtonProps} from '../components/Button';
+import {Button, ButtonProps} from '../../../components/Button';
 
 export interface MagicButtonProps extends Omit<ButtonProps, 'startIcon'> {
   /**

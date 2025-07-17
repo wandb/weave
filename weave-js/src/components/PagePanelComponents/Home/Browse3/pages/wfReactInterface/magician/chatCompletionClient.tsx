@@ -10,9 +10,9 @@ import React, {
 import z from 'zod';
 import {zodToJsonSchema} from 'zod-to-json-schema';
 
-import {TraceServerClient} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClient';
-import {useGetTraceServerClientContext} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
-import {ResponseFormat} from '../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientTypes';
+import {TraceServerClient} from '../../../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClient';
+import {useGetTraceServerClientContext} from '../../../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientContext';
+import {ResponseFormat} from '../../../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/traceServerClientTypes';
 import {dangerouslyLogCallToWeave} from './magicianWeaveLogger';
 
 const DEFAULT_MODEL = 'coreweave/moonshotai/Kimi-K2-Instruct';
