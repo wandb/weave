@@ -83,6 +83,103 @@ const messages = prepareSingleShotMessages({
 await complete({messages}, onChunk);
 ```
 
+### Structured Output
+
+#### Using Zod Schemas for Type-Safe Responses
+Pass Zod schemas directly to automatically get structured, validated responses. The library converts your schema to JSON schema format and handles parsing automatically.
+
+```tsx
+import { z } from 'zod';
+
+// Define your schema
+const UserSchema = z.object({
+  name: z.string(),
+  age: z.number(),
+  email: z.string().email(),
+  preferences: z.array(z.string())
+});
+
+// With MagicTooltip - just pass the schema!
+<MagicTooltip
+  onStream={(content, isComplete) => {
+    if (isComplete) {
+      // content is already parsed and validated!
+      console.log('User:', content);
+    }
+  }}
+  systemPrompt="Generate a user profile"
+  responseFormat={UserSchema}
+>
+  <MagicButton>Generate User</MagicButton>
+</MagicTooltip>
+
+// With useChatCompletionStream - same magic!
+const complete = useChatCompletionStream();
+
+const generateUser = async () => {
+  await complete(
+    {
+      messages: "Create a user profile for a 25-year-old developer",
+      responseFormat: UserSchema
+    },
+    (chunk) => {
+      if (chunk.isComplete) {
+        // chunk.content is already the parsed object!
+        setUser(chunk.content);
+      }
+    }
+  );
+};
+```
+
+**Available response formats:**
+- **Zod Schema** - Automatically converts to JSON schema and parses response
+- `{ type: "json_object" }` - Forces JSON object output (manual parsing required)
+- `{ type: "text" }` - Default text output (can be omitted)
+
+**Why Zod schemas are magical:**
+- ✅ **Type Safety** - Full TypeScript support
+- ✅ **Auto-Validation** - Responses are automatically validated against your schema
+- ✅ **Auto-Parsing** - No manual JSON.parse() needed
+- ✅ **Error Handling** - Invalid responses are caught automatically
+
+### Cancellation
+
+Both `MagicTooltip` and `useChatCompletionStream` support cancellation to stop ongoing generation.
+
+```tsx
+// With MagicTooltip - handle cancellation to revert changes
+<MagicTooltip
+  onStream={(content, isComplete) => setContent(content)}
+  onCancel={() => setContent(originalContent)} // Revert on cancel
+  systemPrompt="Generate content..."
+>
+  <MagicButton>Generate</MagicButton>
+</MagicTooltip>
+
+// With useChatCompletionStream - use AbortController
+const complete = useChatCompletionStream();
+const abortController = new AbortController();
+
+const generate = async () => {
+  try {
+    await complete(
+      { messages: "Generate content..." },
+      (chunk) => setContent(chunk.content),
+      undefined,
+      abortController.signal
+    );
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log('Generation cancelled');
+    }
+  }
+};
+
+// Cancel generation
+const cancel = () => abortController.abort();
+```
+
 ### UI Components
 
 #### `MagicTooltip`
@@ -91,6 +188,7 @@ Minimal tooltip for AI content generation. Manages all UI state internally.
 ```tsx
 <MagicTooltip
   onStream={(content, isComplete) => setContent(content)}
+  onCancel={() => setContent(originalContent)} // Optional: handle cancellation
   systemPrompt="You are an expert..."
   placeholder="What would you like to generate?"
   contentToRevise={existingContent} // Optional: revise existing content
@@ -101,7 +199,7 @@ Minimal tooltip for AI content generation. Manages all UI state internally.
 ```
 
 #### `MagicButton`
-Button with sparkle icon that supports multiple states.
+Button with sparkle icon that supports multiple states. Automatically handles cancellation when clicked during generation.
 
 ```tsx
 <MagicButton 

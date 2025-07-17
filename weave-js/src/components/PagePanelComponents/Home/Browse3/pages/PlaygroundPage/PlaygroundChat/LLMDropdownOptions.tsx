@@ -157,6 +157,7 @@ const SubMenu = ({
   }, [direction, position, viewportWidth, viewportHeight]);
 
   const fontSize = size === 'small' ? '12px' : '16px';
+  const verticalPadding = size === 'small' ? '3px' : '6px';
 
   return ReactDOM.createPortal(
     <Tailwind>
@@ -211,7 +212,7 @@ const SubMenu = ({
                 wordBreak: 'break-all',
                 wordWrap: 'break-word',
                 whiteSpace: 'normal',
-                p: '6px',
+                p: `${verticalPadding} 6px`,
                 cursor: 'pointer',
                 borderRadius: '4px',
                 '&:hover': {
@@ -264,13 +265,14 @@ const SubMenu = ({
               onViewCatalog();
             }}
             sx={{
+              fontSize: fontSize,
               display: 'flex',
               alignItems: 'center',
               width: '100%',
               wordBreak: 'break-all',
               wordWrap: 'break-word',
               whiteSpace: 'normal',
-              p: '6px',
+              p: `${verticalPadding} 6px`,
               cursor: 'pointer',
               borderRadius: '4px',
               fontWeight: 600,
@@ -322,7 +324,7 @@ const SubMenu = ({
                 }}>
                 {provider.label}
               </Box>
-              <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+              <Box sx={{display: 'flex', gap: 1, alignItems: 'center', fontSize: fontSize}}>
                 <Button
                   variant="ghost"
                   size="small"
@@ -395,6 +397,8 @@ const SubMenuOption = ({
     );
   }
 
+  const fontSize = props.size === 'small' ? '12px' : '16px';
+
   return (
     <Box
       ref={optionRef}
@@ -429,6 +433,7 @@ const SubMenuOption = ({
                 wordWrap: 'break-word',
                 whiteSpace: 'normal',
                 width: '90%',
+                fontSize: fontSize,
               }}>
               <div className="flex items-center gap-8">
                 {children}

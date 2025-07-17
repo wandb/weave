@@ -130,6 +130,7 @@ export const prepareSingleShotMessages = (
  * @param project The project name
  * @param params Chat completion parameters
  * @param onChunk Callback for each streaming chunk
+ * @param signal Optional AbortSignal for cancellation
  * @returns The complete response as a string
  */
 const chatCompleteStream = async (
@@ -138,12 +139,18 @@ const chatCompleteStream = async (
   project: string,
   params: ChatCompletionParams,
   onChunk: (chunk: Chunk) => void,
-  _dangerousExtraAttributesToLog?: Record<string, any>
+  _dangerousExtraAttributesToLog?: Record<string, any>,
+  signal?: AbortSignal
 ): Promise<Completion> => {
   // Process raw chunks to extract content
   const processedChunks: unknown[] = [];
 
   const processChunk = (rawChunk: unknown) => {
+    // Check for cancellation
+    if (signal?.aborted) {
+      return;
+    }
+
     processedChunks.push(rawChunk);
 
     const content = extractChunkContent(rawChunk);
@@ -224,7 +231,8 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
         weavePlaygroundModelId?: string;
       },
       onChunk: (chunk: Chunk) => void,
-      _dangerousExtraAttributesToLog?: Record<string, any>
+      _dangerousExtraAttributesToLog?: Record<string, any>,
+      signal?: AbortSignal
     ) => {
       const client = getClient();
       // Use selected model from context if not specified in params
@@ -236,7 +244,8 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
         finalProject,
         {...params, weavePlaygroundModelId: weavePlaygroundModelId},
         onChunk,
-        _dangerousExtraAttributesToLog
+        _dangerousExtraAttributesToLog,
+        signal
       );
     },
     [finalEntity, finalProject, getClient, selectedModel]

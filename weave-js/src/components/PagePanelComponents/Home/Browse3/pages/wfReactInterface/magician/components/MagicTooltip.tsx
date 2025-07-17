@@ -45,6 +45,10 @@ export interface MagicTooltipProps {
    */
   onError?: (error: Error) => void;
   /**
+   * Callback for when generation is cancelled.
+   */
+  onCancel?: () => void;
+  /**
    * System prompt for the AI.
    */
   systemPrompt: string;
@@ -101,6 +105,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   onStream,
   onComplete,
   onError,
+  onCancel,
   systemPrompt,
   placeholder,
   revisionPlaceholder = DEFAULT_REVISION_PLACEHOLDER,
@@ -168,6 +173,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     }
     setIsGenerating(false);
     setAnchorEl(null);
+    onCancel?.();
   };
 
   const handleGenerate = async () => {
@@ -205,7 +211,8 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
           responseFormat: responseFormat,
         },
         onChunk,
-        _dangerousExtraAttributesToLog
+        _dangerousExtraAttributesToLog,
+        abortControllerRef.current?.signal
       );
 
       onComplete?.(res);
@@ -300,7 +307,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
                         setSelectedModel(modelId);
                       }}
                       isTeamAdmin={false}
-                      className="[&_.Select__control]:min-h-[32px] [&_.Select__control]:text-xs"
                       direction={{horizontal: 'right'}}
                       excludeSavedModels={true}
                       size="small"
