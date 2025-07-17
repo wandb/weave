@@ -36,7 +36,7 @@ const CallChartsWidget: React.FC<CallChartsWidgetProps> = ({
       <Chart
         key={chart.id}
         data={callData}
-        height={280}
+        height={232}
         xAxis={chart.xAxis}
         yAxis={chart.yAxis}
         plotType={chart.plotType || 'scatter'}

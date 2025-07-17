@@ -37,7 +37,7 @@ const CostsBarChart: React.FC<CostsBarChartProps> = ({
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [isChartHovered, setIsChartHovered] = React.useState(false);
   const [hintValue, setHintValue] = React.useState<any>(null);
-  const chartHeight = isFullscreen ? window.innerHeight : 280;
+  const chartHeight = isFullscreen ? window.innerHeight : 232;
   const chartWidth = isFullscreen ? window.innerWidth : 'calc(100% - 8px)';
 
   // Prepare data for react-vis
