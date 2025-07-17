@@ -86,6 +86,7 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.weave_client import make_client_call
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
@@ -237,11 +238,12 @@ class AsyncWeaveClient:
         # Create end request
         req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
+                project_id=self._project_id(),
                 id=call_id,
                 ended_at=ended_at,
                 output=output_with_refs,
                 exception=exception,
-                summary=summary,
+                summary=summary or {},  # Default to empty dict if None
             )
         )
         
@@ -274,25 +276,36 @@ class AsyncWeaveClient:
         req = tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
                 project_id=self._project_id(),
-                object_id=generate_id(),
+                object_id=name,  # Use name as object_id like sync client
                 val=serialized,
-                set_leaf_values=True,
             )
         )
         
         res = await self.server.obj_create(req)
         
         # Create reference
-        ref = ObjectRef(
-            entity=self.entity,
-            project=self.project,
-            object_id=res.object_id,
-            name=name,
-            _digest=res.digest,
-        )
+        if is_op(obj):
+            ref = OpRef(
+                entity=self.entity,
+                project=self.project,
+                name=name,
+                _digest=res.digest,
+            )
+        else:
+            ref = ObjectRef(
+                entity=self.entity,
+                project=self.project,
+                name=name,
+                _digest=res.digest,
+            )
         
         # Set ref on object
-        set_ref(obj, ref)
+        try:
+            set_ref(obj, ref)
+        except Exception:
+            # Don't worry if we can't set the ref.
+            # This can happen for primitive types that don't have __dict__
+            pass
         
         return ref
 
@@ -308,19 +321,22 @@ class AsyncWeaveClient:
         
         req = tsi.ObjReadReq(
             project_id=f"{ref.entity}/{ref.project}",
-            object_id=ref.object_id,
+            object_id=ref.name,  # ObjectRef uses name, not object_id
             digest=ref._digest,
         )
         
         res = await self.server.obj_read(req)
         
+        # Update ref with actual digest
+        ref = dataclasses.replace(ref, _digest=res.obj.digest)
+        
         # Deserialize
         obj = from_json(res.obj.val, f"{ref.entity}/{ref.project}", self.server)
         
-        # Set reference
-        set_ref(obj, ref)
+        # Convert to trace object
+        weave_obj = make_trace_obj(obj, ref, self.server, None)
         
-        return obj
+        return maybe_objectify(weave_obj)
 
     async def calls(
         self,
@@ -342,11 +358,11 @@ class AsyncWeaveClient:
         
         calls = []
         for call_schema in res.calls:
-            # Convert to WeaveObject
-            call_dict = call_schema.model_dump()
-            call_obj = make_trace_obj(
-                call_dict,
-                self._project_id(),
+            # Use make_client_call to create proper Call objects
+            call_obj = make_client_call(
+                self.entity,
+                self.project,
+                call_schema,
                 self.server,
             )
             calls.append(call_obj)
@@ -410,7 +426,7 @@ class AsyncWeaveClient:
         """Create or get a table (async version)."""
         # Create table if rows provided
         if rows is not None:
-            table = Table(name=name, rows=rows)
+            table = Table(rows=rows)
             ref = await self.save(table, name)
             return table
         else:
@@ -455,21 +471,23 @@ class AsyncWeaveClient:
         payload: dict[str, Any],
     ) -> str:
         """Add feedback to a call (async version)."""
-        # Get call ID
-        call_id: str
+        # Get call ref URI
+        weave_ref: str
         if isinstance(call, str):
-            call_id = call
+            # Assume it's a call ID, create ref URI
+            weave_ref = f"weave:///{self.entity}/{self.project}/call/{call}"
         elif isinstance(call, CallRef):
-            call_id = call.id
+            weave_ref = call.uri()
         elif hasattr(call, "id"):
-            call_id = call.id
+            # It's a Call object
+            weave_ref = f"weave:///{self.entity}/{self.project}/call/{call.id}"
         else:
             raise ValueError(f"Invalid call type: {type(call)}")
         
         # Create feedback
         req = tsi.FeedbackCreateReq(
             project_id=self._project_id(),
-            call_id=call_id,
+            weave_ref=weave_ref,
             feedback_type=feedback_type,
             payload=payload,
         )

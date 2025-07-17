@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from weave.trace.env import weave_trace_server_url
 from weave.trace_server import trace_server_interface as tsi
 from weave.utils.retry import _is_retryable_exception
+from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
 
@@ -67,14 +68,17 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         url: str,
         *,
         json: Optional[dict[str, Any]] = None,
+        data: Optional[bytes] = None,
         files: Optional[dict[str, Any]] = None,
         stream: bool = False,
     ) -> httpx.Response:
         """Make an HTTP request."""
+        # Note: httpx client already has base_url set, so we just use the relative path
         response = await self._client.request(
             method=method,
             url=url,
             json=json,
+            data=data,
             files=files,
         )
         response.raise_for_status()
@@ -85,6 +89,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         method: str,
         url: str,
         *,
+        req: Optional[BaseModel] = None,
         json: Optional[dict[str, Any]] = None,
         files: Optional[dict[str, Any]] = None,
         max_retries: int = 3,
@@ -92,9 +97,17 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         """Retry a request with exponential backoff."""
         import asyncio
 
+        # If we have a pydantic model, serialize it properly
+        data = None
+        if req is not None:
+            data = req.model_dump_json(by_alias=True).encode("utf-8")
+            json = None  # Don't use json if we have data
+
         for attempt in range(max_retries):
             try:
-                response = await self._make_request(method, url, json=json, files=files)
+                response = await self._make_request(
+                    method, url, json=json, data=data, files=files
+                )
                 if response.headers.get("content-type", "").startswith("application/json"):
                     return response.json()
                 return response.content
@@ -113,19 +126,19 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes:
         """Ensure project exists."""
-        response = await self._retry_request(
-            "POST",
-            "/ensure_project_exists",
-            json={"entity": entity, "project": project},
+        # TODO: This should happen in the wandb backend, not here, and it's slow
+        # (hundreds of ms)
+        # Note: This is synchronous like in the original implementation
+        return tsi.EnsureProjectExistsRes.model_validate(
+            project_creator.ensure_project_exists(entity, project)
         )
-        return tsi.EnsureProjectExistsRes(**response)
 
     async def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         """Export OpenTelemetry traces."""
         response = await self._retry_request(
             "POST",
             "/otel/export",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.OtelExportRes(**response)
 
@@ -135,7 +148,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/call/start",
-            json=req.model_dump(exclude_none=True),
+            req=req,
         )
         return tsi.CallStartRes(**response)
 
@@ -144,7 +157,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/call/end",
-            json=req.model_dump(exclude_none=True),
+            req=req,
         )
         return tsi.CallEndRes(**response)
 
@@ -153,7 +166,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/call/read",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.CallReadRes(**response)
 
@@ -162,7 +175,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/calls/query",
-            json=req.model_dump(exclude_none=True),
+            req=req,
         )
         return tsi.CallsQueryRes(**response)
 
@@ -191,7 +204,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/calls/delete",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.CallsDeleteRes(**response)
 
@@ -202,7 +215,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/calls/query_stats",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.CallsQueryStatsRes(**response)
 
@@ -211,7 +224,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/call/update",
-            json=req.model_dump(exclude_none=True),
+            req=req,
         )
         return tsi.CallUpdateRes(**response)
 
@@ -222,7 +235,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/call/start_batch",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.CallCreateBatchRes(**response)
 
@@ -232,7 +245,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/op/create",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.OpCreateRes(**response)
 
@@ -241,7 +254,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/op/read",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.OpReadRes(**response)
 
@@ -250,7 +263,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/ops/query",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.OpQueryRes(**response)
 
@@ -260,7 +273,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/cost/create",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.CostCreateRes(**response)
 
@@ -269,7 +282,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/cost/query",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.CostQueryRes(**response)
 
@@ -278,7 +291,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/cost/purge",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.CostPurgeRes(**response)
 
@@ -288,7 +301,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/obj/create",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.ObjCreateRes(**response)
 
@@ -297,7 +310,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/obj/read",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.ObjReadRes(**response)
 
@@ -306,7 +319,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/objs/query",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.ObjQueryRes(**response)
 
@@ -315,7 +328,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/obj/delete",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.ObjDeleteRes(**response)
 
@@ -325,7 +338,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/table/create",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.TableCreateRes(**response)
 
@@ -334,7 +347,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/table/update",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.TableUpdateRes(**response)
 
@@ -343,7 +356,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/table/query",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.TableQueryRes(**response)
 
@@ -374,7 +387,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/table/query_stats",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.TableQueryStatsRes(**response)
 
@@ -385,7 +398,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/table/query_stats_batch",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.TableQueryStatsBatchRes(**response)
 
@@ -395,7 +408,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/refs/read_batch",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.RefsReadBatchRes(**response)
 
@@ -415,7 +428,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/file/content_read",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.FileContentReadRes(**response)
 
@@ -425,7 +438,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/feedback/create",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.FeedbackCreateRes(**response)
 
@@ -434,7 +447,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/feedback/query",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.FeedbackQueryRes(**response)
 
@@ -443,7 +456,7 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/feedback/replace",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.FeedbackReplaceRes(**response)
 
@@ -452,6 +465,6 @@ class AsyncRemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = await self._retry_request(
             "POST",
             "/feedback/purge",
-            json=req.model_dump(),
+            req=req,
         )
         return tsi.FeedbackPurgeRes(**response)
