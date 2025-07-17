@@ -1,5 +1,5 @@
+import {MagicButton, MagicTooltip} from '@wandb/weave/common/util/WBMagician2';
 import {Button} from '@wandb/weave/components/Button';
-import {MagicButton, MagicTooltip} from '@wandb/weave/WBMagician2';
 import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useState} from 'react';

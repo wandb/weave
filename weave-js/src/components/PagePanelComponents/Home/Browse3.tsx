@@ -2,7 +2,7 @@ import {ApolloProvider} from '@apollo/client';
 import {Box, Drawer} from '@mui/material';
 import {LicenseInfo} from '@mui/x-license';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
-import {ChatClientProvider} from '@wandb/weave/WBMagician2/chatCompletionClient';
+import {ChatClientProvider} from '@wandb/weave/common/util/WBMagician2/chatCompletionClient';
 import {debounce} from 'lodash';
 import React, {
   FC,
