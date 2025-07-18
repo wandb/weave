@@ -92,7 +92,7 @@ def main():
 def test_mcp_client(client: WeaveClient) -> None:
     main()
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     assert len(calls) == 3
 
     flattened_calls = flatten_calls(calls)
@@ -155,7 +155,7 @@ def test_mcp_server(client: WeaveClient) -> None:
         == "Please review this code:\\n\\nprint('Hello, world!')"
     )
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     assert len(calls) == 3
 
     flattened_calls = flatten_calls(calls)

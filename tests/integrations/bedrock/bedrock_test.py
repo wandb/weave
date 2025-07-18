@@ -271,7 +271,7 @@ def test_bedrock_converse(
         assert "content" in response["output"]["message"]
 
     # Now verify that a trace was captured.
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1, "Expected exactly one trace call"
     call = calls[0]
 
@@ -332,7 +332,7 @@ def test_bedrock_converse_stream(
         assert final_response is not None
 
     # Now verify that a trace was captured.
-    calls = client.calls()
+    calls = client.get_calls()
     assert len(calls) == 1, "Expected exactly one trace call for the stream test"
     call = calls[0]
 
@@ -391,7 +391,7 @@ def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
         )
 
     # Check that a trace was captured
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1, "Expected exactly one trace call for invoke command"
     call = calls[0]
     assert call.exception is None
@@ -446,7 +446,7 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
         assert result.metadata["usage"]["totalTokens"] == 70
 
     # Now verify that a trace was captured
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) >= 1, "Expected at least one trace call"
     # Find the score call
     score_calls = [call for call in calls if "score" in call._op_name]
@@ -520,7 +520,7 @@ def test_bedrock_invoke_exception_handling(
         assert "The provided model identifier is invalid" in str(exc_info.value)
 
     # Check that a trace was captured even with the exception
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1, "Expected exactly one trace call even with exception"
     call = calls[0]
 

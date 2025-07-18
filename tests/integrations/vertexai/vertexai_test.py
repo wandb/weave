@@ -16,7 +16,7 @@ def test_content_generation(client):
     model = GenerativeModel("gemini-1.5-flash")
     model.generate_content("What is the capital of France?")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -46,7 +46,7 @@ def test_content_generation_stream(client):
     chunks = [chunk.text for chunk in response]
     assert len(chunks) > 1
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -73,7 +73,7 @@ async def test_content_generation_async(client):
     model = GenerativeModel("gemini-1.5-flash")
     await model.generate_content_async("What is the capital of France?")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -112,7 +112,7 @@ async def test_content_generation_async_stream(client):
 
     await get_response()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -139,7 +139,7 @@ def test_chat_session(client):
     chat = model.start_chat()
     chat.send_message("What is the capital of France?")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -169,7 +169,7 @@ async def test_chat_session_async(client):
     chat = model.start_chat()
     await chat.send_message_async("What is the capital of France?")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]

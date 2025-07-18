@@ -143,7 +143,7 @@ async def test_evaluation_performance(client: WeaveClient):
         }
     )
 
-    calls = client.calls()
+    calls = client.get_calls()
     objects = client._objects()
 
     assert (
