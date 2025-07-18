@@ -7,6 +7,7 @@ import {
 } from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
+import {SelectSize} from '@wandb/weave/components/Form/Select';
 import {Icon} from '@wandb/weave/components/Icon';
 import {Pill} from '@wandb/weave/components/Tag';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
@@ -76,6 +77,7 @@ export interface CustomOptionProps extends OptionProps<ProviderOption, false> {
   onViewCatalog?: (path?: string) => void;
   providers?: ProviderOption[];
   direction: OpenDirection;
+  size?: SelectSize;
 }
 
 const SubMenu = ({
@@ -89,6 +91,7 @@ const SubMenu = ({
   onViewCatalog,
   providers,
   direction,
+  size,
 }: {
   value: string;
   llms: Array<LLMOption>;
@@ -104,6 +107,7 @@ const SubMenu = ({
   onViewCatalog?: (path?: string) => void;
   providers?: ProviderOption[];
   direction: OpenDirection;
+  size?: SelectSize;
 }) => {
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
@@ -151,6 +155,9 @@ const SubMenu = ({
     }
     return {};
   }, [direction, position, viewportWidth, viewportHeight]);
+
+  const fontSize = size === 'small' ? '12px' : '16px';
+  const verticalPadding = size === 'small' ? '3px' : '6px';
 
   return ReactDOM.createPortal(
     <Tailwind>
@@ -205,7 +212,7 @@ const SubMenu = ({
                 wordBreak: 'break-all',
                 wordWrap: 'break-word',
                 whiteSpace: 'normal',
-                p: '6px',
+                p: `${verticalPadding} 6px`,
                 cursor: 'pointer',
                 borderRadius: '4px',
                 '&:hover': {
@@ -215,7 +222,7 @@ const SubMenu = ({
                   },
                 },
               }}>
-              <Box sx={{flex: 1}}>
+              <Box sx={{flex: 1, fontSize: fontSize}}>
                 {llm.label}
                 {llm.subLabel && (
                   <div className="text-sm text-moon-500">{llm.subLabel}</div>
@@ -258,13 +265,14 @@ const SubMenu = ({
               onViewCatalog();
             }}
             sx={{
+              fontSize: fontSize,
               display: 'flex',
               alignItems: 'center',
               width: '100%',
               wordBreak: 'break-all',
               wordWrap: 'break-word',
               whiteSpace: 'normal',
-              p: '6px',
+              p: `${verticalPadding} 6px`,
               cursor: 'pointer',
               borderRadius: '4px',
               fontWeight: 600,
@@ -312,10 +320,17 @@ const SubMenu = ({
                   wordBreak: 'break-all',
                   wordWrap: 'break-word',
                   whiteSpace: 'normal',
+                  fontSize: fontSize,
                 }}>
                 {provider.label}
               </Box>
-              <Box sx={{display: 'flex', gap: 1, alignItems: 'center'}}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1,
+                  alignItems: 'center',
+                  fontSize: fontSize,
+                }}>
                 <Button
                   variant="ghost"
                   size="small"
@@ -388,6 +403,8 @@ const SubMenuOption = ({
     );
   }
 
+  const fontSize = props.size === 'small' ? '12px' : '16px';
+
   return (
     <Box
       ref={optionRef}
@@ -422,6 +439,7 @@ const SubMenuOption = ({
                 wordWrap: 'break-word',
                 whiteSpace: 'normal',
                 width: '90%',
+                fontSize: fontSize,
               }}>
               <div className="flex items-center gap-8">
                 {children}
@@ -460,6 +478,7 @@ const SubMenuOption = ({
           onConfigureProvider={onConfigureProvider}
           onViewCatalog={onViewCatalog}
           direction={direction}
+          size={props.size}
         />
       )}
     </Box>
@@ -581,7 +600,8 @@ export const CustomOption = ({
       project={project}
       isAdmin={isAdmin}
       onConfigureProvider={onConfigureProvider}
-      onViewCatalog={onViewCatalog}>
+      onViewCatalog={onViewCatalog}
+      size={props.size}>
       {children}
     </SubMenuOption>
   );
@@ -617,7 +637,7 @@ export const useLLMDropdownOptions = (
   customLoading: boolean,
   savedModelsResult: TraceObjSchemaForBaseObjectClass<'LLMStructuredCompletionModel'>[],
   savedModelsLoading: boolean
-) => {
+): ProviderOption[] => {
   const inferenceContext = useInferenceContext();
   const options: ProviderOption[] = [];
   const disabledOptions: ProviderOption[] = [];
