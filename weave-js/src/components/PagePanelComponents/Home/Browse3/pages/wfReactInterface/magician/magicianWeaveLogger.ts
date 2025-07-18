@@ -5,11 +5,11 @@ import {DirectTraceServerClient} from '../traceServerDirectClient';
 /** Direct trace server client for logging to Weave */
 const hackweekClient = new DirectTraceServerClient(
   'https://trace.wandb.ai',
-  '659db88fac303193659de93441345a0a7843e0ff'
+  'API_KEY'
 );
 
 /** Project ID for logging magic calls */
-const projectId = 'wandb/hackweek_sweeney_2025';
+const projectId = 'PROJECT_ID';
 
 /**
  * Logs a magic call to Weave for debugging and analysis.
