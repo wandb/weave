@@ -263,49 +263,13 @@ Smart button with built-in AI generation capabilities. Manages all UI state inte
   placeholder="What would you like to generate?"
   contentToRevise={existingContent} // Optional: revise existing content
   showModelSelector={true} // Optional: show model dropdown
+  additionalContext={{
+    // Optional context for the model
+  }}
   size="medium" // Button size
   variant="primary" // Button variant
   text="Generate Analysis"
 />
-
-// Or using the text prop:
-<MagicButton
-  onStream={(chunk, accumulation, parsedCompletion, isComplete) => setContent(accumulation)}
-  systemPrompt="You are an expert..."
-  placeholder="What would you like to generate?"
-  text="Generate Analysis"
-  size="medium"
-  variant="primary"
-/>
-```
-
-**MagicButton Props:**
-```tsx
-interface MagicButtonProps {
-  // Magic-specific props
-  onStream: (chunk: string, accumulation: string, parsedCompletion: Completion | null, isComplete: boolean) => void;
-  onError?: (error: Error) => void;
-  onCancel?: () => void;
-  systemPrompt: string;
-  placeholder?: string;
-  revisionPlaceholder?: string;
-  contentToRevise?: string;
-  additionalContext?: Record<string, any>;
-  responseFormat?: CompletionResponseFormat;
-  showModelSelector?: boolean;
-  width?: number;
-  textareaLines?: number;
-  _dangerousExtraAttributesToLog?: Record<string, any>;
-  
-  // Button-specific props (extends ButtonProps)
-  children?: React.ReactNode;
-  text?: string; // Alternative to children for button text
-  size?: 'small' | 'medium' | 'large';
-  variant?: 'ghost' | 'secondary' | 'primary' | 'destructive';
-  disabled?: boolean;
-  // ... other Button props
-}
-```
 
 #### `MagicTooltip` (Advanced Usage)
 Low-level tooltip component for advanced use cases where you need custom trigger elements.
