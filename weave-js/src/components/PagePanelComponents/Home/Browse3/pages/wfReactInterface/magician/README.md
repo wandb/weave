@@ -30,12 +30,11 @@ function MyComponent() {
 
   return (
     <MagicButton
-      onStream={(chunk, isComplete) => setContent(chunk)}
+      onStream={(chunk, accumulation, parsedCompletion, isComplete) => setContent(accumulation)}
       systemPrompt="You are a helpful assistant..."
       placeholder="What would you like to generate?"
-    >
-      Generate
-    </MagicButton>
+      text="Generate"
+    />
   );
 }
 ```
@@ -101,17 +100,16 @@ const UserSchema = z.object({
 
 // With MagicButton - just pass the schema!
 <MagicButton
-  onStream={(content, isComplete) => {
-    if (isComplete) {
-      // content is already parsed and validated!
-      console.log('User:', content);
+  onStream={(chunk, accumulation, parsedCompletion, isComplete) => {
+    if (isComplete && parsedCompletion) {
+      // parsedCompletion is already parsed and validated!
+      console.log('User:', parsedCompletion);
     }
   }}
   systemPrompt="Generate a user profile"
   responseFormat={UserSchema}
->
-  Generate User
-</MagicButton>
+  text="Generate User"
+/>
 
 // With useChatCompletionStream - same magic!
 const complete = useChatCompletionStream();
@@ -150,12 +148,11 @@ Both `MagicButton` and `useChatCompletionStream` support cancellation to stop on
 ```tsx
 // With MagicButton - handle cancellation to revert changes
 <MagicButton
-  onStream={(content, isComplete) => setContent(content)}
+  onStream={(chunk, accumulation, parsedCompletion, isComplete) => setContent(accumulation)}
   onCancel={() => setContent(originalContent)} // Revert on cancel
   systemPrompt="Generate content..."
->
-  Generate
-</MagicButton>
+  text="Generate"
+/>
 
 // With useChatCompletionStream - use AbortController
 const complete = useChatCompletionStream();
@@ -187,7 +184,7 @@ Smart button with built-in AI generation capabilities. Manages all UI state inte
 
 ```tsx
 <MagicButton
-  onStream={(content, isComplete) => setContent(content)}
+  onStream={(chunk, accumulation, parsedCompletion, isComplete) => setContent(accumulation)}
   onCancel={() => setContent(originalContent)} // Optional: handle cancellation
   systemPrompt="You are an expert..."
   placeholder="What would you like to generate?"
@@ -195,13 +192,12 @@ Smart button with built-in AI generation capabilities. Manages all UI state inte
   showModelSelector={true} // Optional: show model dropdown
   size="medium" // Button size
   variant="primary" // Button variant
->
-  Generate Analysis
-</MagicButton>
+  text="Generate Analysis"
+/>
 
 // Or using the text prop:
 <MagicButton
-  onStream={(content, isComplete) => setContent(content)}
+  onStream={(chunk, accumulation, parsedCompletion, isComplete) => setContent(accumulation)}
   systemPrompt="You are an expert..."
   placeholder="What would you like to generate?"
   text="Generate Analysis"
@@ -214,8 +210,7 @@ Smart button with built-in AI generation capabilities. Manages all UI state inte
 ```tsx
 interface MagicButtonProps {
   // Magic-specific props
-  onStream: (content: string, isComplete: boolean) => void;
-  onComplete?: (completion: Completion) => void;
+  onStream: (chunk: string, accumulation: string, parsedCompletion: Completion | null, isComplete: boolean) => void;
   onError?: (error: Error) => void;
   onCancel?: () => void;
   systemPrompt: string;
@@ -272,12 +267,12 @@ function PlaygroundMessagePanelEditor() {
   const [editedContent, setEditedContent] = useState('');
   const [isEditable, setIsEditable] = useState(true);
 
-  const handleMagicStream = (content: string, isComplete: boolean) => {
+  const handleMagicStream = (chunk: string, accumulation: string, parsedCompletion: any, isComplete: boolean) => {
     if (!isComplete) {
       setIsEditable(false);
-      setEditedContent(content + '█'); // Show cursor during generation
+      setEditedContent(accumulation + '█'); // Show cursor during generation
     } else {
-      setEditedContent(content);
+      setEditedContent(accumulation);
       setIsEditable(true);
     }
   };
@@ -295,6 +290,7 @@ function PlaygroundMessagePanelEditor() {
         placeholder="What would you like the model to do?"
         contentToRevise={editedContent}
         size="medium"
+        text="Generate"
       />
     </div>
   );

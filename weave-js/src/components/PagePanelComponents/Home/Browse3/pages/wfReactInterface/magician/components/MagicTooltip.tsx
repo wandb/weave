@@ -35,14 +35,12 @@ export interface MagicTooltipProps {
   children?: React.ReactElement;
   /**
    * Callback for streaming content as it's generated.
-   * @param content The content chunk
+   * @param chunk The current chunk string
+   * @param accumulation The accumulated content so far
+   * @param parsedCompletion The final parsed completion (null until complete)
    * @param isComplete Whether generation is complete
    */
-  onStream: (content: string, isComplete: boolean) => void;
-  /**
-   * Callback for when generation is complete.
-   */
-  onComplete?: (completion: Completion) => void;
+  onStream: (chunk: string, accumulation: string, parsedCompletion: Completion | null, isComplete: boolean) => void;
   /**
    * Callback for errors during generation.
    */
@@ -124,7 +122,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   entityProject,
   children,
   onStream,
-  onComplete,
   onError,
   onCancel,
   systemPrompt,
@@ -237,7 +234,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     abortControllerRef.current = new AbortController();
 
     // Immediately trigger loading state
-    onStream('', false);
+    onStream('', '', null, false);
 
     // Close the tooltip immediately
     if (isControlled) {
@@ -253,7 +250,7 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
         if (abortControllerRef.current?.signal.aborted) return;
 
         accumulatedContent += chunk.content;
-        onStream(accumulatedContent, false);
+        onStream(chunk.content, accumulatedContent, null, false);
       };
 
       const logAttrs = {
@@ -280,11 +277,9 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
         abortControllerRef.current?.signal
       );
 
-      onComplete?.(res);
-
       // Signal completion
       if (!abortControllerRef.current?.signal.aborted) {
-        onStream(accumulatedContent, true);
+        onStream('', accumulatedContent, res, true);
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== 'AbortError') {

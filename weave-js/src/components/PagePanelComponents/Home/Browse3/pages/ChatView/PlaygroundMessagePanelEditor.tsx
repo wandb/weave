@@ -97,12 +97,12 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setEditorHeight(null);
   };
 
-  const handleMagicStream = (content: string, isComplete: boolean) => {
+  const handleMagicStream = (chunk: string, accumulation: string, parsedCompletion: any, isComplete: boolean) => {
     if (!isComplete) {
       setIsEditable(false);
-      setEditedContent(content + TYPING_CHAR);
+      setEditedContent(accumulation + TYPING_CHAR);
     } else {
-      setEditedContent(content);
+      setEditedContent(accumulation);
       setIsEditable(true);
     }
   };

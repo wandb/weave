@@ -238,14 +238,14 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
     }
   }, [currentVersionIndex, allFeedbacks]);
 
-  const handleMagicStream = async (content: string, isComplete: boolean) => {
+  const handleMagicStream = async (chunk: string, accumulation: string, parsedCompletion: any, isComplete: boolean) => {
     if (!isComplete) {
       setIsGenerating(true);
       setError(null);
       // Show content without cursor - markdown handles updates smoothly
-      setMagicSummary(content);
+      setMagicSummary(accumulation);
     } else {
-      setMagicSummary(content);
+      setMagicSummary(accumulation);
       setIsGenerating(false);
 
       // Save the analysis when generation is complete
@@ -256,7 +256,7 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
           entity,
           project,
           callId,
-          content,
+          accumulation,
           config.feedbackType
         );
 

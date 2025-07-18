@@ -616,10 +616,10 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               Add row
             </Button>
             <MagicButton
-              onStream={(response: string, isComplete: boolean) => {
+              onStream={(chunk: string, accumulation: string, parsedCompletion: any, isComplete: boolean) => {
                 const newRows = isComplete
-                  ? parseCompleteLLMRows(response)
-                  : parsePartialLLMRows(response);
+                  ? parseCompleteLLMRows(accumulation)
+                  : parsePartialLLMRows(accumulation);
                 if (newRows.length > lastGeneratedIndex.current + 1) {
                   const rowsToAdd = newRows.slice(
                     lastGeneratedIndex.current + 1
@@ -631,8 +631,8 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
                 if (isComplete) {
                   lastGeneratedIndex.current = -1;
                 }
-                // console.log(parsePartialLLMRows(response));
-                // // console.log(response);
+                // console.log(parsePartialLLMRows(accumulation));
+                // // console.log(accumulation);
               }}
               systemPrompt={`
 You are an LLM developer building a dataset.

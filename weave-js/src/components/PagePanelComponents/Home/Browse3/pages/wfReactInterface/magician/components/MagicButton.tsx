@@ -19,14 +19,12 @@ export interface MagicButtonProps
   entityProject?: EntityProject;
   /**
    * Callback for streaming content as it's generated.
-   * @param content The content chunk
+   * @param chunk The current chunk string
+   * @param accumulation The accumulated content so far
+   * @param parsedCompletion The final parsed completion (null until complete)
    * @param isComplete Whether generation is complete
    */
-  onStream: (content: string, isComplete: boolean) => void;
-  /**
-   * Callback for when generation is complete.
-   */
-  onComplete?: (completion: Completion) => void;
+  onStream: (chunk: string, accumulation: string, parsedCompletion: Completion | null, isComplete: boolean) => void;
   /**
    * Callback for errors during generation.
    */
@@ -95,7 +93,6 @@ export interface MagicButtonProps
 export const MagicButton: React.FC<MagicButtonProps> = ({
   entityProject,
   onStream,
-  onComplete,
   onError,
   onCancel,
   systemPrompt,
@@ -150,7 +147,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
     abortControllerRef.current = new AbortController();
 
     // Immediately trigger loading state
-    onStream('', false);
+    onStream('', '', null, false);
 
     // Close the tooltip immediately
     setAnchorEl(null);
@@ -162,7 +159,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
         if (abortControllerRef.current?.signal.aborted) return;
 
         accumulatedContent += chunk.content;
-        onStream(accumulatedContent, false);
+        onStream(chunk.content, accumulatedContent, null, false);
       };
 
       const logAttrs = {
@@ -190,11 +187,9 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
         abortControllerRef.current?.signal
       );
 
-      onComplete?.(res);
-
       // Signal completion
       if (!abortControllerRef.current?.signal.aborted) {
-        onStream(accumulatedContent, true);
+        onStream('', accumulatedContent, res, true);
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== 'AbortError') {
@@ -245,7 +240,6 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
         textareaLines={textareaLines}
         entityProject={entityProject}
         onStream={onStream}
-        onComplete={onComplete}
         onError={onError}
         onCancel={onCancel}
         systemPrompt={systemPrompt}
