@@ -3,15 +3,21 @@ import React, {FC, useMemo} from 'react';
 
 import {useEvaluationComparisonState} from '../CompareEvaluationsPage/ecpState';
 import {MagicAnalysisBase, MagicAnalysisConfig} from './MagicAnalysisBase';
-import {createEvaluationAnalysisContext,MAGIC_EVALUATION_ANALYSIS_SYSTEM_PROMPT} from './magicEvaluationAnalysis';
+import {
+  createEvaluationAnalysisContext,
+  MAGIC_EVALUATION_ANALYSIS_SYSTEM_PROMPT,
+} from './magicEvaluationAnalysis';
 
 const MAGIC_EVALUATION_ANALYSIS_FEEDBACK_TYPE = 'wandb.magic_analysis';
 
 const EMPTY_STATE_TITLE = 'Generate Evaluation Analysis';
-const EMPTY_STATE_DESCRIPTION = 'Use AI to analyze this evaluation run and generate insights about model performance, patterns, and potential improvements.';
+const EMPTY_STATE_DESCRIPTION =
+  'Use AI to analyze this evaluation run and generate insights about model performance, patterns, and potential improvements.';
 const ANALYSIS_TITLE = 'Generated Evaluation Analysis';
-const PLACEHOLDER = 'Ask specific questions about the evaluation results, or leave empty for a comprehensive analysis...';
-const REVISION_PLACEHOLDER = 'Ask follow-up questions or leave empty to regenerate the analysis...';
+const PLACEHOLDER =
+  'Ask specific questions about the evaluation results, or leave empty for a comprehensive analysis...';
+const REVISION_PLACEHOLDER =
+  'Ask follow-up questions or leave empty to regenerate the analysis...';
 
 export const MagicEvaluationAnalysisTab: FC<{
   entity: string;
@@ -37,7 +43,9 @@ const MagicEvaluationAnalysisTabInner: FC<{
   );
 
   const additionalContext = useMemo(() => {
-    return createEvaluationAnalysisContext(evaluationComparisonStateQuery.result);
+    return createEvaluationAnalysisContext(
+      evaluationComparisonStateQuery.result
+    );
   }, [evaluationComparisonStateQuery.result]);
 
   const config: MagicAnalysisConfig = {

@@ -4,15 +4,21 @@ import React, {FC, useMemo} from 'react';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {MagicAnalysisBase, MagicAnalysisConfig} from './MagicAnalysisBase';
-import {createCallAnalysisContext,MAGIC_CALL_ANALYSIS_SYSTEM_PROMPT} from './magicCallAnalysis';
+import {
+  createCallAnalysisContext,
+  MAGIC_CALL_ANALYSIS_SYSTEM_PROMPT,
+} from './magicCallAnalysis';
 
 const MAGIC_CALL_ANALYSIS_FEEDBACK_TYPE = 'wandb.magic_call_analysis';
 
 const EMPTY_STATE_TITLE = 'Generate Call Analysis';
-const EMPTY_STATE_DESCRIPTION = 'Use AI to analyze this call and generate insights about performance, patterns, and potential improvements.';
+const EMPTY_STATE_DESCRIPTION =
+  'Use AI to analyze this call and generate insights about performance, patterns, and potential improvements.';
 const ANALYSIS_TITLE = 'Generated Call Analysis';
-const PLACEHOLDER = 'Ask specific questions about the call, or leave empty for a comprehensive analysis...';
-const REVISION_PLACEHOLDER = 'Ask follow-up questions or leave empty to regenerate the analysis...';
+const PLACEHOLDER =
+  'Ask specific questions about the call, or leave empty for a comprehensive analysis...';
+const REVISION_PLACEHOLDER =
+  'Ask follow-up questions or leave empty to regenerate the analysis...';
 
 export const MagicCallAnalysisTab: FC<{
   entity: string;
