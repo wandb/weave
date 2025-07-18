@@ -124,14 +124,14 @@ def _get_score_column(
         )
 
     score_column, score_val = next(iter(scores.items()))
-    _not_diamond_score_column = f"{score_column}_score"
-    if score_col_name is not None and _not_diamond_score_column != score_col_name:
+    not_diamond_score_column = f"{score_column}_score"
+    if score_col_name is not None and not_diamond_score_column != score_col_name:
         raise ValueError(
-            f"Multiple eval scores for {model}: {score_col_name} and {_not_diamond_score_column}. "
+            f"Multiple eval scores for {model}: {score_col_name} and {not_diamond_score_column}. "
             "Please specify a single score column."
         )
 
-    return _not_diamond_score_column, score_val
+    return not_diamond_score_column, score_val
 
 
 def _build_dataframe(
@@ -140,13 +140,13 @@ def _build_dataframe(
     df_rows = []
     score_col_name = None
     for row in dataset.rows:
-        _df_row = {}
+        df_row = {}
         for col, val in row.items():
             if col == "scores":
                 col, val = _get_score_column(model, val, score_col_name=score_col_name)
                 score_col_name = score_col_name or col
-            _df_row[col] = val
-        df_rows.append(_df_row)
+            df_row[col] = val
+        df_rows.append(df_row)
 
     if score_col_name is None:
         raise ValueError(f"No score column found for {model}. Is this correct?")

@@ -87,9 +87,9 @@ def encode_custom_obj(obj: Any) -> dict | None:
 
 
 def decode_custom_inline_obj(obj: dict) -> Any:
-    _type = obj["weave_type"]["type"]
-    if _type in KNOWN_TYPES:
-        serializer = get_serializer_by_id(_type)
+    type_ = obj["weave_type"]["type"]
+    if type_ in KNOWN_TYPES:
+        serializer = get_serializer_by_id(type_)
         if serializer is not None:
             if is_op(serializer.load):
                 # We would expect this to be already set to False, but
@@ -99,7 +99,7 @@ def decode_custom_inline_obj(obj: dict) -> Any:
 
     load_op_uri = obj.get("load_op")
     if load_op_uri is None:
-        raise ValueError(f"No serializer found for `{_type}`")
+        raise ValueError(f"No serializer found for `{type_}`")
 
     ref = parse_uri(load_op_uri)
     if not isinstance(ref, OpRef):
@@ -109,7 +109,7 @@ def decode_custom_inline_obj(obj: dict) -> Any:
     load_instance_op = wc.get(ref)
     if load_instance_op is None:
         raise ValueError(
-            f"Failed to load op needed to decode object of type `{_type}`. See logs above for more information."
+            f"Failed to load op needed to decode object of type `{type_}`. See logs above for more information."
         )
 
     load_instance_op._tracing_enabled = False  # type: ignore
@@ -133,12 +133,12 @@ def decode_custom_files_obj(
     encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op_uri: str | None = None,
 ) -> Any:
-    _type = weave_type["type"]
+    type_ = weave_type["type"]
     found_serializer = False
 
     # First, try to load the object using a known serializer
-    if _type in KNOWN_TYPES:
-        serializer = get_serializer_by_id(_type)
+    if type_ in KNOWN_TYPES:
+        serializer = get_serializer_by_id(type_)
         if serializer is not None:
             found_serializer = True
             load_instance_op = serializer.load
@@ -151,7 +151,7 @@ def decode_custom_files_obj(
     # Otherwise, fall back to load_instance_op
     if not found_serializer:
         if load_instance_op_uri is None:
-            raise ValueError(f"No serializer found for `{_type}`")
+            raise ValueError(f"No serializer found for `{type_}`")
 
         ref = parse_uri(load_instance_op_uri)
         if not isinstance(ref, ObjectRef):
@@ -161,12 +161,12 @@ def decode_custom_files_obj(
         load_instance_op = wc.get(ref)
         if load_instance_op is None:
             raise ValueError(
-                f"Failed to load op needed to decode object of type `{_type}`. See logs above for more information."
+                f"Failed to load op needed to decode object of type `{type_}`. See logs above for more information."
             )
 
     try:
         return _decode_custom_files_obj(encoded_path_contents, load_instance_op)
     except Exception as e:
         raise DecodeCustomObjectError(
-            f"Failed to decode object of type `{_type}`. See logs above for more information."
+            f"Failed to decode object of type `{type_}`. See logs above for more information."
         ) from e
