@@ -196,7 +196,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             else:
                 # Add items back to the queue for later processing, but only if the processor is still accepting work
                 logger.warning(
-                    f"Batch failed after max retries, requeueing batch with {len(batch)=} for later processing",
+                    f"Batch failed after max retries, requeuing batch with {len(batch)=} for later processing",
                 )
 
                 # only if debug mode
@@ -207,7 +207,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                             ids.append(f"{item.req.start.id}-start")
                         elif isinstance(item, EndBatchItem):
                             ids.append(f"{item.req.end.id}-end")
-                    logger.debug(f"Requeueing batch with {ids=}")
+                    logger.debug(f"Requeuing batch with {ids=}")
 
                 # Only requeue if the processor is still accepting work
                 if self.call_processor and self.call_processor.is_accepting_new_work():
@@ -496,7 +496,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def table_query_stream(
         self, req: tsi.TableQueryReq
     ) -> Iterator[tsi.TableRowSchema]:
-        # Need to manually iterate over this until the stram endpoint is built and shipped.
+        # Need to manually iterate over this until the stream endpoint is built and shipped.
         res = self.table_query(req)
         yield from res.rows
 
@@ -641,6 +641,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self._generic_stream_request(
             "/threads/stream_query", req, tsi.ThreadsQueryReq, tsi.ThreadSchema
         )
+
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise NotImplementedError("evaluate_model is not implemented")
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        raise NotImplementedError("evaluation_status is not implemented")
 
 
 __docspec__ = [

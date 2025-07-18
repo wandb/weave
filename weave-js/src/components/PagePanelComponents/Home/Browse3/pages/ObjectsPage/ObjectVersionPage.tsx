@@ -352,32 +352,6 @@ const ObjectVersionPageInner: React.FC<{
           </div>
         </Tailwind>
       }
-      // menuItems={[
-      //   {
-      //     label: 'Open in Board',
-      //     onClick: () => {
-      //       onMakeBoard();
-      //     },
-      //   },
-      //   {
-      //     label: '(Under Construction) Compare',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Compare');
-      //     },
-      //   },
-      //   {
-      //     label: '(Under Construction) Process with Function',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Process with Function');
-      //     },
-      //   },
-      //   {
-      //     label: '(Coming Soon) Add to Hub',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Add to Hub');
-      //     },
-      //   },
-      // ]}
       tabs={[
         ...(showPromptTab
           ? [

@@ -5,7 +5,7 @@ def test_dirty_model_op_retrieval(client):
     class MyModel(weave.Model):
         client: str
 
-        @weave.op()
+        @weave.op
         def invoke(self):
             return self.client
 

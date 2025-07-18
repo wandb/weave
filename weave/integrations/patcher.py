@@ -37,7 +37,7 @@ class MultiPatcher(Patcher):
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise
-                logger.exception(f"Error patching - some logs may not be captured: {e}")
+                logger.exception("Error patching - some logs may not be captured")
                 all_successful = False
         return all_successful
 
@@ -49,7 +49,7 @@ class MultiPatcher(Patcher):
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise
-                logger.exception(f"Error unpatching: {e}")
+                logger.exception("Error unpatching")
                 all_successful = False
         return all_successful
 

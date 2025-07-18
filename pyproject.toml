@@ -35,6 +35,7 @@ classifiers = [
 requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
+  "wandb>=0.17.1",
   "sentry-sdk>=2.0.0,<3.0.0",
   "pydantic>=2.0.0",
   "packaging>=21.0",          # For version parsing in integrations
@@ -71,7 +72,7 @@ trace_server = [
   # BYOB - S3
   "boto3>=1.34.0",
   # BYOB - Azure
-  "azure-storage-blob>=12.24.0",
+  "azure-storage-blob>=12.24.0,<12.26.0",
   # BYOB - GCP
   "google-cloud-storage>=2.7.0",
   # LLM Support
@@ -272,6 +273,7 @@ select = [
   "TRY004",  # https://docs.astral.sh/ruff/rules/type-check-without-type-error/
   "TRY300",  # https://docs.astral.sh/ruff/rules/try-consider-else/
   "TRY400",  # https://docs.astral.sh/ruff/rules/error-instead-of-exception/
+  "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
   "B006",    # https://docs.astral.sh/ruff/rules/mutable-argument-default/
@@ -284,6 +286,7 @@ select = [
   "B904",    # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
   "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
   "N801",    # https://docs.astral.sh/ruff/rules/invalid-class-name/
+  "N802",    # https://docs.astral.sh/ruff/rules/invalid-function-name/
   "N803",    # https://docs.astral.sh/ruff/rules/invalid-argument-name/
   "N804",    # https://docs.astral.sh/ruff/rules/non-lowercase-variable-in-class/
   "N805",    # https://docs.astral.sh/ruff/rules/invalid-first-argument-name-for-method/
@@ -292,14 +295,24 @@ select = [
   "T20",     # https://docs.astral.sh/ruff/rules/#flake8-print-t20
   "PT001",   # https://docs.astral.sh/ruff/rules/pytest-fixture-incorrect-parentheses-style/
   "PT006",   # https://docs.astral.sh/ruff/rules/pytest-parametrize-names-wrong-type/
+  "PT008",   # https://docs.astral.sh/ruff/rules/pytest-parametrize-values-wrong-type/
   "PT018",   # https://docs.astral.sh/ruff/rules/pytest-composite-assertion/
   "PT022",   # https://docs.astral.sh/ruff/rules/pytest-useless-yield-fixture/
   "PT023",   # https://docs.astral.sh/ruff/rules/pytest-incorrect-mark-parentheses-style/
+  "RUF010",  # https://docs.astral.sh/ruff/rules/explicit-f-string-type-conversion/
   "RUF012",  # https://docs.astral.sh/ruff/rules/mutable-class-default/
   "RUF013",  # https://docs.astral.sh/ruff/rules/implicit-optional/
   "RUF015",  # https://docs.astral.sh/ruff/rules/unnecessary-iterable-allocation-for-first-element/
   "RUF018",  # https://docs.astral.sh/ruff/rules/assignment-in-assert/
   "RUF022",  # https://docs.astral.sh/ruff/rules/unsorted-dunder-all/
+  "RUF031",  # https://docs.astral.sh/ruff/rules/incorrectly-parenthesized-tuple-in-subscript/
+  "RUF039",  # https://docs.astral.sh/ruff/rules/unraw-re-pattern/
+  "RUF046",  # https://docs.astral.sh/ruff/rules/unnecessary-cast-to-int/
+  "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
+  "RUF052",  # https://docs.astral.sh/ruff/rules/used-dummy-variable/
+  "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
+  "RUF100",  # https://docs.astral.sh/ruff/rules/unused-noqa/
+  "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
 ]
 ignore = [
   # we use Google style
@@ -322,10 +335,11 @@ fixture-parentheses = false
 [tool.ruff]
 line-length = 88
 show-fixes = true
-exclude = ["weave_query"]
+exclude = ["weave_query", "rules"]
 
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
+"!/tests/**/*.py" = ["RUF059"]
 
 [tool.pyright]
 include = ["weave"]
@@ -356,7 +370,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.56-dev0"
+current_version = "0.51.57-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -391,3 +405,11 @@ optional_value = "final"
 
 [tool.typos.default.extend-words]
 fasion = "fasion" # Wandb lore
+
+[tool.typos.default.extend-identifiers]
+alog_score = "alog_score"
+BoxedNDArray = "BoxedNDArray"
+
+[tool.fixit]
+enable = [".rules.op_deco", ".rules.legacy_methods"]
+disable = ["fixit.rules"]

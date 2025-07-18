@@ -546,12 +546,12 @@ class EvaluationLogger(BaseModel):
         if summary_data:
             final_summary = summary_data
         if summary is not None:
-            final_summary = {**final_summary, **summary}
+            final_summary = {**final_summary, "output": summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
 
         # Use set_call_stack to temporarily set the evaluation as the parent
         with call_context.set_call_stack([self._evaluate_call]):
