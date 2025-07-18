@@ -115,7 +115,7 @@ async def test_basic_evaluation(client):
             f"weave:///shawn/test-project/op/{name}:"
         )
 
-    ## Assertion Category 1: Here we make some application-specific assertions about the
+    # Assertion Category 1: Here we make some application-specific assertions about the
     # structure of the calls, specifically for evaluation-specific UI elements
 
     # The `Evaluation.evaluate` call is expected to have the correct inputs as refs

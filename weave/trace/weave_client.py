@@ -979,7 +979,7 @@ class WeaveClient:
             self._server_call_processor = self.server.get_call_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
-    ################ High Level Convenience Methods ################
+    # High Level Convenience Methods ################
 
     @trace_sentry.global_trace_sentry.watch()
     def save(self, val: Any, name: str, branch: str = "latest") -> Any:
@@ -1070,7 +1070,7 @@ class WeaveClient:
             return maybe_objectify(weave_obj)
         return weave_obj
 
-    ################ Query API ################
+    # Query API ################
 
     @trace_sentry.global_trace_sentry.watch()
     @pydantic.validate_call
@@ -1909,7 +1909,7 @@ class WeaveClient:
 
         return response.id
 
-    ################# Object Saving ##################
+    # Object Saving ##################
     # `_save_object` is the top level entry point for saving data to the weave server.
     # `_save_nested_objects` is a recursive method to dispatch saving of nested objects.
     #  it is called by `_save_object` above, as well as `create_call` and `finish_call`
@@ -2179,7 +2179,7 @@ class WeaveClient:
             server=self.server,
         )
 
-    ################ Internal Helpers ################
+    # Internal Helpers ################
 
     def _ref_is_own(self, ref: Ref) -> bool:
         return isinstance(ref, Ref)

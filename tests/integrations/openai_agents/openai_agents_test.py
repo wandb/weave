@@ -122,7 +122,7 @@ async def test_openai_agents_quickstart_homework(
         result = await Runner.run(triage_agent, "what is life")
 
     #####################
-    ### Result1 Block ###
+    # Result1 Block ###
     #####################
 
     calls = client.get_calls()
@@ -228,7 +228,7 @@ async def test_openai_agents_quickstart_homework(
     assert val8.status == "completed"
 
     #####################
-    ### Result2 Block ###
+    # Result2 Block ###
     #####################
 
     call9 = calls[9]
