@@ -347,6 +347,7 @@ jobs:
         image: mcr.microsoft.com/azure-storage/azurite
         ports:
           - "10000:10000"
+        options: --skipApiVersionCheck
       weave_clickhouse:
         image: clickhouse/clickhouse-server:25.4
         env:
