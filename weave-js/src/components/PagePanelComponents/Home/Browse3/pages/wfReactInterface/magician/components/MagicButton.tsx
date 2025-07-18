@@ -1,5 +1,5 @@
 import {Button, ButtonProps} from '@wandb/weave/components/Button';
-import React, {useState, useRef, useEffect} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 
 import {useChatCompletionStream, useMagicContext} from '../index';
 import {prepareSingleShotMessages} from '../query';
@@ -11,7 +11,8 @@ import {
 } from '../types';
 import {MagicTooltip} from './MagicTooltip';
 
-export interface MagicButtonProps extends Omit<ButtonProps, 'startIcon' | 'onError'> {
+export interface MagicButtonProps
+  extends Omit<ButtonProps, 'startIcon' | 'onError'> {
   /**
    * Entity project for API calls.
    */

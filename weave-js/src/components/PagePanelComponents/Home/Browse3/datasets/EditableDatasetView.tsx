@@ -645,7 +645,8 @@ The values will always be stringified and parsed back into the correct type.
                 existingRows: exampleRows,
               }}
               responseFormat={responseFormat}
-              text="Generate Rows" />
+              text="Generate Rows"
+            />
           </Box>
         )}
         <Box

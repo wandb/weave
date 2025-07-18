@@ -145,7 +145,8 @@ export const PlaygroundMessagePanelEditor: React.FC<
                 feature: 'playground_prompt',
               }}
               size="medium"
-              text="Generate" />
+              text="Generate"
+            />
 
             <div className="flex-1"></div>
           </>

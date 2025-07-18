@@ -362,7 +362,8 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
                   _dangerousExtraAttributesToLog={config.extraLogAttributes}
                   size="large"
                   icon="magic-wand-star"
-                  text="Generate Analysis" />
+                  text="Generate Analysis"
+                />
               </Tailwind>
             </EmptyStateContent>
           </EmptyStateContainer>
@@ -402,7 +403,8 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
               _dangerousExtraAttributesToLog={config.extraLogAttributes}
               size="medium"
               variant="secondary"
-              text="Regenerate" />
+              text="Regenerate"
+            />
           )}
         </div>
       </Header>

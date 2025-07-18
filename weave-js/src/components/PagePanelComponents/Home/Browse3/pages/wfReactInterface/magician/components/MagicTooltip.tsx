@@ -91,7 +91,7 @@ export interface MagicTooltipProps {
    * Extra attributes to log to Weave.
    */
   _dangerousExtraAttributesToLog?: Record<string, any>;
-  
+
   // Controlled props for use by MagicButton
   /**
    * Whether the tooltip is open (controlled mode).
@@ -145,17 +145,19 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
 }) => {
   const chatCompletionStream = useChatCompletionStream(entityProject);
   const {selectedModel, setSelectedModel} = useMagicContext();
-  
+
   // Determine if we're in controlled mode
   const isControlled = controlledOpen !== undefined;
-  
+
   // State management - use controlled props if available, otherwise internal state
-  const [internalAnchorEl, setInternalAnchorEl] = useState<HTMLElement | null>(null);
+  const [internalAnchorEl, setInternalAnchorEl] = useState<HTMLElement | null>(
+    null
+  );
   const [userInstructions, setUserInstructions] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+
   const anchorEl = isControlled ? controlledAnchorEl : internalAnchorEl;
   const isOpen = isControlled ? controlledOpen : Boolean(anchorEl);
 
@@ -306,18 +308,19 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   };
 
   // Only render trigger in uncontrolled mode
-  const trigger = !isControlled && isValidElement(children)
-    ? cloneElement(children as React.ReactElement<any>, {
-        onClick: isGenerating ? handleCancel : handleOpen,
-        // If it's a MagicButton, pass the state
-        ...(children.type === MagicButton
-          ? {
-              state: getButtonState(),
-              onCancel: handleCancel,
-            }
-          : {}),
-      })
-    : null;
+  const trigger =
+    !isControlled && isValidElement(children)
+      ? cloneElement(children as React.ReactElement<any>, {
+          onClick: isGenerating ? handleCancel : handleOpen,
+          // If it's a MagicButton, pass the state
+          ...(children.type === MagicButton
+            ? {
+                state: getButtonState(),
+                onCancel: handleCancel,
+              }
+            : {}),
+        })
+      : null;
 
   return (
     <>
