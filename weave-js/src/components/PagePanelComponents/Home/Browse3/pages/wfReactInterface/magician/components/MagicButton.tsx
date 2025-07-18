@@ -78,6 +78,10 @@ export interface MagicButtonProps extends Omit<ButtonProps, 'startIcon' | 'onErr
    * Whether to show just the icon without text.
    */
   iconOnly?: boolean;
+  /**
+   * Button text. If provided, this will be used instead of children.
+   */
+  text?: string;
 }
 
 /**
@@ -105,6 +109,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   _dangerousExtraAttributesToLog,
   iconOnly = false,
   children,
+  text,
   size = 'small',
   variant = 'ghost',
   disabled,
@@ -224,7 +229,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
         icon={getIcon()}
         className={`transition-all ${className}`}
         {...restProps}>
-        {children}
+        {text || children}
       </Button>
 
       <MagicTooltip

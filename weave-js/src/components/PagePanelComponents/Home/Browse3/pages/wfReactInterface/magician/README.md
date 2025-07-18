@@ -198,6 +198,16 @@ Smart button with built-in AI generation capabilities. Manages all UI state inte
 >
   Generate Analysis
 </MagicButton>
+
+// Or using the text prop:
+<MagicButton
+  onStream={(content, isComplete) => setContent(content)}
+  systemPrompt="You are an expert..."
+  placeholder="What would you like to generate?"
+  text="Generate Analysis"
+  size="medium"
+  variant="primary"
+/>
 ```
 
 **MagicButton Props:**
@@ -221,6 +231,7 @@ interface MagicButtonProps {
   
   // Button-specific props (extends ButtonProps)
   children?: React.ReactNode;
+  text?: string; // Alternative to children for button text
   size?: 'small' | 'medium' | 'large';
   variant?: 'ghost' | 'secondary' | 'primary' | 'destructive';
   disabled?: boolean;

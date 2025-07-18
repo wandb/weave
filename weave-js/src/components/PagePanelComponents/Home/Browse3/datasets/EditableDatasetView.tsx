@@ -644,9 +644,8 @@ The values will always be stringified and parsed back into the correct type.
               additionalContext={{
                 existingRows: exampleRows,
               }}
-              responseFormat={responseFormat}>
-              Generate Rows
-            </MagicButton>
+              responseFormat={responseFormat}
+              text="Generate Rows" />
           </Box>
         )}
         <Box

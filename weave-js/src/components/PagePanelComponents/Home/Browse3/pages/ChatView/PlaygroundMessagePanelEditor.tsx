@@ -144,7 +144,8 @@ export const PlaygroundMessagePanelEditor: React.FC<
               _dangerousExtraAttributesToLog={{
                 feature: 'playground_prompt',
               }}
-              size="medium" />
+              size="medium"
+              text="Generate" />
 
             <div className="flex-1"></div>
           </>

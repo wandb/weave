@@ -361,9 +361,8 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
                   textareaLines={6}
                   _dangerousExtraAttributesToLog={config.extraLogAttributes}
                   size="large"
-                  icon="magic-wand-star">
-                  Generate Analysis
-                </MagicButton>
+                  icon="magic-wand-star"
+                  text="Generate Analysis" />
               </Tailwind>
             </EmptyStateContent>
           </EmptyStateContainer>
@@ -402,9 +401,8 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
               textareaLines={4}
               _dangerousExtraAttributesToLog={config.extraLogAttributes}
               size="medium"
-              variant="secondary">
-              Regenerate
-            </MagicButton>
+              variant="secondary"
+              text="Regenerate" />
           )}
         </div>
       </Header>
