@@ -238,7 +238,12 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
     }
   }, [currentVersionIndex, allFeedbacks]);
 
-  const handleMagicStream = async (chunk: string, accumulation: string, parsedCompletion: any, isComplete: boolean) => {
+  const handleMagicStream = async (
+    chunk: string,
+    accumulation: string,
+    parsedCompletion: any,
+    isComplete: boolean
+  ) => {
     if (!isComplete) {
       setIsGenerating(true);
       setError(null);

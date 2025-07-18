@@ -24,7 +24,12 @@ export interface MagicButtonProps
    * @param parsedCompletion The final parsed completion (null until complete)
    * @param isComplete Whether generation is complete
    */
-  onStream: (chunk: string, accumulation: string, parsedCompletion: Completion | null, isComplete: boolean) => void;
+  onStream: (
+    chunk: string,
+    accumulation: string,
+    parsedCompletion: Completion | null,
+    isComplete: boolean
+  ) => void;
   /**
    * Callback for errors during generation.
    */
