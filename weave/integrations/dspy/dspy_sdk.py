@@ -46,28 +46,35 @@ def get_dspy_patcher(
 
     _dspy_patcher = DSPyPatcher(
         [
+            # Adapters
+            get_symbol_patcher("dspy", "ChatAdapter.__call__", base),
+            get_symbol_patcher("dspy", "JSONAdapter.__call__", base),
+            # Models
             get_symbol_patcher("dspy", "LM.__call__", base),
             get_symbol_patcher("dspy", "Embedder.__call__", base),
+            # Tools
             get_symbol_patcher("dspy", "ColBERTv2.__call__", base),
-            get_symbol_patcher("dspy", "BootstrapFinetune.compile", base),
-            get_symbol_patcher("dspy", "MIPROv2.compile", base),
-            get_symbol_patcher("dspy", "LabeledFewShot.compile", base),
-            get_symbol_patcher("dspy", "KNNFewShot.compile", base),
-            get_symbol_patcher("dspy", "KNN.__call__", base),
-            get_symbol_patcher("dspy", "Ensemble.compile", base),
-            get_symbol_patcher("dspy", "COPRO.compile", base),
-            get_symbol_patcher(
-                "dspy", "BootstrapFewShotWithRandomSearch.compile", base
-            ),
-            get_symbol_patcher("dspy", "BootstrapFewShot.compile", base),
-            get_symbol_patcher("dspy", "BetterTogether.compile", base),
-            get_symbol_patcher("dspy", "Evaluate.__call__", base),
             get_symbol_patcher("dspy.retrievers", "Embeddings.__call__", base),
             get_symbol_patcher("dspy.retrievers", "Embeddings.forward", base),
             get_symbol_patcher("dspy", "PythonInterpreter.__call__", base),
             get_symbol_patcher("dspy", "PythonInterpreter.execute", base),
-            get_symbol_patcher("dspy", "ChatAdapter.__call__", base),
-            get_symbol_patcher("dspy", "JSONAdapter.__call__", base),
+            # Optimizers
+            get_symbol_patcher("dspy", "BetterTogether.compile", base),
+            get_symbol_patcher("dspy", "BootstrapFewShot.compile", base),
+            get_symbol_patcher(
+                "dspy", "BootstrapFewShotWithRandomSearch.compile", base
+            ),
+            get_symbol_patcher("dspy", "BootstrapFinetune.compile", base),
+            get_symbol_patcher("dspy", "COPRO.compile", base),
+            get_symbol_patcher("dspy", "Ensemble.compile", base),
+            # TODO: add dspy.InferRules.compile
+            get_symbol_patcher("dspy", "KNN.__call__", base),
+            get_symbol_patcher("dspy", "KNNFewShot.compile", base),
+            get_symbol_patcher("dspy", "LabeledFewShot.compile", base),
+            get_symbol_patcher("dspy", "MIPROv2.compile", base),
+            # TODO: add dspy.InferRules.compile
+            # Evaluate
+            get_symbol_patcher("dspy", "Evaluate.__call__", base),
         ]
     )
 
