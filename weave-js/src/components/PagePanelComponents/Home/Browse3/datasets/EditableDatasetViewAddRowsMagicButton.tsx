@@ -116,6 +116,9 @@ export const EditableDatasetViewAddRowsMagicButton: React.FC<
       }}
       responseFormat={responseFormat}
       text={BUTTON_TEXT}
+      _dangerousExtraAttributesToLog={{
+        feature: 'add_rows',
+      }}
       {...props}
     />
   );

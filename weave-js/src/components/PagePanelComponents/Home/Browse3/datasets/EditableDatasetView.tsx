@@ -13,7 +13,6 @@ import {A} from '@wandb/weave/common/util/links';
 import {Button} from '@wandb/weave/components/Button';
 import {RowId} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallPage/DataTableView';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
-import _ from 'lodash';
 import get from 'lodash/get';
 import React, {
   useCallback,

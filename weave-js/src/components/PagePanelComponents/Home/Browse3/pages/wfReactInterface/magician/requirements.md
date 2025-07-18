@@ -162,15 +162,6 @@ function MyComponent() {
 }
 ```
 
-## 🚀 Migration Guide
-
-For developers migrating from MagicFill/MagicDialog:
-
-1. Replace `MagicFill` with `MagicTooltip`
-2. Move content display logic to parent component
-3. Use streaming callbacks instead of waiting for complete response
-4. Update button to use new `MagicButton` with state management
-
 ## 📝 API Reference
 
 ### MagicTooltip Props

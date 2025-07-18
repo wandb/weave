@@ -1,5 +1,4 @@
 import {Button} from '@wandb/weave/components/Button';
-import {MagicButton} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
 import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
@@ -8,7 +7,7 @@ import {StyledTextArea} from '../../StyledTextarea';
 import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {DEFAULT_SYSTEM_MESSAGE_CONTENT} from '../PlaygroundPage/usePlaygroundState';
 import {TYPING_CHAR} from '../wfReactInterface/magician';
-import {PLAYGROUND_PROMPT_GENERATOR_SYSTEM_PROMPT} from './playgroundSystemPrompt.prompt';
+import {PlaygroundSystemPromptMagicButton} from './PlaygroundSystemPromptMagicButton';
 import {Message} from './types';
 
 type PlaygroundMessagePanelEditorProps = {
@@ -123,17 +122,10 @@ export const PlaygroundMessagePanelEditor: React.FC<
       <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
         {showPromptGenerator && (
           <div className="flex-1">
-            <MagicButton
+            <PlaygroundSystemPromptMagicButton
               onStream={handleMagicStream}
               onCancel={handleMagicCancel}
-              systemPrompt={PLAYGROUND_PROMPT_GENERATOR_SYSTEM_PROMPT}
-              placeholder={'What are you interested in building?'}
               contentToRevise={contentToRevise}
-              size="medium"
-              text="Generate"
-              _dangerousExtraAttributesToLog={{
-                feature: 'playground_prompt',
-              }}
             />
           </div>
         )}
