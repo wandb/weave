@@ -5,7 +5,7 @@ import {DirectTraceServerClient} from '../traceServerDirectClient';
 /** Direct trace server client for logging to Weave */
 const hackweekClient = new DirectTraceServerClient(
   'https://trace.wandb.ai',
-  'API_KEY'
+  // Security Note: An API key once once checked in here, but was immediately removed and rotated.
 );
 
 /** Project ID for logging magic calls */
