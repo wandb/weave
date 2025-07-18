@@ -311,6 +311,7 @@ select = [
   "RUF052",  # https://docs.astral.sh/ruff/rules/used-dummy-variable/
   "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
   "RUF100",  # https://docs.astral.sh/ruff/rules/unused-noqa/
+  "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
 ]
 ignore = [
   # we use Google style
