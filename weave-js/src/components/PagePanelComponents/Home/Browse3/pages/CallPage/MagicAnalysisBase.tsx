@@ -4,7 +4,7 @@ import * as Colors from '@wandb/weave/common/css/color.styles';
 import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
-import {MagicButton, MagicTooltip} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
+import {MagicButton} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import copyToClipboard from 'copy-to-clipboard';
@@ -351,7 +351,7 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
                   {config.emptyStateDescription}
                 </p>
 
-                <MagicTooltip
+                <MagicButton
                   onStream={handleMagicStream}
                   onError={handleError}
                   systemPrompt={config.systemPrompt}
@@ -359,11 +359,11 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
                   showModelSelector={true}
                   width={450}
                   textareaLines={6}
-                  _dangerousExtraAttributesToLog={config.extraLogAttributes}>
-                  <MagicButton size="large" icon="magic-wand-star">
-                    Generate Analysis
-                  </MagicButton>
-                </MagicTooltip>
+                  _dangerousExtraAttributesToLog={config.extraLogAttributes}
+                  size="large"
+                  icon="magic-wand-star">
+                  Generate Analysis
+                </MagicButton>
               </Tailwind>
             </EmptyStateContent>
           </EmptyStateContainer>
@@ -392,7 +392,7 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
           {isGenerating ? (
             <span className="text-sm text-moon-500">Generating...</span>
           ) : (
-            <MagicTooltip
+            <MagicButton
               onStream={handleMagicStream}
               onError={handleError}
               systemPrompt={config.systemPrompt}
@@ -400,11 +400,11 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
               showModelSelector={true}
               width={450}
               textareaLines={4}
-              _dangerousExtraAttributesToLog={config.extraLogAttributes}>
-              <MagicButton size="medium" variant="secondary">
-                Regenerate
-              </MagicButton>
-            </MagicTooltip>
+              _dangerousExtraAttributesToLog={config.extraLogAttributes}
+              size="medium"
+              variant="secondary">
+              Regenerate
+            </MagicButton>
           )}
         </div>
       </Header>

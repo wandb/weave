@@ -12,10 +12,7 @@ import {
 import {A} from '@wandb/weave/common/util/links';
 import {Button} from '@wandb/weave/components/Button';
 import {RowId} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallPage/DataTableView';
-import {
-  MagicButton,
-  MagicTooltip,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
+import {MagicButton} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
 import _ from 'lodash';
 import get from 'lodash/get';
@@ -305,7 +302,7 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
             Object.fromEntries(initialFields.map(key => [key, z.string()]))
           )
         )
-        .length(10),
+        .length(5),
     });
   }, [initialFields]);
 
@@ -618,8 +615,8 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               tooltip="Add row">
               Add row
             </Button>
-            <MagicTooltip
-              onStream={(response, isComplete) => {
+            <MagicButton
+              onStream={(response: string, isComplete: boolean) => {
                 const newRows = isComplete
                   ? parseCompleteLLMRows(response)
                   : parsePartialLLMRows(response);
@@ -637,30 +634,6 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
                 // console.log(parsePartialLLMRows(response));
                 // // console.log(response);
               }}
-              // onComplete={completion => {
-              //   if (typeof completion === 'string') {
-              //     // invalid
-              //     return;
-              //   }
-              //   const rows = completion.rows;
-              //   if (!_.isArray(rows)) {
-              //     return;
-              //   }
-              //   const parsedRows = rows.map(row => {
-              //     return Object.fromEntries(
-              //       initialFields.map(key => {
-              //         const value = row[key] ?? '';
-              //         try {
-              //           return [key, JSON.parse(value)];
-              //         } catch (e) {
-              //           return [key, value];
-              //         }
-              //       })
-              //     );
-              //   });
-
-              //   addManyRows(parsedRows);
-              // }}
               systemPrompt={`
 You are an LLM developer building a dataset.
 Your goal is to extend the dataset with 5 additional rows.
@@ -672,8 +645,8 @@ The values will always be stringified and parsed back into the correct type.
                 existingRows: exampleRows,
               }}
               responseFormat={responseFormat}>
-              <MagicButton>Generate Rows</MagicButton>
-            </MagicTooltip>
+              Generate Rows
+            </MagicButton>
           </Box>
         )}
         <Box

@@ -30,8 +30,9 @@ export interface MagicTooltipProps {
   /**
    * Trigger element - typically a MagicButton.
    * Will be cloned with appropriate props for state management.
+   * Required when using children pattern.
    */
-  children: React.ReactElement;
+  children?: React.ReactElement;
   /**
    * Callback for streaming content as it's generated.
    * @param content The content chunk
@@ -90,6 +91,24 @@ export interface MagicTooltipProps {
    * Extra attributes to log to Weave.
    */
   _dangerousExtraAttributesToLog?: Record<string, any>;
+  
+  // Controlled props for use by MagicButton
+  /**
+   * Whether the tooltip is open (controlled mode).
+   */
+  open?: boolean;
+  /**
+   * Anchor element for positioning (controlled mode).
+   */
+  anchorEl?: HTMLElement | null;
+  /**
+   * Callback when tooltip should close (controlled mode).
+   */
+  onClose?: () => void;
+  /**
+   * Callback when generation should start (controlled mode).
+   */
+  onGenerate?: (userInstructions: string) => Promise<void>;
 }
 
 const DEFAULT_REVISION_PLACEHOLDER = 'What would you like to change?';
@@ -118,14 +137,27 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   width = 350,
   textareaLines = 7,
   _dangerousExtraAttributesToLog,
+  // Controlled props
+  open: controlledOpen,
+  anchorEl: controlledAnchorEl,
+  onClose: controlledOnClose,
+  onGenerate: controlledOnGenerate,
 }) => {
   const chatCompletionStream = useChatCompletionStream(entityProject);
   const {selectedModel, setSelectedModel} = useMagicContext();
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  
+  // Determine if we're in controlled mode
+  const isControlled = controlledOpen !== undefined;
+  
+  // State management - use controlled props if available, otherwise internal state
+  const [internalAnchorEl, setInternalAnchorEl] = useState<HTMLElement | null>(null);
   const [userInstructions, setUserInstructions] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  const anchorEl = isControlled ? controlledAnchorEl : internalAnchorEl;
+  const isOpen = isControlled ? controlledOpen : Boolean(anchorEl);
 
   // Focus textarea when opened
   useEffect(() => {
@@ -159,12 +191,20 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   }, [anchorEl, isGenerating]);
 
   const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
+    if (isControlled) {
+      // In controlled mode, we don't manage anchorEl internally
+      return;
+    }
+    setInternalAnchorEl(event.currentTarget);
   };
 
   const handleClose = () => {
     if (!isGenerating) {
-      setAnchorEl(null);
+      if (isControlled) {
+        controlledOnClose?.();
+      } else {
+        setInternalAnchorEl(null);
+      }
     }
   };
 
@@ -174,12 +214,22 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
       abortControllerRef.current = null;
     }
     setIsGenerating(false);
-    setAnchorEl(null);
+    if (isControlled) {
+      controlledOnClose?.();
+    } else {
+      setInternalAnchorEl(null);
+    }
     onCancel?.();
   };
 
   const handleGenerate = async () => {
     if (!userInstructions.trim() || isGenerating) return;
+
+    // In controlled mode, delegate to the parent
+    if (isControlled && controlledOnGenerate) {
+      await controlledOnGenerate(userInstructions);
+      return;
+    }
 
     setIsGenerating(true);
     abortControllerRef.current = new AbortController();
@@ -188,7 +238,11 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     onStream('', false);
 
     // Close the tooltip immediately
-    setAnchorEl(null);
+    if (isControlled) {
+      controlledOnClose?.();
+    } else {
+      setInternalAnchorEl(null);
+    }
 
     try {
       let accumulatedContent = '';
@@ -251,8 +305,8 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     return 'default';
   };
 
-  // Clone the trigger element with appropriate props
-  const trigger = isValidElement(children)
+  // Only render trigger in uncontrolled mode
+  const trigger = !isControlled && isValidElement(children)
     ? cloneElement(children as React.ReactElement<any>, {
         onClick: isGenerating ? handleCancel : handleOpen,
         // If it's a MagicButton, pass the state
@@ -263,14 +317,14 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
             }
           : {}),
       })
-    : children;
+    : null;
 
   return (
     <>
       {trigger}
 
       <Popover
-        open={Boolean(anchorEl)}
+        open={isOpen}
         anchorEl={anchorEl}
         onClose={handleClose}
         anchorOrigin={{

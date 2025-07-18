@@ -15,7 +15,7 @@ Building AI features shouldn't be hard. Magician gives you:
 ![./magic_tooltip.png](./magic_tooltip.png)
 
 ```tsx
-import { MagicProvider, MagicTooltip, MagicButton } from './magician';
+import { MagicProvider, MagicButton } from './magician';
 
 function App() {
   return (
@@ -29,13 +29,13 @@ function MyComponent() {
   const [content, setContent] = useState('');
 
   return (
-    <MagicTooltip
+    <MagicButton
       onStream={(chunk, isComplete) => setContent(chunk)}
       systemPrompt="You are a helpful assistant..."
       placeholder="What would you like to generate?"
     >
-      <MagicButton>Generate</MagicButton>
-    </MagicTooltip>
+      Generate
+    </MagicButton>
   );
 }
 ```
@@ -99,8 +99,8 @@ const UserSchema = z.object({
   preferences: z.array(z.string())
 });
 
-// With MagicTooltip - just pass the schema!
-<MagicTooltip
+// With MagicButton - just pass the schema!
+<MagicButton
   onStream={(content, isComplete) => {
     if (isComplete) {
       // content is already parsed and validated!
@@ -110,8 +110,8 @@ const UserSchema = z.object({
   systemPrompt="Generate a user profile"
   responseFormat={UserSchema}
 >
-  <MagicButton>Generate User</MagicButton>
-</MagicTooltip>
+  Generate User
+</MagicButton>
 
 // With useChatCompletionStream - same magic!
 const complete = useChatCompletionStream();
@@ -145,17 +145,17 @@ const generateUser = async () => {
 
 ### Cancellation
 
-Both `MagicTooltip` and `useChatCompletionStream` support cancellation to stop ongoing generation.
+Both `MagicButton` and `useChatCompletionStream` support cancellation to stop ongoing generation.
 
 ```tsx
-// With MagicTooltip - handle cancellation to revert changes
-<MagicTooltip
+// With MagicButton - handle cancellation to revert changes
+<MagicButton
   onStream={(content, isComplete) => setContent(content)}
   onCancel={() => setContent(originalContent)} // Revert on cancel
   systemPrompt="Generate content..."
 >
-  <MagicButton>Generate</MagicButton>
-</MagicTooltip>
+  Generate
+</MagicButton>
 
 // With useChatCompletionStream - use AbortController
 const complete = useChatCompletionStream();
@@ -182,32 +182,63 @@ const cancel = () => abortController.abort();
 
 ### UI Components
 
-#### `MagicTooltip`
-Minimal tooltip for AI content generation. Manages all UI state internally.
+#### `MagicButton`
+Smart button with built-in AI generation capabilities. Manages all UI state internally and provides a tooltip interface for user input.
 
 ```tsx
-<MagicTooltip
+<MagicButton
   onStream={(content, isComplete) => setContent(content)}
   onCancel={() => setContent(originalContent)} // Optional: handle cancellation
   systemPrompt="You are an expert..."
   placeholder="What would you like to generate?"
   contentToRevise={existingContent} // Optional: revise existing content
   showModelSelector={true} // Optional: show model dropdown
+  size="medium" // Button size
+  variant="primary" // Button variant
 >
-  <MagicButton>Generate</MagicButton>
-</MagicTooltip>
+  Generate Analysis
+</MagicButton>
 ```
 
-#### `MagicButton`
-Button with sparkle icon that supports multiple states. Automatically handles cancellation when clicked during generation.
+**MagicButton Props:**
+```tsx
+interface MagicButtonProps {
+  // Magic-specific props
+  onStream: (content: string, isComplete: boolean) => void;
+  onComplete?: (completion: Completion) => void;
+  onError?: (error: Error) => void;
+  onCancel?: () => void;
+  systemPrompt: string;
+  placeholder?: string;
+  revisionPlaceholder?: string;
+  contentToRevise?: string;
+  additionalContext?: Record<string, any>;
+  responseFormat?: CompletionResponseFormat;
+  showModelSelector?: boolean;
+  width?: number;
+  textareaLines?: number;
+  _dangerousExtraAttributesToLog?: Record<string, any>;
+  
+  // Button-specific props (extends ButtonProps)
+  children?: React.ReactNode;
+  size?: 'small' | 'medium' | 'large';
+  variant?: 'ghost' | 'secondary' | 'primary' | 'destructive';
+  disabled?: boolean;
+  // ... other Button props
+}
+```
+
+#### `MagicTooltip` (Advanced Usage)
+Low-level tooltip component for advanced use cases where you need custom trigger elements.
 
 ```tsx
-<MagicButton 
-  state="generating" // 'default' | 'tooltipOpen' | 'generating' | 'error'
-  onCancel={() => abortGeneration()}
+<MagicTooltip
+  onStream={handleStream}
+  systemPrompt="Generate content..."
+  placeholder="What would you like to generate?"
 >
-  Generate
-</MagicButton>
+  <CustomTriggerComponent />
+</MagicTooltip>
 ```
 
 ### Provider
@@ -247,14 +278,13 @@ function PlaygroundMessagePanelEditor() {
         disabled={!isEditable}
       />
       
-      <MagicTooltip
+      <MagicButton
         onStream={handleMagicStream}
         systemPrompt="You are an expert LLM developer..."
         placeholder="What would you like the model to do?"
         contentToRevise={editedContent}
-      >
-        <MagicButton size="medium" />
-      </MagicTooltip>
+        size="medium"
+      />
     </div>
   );
 }

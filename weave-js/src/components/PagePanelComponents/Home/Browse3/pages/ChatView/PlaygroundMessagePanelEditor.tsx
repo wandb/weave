@@ -1,8 +1,5 @@
 import {Button} from '@wandb/weave/components/Button';
-import {
-  MagicButton,
-  MagicTooltip,
-} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
+import {MagicButton} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
 import classNames from 'classnames';
 import _ from 'lodash';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
@@ -138,7 +135,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
       <div className="z-100 mt-[6px] flex justify-end gap-[8px]">
         {index === 0 && message.role === 'system' && (
           <>
-            <MagicTooltip
+            <MagicButton
               onStream={handleMagicStream}
               onCancel={handleMagicCancel}
               systemPrompt={SYSTEM_PROMPT}
@@ -146,9 +143,8 @@ export const PlaygroundMessagePanelEditor: React.FC<
               contentToRevise={contentToRevise}
               _dangerousExtraAttributesToLog={{
                 feature: 'playground_prompt',
-              }}>
-              <MagicButton size="medium" />
-            </MagicTooltip>
+              }}
+              size="medium" />
 
             <div className="flex-1"></div>
           </>
