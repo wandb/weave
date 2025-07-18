@@ -26,7 +26,7 @@ def test_huggingface_chat_completion(client):
         seed=42,
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -67,7 +67,7 @@ def test_huggingface_chat_completion_stream(client):
     for chunk in result:
         chunks.append(chunk)
     assert len(chunks) > 0
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -104,7 +104,7 @@ def test_huggingface_chat_completion_async(client):
         )
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -140,7 +140,7 @@ def test_huggingface_document_question_answering(client):
         question="What is the invoice number?",
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -173,7 +173,7 @@ def test_huggingface_document_question_answering_async(client):
         )
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -199,7 +199,7 @@ def test_huggingface_fill_mask(client):
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     ).fill_mask("The goal of life is <mask>.")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -225,7 +225,7 @@ def test_huggingface_fill_mask_async(client):
         ).fill_mask("The goal of life is <mask>.")
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -254,7 +254,7 @@ def test_huggingface_question_answering(client):
         question="What's my name?", context="My name is Clara and I live in Berkeley."
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -285,7 +285,7 @@ def test_huggingface_question_answering_async(client):
         )
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -316,7 +316,7 @@ def test_huggingface_table_question_answering(client):
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     ).table_question_answering(table, query, model="google/tapas-base-finetuned-wtq")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -351,7 +351,7 @@ def test_huggingface_table_question_answering_async(client):
         )
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -377,7 +377,7 @@ def test_huggingface_text_classification(client):
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     ).text_classification("I like you")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -406,7 +406,7 @@ def test_huggingface_text_classification_async(client):
         ).text_classification("I like you")
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -435,7 +435,7 @@ def test_huggingface_token_classification(client):
         "My name is Sarah Jessica Parker but you can call me Jessica"
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -466,7 +466,7 @@ def test_huggingface_token_classification_async(client):
         )
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -495,7 +495,7 @@ def test_huggingface_translation(client):
         "My name is Wolfgang and I live in Berlin", model="Helsinki-NLP/opus-mt-en-fr"
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -525,7 +525,7 @@ def test_huggingface_translation_async(client):
         )
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -555,7 +555,7 @@ def test_huggingface_text_to_image(client):
         num_inference_steps=4,
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -587,7 +587,7 @@ def test_huggingface_text_to_image_async(client):
         )
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
