@@ -121,12 +121,11 @@ Streaming chat completions with automatic context management.
 ```tsx
 const complete = useChatCompletionStream();
 
-const generate = async () => {
-  await complete(
-    {messages: 'Write a haiku about coding'},
-    (chunk) => console.log(chunk.content)
-  );
-};
+// inside some callback:
+const res = await complete(
+  {messages: 'Write a haiku about coding'},
+  (chunk) => console.log(chunk.content)
+);
 ```
 
 #### `useMagicContext`
