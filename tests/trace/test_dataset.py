@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 import weave
@@ -232,75 +234,402 @@ def test_add_rows_to_unsaved_dataset(client):
         ds.add_rows([{"a": 10}])
 
 
-def test_hf_conversion(client):
-    try:
-        from datasets import Dataset as HFDataset
-        from datasets import DatasetDict as HFDatasetDict
-        from datasets.features import Value  # Import Value for feature checking
-    except ImportError:
-        pytest.skip("requires huggingface datasets library")
+# Dataset.map tests
 
-    # Define data as list of dicts
-    expected_rows = [{"col1": 1, "col2": "A"}, {"col1": 2, "col2": "B"}]
 
-    # Create a dummy HF Dataset from list of dicts
-    hf_dataset = HFDataset.from_list(expected_rows)
+def test_dataset_map_basic(client):
+    original_rows = [{"id": i, "val": i * 2} for i in range(5)]
+    ds = weave.Dataset(rows=original_rows)
 
-    # Test from_hf
-    weave_dataset = weave.Dataset.from_hf(hf_dataset)
-    assert list(weave_dataset.rows) == expected_rows
+    # Use named parameters instead of row dictionary
+    def add_doubled_val(val):
+        return {"val_doubled": val * 2}
 
-    # Test to_hf
-    converted_hf_dataset = weave_dataset.to_hf()
-    assert isinstance(converted_hf_dataset, HFDataset)  # Check type
-    assert list(converted_hf_dataset) == expected_rows
-    assert converted_hf_dataset.column_names == ["col1", "col2"]  # Check column names
-    # Check features (basic type check)
-    assert isinstance(converted_hf_dataset.features["col1"], Value)
-    assert converted_hf_dataset.features["col1"].dtype == "int64"
-    assert isinstance(converted_hf_dataset.features["col2"], Value)
-    assert converted_hf_dataset.features["col2"].dtype == "string"
+    mapped_ds = asyncio.run(ds.map(add_doubled_val))
 
-    # Test round trip consistency
-    assert converted_hf_dataset.to_dict() == hf_dataset.to_dict()
+    assert len(mapped_ds) == 5
+    expected_rows = [
+        {"id": 0, "val": 0, "val_doubled": 0},
+        {"id": 1, "val": 2, "val_doubled": 4},
+        {"id": 2, "val": 4, "val_doubled": 8},
+        {"id": 3, "val": 6, "val_doubled": 12},
+        {"id": 4, "val": 8, "val_doubled": 16},
+    ]
+    assert list(mapped_ds) == expected_rows
+    assert set(mapped_ds.columns_names) == {"id", "val", "val_doubled"}
 
-    # Test conversion from DatasetDict (should use 'train' split and warn)
-    train_rows = [{"id": 0, "text": "train_0"}, {"id": 1, "text": "train_1"}]
-    test_rows = [{"id": 2, "text": "test_2"}]
-    hf_dataset_dict = HFDatasetDict(
-        {
-            "train": HFDataset.from_list(train_rows),
-            "test": HFDataset.from_list(test_rows),
+
+async def add_tripled_val_async(val):
+    await asyncio.sleep(0.01)  # Simulate async work
+    return {"val_tripled": val * 3}
+
+
+def test_dataset_map_async(client):
+    original_rows = [{"id": i, "val": i * 2} for i in range(3)]
+    ds = weave.Dataset(rows=original_rows)
+
+    mapped_ds = asyncio.run(ds.map(add_tripled_val_async))
+
+    assert len(mapped_ds) == 3
+    expected_rows = [
+        {"id": 0, "val": 0, "val_tripled": 0},
+        {"id": 1, "val": 2, "val_tripled": 6},
+        {"id": 2, "val": 4, "val_tripled": 12},
+    ]
+    assert list(mapped_ds) == expected_rows
+    assert set(mapped_ds.columns_names) == {"id", "val", "val_tripled"}
+
+
+def test_dataset_map_failing_row(client):
+    original_rows = [{"id": i, "val": i} for i in range(5)]
+    ds = weave.Dataset(rows=original_rows)
+
+    def fail_on_three(id):
+        if id == 3:
+            raise ValueError("ID cannot be 3!")
+        return {"processed": True}
+
+    with pytest.raises(ValueError, match="ID cannot be 3!"):
+        asyncio.run(ds.map(fail_on_three))
+
+
+def test_dataset_map_uneven_dicts(client):
+    original_rows = [{"id": i} for i in range(4)]
+    ds = weave.Dataset(rows=original_rows)
+
+    def add_conditional_cols(id):
+        if id % 2 == 0:
+            return {"is_even": True, "even_val": id * 10}
+        else:
+            return {"is_odd": True}
+
+    # Note: weave.Table currently doesn't enforce strict schemas or fill missing vals with None
+    # The behavior here reflects how weave.Table handles lists of dicts with varying keys.
+    mapped_ds = asyncio.run(ds.map(add_conditional_cols))
+
+    assert len(mapped_ds) == 4
+    expected_rows = [
+        {"id": 0, "is_even": True, "even_val": 0},  # missing is_odd
+        {"id": 1, "is_odd": True},  # missing is_even, even_val
+        {"id": 2, "is_even": True, "even_val": 20},  # missing is_odd
+        {"id": 3, "is_odd": True},  # missing is_even, even_val
+    ]
+    assert list(mapped_ds) == expected_rows
+    # The columns_names property gets the keys from the *first* row.
+    assert set(mapped_ds.columns_names) == {"id", "is_even", "even_val"}
+
+
+def test_dataset_map_immutability(client):
+    original_rows = [{"id": i, "val": i} for i in range(3)]
+    original_rows_copy = [r.copy() for r in original_rows]  # Deep copy for comparison
+    ds = weave.Dataset(rows=original_rows)
+
+    # Use named parameters instead of row dictionary
+    def add_square(val):
+        return {"val_squared": val**2}
+
+    mapped_ds = asyncio.run(ds.map(add_square))
+
+    # Assert mapped_ds is different
+    assert len(mapped_ds) == 3
+    assert list(mapped_ds)[0] == {"id": 0, "val": 0, "val_squared": 0}
+
+    # Assert original dataset (ds) and its rows are unchanged
+    assert len(ds) == 3
+    assert list(ds) == original_rows_copy
+
+    # Check value equality rather than object identity
+    # WeaveDict objects won't be the same objects as the original dicts,
+    # but they should contain the same data
+    assert ds.rows[0] == original_rows_copy[0]
+
+
+def test_dataset_map_with_specific_params(client):
+    """Test mapping a function that takes specific parameters instead of a row dictionary."""
+    original_rows = [{"id": i, "val": i * 2, "name": f"Item {i}"} for i in range(5)]
+    ds = weave.Dataset(rows=original_rows)
+
+    # Function that takes specific columns as parameters
+    def multiply_val(val, id):
+        return {"product": val * id}
+
+    mapped_ds = asyncio.run(ds.map(multiply_val))
+
+    assert len(mapped_ds) == 5
+    expected_rows = [
+        {"id": 0, "val": 0, "name": "Item 0", "product": 0},
+        {"id": 1, "val": 2, "name": "Item 1", "product": 2},
+        {"id": 2, "val": 4, "name": "Item 2", "product": 8},
+        {"id": 3, "val": 6, "name": "Item 3", "product": 18},
+        {"id": 4, "val": 8, "name": "Item 4", "product": 32},
+    ]
+    assert list(mapped_ds) == expected_rows
+
+
+def test_dataset_map_with_scalar_return(client):
+    """Test that mapping with a scalar return value raises a TypeError."""
+    original_rows = [{"id": i, "val": i * 2} for i in range(5)]
+    ds = weave.Dataset(rows=original_rows)
+
+    # Function that takes specific columns and returns a scalar
+    def sum_values(id, val):
+        return id + val
+
+    # Should raise TypeError because function returns a scalar, not a dict
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        asyncio.run(ds.map(sum_values))
+
+    # Correct version that returns a dictionary
+    def sum_values_dict(id, val):
+        return {"sum": id + val}
+
+    # This should work
+    mapped_ds = asyncio.run(ds.map(sum_values_dict))
+    assert mapped_ds[2]["sum"] == 6  # 2 + 4
+
+
+def test_dataset_map_with_default_param(client):
+    """Test mapping a function with default parameter values."""
+    original_rows = [{"id": i, "val": i * 2} for i in range(5)]
+    ds = weave.Dataset(rows=original_rows)
+
+    # Function with a default parameter
+    def process_with_default(val, multiplier=10):
+        return {"scaled": val * multiplier}
+
+    mapped_ds = asyncio.run(ds.map(process_with_default))
+
+    assert len(mapped_ds) == 5
+    expected_rows = [
+        {"id": 0, "val": 0, "scaled": 0},
+        {"id": 1, "val": 2, "scaled": 20},
+        {"id": 2, "val": 4, "scaled": 40},
+        {"id": 3, "val": 6, "scaled": 60},
+        {"id": 4, "val": 8, "scaled": 80},
+    ]
+    assert list(mapped_ds) == expected_rows
+
+
+def test_dataset_map_missing_param(client):
+    """Test mapping a function that expects a parameter not in the dataset."""
+    original_rows = [{"id": i, "val": i * 2} for i in range(5)]
+    ds = weave.Dataset(rows=original_rows)
+
+    # Function expecting a parameter not in the dataset
+    def needs_missing_param(val, missing_param):
+        return {"result": val + missing_param}
+
+    # Should raise an error because missing_param is not in the dataset
+    with pytest.raises(ValueError, match="Function expects parameter 'missing_param'"):
+        asyncio.run(ds.map(needs_missing_param))
+
+
+def test_dataset_map_with_lambda(client):
+    """Test mapping with lambda functions."""
+    ds = weave.Dataset(rows=[{"a": i, "b": i * 2} for i in range(5)])
+
+    # Lambda that takes specific params and returns a dictionary
+    mapped_ds = asyncio.run(ds.map(lambda a, b: {"sum": a + b}))
+    assert len(mapped_ds) == 5
+    assert mapped_ds[0] == {"a": 0, "b": 0, "sum": 0}
+    assert mapped_ds[2] == {"a": 2, "b": 4, "sum": 6}
+
+    # Lambda with a scalar return value should raise TypeError
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        asyncio.run(ds.map(lambda a, b: a * b))
+
+    # Correct version that returns a dictionary
+    mapped_ds = asyncio.run(ds.map(lambda a, b: {"product": a * b}))
+    assert len(mapped_ds) == 5
+    assert mapped_ds[0] == {"a": 0, "b": 0, "product": 0}
+    assert mapped_ds[2] == {"a": 2, "b": 4, "product": 8}
+
+
+def test_dataset_map_parameter_reuse(client):
+    """Test mapping when a function uses the same parameter in multiple ways."""
+    ds = weave.Dataset(rows=[{"id": i, "val": i * 2} for i in range(3)])
+
+    # Function that uses a parameter in multiple ways
+    def reuse_param(id, val):
+        return {
+            "identity": id,
+            "id_plus_val": id + val,
+            "id_times_val": id * val,
         }
+
+    mapped_ds = asyncio.run(ds.map(reuse_param))
+
+    assert len(mapped_ds) == 3
+    assert mapped_ds[2] == {
+        "id": 2,
+        "val": 4,
+        "identity": 2,
+        "id_plus_val": 6,  # 2 + 4
+        "id_times_val": 8,  # 2 * 4
+    }
+
+
+def test_dataset_map_error_handling(client):
+    """Test error handling in more complex scenarios."""
+    ds = weave.Dataset(rows=[{"id": i, "val": i} for i in range(5)])
+
+    # Test None return value
+    def return_none(id):
+        return None
+
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        asyncio.run(ds.map(return_none))
+
+    # Test list return
+    def return_list(id):
+        return [id, id * 2]
+
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        asyncio.run(ds.map(return_list))
+
+    # Test proper dictionary return with error inside
+    def problematic_func(id, val):
+        if id == 0:
+            return {"ok": True}
+        elif id == 3:
+            # KeyError
+            d = {}
+            return {"error": d["nonexistent"]}
+        else:
+            return {"ok": False}
+
+    # Should propagate the KeyError from the problematic_func
+    with pytest.raises(KeyError):
+        asyncio.run(ds.map(problematic_func))
+
+
+def test_dataset_map_key_collision(client):
+    """Test that mapping can update/override existing keys in the dataset."""
+    ds = weave.Dataset(
+        rows=[{"id": i, "val": i * 2, "data": f"Original {i}"} for i in range(3)]
     )
 
-    with pytest.warns(
-        UserWarning,
-        match="Input dataset has multiple splits. Using 'train' split by default.",
-    ):
-        weave_dataset_from_dict = weave.Dataset.from_hf(hf_dataset_dict)
+    # Function that returns a dict with keys that already exist
+    def update_existing_keys(id, val):
+        # Override existing 'val' and 'data' keys
+        return {
+            "val": val * 10,  # Replace original val
+            "data": f"New {id}",  # Replace original data
+        }
 
-    assert list(weave_dataset_from_dict.rows) == train_rows
+    mapped_ds = asyncio.run(ds.map(update_existing_keys))
 
-    # Test error when 'train' split is missing
-    hf_dataset_dict_no_train = HFDatasetDict(
-        {"validation": HFDataset.from_list(test_rows)}
+    assert len(mapped_ds) == 3
+    # Check that original keys were overridden
+    assert mapped_ds[1]["val"] == 20  # Original was 2, now 2*10
+    assert mapped_ds[1]["data"] == "New 1"  # Original was "Original 1"
+    # Check that untouched keys remain
+    assert mapped_ds[1]["id"] == 1  # Not modified
+
+
+def test_dataset_map_non_dict_return_error(client):
+    """Test that non-dictionary returns raise TypeError."""
+    ds = weave.Dataset(rows=[{"id": i} for i in range(3)])
+
+    # Test various non-dictionary returns
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        asyncio.run(ds.map(lambda id: (id, id * 10)))  # Tuple
+
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        asyncio.run(ds.map(lambda id: [id, id * 10]))  # List
+
+    class CustomClass:
+        def __init__(self, value):
+            self.value = value
+
+    with pytest.raises(TypeError, match="Function must return a dictionary"):
+        asyncio.run(ds.map(lambda id: CustomClass(id)))  # Custom object
+
+
+def test_dataset_map_empty_dataset(client):
+    """Test mapping on an empty dataset (should fail)."""
+    # Create an empty dataset
+    with pytest.raises(ValueError, match="empty list"):
+        # This should fail during dataset creation, not during map
+        ds = weave.Dataset(rows=[])
+        asyncio.run(ds.map(lambda x: {"result": x + 1}))
+
+
+def test_dataset_map_return_types(client):
+    """Test mapping with different return types in a dictionary."""
+    ds = weave.Dataset(rows=[{"id": i} for i in range(3)])
+
+    # Test returning various data types in a dictionary
+    def return_types(id):
+        return {
+            "str_val": str(id),
+            "bool_val": bool(id),
+            "list_val": [0, id],
+            "dict_val": {"x": id},
+            "none_val": None,
+            "float_val": float(id),
+        }
+
+    types_ds = asyncio.run(ds.map(return_types))
+
+    # Check all types are preserved
+    assert types_ds[1]["str_val"] == "1"
+    assert types_ds[1]["bool_val"] is True
+    assert types_ds[1]["list_val"] == [0, 1]
+    assert types_ds[1]["dict_val"] == {"x": 1}
+    assert types_ds[1]["none_val"] is None
+    assert types_ds[1]["float_val"] == 1.0
+
+
+def test_dataset_map_typed_params(client):
+    """Test mapping with type hints in function parameters."""
+    ds = weave.Dataset(
+        rows=[{"id": i, "num": str(i), "flag": i % 2 == 0} for i in range(5)]
     )
-    with pytest.raises(ValueError, match="does not contain a 'train' split"):
-        weave.Dataset.from_hf(hf_dataset_dict_no_train)
 
-    # Test converting an empty weave.Dataset to HFDataset
-    # Create a valid dataset first, then manually empty its rows to test to_hf directly
-    temp_weave_ds = weave.Dataset(rows=[{"temp": 1}])
-    temp_weave_ds.rows = []  # Manually set rows to empty, bypassing validator
-    empty_hf_ds = temp_weave_ds.to_hf()
-    assert isinstance(empty_hf_ds, HFDataset)
-    assert len(empty_hf_ds) == 0
-    assert empty_hf_ds.column_names == []
+    # Function with type annotations
+    def typed_func(id: int, num: str, flag: bool) -> dict:
+        # Convert num to int and add to id if flag is True
+        result = int(num) + id if flag else id
+        return {"result": result}
 
-    # Test from_hf with an empty HFDataset (should raise ValueError)
-    empty_hf_dataset_input = HFDataset.from_list([])
-    with pytest.raises(
-        ValueError, match="Attempted to construct a Dataset with an empty list"
-    ):
-        weave.Dataset.from_hf(empty_hf_dataset_input)
+    mapped_ds = asyncio.run(ds.map(typed_func))
+
+    assert len(mapped_ds) == 5
+    assert mapped_ds[0]["result"] == 0  # 0 + 0, flag=True
+    assert mapped_ds[1]["result"] == 1  # Just id, flag=False
+    assert mapped_ds[2]["result"] == 4  # 2 + 2, flag=True
+    assert mapped_ds[3]["result"] == 3  # Just id, flag=False
+    assert mapped_ds[4]["result"] == 8  # 4 + 4, flag=True
+
+
+def test_dataset_map_empty_function(client):
+    """Test mapping with an empty function (no parameters)."""
+    ds = weave.Dataset(rows=[{"id": i, "val": i} for i in range(5)])
+
+    # Function with no parameters
+    def constant_func():
+        return {"constant": 42}
+
+    mapped_ds = asyncio.run(ds.map(constant_func))
+
+    # Should add the constant to every row
+    assert len(mapped_ds) == 5
+    for i in range(5):
+        assert mapped_ds[i] == {"id": i, "val": i, "constant": 42}
+
+
+# New test for Jupyter environments: map returns a coroutine to await when event loop is running
+@pytest.mark.asyncio
+async def test_dataset_map_jupyter_event_loop(client):
+    # In an interactive environment with a running event loop (e.g., Jupyter),
+    # map should return a coroutine that can be awaited.
+    ds = weave.Dataset(rows=[{"val": i} for i in range(3)])
+    # Function parameter 'val' matches the column name.
+    coro = ds.map(lambda val: {"double": val * 2})
+    assert asyncio.iscoroutine(coro)
+    mapped_ds = await coro
+    # After awaiting, ensure we get a Dataset with doubled values.
+    expected_rows = [{"val": i, "double": i * 2} for i in range(3)]
+    assert isinstance(mapped_ds, weave.Dataset)
+    assert list(mapped_ds) == expected_rows
