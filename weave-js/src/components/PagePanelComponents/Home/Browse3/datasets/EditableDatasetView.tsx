@@ -12,17 +12,24 @@ import {
 import {A} from '@wandb/weave/common/util/links';
 import {Button} from '@wandb/weave/components/Button';
 import {RowId} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/CallPage/DataTableView';
+import {
+  MagicButton,
+  MagicTooltip,
+} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
 import {Tooltip} from '@wandb/weave/components/Tooltip';
+import _ from 'lodash';
 import get from 'lodash/get';
 import React, {
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {useHistory} from 'react-router-dom';
 import {v4 as uuidv4} from 'uuid';
+import z from 'zod';
 
 import {isWeaveObjectRef, parseRef, parseRefMaybe} from '../../../../../react';
 import {CellValue} from '../../Browse2/CellValue';
@@ -248,31 +255,59 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     [setAddedRows]
   );
 
+  const addRowDirectly = useCallback(
+    (row: {[key: string]: any}) => {
+      setAddedRows(prev => {
+        const updatedMap = new Map(prev);
+        const newId = `${ADDED_ROW_ID_PREFIX}${uuidv4()}`;
+        const newRow = {
+          ___weave: {
+            id: newId,
+            isNew: true,
+          },
+          ...row,
+        };
+        updatedMap.set(newId, newRow);
+
+        // Wait for the next tick to ensure the row is added and grid is updated
+        setTimeout(() => {
+          const firstField = row[0];
+          if (firstField) {
+            apiRef.current.scrollToIndexes({rowIndex: numAddedRows});
+          }
+        }, 0);
+
+        return updatedMap;
+      });
+    },
+    [apiRef, numAddedRows, setAddedRows]
+  );
+
   const handleAddRowsClick = useCallback(() => {
     setPaginationModel(prev => ({...prev, page: 0}));
-    setAddedRows(prev => {
-      const updatedMap = new Map(prev);
-      const newId = `${ADDED_ROW_ID_PREFIX}${uuidv4()}`;
-      const newRow = {
-        ___weave: {
-          id: newId,
-          isNew: true,
-        },
-        ...Object.fromEntries(initialFields.map(field => [field, ''])),
-      };
-      updatedMap.set(newId, newRow);
+    addRowDirectly(Object.fromEntries(initialFields.map(field => [field, ''])));
+  }, [addRowDirectly, initialFields]);
 
-      // Wait for the next tick to ensure the row is added and grid is updated
-      setTimeout(() => {
-        const firstField = initialFields[0];
-        if (firstField) {
-          apiRef.current.scrollToIndexes({rowIndex: numAddedRows});
-        }
-      }, 0);
+  const addManyRows = useCallback(
+    (data: Array<{[key: string]: any}>) => {
+      data.forEach(row => {
+        addRowDirectly(row);
+      });
+    },
+    [addRowDirectly]
+  );
 
-      return updatedMap;
+  const responseFormat = useMemo(() => {
+    return z.object({
+      rows: z
+        .array(
+          z.object(
+            Object.fromEntries(initialFields.map(key => [key, z.string()]))
+          )
+        )
+        .length(10),
     });
-  }, [setAddedRows, initialFields, apiRef, numAddedRows]);
+  }, [initialFields]);
 
   const rows = useMemo(() => {
     if (fetchQueryLoaded) {
@@ -293,6 +328,14 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     }
     return [];
   }, [loadedRows, fetchQueryLoaded, editedRows]);
+
+  const exampleRows = useMemo(() => {
+    return rows.map((row: {[key: string]: any}) => {
+      return Object.fromEntries(
+        initialFields.map(key => [key, JSON.stringify(row[key] ?? '')])
+      );
+    });
+  }, [initialFields, rows]);
 
   const combinedRows = useMemo(() => {
     if (
@@ -494,6 +537,68 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
     }));
   }, []);
 
+  const lastGeneratedIndex = useRef(-1);
+
+  const parseCompleteLLMRows = useCallback(
+    (completeRows: string) => {
+      const newRows: any[] = JSON.parse(completeRows).rows;
+      const parsedRows = newRows.map(row => {
+        return Object.fromEntries(
+          initialFields.map(key => {
+            const value = row[key] ?? '';
+            try {
+              return [key, JSON.parse(value)];
+            } catch (e) {
+              return [key, value];
+            }
+          })
+        );
+      });
+      return parsedRows;
+    },
+    [initialFields]
+  );
+
+  const parsePartialLLMRows = useCallback(
+    (partialRows: string) => {
+      let newRows: any[] = [];
+      let remainingGuess = partialRows;
+      while (remainingGuess.length > 0) {
+        try {
+          newRows = JSON.parse(remainingGuess).rows;
+          break;
+        } catch (e) {
+          try {
+            newRows = JSON.parse(remainingGuess + ']}').rows;
+            console.log(newRows);
+            break;
+          } catch (e) {
+            const parts = remainingGuess.split('}');
+            if (parts.length <= 1) {
+              break;
+            }
+            remainingGuess = parts.slice(0, -1).join('}') + '}';
+          }
+        }
+      }
+
+      const parsedRows = newRows.map(row => {
+        return Object.fromEntries(
+          initialFields.map(key => {
+            const value = row[key] ?? '';
+            try {
+              return [key, JSON.parse(value)];
+            } catch (e) {
+              return [key, value];
+            }
+          })
+        );
+      });
+      return parsedRows;
+    },
+    [initialFields]
+  );
+
   const CustomFooter = useCallback(() => {
     return (
       <GridFooterContainer>
@@ -513,6 +618,62 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
               tooltip="Add row">
               Add row
             </Button>
+            <MagicTooltip
+              onStream={(response, isComplete) => {
+                const newRows = isComplete
+                  ? parseCompleteLLMRows(response)
+                  : parsePartialLLMRows(response);
+                if (newRows.length > lastGeneratedIndex.current + 1) {
+                  const rowsToAdd = newRows.slice(
+                    lastGeneratedIndex.current + 1
+                  );
+                  console.log({rowsToAdd});
+                  addManyRows(rowsToAdd);
+                  lastGeneratedIndex.current = newRows.length - 1;
+                }
+                if (isComplete) {
+                  lastGeneratedIndex.current = -1;
+                }
+                // console.log(parsePartialLLMRows(response));
+                // // console.log(response);
+              }}
+              // onComplete={completion => {
+              //   if (typeof completion === 'string') {
+              //     // invalid
+              //     return;
+              //   }
+              //   const rows = completion.rows;
+              //   if (!_.isArray(rows)) {
+              //     return;
+              //   }
+              //   const parsedRows = rows.map(row => {
+              //     return Object.fromEntries(
+              //       initialFields.map(key => {
+              //         const value = row[key] ?? '';
+              //         try {
+              //           return [key, JSON.parse(value)];
+              //         } catch (e) {
+              //           return [key, value];
+              //         }
+              //       })
+              //     );
+              //   });
+
+              //   addManyRows(parsedRows);
+              // }}
+              systemPrompt={`
+You are an LLM developer building a dataset.
+Your goal is to extend the dataset with 5 additional rows.
+Make sure to exactly match the schema of the existing rows.
+The values will always be stringified and parsed back into the correct type.
+                `}
+              placeholder={'What do you want these rows to cover?'}
+              additionalContext={{
+                existingRows: exampleRows,
+              }}
+              responseFormat={responseFormat}>
+              <MagicButton>Generate Rows</MagicButton>
+            </MagicTooltip>
           </Box>
         )}
         <Box
@@ -523,7 +684,17 @@ export const EditableDatasetView: React.FC<EditableDatasetViewProps> = ({
         </Box>
       </GridFooterContainer>
     );
-  }, [isEditing, handleAddRowsClick, showAddRowButton]);
+  }, [
+    isEditing,
+    showAddRowButton,
+    handleAddRowsClick,
+    exampleRows,
+    responseFormat,
+    parseCompleteLLMRows,
+    parsePartialLLMRows,
+    lastGeneratedIndex,
+    addManyRows,
+  ]);
 
   return (
     <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
