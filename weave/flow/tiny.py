@@ -1,9 +1,7 @@
-from itertools import tee
 import tempfile
 from weave.flow.dataset import Dataset
 from weave.flow.model import Model
 from weave.scorers import TinyWrapScorer
-from weave.trace.op import Op
 from weave.trace.refs import Ref
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.flow.eval import Evaluation
@@ -270,3 +268,24 @@ def tinyify(dataset_ref: Ref, models: list[Model], scorer: Scorer, num_items: in
         # No event loop is running, we can use asyncio.run()
         return asyncio.run(_tinyify_async(dataset_ref, models, scorer, num_items))
 
+
+def get_evaluation_results_from_project_and_dataset(project_name: str, dataset_name: str) -> dict[str, list[float]]:
+    """
+    Get evaluation results from a project and dataset.
+    """
+    client = require_weave_client()
+    pass
+
+def tinify_from_evaluation_results(evaluation_results: dict[str, list[float]], dataset: Dataset, num_items: int=100) -> Ref:
+    """
+    Tinify from dataset scores.
+    """
+    client = require_weave_client()
+
+    irt_model = train_irt_model(evaluation_results)
+
+    teenytiny = tiny_dataset(dataset, evaluation_results, irt_model, num_items)
+
+    teenytiny_ref = client._save_object(teenytiny, teenytiny.name, "latest")
+
+    return teenytiny_ref
