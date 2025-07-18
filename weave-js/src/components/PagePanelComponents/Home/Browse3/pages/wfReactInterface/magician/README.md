@@ -2,7 +2,23 @@
 
 A React library for adding AI-powered "magic moments" to your W&B application. Provides dead-simple access to LLM capabilities through a developer-friendly API and consistent UI components.
 
-## Why Magician?
+## 🎯 **What Magician Does**
+
+Magician allows React developers to focus on lightweight prompting by handling all the complex LLM integration details:
+
+### **Automatic Infrastructure**
+- **Authentication** - Handles W&B API authentication seamlessly
+- **Model Selection** - Global model management with dropdown UI. Supports CoreWeave inference service as well as any configured vendor!
+- **Streaming & Error Handling** - Real-time responses with built-in error recovery
+- **Structured Response Handling** - Automatic parsing and validation with Zod schemas
+- **LLM API Semantics** - Manages message construction, temperature, and provider-specific details
+
+### **Simple Developer Experience**
+- **Common UX Components** - Pre-built buttons, tooltips, and interfaces
+- **Lightweight APIs** - Focus on your prompts, not boilerplate code
+- **Real-time Feel** - Streaming responses that feel instant
+
+## 🚀 **Why Magician?**
 
 Building AI features shouldn't be hard. Magician gives you:
 - **Simple APIs** - Focus on content, not API complexity
@@ -10,10 +26,11 @@ Building AI features shouldn't be hard. Magician gives you:
 - **Real-time feel** - Streaming responses that feel instant
 - **Context management** - Global state for models and projects
 
-## Quick Start
+## ⚡ **Quick Integration Guide**
 
-![./magic_tooltip.png](./magic_tooltip.png)
+Adding magic to any component takes just **3 steps**:
 
+### Step 1: Wrap with Provider
 ```tsx
 import { MagicProvider, MagicButton } from './magician';
 
@@ -24,13 +41,21 @@ function App() {
     </MagicProvider>
   );
 }
+```
 
+### Step 2: Add Magic Button
+
+![./magic_tooltip.png](./magic_tooltip.png)
+
+```tsx
 function MyComponent() {
   const [content, setContent] = useState('');
 
   return (
     <MagicButton
-      onStream={(chunk, accumulation, parsedCompletion, isComplete) => setContent(accumulation)}
+      onStream={(chunk, accumulation, parsedCompletion, isComplete) => 
+        setContent(accumulation)
+      }
       systemPrompt="You are a helpful assistant..."
       placeholder="What would you like to generate?"
       text="Generate"
@@ -39,7 +64,54 @@ function MyComponent() {
 }
 ```
 
-## API Reference
+**That's it!** ✨ Your component now has AI-powered generation capabilities.
+
+## 🎯 **Common Use Cases**
+
+### Text Generation
+```tsx
+<MagicButton
+  onStream={(chunk, accumulation) => setDescription(accumulation)}
+  systemPrompt="You are an expert at writing clear, concise descriptions."
+  placeholder="What should I describe?"
+  text="Generate Description"
+/>
+```
+
+### Content Revision
+```tsx
+<MagicButton
+  onStream={(chunk, accumulation) => setContent(accumulation)}
+  systemPrompt="You are an expert editor. Improve the given content."
+  contentToRevise={existingContent}
+  revisionPlaceholder="How should I improve this?"
+  text="Revise Content"
+/>
+```
+
+### Structured Data Generation
+```tsx
+import { z } from 'zod';
+
+const UserProfileSchema = z.object({
+  name: z.string(),
+  bio: z.string(),
+  skills: z.array(z.string())
+});
+
+<MagicButton
+  onStream={(chunk, accumulation, parsedCompletion, isComplete) => {
+    if (isComplete && parsedCompletion) {
+      setUserProfile(parsedCompletion); // Already parsed and validated!
+    }
+  }}
+  systemPrompt="Generate a user profile"
+  responseFormat={UserProfileSchema}
+  text="Generate Profile"
+/>
+```
+
+## 📚 **API Reference**
 
 ### Core Hooks
 
@@ -50,7 +122,8 @@ Streaming chat completions with automatic context management.
 const complete = useChatCompletionStream();
 
 const generate = async () => {
-  await complete({messages: 'Write a haiku about coding'},
+  await complete(
+    {messages: 'Write a haiku about coding'},
     (chunk) => console.log(chunk.content)
   );
 };
@@ -258,7 +331,7 @@ Provides context for entity/project and model selection.
 </MagicProvider>
 ```
 
-## Real Example
+## 🎮 **Real Example**
 
 Here's how it's used in the W&B playground:
 
@@ -297,10 +370,8 @@ function PlaygroundMessagePanelEditor() {
 }
 ```
 
-## Design Principles
+## 🎨 **Design Principles**
 
 - **Developer Simplicity** - APIs should be intuitive with minimal boilerplate
 - **Real-time Feel** - Emphasize streaming and immediate feedback  
 - **Minimal UI** - Dead-simple design, no unnecessary styling
-- **Parent Control** - Parent components orchestrate content display
-- **State Encapsulation** - UI components manage their own state internally 
