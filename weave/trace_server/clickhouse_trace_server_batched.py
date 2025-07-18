@@ -370,10 +370,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
         )
         try:
-            _call = next(res)
+            call = next(res)
         except StopIteration:
-            _call = None
-        return tsi.CallReadRes(call=_call)
+            call = None
+        return tsi.CallReadRes(call=call)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)

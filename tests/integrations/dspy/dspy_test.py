@@ -62,7 +62,7 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     assert len(result) == 1
     assert result[0].lower() == "this is a test!"
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 3
 
     call = calls[0]
@@ -99,7 +99,7 @@ def test_dspy_predict_module(client: WeaveClient) -> None:
     response = qa(question="who is the creator of git?")
     assert "Linus Torvalds" in response.response
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 5
 
     call = calls[0]
@@ -146,7 +146,7 @@ def test_dspy_cot(client: WeaveClient) -> None:
     )
     assert response.answer > 0.027
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 6
 
     call = calls[0]
@@ -208,7 +208,7 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
     assert response.sentiment == "positive"
     assert response.confidence > 0.5
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 5
 
     call = calls[0]
@@ -256,7 +256,7 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     accuracy = evaluate(module)
     assert accuracy > 30
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 22
 
     call = calls[0]
@@ -287,7 +287,7 @@ def test_dspy_optimizer_labeled_fewshot(client: WeaveClient) -> None:
         == "Given the fields `question`, produce the fields `answer`, `explanation`."
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -322,7 +322,7 @@ def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
         == "Given the fields `question`, produce the fields `answer`, `explanation`."
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 20
 
     call = calls[0]
@@ -366,7 +366,7 @@ def test_dspy_optimizer_bootstrap_fewshot_with_random_search(
         == "Given the fields `question`, produce the fields `answer`, `explanation`."
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 23
 
     call = calls[0]

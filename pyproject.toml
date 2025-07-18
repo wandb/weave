@@ -309,8 +309,10 @@ select = [
   "RUF039",  # https://docs.astral.sh/ruff/rules/unraw-re-pattern/
   "RUF046",  # https://docs.astral.sh/ruff/rules/unnecessary-cast-to-int/
   "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
+  "RUF052",  # https://docs.astral.sh/ruff/rules/used-dummy-variable/
   "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
   "RUF100",  # https://docs.astral.sh/ruff/rules/unused-noqa/
+  "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
 ]
 ignore = [
   # we use Google style
@@ -409,5 +411,5 @@ alog_score = "alog_score"
 BoxedNDArray = "BoxedNDArray"
 
 [tool.fixit]
-enable = [".rules.op_deco"]
+enable = [".rules.op_deco", ".rules.legacy_methods"]
 disable = ["fixit.rules"]
