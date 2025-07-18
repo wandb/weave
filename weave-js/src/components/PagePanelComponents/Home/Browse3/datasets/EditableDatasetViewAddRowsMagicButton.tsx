@@ -28,7 +28,9 @@ export const EditableDatasetViewAddRowsMagicButton: React.FC<
   EditableDatasetViewAddRowsMagicButtonProps
 > = props => {
   const keys = useMemo(() => {
-    return Object.keys(props.exampleRows[0]);
+    return Object.keys(
+      props.exampleRows.length > 0 ? props.exampleRows[0] : {}
+    );
   }, [props.exampleRows]);
 
   const responseFormat = useMemo(() => {
@@ -53,21 +55,20 @@ export const EditableDatasetViewAddRowsMagicButton: React.FC<
     (partialRows: string) => {
       let newRows: any[] = [];
       let remainingGuess = partialRows;
-      while (remainingGuess.length > 0) {
-        try {
-          newRows = JSON.parse(remainingGuess).rows;
-          break;
-        } catch (e) {
+
+      try {
+        newRows = JSON.parse(remainingGuess).rows;
+      } catch (e) {
+        while (remainingGuess.length > 0) {
+          // remove the last element
+          remainingGuess = remainingGuess.slice(0, -1);
+          const lastBraceIndex = remainingGuess.lastIndexOf('}');
+          remainingGuess = remainingGuess.slice(0, lastBraceIndex + 1);
           try {
             newRows = JSON.parse(remainingGuess + ']}').rows;
-            console.log(newRows);
             break;
           } catch (e) {
-            const parts = remainingGuess.split('}');
-            if (parts.length <= 1) {
-              break;
-            }
-            remainingGuess = parts.slice(0, -1).join('}') + '}';
+            continue;
           }
         }
       }
