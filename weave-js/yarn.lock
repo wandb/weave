@@ -5353,11 +5353,6 @@
     loupe "^2.3.7"
     pretty-format "^29.7.0"
 
-"@wandb/semantic@^0.0.1":
-  version "0.0.1"
-  resolved "https://npm.pkg.github.com/download/@wandb/semantic/0.0.1/879e6cf3b80ad29b7f3b636b2eb170763ffa79fd#879e6cf3b80ad29b7f3b636b2eb170763ffa79fd"
-  integrity sha512-tt48NPjbz9/2F+T7vpjZQQvanmF780wx7e7U430viZwr+DFn0l+EWz2yDYYzistRZgOSrsnibn8xdgk9O3tfgw==
-
 "@wandb/ui@^0.1.0":
   version "0.1.0"
   resolved "https://npm.pkg.github.com/download/@wandb/ui/0.1.0/bc6d881055e2c0614fcd0f967321b511b2bacf63#bc6d881055e2c0614fcd0f967321b511b2bacf63"
