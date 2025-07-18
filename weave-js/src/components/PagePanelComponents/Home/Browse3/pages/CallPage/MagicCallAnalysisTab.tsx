@@ -4,9 +4,15 @@ import React, {FC, useMemo} from 'react';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {MagicAnalysisBase, MagicAnalysisConfig} from './MagicAnalysisBase';
-import {SYSTEM_PROMPT_FN} from './magicCallAnalysis';
+import {createCallAnalysisContext,MAGIC_CALL_ANALYSIS_SYSTEM_PROMPT} from './magicCallAnalysis';
 
 const MAGIC_CALL_ANALYSIS_FEEDBACK_TYPE = 'wandb.magic_call_analysis';
+
+const EMPTY_STATE_TITLE = 'Generate Call Analysis';
+const EMPTY_STATE_DESCRIPTION = 'Use AI to analyze this call and generate insights about performance, patterns, and potential improvements.';
+const ANALYSIS_TITLE = 'Generated Call Analysis';
+const PLACEHOLDER = 'Ask specific questions about the call, or leave empty for a comprehensive analysis...';
+const REVISION_PLACEHOLDER = 'Ask follow-up questions or leave empty to regenerate the analysis...';
 
 export const MagicCallAnalysisTab: FC<{
   entity: string;
@@ -40,29 +46,30 @@ const MagicCallAnalysisTabInner: FC<{
 
   const call = callQuery.result;
 
-  const systemPrompt = useMemo(() => {
-    return SYSTEM_PROMPT_FN({
-      call: call as CallSchema | null,
-    });
+  const additionalContext = useMemo(() => {
+    return createCallAnalysisContext(call as CallSchema | null);
   }, [call]);
 
   const config: MagicAnalysisConfig = {
     feedbackType: MAGIC_CALL_ANALYSIS_FEEDBACK_TYPE,
-    systemPrompt,
-    emptyStateTitle: 'Generate Call Analysis',
-    emptyStateDescription:
-      'Use AI to analyze this call and generate insights about performance, patterns, and potential improvements.',
-    analysisTitle: 'Generated Call Analysis',
-    tooltipPlaceholder:
-      'Ask specific questions about the call, or leave empty for a comprehensive analysis...',
-    regenerateTooltipPlaceholder:
-      'Ask follow-up questions or leave empty to regenerate the analysis...',
-    extraLogAttributes: {
-      entity,
-      project,
-      callId,
-      callLink: `https://wandb.ai/${entity}/${project}/weave/calls/${callId}`,
-      feature: 'call_analysis',
+    emptyStateTitle: EMPTY_STATE_TITLE,
+    emptyStateDescription: EMPTY_STATE_DESCRIPTION,
+    analysisTitle: ANALYSIS_TITLE,
+    magicButtonProps: {
+      systemPrompt: MAGIC_CALL_ANALYSIS_SYSTEM_PROMPT,
+      placeholder: PLACEHOLDER,
+      revisionPlaceholder: REVISION_PLACEHOLDER,
+      additionalContext,
+      showModelSelector: true,
+      width: 450,
+      textareaLines: 6,
+      _dangerousExtraAttributesToLog: {
+        entity,
+        project,
+        callId,
+        callLink: `https://wandb.ai/${entity}/${project}/weave/calls/${callId}`,
+        feature: 'call_analysis',
+      },
     },
   };
 

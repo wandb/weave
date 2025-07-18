@@ -19,16 +19,7 @@
 
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 
-/**
- * Context passed to the system prompt function.
- */
-type CallAnalysisContext = {
-  call?: CallSchema | null;
-};
-
-export const SYSTEM_PROMPT_FN = (
-  context: CallAnalysisContext
-) => `You are a Weave call analyst. Analyze the provided call data and provide insights about performance, patterns, and potential improvements.
+export const MAGIC_CALL_ANALYSIS_SYSTEM_PROMPT = `You are a Weave call analyst. Analyze the provided call data and provide insights about performance, patterns, and potential improvements.
 
 RULES:
 - Only analyze provided data
@@ -69,10 +60,7 @@ PATTERNS TO DETECT:
 - Resource inefficiencies
 - Unusual input/output patterns
 
-<call_context>
-${context.call ? prepareCallContextForLLM(context.call) : ''}
-</call_context>
-`;
+Analyze the call data provided in the additional context.`;
 
 /**
  * Prepares call data for LLM consumption, extracting relevant information.
@@ -82,14 +70,13 @@ const prepareCallContextForLLM = (call: CallSchema) => {
     callId: call.callId,
     spanName: call.spanName,
     status: call.traceCall?.exception ? 'failed' : 'success',
-    startedAt: call.startedAt,
-    endedAt: call.endedAt,
+    startedAt: call.rawSpan.start_time_ms,
+    endedAt: call.rawSpan.end_time_ms,
   };
 
   // Calculate duration if both timestamps exist
-  if (call.startedAt && call.endedAt) {
-    const duration =
-      new Date(call.endedAt).getTime() - new Date(call.startedAt).getTime();
+  if (call.rawSpan.start_time_ms && call.rawSpan.end_time_ms) {
+    const duration = call.rawSpan.end_time_ms - call.rawSpan.start_time_ms;
     simplified.durationMs = duration;
     simplified.durationSeconds = (duration / 1000).toFixed(2);
   }
@@ -109,6 +96,13 @@ const prepareCallContextForLLM = (call: CallSchema) => {
     if (call.traceCall.attributes) {
       simplified.attributes = call.traceCall.attributes;
     }
+  } else {
+    // Fallback to raw span data
+    simplified.inputs = call.rawSpan.inputs;
+    simplified.output = call.rawSpan.output;
+    simplified.exception = call.rawSpan.exception;
+    simplified.summary = call.rawSpan.summary;
+    simplified.attributes = call.rawSpan.attributes;
   }
 
   // Add op version info if available
@@ -123,4 +117,20 @@ const prepareCallContextForLLM = (call: CallSchema) => {
   }
 
   return JSON.stringify(simplified, null, 2);
+};
+
+/**
+ * Creates additional context for the call analysis.
+ * This replaces the old system prompt interpolation pattern.
+ */
+export const createCallAnalysisContext = (
+  call?: CallSchema | null
+): Record<string, any> => {
+  if (!call) {
+    return {};
+  }
+
+  return {
+    callContext: prepareCallContextForLLM(call),
+  };
 };

@@ -5,6 +5,7 @@ import {hexToRGB} from '@wandb/weave/common/css/utils';
 import {Button} from '@wandb/weave/components/Button';
 import {Icon} from '@wandb/weave/components/Icon';
 import {MagicButton} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician';
+import {MagicButtonProps} from '@wandb/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/magician/components/MagicButton';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {makeRefCall} from '@wandb/weave/util/refs';
 import copyToClipboard from 'copy-to-clipboard';
@@ -162,13 +163,10 @@ const PaginationText = styled.span`
 
 export interface MagicAnalysisConfig {
   feedbackType: string;
-  systemPrompt: string;
   emptyStateTitle: string;
   emptyStateDescription: string;
   analysisTitle: string;
-  tooltipPlaceholder: string;
-  regenerateTooltipPlaceholder: string;
-  extraLogAttributes?: Record<string, any>;
+  magicButtonProps: Omit<MagicButtonProps, 'onStream' | 'onError' | 'onCancel'>;
 }
 
 interface MagicAnalysisBaseProps {
@@ -357,17 +355,12 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
                 </p>
 
                 <MagicButton
-                  onStream={handleMagicStream}
-                  onError={handleError}
-                  systemPrompt={config.systemPrompt}
-                  placeholder={config.tooltipPlaceholder}
-                  showModelSelector={true}
-                  width={450}
-                  textareaLines={6}
-                  _dangerousExtraAttributesToLog={config.extraLogAttributes}
                   size="large"
                   icon="magic-wand-star"
                   text="Generate Analysis"
+                  onStream={handleMagicStream}
+                  onError={handleError}
+                  {...config.magicButtonProps}
                 />
               </Tailwind>
             </EmptyStateContent>
@@ -398,17 +391,12 @@ export const MagicAnalysisBase: FC<MagicAnalysisBaseProps> = ({
             <span className="text-sm text-moon-500">Generating...</span>
           ) : (
             <MagicButton
-              onStream={handleMagicStream}
-              onError={handleError}
-              systemPrompt={config.systemPrompt}
-              placeholder={config.regenerateTooltipPlaceholder}
-              showModelSelector={true}
-              width={450}
-              textareaLines={4}
-              _dangerousExtraAttributesToLog={config.extraLogAttributes}
               size="medium"
               variant="secondary"
               text="Regenerate"
+              onStream={handleMagicStream}
+              onError={handleError}
+              {...config.magicButtonProps}
             />
           )}
         </div>

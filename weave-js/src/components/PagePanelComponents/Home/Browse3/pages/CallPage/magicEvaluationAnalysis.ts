@@ -41,16 +41,7 @@ import {EvaluationComparisonState} from '../CompareEvaluationsPage/ecpState';
 
 const MAX_LLM_CONTEXT_LENGTH = 10000;
 
-/**
- * Context passed to the system prompt function.
- * Can be extended with additional context like user preferences or historical data.
- */
-type EvaluationAnalysisContext = {
-  evaluationState?: EvaluationComparisonState | null;
-};
-export const SYSTEM_PROMPT_FN = (
-  context: EvaluationAnalysisContext
-) => `You are an ML evaluation analyst. Be direct, helpful, and use emojis + subtle data cards for visual clarity.
+export const MAGIC_EVALUATION_ANALYSIS_SYSTEM_PROMPT = `You are an ML evaluation analyst. Be direct, helpful, and use emojis + subtle data cards for visual clarity.
 
 RULES:
 - Only analyze provided data
@@ -153,14 +144,7 @@ Score distribution: [pattern] | Truncated: [yes/no]
 - Token/latency spikes → verbose model responses
 - Consistent failure patterns → prompt needs clarity
 
-<evaluation_context>
-${
-  context.evaluationState
-    ? prepareEvaluationContextForLLM(context.evaluationState)
-    : ''
-}
-</evaluation_context>
-`;
+Analyze the evaluation data provided in the additional context.`;
 
 /**
  * Prepares evaluation data for LLM consumption with token limit handling.
@@ -318,4 +302,20 @@ const simplifyEvaluationResults = (results: EvaluationComparisonState) => {
   }
 
   return simplified;
+};
+
+/**
+ * Creates additional context for the evaluation analysis.
+ * This replaces the old system prompt interpolation pattern.
+ */
+export const createEvaluationAnalysisContext = (
+  evaluationState?: EvaluationComparisonState | null
+): Record<string, any> => {
+  if (!evaluationState) {
+    return {};
+  }
+
+  return {
+    evaluationContext: prepareEvaluationContextForLLM(evaluationState),
+  };
 };
