@@ -39,7 +39,14 @@ import {
   WeaveInterface,
 } from '@wandb/weave/core';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import BaseTable, {BaseTableProps} from 'react-base-table';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import {
@@ -1109,7 +1116,7 @@ const PanelTableInner: React.FC<
   });
   const actionBarRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const updateDimensions = () => {
       if (actionBarRef.current) {
         const {width: actionBarWidth, height: actionBarHeight} =

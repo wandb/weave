@@ -65,13 +65,13 @@ def success_response():
 
 @pytest.fixture
 def server(request):
-    _server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server_ = RemoteHTTPTraceServer("http://example.com", should_batch=True)
 
     if request.param == "normal":
-        _server._send_batch_to_server = MagicMock()
+        server_._send_batch_to_server = MagicMock()
     elif request.param == "small_limit":
-        _server.remote_request_bytes_limit = 1024  # 1kb
-        _server._send_batch_to_server = MagicMock()
+        server_.remote_request_bytes_limit = 1024  # 1kb
+        server_._send_batch_to_server = MagicMock()
     elif request.param == "fast_retrying":
         fast_retry = tenacity.retry(
             wait=tenacity.wait_fixed(0.1),
@@ -79,14 +79,14 @@ def server(request):
             reraise=True,
         )
         unwrapped_send_batch_to_server = MethodType(
-            _server._send_batch_to_server.__wrapped__, _server
+            server_._send_batch_to_server.__wrapped__, server_
         )
-        _server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+        server_._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
 
-    yield _server
+    yield server_
 
-    if _server.call_processor:
-        _server.call_processor.stop_accepting_new_work_and_flush_queue()
+    if server_.call_processor:
+        server_.call_processor.stop_accepting_new_work_and_flush_queue()
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)

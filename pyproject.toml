@@ -305,11 +305,14 @@ select = [
   "RUF015",  # https://docs.astral.sh/ruff/rules/unnecessary-iterable-allocation-for-first-element/
   "RUF018",  # https://docs.astral.sh/ruff/rules/assignment-in-assert/
   "RUF022",  # https://docs.astral.sh/ruff/rules/unsorted-dunder-all/
+  "RUF031",  # https://docs.astral.sh/ruff/rules/incorrectly-parenthesized-tuple-in-subscript/
   "RUF046",  # https://docs.astral.sh/ruff/rules/unnecessary-cast-to-int/
   "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
+  "RUF052",  # https://docs.astral.sh/ruff/rules/used-dummy-variable/
   "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
   "RUF100",  # https://docs.astral.sh/ruff/rules/unused-noqa/
   "E711",    # https://docs.astral.sh/ruff/rules/none-comparison/
+  "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
 ]
 ignore = [
   # we use Google style
