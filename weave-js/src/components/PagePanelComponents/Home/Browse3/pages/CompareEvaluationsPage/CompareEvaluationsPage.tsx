@@ -341,23 +341,35 @@ const ResultExplorer: React.FC<{
         }}>
         <Box
           style={{
-            flex: 1,
-            width: '50%',
-            display: viewMode !== 'detail' ? 'block' : 'none',
+            flex: viewMode === 'detail' ? 0 : viewMode === 'split' ? 1 : 1,
+            width:
+              viewMode === 'detail'
+                ? '64px'
+                : viewMode === 'split'
+                ? '50%'
+                : '100%',
+            display: 'block',
           }}>
           <ExampleCompareSectionTable
             state={state}
-            shouldHighlightSelectedRow={viewMode === 'split'}
-            onShowSplitView={() => setViewMode('split')}
+            shouldHighlightSelectedRow={viewMode === 'detail'}
+            onShowSplitView={() => setViewMode('detail')}
           />
         </Box>
 
         <Box
           style={{
-            flex: 1,
-            width: '50%',
-            borderLeft: '1px solid #e0e0e0',
+            flex: viewMode === 'detail' ? 1 : viewMode === 'split' ? 1 : 0,
+            width:
+              viewMode === 'detail'
+                ? 'calc(100% - 64px)'
+                : viewMode === 'split'
+                ? '50%'
+                : '0%',
             display: viewMode !== 'table' ? 'block' : 'none',
+            boxShadow:
+              viewMode !== 'table' ? '0 4px 12px rgba(0, 0, 0, 0.15)' : 'none',
+            zIndex: viewMode !== 'table' ? 1 : 0,
           }}>
           <ExampleCompareSectionDetailGuarded
             state={state}
