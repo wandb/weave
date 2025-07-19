@@ -143,7 +143,7 @@ Once you have the URI of the Model object, you can export and re-use it. Note th
     ```python
     # the exported weave model is already initialised and ready to be called
     # highlight-next-line
-    new_dinos = weave.ref("weave:///morgan/jurassic-park/object/ExtractDinos:ey4udBU2MU23heQFJenkVxLBX4bmDsFk7vsGcOWPjY4").get()
+    new_dinos = weave.get("weave:///morgan/jurassic-park/object/ExtractDinos:ey4udBU2MU23heQFJenkVxLBX4bmDsFk7vsGcOWPjY4")
 
     # set the client to the openai client again
     new_dinos.client = client

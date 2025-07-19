@@ -200,9 +200,9 @@ The code below retrieves the `RagModel` object using a reference from the Weave 
 
 
 ```python
-RagModel = weave.ref(
+RagModel = weave.get(
     "weave:///wandb-smle/weave-cookboook-demo/object/RagModel:cqRaGKcxutBWXyM0fCGTR1Yk2mISLsNari4wlGTwERo"
-).get()
+)
 ```
 
 
@@ -256,7 +256,7 @@ The code below demonstrates how to retrieve an evaluation object, execute the ev
 ```python
 # MAGIC: we can simply get an evaluation with a eval dataset and scorers and use them
 WEAVE_EVAL = "weave:///wandb-smle/weave-cookboook-demo/object/climate_rag_eval:ntRX6qn3Tx6w3UEVZXdhIh1BWGh7uXcQpOQnIuvnSgo"
-climate_rag_eval = weave.ref(WEAVE_EVAL).get()
+climate_rag_eval = weave.get(WEAVE_EVAL)
 ```
 
 

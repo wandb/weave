@@ -349,7 +349,7 @@ weave.init(PROJECT)
 
 # Note: this url is available from the UI after publishing the object!
 ref_url = f"weave:///{ref.entity}/{PROJECT}/object/{ref.name}:{ref.digest}"
-fetched_collector = weave.ref(ref_url).get()
+fetched_collector = weave.get(ref_url)
 
 # Notice: this object was loaded from remote location!
 result = fetched_collector.predict("That was so easy, it was a piece of pie!")
