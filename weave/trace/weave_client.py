@@ -142,6 +142,7 @@ from weave.trace_server.trace_server_interface import (
 from weave.utils.redact import redact_sensitive_keys_recursively
 
 if TYPE_CHECKING:
+    import pandas as pd
     import wandb
 
     from weave.flow.scorer import ApplyScorerResult, Scorer
