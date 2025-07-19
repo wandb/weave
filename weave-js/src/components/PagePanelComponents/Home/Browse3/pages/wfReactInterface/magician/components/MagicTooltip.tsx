@@ -90,10 +90,6 @@ export interface MagicTooltipProps {
    * Height of the textarea in lines (defaults to 7).
    */
   textareaLines?: number;
-  /**
-   * Extra attributes to log to Weave.
-   */
-  _dangerousExtraAttributesToLog?: Record<string, any>;
 
   // Controlled props for use by MagicButton
   /**
@@ -138,7 +134,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   showModelSelector = true,
   width = 350,
   textareaLines = 7,
-  _dangerousExtraAttributesToLog,
   // Controlled props
   open: controlledOpen,
   anchorEl: controlledAnchorEl,
@@ -258,13 +253,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
         onStream(chunk.content, accumulatedContent, null, false);
       };
 
-      const logAttrs = {
-        ..._dangerousExtraAttributesToLog,
-        systemPrompt: systemPrompt,
-        contentToRevise: contentToRevise,
-        additionalContext: additionalContext,
-        userInstructions: userInstructions,
-      };
       const res = await chatCompletionStream(
         {
           messages: prepareSingleShotMessages({
@@ -278,7 +266,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
           responseFormat: responseFormat,
         },
         onChunk,
-        logAttrs,
         abortControllerRef.current?.signal
       );
 

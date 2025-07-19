@@ -1,5 +1,6 @@
-import {Query} from './traceServerClientInterface/query';
 import {JSONSchema7} from 'json-schema';
+
+import {Query} from './traceServerClientInterface/query';
 
 type ExtraKeysAllowed = {
   [key: string]: any;
@@ -347,7 +348,6 @@ export type FilesStatsRes = {
   total_size_bytes: number;
 };
 
-
 type JsonObjectResponseFormat = {
   type: 'json_object';
 };
@@ -367,7 +367,6 @@ export type ResponseFormat =
   | JsonSchemaResponseFormat
   | JsonObjectResponseFormat
   | TextResponseFormat;
-
 
 export type CompletionsCreateInputs = {
   model: string;

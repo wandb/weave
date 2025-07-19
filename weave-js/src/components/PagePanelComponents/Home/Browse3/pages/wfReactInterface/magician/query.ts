@@ -1,12 +1,10 @@
 import _ from 'lodash';
 import {useCallback, useMemo} from 'react';
-import z from 'zod';
 import {zodToJsonSchema} from 'zod-to-json-schema';
 
 import {TraceServerClient} from '../traceServerClient';
 import {useGetTraceServerClientContext} from '../traceServerClientContext';
 import {useMagicContext} from './context';
-import {dangerouslyLogCallToWeave} from './magicianWeaveLogger';
 import {
   ChatCompletionParams,
   Chunk,
@@ -139,7 +137,6 @@ const chatCompleteStream = async (
   project: string,
   params: ChatCompletionParams,
   onChunk: (chunk: Chunk) => void,
-  _dangerousExtraAttributesToLog?: Record<string, any>,
   signal?: AbortSignal
 ): Promise<Completion> => {
   // Process raw chunks to extract content
@@ -195,16 +192,6 @@ const chatCompleteStream = async (
     res = rawRes;
   }
 
-  await dangerouslyLogCallToWeave(
-    'magic' +
-      (_dangerousExtraAttributesToLog?.feature
-        ? `_${_dangerousExtraAttributesToLog.feature}`
-        : ''),
-    args,
-    res,
-    _dangerousExtraAttributesToLog
-  );
-
   return res;
 };
 
@@ -234,7 +221,6 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
         weavePlaygroundModelId?: string;
       },
       onChunk: (chunk: Chunk) => void,
-      _dangerousExtraAttributesToLog?: Record<string, any>,
       signal?: AbortSignal
     ) => {
       const client = getClient();
@@ -247,7 +233,6 @@ export const useChatCompletionStream = (entityProject?: EntityProject) => {
         finalProject,
         {...params, weavePlaygroundModelId: weavePlaygroundModelId},
         onChunk,
-        _dangerousExtraAttributesToLog,
         signal
       );
     },

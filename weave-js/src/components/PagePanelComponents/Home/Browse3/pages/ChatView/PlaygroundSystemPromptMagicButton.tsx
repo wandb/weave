@@ -37,9 +37,6 @@ export const PlaygroundSystemPromptMagicButton: React.FC<
       placeholder={PLACEHOLDER}
       size="medium"
       text={BUTTON_TEXT}
-      _dangerousExtraAttributesToLog={{
-        feature: 'playground_prompt',
-      }}
       {...props}
     />
   );

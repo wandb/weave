@@ -1,7 +1,7 @@
 import {Button, ButtonProps} from '@wandb/weave/components/Button';
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useRef, useState} from 'react';
 
-import {useChatCompletionStream, useMagicContext} from '../index';
+import {useChatCompletionStream} from '../index';
 import {prepareSingleShotMessages} from '../query';
 import {
   Chunk,
@@ -75,10 +75,6 @@ export interface MagicButtonProps
    */
   textareaLines?: number;
   /**
-   * Extra attributes to log to Weave.
-   */
-  _dangerousExtraAttributesToLog?: Record<string, any>;
-  /**
    * Whether to show just the icon without text.
    */
   iconOnly?: boolean;
@@ -109,7 +105,6 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   showModelSelector = true,
   width = 350,
   textareaLines = 7,
-  _dangerousExtraAttributesToLog,
   iconOnly = false,
   children,
   text,
@@ -167,14 +162,6 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
         onStream(chunk.content, accumulatedContent, null, false);
       };
 
-      const logAttrs = {
-        ..._dangerousExtraAttributesToLog,
-        systemPrompt: systemPrompt,
-        contentToRevise: contentToRevise,
-        additionalContext: additionalContext,
-        userInstructions: userInstructions,
-      };
-
       const res = await chatCompletionStream(
         {
           messages: prepareSingleShotMessages({
@@ -188,7 +175,6 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
           responseFormat: responseFormat,
         },
         onChunk,
-        logAttrs,
         abortControllerRef.current?.signal
       );
 
@@ -250,7 +236,6 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
         systemPrompt={systemPrompt}
         additionalContext={additionalContext}
         responseFormat={responseFormat}
-        _dangerousExtraAttributesToLog={_dangerousExtraAttributesToLog}
       />
     </>
   );
