@@ -997,8 +997,13 @@ const useFileContent = (
   }, [getTsClient, params.entity, params.project, params.digest, params.skip]);
 
   return useMemo(() => {
+    // Just submit the last known or initial state
     if (params.skip) {
-      return {loading: false, result: null, error: null};
+      return {
+        loading: loadingRef.current,
+        result: fileContentRes?.content ?? null,
+        error,
+      };
     }
     if (fileContentRes == null || loadingRef.current) {
       return {loading: true, result: null, error};
