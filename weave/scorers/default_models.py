@@ -14,10 +14,10 @@ DEFAULT_TEMPERATURE = 0.7
 
 # Model paths for various scorers
 MODEL_PATHS = {
-    "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer:v0",
-    "bias_scorer": "c-metrics/weave-scorers/bias_scorer:v0",
-    "coherence_scorer": "c-metrics/weave-scorers/coherence_scorer:v0",
-    "fluency_scorer": "c-metrics/weave-scorers/fluency_scorer:v0",
-    "hallucination_scorer": "c-metrics/weave-scorers/hallucination_hhem_scorer:v0",
-    "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer:v0",
+    "toxicity_scorer": "wandb/WeaveToxicityScorerV1",
+    "bias_scorer": "wandb/WeaveBiasScorerV1",
+    "coherence_scorer": "wandb/WeaveCoherenceScorerV1",
+    "fluency_scorer": "wandb/WeaveFluencyScorerV1",
+    "hallucination_scorer": "wandb/WeaveHallucinationScorerV1",
+    "relevance_scorer": "wandb/WeaveContextRelevanceScorerV1",
 }
