@@ -146,3 +146,38 @@ export const annotationsViewed = makeTrackEvent<
     };
   }
 >('Weave annotations viewed');
+
+export const emptyStateViewed = makeTrackEvent<
+  {
+    userId: string;
+    organizationName: string;
+    entityName: string;
+    projectName: string;
+    emptyStateType: string;
+  },
+  {
+    _description: `User viewed an empty state`;
+    _location: '';
+    _motivation: 'Used for tracking empty state engagement';
+    userId: {
+      description: 'ID of user viewing empty state';
+      exampleValues: ['VXNlcjo0NTM4MTM='];
+    };
+    organizationName: {
+      description: 'Name of organization';
+      exampleValues: ['my-org'];
+    };
+    entityName: {
+      description: 'Name of entity';
+      exampleValues: ['my-entity'];
+    };
+    projectName: {
+      description: 'Name of project';
+      exampleValues: ['my-project'];
+    };
+    emptyStateType: {
+      description: 'Type of empty state viewed';
+      exampleValues: ['traces', 'evaluations', 'datasets'];
+    };
+  }
+>('Weave empty state viewed');
