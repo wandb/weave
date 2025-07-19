@@ -4,6 +4,7 @@
   This file contains the CallsCharts component, which is used to display the charts for the calls page.
 */
 import {GridFilterModel, GridSortModel} from '@mui/x-data-grid-pro';
+import styled from '@emotion/styled';
 import React from 'react';
 
 import {Button} from '../../../../../components/Button';
@@ -21,6 +22,22 @@ import {ChartTypeSelectionDrawer} from './ChartTypeSelectionDrawer';
 import {chartAxisFields} from './extractData';
 import {ChartConfig} from './types';
 import {useChartsData} from './useChartsData';
+
+const ResponsiveChartsContainer = styled.div<{$containerWidth: number}>`
+  display: grid;
+  grid-template-columns: ${({$containerWidth}) => {
+    if ($containerWidth <= 600) return '1fr';
+    if ($containerWidth <= 900) return 'repeat(2, 1fr)';
+    if ($containerWidth <= 1200) return 'repeat(3, 1fr)';
+    return 'repeat(4, 1fr)';
+  }};
+  gap: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 12px;
+  flex: 1;
+  min-height: 0;
+`;
 
 type CallsChartsProps = {
   entity: string;
@@ -43,6 +60,8 @@ const CallsChartsInner = ({
   sortModel,
 }: CallsChartsProps) => {
   const [pageSize, setPageSize] = React.useState(250);
+  const [containerWidth, setContainerWidth] = React.useState(1200); // Default to 4 columns
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   const pageSizeOptions = React.useMemo(
     () => [
@@ -144,6 +163,21 @@ const CallsChartsInner = ({
     closeModal();
   };
 
+  // Track container width for responsive behavior
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
+
   const prevChartIdsRef = React.useRef(new Set(charts.map(c => c.id)));
   React.useEffect(() => {
     if (pendingChartTypeSelection && charts.length > 0) {
@@ -196,7 +230,7 @@ const CallsChartsInner = ({
       </div>
 
       {/* Scrollable charts container */}
-      <div style={callsChartsStyles.chartsContainer}>
+      <ResponsiveChartsContainer ref={containerRef} $containerWidth={containerWidth}>
         {charts.length === 0 ? (
           <div style={callsChartsStyles.emptyState}>
             No charts available. Click "Add Chart" to create one.
@@ -230,7 +264,7 @@ const CallsChartsInner = ({
             );
           })
         )}
-      </div>
+      </ResponsiveChartsContainer>
 
       <ChartTypeSelectionDrawer
         open={typeSelectionDrawerOpen}

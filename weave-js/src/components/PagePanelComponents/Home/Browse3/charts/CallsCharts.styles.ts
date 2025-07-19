@@ -37,8 +37,8 @@ export const callsChartsStyles = {
   },
 
   chartsContainer: {
-    display: 'flex' as const,
-    flexDirection: 'column' as const,
+    display: 'grid' as const,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
     gap: 12,
     overflowX: 'hidden' as const,
     overflowY: 'auto' as const,
