@@ -157,6 +157,7 @@ def tests(session, shard):
     # Add sharding logic for trace1, trace2, trace3
     pytest_args = [
         "pytest",
+        "-n 8",
         "--durations=20",
         "--strict-markers",
         "--cov=weave",
