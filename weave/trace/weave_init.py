@@ -83,8 +83,10 @@ Args:
 
 def init_weave(
     project_name: str,
+    *,
     ensure_project_exists: bool = True,
     autopatch_settings: autopatch.AutopatchSettings | None = None,
+    host: str | None = None,
 ) -> InitializedClient:
     global _current_inited_client
     if _current_inited_client is not None:
@@ -107,13 +109,17 @@ def init_weave(
     wandb_api.init()
     wandb_context = wandb_api.get_wandb_api_context()
     if wandb_context is None:
-        import wandb
-
         logger.info(
             "Please login to Weights & Biases (https://wandb.ai/) to continue..."
         )
         wandb_termlog_patch.ensure_patched()
-        wandb.login(anonymous="never", force=True)  # type: ignore
+        try:
+            import wandb
+        except (ImportError, ModuleNotFoundError):
+            from weave import wandb_thin as wandb  # type: ignore[no-redef]
+        finally:
+            wandb.login(anonymous="never", force=True, host=host)  # type: ignore
+
         wandb_api.init()
         wandb_context = wandb_api.get_wandb_api_context()
 
