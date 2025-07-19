@@ -6,13 +6,17 @@
 export const flattenObjectPreservingWeaveTypes = (obj: {
   [key: string]: any;
 }) => {
-  return flattenObject(obj, '', {}, (key, value) => {
+  const shouldFlatten = (key: string, value: any) => {
+    if (key.startsWith('summary.weave.feedback.')) {
+      return false;
+    }
     return (
       typeof value !== 'object' ||
       value == null ||
       value._type !== 'CustomWeaveType'
     );
-  });
+  };
+  return flattenObject(obj, '', {}, shouldFlatten);
 };
 
 const flattenObject = (
