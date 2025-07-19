@@ -6,9 +6,40 @@ import {TargetBlank} from '../../../../../../common/util/links';
 import {Button} from '../../../../../Button';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
+import {CreatePromptDrawer} from '../../prompts/CreatePromptDrawer';
+import {usePromptSaving} from '../../prompts/usePromptSaving';
 import {MonitorDrawerRouter} from '../MonitorsPage/MonitorFormDrawer';
 import {EmptyProps} from './Empty';
 import {Link} from './Links';
+
+const NewPromptButton: React.FC = () => {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const {entity, project} = useParams<{entity: string; project: string}>();
+  const {isCreatingPrompt, handleSavePrompt} = usePromptSaving({
+    entity,
+    project,
+    onSaveComplete: () => setIsDrawerOpen(false),
+  });
+
+  return (
+    <>
+      <Button
+        variant="primary"
+        icon="add-new"
+        onClick={() => setIsDrawerOpen(true)}
+        data-testid="create-prompt-button">
+        New prompt
+      </Button>
+      <CreatePromptDrawer
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onSavePrompt={handleSavePrompt}
+        isCreating={isCreatingPrompt}
+        data-testid="create-prompt-drawer"
+      />
+    </>
+  );
+};
 
 const NewDatasetButton: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -160,6 +191,9 @@ export const EMPTY_PROPS_PROMPTS: EmptyProps = {
         prompt basics
       </TargetBlank>
       .
+      <Box sx={{mt: 2}}>
+        <NewPromptButton />
+      </Box>
     </>
   ),
 };

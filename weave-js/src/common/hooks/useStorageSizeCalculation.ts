@@ -3,12 +3,12 @@ import {useMemo} from 'react';
 
 import {ObjectVersionSchema} from '../../components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/wfDataModelHooksInterface';
 
-interface StorageSizeResult {
+export type StorageSizeResult = {
   currentVersionSizeBytes?: number;
   allVersionsSizeBytes?: number;
   shouldShowAllVersions: boolean;
   isLoading: boolean;
-}
+};
 
 /**
  * Calculate storage size for dataset versions
