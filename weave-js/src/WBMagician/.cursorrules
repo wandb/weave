@@ -1,0 +1,54 @@
+# Magician Project Cursor Rules
+
+## Living Documentation
+
+The README.md in this directory serves as the single source of truth for the Magician project. It is a living document that must be kept up to date throughout development.
+
+### Update README.md whenever you:
+
+1. **Make Architecture Changes**
+   - Add or modify classes, interfaces, or major components
+   - Change the data flow or component hierarchy
+   - Introduce new dependencies or services
+
+2. **Make Design Decisions**
+   - Choose between implementation alternatives
+   - Add rationale for technical choices
+   - Document trade-offs and constraints
+
+3. **Update Implementation Status**
+   - Check off completed tasks in the Implementation Plan
+   - Add new tasks discovered during development
+   - Update phase timelines if needed
+
+4. **Add Code Examples**
+   - Include new usage patterns discovered during implementation
+   - Update existing examples if APIs change
+   - Add edge cases or gotchas
+
+5. **Document Issues & Solutions**
+   - Record blocking issues and their resolutions
+   - Note workarounds for technical limitations
+   - Track deferred decisions for post-hackweek
+
+### How to Update
+
+- Make inline updates to relevant sections
+- Add a "Recent Updates" section at the top if making major changes
+- Keep the document scannable - use clear headings and bullet points
+- Preserve the overall structure unless a major refactor is needed
+
+### Collaboration Notes
+
+- This README is our shared context between conversations
+- Always read the current state before making changes
+- If the conversation history is lost, the README should contain enough context to continue
+- Include TODOs inline with clear ownership (e.g., "TODO: Implement streaming - blocked on API key setup")
+
+### Code and Documentation Sync
+
+- Type definitions in README should match actual implementation
+- If you change an API, update both code and README in the same commit
+- Examples in README should be runnable (test them!)
+
+Remember: The README is not just documentation - it's our project memory and collaboration tool. 

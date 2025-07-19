@@ -15,6 +15,8 @@ import useMousetrap from 'react-hook-mousetrap';
 import {Redirect, Route, Switch, useHistory, useParams} from 'react-router-dom';
 
 import {URL_BROWSE3} from '../../../urls';
+import {MagicianContextProvider} from '../../../WBMagician/Magician';
+import {MagicianComponent} from '../../../WBMagician/MagicianComponent';
 import {Button} from '../../Button';
 import {ErrorBoundary} from '../../ErrorBoundary';
 import {ComparePage} from './Browse3/compare/ComparePage';
@@ -156,19 +158,21 @@ export const Browse3: FC<{
   return (
     <ApolloProvider client={apolloClient}>
       <Browse3WeaveflowRouteContextProvider projectRoot={props.projectRoot}>
-        <Switch>
-          <Route
-            path={[
-              ...browse3Paths(props.projectRoot(':entity', ':project')),
-              `/${URL_BROWSE3}/:entity`,
-              `/${URL_BROWSE3}`,
-            ]}>
-            <Browse3Mounted
-              headerOffset={props.headerOffset}
-              navigateAwayFromProject={props.navigateAwayFromProject}
-            />
-          </Route>
-        </Switch>
+        <MagicianContextProvider>
+          <Switch>
+            <Route
+              path={[
+                ...browse3Paths(props.projectRoot(':entity', ':project')),
+                `/${URL_BROWSE3}/:entity`,
+                `/${URL_BROWSE3}`,
+              ]}>
+              <Browse3Mounted
+                headerOffset={props.headerOffset}
+                navigateAwayFromProject={props.navigateAwayFromProject}
+              />
+            </Route>
+          </Switch>
+        </MagicianContextProvider>
       </Browse3WeaveflowRouteContextProvider>
     </ApolloProvider>
   );
@@ -180,6 +184,7 @@ const Browse3Mounted: FC<{
 }> = props => {
   const {baseRouter} = useWeaveflowRouteContext();
   const hasTSContext = useHasTraceServerClientContext();
+  const params = useParamsDecoded<Browse3Params>();
   return (
     <Box
       sx={{
@@ -203,10 +208,13 @@ const Browse3Mounted: FC<{
                 width: '100%',
                 overflow: 'hidden',
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection: 'row',
               }}>
               <ErrorBoundary>
                 <MainPeekingLayout />
+                <MagicianComponent
+                  projectId={params.entity! + '/' + params.project!}
+                />
               </ErrorBoundary>
             </Box>
           </Route>

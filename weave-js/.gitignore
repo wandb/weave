@@ -5,3 +5,6 @@ build/
 src/generated
 .eslintcache
 tsconfig.tsbuildinfo
+.env
+.env.local
+src/WBMagician/env.local.js
