@@ -288,10 +288,6 @@ const ObjectVersionPageInner: React.FC<{
               </div>
             </div>
             <div className="block">
-              <p className="text-moon-500">Version</p>
-              <p>{objectVersionIndex}</p>
-            </div>
-            <div className="block">
               <p className="text-moon-500">Last updated</p>
               <p>
                 <Timestamp value={createdAtMs / 1000} format="relative" />
