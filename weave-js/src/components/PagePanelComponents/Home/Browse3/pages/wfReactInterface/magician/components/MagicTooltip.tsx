@@ -20,8 +20,8 @@ import {
   STATE_RESET_DELAY_MS,
   TEXTAREA_FOCUS_DELAY_MS,
 } from '../constants';
-import {useMagicContext} from '../index';
 import {useMagicGeneration} from '../hooks/useMagicGeneration';
+import {useMagicContext} from '../index';
 import {
   Completion,
   CompletionResponseFormat,

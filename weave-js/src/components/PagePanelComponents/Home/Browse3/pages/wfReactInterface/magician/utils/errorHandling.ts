@@ -42,4 +42,4 @@ export const handleAsyncError = (
     }
     onError?.(error);
   }
-}; 
+};

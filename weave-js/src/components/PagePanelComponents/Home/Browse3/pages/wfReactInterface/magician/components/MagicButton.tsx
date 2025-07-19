@@ -1,16 +1,9 @@
 import {Button, ButtonProps} from '@wandb/weave/components/Button';
 import React, {useState} from 'react';
 
-import {
-  DEFAULT_TEXTAREA_LINES,
-  DEFAULT_TOOLTIP_WIDTH,
-} from '../constants';
+import {DEFAULT_TEXTAREA_LINES, DEFAULT_TOOLTIP_WIDTH} from '../constants';
 import {useMagicGeneration} from '../hooks/useMagicGeneration';
-import {
-  Completion,
-  CompletionResponseFormat,
-  EntityProject,
-} from '../types';
+import {Completion, CompletionResponseFormat, EntityProject} from '../types';
 import {MagicTooltip} from './MagicTooltip';
 
 export interface MagicButtonProps
@@ -117,7 +110,7 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   ...restProps
 }) => {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  
+
   const {isGenerating, generate, cancel} = useMagicGeneration({
     entityProject,
     systemPrompt,
@@ -173,7 +166,9 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
         variant={getButtonVariant()}
         icon={getIcon()}
         className={`transition-all ${className}`}
-        aria-label={isGenerating ? 'Cancel generation' : 'Generate content with AI'}
+        aria-label={
+          isGenerating ? 'Cancel generation' : 'Generate content with AI'
+        }
         aria-expanded={Boolean(anchorEl)}
         aria-haspopup="dialog"
         {...restProps}>

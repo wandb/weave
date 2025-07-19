@@ -1,5 +1,4 @@
-import {renderHook, act} from '@testing-library/react';
-import React from 'react';
+import {act, renderHook} from '@testing-library/react';
 
 import {useMagicGeneration} from '../hooks/useMagicGeneration';
 
@@ -58,7 +57,12 @@ describe('useMagicGeneration', () => {
     });
 
     expect(mockOnStream).toHaveBeenCalledWith('', '', null, false); // Loading state
-    expect(mockOnStream).toHaveBeenCalledWith('', mockResponse, mockResponse, true); // Completion
+    expect(mockOnStream).toHaveBeenCalledWith(
+      '',
+      mockResponse,
+      mockResponse,
+      true
+    ); // Completion
     expect(result.current.isGenerating).toBe(false);
   });
 
@@ -114,4 +118,4 @@ describe('useMagicGeneration', () => {
     expect(mockChatCompletionStream).not.toHaveBeenCalled();
     expect(mockOnStream).not.toHaveBeenCalled();
   });
-}); 
+});

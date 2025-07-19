@@ -24,4 +24,4 @@ export const STATE_RESET_DELAY_MS = 500;
 export const DEFAULT_REVISION_PLACEHOLDER = 'What would you like to change?';
 
 /** Default temperature for LLM completions */
-export const DEFAULT_TEMPERATURE = 0.7; 
+export const DEFAULT_TEMPERATURE = 0.7;

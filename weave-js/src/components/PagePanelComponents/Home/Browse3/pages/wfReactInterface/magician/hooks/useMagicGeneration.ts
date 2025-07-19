@@ -150,4 +150,4 @@ export const useMagicGeneration = ({
     generate,
     cancel,
   };
-}; 
+};

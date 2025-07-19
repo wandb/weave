@@ -4,4 +4,8 @@ export {TYPING_CHAR} from './components/utils';
 export {MagicProvider, useMagicContext} from './context';
 export {useMagicGeneration} from './hooks/useMagicGeneration';
 export {prepareSingleShotMessages, useChatCompletionStream} from './query';
-export {handleAsyncError, isAbortError, shouldHandleError} from './utils/errorHandling';
+export {
+  handleAsyncError,
+  isAbortError,
+  shouldHandleError,
+} from './utils/errorHandling';
