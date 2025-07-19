@@ -7,6 +7,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.environment import wf_kafka_broker_host, wf_kafka_broker_port
 
 CALL_ENDED_TOPIC = "weave.call_ended"
+CALL_ENDED_TOPIC_2 = "weave.call_ended_2"
 
 
 class KafkaProducer(ConfluentKafkaProducer):
@@ -24,6 +25,10 @@ class KafkaProducer(ConfluentKafkaProducer):
     ) -> None:
         self.produce(
             topic=CALL_ENDED_TOPIC,
+            value=call_end.model_dump_json(),
+        )
+        self.produce(
+            topic=CALL_ENDED_TOPIC_2,
             value=call_end.model_dump_json(),
         )
         if flush_immediately:

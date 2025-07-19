@@ -1,0 +1,1 @@
+DROP TABLE calls_complete;
