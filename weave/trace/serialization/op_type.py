@@ -23,10 +23,10 @@ from weave.trace.ipython import (
 )
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
-from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization import serializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace_server.trace_server_interface_util import str_digest
+from weave.utils.redact import REDACTED_VALUE, should_redact
 
 logger = logging.getLogger(__name__)
 

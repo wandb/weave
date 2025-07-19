@@ -75,7 +75,6 @@ from weave.trace.refs import (
     parse_op_uri,
     parse_uri,
 )
-from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
@@ -140,6 +139,11 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
+<<<<<<< Updated upstream
+=======
+from weave.utils.paginated_iterator import PaginatedIterator
+from weave.utils.redact import redact_sensitive_keys_recursively
+>>>>>>> Stashed changes
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -2565,26 +2569,7 @@ def redact_sensitive_keys(obj: Any) -> Any:
     if get_ref(obj):
         return obj
 
-    if isinstance(obj, dict):
-        dict_res = {}
-        for k, v in obj.items():
-            if isinstance(k, str) and should_redact(k):
-                dict_res[k] = REDACTED_VALUE
-            else:
-                dict_res[k] = redact_sensitive_keys(v)
-        return dict_res
-
-    elif isinstance(obj, list):
-        list_res = []
-        for v in obj:
-            list_res.append(redact_sensitive_keys(v))
-        return list_res
-
-    elif isinstance(obj, tuple):
-        tuple_res = []
-        for v in obj:
-            tuple_res.append(redact_sensitive_keys(v))
-        return tuple(tuple_res)
+    redact_sensitive_keys_recursively(obj)
 
     return obj
 
