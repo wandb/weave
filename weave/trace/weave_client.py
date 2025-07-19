@@ -2565,9 +2565,7 @@ def redact_sensitive_keys(obj: Any) -> Any:
     if get_ref(obj):
         return obj
 
-    redact_sensitive_keys_recursively(obj)
-
-    return obj
+    return redact_sensitive_keys_recursively(obj)
 
 
 def sanitize_object_name(name: str) -> str:
