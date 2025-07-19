@@ -44,6 +44,7 @@ const sidebars: SidebarsConfig = {
               id: "guides/tracking/tracing",
             },
             "guides/tracking/costs",
+            "guides/tracking/threads",
             {
               type: "doc",
               label: "Logging Media",
