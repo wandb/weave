@@ -4,6 +4,7 @@ import {zodToJsonSchema} from 'zod-to-json-schema';
 
 import {TraceServerClient} from '../traceServerClient';
 import {useGetTraceServerClientContext} from '../traceServerClientContext';
+import {DEFAULT_TEMPERATURE} from './constants';
 import {useMagicContext} from './context';
 import {
   ChatCompletionParams,
@@ -161,7 +162,7 @@ const chatCompleteStream = async (
     inputs: {
       model: params.weavePlaygroundModelId,
       messages: prepareMessages(params.messages),
-      temperature: params.temperature || 0.7,
+      temperature: params.temperature || DEFAULT_TEMPERATURE,
       response_format: prepareResponseFormat(params.responseFormat),
       tools: params.tools,
     },

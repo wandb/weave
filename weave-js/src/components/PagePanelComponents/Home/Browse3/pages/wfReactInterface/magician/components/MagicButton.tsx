@@ -1,10 +1,12 @@
 import {Button, ButtonProps} from '@wandb/weave/components/Button';
-import React, {useRef, useState} from 'react';
+import React, {useState} from 'react';
 
-import {useChatCompletionStream} from '../index';
-import {prepareSingleShotMessages} from '../query';
 import {
-  Chunk,
+  DEFAULT_TEXTAREA_LINES,
+  DEFAULT_TOOLTIP_WIDTH,
+} from '../constants';
+import {useMagicGeneration} from '../hooks/useMagicGeneration';
+import {
   Completion,
   CompletionResponseFormat,
   EntityProject,
@@ -103,8 +105,8 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   additionalContext,
   responseFormat,
   showModelSelector = true,
-  width = 350,
-  textareaLines = 7,
+  width = DEFAULT_TOOLTIP_WIDTH,
+  textareaLines = DEFAULT_TEXTAREA_LINES,
   iconOnly = false,
   children,
   text,
@@ -114,20 +116,23 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   className = '',
   ...restProps
 }) => {
-  const [isGenerating, setIsGenerating] = useState(false);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const chatCompletionStream = useChatCompletionStream(entityProject);
+  
+  const {isGenerating, generate, cancel} = useMagicGeneration({
+    entityProject,
+    systemPrompt,
+    contentToRevise,
+    additionalContext,
+    responseFormat,
+    onStream,
+    onError,
+    onCancel,
+  });
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     if (isGenerating) {
       // Cancel generation
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      setIsGenerating(false);
-      onCancel?.();
+      cancel();
     } else {
       // Open tooltip
       setAnchorEl(event.currentTarget);
@@ -141,56 +146,9 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
   };
 
   const handleGenerate = async (userInstructions: string) => {
-    if (!userInstructions.trim() || isGenerating) return;
-
-    setIsGenerating(true);
-    abortControllerRef.current = new AbortController();
-
-    // Immediately trigger loading state
-    onStream('', '', null, false);
-
     // Close the tooltip immediately
     setAnchorEl(null);
-
-    try {
-      let accumulatedContent = '';
-
-      const onChunk = (chunk: Chunk) => {
-        if (abortControllerRef.current?.signal.aborted) return;
-
-        accumulatedContent += chunk.content;
-        onStream(chunk.content, accumulatedContent, null, false);
-      };
-
-      const res = await chatCompletionStream(
-        {
-          messages: prepareSingleShotMessages({
-            staticSystemPrompt: systemPrompt,
-            generationSpecificContext: {
-              contentToRevise: contentToRevise,
-              ...additionalContext,
-            },
-            additionalUserPrompt: userInstructions,
-          }),
-          responseFormat: responseFormat,
-        },
-        onChunk,
-        abortControllerRef.current?.signal
-      );
-
-      // Signal completion
-      if (!abortControllerRef.current?.signal.aborted) {
-        onStream('', accumulatedContent, res, true);
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name !== 'AbortError') {
-        console.error('Generation error:', err);
-        onError?.(err);
-      }
-    } finally {
-      setIsGenerating(false);
-      abortControllerRef.current = null;
-    }
+    await generate(userInstructions);
   };
 
   // Determine icon based on state
@@ -215,6 +173,9 @@ export const MagicButton: React.FC<MagicButtonProps> = ({
         variant={getButtonVariant()}
         icon={getIcon()}
         className={`transition-all ${className}`}
+        aria-label={isGenerating ? 'Cancel generation' : 'Generate content with AI'}
+        aria-expanded={Boolean(anchorEl)}
+        aria-haspopup="dialog"
         {...restProps}>
         {text || children}
       </Button>

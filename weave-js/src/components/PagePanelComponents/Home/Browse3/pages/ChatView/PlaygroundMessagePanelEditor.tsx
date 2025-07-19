@@ -98,6 +98,15 @@ export const PlaygroundMessagePanelEditor: React.FC<
     setIsEditable(true);
   };
 
+  const handleMagicError = (error: Error) => {
+    // Handle generation errors gracefully
+    console.error('Magic generation failed:', error);
+    // Revert to original content on error
+    setEditedContent(initialContent);
+    setIsEditable(true);
+    // You could also show a toast notification here
+  };
+
   const contentToRevise =
     editedContent !== DEFAULT_SYSTEM_MESSAGE_CONTENT
       ? editedContent
@@ -125,6 +134,7 @@ export const PlaygroundMessagePanelEditor: React.FC<
             <PlaygroundSystemPromptMagicButton
               onStream={handleMagicStream}
               onCancel={handleMagicCancel}
+              onError={handleMagicError}
               contentToRevise={contentToRevise}
             />
           </div>

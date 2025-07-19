@@ -9,9 +9,11 @@ Magician allows React developers to focus on lightweight prompting by handling a
 ### **Automatic Infrastructure**
 - **Authentication** - Handles W&B API authentication seamlessly
 - **Model Selection** - Global model management with dropdown UI. Supports CoreWeave inference service as well as any configured vendor!
-- **Streaming & Error Handling** - Real-time responses with built-in error recovery
+- **Streaming & Error Handling** - Real-time responses with built-in error recovery and graceful fallbacks
 - **Structured Response Handling** - Automatic parsing and validation with Zod schemas
 - **LLM API Semantics** - Manages message construction, temperature, and provider-specific details
+- **Performance Optimization** - Memoized hooks and efficient state management
+- **Testing Infrastructure** - Comprehensive test suite with proper mocking
 
 ### **Simple Developer Experience**
 - **Common UX Components** - Pre-built buttons, tooltips, and interfaces
@@ -25,6 +27,8 @@ Building AI features shouldn't be hard. Magician gives you:
 - **Consistent UI** - Pre-built components that look great together
 - **Real-time feel** - Streaming responses that feel instant
 - **Context management** - Global state for models and projects
+- **Error resilience** - Built-in error handling with graceful fallbacks
+- **Performance optimized** - Efficient state management and minimal re-renders
 
 ## ⚡ **Quick Integration Guide**
 
@@ -65,6 +69,50 @@ function MyComponent() {
 ```
 
 **That's it!** ✨ Your component now has AI-powered generation capabilities.
+
+## 🔧 **Advanced Usage**
+
+### Using the `useMagicGeneration` Hook Directly
+
+For more control over the generation process, you can use the `useMagicGeneration` hook directly:
+
+```tsx
+function CustomMagicComponent() {
+  const [content, setContent] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const { generate, cancel, isGenerating: hookIsGenerating } = useMagicGeneration({
+    systemPrompt: "You are a helpful assistant...",
+    onStream: (chunk, accumulation) => {
+      setContent(accumulation);
+      setIsGenerating(true);
+    },
+    onError: (error) => {
+      console.error('Generation failed:', error);
+      setIsGenerating(false);
+    },
+    onCancel: () => {
+      setIsGenerating(false);
+    }
+  });
+
+  const handleGenerate = async () => {
+    await generate("Write a poem about coding");
+  };
+
+  return (
+    <div>
+      <textarea value={content} readOnly />
+      <button onClick={handleGenerate} disabled={hookIsGenerating}>
+        {hookIsGenerating ? 'Generating...' : 'Generate'}
+      </button>
+      {hookIsGenerating && (
+        <button onClick={cancel}>Cancel</button>
+      )}
+    </div>
+  );
+}
+```
 
 ## 🎯 **Common Use Cases**
 
@@ -115,6 +163,18 @@ const UserProfileSchema = z.object({
 
 ### Core Hooks
 
+#### `useMagicGeneration`
+Custom hook for managing AI content generation with streaming support.
+
+```tsx
+const { isGenerating, generate, cancel } = useMagicGeneration({
+  systemPrompt: "You are a helpful assistant...",
+  onStream: (chunk, accumulation) => setContent(accumulation),
+  onError: (error) => console.error('Generation failed:', error),
+  onCancel: () => setContent(originalContent)
+});
+```
+
 #### `useChatCompletionStream`
 Streaming chat completions with automatic context management.
 
@@ -152,6 +212,25 @@ const messages = prepareSingleShotMessages({
 
 // Use with chat completion
 await complete({messages}, onChunk);
+```
+
+#### Error Handling Utilities
+Consistent error handling utilities for the magician library.
+
+```tsx
+import { handleAsyncError, isAbortError } from './utils/errorHandling';
+
+// Handle errors consistently
+try {
+  await generateContent();
+} catch (error) {
+  handleAsyncError(error, onError, 'Content generation');
+}
+
+// Check if error is cancellation
+if (isAbortError(error)) {
+  console.log('Operation was cancelled');
+}
 ```
 
 ### Structured Output
@@ -213,40 +292,36 @@ const generateUser = async () => {
 - ✅ **Auto-Parsing** - No manual JSON.parse() needed
 - ✅ **Error Handling** - Invalid responses are caught automatically
 
-### Cancellation
+### Cancellation & Error Handling
 
-Both `MagicButton` and `useChatCompletionStream` support cancellation to stop ongoing generation.
+Both `MagicButton` and `useMagicGeneration` support cancellation and comprehensive error handling.
 
 ```tsx
-// With MagicButton - handle cancellation to revert changes
+// With MagicButton - handle cancellation and errors
 <MagicButton
   onStream={(chunk, accumulation, parsedCompletion, isComplete) => setContent(accumulation)}
   onCancel={() => setContent(originalContent)} // Revert on cancel
+  onError={(error) => {
+    console.error('Generation failed:', error);
+    setContent(originalContent); // Revert on error
+  }}
   systemPrompt="Generate content..."
   text="Generate"
 />
 
-// With useChatCompletionStream - use AbortController
-const complete = useChatCompletionStream();
-const abortController = new AbortController();
-
-const generate = async () => {
-  try {
-    await complete(
-      { messages: "Generate content..." },
-      (chunk) => setContent(chunk.content),
-      undefined,
-      abortController.signal
-    );
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      console.log('Generation cancelled');
-    }
+// With useMagicGeneration - built-in error handling
+const { isGenerating, generate, cancel } = useMagicGeneration({
+  systemPrompt: "Generate content...",
+  onStream: (chunk, accumulation) => setContent(accumulation),
+  onCancel: () => setContent(originalContent),
+  onError: (error) => {
+    console.error('Generation failed:', error);
+    setContent(originalContent);
   }
-};
+});
 
 // Cancel generation
-const cancel = () => abortController.abort();
+const handleCancel = () => cancel();
 ```
 
 ### UI Components
@@ -296,12 +371,13 @@ Provides context for entity/project and model selection.
 
 ## 🎮 **Real Example**
 
-Here's how it's used in the W&B playground:
+Here's how it's used in the W&B playground with comprehensive error handling:
 
 ```tsx
 function PlaygroundMessagePanelEditor() {
   const [editedContent, setEditedContent] = useState('');
   const [isEditable, setIsEditable] = useState(true);
+  const initialContent = 'Original content';
 
   const handleMagicStream = (chunk: string, accumulation: string, parsedCompletion: any, isComplete: boolean) => {
     if (!isComplete) {
@@ -313,6 +389,20 @@ function PlaygroundMessagePanelEditor() {
     }
   };
 
+  const handleMagicCancel = () => {
+    // Revert to original content when cancelled
+    setEditedContent(initialContent);
+    setIsEditable(true);
+  };
+
+  const handleMagicError = (error: Error) => {
+    // Handle generation errors gracefully
+    console.error('Magic generation failed:', error);
+    setEditedContent(initialContent);
+    setIsEditable(true);
+    // You could also show a toast notification here
+  };
+
   return (
     <div>
       <textarea 
@@ -322,6 +412,8 @@ function PlaygroundMessagePanelEditor() {
       
       <MagicButton
         onStream={handleMagicStream}
+        onCancel={handleMagicCancel}
+        onError={handleMagicError}
         systemPrompt="You are an expert LLM developer..."
         placeholder="What would you like the model to do?"
         contentToRevise={editedContent}
@@ -338,3 +430,7 @@ function PlaygroundMessagePanelEditor() {
 - **Developer Simplicity** - APIs should be intuitive with minimal boilerplate
 - **Real-time Feel** - Emphasize streaming and immediate feedback  
 - **Minimal UI** - Dead-simple design, no unnecessary styling
+- **Error Resilience** - Graceful error handling with automatic recovery
+- **Type Safety** - Full TypeScript support with comprehensive type definitions
+- **Performance** - Optimized for minimal re-renders and efficient state management
+- **Testability** - Comprehensive test coverage with proper mocking

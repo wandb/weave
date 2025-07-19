@@ -12,10 +12,17 @@ import React, {
 import styled from 'styled-components';
 
 import {LLMDropdownLoaded} from '../../../PlaygroundPage/PlaygroundChat/LLMDropdown';
-import {useChatCompletionStream, useMagicContext} from '../index';
-import {prepareSingleShotMessages} from '../query';
 import {
-  Chunk,
+  DEFAULT_REVISION_PLACEHOLDER,
+  DEFAULT_TEXTAREA_LINES,
+  DEFAULT_TOOLTIP_WIDTH,
+  LINE_HEIGHT_PX,
+  STATE_RESET_DELAY_MS,
+  TEXTAREA_FOCUS_DELAY_MS,
+} from '../constants';
+import {useMagicContext} from '../index';
+import {useMagicGeneration} from '../hooks/useMagicGeneration';
+import {
   Completion,
   CompletionResponseFormat,
   EntityProject,
@@ -110,14 +117,19 @@ export interface MagicTooltipProps {
   onGenerate?: (userInstructions: string) => Promise<void>;
 }
 
-const DEFAULT_REVISION_PLACEHOLDER = 'What would you like to change?';
+
 
 /**
  * MagicTooltip provides a minimal tooltip interface for AI content generation.
- * It manages all UI state internally and passes appropriate props to the trigger element.
+ * 
+ * This component supports two modes:
+ * - **Uncontrolled mode**: Pass children as trigger, manages its own state
+ * - **Controlled mode**: Pass open/anchorEl/onClose/onGenerate props for external control
+ * 
+ * Used internally by MagicButton for controlled mode, or standalone for custom triggers.
  *
  * @param props Tooltip configuration
- * @returns A tooltip component with trigger
+ * @returns A tooltip component with trigger (in uncontrolled mode)
  */
 export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   entityProject,
@@ -132,15 +144,14 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   additionalContext,
   responseFormat,
   showModelSelector = true,
-  width = 350,
-  textareaLines = 7,
+  width = DEFAULT_TOOLTIP_WIDTH,
+  textareaLines = DEFAULT_TEXTAREA_LINES,
   // Controlled props
   open: controlledOpen,
   anchorEl: controlledAnchorEl,
   onClose: controlledOnClose,
   onGenerate: controlledOnGenerate,
 }) => {
-  const chatCompletionStream = useChatCompletionStream(entityProject);
   const {selectedModel, setSelectedModel} = useMagicContext();
 
   // Determine if we're in controlled mode
@@ -151,9 +162,19 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     null
   );
   const [userInstructions, setUserInstructions] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Use the shared generation hook
+  const {isGenerating, generate, cancel} = useMagicGeneration({
+    entityProject,
+    systemPrompt,
+    contentToRevise,
+    additionalContext,
+    responseFormat,
+    onStream,
+    onError,
+    onCancel,
+  });
 
   const anchorEl = isControlled ? controlledAnchorEl : internalAnchorEl;
   const isOpen = isControlled ? controlledOpen : Boolean(anchorEl);
@@ -161,15 +182,14 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   // Focus textarea when opened
   useEffect(() => {
     if (anchorEl && textareaRef.current) {
-      setTimeout(() => textareaRef.current?.focus(), 100);
+      setTimeout(() => textareaRef.current?.focus(), TEXTAREA_FOCUS_DELAY_MS);
     }
   }, [anchorEl]);
 
   /**
    * Resets state when the tooltip is closed, with a 500ms delay.
    *
-   * This effect waits 500ms after the tooltip is closed before resetting user instructions
-   * and aborting any ongoing request (if not generating).
+   * This effect waits 500ms after the tooltip is closed before resetting user instructions.
    *
    * Examples:
    *   // Closes the tooltip and resets state after 500ms
@@ -179,15 +199,11 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
     if (!anchorEl) {
       const timeout = setTimeout(() => {
         setUserInstructions('');
-        if (abortControllerRef.current && !isGenerating) {
-          abortControllerRef.current.abort();
-          abortControllerRef.current = null;
-        }
-      }, 500);
+      }, STATE_RESET_DELAY_MS);
       return () => clearTimeout(timeout);
     }
     return () => {};
-  }, [anchorEl, isGenerating]);
+  }, [anchorEl]);
 
   const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
     if (isControlled) {
@@ -208,17 +224,12 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
   };
 
   const handleCancel = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsGenerating(false);
+    cancel();
     if (isControlled) {
       controlledOnClose?.();
     } else {
       setInternalAnchorEl(null);
     }
-    onCancel?.();
   };
 
   const handleGenerate = async () => {
@@ -230,12 +241,6 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
       return;
     }
 
-    setIsGenerating(true);
-    abortControllerRef.current = new AbortController();
-
-    // Immediately trigger loading state
-    onStream('', '', null, false);
-
     // Close the tooltip immediately
     if (isControlled) {
       controlledOnClose?.();
@@ -243,49 +248,11 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
       setInternalAnchorEl(null);
     }
 
-    try {
-      let accumulatedContent = '';
-
-      const onChunk = (chunk: Chunk) => {
-        if (abortControllerRef.current?.signal.aborted) return;
-
-        accumulatedContent += chunk.content;
-        onStream(chunk.content, accumulatedContent, null, false);
-      };
-
-      const res = await chatCompletionStream(
-        {
-          messages: prepareSingleShotMessages({
-            staticSystemPrompt: systemPrompt,
-            generationSpecificContext: {
-              contentToRevise: contentToRevise,
-              ...additionalContext,
-            },
-            additionalUserPrompt: userInstructions,
-          }),
-          responseFormat: responseFormat,
-        },
-        onChunk,
-        abortControllerRef.current?.signal
-      );
-
-      // Signal completion
-      if (!abortControllerRef.current?.signal.aborted) {
-        onStream('', accumulatedContent, res, true);
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name !== 'AbortError') {
-        console.error('Generation error:', err);
-        onError?.(err);
-      }
-    } finally {
-      setIsGenerating(false);
-      abortControllerRef.current = null;
-    }
+    await generate(userInstructions);
   };
 
   // Calculate textarea height based on lines
-  const textareaHeight = textareaLines * 24; // Approximate line height
+  const textareaHeight = textareaLines * LINE_HEIGHT_PX;
 
   // Determine button state
   const getButtonState = () => {
@@ -344,6 +311,8 @@ export const MagicTooltip: React.FC<MagicTooltipProps> = ({
               placeholder={contentToRevise ? revisionPlaceholder : placeholder}
               disabled={isGenerating}
               autoFocus
+              aria-label="AI generation instructions"
+              aria-describedby={contentToRevise ? "revision-instructions" : "generation-instructions"}
               className="dark:border-gray-700 w-full resize-none rounded bg-transparent p-2 text-sm focus:outline-none disabled:opacity-50 dark:text-white"
               style={{height: `${textareaHeight}px`}}
             />

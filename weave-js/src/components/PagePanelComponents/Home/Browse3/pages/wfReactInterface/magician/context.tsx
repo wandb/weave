@@ -1,10 +1,8 @@
 import React, {createContext, useContext, useMemo, useState} from 'react';
 
 import {useGetTraceServerClientContext} from '../traceServerClientContext';
+import {DEFAULT_MODEL} from './constants';
 import {EntityProject, MagicContextValue} from './types';
-
-/** Default model to use when no model is selected */
-const DEFAULT_MODEL = 'coreweave/moonshotai/Kimi-K2-Instruct';
 
 /** React context for magic-related state (entity, project, selected model) */
 const MagicContext = createContext<MagicContextValue | undefined>(undefined);
