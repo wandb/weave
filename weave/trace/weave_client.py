@@ -139,14 +139,9 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
-<<<<<<< Updated upstream
-=======
-from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.redact import redact_sensitive_keys_recursively
->>>>>>> Stashed changes
 
 if TYPE_CHECKING:
-    import pandas as pd
     import wandb
 
     from weave.flow.scorer import ApplyScorerResult, Scorer
