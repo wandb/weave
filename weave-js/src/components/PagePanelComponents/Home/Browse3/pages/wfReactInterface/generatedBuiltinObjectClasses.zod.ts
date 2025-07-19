@@ -6,6 +6,19 @@ export type ActionType = z.infer<typeof ActionTypeSchema>;
 export const ModelSchema = z.enum(['gpt-4o', 'gpt-4o-mini']);
 export type Model = z.infer<typeof ModelSchema>;
 
+export const AggregationSchema = z.enum([
+  'average',
+  'max',
+  'min',
+  'p95',
+  'p99',
+  'sum',
+]);
+export type Aggregation = z.infer<typeof AggregationSchema>;
+
+export const PlottypeSchema = z.enum(['bar', 'line', 'scatter']);
+export type Plottype = z.infer<typeof PlottypeSchema>;
+
 export const ResponseFormatSchema = z.enum([
   'json_object',
   'json_schema',
@@ -36,6 +49,18 @@ export const AnnotationSpecSchema = z.object({
   unique_among_creators: z.boolean().optional(),
 });
 export type AnnotationSpec = z.infer<typeof AnnotationSpecSchema>;
+
+export const ChartConfigSchema = z.object({
+  aggregation: z.union([AggregationSchema, z.null()]).optional(),
+  binCount: z.union([z.number(), z.null()]).optional(),
+  customName: z.union([z.null(), z.string()]).optional(),
+  groupKeys: z.union([z.array(z.string()), z.null()]).optional(),
+  id: z.string(),
+  plotType: z.union([PlottypeSchema, z.null()]).optional(),
+  xAxis: z.string(),
+  yAxis: z.string(),
+});
+export type ChartConfig = z.infer<typeof ChartConfigSchema>;
 
 export const LeaderboardColumnSchema = z.object({
   evaluation_object_ref: z.string(),
@@ -97,8 +122,10 @@ export const CallsFilterSchema = z.object({
   op_names: z.union([z.array(z.string()), z.null()]).optional(),
   output_refs: z.union([z.array(z.string()), z.null()]).optional(),
   parent_ids: z.union([z.array(z.string()), z.null()]).optional(),
+  thread_ids: z.union([z.array(z.string()), z.null()]).optional(),
   trace_ids: z.union([z.array(z.string()), z.null()]).optional(),
   trace_roots_only: z.union([z.boolean(), z.null()]).optional(),
+  turn_ids: z.union([z.array(z.string()), z.null()]).optional(),
   wb_run_ids: z.union([z.array(z.string()), z.null()]).optional(),
   wb_user_ids: z.union([z.array(z.string()), z.null()]).optional(),
 });
@@ -221,6 +248,7 @@ export const QuerySchema = z.object({
 export type Query = z.infer<typeof QuerySchema>;
 
 export const SavedViewDefinitionSchema = z.object({
+  charts: z.union([z.array(ChartConfigSchema), z.null()]).optional(),
   cols: z.union([z.record(z.string(), z.boolean()), z.null()]).optional(),
   columns: z.union([z.array(ColumnSchema), z.null()]).optional(),
   filter: z.union([CallsFilterSchema, z.null()]).optional(),
@@ -243,6 +271,7 @@ export type SavedView = z.infer<typeof SavedViewSchema>;
 export const builtinObjectClassRegistry = {
   ActionSpec: ActionSpecSchema,
   AnnotationSpec: AnnotationSpecSchema,
+  ChartConfig: ChartConfigSchema,
   Leaderboard: LeaderboardSchema,
   LLMStructuredCompletionModel: LlmStructuredCompletionModelSchema,
   Provider: ProviderSchema,
