@@ -9,8 +9,8 @@ import TabItem from '@theme/TabItem';
   <TabItem value="python" label="Python" default>
     You can add a custom cost by using the [`add_cost`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-add_cost) method.
     The three required fields are `llm_id`, `prompt_token_cost`, and `completion_token_cost`.
-    `llm_id` is the name of the LLM (e.g. `gpt-4o`). `prompt_token_cost` and `completion_token_cost` are cost per token for the LLM (if the LLM prices were specified inper million tokens, make sure to convert the value).
-    You can also set `effective_date` to a datetime, to make the cost effective at a specific date, this defaults to the current date.
+    `llm_id` is the name of the LLM (e.g. `gpt-4o`). `prompt_token_cost` and `completion_token_cost` are cost per token for the LLM (if the LLM prices were specified in per million tokens, make sure to convert the value).
+    You can also set `effective_date` to a datetime to make the cost effective at a specific date. Defaults to current date if you don't provide a value.
 
     ```python
     import weave
@@ -28,7 +28,7 @@ import TabItem from '@theme/TabItem';
         llm_id="your_model_name",
         prompt_token_cost=10,
         completion_token_cost=20,
-        # If for example I want to raise the price of the model after a certain date
+        # If for example you want to raise the price of the model after a certain date
         effective_date=datetime(2025, 4, 22),
     )
     ```
@@ -48,7 +48,7 @@ import TabItem from '@theme/TabItem';
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
     You can query for costs by using the [`query_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-query_costs) method.
-    There are a few ways to query for costs, you can pass in a singular cost id, or a list of LLM model names.
+    There are a few ways to query for costs, you can pass in a singular cost ID or a list of LLM model names.
 
     ```python
     import weave
@@ -74,7 +74,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
-    You can purge a custom cost by using the [`purge_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-purge_costs) method. You pass in a list of cost ids, and the costs with those ids are purged.
+    You can purge a custom cost by using the [`purge_costs`](/reference/python-sdk/weave/trace/weave.trace.weave_client#method-purge_costs) method. You pass in a list of cost IDs, and the costs with those IDs are purged.
 
     ```python
     import weave
@@ -97,7 +97,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
-    You can calculate costs for a project by using our `calls_query` and adding `include_costs=True` with a little bit of setup.
+    You can calculate costs for a project by using our `calls_query` and adding `include_costs=True` with some setup.
 
     ```python
     import weave
@@ -144,4 +144,4 @@ import TabItem from '@theme/TabItem';
 
 ## Setting up a custom model with custom costs
 
-Try our cookbook for a [Setting up costs with a custom model](/reference/gen_notebooks/custom_model_cost) or <a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/custom_model_cost.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
+Try our cookbook for [Setting up costs with a custom model](/reference/gen_notebooks/custom_model_cost) or <a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/custom_model_cost.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
