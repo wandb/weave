@@ -115,17 +115,13 @@ export const EMPTY_PROPS_EVALUATIONS: EmptyProps = {
 
 export const EMPTY_PROPS_LEADERBOARD: EmptyProps = {
   icon: 'benchmark-square' as const,
-  heading: 'No leaderboard submissions found.',
-  description: 'Create leaderboard submissions by running evaluations.',
+  heading: 'No leaderboard evaluations',
+  description: 'Create leaderboard evaluations to submit to leaderboards.',
   moreInformation: (
     <>
-      Learn{' '}
-      <TargetBlank href="https://wandb.me/weave_evals">
-        evaluation basics
-      </TargetBlank>{' '}
-      or follow our tutorial to{' '}
-      <TargetBlank href="http://wandb.me/weave_eval_tut">
-        set up an evaluation pipeline
+      Get started creating your leaderboard with our{' '}
+      <TargetBlank href="https://weave-docs.wandb.ai/reference/gen_notebooks/leaderboard_quickstart">
+        leaderboard quickstart guide
       </TargetBlank>
       .
     </>
