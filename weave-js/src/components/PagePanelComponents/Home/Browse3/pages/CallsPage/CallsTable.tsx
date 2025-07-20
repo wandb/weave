@@ -160,15 +160,14 @@ const CustomLoadingOverlay: React.FC<{hideControls?: boolean}> = ({
   return (
     <div
       style={{
-        position: 'fixed',
+        width: '100%',
+        height: '100%',
         display: 'flex',
+        alignItems: 'flex-end',
         justifyContent: 'center',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: 'rgba(255, 255, 255, 0.5)',
-        zIndex: 1,
+        paddingBottom: '100px',
+        pointerEvents: 'none',
+        position: 'relative',
       }}>
       <WaveLoader size="huge" />
     </div>
@@ -357,20 +356,36 @@ export const CallsTable: FC<{
       // has no effective impact (frozen vs. not frozen) we need to
       // manually refetch
       calls.refetch();
-    } else if (!calls.loading) {
+    } else if (calls.result.length > callsResult.length) {
+      // Streaming: only update when we have more results
       setCallsResult(calls.result);
+    } else if (!calls.loading) {
+      // Update total when loading is complete
       setCallsTotal(calls.total);
       callsEffectiveFilter.current = effectiveFilter;
       prevViewIdRef.current = currentViewIdResolved;
     }
-  }, [calls, effectiveFilter, currentViewIdResolved, hasStructuralChange]);
+  }, [
+    calls,
+    effectiveFilter,
+    currentViewIdResolved,
+    hasStructuralChange,
+    callsResult.length,
+  ]);
 
   // Construct Flattened Table Data
-  const tableData: FlattenedCallData[] = useMemo(
-    () =>
-      prepareFlattenedCallDataForTable(hasStructuralChange ? [] : callsResult),
-    [callsResult, hasStructuralChange]
-  );
+  const tableData: FlattenedCallData[] = useMemo(() => {
+    const flattened = prepareFlattenedCallDataForTable(
+      hasStructuralChange ? [] : callsResult
+    );
+    return flattened;
+  }, [callsResult, hasStructuralChange]);
+
+  const doCallsRefetch = useCallback(() => {
+    calls.refetch();
+    setCallsResult([]);
+    setCallsTotal(0);
+  }, [calls]);
 
   // This is a specific helper that is used when the user attempts to option-click
   // a cell that is a child cell of an expanded ref. In this case, we want to
@@ -1047,7 +1062,7 @@ export const CallsTable: FC<{
           {selectedCalls.length === 0 ? (
             <>
               <RefreshButton
-                onClick={() => calls.refetch()}
+                onClick={() => doCallsRefetch?.()}
                 disabled={callsLoading}
               />
               {columnVisibilityModel &&
