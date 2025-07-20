@@ -121,7 +121,7 @@ export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
     () => extractFeedbackValues(foundFeedback, props.viewer, feedbackSpecRef),
     [foundFeedback, props.viewer, feedbackSpecRef]
   );
-  const {rawValues, mostRecentVal, viewerFeedbackVal} = extractedValues;
+  const {viewerFeedbackVal} = extractedValues;
 
   const type = useMemo(
     () => inferTypeFromJsonSchema(props.hfSpec.field_schema ?? {}),
@@ -134,14 +134,13 @@ export const HumanAnnotationCell: React.FC<HumanAnnotationProps> = props => {
   if (props.readOnly) {
     return (
       <div className="flex w-full justify-center">
-        <CellValueString value={rawValues?.join(', ')} />
+        <CellValueString
+          value={viewerFeedbackVal != null ? String(viewerFeedbackVal) : ''}
+        />
       </div>
     );
   }
-  let foundValue = mostRecentVal;
-  if (props.hfSpec.unique_among_creators) {
-    foundValue = viewerFeedbackVal;
-  }
+  const foundValue = viewerFeedbackVal;
   return (
     <div className="w-full py-4">
       <FeedbackComponentSelector
