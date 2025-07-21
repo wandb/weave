@@ -312,9 +312,9 @@ class GitHubDigest:
         def format_number(n: int) -> str:
             """Format a number compactly using K/M suffixes."""
             if n >= 1_000_000:
-                return f"{n/1_000_000:.0f}M"  # Remove decimal for millions
+                return f"{n / 1_000_000:.0f}M"  # Remove decimal for millions
             elif n >= 1_000:
-                return f"{n/1_000:.0f}K"  # Remove decimal for thousands
+                return f"{n / 1_000:.0f}K"  # Remove decimal for thousands
             return str(n)
 
         # Format with no space between +/- to save space
@@ -338,7 +338,7 @@ class GitHubDigest:
                         self._handle_rate_limit()
                     futures[executor.submit(processor, item)] = item
                 except GithubException as e:
-                    logger.exception(f"GitHub API error while submitting item: {e}")
+                    logger.exception("GitHub API error while submitting item")
                     results.append((item, e))
 
             progress = self._get_progress()
@@ -358,17 +358,15 @@ class GitHubDigest:
                         results.append((result, None))
                     except Exception as e:
                         results.append((original_item, e))
-                        logger.exception(
-                            f"Error processing item after rate limit retry: {e}"
-                        )
+                        logger.exception("Error processing item after rate limit retry")
                 except GithubException as e:
                     original_item = futures[future]
                     results.append((original_item, e))
-                    logger.exception(f"GitHub API error: {e}")
+                    logger.exception("GitHub API error")
                 except Exception as e:
                     original_item = futures[future]
                     results.append((original_item, e))
-                    logger.exception(f"Unexpected error: {e}")
+                    logger.exception("Unexpected error")
 
                 if progress is not None:
                     progress.update(task, advance=1)
@@ -596,7 +594,7 @@ class GitHubDigest:
                 if pr.updated_at >= since_date
             ]
         except GithubException as e:
-            logger.exception(f"GitHub API error: {e}")
+            logger.exception("GitHub API error")
             raise
 
         # Create header section with date range and bold formatting
@@ -894,7 +892,7 @@ def main():
             output.send(content)
 
     except Exception as e:
-        logger.exception(f"Error: {str(e)}")
+        logger.exception("Error")
         raise
 
 

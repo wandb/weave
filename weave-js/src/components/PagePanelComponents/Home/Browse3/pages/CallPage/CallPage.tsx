@@ -24,6 +24,8 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
+import {DocumentView} from '../DocumentView/DocumentView';
+import {callHasDocuments, parseCall} from '../DocumentView/parser';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
@@ -180,6 +182,20 @@ const useCallTabs = (call: CallSchema) => {
                   </Tailwind>
                 </ScrollableTabContent>
               </>
+            ),
+          },
+        ]
+      : []),
+    ...(call.traceCall && callHasDocuments(call.traceCall)
+      ? [
+          {
+            label: 'Documents',
+            content: (
+              <ScrollableTabContent>
+                <Tailwind>
+                  {call.traceCall && <DocumentView data={parseCall(call)} />}
+                </Tailwind>
+              </ScrollableTabContent>
             ),
           },
         ]

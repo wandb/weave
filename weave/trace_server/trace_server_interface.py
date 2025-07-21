@@ -712,7 +712,7 @@ class TableUpdateRes(BaseModel):
     # As a result, we might have servers in the wild that
     # do not support this field. Therefore, we want to ensure
     # that clients expecting this field will not break when
-    # they are targetting an older server. We should remove
+    # they are targeting an older server. We should remove
     # this default factory once we are sure that all servers
     # have been updated to support this field.
     updated_row_digests: list[str] = Field(
@@ -734,7 +734,7 @@ class TableCreateRes(BaseModel):
     # As a result, we might have servers in the wild that
     # do not support this field. Therefore, we want to ensure
     # that clients expecting this field will not break when
-    # they are targetting an older server. We should remove
+    # they are targeting an older server. We should remove
     # this default factory once we are sure that all servers
     # have been updated to support this field.
     row_digests: list[str] = Field(
@@ -1145,29 +1145,29 @@ class EvaluationStatusReq(BaseModel):
     call_id: str
 
 
-class EvaluationStatusPending(BaseModel):
-    status: Literal["pending"]
+class EvaluationStatusNotFound(BaseModel):
+    code: Literal["not_found"] = "not_found"
 
 
 class EvaluationStatusRunning(BaseModel):
-    status: Literal["running"]
+    code: Literal["running"] = "running"
     completed_rows: int
     total_rows: int
 
 
 class EvaluationStatusFailed(BaseModel):
-    status: Literal["failed"]
+    code: Literal["failed"] = "failed"
     error: Optional[str] = None
 
 
 class EvaluationStatusComplete(BaseModel):
-    status: Literal["complete"]
+    code: Literal["complete"] = "complete"
     output: Optional[Any] = None
 
 
 class EvaluationStatusRes(BaseModel):
     status: Union[
-        EvaluationStatusPending,
+        EvaluationStatusNotFound,
         EvaluationStatusRunning,
         EvaluationStatusFailed,
         EvaluationStatusComplete,

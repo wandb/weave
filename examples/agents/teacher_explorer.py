@@ -25,7 +25,7 @@ Agent is terse in its communication.
 console = Console()
 
 
-@weave.op()
+@weave.op
 def run_command(command: str) -> str:
     """Run a shell command and return its output.
 
@@ -41,7 +41,7 @@ def run_command(command: str) -> str:
 class Teacher(Object):
     model_name: str = "gpt-4-0125-preview"
 
-    @weave.op()
+    @weave.op
     def step(self, agent_state: AgentState) -> str:
         LogEvents.step_start("teacher", "blue")
         prompt = textwrap.dedent(

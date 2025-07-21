@@ -213,7 +213,7 @@ def test_op_versions(client: WeaveClient):
     my_op(1)
     my_op(2)
 
-    @weave.op()
+    @weave.op
     def my_op(x: int, y: int) -> int:
         return x + y
 

@@ -189,7 +189,7 @@ if not import_failed:
                         # 2. Both us and the sibling run must have empty parents (i think
                         # this condition will always be true, else we would have a parent
                         # run already, but trying to be safe here)
-                        and attrs.get("parent_run_id") == lc_parent_run_id == None
+                        and attrs.get("parent_run_id") == lc_parent_run_id is None
                     ):
                         # Now, we know that Langchain has confused us. And we want to set the
                         # parent to the current Weave Run's parent. So, if that parent is

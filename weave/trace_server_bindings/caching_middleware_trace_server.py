@@ -36,13 +36,13 @@ class CacheRecorder(TypedDict):
 
 def digest_is_cacheable(digest: str) -> bool:
     """
-    Check if a digest is cachable.
+    Check if a digest is cacheable.
 
     Examples:
     - v1 -> False
     - oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8 -> True
     """
-    # If it looks like a version, it is not cachable
+    # If it looks like a version, it is not cacheable
     if digest.startswith("v"):
         try:
             int(digest[1:])
@@ -102,7 +102,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         try:
             self._cache.close()
         except Exception as e:
-            logger.exception(f"Error closing cache: {e}")
+            logger.exception("Error closing cache")
 
     def get_call_processor(self) -> AsyncBatchProcessor | None:
         """
@@ -204,7 +204,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         try:
             cache_key = self._make_cache_key(namespace, make_cache_key(req))
         except Exception as e:
-            logger.exception(f"Error creating cache key: {e}")
+            logger.exception("Error creating cache key")
             return func(req)
 
         # Try to get from cache
@@ -213,7 +213,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             try:
                 return deserialize(cached_json_value)
             except Exception as e:
-                logger.exception(f"Error deserializing cached value: {e}")
+                logger.exception("Error deserializing cached value")
                 # Remove corrupted cache entry
                 self._safe_cache_delete(cache_key)
 
@@ -225,7 +225,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             json_value_to_cache = serialize(res)
             self._safe_cache_set(cache_key, json_value_to_cache)
         except Exception as e:
-            logger.exception(f"Error serializing value for cache: {e}")
+            logger.exception("Error serializing value for cache")
 
         return res
 
@@ -381,7 +381,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
                             needed_val,
                         )
                 except Exception as e:
-                    logger.exception(f"Error parsing ref for caching: {e}")
+                    logger.exception("Error parsing ref for caching")
 
         return tsi.RefsReadBatchRes(vals=final_results)
 
