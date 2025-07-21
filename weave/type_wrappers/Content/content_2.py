@@ -6,9 +6,10 @@ import subprocess
 import sys
 import base64
 import hashlib
+from typing_extensions import TypeVar
 import uuid
 from pathlib import Path
-from typing import Annotated, Any, Type
+from typing import Annotated, Any, Generic, Type
 from pydantic import Field, BaseModel
 from utils import (
     get_mime_and_extension,
@@ -44,13 +45,33 @@ class BaseContentHandler(BaseModel):
     extension: str | None = None
 
 
-class Content(BaseContentHandler):
+# Dummy typevar to allow for passing mimetype/extension through annotated content
+# e.x. Content["pdf"] or Content["application/pdf"]
+T = TypeVar("T", bound=str)
+
+class Content(Generic[T], BaseModel):
     """
     A class to represent content from various sources, resolving them
     to a unified byte-oriented representation with associated metadata.
 
     The default constructor initializes content from a file path.
     """
+    id: str
+    data: bytes
+    size: int
+    mimetype: str
+    digest: str
+    filename: str
+    content_type: ContentType
+    input_type: str
+
+    extra: Annotated[MetadataType, Field(
+        description="Extra metadata to associate with the content",
+        examples=[{"number of cats": 1}]
+    )] = {}
+    encoding: str | None = "utf-8"
+    path: str | None = None
+    extension: str | None = None
 
     def __init__(
         self,
@@ -183,7 +204,6 @@ class Content(BaseContentHandler):
         """Initializes Content from a base64 encoded string or bytes."""
         if isinstance(b64_data, str):
             b64_data = b64_data.encode('ascii')
-
         try:
             data = base64.b64decode(b64_data, validate=True)
         except (ValueError, TypeError) as e:
@@ -237,20 +257,35 @@ class Content(BaseContentHandler):
         extension: str | None = None,
         mimetype: str | None = None
     ) -> Content:
-
-        # First check if it is a path
+        # First check if it is a path, we only check validity for str scenario
+        # because we have dedicated error message for invalid path
         if isinstance(input, Path) or (isinstance(input, str) and is_valid_path(input)):
-            return cls.from_path(input, mimetype=mimetype)
+            return cls.from_path(
+                input,
+                mimetype=mimetype
+            )
 
         # Then check if it is base64
-        elif (isinstance(input, bytes) or isinstance(input, str)) and is_valid_b64(input):
-            return cls.from_base64(input, mimetype=mimetype, extension=extension)
+        elif isinstance(input, (bytes, str)) and is_valid_b64(input):
+            return cls.from_base64(
+                input,
+                mimetype=mimetype,
+                extension=extension
+            )
 
         # If it is still a str - treat as raw text
         elif isinstance(input, str):
-            return cls.from_text(input, mimetype=mimetype, extension=extension)
+            return cls.from_text(
+                input,
+                mimetype=mimetype,
+                extension=extension
+            )
 
-        return cls.from_bytes(input, mimetype=mimetype, extension=extension)
+        return cls.from_bytes(
+            input,
+            mimetype=mimetype,
+            extension=extension
+        )
 
 
     @classmethod

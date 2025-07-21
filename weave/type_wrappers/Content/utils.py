@@ -27,12 +27,14 @@ MIME_DETECTION_BUFFER_SIZE = 2048
 
 
 def is_valid_b64(input: str | bytes) -> bool:
+    # Normalize to bytes
+    if isinstance(input, str):
+        input = input.encode('ascii')
     try:
         base64.b64decode(input, validate=True)
-        return True
-
-    except Exception as _:
+    except (ValueError, TypeError) as _:
         return False
+    return True
 
 def is_valid_path(input: str | Path) -> bool:
     if isinstance(input, str):
