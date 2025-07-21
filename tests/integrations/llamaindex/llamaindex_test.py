@@ -869,7 +869,7 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
-    assert len(flattened_calls) == 50
+    assert len(flattened_calls) == 49
     assert flattened_calls_to_names(flattened_calls) == [
         ("llama_index.span.SentenceSplitter-parse_nodes", 0),
         ("llama_index.span.SentenceSplitter.split_text_metadata_aware", 1),
@@ -894,7 +894,6 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
         ("llama_index.span.OpenAIEmbedding.aget_query_embedding", 7),
         ("llama_index.event.Embedding", 8),
         ("llama_index.span.OpenAIEmbedding-aget_query_embedding", 8),
-        ("openai.embeddings.create", 9),
         ("llama_index.span.CompactAndRefine.asynthesize", 5),
         ("llama_index.event.Synthesize", 6),
         ("llama_index.span.CompactAndRefine.aget_response", 6),
