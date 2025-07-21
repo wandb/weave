@@ -277,10 +277,6 @@ class Content(Generic[T], BaseModel):
         """
         return cls.model_construct(**args)
 
-    @property
-    def _weave_metadata(self) -> dict[str, Any]:
-        return self.model_dump(exclude={"data"})
-
     def open(self) -> bool:
         """Open the file using the operating system's default application.
 
