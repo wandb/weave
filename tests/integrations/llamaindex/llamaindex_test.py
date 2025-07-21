@@ -830,10 +830,6 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
 async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
 
-    import nltk
-
-    nltk.download("stopwords", quiet=True)
-
     documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
     parser = SentenceSplitter()
     nodes = parser.get_nodes_from_documents(documents)
@@ -873,7 +869,7 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
-    assert len(flattened_calls) == 49
+    assert len(flattened_calls) == 50
     assert flattened_calls_to_names(flattened_calls) == [
         ("llama_index.span.SentenceSplitter-parse_nodes", 0),
         ("llama_index.span.SentenceSplitter.split_text_metadata_aware", 1),
@@ -898,6 +894,7 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
         ("llama_index.span.OpenAIEmbedding.aget_query_embedding", 7),
         ("llama_index.event.Embedding", 8),
         ("llama_index.span.OpenAIEmbedding-aget_query_embedding", 8),
+        ("openai.embeddings.create", 9),
         ("llama_index.span.CompactAndRefine.asynthesize", 5),
         ("llama_index.event.Synthesize", 6),
         ("llama_index.span.CompactAndRefine.aget_response", 6),
