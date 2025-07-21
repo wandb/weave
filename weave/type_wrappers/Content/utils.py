@@ -6,6 +6,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -25,26 +26,13 @@ except Exception as e:
 MIME_DETECTION_BUFFER_SIZE = 2048
 
 
-class ContentArgs(TypedDict):
-    extension: str | None
-    mimetype: str | None
-    filename: str | None
-    path: str | None
-    size: int | None
-    encoding: str | None
-    extra: dict[str, Any]
+def is_valid_b64(input: str | bytes) -> bool:
+    try:
+        base64.b64decode(input, validate=True)
+        return True
 
-
-# use discriminated unions instead of typedict
-class ContentKeywordArgs(TypedDict, total=False):
-    extension: str
-    mimetype: str
-    filename: str
-    path: str
-    size: int
-    encoding: str
-    extra: dict[str, Any]
-
+    except Exception as _:
+        return False
 
 def is_valid_path(input: str | Path) -> bool:
     if isinstance(input, str):
@@ -57,14 +45,16 @@ def is_valid_path(input: str | Path) -> bool:
 
 def default_filename(
     extension: str | None,
+    mimetype: str,
+    digest: str,
 ) -> str:
-    now = datetime.now()
-    datetime_str = now.strftime("%Y%m%d_%H%M%S")
-    # Do not give the file an empty extension. Prefer none
-    if extension is None or len(extension) == 0:
-        return datetime_str
+    type_name, _ = mimetype.split('/')
+    if type_name == 'application':
+        # This seems a bit more 'presentable'
+        type_name = 'file'
 
-    return datetime_str + "." + extension
+    digest_suffix = digest[:4]
+    return f"{type_name}-{digest_suffix}{extension}"
 
 
 def get_extension_from_mimetype(mimetype: str) -> str:
@@ -73,7 +63,7 @@ def get_extension_from_mimetype(mimetype: str) -> str:
         raise ValueError(
             f"Got mime-type {mimetype} but failed to resolve a valid extension"
         )
-    return extension.lstrip(".")
+    return extension
 
 
 def guess_from_buffer(buffer: bytes) -> str | None:
