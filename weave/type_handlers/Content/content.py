@@ -8,7 +8,10 @@ import logging
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 from weave.type_wrappers import Content
-from weave.type_wrappers.Content.content_types import ResolvedContentArgs, ResolvedContentArgsWithoutData
+from weave.type_wrappers.Content.content_types import (
+    ResolvedContentArgs,
+    ResolvedContentArgsWithoutData,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +33,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> Content:
     with open(artifact.path("content"), "rb") as f:
         data = f.read()
 
-    resolved_args: ResolvedContentArgs = {
-        'data': data,
-        **metadata
-    }
+    resolved_args: ResolvedContentArgs = {"data": data, **metadata}
 
     return Content._from_resolved_args(resolved_args)
 

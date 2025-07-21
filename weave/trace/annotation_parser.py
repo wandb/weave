@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import re
 import logging
+import re
 from inspect import Signature
 
 from pydantic import BaseModel
@@ -47,16 +47,20 @@ PATTERN_WITHOUT_TYPE_HINT = re.compile(
     r"\]"  # Closing bracket for Annotated[...]
 )
 
+
 class ContentAnnotation(BaseModel):
     base_type: str
     content_class: str
     raw_annotation: str
 
+
 class ContentAnnotationWithExtention(ContentAnnotation):
     extension: str
 
+
 class ContentAnnotationWithMimetype(ContentAnnotation):
     mimetype: str
+
 
 def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation | None:
     """
@@ -79,8 +83,7 @@ def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation 
     base_type = match_with_format.group(1).strip()
     type_hint = match_with_format.group(2)
 
-
-    if type_hint.find('/') > -1:
+    if type_hint.find("/") > -1:
         # We know it's a Mimetype if there's a '/'
         return ContentAnnotationWithMimetype(
             base_type=base_type,
@@ -90,7 +93,7 @@ def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation 
         )
 
     # Pad if there's not a leading period
-    elif type_hint.find('.') != 0:
+    elif type_hint.find(".") != 0:
         type_hint = f".{type_hint}"
 
     return ContentAnnotationWithExtention(
@@ -100,7 +103,10 @@ def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation 
         raw_annotation=annotation_string,
     )
 
-def try_parse_annotation_without_hint(annotation_string: str) -> ContentAnnotation | None:
+
+def try_parse_annotation_without_hint(
+    annotation_string: str,
+) -> ContentAnnotation | None:
     """
     The function expects the string to be of the form:
     typing.Annotated[<SomeType>, <class 'weave.type_handlers.Content.content.Content'>]
@@ -145,9 +151,9 @@ def parse_content_annotation(
         ContentAnnotation | ContentAnnotationWithExtention | ContentAnnotationWithMimetype | None
     """
     # Try matching the pattern with format first (it's more specific)
-    return try_parse_annotation_with_hint(annotation_string) or try_parse_annotation_without_hint(
+    return try_parse_annotation_with_hint(
         annotation_string
-    )
+    ) or try_parse_annotation_without_hint(annotation_string)
 
 
 def parse_from_signature(sig: Signature) -> dict[str, ContentAnnotation]:

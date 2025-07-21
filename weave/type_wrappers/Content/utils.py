@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import base64
 import logging
 import mimetypes
-from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypedDict
-import base64
+from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +28,13 @@ MIME_DETECTION_BUFFER_SIZE = 2048
 def is_valid_b64(input: str | bytes) -> bool:
     # Normalize to bytes
     if isinstance(input, str):
-        input = input.encode('ascii')
+        input = input.encode("ascii")
     try:
         base64.b64decode(input, validate=True)
     except (ValueError, TypeError) as _:
         return False
     return True
+
 
 def is_valid_path(input: str | Path) -> bool:
     if isinstance(input, str):
@@ -50,10 +50,10 @@ def default_filename(
     mimetype: str,
     digest: str,
 ) -> str:
-    type_name, _ = mimetype.split('/')
-    if type_name == 'application':
+    type_name, _ = mimetype.split("/")
+    if type_name == "application":
         # This seems a bit more 'presentable'
-        type_name = 'file'
+        type_name = "file"
 
     digest_suffix = digest[:4]
     return f"{type_name}-{digest_suffix}{extension}"
