@@ -96,7 +96,6 @@ export const useCallsForQuery = (
     filter: lowLevelFilter,
     query: filterBy,
     refetchOnDelete: true,
-    expandColumns: expandedColumns,
   });
 
   const callResults = useMemo(() => {

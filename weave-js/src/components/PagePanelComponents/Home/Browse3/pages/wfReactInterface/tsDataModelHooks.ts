@@ -330,11 +330,6 @@ const useCallsNoExpansion = (
       sort_by: params.sortBy,
       query: params.query,
       columns: params.columns,
-      expand_columns: params.expandedRefColumns
-        ? Array.from(params.expandedRefColumns)
-        : undefined,
-      // Never expand server side, we handle this manually in the frontend
-      return_expanded_column_values: false,
       include_costs: params.includeCosts,
       include_feedback: params.includeFeedback,
       ...(params.includeStorageSize ? {include_storage_size: true} : null),
@@ -351,7 +346,6 @@ const useCallsNoExpansion = (
     params.sortBy,
     params.query,
     params.columns,
-    params.expandedRefColumns,
     params.includeCosts,
     params.includeFeedback,
     params.includeStorageSize,
@@ -528,9 +522,6 @@ export const useCallsStats = (
         : undefined,
       query: params.query,
       limit: params.limit,
-      expand_columns: params.expandColumns
-        ? Array.from(params.expandColumns)
-        : undefined,
       ...(!!params.includeTotalStorageSize
         ? {include_total_storage_size: true}
         : null),
@@ -554,7 +545,6 @@ export const useCallsStats = (
     deepFilter,
     params.query,
     params.limit,
-    params.expandColumns,
     getTsClient,
   ]);
 

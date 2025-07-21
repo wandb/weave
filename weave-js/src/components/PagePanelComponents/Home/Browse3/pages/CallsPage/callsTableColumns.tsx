@@ -425,7 +425,7 @@ function buildCallsTableColumns(
     onCollapse,
     onExpand,
     // TODO (Tim) - (BackendExpansion): This can be removed once we support backend expansion!
-    key => !columnsWithRefs.has(key),
+    key => !columnIsRefExpanded(key) && !columnsWithRefs.has(key),
     (key, operator, value, rowId) => {
       onUpdateFilter?.(key, operator, value, rowId);
     }

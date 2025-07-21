@@ -124,7 +124,6 @@ export type TraceCallsQueryReq = {
   query?: Query;
   columns?: string[];
   expand_columns?: string[];
-  return_expanded_column_values?: boolean;
   include_costs?: boolean;
   include_feedback?: boolean;
   include_storage_size?: boolean;
@@ -140,7 +139,6 @@ export type TraceCallsQueryStatsReq = {
   filter?: TraceCallsFilter;
   query?: Query;
   limit?: number;
-  expand_columns?: string[];
 };
 
 export type TraceCallsQueryStatsRes = {

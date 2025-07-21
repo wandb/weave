@@ -185,11 +185,6 @@ export const ExportSelector = ({
     setSelectionState('all');
   };
 
-  const usedExpandColumns = getUsedExpandColumns(
-    refColumnsToExpand,
-    filterBy,
-    sortBy
-  );
   const pythonText = makeCodeText(
     callQueryParams.entity,
     callQueryParams.project,
@@ -198,8 +193,7 @@ export const ExportSelector = ({
     filterBy,
     sortBy,
     includeFeedback,
-    includeCosts,
-    usedExpandColumns
+    includeCosts
   );
   const curlText = makeCurlText(
     callQueryParams.entity,
@@ -207,7 +201,7 @@ export const ExportSelector = ({
     selectionState === 'selected' ? selectedCalls : undefined,
     lowLevelFilter,
     filterBy,
-    usedExpandColumns,
+    refColumnsToExpand,
     sortBy,
     includeFeedback,
     includeCosts
@@ -293,106 +287,6 @@ export const ExportSelector = ({
     </>
   );
 };
-
-/**
- * Determines which expandable columns are actually needed based on current filters and sorting.
- *
- * This function optimizes column expansion by only including columns that are referenced
- * in the current query's filters or sorting criteria, rather than expanding all possible
- * columns. It also includes intermediate path levels when deeper nested fields are accessed.
- *
- * @param refColumnsToExpand - Array of column paths that can be expanded (e.g., ['output', 'inputs', 'summary.usage'])
- * @param filterBy - Query object containing filter conditions that may reference expandable columns
- * @param sortBy - Array of sort criteria that may reference expandable columns
- * @returns Array of column paths that should actually be expanded
- *
- * @example
- * // Given these expandable columns:
- * const refColumnsToExpand = ['output', 'inputs', 'summary.usage', 'summary.costs'];
- *
- * // And these query conditions:
- * const sortBy = [{ field: 'output.result.score', direction: 'asc' }];
- * const filterBy = {
- *   $and: [
- *     {$eq: [{ $getField: 'inputs.prompt' }, {$literal: 1}]}
- *     {$contians: [{ $getField: 'summary.model.x' }, {$literal: True}]}
- *   ]
- * };
- *
- * // The function returns:
- * // ['output', 'output.result', 'inputs', 'summary.model']
- * //
- * // Note: 'summary.costs' is excluded since it's not referenced
- * // Note: 'output.result' is included as an intermediate level for 'output.result.score'
- */
-function getUsedExpandColumns(
-  refColumnsToExpand: string[],
-  filterBy: Query | undefined,
-  sortBy: Array<{field: string; direction: 'asc' | 'desc'}>
-): string[] {
-  const usedColumns = new Set<string>();
-
-  // Helper function to find all matching expand columns for a field
-  const findMatchingExpandColumns = (field: string): string[] => {
-    const matches: string[] = [];
-
-    // Find the base expand column that matches
-    for (const expandCol of refColumnsToExpand) {
-      if (field.startsWith(expandCol + '.') || field === expandCol) {
-        matches.push(expandCol);
-
-        // If this field goes deeper than the expand column, add intermediate levels
-        if (field.startsWith(expandCol + '.')) {
-          const remainingPath = field.substring(expandCol.length + 1);
-          const remainingParts = remainingPath.split('.');
-
-          // Add intermediate levels (but not the final field)
-          for (let i = 1; i < remainingParts.length; i++) {
-            const intermediatePath =
-              expandCol + '.' + remainingParts.slice(0, i).join('.');
-            if (!matches.includes(intermediatePath)) {
-              matches.push(intermediatePath);
-            }
-          }
-        }
-      }
-    }
-
-    return matches;
-  };
-
-  // Check sortBy fields
-  for (const sort of sortBy) {
-    const matchingColumns = findMatchingExpandColumns(sort.field);
-    matchingColumns.forEach(col => usedColumns.add(col));
-  }
-
-  // Check filterBy for getField references
-  if (filterBy) {
-    const extractFieldsFromQuery = (query: any): void => {
-      if (!query || typeof query !== 'object') return;
-
-      // Check for getField operations
-      if (query.$getField && typeof query.$getField === 'string') {
-        const matchingColumns = findMatchingExpandColumns(query.$getField);
-        matchingColumns.forEach(col => usedColumns.add(col));
-      }
-
-      // Recursively check all properties
-      for (const value of Object.values(query)) {
-        if (Array.isArray(value)) {
-          value.forEach(extractFieldsFromQuery);
-        } else {
-          extractFieldsFromQuery(value);
-        }
-      }
-    };
-
-    extractFieldsFromQuery(filterBy);
-  }
-
-  return Array.from(usedColumns);
-}
 
 const SelectionCheckboxes: FC<{
   numSelectedCalls: number;
@@ -684,8 +578,7 @@ function makeCodeText(
   query: Query | undefined,
   sortBy: Array<{field: string; direction: 'asc' | 'desc'}>,
   includeFeedback: boolean,
-  includeCosts: boolean,
-  refColumnsToExpand: string[]
+  includeCosts: boolean
 ) {
   let codeStr = `import weave\n\nclient = weave.init("${entity}/${project}")`;
   codeStr += `\ncalls = client.get_calls(\n`;
@@ -737,13 +630,6 @@ function makeCodeText(
   }
   if (includeCosts) {
     codeStr += `    include_costs=True,\n`;
-  }
-  if (refColumnsToExpand.length > 0) {
-    codeStr += `    expand_columns=${JSON.stringify(
-      refColumnsToExpand,
-      null,
-      0
-    )},\n`;
   }
 
   codeStr += `)`;
