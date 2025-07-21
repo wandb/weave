@@ -11,6 +11,8 @@ MetadataType = dict[MetadataKeysType, "MetadataValueType"]
 
 ContentType = Literal['bytes', 'text', 'base64', 'file', 'url']
 
+ValidContentInputs =  bytes | str | Path
+
 # These represent the args the user can pass in to create various types of content
 # Optional args that can be passed to any content
 class BaseContentArgs(TypedDict):
