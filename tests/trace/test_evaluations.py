@@ -595,11 +595,11 @@ async def test_eval_supports_model_as_op(client):
     evaluation = make_test_eval()
 
     res = await evaluation.evaluate(function_model)
-    assert res != None
+    assert res is not None
 
     gotten_op = weave.ref(function_model.ref.uri()).get()
     res = await evaluation.evaluate(gotten_op)
-    assert res != None
+    assert res is not None
 
 
 class MyTestModel(Model):
@@ -614,11 +614,11 @@ async def test_eval_supports_model_class(client):
 
     model = MyTestModel()
     res = await evaluation.evaluate(model)
-    assert res != None
+    assert res is not None
 
     gotten_model = weave.ref(model.ref.uri()).get()
     res = await evaluation.evaluate(gotten_model)
-    assert res != None
+    assert res is not None
 
 
 @pytest.mark.asyncio

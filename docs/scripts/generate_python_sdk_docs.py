@@ -161,10 +161,10 @@ def fix_pydantic_model(text, obj, module_name):
     if obj.model_fields:
         for k, v in obj.model_fields.items():
             name = k
-            if hasattr(v, "alias") and v.alias != None:
+            if hasattr(v, "alias") and v.alias is not None:
                 name = v.alias
             annotation = "Any"
-            if hasattr(v, "annotation") and v.annotation != None:
+            if hasattr(v, "annotation") and v.annotation is not None:
                 annotation = str(v.annotation)
                 annotation = annotation.replace(module_name + ".", "")
 

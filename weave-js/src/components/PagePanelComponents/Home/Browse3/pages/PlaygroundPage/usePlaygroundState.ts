@@ -296,5 +296,10 @@ export const getInputFromPlaygroundState = (state: PlaygroundState) => {
     };
   }
 
+  if (state.model.includes('grok-4')) {
+    const {presence_penalty, frequency_penalty, ...rest} = inputs;
+    return rest;
+  }
+
   return inputs;
 };
