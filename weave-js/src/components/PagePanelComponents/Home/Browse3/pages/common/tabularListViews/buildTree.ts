@@ -67,23 +67,42 @@ function addToTree(
     return;
   }
 
+  // Combine middle layers into a single group name
+  const isFirstLevel = depth === 0;
+  const isLastLevel = fields.length === 2;
+
+  let groupName: string;
+  let remainingFields: string[];
+  let groupId: string;
+
+  if (isFirstLevel || isLastLevel) {
+    groupName = fields[0];
+    remainingFields = fields.slice(1);
+    groupId = fullPath
+      .split('.')
+      .slice(0, depth + 1)
+      .join('.');
+  } else {
+    // Combine all middle fields with + separator
+    groupName = fields.slice(0, -1).join('.');
+    remainingFields = [fields[fields.length - 1]];
+    groupId = fullPath.split('.').slice(0, -1).join('.');
+  }
+
   for (const child of node.children) {
-    if ('groupId' in child && child.headerName === fields[0]) {
-      addToTree(child as GridColumnGroup, fields.slice(1), fullPath, depth + 1);
+    if ('groupId' in child && child.headerName === groupName) {
+      addToTree(child as GridColumnGroup, remainingFields, fullPath, depth + 1);
       return;
     }
   }
 
   const newNode: GridColumnGroup = {
-    headerName: fields[0],
-    groupId: fullPath
-      .split('.')
-      .slice(0, depth + 1)
-      .join('.'),
+    headerName: groupName,
+    groupId,
     children: [],
   };
   node.children.push(newNode);
-  addToTree(newNode, fields.slice(1), fullPath, depth + 1);
+  addToTree(newNode, remainingFields, fullPath, depth + 1);
 }
 function nodeIsGroup(node: GridColumnNode): node is GridColumnGroup {
   return 'groupId' in node;
