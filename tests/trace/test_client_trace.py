@@ -2560,7 +2560,7 @@ def test_call_read_with_unkown_llm(client):
     # Generate a unique LLM ID unlikely to exist
     llm_id_no_cost = f"non_existent_llm_{generate_id()}"
 
-    @weave.op()
+    @weave.op
     def op_with_usage_no_cost(input_val: int) -> dict[str, Any]:
         usage_details = {
             "requests": 1,

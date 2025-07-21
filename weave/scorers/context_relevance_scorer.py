@@ -147,7 +147,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
             span_prob = positive_probs[start:end].mean()
             spans_with_probs.append({"text": span_text, "score": float(span_prob)})
 
-        return spans_with_probs, int(label_mask.sum()), int(len(label_mask))
+        return spans_with_probs, int(label_mask.sum()), len(label_mask)
 
     @validate_call
     @weave.op

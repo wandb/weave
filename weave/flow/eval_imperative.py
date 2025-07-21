@@ -546,7 +546,7 @@ class EvaluationLogger(BaseModel):
         if summary_data:
             final_summary = summary_data
         if summary is not None:
-            final_summary = {**final_summary, **summary}
+            final_summary = {**final_summary, "output": summary}
 
         # Call the summarize op
         assert self._evaluate_call is not None, (

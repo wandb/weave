@@ -7,7 +7,7 @@ from weave.trace_server import trace_server_interface as tsi
 
 
 def test_call_attributes_read_only(client):
-    @weave.op()
+    @weave.op
     def my_op():
         call = call_context.get_current_call()
         with pytest.raises(TypeError):
@@ -21,7 +21,7 @@ def test_call_attributes_read_only(client):
 
 
 def test_call_summary_editable(client):
-    @weave.op()
+    @weave.op
     def my_op():
         call = call_context.get_current_call()
         call.summary["foo"] = 1
@@ -38,7 +38,7 @@ def test_call_summary_editable(client):
 
 
 def test_call_attributes_update_and_delete_forbidden(client):
-    @weave.op()
+    @weave.op
     def my_op():
         call = call_context.get_current_call()
         with pytest.raises(TypeError):
@@ -57,7 +57,7 @@ def test_call_attributes_update_and_delete_forbidden(client):
 
 
 def test_call_summary_deep_merge(client):
-    @weave.op()
+    @weave.op
     def my_op():
         call = call_context.get_current_call()
         call.summary["nested"] = {"foo": 1}

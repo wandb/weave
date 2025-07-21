@@ -129,10 +129,10 @@ class ObjectMetadataQueryBuilder:
 
     @property
     def conditions_part(self) -> str:
-        _conditions = list(self._conditions)
+        conditions = list(self._conditions)
         if not self._include_deleted:
-            _conditions.append("deleted_at IS NULL")
-        return _make_conditions_part(_conditions)
+            conditions.append("deleted_at IS NULL")
+        return _make_conditions_part(conditions)
 
     @property
     def object_id_conditions_part(self) -> str:

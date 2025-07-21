@@ -196,7 +196,7 @@ def ref(location: str) -> ObjectRef:
     Returns:
         A weave Ref to the object.
     """
-    if not "://" in location:
+    if "://" not in location:
         client = weave_client_context.get_weave_client()
         if not client:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")

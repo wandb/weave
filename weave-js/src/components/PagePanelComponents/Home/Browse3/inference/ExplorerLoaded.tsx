@@ -56,6 +56,11 @@ export const ExplorerLoaded = ({
 
     if (sort === 'Popularity') {
       filteredModels = filteredModels.sort((a, b) => {
+        const aIsNew = a.isNew ? 1 : 0;
+        const bIsNew = b.isNew ? 1 : 0;
+        if (bIsNew !== aIsNew) {
+          return bIsNew - aIsNew;
+        }
         const aPopularity = a.likesHuggingFace ?? 0;
         const bPopularity = b.likesHuggingFace ?? 0;
         return bPopularity - aPopularity;

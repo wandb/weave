@@ -168,7 +168,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
             annotation_ref=annotation_ref,
         )
     )
-    assert create_res.id != None
+    assert create_res.id is not None
     # Correct Query Result Payload
     query_res = client.server.feedback_query(
         tsi.FeedbackQueryReq(
