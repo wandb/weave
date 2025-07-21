@@ -853,7 +853,7 @@ def _build_intermediate_cte_sql(
         {join_clause_for_ordering}
         WHERE ov.project_id = {param_slot(project_param, "String")}
             AND length(refs) > 0
-            AND JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) IN (
+            AND JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, "String")}) IN (
                 SELECT ref FROM {current_cte_name}
             )
         GROUP BY ov.project_id, ov.object_id, ov.digest

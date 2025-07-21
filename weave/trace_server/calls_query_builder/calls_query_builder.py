@@ -744,8 +744,14 @@ class CallsQuery(BaseModel):
         raw_sql = "WITH "
         if object_join_cte:
             raw_sql += f"{object_join_cte},\n"
-        raw_sql += f"""filtered_calls AS ({filter_query._as_sql_base_format(
-            pb, table_alias, field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)})
+        raw_sql += f"""filtered_calls AS ({
+            filter_query._as_sql_base_format(
+                pb,
+                table_alias,
+                field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
+            )
+        })
         """
 
         if self.include_costs:

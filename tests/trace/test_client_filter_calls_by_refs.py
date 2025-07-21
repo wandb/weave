@@ -50,7 +50,7 @@ def test_filter_calls_by_ref_properties(client):
     }
     project_ref = weave.publish(project_data, "project")
 
-    @weave.op()
+    @weave.op
     def process_with_config(worker_config, project_info):
         return {
             "processed_worker": worker_config,
@@ -354,7 +354,7 @@ def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
         pytest.skip("Not implemented in SQLite")
 
     # run an evaluation, then delete the evaluation and its children
-    @weave.op()
+    @weave.op
     async def model_predict(input) -> str:
         return eval(input)
 
@@ -372,7 +372,7 @@ def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
         {"input": "5**1", "target": 5, "object": object_ref5},
     ]
 
-    @weave.op()
+    @weave.op
     async def score(target, model_output, object):
         return target == model_output
 

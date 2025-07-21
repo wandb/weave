@@ -455,7 +455,14 @@ class CallsQueryStatsReq(BaseModel):
     query: Optional[Query] = None
     limit: Optional[int] = None
     include_total_storage_size: Optional[bool] = False
-    expand_columns: Optional[list[str]] = None
+    # List of columns that include refs to objects or table rows that require
+    # expansion during filtering or ordering. Required when filtering
+    # on reffed fields.
+    expand_columns: Optional[list[str]] = Field(
+        default=None,
+        examples=[["inputs.self.message", "inputs.model.prompt"]],
+        description="Columns with refs to objects or table rows that require expansion during filtering or ordering.",
+    )
 
 
 class CallsQueryStatsRes(BaseModel):
