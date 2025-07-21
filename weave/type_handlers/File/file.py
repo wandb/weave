@@ -123,7 +123,7 @@ def save(obj: File, artifact: MemTraceFilesArtifact, name: str) -> None:
 @deprecated(DEPRECATION_MESSAGE)
 def save(obj: File, artifact: MemTraceFilesArtifact, name: str) -> None:
     logger.warning("Saving File as Content object")
-    content = Content.from_path(obj.path, obj.mimetype)
+    content: Content = Content.from_path(obj.path, mimetype=obj.mimetype)
     save_content(content, artifact, name)
 >>>>>>> 44250b63b8 (Add back File with deprecation)
 
