@@ -65,10 +65,12 @@ def test_basic_evaluation(
     assert evaluate_call.inputs["self"]._class_name == "Evaluation"
     assert evaluate_call.inputs["model"]._class_name == "Model"
     assert evaluate_call.output == {
-        "avg_score": 1.0,
-        "total_examples": 3,
         "greater_than_2_scorer": {"true_count": 3, "true_fraction": 1.0},
         "greater_than_4_scorer": {"true_count": 3, "true_fraction": 1.0},
+        "output": {
+            "avg_score": 1.0,
+            "total_examples": 3,
+        },
     }
 
     for i, (inputs, output_val, score1, score2) in enumerate(
@@ -119,10 +121,12 @@ def test_basic_evaluation(
     assert summarize_call.attributes["_weave_eval_meta"]["imperative"] is True
     assert summarize_call.inputs["self"]._class_name == "Evaluation"
     assert summarize_call.output == {
-        "avg_score": 1.0,
-        "total_examples": 3,
         "greater_than_2_scorer": {"true_count": 3, "true_fraction": 1.0},
         "greater_than_4_scorer": {"true_count": 3, "true_fraction": 1.0},
+        "output": {
+            "avg_score": 1.0,
+            "total_examples": 3,
+        },
     }
 
 
@@ -352,7 +356,7 @@ def scorer(request):
     elif request.param == "weave-scorer":
 
         class MyScorer(weave.Scorer):
-            @weave.op()
+            @weave.op
             def score(self, output: int, exp_output: int):
                 return output == exp_output
 
@@ -468,7 +472,7 @@ def test_evaluation_no_auto_summarize(client):
     calls = client.get_calls()
     # assert len(calls) == 1
     summarize_call = calls[4]
-    assert summarize_call.output == {}
+    assert summarize_call.output == {"output": {}}
 
 
 def test_evaluation_no_auto_summarize_with_custom_dict(client):
@@ -482,4 +486,8 @@ def test_evaluation_no_auto_summarize_with_custom_dict(client):
     calls = client.get_calls()
     # assert len(calls) == 1
     summarize_call = calls[4]
-    assert summarize_call.output == {"something": 1, "else": 2}
+    assert summarize_call.output == {
+        "something": 1,
+        "else": 2,
+        "output": {"something": 1, "else": 2},
+    }

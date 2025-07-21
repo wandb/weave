@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
 
-# Memory address with at least 4 charaters (decrease false positives)
+# Memory address with at least 4 characters (decrease false positives)
 MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{4,}>", re.ASCII)
 
 CODE_DEP_ERROR_SENTINEL = "<error>"
@@ -166,7 +166,7 @@ class RefJSONEncoder(json.JSONEncoder):
 
     def default(self, o: Any) -> Any:
         if isinstance(o, (ObjectRef)):
-            ref_code = f"weave.ref('{str(o)}')"
+            ref_code = f"weave.ref('{o!s}')"
 
         if ref_code is not None:
             # This will be a quoted json string in the json.dumps result. We put special
@@ -306,7 +306,7 @@ def get_code_deps_safe(
       to be present in the loading code)
     - doesn't serialize python requirements and other necessary system information
     - type annotations are not well handled, and may cause errors
-    - refering to @weave.type() objects will cause errors
+    - referring to @weave.type() objects will cause errors
 
     Args:
         fn: The Python function to analyze.
@@ -387,7 +387,7 @@ def _get_code_deps(
             import_code.append(import_line)
         elif isinstance(var_value, (py_types.FunctionType, type)) or is_op(var_value):
             if var_value.__module__ == fn.__module__:
-                if not var_value in seen:
+                if var_value not in seen:
                     seen[var_value] = True
                     result = _get_code_deps(var_value, artifact, seen, depth + 1)
                     fn_warnings = result["warnings"]
