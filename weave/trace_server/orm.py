@@ -499,7 +499,7 @@ def clickhouse_cast(
     inner_sql: str, cast: typing.Optional[tsi_query.CastTo] = None
 ) -> str:
     """Helper function to cast a sql expression to a clickhouse type."""
-    if cast == None:
+    if cast is None:
         return inner_sql
     if cast == "int":
         return f"toInt64OrNull({inner_sql})"

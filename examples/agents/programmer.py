@@ -30,7 +30,7 @@ import os
 LENGTH_LIMIT = 1000
 
 
-@weave.op()
+@weave.op
 def list_files(directory: str) -> str:
     """List names of all files in a directory.
 
@@ -51,7 +51,7 @@ def list_files(directory: str) -> str:
         return result
 
 
-@weave.op()
+@weave.op
 def write_to_file(path: str, content: str) -> str:
     """Write text to a file at the tiven path.
 
@@ -71,7 +71,7 @@ def write_to_file(path: str, content: str) -> str:
         return "File written successfully."
 
 
-@weave.op()
+@weave.op
 def read_from_file(path: str) -> str:
     """Read text from a file at the given path.
 
@@ -92,7 +92,7 @@ def read_from_file(path: str) -> str:
         return str(e)
 
 
-@weave.op()
+@weave.op
 def run_command(command: str) -> str:
     """Run a shell command and return its output.
 
@@ -132,7 +132,7 @@ def run_command(command: str) -> str:
     return result
 
 
-@weave.op()
+@weave.op
 def run(state: AgentState):
     while True:
         state = agent.step(state)

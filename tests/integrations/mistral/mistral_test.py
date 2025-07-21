@@ -48,7 +48,7 @@ def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> Non
 
 Each of these cheeses has its unique characteristics, so the "best" one depends on your preferences. It's always fun to try several and decide which you like the most!"""
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -107,7 +107,7 @@ async def test_mistral_quickstart_async(
 Each of these cheeses offers a unique taste and texture, so the "best" one is a matter of personal preference."""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -167,7 +167,7 @@ def test_mistral_quickstart_with_stream(
 
 Each of these cheeses offers a unique taste and texture, so the "best" one depends on your personal preference. It's always fun to try a variety to see which you like best!"""
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -236,7 +236,7 @@ async def test_mistral_quickstart_with_stream_async(
 
 Each of these cheeses has its unique characteristics, so the "best" one depends on your preferences. It's always fun to try several types to discover your favorite!"""
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 

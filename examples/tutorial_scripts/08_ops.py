@@ -1,7 +1,7 @@
 import weave
 
 
-@weave.op()
+@weave.op
 def track_me(v):
     return v + 5
 

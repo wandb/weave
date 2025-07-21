@@ -40,7 +40,7 @@ def test_groq_quickstart(
         chat_completion.choices[0].message.content
         == "The capital of India is New Delhi."
     )
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -96,7 +96,7 @@ def test_groq_async_chat_completion(
 
     asyncio.run(complete_chat())
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -159,7 +159,7 @@ def test_groq_streaming_chat_completion(
         if chunk.choices[0].delta.content is not None:
             all_content += chunk.choices[0].delta.content
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -246,7 +246,7 @@ def test_groq_async_streaming_chat_completion(
 
     asyncio.run(generate_reponse())
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -293,7 +293,7 @@ def test_groq_tool_call(
 
     groq_client = Groq(api_key=os.getenv("GROQ_API_KEY", "DUMMY_API_KEY"))
 
-    @weave.op()
+    @weave.op
     def get_game_score(team_name: str) -> str:
         """Get the current score for a given NBA game"""
         if "warriors" in team_name.lower():
@@ -343,7 +343,7 @@ def test_groq_tool_call(
         else:
             return json.dumps({"team_name": team_name, "score": "unknown"})
 
-    @weave.op()
+    @weave.op
     def run_conversation(user_prompt: str) -> Union[str, None]:
         # Step 1: send the conversation and available functions to the model
         messages = [
@@ -420,7 +420,7 @@ def test_groq_tool_call(
 
     response = run_conversation("What was the score of the Warriors game?")
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 4
 
