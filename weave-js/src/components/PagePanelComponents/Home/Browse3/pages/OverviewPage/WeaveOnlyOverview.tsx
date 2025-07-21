@@ -2,6 +2,8 @@ import {ApolloProvider} from '@apollo/client';
 import {makeGorillaApolloClient} from '@wandb/weave/apollo';
 import {MOON_100} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
+import * as DropdownMenu from '@wandb/weave/components/DropdownMenu';
+import {Icon} from '@wandb/weave/components/Icon';
 import {Tailwind} from '@wandb/weave/components/Tailwind';
 import {useUsers} from '@wandb/weave/components/UserLink';
 import _ from 'lodash';
@@ -73,6 +75,7 @@ export const WeaveOnlyOverviewInner: React.FC<{
   );
 
   const [showChartsDrawer, setShowChartsDrawer] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const {data: callData, isLoading} = useChartsData({
     entity: entityName,
@@ -331,33 +334,68 @@ export const WeaveOnlyOverviewInner: React.FC<{
             display: 'flex',
             gap: 16,
           }}>
-          <Button
-            icon="add-new"
-            variant="primary"
-            size="large"
-            tooltip="Open Call Charts"
-            onClick={() => setShowChartsDrawer(true)}
-            className="no-drag rounded-full shadow-lg"
-          />
-          {!hasUserTraceCountsChart && (
+          {/* Conditional add-new button: menu if charts missing, direct action if both present */}
+          {hasUserTraceCountsChart && hasCostsBarChart ? (
+            // Both charts are present, open call charts directly
             <Button
-              icon="chart-vertical-bars"
-              variant="secondary"
+              icon="add-new"
+              variant="primary"
               size="large"
-              tooltip="Add User Trace Counts Chart"
-              onClick={addUserTraceCountsChartWidget}
-              className="no-drag shadow-lg"
+              tooltip="Open Call Charts"
+              onClick={() => setShowChartsDrawer(true)}
+              className="no-drag rounded-full shadow-lg"
             />
-          )}
-          {!hasCostsBarChart && (
-            <Button
-              icon="chart-vertical-bars"
-              variant="secondary"
-              size="large"
-              tooltip="Add Costs Bar Chart"
-              onClick={addCostsBarChartWidget}
-              className="no-drag shadow-lg"
-            />
+          ) : (
+            // At least one chart is missing, show dropdown menu
+            <DropdownMenu.Root
+              open={isDropdownOpen}
+              onOpenChange={setIsDropdownOpen}>
+              <DropdownMenu.Trigger>
+                <Button
+                  icon="add-new"
+                  variant="primary"
+                  size="large"
+                  tooltip="Add Chart"
+                  className="no-drag rounded-full shadow-lg"
+                />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  align="end"
+                  side="top"
+                  className="z-[10000000]"
+                  style={{zIndex: 10000000}}>
+                  <DropdownMenu.Item
+                    onClick={() => {
+                      setShowChartsDrawer(true);
+                      setIsDropdownOpen(false);
+                    }}>
+                    <Icon name="chart-scatterplot" />
+                    Open Call Charts
+                  </DropdownMenu.Item>
+                  {!hasUserTraceCountsChart && (
+                    <DropdownMenu.Item
+                      onClick={() => {
+                        addUserTraceCountsChartWidget();
+                        setIsDropdownOpen(false);
+                      }}>
+                      <Icon name="chart-vertical-bars" />
+                      Add User Trace Counts Chart
+                    </DropdownMenu.Item>
+                  )}
+                  {!hasCostsBarChart && (
+                    <DropdownMenu.Item
+                      onClick={() => {
+                        addCostsBarChartWidget();
+                        setIsDropdownOpen(false);
+                      }}>
+                      <Icon name="chart-vertical-bars" />
+                      Add Costs Bar Chart
+                    </DropdownMenu.Item>
+                  )}
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
           )}
         </div>
         {/* End floating action buttons */}

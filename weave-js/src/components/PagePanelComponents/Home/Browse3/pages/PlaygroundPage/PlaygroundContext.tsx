@@ -6,6 +6,7 @@ import {PlaygroundMessageRole} from './types';
 export type PlaygroundContextType = {
   isStreaming: boolean;
   isPlayground: boolean;
+  enableMarkdown?: boolean;
   addMessage: (newMessage: Message) => void;
   editMessage: (messageIndex: number, newMessage: Message) => void;
   deleteMessage: (messageIndex: number, responseIndexes?: number[]) => void;
@@ -26,6 +27,7 @@ export type PlaygroundContextType = {
 const DEFAULT_CONTEXT: PlaygroundContextType = {
   isStreaming: false,
   isPlayground: false,
+  enableMarkdown: false,
   addMessage: () => {},
   editMessage: () => {},
   deleteMessage: () => {},

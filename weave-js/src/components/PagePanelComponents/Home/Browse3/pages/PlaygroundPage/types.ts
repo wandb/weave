@@ -41,6 +41,7 @@ export type PlaygroundModelParams = {
   stopSequences: string[];
   responseFormatSchema?: Record<string, any>;
   jsonSchema?: string;
+  enableMarkdown: boolean;
 };
 
 // Define the keys from PlaygroundModelParams to iterate and compare
@@ -53,9 +54,12 @@ export const PLAYGROUND_MODEL_PARAMS_KEYS: Array<
   'frequencyPenalty',
   'presencePenalty',
   'nTimes',
+  'responseFormat',
   'functions',
   'stopSequences',
-  'responseFormat',
+  'responseFormatSchema',
+  'jsonSchema',
+  'enableMarkdown',
   'messagesTemplate',
 ];
 

@@ -33,12 +33,14 @@ interface MarkdownEditorProps {
   content: string;
   condensed?: boolean;
   onContentHeightChange?(h: number): void;
+  disableTailwindEject?: boolean;
 }
 
 const Markdown: React.FC<MarkdownEditorProps> = ({
   content,
   condensed,
   onContentHeightChange,
+  disableTailwindEject = false,
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [html, setHTML] = useState<string | vfile.VFile>(
@@ -111,7 +113,9 @@ const Markdown: React.FC<MarkdownEditorProps> = ({
       className="markdown-content"
       data-testid="markdown-container">
       <Item.Description
-        className={`tw-eject ${condensed ? '' : 'markdown'}`}
+        className={`${disableTailwindEject ? '' : 'tw-eject'} ${
+          condensed ? '' : 'markdown'
+        }`}
         dangerouslySetInnerHTML={{
           __html: html,
         }}

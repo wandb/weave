@@ -198,7 +198,7 @@ export const MessagePanel = ({
               )}
             </div>
 
-            {isOverflowing && !editorHeight && (
+            {isOverflowing && !editorHeight && !isLast && (
               <ShowMoreButton
                 isUser={isUser}
                 isSystemPrompt={isSystemPrompt}

@@ -6,9 +6,13 @@ import React, {useMemo, useState} from 'react';
 import {TargetBlank} from '../../../../../../common/util/links';
 import {Button} from '../../../../../Button';
 import {CodeEditor} from '../../../../../CodeEditor';
+import Markdown from '../../../../../../common/components/Markdown';
+import {usePlaygroundContext} from '../PlaygroundPage/PlaygroundContext';
 import {StructuredOutputsMessagePart} from './StructuredOutputsMessagePart';
 import {ToolCalls} from './ToolCalls';
 import {MessagePart, ToolCall} from './types';
+
+const MARKDOWN_COMPACT_STYLES = `markdown-compact w-[90%] [&>*]:!mb-2 [&>*]:!mt-0 [&>blockquote]:!mb-2 [&>h1]:!mb-2 [&>h2]:!mb-2 [&>h3]:!mb-2 [&>h4]:!mb-2 [&>h5]:!mb-2 [&>h6]:!mb-2 [&>hr]:!mb-2 [&>ol]:!mb-2 [&>p]:!mb-2 [&>pre]:!mb-2 [&>table]:!mb-2 [&>ul]:!mb-2 [&_li]:!mb-1 [&_li]:!mt-0 [&>*:last-child]:!mb-0`;
 
 type MessagePanelPartProps = {
   value: MessagePart;
@@ -82,6 +86,17 @@ const ThinkingPart = ({
   isLastPart,
   onToggleExpanded,
 }: ThinkingPartProps) => {
+  const playgroundContext = usePlaygroundContext();
+  const enableMarkdown = playgroundContext?.enableMarkdown ?? false;
+
+  const contentElement = enableMarkdown
+    ? (content: string) => (
+        <div className={MARKDOWN_COMPACT_STYLES}>
+          <Markdown content={content} disableTailwindEject={true} />
+        </div>
+      )
+    : (content: string) => content;
+
   return (
     <div>
       <Button
@@ -95,7 +110,7 @@ const ThinkingPart = ({
       {isExpanded && (
         <div className="mb-8 rounded bg-moon-100 p-16">
           <span className="whitespace-break-spaces italic text-moon-600">
-            {content.trim()}
+            {contentElement(content.trim())}
           </span>
           <CursorAnimated show={showCursor && isLastPart} />
         </div>
@@ -111,9 +126,22 @@ type TextPartProps = {
 };
 
 const TextPart = ({content, showCursor, isLastPart}: TextPartProps) => {
+  const playgroundContext = usePlaygroundContext();
+  const enableMarkdown = playgroundContext?.enableMarkdown ?? false;
+
+  const contentElement = enableMarkdown
+    ? (content: string) => (
+        <div className={MARKDOWN_COMPACT_STYLES}>
+          <Markdown content={content} disableTailwindEject={true} />
+        </div>
+      )
+    : (content: string) => content;
+
   return (
     <span className="whitespace-break-spaces">
-      {!showCursor && isLastPart ? content.trim() : content}
+      {!showCursor && isLastPart
+        ? contentElement(content)
+        : contentElement(content)}
       <CursorAnimated show={showCursor && isLastPart} />
     </span>
   );
@@ -128,6 +156,9 @@ export const MessagePanelPart = ({
   const [expandedThinking, setExpandedThinking] = useState<{
     [key: number]: boolean;
   }>({});
+
+  const playgroundContext = usePlaygroundContext();
+  const enableMarkdown = playgroundContext?.enableMarkdown ?? false;
 
   const parts = useMemo(() => {
     // Only parse thinking blocks for assistant messages, not user messages
@@ -148,11 +179,7 @@ export const MessagePanelPart = ({
         // This happens when streaming the object, and the current chunk is not valid JSON.
       } catch (error) {}
     }
-    // Markdown is slowing down chat view, disable for now
-    // Bring back if we can find a faster way to render markdown
-    // if (isLikelyMarkdown(value)) {
-    //   return <Markdown content={value} />;
-    // }
+
     const lastPartIndex = parts.length - 1;
 
     return (
@@ -191,7 +218,17 @@ export const MessagePanelPart = ({
     );
   }
   if (value.type === 'text' && 'text' in value) {
-    return <div className="whitespace-break-spaces">{value.text}</div>;
+    return (
+      <div className="whitespace-break-spaces">
+        {enableMarkdown ? (
+          <div className={MARKDOWN_COMPACT_STYLES}>
+            <Markdown content={value.text || ''} disableTailwindEject={true} />
+          </div>
+        ) : (
+          value.text
+        )}
+      </div>
+    );
   }
   if (value.type === 'image_url' && 'image_url' in value && value.image_url) {
     const {url} = value.image_url;
