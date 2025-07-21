@@ -14,11 +14,13 @@ from utils import (
     get_mime_and_extension,
     default_filename,
     is_valid_path,
+    is_valid_b64
 )
 from content_types import (
     ContentType,
     MetadataType,
     ResolvedContentArgs,
+    ValidContentInputs
 )
 
 logger = logging.getLogger(__name__)
@@ -70,7 +72,7 @@ class Content(BaseContentHandler):
 
         mimetype, extension = get_mime_and_extension(
             mimetype=mimetype,
-            extension=path_obj.suffix.lstrip('.'),
+            extension=path_obj.suffix,
             filename=file_name,
             buffer=data
         )
@@ -111,7 +113,7 @@ class Content(BaseContentHandler):
             filename=None,
             buffer=data
         )
-        filename = default_filename(extension or "")
+        filename = default_filename(extension=extension, mimetype=mimetype, digest=digest)
 
         resolved_args: ResolvedContentArgs = {
             "id": uuid.uuid4().hex,
@@ -150,7 +152,7 @@ class Content(BaseContentHandler):
             filename=None,
             buffer=data
         )
-        filename = default_filename(extension or "")
+        filename = default_filename(extension=extension, mimetype=mimetype, digest=digest)
 
         resolved_args: ResolvedContentArgs = {
             "id": uuid.uuid4().hex,
@@ -195,7 +197,7 @@ class Content(BaseContentHandler):
             filename=None,
             buffer=data
         )
-        filename = default_filename(extension or "")
+        filename = default_filename(extension=extension, mimetype=mimetype, digest=digest)
 
         resolved_args: ResolvedContentArgs = {
             "id": uuid.uuid4().hex,
@@ -226,6 +228,30 @@ class Content(BaseContentHandler):
         """Initializes Content from a local file path."""
         # This classmethod delegates to the main constructor
         return cls(path, encoding=encoding, mimetype=mimetype, metadata=metadata)
+
+    @classmethod
+    def _from_guess(
+        cls: Type["Content"],
+        input: ValidContentInputs,
+        /,
+        extension: str | None = None,
+        mimetype: str | None = None
+    ) -> Content:
+
+        # First check if it is a path
+        if isinstance(input, Path) or (isinstance(input, str) and is_valid_path(input)):
+            return cls.from_path(input, mimetype=mimetype)
+
+        # Then check if it is base64
+        elif (isinstance(input, bytes) or isinstance(input, str)) and is_valid_b64(input):
+            return cls.from_base64(input, mimetype=mimetype, extension=extension)
+
+        # If it is still a str - treat as raw text
+        elif isinstance(input, str):
+            return cls.from_text(input, mimetype=mimetype, extension=extension)
+
+        return cls.from_bytes(input, mimetype=mimetype, extension=extension)
+
 
     @classmethod
     def _from_resolved_args(cls: Type["Content"], /, args: ResolvedContentArgs) -> Content:
