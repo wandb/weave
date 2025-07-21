@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import re
+import logging
 from inspect import Signature
 
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 CONTENT_CLASS_NAME = "weave.type_wrappers.Content.content.Content"
 
@@ -44,15 +47,18 @@ PATTERN_WITHOUT_TYPE_HINT = re.compile(
     r"\]"  # Closing bracket for Annotated[...]
 )
 
-
 class ContentAnnotation(BaseModel):
     base_type: str
-    media_class: str
+    content_class: str
     raw_annotation: str
-    type_hint: str | None = None
 
+class ContentAnnotationWithExtention(ContentAnnotation):
+    extension: str
 
-def parse_data_annotation(annotation_string: str) -> ContentAnnotation | None:
+class ContentAnnotationWithMimetype(ContentAnnotation):
+    mimetype: str
+
+def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation | None:
     """
     The function expects the string to be of the form:
     typing.Annotated[<SomeType>, weave.type_wrappers.Content.content.Content[typing.Literal[<format>]]]
@@ -72,15 +78,29 @@ def parse_data_annotation(annotation_string: str) -> ContentAnnotation | None:
 
     base_type = match_with_format.group(1).strip()
     type_hint = match_with_format.group(2)
-    return ContentAnnotation(
+
+
+    if type_hint.find('/') > -1:
+        # We know it's a Mimetype if there's a '/'
+        return ContentAnnotationWithMimetype(
+            base_type=base_type,
+            content_class=CONTENT_CLASS_NAME,
+            mimetype=type_hint,
+            raw_annotation=annotation_string,
+        )
+
+    # Pad if there's not a leading period
+    elif type_hint.find('.') != 0:
+        type_hint = f".{type_hint}"
+
+    return ContentAnnotationWithExtention(
         base_type=base_type,
-        media_class=CONTENT_CLASS_NAME,
-        type_hint=type_hint,
+        content_class=CONTENT_CLASS_NAME,
+        extension=type_hint,
         raw_annotation=annotation_string,
     )
 
-
-def parse_file_annotation(annotation_string: str) -> ContentAnnotation | None:
+def try_parse_annotation_without_hint(annotation_string: str) -> ContentAnnotation | None:
     """
     The function expects the string to be of the form:
     typing.Annotated[<SomeType>, <class 'weave.type_handlers.Content.content.Content'>]
@@ -91,7 +111,7 @@ def parse_file_annotation(annotation_string: str) -> ContentAnnotation | None:
         annotation_string: The string representation of the type annotation.
 
     Returns:
-        ContentFileAnnotation | None: An instance of ContentFileAnnotation if the parsing is successful,
+        ContentAnnotation | None: An instance of ContentAnnotation if the parsing is successful,
     """
     match_without_format = PATTERN_WITHOUT_TYPE_HINT.fullmatch(annotation_string)
 
@@ -100,7 +120,7 @@ def parse_file_annotation(annotation_string: str) -> ContentAnnotation | None:
 
     return ContentAnnotation(
         base_type=match_without_format.group(1).strip(),
-        media_class=CONTENT_CLASS_NAME,
+        content_class=CONTENT_CLASS_NAME,
         raw_annotation=annotation_string,
     )
 
@@ -122,15 +142,10 @@ def parse_content_annotation(
         annotation_string: The string representation of the type annotation.
 
     Returns:
-        A dictionary containing:
-        - "base_type": The underlying type being annotated (e.g., "SomeType", "str", "typing.Union[str, bytes]").
-        - "content_class": The name of the content handler class.
-        - "content_format": The content extension or mimetype (e.g. "mp3", "audio/mpeg") if specified, otherwise None.
-        - "raw_annotation": The original input string.
-        If parsing fails, it returns a dictionary with an "error" key and "raw_annotation".
+        ContentAnnotation | ContentAnnotationWithExtention | ContentAnnotationWithMimetype | None
     """
     # Try matching the pattern with format first (it's more specific)
-    return parse_data_annotation(annotation_string) or parse_file_annotation(
+    return try_parse_annotation_with_hint(annotation_string) or try_parse_annotation_without_hint(
         annotation_string
     )
 
