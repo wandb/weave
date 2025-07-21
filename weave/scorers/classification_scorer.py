@@ -49,7 +49,7 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
 
     class_names: list[str]
 
-    @weave.op()
+    @weave.op
     def summarize(self, score_rows: list) -> Optional[dict]:
         """
         Aggregate scoring results and compute precision, recall, and F1 score for each class.
@@ -78,7 +78,7 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
     # NOTE: This is an old-style scorer that uses `model_output` instead of `output` for
     # backwards compatibility.  In the future, this behavior may change to use the newer `output` key.
     # You can still pass a `column_map` to map to the new `output` key if preferred.
-    @weave.op()
+    @weave.op
     def score(
         self, *, target: dict, model_output: Optional[dict], **kwargs: Any
     ) -> dict:

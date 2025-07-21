@@ -445,7 +445,7 @@ def _get_direct_ref(obj: Any) -> Ref | None:
 
 def _remove_empty_ref(obj: ObjectRecord) -> ObjectRecord:
     if hasattr(obj, "ref"):
-        if obj.ref != None:
+        if obj.ref is not None:
             raise ValueError(f"Unexpected ref in object record: {obj}")
         else:
             del obj.__dict__["ref"]
@@ -972,7 +972,7 @@ class WeaveClient:
         # the underlying implementation of the specific server to get the call processor.
         # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
         # some client-side flushing mechanics. We should move this to the interface layer. However,
-        # we don't really want the server-side implementaitons to need to define no-ops as that is
+        # we don't really want the server-side implementations to need to define no-ops as that is
         # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
         # to define no-ops.
         if hasattr(self.server, "get_call_processor"):
@@ -996,7 +996,7 @@ class WeaveClient:
         # Adding a second comment line for developers that is not a docstring:
         # Save an object to the weave server and return a deserialized version of it.
 
-        # Note: This is sort of a weird method becuase:
+        # Note: This is sort of a weird method because:
         # 1. It returns a deserialized version of the object (which will often not pass type-checks)
         # 2. It is slow (because it re-downloads the object from the weave server)
         # 3. It explicitly filters out non ObjectRefs, which seems like a useless constraint.
@@ -1107,7 +1107,7 @@ class WeaveClient:
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
-            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are ANDed.
+            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
@@ -1326,8 +1326,8 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
-        _should_print_call_link = should_print_call_link()
-        _current_call = call_context.get_current_call()
+        should_print_call_link_ = should_print_call_link()
+        current_call = call_context.get_current_call()
 
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
@@ -1369,8 +1369,8 @@ class WeaveClient:
 
         def on_complete(f: Future) -> None:
             try:
-                root_call_did_not_error = f.result() and not _current_call
-                if root_call_did_not_error and _should_print_call_link:
+                root_call_did_not_error = f.result() and not current_call
+                if root_call_did_not_error and should_print_call_link_:
                     print_call_link(call)
             except Exception:
                 pass

@@ -39,6 +39,7 @@ export interface LLMOption {
   catalogId?: string; // Model Catalog ID
   label: string;
   subLabel?: string | React.ReactNode;
+  isNew?: boolean;
   value: LLMMaxTokensKey | string;
   max_tokens: number;
 
@@ -215,10 +216,13 @@ const SubMenu = ({
                   },
                 },
               }}>
-              <Box sx={{flex: 1}}>
+              <Box sx={{flex: 1, display: 'flex', alignItems: 'center'}}>
                 {llm.label}
                 {llm.subLabel && (
                   <div className="text-sm text-moon-500">{llm.subLabel}</div>
+                )}
+                {llm.isNew && (
+                  <Pill className="ml-8" label="New" color="teal" />
                 )}
               </Box>
               {catalogModel && onViewCatalog && (
@@ -643,6 +647,7 @@ export const useLLMDropdownOptions = (
             value: `coreweave/${model.idPlayground}`, // What gets sent to completion endpoint
             label: model.label ?? model.id, // What gets shown as selected
             max_tokens: 1000, // TODO: Get max tokens from model info
+            isNew: model.isNew,
           }))
         );
       } else {

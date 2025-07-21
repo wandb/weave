@@ -13,7 +13,7 @@ Agent documents its learnings in a file call "journal.txt".
 LENGTH_LIMIT = 1000
 
 
-@weave.op()
+@weave.op
 def run_command(command: str) -> str:
     """Run a shell command and return its output.
 

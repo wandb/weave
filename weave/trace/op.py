@@ -86,7 +86,7 @@ if sys.version_info < (3, 10):
     def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
         return obj.__aiter__()
 
-    async def anext(obj: AsyncIterator[V], default: Optional[V] = None) -> V:  # noqa: UP007,UP045
+    async def anext(obj: AsyncIterator[V], default: Optional[V] = None) -> V:  # noqa: UP045
         try:
             return await obj.__anext__()
         except StopAsyncIteration:
