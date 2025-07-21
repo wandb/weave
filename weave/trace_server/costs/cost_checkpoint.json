@@ -8176,5 +8176,141 @@
       "output": 0.0,
       "created_at": "2025-07-07 12:22:29"
     }
+  ],
+  "azure/o3-deep-research": [
+    {
+      "provider": "azure",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "mistral/devstral-small-2507": [
+    {
+      "provider": "mistral",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "mistral/devstral-medium-2507": [
+    {
+      "provider": "mistral",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "xai/grok-4": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "xai/grok-4-0709": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "xai/grok-4-latest": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "groq/moonshotai-kimi-k2-instruct": [
+    {
+      "provider": "groq",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "jamba-large-1.7": [
+    {
+      "provider": "ai21",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "jamba-mini-1.7": [
+    {
+      "provider": "ai21",
+      "input": 2e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "eu.mistral.pixtral-large-2502-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "us.mistral.pixtral-large-2502-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "together_ai/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8": [
+    {
+      "provider": "together_ai",
+      "input": 2.7e-07,
+      "output": 8.5e-07,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "together_ai/meta-llama/Llama-4-Scout-17B-16E-Instruct": [
+    {
+      "provider": "together_ai",
+      "input": 1.8e-07,
+      "output": 5.9e-07,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "together_ai/deepseek-ai/DeepSeek-V3": [
+    {
+      "provider": "together_ai",
+      "input": 1.25e-06,
+      "output": 1.25e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "together_ai/deepseek-ai/DeepSeek-R1": [
+    {
+      "provider": "together_ai",
+      "input": 3e-06,
+      "output": 7e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "together_ai/moonshotai/Kimi-K2-Instruct": [
+    {
+      "provider": "together_ai",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "moonshot/kimi-k2-0711-preview": [
+    {
+      "provider": "moonshot",
+      "input": 6e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
   ]
 }

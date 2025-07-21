@@ -30,7 +30,7 @@ For the other key mappings, a dict is dumped with each of the top level keys in 
 The inner list of those key represents the attributes which are checked similarly to
 how INPUT_KEYS and OUTPUT_KEYS are checked, where the first one found is used.
 
-If we recieved attributes where:
+If we received attributes where:
 gen_ai.usage.prompt_tokens: 30
 gen_ai.usage.completion_tokens: 40
 gen_ai.usage.llm.usage.total_tokens: 70

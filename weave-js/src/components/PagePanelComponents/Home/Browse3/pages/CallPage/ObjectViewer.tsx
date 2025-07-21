@@ -165,6 +165,9 @@ export const ObjectViewer = ({
   // `resolvedData`.
   useEffect(() => {
     if (refsData.loading) {
+      // Still update resolvedData with fresh truncated data while loading
+      const {result: freshTruncatedData} = traverseAndTruncate(data);
+      setResolvedData(freshTruncatedData);
       return;
     }
     const resolvedRefData = refsData.result;

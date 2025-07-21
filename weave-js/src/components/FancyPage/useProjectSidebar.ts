@@ -209,6 +209,13 @@ export const useProjectSidebar = (
           },
           {
             type: 'button' as const,
+            name: 'Threads',
+            slug: 'weave/threads',
+            isShown: (showWeaveSidebarItems || isShowAll) && isWandbAdmin,
+            iconName: IconNames.ForumChatBubble,
+          },
+          {
+            type: 'button' as const,
             name: 'Mods',
             slug: 'weave/mods',
             isShown: false, // Only shown in overflow menu

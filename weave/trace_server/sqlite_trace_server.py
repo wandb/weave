@@ -30,6 +30,7 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import Row, quote_json_path
@@ -1537,9 +1538,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
-        raise NotImplementedError(
-            "evaluation_status is not implemented for SQLite trace server"
-        )
+        return evaluation_status(self, req)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1649,7 +1648,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
 
 def get_type(val: Any) -> str:
-    if val == None:
+    if val is None:
         return "none"
     elif isinstance(val, dict):
         if "_type" in val:
