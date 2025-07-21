@@ -830,6 +830,10 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
 async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
 
+    import nltk
+
+    nltk.download("stopwords", quiet=True)
+
     documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
     parser = SentenceSplitter()
     nodes = parser.get_nodes_from_documents(documents)
