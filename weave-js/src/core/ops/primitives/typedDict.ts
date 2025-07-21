@@ -118,6 +118,74 @@ export const opDictPick = makeObjectOp({
   hidden: true,
 });
 
+const opArtifactMetadataPickArgs: Parameters<typeof makeObjectOp>['0'] = {
+  name: 'artifactMetadata-pick',
+  hidden: true,
+  argTypes: objectArgTypes,
+  renderInfo: {type: 'brackets'},
+  returnType: (inputTypes, inputs) => {
+    const {obj: objType} = inputTypes;
+    const {key} = inputs;
+
+    if (key.nodeType !== 'const') {
+      // Should probably use unknown for cases like this.
+      if (isDict(objType)) {
+        return maybe(
+          (objType as any) /* weird because we already think its a typedDict*/
+            .objectType
+        );
+      } else if (isTypedDictLike(objType)) {
+        return maybe(
+          union(Object.values(typedDictPropertyTypes(objType)).filter(notEmpty))
+        );
+      }
+      throw new Error('opMetadataPickArgs: expected dict-like object');
+    }
+
+    // TODO(sl): Hacky way to handle when key is a union>..
+    // Disallowed per input types but this is to support the equivalent of a keyof op
+    // against a typedDict.
+    if (isUnion(key.type)) {
+      const keys = [];
+      for (const mem of key.type.members) {
+        if (isSimpleTypeShape(mem) || mem.type !== 'const') {
+          throw new Error(
+            'cannot handle non-const members of union type for key arg'
+          );
+        }
+        keys.push(mem.val);
+      }
+      if (!isTypedDictLike(objType)) {
+        throw new Error('cannot calculate keyof type for non-typedDict');
+      }
+      const propertyTypes = typedDictPropertyTypes(objType);
+      const valTypes = keys.map(k => propertyTypes[k] ?? 'none');
+      return union(valTypes);
+    }
+    const keyValue = key.val;
+
+    return typedDictPathType(objType, [keyValue]);
+  },
+  description: `Selects a value from a ${docType('typedDict')} by key`,
+  argDescriptions: {
+    obj: `The input ${docType('typedDict')}`,
+    key: `The key for the value to select`,
+  },
+  returnValueDescription: `Value at the given key`,
+  resolverIsSync: true,
+  resolver: inputs => {
+    if (inputs.key == null) {
+      // This shouldn't happen because we're a standardOp, but we have an
+      // incorrect type here.
+      return null;
+    }
+    return typedDictPathVal(inputs.obj, [inputs.key]);
+  },
+};
+export const opArtifactMetadataPick = makeObjectOp(
+  opArtifactMetadataPickArgs
+);
+
 export const opValues = makeOp({
   hidden: true,
   name: 'typedDict-values',
