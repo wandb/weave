@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
@@ -10,16 +11,6 @@ from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallba
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.trace_server_bindings.http_utils import (
-    handle_response_error,
-    log_dropped_call_batch,
-)
-from weave.trace_server_bindings.models import (
-    Batch,
-    EndBatchItem,
-    ServerInfoRes,
-    StartBatchItem,
-)
 from weave.utils.retry import _is_retryable_exception, get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 
@@ -31,9 +22,50 @@ logger = logging.getLogger(__name__)
 # DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
+class StartBatchItem(BaseModel):
+    mode: str = "start"
+    req: tsi.CallStartReq
+
+
+class EndBatchItem(BaseModel):
+    mode: str = "end"
+    req: tsi.CallEndReq
+
+
+class Batch(BaseModel):
+    batch: list[Union[StartBatchItem, EndBatchItem]]
+
+
+class ServerInfoRes(BaseModel):
+    min_required_weave_python_version: str
+
+
 REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
+
+
+def _log_dropped_call_batch(
+    batch: list[Union[StartBatchItem, EndBatchItem]], e: Exception
+) -> None:
+    logger.error(f"Error sending batch of {len(batch)} call events to server")
+    dropped_start_ids = []
+    dropped_end_ids = []
+    for item in batch:
+        if isinstance(item, StartBatchItem):
+            dropped_start_ids.append(item.req.start.id)
+        elif isinstance(item, EndBatchItem):
+            dropped_end_ids.append(item.req.end.id)
+    if dropped_start_ids:
+        logger.error(f"dropped call start ids: {dropped_start_ids}")
+    if dropped_end_ids:
+        logger.error(f"dropped call end ids: {dropped_end_ids}")
+    if isinstance(e, requests.HTTPError) and e.response is not None:
+        logger.error(f"status code: {e.response.status_code}")
+        logger.error(f"reason: {e.response.reason}")
+        logger.error(f"text: {e.response.text}")
+    else:
+        logger.error(f"error: {e}")
 
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
@@ -119,7 +151,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/call/upsert_batch",
             data=encoded_data,  # type: ignore
         )
-        handle_response_error(r, "/call/upsert_batch")
+        if r.status_code == 413:
+            # handle 413 explicitly to provide actionable error message
+            reason = json.loads(r.text)["reason"]
+            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
+        r.raise_for_status()
 
     def _flush_calls(
         self,
@@ -168,7 +204,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._send_batch_to_server(encoded_data)
         except Exception as e:
             if not _is_retryable_exception(e):
-                log_dropped_call_batch(batch, e)
+                _log_dropped_call_batch(batch, e)
             else:
                 # Add items back to the queue for later processing, but only if the processor is still accepting work
                 logger.warning(
@@ -216,7 +252,17 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
             stream=stream,
         )
-        handle_response_error(r, url)
+        if r.status_code == 500:
+            reason_val = r.text
+            try:
+                reason_val = json.dumps(json.loads(reason_val), indent=2)
+            except json.JSONDecodeError:
+                reason_val = f"Reason: {reason_val}"
+            raise requests.HTTPError(
+                f"500 Server Error: Internal Server Error for url: {url}. {reason_val}",
+                response=r,
+            )
+        r.raise_for_status()
 
         return r
 
@@ -251,7 +297,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r = self.get(
             "/server_info",
         )
-        handle_response_error(r, "/server_info")
+        r.raise_for_status()
         return ServerInfoRes.model_validate(r.json())
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
@@ -497,7 +543,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             data={"project_id": req.project_id},
             files={"file": (req.name, req.content)},
         )
-        handle_response_error(r, "/files/create")
+        r.raise_for_status()
         return tsi.FileCreateRes.model_validate(r.json())
 
     @with_retry
@@ -506,7 +552,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},
         )
-        handle_response_error(r, "/files/content")
+        r.raise_for_status()
         # TODO: Should stream to disk rather than to memory
         bytes = io.BytesIO()
         bytes.writelines(r.iter_content())
@@ -619,4 +665,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
 __docspec__ = [
     RemoteHTTPTraceServer,
+    ServerInfoRes,
+    StartBatchItem,
+    EndBatchItem,
+    Batch,
 ]
