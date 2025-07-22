@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Annotated, Any, Generic, Literal, TypedDict, Union
 
 from pydantic import BaseModel, Field
-from typing_extensions import TypeVar, Self
+from typing_extensions import Self, TypeVar
 
 from .utils import default_filename, get_mime_and_extension, is_valid_b64, is_valid_path
 
@@ -48,6 +48,7 @@ class ResolvedContentArgsWithoutData(TypedDict):
 class ResolvedContentArgs(ResolvedContentArgsWithoutData):
     # Required Fields
     data: bytes
+
 
 class Content(BaseModel, Generic[T]):
     """
@@ -308,7 +309,7 @@ class Content(BaseModel, Generic[T]):
             else:  # linux variants
                 subprocess.call(("xdg-open", str(path)))
         except Exception as e:
-            logger.exception(f"Failed to open file {path}: {e}")
+            logger.exception("Failed to open file %s", self.path)
             return False
         return True
 
