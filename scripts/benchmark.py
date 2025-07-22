@@ -58,7 +58,7 @@ def find_benchmarks(benchmarks_dir: Path) -> list[Path]:
 
 def get_benchmark_description(benchmark_path: Path) -> str:
     """
-    Extract a description from the benchmark file's docstring or comments.
+    Extract a description from the benchmark file's header docstring.
 
     Args:
         benchmark_path (Path): Path to the benchmark file.
@@ -68,51 +68,23 @@ def get_benchmark_description(benchmark_path: Path) -> str:
     """
     try:
         with open(benchmark_path) as f:
-            lines = f.readlines()
+            content = f.read()
 
-        # Look for docstring or comments at the top
-        description_lines = []
-        in_docstring = False
-
-        for line in lines[:20]:  # Only check first 20 lines
-            line = line.strip()
-
-            # Check for triple quotes docstring
-            if '"""' in line and not in_docstring:
-                in_docstring = True
-                content = (
-                    line.split('"""')[1]
-                    if line.count('"""') == 1
-                    else line.split('"""')[1]
-                )
-                if content:
-                    description_lines.append(content)
-                if line.count('"""') == 2:
-                    break
-                continue
-            elif '"""' in line and in_docstring:
-                content = line.split('"""')[0]
-                if content:
-                    description_lines.append(content)
-                break
-            elif in_docstring:
-                description_lines.append(line)
-
-            # Check for comments starting with #
-            elif (
-                line.startswith("#")
-                and not line.startswith("#!/")
-                and not line.startswith("# ///")
-            ):
-                description_lines.append(line[1:].strip())
-
-        if description_lines:
-            return " ".join(description_lines).strip()
-        else:
-            return "No description available"
+        # Look for the very first docstring at the top of the file
+        # This should be the main description of what the benchmark does
+        if content.startswith('"""'):
+            # Find the closing triple quotes
+            end_pos = content.find('"""', 3)
+            if end_pos != -1:
+                description = content[3:end_pos].strip()
+                # Clean up the description - remove extra whitespace and newlines
+                description = " ".join(description.split())
+                return description if description else "No description available"
 
     except Exception:
         return "Error reading description"
+    else:
+        return "No description available"
 
 
 def display_benchmarks_table(benchmarks: list[Path]) -> None:

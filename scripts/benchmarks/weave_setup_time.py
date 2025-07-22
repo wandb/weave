@@ -1,3 +1,5 @@
+"""Benchmark Weave import and initialization time."""
+
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [

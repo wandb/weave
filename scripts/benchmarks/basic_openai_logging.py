@@ -1,3 +1,5 @@
+"""Benchmark Weave overhead on OpenAI API calls."""
+
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
