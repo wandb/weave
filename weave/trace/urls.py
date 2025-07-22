@@ -1,6 +1,6 @@
 from urllib.parse import quote
 
-import weave.wandb_thin as wandb
+from weave.compat import wandb
 from weave.trace import env
 
 BROWSE3_PATH = "browse3"
