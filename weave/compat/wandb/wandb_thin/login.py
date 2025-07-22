@@ -5,8 +5,8 @@ from typing import Literal
 
 import click
 
+from weave.compat.wandb.util.netrc import Netrc
 from weave.compat.wandb.wandb_thin import util
-from weave.utils.netrc import Netrc
 
 logger = logging.getLogger(__name__)
 
