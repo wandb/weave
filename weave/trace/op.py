@@ -40,8 +40,6 @@ from typing_extensions import ParamSpec
 from weave.trace import box, settings
 from weave.trace.annotation_parser import (
     ContentAnnotation,
-    ContentAnnotationWithExtention,
-    ContentAnnotationWithMimetype,
     parse_content_annotation,
     parse_from_signature,
 )
@@ -309,12 +307,8 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
             if not parsed:
                 to_weave_inputs[param_name] = value
                 continue
-            elif isinstance(parsed, ContentAnnotationWithMimetype):
-                to_weave_inputs[param_name] = Content._from_guess(value, mimetype=parsed.mimetype)
-            elif isinstance(parsed, ContentAnnotationWithExtention):
-                to_weave_inputs[param_name] = Content._from_guess(value, extension=parsed.extension)
             elif isinstance(parsed, ContentAnnotation):
-                to_weave_inputs[param_name] = Content._from_guess(value)
+                to_weave_inputs[param_name] = Content._from_guess(value, mimetype=parsed.mimetype, extension=parsed.extension)
     else:
         to_weave_inputs = inputs_with_defaults
 
@@ -323,7 +317,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     if not func.postprocess_output and sig.return_annotation:
         parsed = parse_content_annotation(str(sig.return_annotation))
         if isinstance(parsed, ContentAnnotation):
-            func.postprocess_output = lambda x: Content(x, parsed.type_hint)
+            func.postprocess_output = lambda x: Content._from_guess(x, mimetype=parsed.mimetype, extension=parsed.extension)
 
     return ProcessedInputs(
         original_args=args,
